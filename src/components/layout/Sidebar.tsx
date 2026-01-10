@@ -5,10 +5,12 @@ import {
   Users, 
   Settings,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Workflow
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { useNavigate } from 'react-router-dom';
 
 interface SidebarProps {
   activeView: string;
@@ -16,15 +18,17 @@ interface SidebarProps {
 }
 
 const menuItems = [
-  { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
-  { id: 'tasks', label: 'Tâches', icon: CheckSquare },
-  { id: 'analytics', label: 'Analytiques', icon: BarChart3 },
-  { id: 'team', label: 'Équipe', icon: Users },
-  { id: 'settings', label: 'Paramètres', icon: Settings },
+  { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard, path: '/' },
+  { id: 'tasks', label: 'Tâches', icon: CheckSquare, path: '/' },
+  { id: 'templates', label: 'Modèles', icon: Workflow, path: '/templates' },
+  { id: 'analytics', label: 'Analytiques', icon: BarChart3, path: '/' },
+  { id: 'team', label: 'Équipe', icon: Users, path: '/' },
+  { id: 'settings', label: 'Paramètres', icon: Settings, path: '/' },
 ];
 
 export function Sidebar({ activeView, onViewChange }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const navigate = useNavigate();
 
   return (
     <aside 
@@ -64,7 +68,10 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
           return (
             <button
               key={item.id}
-              onClick={() => onViewChange(item.id)}
+              onClick={() => {
+                onViewChange(item.id);
+                navigate(item.path);
+              }}
               className={cn(
                 "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200",
                 isActive 
