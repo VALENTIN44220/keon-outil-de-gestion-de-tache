@@ -64,3 +64,28 @@ export interface UserRole {
   role: AppRole;
   created_at: string;
 }
+
+export interface UserProfile {
+  id: string;
+  user_id: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  company_id: string | null;
+  department_id: string | null;
+  job_title_id: string | null;
+  hierarchy_level_id: string | null;
+  permission_profile_id: string | null;
+  manager_id: string | null;
+  must_change_password: boolean;
+  is_private: boolean;
+  created_at: string;
+  updated_at: string;
+  // Joined data
+  company?: Company;
+  department?: Department;
+  job_title?: JobTitle;
+  hierarchy_level?: HierarchyLevel;
+  permission_profile?: PermissionProfile;
+  manager?: UserProfile;
+  subordinates?: UserProfile[];
+}
