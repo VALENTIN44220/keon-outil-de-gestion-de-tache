@@ -1,4 +1,4 @@
-import { Search, Bell, Plus, LogOut, User } from 'lucide-react';
+import { Search, Plus, LogOut, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,15 +11,30 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { TaskNotification } from '@/hooks/useNotifications';
 
 interface HeaderProps {
   title: string;
   searchQuery: string;
   onSearchChange: (query: string) => void;
   onAddTask: () => void;
+  notifications?: TaskNotification[];
+  unreadCount?: number;
+  hasUrgent?: boolean;
+  onNotificationClick?: (taskId: string) => void;
 }
 
-export function Header({ title, searchQuery, onSearchChange, onAddTask }: HeaderProps) {
+export function Header({
+  title,
+  searchQuery,
+  onSearchChange,
+  onAddTask,
+  notifications = [],
+  unreadCount = 0,
+  hasUrgent = false,
+  onNotificationClick,
+}: HeaderProps) {
   const { user, profile, signOut } = useAuth();
   const navigate = useNavigate();
 
@@ -60,10 +75,12 @@ export function Header({ title, searchQuery, onSearchChange, onAddTask }: Header
           </div>
 
           {/* Notifications */}
-          <Button variant="ghost" size="icon" className="relative">
-            <Bell className="w-5 h-5" />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full" />
-          </Button>
+          <NotificationBell
+            notifications={notifications}
+            unreadCount={unreadCount}
+            hasUrgent={hasUrgent}
+            onNotificationClick={onNotificationClick}
+          />
 
           {/* Add Task */}
           <Button onClick={onAddTask} className="gap-2">
