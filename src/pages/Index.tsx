@@ -1,12 +1,120 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState } from 'react';
+import { Sidebar } from '@/components/layout/Sidebar';
+import { Header } from '@/components/layout/Header';
+import { Dashboard } from '@/components/dashboard/Dashboard';
+import { TaskList } from '@/components/tasks/TaskList';
+import { TaskFilters } from '@/components/tasks/TaskFilters';
+import { AddTaskDialog } from '@/components/tasks/AddTaskDialog';
+import { useTasks } from '@/hooks/useTasks';
 
 const Index = () => {
+  const [activeView, setActiveView] = useState('dashboard');
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  
+  const {
+    tasks,
+    allTasks,
+    stats,
+    statusFilter,
+    setStatusFilter,
+    priorityFilter,
+    setPriorityFilter,
+    searchQuery,
+    setSearchQuery,
+    updateTaskStatus,
+    addTask,
+    deleteTask,
+  } = useTasks();
+
+  const getTitle = () => {
+    switch (activeView) {
+      case 'dashboard':
+        return 'Tableau de bord';
+      case 'tasks':
+        return 'Gestion des tâches';
+      case 'analytics':
+        return 'Analytiques';
+      case 'team':
+        return 'Équipe';
+      case 'settings':
+        return 'Paramètres';
+      default:
+        return 'TaskFlow';
+    }
+  };
+
+  const renderContent = () => {
+    switch (activeView) {
+      case 'dashboard':
+        return (
+          <Dashboard 
+            stats={stats} 
+            recentTasks={allTasks.slice(0, 6)}
+            onStatusChange={updateTaskStatus}
+            onDelete={deleteTask}
+          />
+        );
+      case 'tasks':
+        return (
+          <>
+            <TaskFilters
+              statusFilter={statusFilter}
+              priorityFilter={priorityFilter}
+              onStatusChange={setStatusFilter}
+              onPriorityChange={setPriorityFilter}
+            />
+            <TaskList 
+              tasks={tasks} 
+              onStatusChange={updateTaskStatus}
+              onDelete={deleteTask}
+            />
+          </>
+        );
+      case 'analytics':
+        return (
+          <div className="flex items-center justify-center h-64 bg-card rounded-xl shadow-card">
+            <p className="text-muted-foreground">Module analytiques à venir...</p>
+          </div>
+        );
+      case 'team':
+        return (
+          <div className="flex items-center justify-center h-64 bg-card rounded-xl shadow-card">
+            <p className="text-muted-foreground">Module équipe à venir...</p>
+          </div>
+        );
+      case 'settings':
+        return (
+          <div className="flex items-center justify-center h-64 bg-card rounded-xl shadow-card">
+            <p className="text-muted-foreground">Paramètres à venir...</p>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
+    <div className="flex h-screen bg-background">
+      <Sidebar activeView={activeView} onViewChange={setActiveView} />
+      
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <Header 
+          title={getTitle()}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          onAddTask={() => setIsAddDialogOpen(true)}
+        />
+        
+        <main className="flex-1 overflow-y-auto p-6">
+          {renderContent()}
+        </main>
       </div>
+
+      <AddTaskDialog
+        open={isAddDialogOpen}
+        onClose={() => setIsAddDialogOpen(false)}
+        onAdd={addTask}
+      />
     </div>
   );
 };
