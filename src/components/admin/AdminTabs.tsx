@@ -1,11 +1,12 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building2, Briefcase, Users, Layers, Shield } from 'lucide-react';
+import { Building2, Briefcase, Users, Layers, Shield, UserCog } from 'lucide-react';
 import { CompaniesTab } from './CompaniesTab';
 import { DepartmentsTab } from './DepartmentsTab';
 import { JobTitlesTab } from './JobTitlesTab';
 import { HierarchyLevelsTab } from './HierarchyLevelsTab';
 import { PermissionProfilesTab } from './PermissionProfilesTab';
-import type { Company, Department, JobTitle, HierarchyLevel, PermissionProfile } from '@/types/admin';
+import { UsersTab } from './UsersTab';
+import type { Company, Department, JobTitle, HierarchyLevel, PermissionProfile, UserProfile } from '@/types/admin';
 
 interface AdminTabsProps {
   companies: Company[];
@@ -13,6 +14,8 @@ interface AdminTabsProps {
   jobTitles: JobTitle[];
   hierarchyLevels: HierarchyLevel[];
   permissionProfiles: PermissionProfile[];
+  users: UserProfile[];
+  refetch: () => void;
   addCompany: (name: string, description?: string) => Promise<Company>;
   deleteCompany: (id: string) => Promise<void>;
   addDepartment: (name: string, company_id?: string, description?: string) => Promise<Department>;
@@ -27,8 +30,12 @@ interface AdminTabsProps {
 
 export function AdminTabs(props: AdminTabsProps) {
   return (
-    <Tabs defaultValue="companies" className="space-y-6">
-      <TabsList className="grid w-full grid-cols-5">
+    <Tabs defaultValue="users" className="space-y-6">
+      <TabsList className="grid w-full grid-cols-6">
+        <TabsTrigger value="users" className="flex items-center gap-2">
+          <UserCog className="h-4 w-4" />
+          <span className="hidden sm:inline">Utilisateurs</span>
+        </TabsTrigger>
         <TabsTrigger value="companies" className="flex items-center gap-2">
           <Building2 className="h-4 w-4" />
           <span className="hidden sm:inline">Sociétés</span>
@@ -50,6 +57,19 @@ export function AdminTabs(props: AdminTabsProps) {
           <span className="hidden sm:inline">Droits</span>
         </TabsTrigger>
       </TabsList>
+
+      <TabsContent value="users">
+        <UsersTab
+          users={props.users}
+          companies={props.companies}
+          departments={props.departments}
+          jobTitles={props.jobTitles}
+          hierarchyLevels={props.hierarchyLevels}
+          permissionProfiles={props.permissionProfiles}
+          onUserCreated={props.refetch}
+          onUserUpdated={props.refetch}
+        />
+      </TabsContent>
 
       <TabsContent value="companies">
         <CompaniesTab 

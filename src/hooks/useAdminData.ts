@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import type { Company, Department, JobTitle, HierarchyLevel, PermissionProfile } from '@/types/admin';
+import type { Company, Department, JobTitle, HierarchyLevel, PermissionProfile, UserProfile } from '@/types/admin';
 
 export function useAdminData() {
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -8,17 +8,26 @@ export function useAdminData() {
   const [jobTitles, setJobTitles] = useState<JobTitle[]>([]);
   const [hierarchyLevels, setHierarchyLevels] = useState<HierarchyLevel[]>([]);
   const [permissionProfiles, setPermissionProfiles] = useState<PermissionProfile[]>([]);
+  const [users, setUsers] = useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchAll = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [companiesRes, departmentsRes, jobTitlesRes, levelsRes, profilesRes] = await Promise.all([
+      const [companiesRes, departmentsRes, jobTitlesRes, levelsRes, profilesRes, usersRes] = await Promise.all([
         supabase.from('companies').select('*').order('name'),
         supabase.from('departments').select('*, company:companies(*)').order('name'),
         supabase.from('job_titles').select('*, department:departments(*, company:companies(*))').order('name'),
         supabase.from('hierarchy_levels').select('*').order('level'),
         supabase.from('permission_profiles').select('*').order('name'),
+        supabase.from('profiles').select(`
+          *,
+          company:companies(*),
+          department:departments(*),
+          job_title:job_titles(*),
+          hierarchy_level:hierarchy_levels(*),
+          permission_profile:permission_profiles(*)
+        `).order('display_name'),
       ]);
 
       if (companiesRes.data) setCompanies(companiesRes.data);
@@ -26,6 +35,15 @@ export function useAdminData() {
       if (jobTitlesRes.data) setJobTitles(jobTitlesRes.data);
       if (levelsRes.data) setHierarchyLevels(levelsRes.data);
       if (profilesRes.data) setPermissionProfiles(profilesRes.data);
+      
+      // Process users to add manager reference
+      if (usersRes.data) {
+        const usersWithManagers = usersRes.data.map(user => ({
+          ...user,
+          manager: usersRes.data.find(u => u.id === user.manager_id) || undefined,
+        }));
+        setUsers(usersWithManagers as UserProfile[]);
+      }
     } catch (error) {
       console.error('Error fetching admin data:', error);
     } finally {
@@ -133,6 +151,7 @@ export function useAdminData() {
     jobTitles,
     hierarchyLevels,
     permissionProfiles,
+    users,
     isLoading,
     refetch: fetchAll,
     addCompany,

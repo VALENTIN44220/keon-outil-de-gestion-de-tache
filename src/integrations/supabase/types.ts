@@ -226,48 +226,101 @@ export type Database = {
         Row: {
           avatar_url: string | null
           company: string | null
+          company_id: string | null
           created_at: string
           department: string | null
+          department_id: string | null
           display_name: string | null
+          hierarchy_level_id: string | null
           id: string
           is_private: boolean
           job_title: string | null
+          job_title_id: string | null
           manager_id: string | null
+          must_change_password: boolean
+          permission_profile_id: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
           avatar_url?: string | null
           company?: string | null
+          company_id?: string | null
           created_at?: string
           department?: string | null
+          department_id?: string | null
           display_name?: string | null
+          hierarchy_level_id?: string | null
           id?: string
           is_private?: boolean
           job_title?: string | null
+          job_title_id?: string | null
           manager_id?: string | null
+          must_change_password?: boolean
+          permission_profile_id?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
           avatar_url?: string | null
           company?: string | null
+          company_id?: string | null
           created_at?: string
           department?: string | null
+          department_id?: string | null
           display_name?: string | null
+          hierarchy_level_id?: string | null
           id?: string
           is_private?: boolean
           job_title?: string | null
+          job_title_id?: string | null
           manager_id?: string | null
+          must_change_password?: boolean
+          permission_profile_id?: string | null
           updated_at?: string
           user_id?: string
         }
         Relationships: [
           {
+            foreignKeyName: "profiles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_hierarchy_level_id_fkey"
+            columns: ["hierarchy_level_id"]
+            isOneToOne: false
+            referencedRelation: "hierarchy_levels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_job_title_id_fkey"
+            columns: ["job_title_id"]
+            isOneToOne: false
+            referencedRelation: "job_titles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "profiles_manager_id_fkey"
             columns: ["manager_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_permission_profile_id_fkey"
+            columns: ["permission_profile_id"]
+            isOneToOne: false
+            referencedRelation: "permission_profiles"
             referencedColumns: ["id"]
           },
         ]
