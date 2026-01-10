@@ -16,6 +16,8 @@ export interface TaskTemplate {
   description: string | null;
   priority: 'low' | 'medium' | 'high' | 'urgent';
   category: string | null;
+  category_id: string | null;
+  subcategory_id: string | null;
   default_duration_days: number;
   order_index: number;
   user_id: string;
