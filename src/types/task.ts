@@ -9,8 +9,12 @@ export interface Task {
   status: TaskStatus;
   priority: TaskPriority;
   category: string | null;
+  category_id: string | null;
+  subcategory_id: string | null;
   due_date: string | null;
   assignee_id: string | null;
+  requester_id: string | null;
+  reporter_id: string | null;
   created_at: string;
   updated_at: string;
 }

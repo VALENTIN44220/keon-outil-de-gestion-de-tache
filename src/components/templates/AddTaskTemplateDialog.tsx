@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,6 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TaskTemplate } from '@/types/template';
+import { CategorySelect } from './CategorySelect';
+import { useCategories } from '@/hooks/useCategories';
 
 interface AddTaskTemplateDialogProps {
   open: boolean;
@@ -18,19 +20,27 @@ export function AddTaskTemplateDialog({ open, onClose, onAdd, orderIndex }: AddT
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
-  const [category, setCategory] = useState('');
+  const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [subcategoryId, setSubcategoryId] = useState<string | null>(null);
   const [defaultDurationDays, setDefaultDurationDays] = useState(7);
+
+  const { categories, addCategory, addSubcategory } = useCategories();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!title.trim()) return;
 
+    // Get category name for backward compatibility
+    const selectedCategory = categories.find(c => c.id === categoryId);
+
     onAdd({
       title: title.trim(),
       description: description.trim() || null,
       priority,
-      category: category.trim() || null,
+      category: selectedCategory?.name || null,
+      category_id: categoryId,
+      subcategory_id: subcategoryId,
       default_duration_days: defaultDurationDays,
       order_index: orderIndex,
     });
@@ -43,13 +53,28 @@ export function AddTaskTemplateDialog({ open, onClose, onAdd, orderIndex }: AddT
     setTitle('');
     setDescription('');
     setPriority('medium');
-    setCategory('');
+    setCategoryId(null);
+    setSubcategoryId(null);
     setDefaultDurationDays(7);
+  };
+
+  const handleAddCategory = async (name: string) => {
+    const newCategory = await addCategory(name);
+    if (newCategory) {
+      setCategoryId(newCategory.id);
+    }
+  };
+
+  const handleAddSubcategory = async (catId: string, name: string) => {
+    const newSubcategory = await addSubcategory(catId, name);
+    if (newSubcategory) {
+      setSubcategoryId(newSubcategory.id);
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Ajouter une tâche modèle</DialogTitle>
         </DialogHeader>
@@ -108,16 +133,15 @@ export function AddTaskTemplateDialog({ open, onClose, onAdd, orderIndex }: AddT
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="category">Catégorie</Label>
-            <Input
-              id="category"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              placeholder="Ex: IT, RH, Admin..."
-              maxLength={50}
-            />
-          </div>
+          <CategorySelect
+            categories={categories}
+            selectedCategoryId={categoryId}
+            selectedSubcategoryId={subcategoryId}
+            onCategoryChange={setCategoryId}
+            onSubcategoryChange={setSubcategoryId}
+            onAddCategory={handleAddCategory}
+            onAddSubcategory={handleAddSubcategory}
+          />
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>

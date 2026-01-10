@@ -4,14 +4,17 @@ import { Header } from '@/components/layout/Header';
 import { ProcessList } from '@/components/templates/ProcessList';
 import { TemplateFilters } from '@/components/templates/TemplateFilters';
 import { AddProcessDialog } from '@/components/templates/AddProcessDialog';
+import { EditProcessDialog } from '@/components/templates/EditProcessDialog';
 import { useProcessTemplates } from '@/hooks/useProcessTemplates';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useTasks } from '@/hooks/useTasks';
 import { Loader2 } from 'lucide-react';
+import { ProcessTemplate } from '@/types/template';
 
 const Templates = () => {
   const [activeView, setActiveView] = useState('templates');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [editingProcess, setEditingProcess] = useState<ProcessTemplate | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   
   const {
@@ -24,6 +27,7 @@ const Templates = () => {
     companies,
     departments,
     addProcess,
+    updateProcess,
     deleteProcess,
     addTaskTemplate,
     deleteTaskTemplate,
@@ -37,6 +41,20 @@ const Templates = () => {
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     p.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const handleEditProcess = (id: string) => {
+    const process = processes.find(p => p.id === id);
+    if (process) {
+      setEditingProcess(process);
+    }
+  };
+
+  const handleUpdateProcess = async (updates: Partial<ProcessTemplate>) => {
+    if (editingProcess) {
+      await updateProcess(editingProcess.id, updates);
+      setEditingProcess(null);
+    }
+  };
 
   return (
     <div className="flex h-screen bg-background">
@@ -73,6 +91,7 @@ const Templates = () => {
               <ProcessList
                 processes={filteredProcesses}
                 onDelete={deleteProcess}
+                onEdit={handleEditProcess}
                 onAddTask={addTaskTemplate}
                 onDeleteTask={deleteTaskTemplate}
               />
@@ -85,6 +104,13 @@ const Templates = () => {
         open={isAddDialogOpen}
         onClose={() => setIsAddDialogOpen(false)}
         onAdd={addProcess}
+      />
+
+      <EditProcessDialog
+        process={editingProcess}
+        open={!!editingProcess}
+        onClose={() => setEditingProcess(null)}
+        onSave={handleUpdateProcess}
       />
     </div>
   );

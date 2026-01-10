@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Task, TaskStatus, TaskPriority } from '@/types/task';
 import {
   Dialog,
@@ -17,6 +17,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { CategorySelect } from '@/components/templates/CategorySelect';
+import { useCategories } from '@/hooks/useCategories';
+import { supabase } from '@/integrations/supabase/client';
+
+interface Profile {
+  id: string;
+  display_name: string | null;
+  job_title: string | null;
+}
 
 interface AddTaskDialogProps {
   open: boolean;
@@ -29,37 +38,89 @@ export function AddTaskDialog({ open, onClose, onAdd }: AddTaskDialogProps) {
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<TaskPriority>('medium');
   const [status, setStatus] = useState<TaskStatus>('todo');
-  const [category, setCategory] = useState('');
+  const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [subcategoryId, setSubcategoryId] = useState<string | null>(null);
   const [dueDate, setDueDate] = useState('');
+  const [assigneeId, setAssigneeId] = useState<string | null>(null);
+  const [requesterId, setRequesterId] = useState<string | null>(null);
+  const [reporterId, setReporterId] = useState<string | null>(null);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+
+  const { categories, addCategory, addSubcategory } = useCategories();
+
+  useEffect(() => {
+    if (open) {
+      fetchProfiles();
+    }
+  }, [open]);
+
+  const fetchProfiles = async () => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, display_name, job_title')
+      .order('display_name');
+
+    if (!error && data) {
+      setProfiles(data);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!title.trim()) return;
 
+    const selectedCategory = categories.find(c => c.id === categoryId);
+
     onAdd({
       title: title.trim(),
       description: description.trim() || null,
       priority,
       status,
-      category: category.trim() || null,
+      category: selectedCategory?.name || null,
+      category_id: categoryId,
+      subcategory_id: subcategoryId,
       due_date: dueDate || null,
-      assignee_id: null,
+      assignee_id: assigneeId,
+      requester_id: requesterId,
+      reporter_id: reporterId,
     });
 
     // Reset form
+    resetForm();
+    onClose();
+  };
+
+  const resetForm = () => {
     setTitle('');
     setDescription('');
     setPriority('medium');
     setStatus('todo');
-    setCategory('');
+    setCategoryId(null);
+    setSubcategoryId(null);
     setDueDate('');
-    onClose();
+    setAssigneeId(null);
+    setRequesterId(null);
+    setReporterId(null);
+  };
+
+  const handleAddCategory = async (name: string) => {
+    const newCategory = await addCategory(name);
+    if (newCategory) {
+      setCategoryId(newCategory.id);
+    }
+  };
+
+  const handleAddSubcategory = async (catId: string, name: string) => {
+    const newSubcategory = await addSubcategory(catId, name);
+    if (newSubcategory) {
+      setSubcategoryId(newSubcategory.id);
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Nouvelle tâche</DialogTitle>
         </DialogHeader>
@@ -118,25 +179,92 @@ export function AddTaskDialog({ open, onClose, onAdd }: AddTaskDialogProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="category">Catégorie</Label>
-              <Input
-                id="category"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                placeholder="Ex: Qualité, Production..."
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="dueDate">Date d'échéance</Label>
+            <Input
+              id="dueDate"
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+            />
+          </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="dueDate">Date d'échéance</Label>
-              <Input
-                id="dueDate"
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-              />
+          <CategorySelect
+            categories={categories}
+            selectedCategoryId={categoryId}
+            selectedSubcategoryId={subcategoryId}
+            onCategoryChange={setCategoryId}
+            onSubcategoryChange={setSubcategoryId}
+            onAddCategory={handleAddCategory}
+            onAddSubcategory={handleAddSubcategory}
+          />
+
+          <div className="border-t pt-4 mt-4">
+            <Label className="text-base font-medium mb-3 block">Responsabilités</Label>
+            
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Demandeur (qui crée l'action)</Label>
+                <Select 
+                  value={requesterId || 'none'} 
+                  onValueChange={(v) => setRequesterId(v === 'none' ? null : v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner le demandeur" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Non défini</SelectItem>
+                    {profiles.map(profile => (
+                      <SelectItem key={profile.id} value={profile.id}>
+                        {profile.display_name || 'Sans nom'} 
+                        {profile.job_title && ` - ${profile.job_title}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Exécutant (qui fait l'action)</Label>
+                <Select 
+                  value={assigneeId || 'none'} 
+                  onValueChange={(v) => setAssigneeId(v === 'none' ? null : v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner l'exécutant" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Non défini</SelectItem>
+                    {profiles.map(profile => (
+                      <SelectItem key={profile.id} value={profile.id}>
+                        {profile.display_name || 'Sans nom'} 
+                        {profile.job_title && ` - ${profile.job_title}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Rapporteur (à qui rapporter l'action)</Label>
+                <Select 
+                  value={reporterId || 'none'} 
+                  onValueChange={(v) => setReporterId(v === 'none' ? null : v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner le rapporteur" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Non défini</SelectItem>
+                    {profiles.map(profile => (
+                      <SelectItem key={profile.id} value={profile.id}>
+                        {profile.display_name || 'Sans nom'} 
+                        {profile.job_title && ` - ${profile.job_title}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 

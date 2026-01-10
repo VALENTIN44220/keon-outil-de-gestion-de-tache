@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      categories: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       companies: {
         Row: {
           created_at: string
@@ -325,9 +349,45 @@ export type Database = {
           },
         ]
       }
+      subcategories: {
+        Row: {
+          category_id: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subcategories_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_templates: {
         Row: {
           category: string | null
+          category_id: string | null
           created_at: string
           default_duration_days: number | null
           description: string | null
@@ -335,12 +395,14 @@ export type Database = {
           order_index: number | null
           priority: string
           process_template_id: string | null
+          subcategory_id: string | null
           title: string
           updated_at: string
           user_id: string
         }
         Insert: {
           category?: string | null
+          category_id?: string | null
           created_at?: string
           default_duration_days?: number | null
           description?: string | null
@@ -348,12 +410,14 @@ export type Database = {
           order_index?: number | null
           priority?: string
           process_template_id?: string | null
+          subcategory_id?: string | null
           title: string
           updated_at?: string
           user_id: string
         }
         Update: {
           category?: string | null
+          category_id?: string | null
           created_at?: string
           default_duration_days?: number | null
           description?: string | null
@@ -361,16 +425,31 @@ export type Database = {
           order_index?: number | null
           priority?: string
           process_template_id?: string | null
+          subcategory_id?: string | null
           title?: string
           updated_at?: string
           user_id?: string
         }
         Relationships: [
           {
+            foreignKeyName: "task_templates_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "task_templates_process_template_id_fkey"
             columns: ["process_template_id"]
             isOneToOne: false
             referencedRelation: "process_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_templates_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "subcategories"
             referencedColumns: ["id"]
           },
         ]
@@ -379,12 +458,16 @@ export type Database = {
         Row: {
           assignee_id: string | null
           category: string | null
+          category_id: string | null
           created_at: string
           description: string | null
           due_date: string | null
           id: string
           priority: string
+          reporter_id: string | null
+          requester_id: string | null
           status: string
+          subcategory_id: string | null
           title: string
           updated_at: string
           user_id: string
@@ -392,12 +475,16 @@ export type Database = {
         Insert: {
           assignee_id?: string | null
           category?: string | null
+          category_id?: string | null
           created_at?: string
           description?: string | null
           due_date?: string | null
           id?: string
           priority?: string
+          reporter_id?: string | null
+          requester_id?: string | null
           status?: string
+          subcategory_id?: string | null
           title: string
           updated_at?: string
           user_id: string
@@ -405,12 +492,16 @@ export type Database = {
         Update: {
           assignee_id?: string | null
           category?: string | null
+          category_id?: string | null
           created_at?: string
           description?: string | null
           due_date?: string | null
           id?: string
           priority?: string
+          reporter_id?: string | null
+          requester_id?: string | null
           status?: string
+          subcategory_id?: string | null
           title?: string
           updated_at?: string
           user_id?: string
@@ -421,6 +512,34 @@ export type Database = {
             columns: ["assignee_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_reporter_id_fkey"
+            columns: ["reporter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_requester_id_fkey"
+            columns: ["requester_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "subcategories"
             referencedColumns: ["id"]
           },
         ]

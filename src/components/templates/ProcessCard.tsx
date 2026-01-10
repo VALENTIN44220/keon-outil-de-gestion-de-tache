@@ -9,12 +9,13 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { MoreVertical, Plus, Trash2, Building2, Briefcase, ListTodo } from 'lucide-react';
+import { MoreVertical, Plus, Trash2, Building2, Briefcase, ListTodo, Edit } from 'lucide-react';
 import { AddTaskTemplateDialog } from './AddTaskTemplateDialog';
 
 interface ProcessCardProps {
   process: ProcessWithTasks;
   onDelete: () => void;
+  onEdit: () => void;
   onAddTask: (task: Omit<TaskTemplate, 'id' | 'user_id' | 'process_template_id' | 'created_at' | 'updated_at'>) => void;
   onDeleteTask: (taskId: string) => void;
 }
@@ -26,7 +27,7 @@ const priorityColors: Record<string, string> = {
   urgent: 'bg-red-500/10 text-red-600 border-red-500/20',
 };
 
-export function ProcessCard({ process, onDelete, onAddTask, onDeleteTask }: ProcessCardProps) {
+export function ProcessCard({ process, onDelete, onEdit, onAddTask, onDeleteTask }: ProcessCardProps) {
   const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
 
   return (
@@ -49,6 +50,10 @@ export function ProcessCard({ process, onDelete, onAddTask, onDeleteTask }: Proc
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={onEdit}>
+                  <Edit className="h-4 w-4 mr-2" />
+                  Modifier
+                </DropdownMenuItem>
                 <DropdownMenuItem 
                   onClick={onDelete}
                   className="text-destructive focus:text-destructive"
