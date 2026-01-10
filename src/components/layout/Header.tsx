@@ -19,6 +19,7 @@ interface HeaderProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   onAddTask: () => void;
+  addButtonLabel?: string;
   notifications?: TaskNotification[];
   unreadCount?: number;
   hasUrgent?: boolean;
@@ -30,6 +31,7 @@ export function Header({
   searchQuery,
   onSearchChange,
   onAddTask,
+  addButtonLabel = 'Nouvelle tâche',
   notifications = [],
   unreadCount = 0,
   hasUrgent = false,
@@ -85,7 +87,7 @@ export function Header({
           {/* Add Task */}
           <Button onClick={onAddTask} className="gap-2">
             <Plus className="w-4 h-4" />
-            Nouvelle tâche
+            {addButtonLabel}
           </Button>
 
           {/* User Menu */}
