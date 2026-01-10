@@ -20,7 +20,7 @@ interface DashboardProps {
 
 export function Dashboard({ stats, recentTasks, onStatusChange, onDelete }: DashboardProps) {
   const urgentTasks = recentTasks
-    .filter(t => t.priority === 'high' && t.status !== 'done')
+    .filter(t => (t.priority === 'high' || t.priority === 'urgent') && t.status !== 'done')
     .slice(0, 3);
 
   return (

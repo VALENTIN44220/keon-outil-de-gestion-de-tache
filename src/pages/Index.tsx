@@ -6,6 +6,7 @@ import { TaskList } from '@/components/tasks/TaskList';
 import { TaskFilters } from '@/components/tasks/TaskFilters';
 import { AddTaskDialog } from '@/components/tasks/AddTaskDialog';
 import { useTasks } from '@/hooks/useTasks';
+import { Loader2 } from 'lucide-react';
 
 const Index = () => {
   const [activeView, setActiveView] = useState('dashboard');
@@ -15,6 +16,7 @@ const Index = () => {
     tasks,
     allTasks,
     stats,
+    isLoading,
     statusFilter,
     setStatusFilter,
     priorityFilter,
@@ -44,6 +46,14 @@ const Index = () => {
   };
 
   const renderContent = () => {
+    if (isLoading) {
+      return (
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      );
+    }
+
     switch (activeView) {
       case 'dashboard':
         return (

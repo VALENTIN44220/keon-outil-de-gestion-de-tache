@@ -21,7 +21,7 @@ import {
 interface AddTaskDialogProps {
   open: boolean;
   onClose: () => void;
-  onAdd: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  onAdd: (task: Omit<Task, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => void;
 }
 
 export function AddTaskDialog({ open, onClose, onAdd }: AddTaskDialogProps) {
@@ -29,7 +29,7 @@ export function AddTaskDialog({ open, onClose, onAdd }: AddTaskDialogProps) {
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<TaskPriority>('medium');
   const [status, setStatus] = useState<TaskStatus>('todo');
-  const [assignee, setAssignee] = useState('');
+  const [category, setCategory] = useState('');
   const [dueDate, setDueDate] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -39,11 +39,12 @@ export function AddTaskDialog({ open, onClose, onAdd }: AddTaskDialogProps) {
 
     onAdd({
       title: title.trim(),
-      description: description.trim(),
+      description: description.trim() || null,
       priority,
       status,
-      assignee: assignee.trim() || undefined,
-      dueDate: dueDate || undefined,
+      category: category.trim() || null,
+      due_date: dueDate || null,
+      assignee_id: null,
     });
 
     // Reset form
@@ -51,7 +52,7 @@ export function AddTaskDialog({ open, onClose, onAdd }: AddTaskDialogProps) {
     setDescription('');
     setPriority('medium');
     setStatus('todo');
-    setAssignee('');
+    setCategory('');
     setDueDate('');
     onClose();
   };
@@ -97,6 +98,7 @@ export function AddTaskDialog({ open, onClose, onAdd }: AddTaskDialogProps) {
                   <SelectItem value="low">Basse</SelectItem>
                   <SelectItem value="medium">Moyenne</SelectItem>
                   <SelectItem value="high">Haute</SelectItem>
+                  <SelectItem value="urgent">Urgente</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -109,7 +111,7 @@ export function AddTaskDialog({ open, onClose, onAdd }: AddTaskDialogProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todo">À faire</SelectItem>
-                  <SelectItem value="in_progress">En cours</SelectItem>
+                  <SelectItem value="in-progress">En cours</SelectItem>
                   <SelectItem value="done">Terminé</SelectItem>
                 </SelectContent>
               </Select>
@@ -118,12 +120,12 @@ export function AddTaskDialog({ open, onClose, onAdd }: AddTaskDialogProps) {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="assignee">Assigné à</Label>
+              <Label htmlFor="category">Catégorie</Label>
               <Input
-                id="assignee"
-                value={assignee}
-                onChange={(e) => setAssignee(e.target.value)}
-                placeholder="Nom du responsable"
+                id="category"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                placeholder="Ex: Qualité, Production..."
               />
             </div>
 
