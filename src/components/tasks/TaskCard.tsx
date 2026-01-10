@@ -1,4 +1,4 @@
-import { Clock, User, MoreVertical, Trash2, Edit } from 'lucide-react';
+import { Clock, User, MoreVertical, Trash2 } from 'lucide-react';
 import { Task, TaskStatus } from '@/types/task';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -21,28 +21,30 @@ const priorityColors = {
   low: 'bg-muted text-muted-foreground',
   medium: 'bg-warning/10 text-warning border-warning/20',
   high: 'bg-destructive/10 text-destructive border-destructive/20',
+  urgent: 'bg-destructive text-destructive-foreground',
 };
 
 const priorityLabels = {
   low: 'Basse',
   medium: 'Moyenne',
   high: 'Haute',
+  urgent: 'Urgente',
 };
 
 const statusColors = {
   todo: 'bg-muted',
-  in_progress: 'bg-info',
+  'in-progress': 'bg-info',
   done: 'bg-success',
 };
 
 const statusLabels = {
   todo: 'À faire',
-  in_progress: 'En cours',
+  'in-progress': 'En cours',
   done: 'Terminé',
 };
 
 export function TaskCard({ task, onStatusChange, onDelete }: TaskCardProps) {
-  const dueDate = task.dueDate ? new Date(task.dueDate) : null;
+  const dueDate = task.due_date ? new Date(task.due_date) : null;
   const isOverdue = dueDate && dueDate < new Date() && task.status !== 'done';
 
   return (
@@ -66,16 +68,18 @@ export function TaskCard({ task, onStatusChange, onDelete }: TaskCardProps) {
           </h3>
 
           {/* Description */}
-          <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-            {task.description}
-          </p>
+          {task.description && (
+            <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+              {task.description}
+            </p>
+          )}
 
           {/* Meta */}
           <div className="flex items-center gap-4 text-xs text-muted-foreground">
-            {task.assignee && (
+            {task.category && (
               <div className="flex items-center gap-1.5">
                 <User className="w-3.5 h-3.5" />
-                <span>{task.assignee}</span>
+                <span>{task.category}</span>
               </div>
             )}
             {dueDate && (
@@ -104,9 +108,9 @@ export function TaskCard({ task, onStatusChange, onDelete }: TaskCardProps) {
               <div className={cn("w-2 h-2 rounded-full mr-2", statusColors.todo)} />
               {statusLabels.todo}
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onStatusChange(task.id, 'in_progress')}>
-              <div className={cn("w-2 h-2 rounded-full mr-2", statusColors.in_progress)} />
-              {statusLabels.in_progress}
+            <DropdownMenuItem onClick={() => onStatusChange(task.id, 'in-progress')}>
+              <div className={cn("w-2 h-2 rounded-full mr-2", statusColors['in-progress'])} />
+              {statusLabels['in-progress']}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onStatusChange(task.id, 'done')}>
               <div className={cn("w-2 h-2 rounded-full mr-2", statusColors.done)} />

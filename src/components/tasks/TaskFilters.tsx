@@ -12,12 +12,13 @@ interface TaskFiltersProps {
 const statusOptions: { value: TaskStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'Tous' },
   { value: 'todo', label: 'À faire' },
-  { value: 'in_progress', label: 'En cours' },
+  { value: 'in-progress', label: 'En cours' },
   { value: 'done', label: 'Terminé' },
 ];
 
 const priorityOptions: { value: TaskPriority | 'all'; label: string }[] = [
   { value: 'all', label: 'Toutes' },
+  { value: 'urgent', label: 'Urgente' },
   { value: 'high', label: 'Haute' },
   { value: 'medium', label: 'Moyenne' },
   { value: 'low', label: 'Basse' },
