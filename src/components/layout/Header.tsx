@@ -2,6 +2,7 @@ import { Search, Bell, Plus, LogOut, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,6 +21,7 @@ interface HeaderProps {
 
 export function Header({ title, searchQuery, onSearchChange, onAddTask }: HeaderProps) {
   const { user, profile, signOut } = useAuth();
+  const navigate = useNavigate();
 
   const displayName = profile?.display_name || user?.email || 'Utilisateur';
   const initials = displayName
@@ -89,7 +91,7 @@ export function Header({ title, searchQuery, onSearchChange, onAddTask }: Header
                 </div>
               </div>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate('/profile')}>
                 <User className="mr-2 h-4 w-4" />
                 Profil
               </DropdownMenuItem>
