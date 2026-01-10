@@ -137,11 +137,16 @@ export type Database = {
       }
       permission_profiles: {
         Row: {
-          can_assign_tasks: boolean
-          can_manage_tasks: boolean
+          can_assign_to_all: boolean
+          can_assign_to_subordinates: boolean
+          can_manage_all_tasks: boolean
+          can_manage_own_tasks: boolean
+          can_manage_subordinates_tasks: boolean
           can_manage_templates: boolean
           can_manage_users: boolean
           can_view_all_tasks: boolean
+          can_view_own_tasks: boolean
+          can_view_subordinates_tasks: boolean
           created_at: string
           description: string | null
           id: string
@@ -149,11 +154,16 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          can_assign_tasks?: boolean
-          can_manage_tasks?: boolean
+          can_assign_to_all?: boolean
+          can_assign_to_subordinates?: boolean
+          can_manage_all_tasks?: boolean
+          can_manage_own_tasks?: boolean
+          can_manage_subordinates_tasks?: boolean
           can_manage_templates?: boolean
           can_manage_users?: boolean
           can_view_all_tasks?: boolean
+          can_view_own_tasks?: boolean
+          can_view_subordinates_tasks?: boolean
           created_at?: string
           description?: string | null
           id?: string
@@ -161,11 +171,16 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          can_assign_tasks?: boolean
-          can_manage_tasks?: boolean
+          can_assign_to_all?: boolean
+          can_assign_to_subordinates?: boolean
+          can_manage_all_tasks?: boolean
+          can_manage_own_tasks?: boolean
+          can_manage_subordinates_tasks?: boolean
           can_manage_templates?: boolean
           can_manage_users?: boolean
           can_view_all_tasks?: boolean
+          can_view_own_tasks?: boolean
+          can_view_subordinates_tasks?: boolean
           created_at?: string
           description?: string | null
           id?: string
