@@ -6,7 +6,9 @@ import { TaskList } from '@/components/tasks/TaskList';
 import { TaskFilters } from '@/components/tasks/TaskFilters';
 import { AddTaskDialog } from '@/components/tasks/AddTaskDialog';
 import { useTasks } from '@/hooks/useTasks';
+import { useNotifications } from '@/hooks/useNotifications';
 import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const Index = () => {
   const [activeView, setActiveView] = useState('dashboard');
@@ -27,6 +29,17 @@ const Index = () => {
     addTask,
     deleteTask,
   } = useTasks();
+
+  const { notifications, unreadCount, hasUrgent } = useNotifications(allTasks);
+
+  const handleNotificationClick = (taskId: string) => {
+    const task = allTasks.find(t => t.id === taskId);
+    if (task) {
+      setActiveView('tasks');
+      setSearchQuery(task.title);
+      toast.info(`Tâche sélectionnée: ${task.title}`);
+    }
+  };
 
   const getTitle = () => {
     switch (activeView) {
@@ -113,6 +126,10 @@ const Index = () => {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onAddTask={() => setIsAddDialogOpen(true)}
+          notifications={notifications}
+          unreadCount={unreadCount}
+          hasUrgent={hasUrgent}
+          onNotificationClick={handleNotificationClick}
         />
         
         <main className="flex-1 overflow-y-auto p-6">
