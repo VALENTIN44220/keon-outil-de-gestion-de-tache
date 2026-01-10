@@ -4,20 +4,27 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Trash2, Building2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Plus, Trash2, Building2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Company } from '@/types/admin';
 
 interface CompaniesTabProps {
   companies: Company[];
   onAdd: (name: string, description?: string) => Promise<Company>;
+  onUpdate: (id: string, name: string, description?: string) => Promise<Company>;
   onDelete: (id: string) => Promise<void>;
 }
 
-export function CompaniesTab({ companies, onAdd, onDelete }: CompaniesTabProps) {
+export function CompaniesTab({ companies, onAdd, onUpdate, onDelete }: CompaniesTabProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [isAdding, setIsAdding] = useState(false);
+  const [editingItem, setEditingItem] = useState<Company | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const handleAdd = async () => {
     if (!name.trim()) {
@@ -35,6 +42,30 @@ export function CompaniesTab({ companies, onAdd, onDelete }: CompaniesTabProps) 
       toast.error(error.message || 'Erreur lors de la création');
     } finally {
       setIsAdding(false);
+    }
+  };
+
+  const openEditDialog = (item: Company) => {
+    setEditingItem(item);
+    setEditName(item.name);
+    setEditDescription(item.description || '');
+  };
+
+  const handleUpdate = async () => {
+    if (!editingItem || !editName.trim()) {
+      toast.error('Le nom est requis');
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      await onUpdate(editingItem.id, editName.trim(), editDescription.trim() || undefined);
+      setEditingItem(null);
+      toast.success('Société modifiée');
+    } catch (error: any) {
+      toast.error(error.message || 'Erreur lors de la modification');
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -92,7 +123,7 @@ export function CompaniesTab({ companies, onAdd, onDelete }: CompaniesTabProps) 
                 <TableRow>
                   <TableHead>Nom</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead className="w-[100px]">Actions</TableHead>
+                  <TableHead className="w-[120px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -101,14 +132,23 @@ export function CompaniesTab({ companies, onAdd, onDelete }: CompaniesTabProps) 
                     <TableCell className="font-medium">{company.name}</TableCell>
                     <TableCell className="text-muted-foreground">{company.description || '-'}</TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(company.id)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openEditDialog(company)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDelete(company.id)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -117,6 +157,42 @@ export function CompaniesTab({ companies, onAdd, onDelete }: CompaniesTabProps) 
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!editingItem} onOpenChange={(open) => !open && setEditingItem(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Modifier la société</DialogTitle>
+            <DialogDescription>Modifiez les informations de la société</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Nom</Label>
+              <Input
+                id="edit-name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">Description</Label>
+              <Textarea
+                id="edit-description"
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                rows={2}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setEditingItem(null)}>
+              Annuler
+            </Button>
+            <Button onClick={handleUpdate} disabled={isUpdating}>
+              {isUpdating ? 'Enregistrement...' : 'Enregistrer'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

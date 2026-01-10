@@ -5,7 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Trash2, Users } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Plus, Trash2, Users, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import type { JobTitle, Department } from '@/types/admin';
 
@@ -13,14 +15,20 @@ interface JobTitlesTabProps {
   jobTitles: JobTitle[];
   departments: Department[];
   onAdd: (name: string, department_id?: string, description?: string) => Promise<JobTitle>;
+  onUpdate: (id: string, name: string, department_id?: string, description?: string) => Promise<JobTitle>;
   onDelete: (id: string) => Promise<void>;
 }
 
-export function JobTitlesTab({ jobTitles, departments, onAdd, onDelete }: JobTitlesTabProps) {
+export function JobTitlesTab({ jobTitles, departments, onAdd, onUpdate, onDelete }: JobTitlesTabProps) {
   const [name, setName] = useState('');
   const [departmentId, setDepartmentId] = useState<string>('');
   const [description, setDescription] = useState('');
   const [isAdding, setIsAdding] = useState(false);
+  const [editingItem, setEditingItem] = useState<JobTitle | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editDepartmentId, setEditDepartmentId] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const handleAdd = async () => {
     if (!name.trim()) {
@@ -39,6 +47,31 @@ export function JobTitlesTab({ jobTitles, departments, onAdd, onDelete }: JobTit
       toast.error(error.message || 'Erreur lors de la création');
     } finally {
       setIsAdding(false);
+    }
+  };
+
+  const openEditDialog = (item: JobTitle) => {
+    setEditingItem(item);
+    setEditName(item.name);
+    setEditDepartmentId(item.department_id || '');
+    setEditDescription(item.description || '');
+  };
+
+  const handleUpdate = async () => {
+    if (!editingItem || !editName.trim()) {
+      toast.error('Le nom est requis');
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      await onUpdate(editingItem.id, editName.trim(), editDepartmentId || undefined, editDescription.trim() || undefined);
+      setEditingItem(null);
+      toast.success('Poste modifié');
+    } catch (error: any) {
+      toast.error(error.message || 'Erreur lors de la modification');
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -110,7 +143,7 @@ export function JobTitlesTab({ jobTitles, departments, onAdd, onDelete }: JobTit
                   <TableHead>Service</TableHead>
                   <TableHead>Société</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead className="w-[100px]">Actions</TableHead>
+                  <TableHead className="w-[120px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -121,14 +154,23 @@ export function JobTitlesTab({ jobTitles, departments, onAdd, onDelete }: JobTit
                     <TableCell>{job.department?.company?.name || '-'}</TableCell>
                     <TableCell className="text-muted-foreground">{job.description || '-'}</TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(job.id)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openEditDialog(job)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDelete(job.id)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -137,6 +179,57 @@ export function JobTitlesTab({ jobTitles, departments, onAdd, onDelete }: JobTit
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!editingItem} onOpenChange={(open) => !open && setEditingItem(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Modifier le poste</DialogTitle>
+            <DialogDescription>Modifiez les informations du poste</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Nom</Label>
+              <Input
+                id="edit-name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-department">Service</Label>
+              <Select value={editDepartmentId} onValueChange={setEditDepartmentId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {departments.map((dept) => (
+                    <SelectItem key={dept.id} value={dept.id}>
+                      {dept.name} {dept.company?.name ? `(${dept.company.name})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">Description</Label>
+              <Textarea
+                id="edit-description"
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                rows={2}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setEditingItem(null)}>
+              Annuler
+            </Button>
+            <Button onClick={handleUpdate} disabled={isUpdating}>
+              {isUpdating ? 'Enregistrement...' : 'Enregistrer'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
