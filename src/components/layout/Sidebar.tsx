@@ -6,8 +6,10 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  Workflow
+  Workflow,
+  ShieldCheck
 } from 'lucide-react';
+import { useUserRole } from '@/hooks/useUserRole';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -26,9 +28,14 @@ const menuItems = [
   { id: 'settings', label: 'Paramètres', icon: Settings, path: '/' },
 ];
 
+const adminMenuItem = { id: 'admin', label: 'Administration', icon: ShieldCheck, path: '/admin' };
+
 export function Sidebar({ activeView, onViewChange }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const navigate = useNavigate();
+  const { isAdmin } = useUserRole();
+
+  const allMenuItems = isAdmin ? [...menuItems, adminMenuItem] : menuItems;
 
   return (
     <aside 
@@ -61,7 +68,7 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="flex-1 p-3 space-y-1">
-        {menuItems.map((item) => {
+        {allMenuItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeView === item.id;
           
