@@ -67,6 +67,18 @@ export function useAdminData() {
     return data;
   };
 
+  const updateCompany = async (id: string, name: string, description?: string) => {
+    const { data, error } = await supabase
+      .from('companies')
+      .update({ name, description })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    setCompanies(prev => prev.map(c => c.id === id ? data : c).sort((a, b) => a.name.localeCompare(b.name)));
+    return data;
+  };
+
   const deleteCompany = async (id: string) => {
     const { error } = await supabase.from('companies').delete().eq('id', id);
     if (error) throw error;
@@ -82,6 +94,18 @@ export function useAdminData() {
       .single();
     if (error) throw error;
     setDepartments(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+    return data;
+  };
+
+  const updateDepartment = async (id: string, name: string, company_id?: string, description?: string) => {
+    const { data, error } = await supabase
+      .from('departments')
+      .update({ name, company_id, description })
+      .eq('id', id)
+      .select('*, company:companies(*)')
+      .single();
+    if (error) throw error;
+    setDepartments(prev => prev.map(d => d.id === id ? data : d).sort((a, b) => a.name.localeCompare(b.name)));
     return data;
   };
 
@@ -103,6 +127,18 @@ export function useAdminData() {
     return data;
   };
 
+  const updateJobTitle = async (id: string, name: string, department_id?: string, description?: string) => {
+    const { data, error } = await supabase
+      .from('job_titles')
+      .update({ name, department_id, description })
+      .eq('id', id)
+      .select('*, department:departments(*, company:companies(*))')
+      .single();
+    if (error) throw error;
+    setJobTitles(prev => prev.map(j => j.id === id ? data : j).sort((a, b) => a.name.localeCompare(b.name)));
+    return data;
+  };
+
   const deleteJobTitle = async (id: string) => {
     const { error } = await supabase.from('job_titles').delete().eq('id', id);
     if (error) throw error;
@@ -118,6 +154,18 @@ export function useAdminData() {
       .single();
     if (error) throw error;
     setHierarchyLevels(prev => [...prev, data].sort((a, b) => a.level - b.level));
+    return data;
+  };
+
+  const updateHierarchyLevel = async (id: string, name: string, level: number, description?: string) => {
+    const { data, error } = await supabase
+      .from('hierarchy_levels')
+      .update({ name, level, description })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    setHierarchyLevels(prev => prev.map(h => h.id === id ? data : h).sort((a, b) => a.level - b.level));
     return data;
   };
 
@@ -139,6 +187,18 @@ export function useAdminData() {
     return data;
   };
 
+  const updatePermissionProfile = async (id: string, profile: Partial<Omit<PermissionProfile, 'id' | 'created_at' | 'updated_at'>>) => {
+    const { data, error } = await supabase
+      .from('permission_profiles')
+      .update(profile)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    setPermissionProfiles(prev => prev.map(p => p.id === id ? data : p).sort((a, b) => a.name.localeCompare(b.name)));
+    return data;
+  };
+
   const deletePermissionProfile = async (id: string) => {
     const { error } = await supabase.from('permission_profiles').delete().eq('id', id);
     if (error) throw error;
@@ -155,14 +215,19 @@ export function useAdminData() {
     isLoading,
     refetch: fetchAll,
     addCompany,
+    updateCompany,
     deleteCompany,
     addDepartment,
+    updateDepartment,
     deleteDepartment,
     addJobTitle,
+    updateJobTitle,
     deleteJobTitle,
     addHierarchyLevel,
+    updateHierarchyLevel,
     deleteHierarchyLevel,
     addPermissionProfile,
+    updatePermissionProfile,
     deletePermissionProfile,
   };
 }

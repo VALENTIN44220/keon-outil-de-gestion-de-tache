@@ -17,14 +17,19 @@ interface AdminTabsProps {
   users: UserProfile[];
   refetch: () => void;
   addCompany: (name: string, description?: string) => Promise<Company>;
+  updateCompany: (id: string, name: string, description?: string) => Promise<Company>;
   deleteCompany: (id: string) => Promise<void>;
   addDepartment: (name: string, company_id?: string, description?: string) => Promise<Department>;
+  updateDepartment: (id: string, name: string, company_id?: string, description?: string) => Promise<Department>;
   deleteDepartment: (id: string) => Promise<void>;
   addJobTitle: (name: string, department_id?: string, description?: string) => Promise<JobTitle>;
+  updateJobTitle: (id: string, name: string, department_id?: string, description?: string) => Promise<JobTitle>;
   deleteJobTitle: (id: string) => Promise<void>;
   addHierarchyLevel: (name: string, level: number, description?: string) => Promise<HierarchyLevel>;
+  updateHierarchyLevel: (id: string, name: string, level: number, description?: string) => Promise<HierarchyLevel>;
   deleteHierarchyLevel: (id: string) => Promise<void>;
   addPermissionProfile: (profile: Omit<PermissionProfile, 'id' | 'created_at' | 'updated_at'>) => Promise<PermissionProfile>;
+  updatePermissionProfile: (id: string, profile: Partial<Omit<PermissionProfile, 'id' | 'created_at' | 'updated_at'>>) => Promise<PermissionProfile>;
   deletePermissionProfile: (id: string) => Promise<void>;
 }
 
@@ -74,7 +79,8 @@ export function AdminTabs(props: AdminTabsProps) {
       <TabsContent value="companies">
         <CompaniesTab 
           companies={props.companies} 
-          onAdd={props.addCompany} 
+          onAdd={props.addCompany}
+          onUpdate={props.updateCompany}
           onDelete={props.deleteCompany} 
         />
       </TabsContent>
@@ -83,7 +89,8 @@ export function AdminTabs(props: AdminTabsProps) {
         <DepartmentsTab 
           departments={props.departments}
           companies={props.companies}
-          onAdd={props.addDepartment} 
+          onAdd={props.addDepartment}
+          onUpdate={props.updateDepartment}
           onDelete={props.deleteDepartment} 
         />
       </TabsContent>
@@ -92,7 +99,8 @@ export function AdminTabs(props: AdminTabsProps) {
         <JobTitlesTab 
           jobTitles={props.jobTitles}
           departments={props.departments}
-          onAdd={props.addJobTitle} 
+          onAdd={props.addJobTitle}
+          onUpdate={props.updateJobTitle}
           onDelete={props.deleteJobTitle} 
         />
       </TabsContent>
@@ -100,7 +108,8 @@ export function AdminTabs(props: AdminTabsProps) {
       <TabsContent value="hierarchy">
         <HierarchyLevelsTab 
           hierarchyLevels={props.hierarchyLevels} 
-          onAdd={props.addHierarchyLevel} 
+          onAdd={props.addHierarchyLevel}
+          onUpdate={props.updateHierarchyLevel}
           onDelete={props.deleteHierarchyLevel} 
         />
       </TabsContent>
@@ -108,7 +117,8 @@ export function AdminTabs(props: AdminTabsProps) {
       <TabsContent value="permissions">
         <PermissionProfilesTab 
           permissionProfiles={props.permissionProfiles} 
-          onAdd={props.addPermissionProfile} 
+          onAdd={props.addPermissionProfile}
+          onUpdate={props.updatePermissionProfile}
           onDelete={props.deletePermissionProfile} 
         />
       </TabsContent>
