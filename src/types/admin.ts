@@ -40,10 +40,18 @@ export interface PermissionProfile {
   name: string;
   description: string | null;
   can_manage_users: boolean;
-  can_manage_tasks: boolean;
   can_manage_templates: boolean;
+  // Permissions sur ses propres tâches
+  can_view_own_tasks: boolean;
+  can_manage_own_tasks: boolean;
+  // Permissions sur les subordonnés hiérarchiques (managers)
+  can_view_subordinates_tasks: boolean;
+  can_manage_subordinates_tasks: boolean;
+  can_assign_to_subordinates: boolean;
+  // Permissions globales (admin)
   can_view_all_tasks: boolean;
-  can_assign_tasks: boolean;
+  can_manage_all_tasks: boolean;
+  can_assign_to_all: boolean;
   created_at: string;
   updated_at: string;
 }
