@@ -5,14 +5,17 @@ import { Dashboard } from '@/components/dashboard/Dashboard';
 import { TaskList } from '@/components/tasks/TaskList';
 import { TaskFilters } from '@/components/tasks/TaskFilters';
 import { AddTaskDialog } from '@/components/tasks/AddTaskDialog';
+import { CreateFromTemplateDialog } from '@/components/tasks/CreateFromTemplateDialog';
 import { useTasks } from '@/hooks/useTasks';
 import { useNotifications } from '@/hooks/useNotifications';
-import { Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Loader2, Workflow } from 'lucide-react';
 import { toast } from 'sonner';
 
 const Index = () => {
   const [activeView, setActiveView] = useState('dashboard');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   
   const {
     tasks,
@@ -28,6 +31,7 @@ const Index = () => {
     updateTaskStatus,
     addTask,
     deleteTask,
+    refetch,
   } = useTasks();
 
   const { notifications, unreadCount, hasUrgent } = useNotifications(allTasks);
@@ -80,12 +84,22 @@ const Index = () => {
       case 'tasks':
         return (
           <>
-            <TaskFilters
-              statusFilter={statusFilter}
-              priorityFilter={priorityFilter}
-              onStatusChange={setStatusFilter}
-              onPriorityChange={setPriorityFilter}
-            />
+            <div className="flex items-center justify-between mb-4">
+              <TaskFilters
+                statusFilter={statusFilter}
+                priorityFilter={priorityFilter}
+                onStatusChange={setStatusFilter}
+                onPriorityChange={setPriorityFilter}
+              />
+              <Button 
+                variant="outline" 
+                onClick={() => setIsTemplateDialogOpen(true)}
+                className="gap-2"
+              >
+                <Workflow className="h-4 w-4" />
+                Depuis un modèle
+              </Button>
+            </div>
             <TaskList 
               tasks={tasks} 
               onStatusChange={updateTaskStatus}
@@ -141,6 +155,12 @@ const Index = () => {
         open={isAddDialogOpen}
         onClose={() => setIsAddDialogOpen(false)}
         onAdd={addTask}
+      />
+
+      <CreateFromTemplateDialog
+        open={isTemplateDialogOpen}
+        onClose={() => setIsTemplateDialogOpen(false)}
+        onTasksCreated={refetch}
       />
     </div>
   );
