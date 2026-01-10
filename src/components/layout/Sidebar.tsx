@@ -10,6 +10,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useAuth } from '@/contexts/AuthContext';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -34,8 +35,19 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const navigate = useNavigate();
   const { isAdmin } = useUserRole();
+  const { profile } = useAuth();
 
   const allMenuItems = isAdmin ? [...menuItems, adminMenuItem] : menuItems;
+
+  // Get user initials from display name
+  const getInitials = (name: string | null | undefined) => {
+    if (!name) return '?';
+    const parts = name.trim().split(' ');
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    }
+    return name.slice(0, 2).toUpperCase();
+  };
 
   return (
     <aside 
@@ -102,12 +114,12 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
           collapsed && "justify-center"
         )}>
           <div className="w-8 h-8 rounded-full bg-sidebar-accent flex items-center justify-center flex-shrink-0">
-            <span className="text-sm font-medium">MD</span>
+            <span className="text-sm font-medium">{getInitials(profile?.display_name)}</span>
           </div>
           {!collapsed && (
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">Marie Dupont</p>
-              <p className="text-xs text-sidebar-foreground/60 truncate">Responsable</p>
+              <p className="text-sm font-medium truncate">{profile?.display_name || 'Utilisateur'}</p>
+              <p className="text-xs text-sidebar-foreground/60 truncate">{profile?.job_title || 'Non défini'}</p>
             </div>
           )}
         </div>
