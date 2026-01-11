@@ -252,7 +252,7 @@ const Index = () => {
 
   return (
     <div className="flex h-screen bg-background">
-      <Sidebar activeView={activeView} onViewChange={setActiveView} />
+      <Sidebar activeView={activeView} onViewChange={setActiveView} onAddTask={() => setIsAddDialogOpen(true)} />
       
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header 

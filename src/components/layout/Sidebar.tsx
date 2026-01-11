@@ -7,17 +7,20 @@ import {
   ChevronLeft,
   ChevronRight,
   Workflow,
-  ShieldCheck
+  ShieldCheck,
+  PlusCircle
 } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useAuth } from '@/contexts/AuthContext';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
 
 interface SidebarProps {
   activeView: string;
   onViewChange: (view: string) => void;
+  onAddTask?: () => void;
 }
 
 const menuItems = [
@@ -31,7 +34,7 @@ const menuItems = [
 
 const adminMenuItem = { id: 'admin', label: 'Administration', icon: ShieldCheck, path: '/admin' };
 
-export function Sidebar({ activeView, onViewChange }: SidebarProps) {
+export function Sidebar({ activeView, onViewChange, onAddTask }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const navigate = useNavigate();
   const { isAdmin } = useUserRole();
@@ -77,6 +80,23 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
           )}
         </button>
       </div>
+
+      {/* Add Task Button */}
+      {onAddTask && (
+        <div className="px-3 pb-2">
+          <Button
+            onClick={onAddTask}
+            className={cn(
+              "w-full gap-2",
+              collapsed ? "px-0" : ""
+            )}
+            size={collapsed ? "icon" : "default"}
+          >
+            <PlusCircle className="w-5 h-5" />
+            {!collapsed && <span>Nouvelle tâche</span>}
+          </Button>
+        </div>
+      )}
 
       {/* Navigation */}
       <nav className="flex-1 p-3 space-y-1">
