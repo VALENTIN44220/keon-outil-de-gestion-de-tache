@@ -14,6 +14,77 @@ export type Database = {
   }
   public: {
     Tables: {
+      assignment_rules: {
+        Row: {
+          category_id: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          priority: number
+          subcategory_id: string | null
+          target_assignee_id: string | null
+          target_department_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          category_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          priority?: number
+          subcategory_id?: string | null
+          target_assignee_id?: string | null
+          target_department_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          priority?: number
+          subcategory_id?: string | null
+          target_assignee_id?: string | null
+          target_department_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assignment_rules_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assignment_rules_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "subcategories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assignment_rules_target_assignee_id_fkey"
+            columns: ["target_assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assignment_rules_target_department_id_fkey"
+            columns: ["target_department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categories: {
         Row: {
           created_at: string
@@ -554,7 +625,9 @@ export type Database = {
           requester_id: string | null
           status: string
           subcategory_id: string | null
+          target_department_id: string | null
           title: string
+          type: string
           updated_at: string
           user_id: string
         }
@@ -571,7 +644,9 @@ export type Database = {
           requester_id?: string | null
           status?: string
           subcategory_id?: string | null
+          target_department_id?: string | null
           title: string
+          type?: string
           updated_at?: string
           user_id: string
         }
@@ -588,7 +663,9 @@ export type Database = {
           requester_id?: string | null
           status?: string
           subcategory_id?: string | null
+          target_department_id?: string | null
           title?: string
+          type?: string
           updated_at?: string
           user_id?: string
         }
@@ -626,6 +703,13 @@ export type Database = {
             columns: ["subcategory_id"]
             isOneToOne: false
             referencedRelation: "subcategories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_target_department_id_fkey"
+            columns: ["target_department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
             referencedColumns: ["id"]
           },
         ]

@@ -99,6 +99,7 @@ export function useTasks() {
       .insert({
         ...taskData,
         user_id: user.id,
+        type: taskData.type || 'task',
       })
       .select()
       .single();

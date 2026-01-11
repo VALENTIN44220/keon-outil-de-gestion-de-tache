@@ -117,6 +117,7 @@ export function CreateFromTemplateDialog({ open, onClose, onTasksCreated }: Crea
         description: template.description,
         priority: template.priority,
         status: 'todo' as const,
+        type: 'task' as const,
         category: template.category,
         category_id: template.category_id,
         subcategory_id: template.subcategory_id,
@@ -125,6 +126,7 @@ export function CreateFromTemplateDialog({ open, onClose, onTasksCreated }: Crea
         assignee_id: null,
         requester_id: null,
         reporter_id: null,
+        target_department_id: null,
       }));
 
       const { data: createdTasks, error } = await supabase
