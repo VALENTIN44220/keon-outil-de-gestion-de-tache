@@ -53,6 +53,8 @@ export function AssignmentRulesTab({ departments, users }: AssignmentRulesTabPro
   const [targetDepartmentId, setTargetDepartmentId] = useState<string | null>(null);
   const [targetAssigneeId, setTargetAssigneeId] = useState<string | null>(null);
   const [priority, setPriority] = useState(0);
+  const [requiresValidation, setRequiresValidation] = useState(false);
+  const [autoAssign, setAutoAssign] = useState(true);
   const [isActive, setIsActive] = useState(true);
 
   const selectedCategory = categories.find(c => c.id === categoryId);
@@ -68,6 +70,8 @@ export function AssignmentRulesTab({ departments, users }: AssignmentRulesTabPro
     setTargetAssigneeId(null);
     setPriority(0);
     setIsActive(true);
+    setRequiresValidation(false);
+    setAutoAssign(true);
     setEditingRule(null);
   };
 
@@ -82,6 +86,8 @@ export function AssignmentRulesTab({ departments, users }: AssignmentRulesTabPro
     setTargetAssigneeId(rule.target_assignee_id);
     setPriority(rule.priority);
     setIsActive(rule.is_active);
+    setRequiresValidation(rule.requires_validation);
+    setAutoAssign(rule.auto_assign);
     setIsDialogOpen(true);
   };
 
@@ -97,6 +103,8 @@ export function AssignmentRulesTab({ departments, users }: AssignmentRulesTabPro
       target_assignee_id: targetType === 'person' ? targetAssigneeId : null,
       priority,
       is_active: isActive,
+      requires_validation: requiresValidation,
+      auto_assign: autoAssign,
     };
 
     try {
@@ -279,6 +287,16 @@ export function AssignmentRulesTab({ departments, users }: AssignmentRulesTabPro
               <div className="flex items-center justify-between">
                 <Label>Règle active</Label>
                 <Switch checked={isActive} onCheckedChange={setIsActive} />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <Label>Affectation automatique</Label>
+                <Switch checked={autoAssign} onCheckedChange={setAutoAssign} />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <Label>Validation requise</Label>
+                <Switch checked={requiresValidation} onCheckedChange={setRequiresValidation} />
               </div>
 
               <div className="flex justify-end gap-3 pt-4">

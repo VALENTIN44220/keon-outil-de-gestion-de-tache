@@ -60,9 +60,12 @@ export function useTasks() {
     const todo = tasks.filter(t => t.status === 'todo').length;
     const inProgress = tasks.filter(t => t.status === 'in-progress').length;
     const done = tasks.filter(t => t.status === 'done').length;
-    const completionRate = total > 0 ? Math.round((done / total) * 100) : 0;
+    const pendingValidation = tasks.filter(t => t.status === 'pending-validation').length;
+    const validated = tasks.filter(t => t.status === 'validated').length;
+    const refused = tasks.filter(t => t.status === 'refused').length;
+    const completionRate = total > 0 ? Math.round(((done + validated) / total) * 100) : 0;
 
-    return { total, todo, inProgress, done, completionRate };
+    return { total, todo, inProgress, done, pendingValidation, validated, refused, completionRate };
   }, [tasks]);
 
   const updateTaskStatus = async (taskId: string, newStatus: TaskStatus) => {
@@ -90,9 +93,17 @@ export function useTasks() {
 
   const addTask = async (
     taskData: Omit<Task, 'id' | 'user_id' | 'created_at' | 'updated_at'>,
-    checklistItems?: { id: string; title: string; order_index: number }[]
+    checklistItems?: { id: string; title: string; order_index: number }[],
+    links?: { id: string; name: string; url: string; type: 'link' | 'file' }[]
   ) => {
     if (!user) return;
+
+    // Get the user's profile for requester_id
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('user_id', user.id)
+      .single();
 
     const { data, error } = await supabase
       .from('tasks')
@@ -100,6 +111,7 @@ export function useTasks() {
         ...taskData,
         user_id: user.id,
         type: taskData.type || 'task',
+        requester_id: taskData.requester_id || profileData?.id || null,
       })
       .select()
       .single();
@@ -124,10 +136,27 @@ export function useTasks() {
           .insert(checklistsToCreate);
       }
 
+      // Create attachments/links if provided
+      if (links && links.length > 0) {
+        const attachmentsToCreate = links.map(link => ({
+          task_id: data.id,
+          name: link.name,
+          url: link.url,
+          type: link.type,
+          uploaded_by: profileData?.id || null,
+        }));
+
+        await supabase
+          .from('task_attachments')
+          .insert(attachmentsToCreate);
+      }
+
       setTasks(prev => [data as Task, ...prev]);
       toast({
-        title: 'Tâche créée',
-        description: 'La tâche a été ajoutée avec succès',
+        title: taskData.type === 'request' ? 'Demande créée' : 'Tâche créée',
+        description: taskData.type === 'request' 
+          ? 'La demande a été soumise avec succès'
+          : 'La tâche a été ajoutée avec succès',
       });
     }
   };

@@ -127,6 +127,8 @@ export function CreateFromTemplateDialog({ open, onClose, onTasksCreated }: Crea
         requester_id: null,
         reporter_id: null,
         target_department_id: null,
+        requires_validation: (template as any).requires_validation || false,
+        current_validation_level: 0,
       }));
 
       const { data: createdTasks, error } = await supabase
