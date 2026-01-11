@@ -9,8 +9,10 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { MoreVertical, Plus, Trash2, Building2, Briefcase, ListTodo, Edit } from 'lucide-react';
+import { MoreVertical, Plus, Trash2, Building2, Briefcase, ListTodo, Edit, ChevronDown, ChevronRight } from 'lucide-react';
 import { AddTaskTemplateDialog } from './AddTaskTemplateDialog';
+import { TemplateChecklistEditor } from './TemplateChecklistEditor';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface ProcessCardProps {
   process: ProcessWithTasks;
@@ -29,6 +31,19 @@ const priorityColors: Record<string, string> = {
 
 export function ProcessCard({ process, onDelete, onEdit, onAddTask, onDeleteTask }: ProcessCardProps) {
   const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+
+  const toggleTaskExpanded = (taskId: string) => {
+    setExpandedTasks(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(taskId)) {
+        newSet.delete(taskId);
+      } else {
+        newSet.add(taskId);
+      }
+      return newSet;
+    });
+  };
 
   return (
     <>
@@ -92,39 +107,56 @@ export function ProcessCard({ process, onDelete, onEdit, onAddTask, onDeleteTask
                 Aucune tâche modèle
               </p>
             ) : (
-              process.task_templates.slice(0, 4).map((task, index) => (
-                <div 
+              process.task_templates.slice(0, 6).map((task, index) => (
+                <Collapsible
                   key={task.id}
-                  className="flex items-center justify-between p-2 rounded-lg bg-muted/50"
+                  open={expandedTasks.has(task.id)}
+                  onOpenChange={() => toggleTaskExpanded(task.id)}
                 >
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground w-5">
-                      {index + 1}.
-                    </span>
-                    <span className="text-sm truncate max-w-[150px]">{task.title}</span>
+                  <div className="rounded-lg bg-muted/50 overflow-hidden">
+                    <div className="flex items-center justify-between p-2">
+                      <CollapsibleTrigger asChild>
+                        <button className="flex items-center gap-2 flex-1 text-left hover:bg-muted/50 rounded transition-colors">
+                          {expandedTasks.has(task.id) ? (
+                            <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                          ) : (
+                            <ChevronRight className="h-3 w-3 text-muted-foreground" />
+                          )}
+                          <span className="text-xs text-muted-foreground w-4">
+                            {index + 1}.
+                          </span>
+                          <span className="text-sm truncate max-w-[120px]">{task.title}</span>
+                        </button>
+                      </CollapsibleTrigger>
+                      <div className="flex items-center gap-2">
+                        <Badge 
+                          variant="outline" 
+                          className={`text-xs ${priorityColors[task.priority]}`}
+                        >
+                          {task.priority}
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => onDeleteTask(task.id)}
+                        >
+                          <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
+                    <CollapsibleContent>
+                      <div className="px-2 pb-2">
+                        <TemplateChecklistEditor taskTemplateId={task.id} />
+                      </div>
+                    </CollapsibleContent>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge 
-                      variant="outline" 
-                      className={`text-xs ${priorityColors[task.priority]}`}
-                    >
-                      {task.priority}
-                    </Badge>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6"
-                      onClick={() => onDeleteTask(task.id)}
-                    >
-                      <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
-                    </Button>
-                  </div>
-                </div>
+                </Collapsible>
               ))
             )}
-            {process.task_templates.length > 4 && (
+            {process.task_templates.length > 6 && (
               <p className="text-xs text-muted-foreground text-center">
-                +{process.task_templates.length - 4} autres tâches
+                +{process.task_templates.length - 6} autres tâches
               </p>
             )}
           </div>

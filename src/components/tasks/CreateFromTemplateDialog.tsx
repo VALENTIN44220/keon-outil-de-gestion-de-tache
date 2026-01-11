@@ -92,6 +92,26 @@ export function CreateFromTemplateDialog({ open, onClose, onTasksCreated }: Crea
 
     setIsLoading(true);
     try {
+      // First, fetch all template checklists for this process's task templates
+      const templateIds = selectedProcess.task_templates.map(t => t.id);
+      const { data: templateChecklists } = await supabase
+        .from('task_template_checklists')
+        .select('*')
+        .in('task_template_id', templateIds)
+        .order('order_index', { ascending: true });
+
+      // Create a map of template id to its checklists
+      const checklistsByTemplate: Record<string, { title: string; order_index: number }[]> = {};
+      (templateChecklists || []).forEach((item: any) => {
+        if (!checklistsByTemplate[item.task_template_id]) {
+          checklistsByTemplate[item.task_template_id] = [];
+        }
+        checklistsByTemplate[item.task_template_id].push({
+          title: item.title,
+          order_index: item.order_index,
+        });
+      });
+
       const tasksToCreate = selectedProcess.task_templates.map((template, index) => ({
         title: template.title,
         description: template.description,
@@ -107,11 +127,36 @@ export function CreateFromTemplateDialog({ open, onClose, onTasksCreated }: Crea
         reporter_id: null,
       }));
 
-      const { error } = await supabase
+      const { data: createdTasks, error } = await supabase
         .from('tasks')
-        .insert(tasksToCreate);
+        .insert(tasksToCreate)
+        .select();
 
       if (error) throw error;
+
+      // Now create the checklists for each created task
+      if (createdTasks && createdTasks.length > 0) {
+        const checklistsToCreate: { task_id: string; title: string; order_index: number }[] = [];
+        
+        createdTasks.forEach((task, index) => {
+          const templateId = selectedProcess.task_templates[index].id;
+          const templateChecklistItems = checklistsByTemplate[templateId] || [];
+          
+          templateChecklistItems.forEach(item => {
+            checklistsToCreate.push({
+              task_id: task.id,
+              title: item.title,
+              order_index: item.order_index,
+            });
+          });
+        });
+
+        if (checklistsToCreate.length > 0) {
+          await supabase
+            .from('task_checklists')
+            .insert(checklistsToCreate);
+        }
+      }
 
       toast.success(`${tasksToCreate.length} tâche(s) créée(s) avec succès`);
       onTasksCreated();
