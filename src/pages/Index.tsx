@@ -11,6 +11,7 @@ import { CalendarView } from '@/components/tasks/CalendarView';
 import { AddTaskDialog } from '@/components/tasks/AddTaskDialog';
 import { CreateFromTemplateDialog } from '@/components/tasks/CreateFromTemplateDialog';
 import { useTasks } from '@/hooks/useTasks';
+import { useTasksProgress } from '@/hooks/useChecklists';
 import { useNotifications } from '@/hooks/useNotifications';
 import { Button } from '@/components/ui/button';
 import { Loader2, Workflow } from 'lucide-react';
@@ -54,6 +55,10 @@ const Index = () => {
 
   const { categories } = useCategories();
   const { notifications, unreadCount, hasUrgent } = useNotifications(allTasks);
+  
+  // Get progress for all tasks
+  const taskIds = useMemo(() => allTasks.map(t => t.id), [allTasks]);
+  const { progressMap, globalProgress, globalStats } = useTasksProgress(taskIds);
 
   // Fetch profiles for group labels
   useEffect(() => {
@@ -141,6 +146,7 @@ const Index = () => {
             onDelete={deleteTask}
             groupBy={advancedFilters.groupBy}
             groupLabels={groupLabels}
+            progressMap={progressMap}
           />
         );
       case 'calendar':
@@ -151,6 +157,7 @@ const Index = () => {
             onDelete={deleteTask}
             groupBy={advancedFilters.groupBy}
             groupLabels={groupLabels}
+            progressMap={progressMap}
           />
         );
       default:
@@ -161,6 +168,7 @@ const Index = () => {
             onDelete={deleteTask}
             groupBy={advancedFilters.groupBy}
             groupLabels={groupLabels}
+            progressMap={progressMap}
           />
         );
     }
@@ -183,6 +191,9 @@ const Index = () => {
             recentTasks={allTasks.slice(0, 6)}
             onStatusChange={updateTaskStatus}
             onDelete={deleteTask}
+            globalProgress={globalProgress}
+            globalStats={globalStats}
+            progressMap={progressMap}
           />
         );
       case 'tasks':

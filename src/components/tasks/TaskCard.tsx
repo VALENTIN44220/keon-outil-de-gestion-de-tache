@@ -1,4 +1,5 @@
-import { Clock, User, MoreVertical, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import { Clock, User, MoreVertical, Trash2, ChevronDown, ChevronRight, ListChecks } from 'lucide-react';
 import { Task, TaskStatus } from '@/types/task';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -10,12 +11,16 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
+import { TaskChecklist } from './TaskChecklist';
+import { TaskProgressBadge } from './TaskProgressBadge';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface TaskCardProps {
   task: Task;
   onStatusChange: (taskId: string, status: TaskStatus) => void;
   onDelete: (taskId: string) => void;
   compact?: boolean;
+  taskProgress?: { completed: number; total: number; progress: number };
 }
 
 const priorityColors = {
@@ -44,7 +49,8 @@ const statusLabels = {
   done: 'Terminé',
 };
 
-export function TaskCard({ task, onStatusChange, onDelete, compact = false }: TaskCardProps) {
+export function TaskCard({ task, onStatusChange, onDelete, compact = false, taskProgress }: TaskCardProps) {
+  const [isChecklistOpen, setIsChecklistOpen] = useState(false);
   const dueDate = task.due_date ? new Date(task.due_date) : null;
   const isOverdue = dueDate && dueDate < new Date() && task.status !== 'done';
 
@@ -61,6 +67,13 @@ export function TaskCard({ task, onStatusChange, onDelete, compact = false }: Ta
             <Badge variant="outline" className={cn("text-xs", priorityColors[task.priority])}>
               {priorityLabels[task.priority]}
             </Badge>
+            {taskProgress && taskProgress.total > 0 && (
+              <TaskProgressBadge 
+                progress={taskProgress.progress} 
+                completed={taskProgress.completed} 
+                total={taskProgress.total} 
+              />
+            )}
           </div>
 
           {/* Title */}
@@ -98,6 +111,22 @@ export function TaskCard({ task, onStatusChange, onDelete, compact = false }: Ta
                 </span>
               </div>
             )}
+            {!compact && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs"
+                onClick={() => setIsChecklistOpen(!isChecklistOpen)}
+              >
+                <ListChecks className="w-3.5 h-3.5 mr-1" />
+                Sous-actions
+                {isChecklistOpen ? (
+                  <ChevronDown className="w-3 h-3 ml-1" />
+                ) : (
+                  <ChevronRight className="w-3 h-3 ml-1" />
+                )}
+              </Button>
+            )}
           </div>
         </div>
 
@@ -129,6 +158,13 @@ export function TaskCard({ task, onStatusChange, onDelete, compact = false }: Ta
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {/* Checklist section */}
+      {!compact && isChecklistOpen && (
+        <div className="mt-4 pt-4 border-t border-border/50">
+          <TaskChecklist taskId={task.id} />
+        </div>
+      )}
     </div>
   );
 }
