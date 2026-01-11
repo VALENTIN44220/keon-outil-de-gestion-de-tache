@@ -9,8 +9,10 @@ import { TaskViewSelector, TaskView } from '@/components/tasks/TaskViewSelector'
 import { KanbanBoard } from '@/components/tasks/KanbanBoard';
 import { CalendarView } from '@/components/tasks/CalendarView';
 import { AddTaskDialog } from '@/components/tasks/AddTaskDialog';
-import { UnifiedTaskDialog } from '@/components/tasks/UnifiedTaskDialog';
+import { NewTaskDialog } from '@/components/tasks/NewTaskDialog';
+import { NewRequestDialog } from '@/components/tasks/NewRequestDialog';
 import { CreateFromTemplateDialog } from '@/components/tasks/CreateFromTemplateDialog';
+import { ActionType } from '@/components/layout/NewActionMenu';
 import { useTasks } from '@/hooks/useTasks';
 import { useTasksProgress } from '@/hooks/useChecklists';
 import { useNotifications } from '@/hooks/useNotifications';
@@ -23,6 +25,8 @@ import { useCategories } from '@/hooks/useCategories';
 const Index = () => {
   const [activeView, setActiveView] = useState('dashboard');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [taskDialogMode, setTaskDialogMode] = useState<ActionType>('personal');
+  const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const [taskView, setTaskView] = useState<TaskView>('grid');
@@ -252,13 +256,21 @@ const Index = () => {
     }
   };
 
+  const handleNewAction = (type: ActionType) => {
+    if (type === 'request') {
+      setIsRequestDialogOpen(true);
+    } else {
+      setTaskDialogMode(type);
+      setIsTaskDialogOpen(true);
+    }
+  };
+
   return (
     <div className="flex h-screen bg-background">
       <Sidebar 
         activeView={activeView} 
         onViewChange={setActiveView} 
-        onAddTask={() => setIsAddDialogOpen(true)}
-        onAddRequest={() => setIsRequestDialogOpen(true)}
+        onNewAction={handleNewAction}
       />
       
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -284,7 +296,15 @@ const Index = () => {
         onAdd={addTask}
       />
 
-      <UnifiedTaskDialog
+      <NewTaskDialog
+        open={isTaskDialogOpen}
+        onClose={() => setIsTaskDialogOpen(false)}
+        mode={taskDialogMode}
+        onAdd={addTask}
+        onTasksCreated={refetch}
+      />
+
+      <NewRequestDialog
         open={isRequestDialogOpen}
         onClose={() => setIsRequestDialogOpen(false)}
         onAdd={addTask}

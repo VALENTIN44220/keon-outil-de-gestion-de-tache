@@ -59,7 +59,6 @@ const Templates = () => {
   return (
     <div className="flex h-screen bg-background">
       <Sidebar activeView={activeView} onViewChange={setActiveView} />
-      
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header 
           title="Modèles de processus"

@@ -297,6 +297,7 @@ export type Database = {
           department: string | null
           description: string | null
           id: string
+          is_shared: boolean
           name: string
           updated_at: string
           user_id: string
@@ -307,6 +308,7 @@ export type Database = {
           department?: string | null
           description?: string | null
           id?: string
+          is_shared?: boolean
           name: string
           updated_at?: string
           user_id: string
@@ -317,6 +319,7 @@ export type Database = {
           department?: string | null
           description?: string | null
           id?: string
+          is_shared?: boolean
           name?: string
           updated_at?: string
           user_id?: string
@@ -600,6 +603,7 @@ export type Database = {
           default_duration_days: number | null
           description: string | null
           id: string
+          is_shared: boolean
           order_index: number | null
           priority: string
           process_template_id: string | null
@@ -616,6 +620,7 @@ export type Database = {
           default_duration_days?: number | null
           description?: string | null
           id?: string
+          is_shared?: boolean
           order_index?: number | null
           priority?: string
           process_template_id?: string | null
@@ -632,6 +637,7 @@ export type Database = {
           default_duration_days?: number | null
           description?: string | null
           id?: string
+          is_shared?: boolean
           order_index?: number | null
           priority?: string
           process_template_id?: string | null
