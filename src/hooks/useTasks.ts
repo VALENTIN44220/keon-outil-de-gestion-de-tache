@@ -88,7 +88,10 @@ export function useTasks() {
     }
   };
 
-  const addTask = async (taskData: Omit<Task, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
+  const addTask = async (
+    taskData: Omit<Task, 'id' | 'user_id' | 'created_at' | 'updated_at'>,
+    checklistItems?: { id: string; title: string; order_index: number }[]
+  ) => {
     if (!user) return;
 
     const { data, error } = await supabase
@@ -107,6 +110,19 @@ export function useTasks() {
         variant: 'destructive',
       });
     } else {
+      // Create checklist items if provided
+      if (checklistItems && checklistItems.length > 0) {
+        const checklistsToCreate = checklistItems.map(item => ({
+          task_id: data.id,
+          title: item.title,
+          order_index: item.order_index,
+        }));
+
+        await supabase
+          .from('task_checklists')
+          .insert(checklistsToCreate);
+      }
+
       setTasks(prev => [data as Task, ...prev]);
       toast({
         title: 'Tâche créée',
