@@ -9,6 +9,7 @@ import { TaskViewSelector, TaskView } from '@/components/tasks/TaskViewSelector'
 import { KanbanBoard } from '@/components/tasks/KanbanBoard';
 import { CalendarView } from '@/components/tasks/CalendarView';
 import { AddTaskDialog } from '@/components/tasks/AddTaskDialog';
+import { AddRequestDialog } from '@/components/tasks/AddRequestDialog';
 import { CreateFromTemplateDialog } from '@/components/tasks/CreateFromTemplateDialog';
 import { useTasks } from '@/hooks/useTasks';
 import { useTasksProgress } from '@/hooks/useChecklists';
@@ -22,6 +23,7 @@ import { useCategories } from '@/hooks/useCategories';
 const Index = () => {
   const [activeView, setActiveView] = useState('dashboard');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const [taskView, setTaskView] = useState<TaskView>('grid');
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFiltersState>({
@@ -252,7 +254,12 @@ const Index = () => {
 
   return (
     <div className="flex h-screen bg-background">
-      <Sidebar activeView={activeView} onViewChange={setActiveView} onAddTask={() => setIsAddDialogOpen(true)} />
+      <Sidebar 
+        activeView={activeView} 
+        onViewChange={setActiveView} 
+        onAddTask={() => setIsAddDialogOpen(true)}
+        onAddRequest={() => setIsRequestDialogOpen(true)}
+      />
       
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header 
@@ -274,6 +281,12 @@ const Index = () => {
       <AddTaskDialog
         open={isAddDialogOpen}
         onClose={() => setIsAddDialogOpen(false)}
+        onAdd={addTask}
+      />
+
+      <AddRequestDialog
+        open={isRequestDialogOpen}
+        onClose={() => setIsRequestDialogOpen(false)}
         onAdd={addTask}
       />
 

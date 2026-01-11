@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Task, TaskStatus, TaskPriority } from '@/types/task';
+import { Task, TaskPriority } from '@/types/task';
 import {
   Dialog,
   DialogContent,
@@ -19,8 +19,16 @@ import {
 } from '@/components/ui/select';
 import { CategorySelect } from '@/components/templates/CategorySelect';
 import { useCategories } from '@/hooks/useCategories';
+import { useAssignmentRules } from '@/hooks/useAssignmentRules';
 import { supabase } from '@/integrations/supabase/client';
 import { InlineChecklistEditor } from './InlineChecklistEditor';
+import { Badge } from '@/components/ui/badge';
+import { ArrowRight, Info } from 'lucide-react';
+
+interface Department {
+  id: string;
+  name: string;
+}
 
 interface Profile {
   id: string;
@@ -34,43 +42,40 @@ interface ChecklistItem {
   order_index: number;
 }
 
-interface AddTaskDialogProps {
+interface AddRequestDialogProps {
   open: boolean;
   onClose: () => void;
   onAdd: (task: Omit<Task, 'id' | 'user_id' | 'created_at' | 'updated_at'>, checklistItems?: ChecklistItem[]) => void;
 }
 
-export function AddTaskDialog({ open, onClose, onAdd }: AddTaskDialogProps) {
+export function AddRequestDialog({ open, onClose, onAdd }: AddRequestDialogProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<TaskPriority>('medium');
-  const [status, setStatus] = useState<TaskStatus>('todo');
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [subcategoryId, setSubcategoryId] = useState<string | null>(null);
   const [dueDate, setDueDate] = useState('');
-  const [assigneeId, setAssigneeId] = useState<string | null>(null);
-  const [requesterId, setRequesterId] = useState<string | null>(null);
-  const [reporterId, setReporterId] = useState<string | null>(null);
-  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
 
   const { categories, addCategory, addSubcategory } = useCategories();
+  const { findMatchingRule } = useAssignmentRules();
+
+  // Find matching assignment rule
+  const matchingRule = findMatchingRule(categoryId, subcategoryId);
 
   useEffect(() => {
     if (open) {
-      fetchProfiles();
+      fetchDepartments();
     }
   }, [open]);
 
-  const fetchProfiles = async () => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, display_name, job_title')
-      .order('display_name');
-
-    if (!error && data) {
-      setProfiles(data);
-    }
+  const fetchDepartments = async () => {
+    const { data } = await supabase
+      .from('departments')
+      .select('id, name')
+      .order('name');
+    if (data) setDepartments(data);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -84,19 +89,19 @@ export function AddTaskDialog({ open, onClose, onAdd }: AddTaskDialogProps) {
       title: title.trim(),
       description: description.trim() || null,
       priority,
-      status,
-      type: 'task',
+      status: 'todo',
+      type: 'request',
       category: selectedCategory?.name || null,
       category_id: categoryId,
       subcategory_id: subcategoryId,
       due_date: dueDate || null,
-      assignee_id: assigneeId,
-      requester_id: requesterId,
-      reporter_id: reporterId,
-      target_department_id: null,
+      // Apply assignment rule
+      assignee_id: matchingRule?.target_assignee_id || null,
+      target_department_id: matchingRule?.target_department_id || null,
+      requester_id: null, // Will be set by the hook to current user's profile
+      reporter_id: null,
     }, checklistItems.length > 0 ? checklistItems : undefined);
 
-    // Reset form
     resetForm();
     onClose();
   };
@@ -105,13 +110,9 @@ export function AddTaskDialog({ open, onClose, onAdd }: AddTaskDialogProps) {
     setTitle('');
     setDescription('');
     setPriority('medium');
-    setStatus('todo');
     setCategoryId(null);
     setSubcategoryId(null);
     setDueDate('');
-    setAssigneeId(null);
-    setRequesterId(null);
-    setReporterId(null);
     setChecklistItems([]);
   };
 
@@ -129,33 +130,41 @@ export function AddTaskDialog({ open, onClose, onAdd }: AddTaskDialogProps) {
     }
   };
 
+  const getDepartmentName = (depId: string | null) => {
+    if (!depId) return null;
+    return departments.find(d => d.id === depId)?.name || null;
+  };
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Nouvelle tâche</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            Nouvelle demande
+            <Badge variant="secondary">Ticket</Badge>
+          </DialogTitle>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
           <div className="space-y-2">
-            <Label htmlFor="title">Titre *</Label>
+            <Label htmlFor="title">Titre de la demande *</Label>
             <Input
               id="title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Nom de la tâche"
+              placeholder="Décrivez brièvement votre demande"
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description">Description détaillée</Label>
             <Textarea
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Décrivez la tâche..."
-              rows={3}
+              placeholder="Donnez plus de détails sur votre demande..."
+              rows={4}
             />
           </div>
 
@@ -176,28 +185,14 @@ export function AddTaskDialog({ open, onClose, onAdd }: AddTaskDialogProps) {
             </div>
 
             <div className="space-y-2">
-              <Label>Statut</Label>
-              <Select value={status} onValueChange={(v) => setStatus(v as TaskStatus)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todo">À faire</SelectItem>
-                  <SelectItem value="in-progress">En cours</SelectItem>
-                  <SelectItem value="done">Terminé</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label htmlFor="dueDate">Date souhaitée</Label>
+              <Input
+                id="dueDate"
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+              />
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="dueDate">Date d'échéance</Label>
-            <Input
-              id="dueDate"
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-            />
           </div>
 
           <CategorySelect
@@ -210,74 +205,34 @@ export function AddTaskDialog({ open, onClose, onAdd }: AddTaskDialogProps) {
             onAddSubcategory={handleAddSubcategory}
           />
 
-          <div className="border-t pt-4 mt-4">
-            <Label className="text-base font-medium mb-3 block">Responsabilités</Label>
-            
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Demandeur (qui crée l'action)</Label>
-                <Select 
-                  value={requesterId || 'none'} 
-                  onValueChange={(v) => setRequesterId(v === 'none' ? null : v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner le demandeur" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Non défini</SelectItem>
-                    {profiles.map(profile => (
-                      <SelectItem key={profile.id} value={profile.id}>
-                        {profile.display_name || 'Sans nom'} 
-                        {profile.job_title && ` - ${profile.job_title}`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Exécutant (qui fait l'action)</Label>
-                <Select 
-                  value={assigneeId || 'none'} 
-                  onValueChange={(v) => setAssigneeId(v === 'none' ? null : v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner l'exécutant" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Non défini</SelectItem>
-                    {profiles.map(profile => (
-                      <SelectItem key={profile.id} value={profile.id}>
-                        {profile.display_name || 'Sans nom'} 
-                        {profile.job_title && ` - ${profile.job_title}`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Rapporteur (à qui rapporter l'action)</Label>
-                <Select 
-                  value={reporterId || 'none'} 
-                  onValueChange={(v) => setReporterId(v === 'none' ? null : v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner le rapporteur" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Non défini</SelectItem>
-                    {profiles.map(profile => (
-                      <SelectItem key={profile.id} value={profile.id}>
-                        {profile.display_name || 'Sans nom'} 
-                        {profile.job_title && ` - ${profile.job_title}`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+          {/* Assignment info based on rule */}
+          {categoryId && (
+            <div className="rounded-lg border bg-muted/50 p-4">
+              <div className="flex items-start gap-2">
+                <Info className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium">Affectation automatique</p>
+                  {matchingRule ? (
+                    <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+                      <span>Cette demande sera envoyée à</span>
+                      <ArrowRight className="h-3 w-3" />
+                      <Badge variant="outline">
+                        {matchingRule.target_department_id 
+                          ? `Service: ${getDepartmentName(matchingRule.target_department_id)}`
+                          : 'Personne assignée'
+                        }
+                      </Badge>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Aucune règle d'affectation trouvée pour cette catégorie. 
+                      La demande sera créée sans affectation.
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           <div className="border-t pt-4 mt-4">
             <InlineChecklistEditor 
@@ -291,7 +246,7 @@ export function AddTaskDialog({ open, onClose, onAdd }: AddTaskDialogProps) {
               Annuler
             </Button>
             <Button type="submit">
-              Créer la tâche
+              Soumettre la demande
             </Button>
           </div>
         </form>
