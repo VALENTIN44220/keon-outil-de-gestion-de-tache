@@ -20,6 +20,7 @@ import {
 import { CategorySelect } from '@/components/templates/CategorySelect';
 import { useCategories } from '@/hooks/useCategories';
 import { supabase } from '@/integrations/supabase/client';
+import { InlineChecklistEditor } from './InlineChecklistEditor';
 
 interface Profile {
   id: string;
@@ -27,10 +28,16 @@ interface Profile {
   job_title: string | null;
 }
 
+interface ChecklistItem {
+  id: string;
+  title: string;
+  order_index: number;
+}
+
 interface AddTaskDialogProps {
   open: boolean;
   onClose: () => void;
-  onAdd: (task: Omit<Task, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => void;
+  onAdd: (task: Omit<Task, 'id' | 'user_id' | 'created_at' | 'updated_at'>, checklistItems?: ChecklistItem[]) => void;
 }
 
 export function AddTaskDialog({ open, onClose, onAdd }: AddTaskDialogProps) {
@@ -45,6 +52,7 @@ export function AddTaskDialog({ open, onClose, onAdd }: AddTaskDialogProps) {
   const [requesterId, setRequesterId] = useState<string | null>(null);
   const [reporterId, setReporterId] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
 
   const { categories, addCategory, addSubcategory } = useCategories();
 
@@ -84,7 +92,7 @@ export function AddTaskDialog({ open, onClose, onAdd }: AddTaskDialogProps) {
       assignee_id: assigneeId,
       requester_id: requesterId,
       reporter_id: reporterId,
-    });
+    }, checklistItems.length > 0 ? checklistItems : undefined);
 
     // Reset form
     resetForm();
@@ -102,6 +110,7 @@ export function AddTaskDialog({ open, onClose, onAdd }: AddTaskDialogProps) {
     setAssigneeId(null);
     setRequesterId(null);
     setReporterId(null);
+    setChecklistItems([]);
   };
 
   const handleAddCategory = async (name: string) => {
@@ -266,6 +275,13 @@ export function AddTaskDialog({ open, onClose, onAdd }: AddTaskDialogProps) {
                 </Select>
               </div>
             </div>
+          </div>
+
+          <div className="border-t pt-4 mt-4">
+            <InlineChecklistEditor 
+              items={checklistItems} 
+              onChange={setChecklistItems} 
+            />
           </div>
 
           <div className="flex justify-end gap-3 pt-4">

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Clock, User, MoreVertical, Trash2, ChevronDown, ChevronRight, ListChecks } from 'lucide-react';
+import { Clock, User, MoreVertical, Trash2, ChevronDown, ChevronRight, ListChecks, FileText } from 'lucide-react';
 import { Task, TaskStatus } from '@/types/task';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { TaskChecklist } from './TaskChecklist';
 import { TaskProgressBadge } from './TaskProgressBadge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { CreateTemplateFromTaskDialog } from './CreateTemplateFromTaskDialog';
 
 interface TaskCardProps {
   task: Task;
@@ -51,6 +52,7 @@ const statusLabels = {
 
 export function TaskCard({ task, onStatusChange, onDelete, compact = false, taskProgress }: TaskCardProps) {
   const [isChecklistOpen, setIsChecklistOpen] = useState(false);
+  const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const dueDate = task.due_date ? new Date(task.due_date) : null;
   const isOverdue = dueDate && dueDate < new Date() && task.status !== 'done';
 
@@ -151,6 +153,11 @@ export function TaskCard({ task, onStatusChange, onDelete, compact = false, task
               {statusLabels.done}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setIsTemplateDialogOpen(true)}>
+              <FileText className="w-4 h-4 mr-2" />
+              Créer un modèle
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem className="text-destructive" onClick={() => onDelete(task.id)}>
               <Trash2 className="w-4 h-4 mr-2" />
               Supprimer
@@ -165,6 +172,13 @@ export function TaskCard({ task, onStatusChange, onDelete, compact = false, task
           <TaskChecklist taskId={task.id} />
         </div>
       )}
+
+      {/* Create template dialog */}
+      <CreateTemplateFromTaskDialog
+        open={isTemplateDialogOpen}
+        onClose={() => setIsTemplateDialogOpen(false)}
+        task={task}
+      />
     </div>
   );
 }
