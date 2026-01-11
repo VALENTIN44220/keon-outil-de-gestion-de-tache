@@ -2,102 +2,135 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import '@fontsource/oswald/400.css';
+@import '@fontsource/oswald/500.css';
+@import '@fontsource/oswald/600.css';
+@import '@fontsource/oswald/700.css';
+@import '@fontsource/roboto/300.css';
+@import '@fontsource/roboto/400.css';
+@import '@fontsource/roboto/500.css';
+@import '@fontsource/roboto/700.css';
 
 @layer base {
   :root {
-    --background: 210 20% 98%;
-    --foreground: 222 47% 11%;
+    /* KEON Brand Colors */
+    --keon-dark: 200 6% 27%; /* #414648 - Gris foncé principal */
+    --keon-dark-80: 200 6% 37%;
+    --keon-dark-60: 200 6% 52%;
+    --keon-dark-40: 200 6% 67%;
+    --keon-dark-20: 200 6% 82%;
+    
+    /* Spectre colors */
+    --keon-cyan: 185 80% 50%;
+    --keon-blue: 210 80% 55%;
+    --keon-purple: 270 60% 55%;
+    --keon-red: 10 80% 55%;
+    --keon-orange: 25 90% 55%;
+    --keon-yellow: 45 90% 55%;
+    --keon-green: 145 70% 45%;
+    
+    --background: 0 0% 98%;
+    --foreground: 200 6% 27%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 200 6% 27%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: 200 6% 27%;
 
-    --primary: 221 83% 53%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 200 6% 27%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222 47% 11%;
+    --secondary: 200 6% 95%;
+    --secondary-foreground: 200 6% 27%;
 
-    --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
+    --muted: 200 6% 95%;
+    --muted-foreground: 200 6% 52%;
 
-    --accent: 210 40% 96%;
-    --accent-foreground: 222 47% 11%;
+    --accent: 185 80% 50%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 0 0% 100%;
 
-    --success: 142 76% 36%;
-    --success-foreground: 210 40% 98%;
+    --success: 145 70% 45%;
+    --success-foreground: 0 0% 100%;
 
-    --warning: 38 92% 50%;
-    --warning-foreground: 222 47% 11%;
+    --warning: 45 90% 55%;
+    --warning-foreground: 200 6% 27%;
 
-    --info: 199 89% 48%;
-    --info-foreground: 210 40% 98%;
+    --info: 210 80% 55%;
+    --info-foreground: 0 0% 100%;
 
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 221 83% 53%;
+    --border: 200 6% 90%;
+    --input: 200 6% 90%;
+    --ring: 185 80% 50%;
 
-    --radius: 0.75rem;
+    --radius: 0.5rem;
 
-    --sidebar-background: 222 47% 11%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 221 83% 53%;
-    --sidebar-primary-foreground: 210 40% 98%;
-    --sidebar-accent: 217 33% 17%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217 33% 17%;
-    --sidebar-ring: 221 83% 53%;
+    /* Sidebar - KEON dark theme */
+    --sidebar-background: 200 6% 27%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 185 80% 50%;
+    --sidebar-primary-foreground: 200 6% 27%;
+    --sidebar-accent: 200 6% 35%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 200 6% 35%;
+    --sidebar-ring: 185 80% 50%;
 
-    --chart-1: 221 83% 53%;
-    --chart-2: 142 76% 36%;
-    --chart-3: 38 92% 50%;
-    --chart-4: 0 84% 60%;
-    --chart-5: 262 83% 58%;
+    --chart-1: 185 80% 50%;
+    --chart-2: 145 70% 45%;
+    --chart-3: 45 90% 55%;
+    --chart-4: 10 80% 55%;
+    --chart-5: 270 60% 55%;
   }
 
   .dark {
-    --background: 222 47% 11%;
-    --foreground: 210 40% 98%;
+    --background: 200 6% 15%;
+    --foreground: 0 0% 95%;
 
-    --card: 217 33% 17%;
-    --card-foreground: 210 40% 98%;
+    --card: 200 6% 20%;
+    --card-foreground: 0 0% 95%;
 
-    --popover: 217 33% 17%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 200 6% 20%;
+    --popover-foreground: 0 0% 95%;
 
-    --primary: 221 83% 53%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 185 80% 50%;
+    --primary-foreground: 200 6% 15%;
 
-    --secondary: 217 33% 17%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 200 6% 25%;
+    --secondary-foreground: 0 0% 95%;
 
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
+    --muted: 200 6% 25%;
+    --muted-foreground: 200 6% 65%;
 
-    --accent: 217 33% 17%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 185 80% 50%;
+    --accent-foreground: 200 6% 15%;
 
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 63% 40%;
+    --destructive-foreground: 0 0% 100%;
 
-    --success: 142 76% 36%;
-    --success-foreground: 210 40% 98%;
+    --success: 145 70% 45%;
+    --success-foreground: 0 0% 100%;
 
-    --warning: 38 92% 50%;
-    --warning-foreground: 222 47% 11%;
+    --warning: 45 90% 55%;
+    --warning-foreground: 200 6% 15%;
 
-    --info: 199 89% 48%;
-    --info-foreground: 210 40% 98%;
+    --info: 210 80% 55%;
+    --info-foreground: 0 0% 100%;
 
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
-    --ring: 221 83% 53%;
+    --border: 200 6% 30%;
+    --input: 200 6% 30%;
+    --ring: 185 80% 50%;
+
+    --sidebar-background: 200 6% 12%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 185 80% 50%;
+    --sidebar-primary-foreground: 200 6% 12%;
+    --sidebar-accent: 200 6% 20%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 200 6% 25%;
+    --sidebar-ring: 185 80% 50%;
   }
 }
 
@@ -107,14 +140,51 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'Inter', sans-serif;
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Roboto', sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
   }
 }
 
 @layer utilities {
-  .gradient-primary {
-    @apply bg-gradient-to-r from-primary to-blue-400;
+  .font-display {
+    font-family: 'Oswald', sans-serif;
+  }
+
+  .font-body {
+    font-family: 'Roboto', sans-serif;
+  }
+
+  .gradient-keon {
+    background: linear-gradient(
+      135deg,
+      hsl(var(--keon-cyan)) 0%,
+      hsl(var(--keon-blue)) 17%,
+      hsl(var(--keon-purple)) 33%,
+      hsl(var(--keon-red)) 50%,
+      hsl(var(--keon-orange)) 67%,
+      hsl(var(--keon-yellow)) 83%,
+      hsl(var(--keon-green)) 100%
+    );
+  }
+
+  .gradient-keon-border {
+    border-image: linear-gradient(
+      135deg,
+      hsl(var(--keon-cyan)),
+      hsl(var(--keon-blue)),
+      hsl(var(--keon-purple)),
+      hsl(var(--keon-red)),
+      hsl(var(--keon-orange)),
+      hsl(var(--keon-yellow)),
+      hsl(var(--keon-green))
+    ) 1;
   }
 
   .shadow-card {
