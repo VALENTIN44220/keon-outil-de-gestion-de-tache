@@ -15,6 +15,7 @@ interface TaskCardProps {
   task: Task;
   onStatusChange: (taskId: string, status: TaskStatus) => void;
   onDelete: (taskId: string) => void;
+  compact?: boolean;
 }
 
 const priorityColors = {
@@ -43,12 +44,15 @@ const statusLabels = {
   done: 'Terminé',
 };
 
-export function TaskCard({ task, onStatusChange, onDelete }: TaskCardProps) {
+export function TaskCard({ task, onStatusChange, onDelete, compact = false }: TaskCardProps) {
   const dueDate = task.due_date ? new Date(task.due_date) : null;
   const isOverdue = dueDate && dueDate < new Date() && task.status !== 'done';
 
   return (
-    <div className="bg-card rounded-xl p-4 shadow-card hover:shadow-card-hover transition-all duration-200 animate-slide-up border border-border/50">
+    <div className={cn(
+      "bg-card rounded-xl shadow-card hover:shadow-card-hover transition-all duration-200 animate-slide-up border border-border/50",
+      compact ? "p-3" : "p-4"
+    )}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           {/* Header */}
@@ -61,14 +65,15 @@ export function TaskCard({ task, onStatusChange, onDelete }: TaskCardProps) {
 
           {/* Title */}
           <h3 className={cn(
-            "font-medium text-foreground mb-1",
+            "font-medium text-foreground",
+            compact ? "text-sm mb-0.5" : "mb-1",
             task.status === 'done' && "line-through text-muted-foreground"
           )}>
             {task.title}
           </h3>
 
           {/* Description */}
-          {task.description && (
+          {task.description && !compact && (
             <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
               {task.description}
             </p>

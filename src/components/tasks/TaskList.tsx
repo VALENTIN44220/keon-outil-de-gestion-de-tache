@@ -6,9 +6,11 @@ interface TaskListProps {
   tasks: Task[];
   onStatusChange: (taskId: string, status: TaskStatus) => void;
   onDelete: (taskId: string) => void;
+  groupBy?: string;
+  groupLabels?: Map<string, string>;
 }
 
-export function TaskList({ tasks, onStatusChange, onDelete }: TaskListProps) {
+export function TaskList({ tasks, onStatusChange, onDelete, groupBy, groupLabels }: TaskListProps) {
   if (tasks.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -19,6 +21,64 @@ export function TaskList({ tasks, onStatusChange, onDelete }: TaskListProps) {
         <p className="text-sm text-muted-foreground">
           Modifiez vos filtres ou créez une nouvelle tâche
         </p>
+      </div>
+    );
+  }
+
+  // Group tasks if groupBy is set
+  if (groupBy && groupBy !== 'none') {
+    const groups = new Map<string, Task[]>();
+    
+    tasks.forEach(task => {
+      let key = 'Non assigné';
+      switch (groupBy) {
+        case 'assignee':
+          key = task.assignee_id || 'Non assigné';
+          break;
+        case 'requester':
+          key = task.requester_id || 'Non défini';
+          break;
+        case 'reporter':
+          key = task.reporter_id || 'Non défini';
+          break;
+        case 'category':
+          key = task.category_id || 'Sans catégorie';
+          break;
+        case 'subcategory':
+          key = task.subcategory_id || 'Sans sous-catégorie';
+          break;
+        default:
+          key = 'Autre';
+      }
+      
+      if (!groups.has(key)) {
+        groups.set(key, []);
+      }
+      groups.get(key)!.push(task);
+    });
+
+    return (
+      <div className="space-y-8">
+        {Array.from(groups.entries()).map(([groupKey, groupTasks]) => (
+          <div key={groupKey}>
+            <h3 className="text-lg font-semibold mb-4 text-foreground border-b border-border pb-2">
+              {groupLabels?.get(groupKey) || groupKey}
+              <span className="ml-2 text-sm font-normal text-muted-foreground">
+                ({groupTasks.length})
+              </span>
+            </h3>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {groupTasks.map((task) => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  onStatusChange={onStatusChange}
+                  onDelete={onDelete}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     );
   }
