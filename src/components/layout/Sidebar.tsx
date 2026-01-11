@@ -8,21 +8,19 @@ import {
   ChevronRight,
   Workflow,
   ShieldCheck,
-  PlusCircle,
-  Ticket
 } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useAuth } from '@/contexts/AuthContext';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
+import { NewActionMenu, ActionType } from '@/components/layout/NewActionMenu';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SidebarProps {
   activeView: string;
   onViewChange: (view: string) => void;
-  onAddTask?: () => void;
-  onAddRequest?: () => void;
+  onNewAction?: (type: ActionType) => void;
 }
 
 const menuItems = [
@@ -36,13 +34,32 @@ const menuItems = [
 
 const adminMenuItem = { id: 'admin', label: 'Administration', icon: ShieldCheck, path: '/admin' };
 
-export function Sidebar({ activeView, onViewChange, onAddTask, onAddRequest }: SidebarProps) {
+export function Sidebar({ activeView, onViewChange, onNewAction }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const [permissionProfileName, setPermissionProfileName] = useState<string | null>(null);
   const navigate = useNavigate();
   const { isAdmin } = useUserRole();
   const { profile } = useAuth();
 
   const allMenuItems = isAdmin ? [...menuItems, adminMenuItem] : menuItems;
+
+  // Fetch permission profile name
+  useEffect(() => {
+    async function fetchPermissionProfile() {
+      if (profile?.permission_profile_id) {
+        const { data } = await supabase
+          .from('permission_profiles')
+          .select('name')
+          .eq('id', profile.permission_profile_id)
+          .single();
+        
+        if (data) {
+          setPermissionProfileName(data.name);
+        }
+      }
+    }
+    fetchPermissionProfile();
+  }, [profile?.permission_profile_id]);
 
   // Get user initials from display name
   const getInitials = (name: string | null | undefined) => {
@@ -84,33 +101,9 @@ export function Sidebar({ activeView, onViewChange, onAddTask, onAddRequest }: S
       </div>
 
       {/* Quick Actions */}
-      <div className="px-3 pb-2 space-y-2">
-        {onAddTask && (
-          <Button
-            onClick={onAddTask}
-            className={cn(
-              "w-full gap-2",
-              collapsed ? "px-0" : ""
-            )}
-            size={collapsed ? "icon" : "default"}
-          >
-            <PlusCircle className="w-5 h-5" />
-            {!collapsed && <span>Nouvelle tâche</span>}
-          </Button>
-        )}
-        {onAddRequest && (
-          <Button
-            onClick={onAddRequest}
-            variant="outline"
-            className={cn(
-              "w-full gap-2",
-              collapsed ? "px-0" : ""
-            )}
-            size={collapsed ? "icon" : "default"}
-          >
-            <Ticket className="w-5 h-5" />
-            {!collapsed && <span>Nouvelle demande</span>}
-          </Button>
+      <div className="px-3 pb-2">
+        {onNewAction && (
+          <NewActionMenu collapsed={collapsed} onAction={onNewAction} />
         )}
       </div>
 
@@ -155,7 +148,9 @@ export function Sidebar({ activeView, onViewChange, onAddTask, onAddRequest }: S
           {!collapsed && (
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{profile?.display_name || 'Utilisateur'}</p>
-              <p className="text-xs text-sidebar-foreground/60 truncate">{profile?.job_title || 'Non défini'}</p>
+              <p className="text-xs text-sidebar-foreground/60 truncate">
+                {permissionProfileName || profile?.job_title || 'Non défini'}
+              </p>
             </div>
           )}
         </div>

@@ -14,6 +14,8 @@ interface Profile {
   company_id: string | null;
   manager_id: string | null;
   is_private: boolean;
+  permission_profile_id: string | null;
+  hierarchy_level_id: string | null;
 }
 
 interface AuthContextType {
