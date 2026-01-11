@@ -9,7 +9,7 @@ import { TaskViewSelector, TaskView } from '@/components/tasks/TaskViewSelector'
 import { KanbanBoard } from '@/components/tasks/KanbanBoard';
 import { CalendarView } from '@/components/tasks/CalendarView';
 import { AddTaskDialog } from '@/components/tasks/AddTaskDialog';
-import { AddRequestDialog } from '@/components/tasks/AddRequestDialog';
+import { UnifiedTaskDialog } from '@/components/tasks/UnifiedTaskDialog';
 import { CreateFromTemplateDialog } from '@/components/tasks/CreateFromTemplateDialog';
 import { useTasks } from '@/hooks/useTasks';
 import { useTasksProgress } from '@/hooks/useChecklists';
@@ -284,7 +284,7 @@ const Index = () => {
         onAdd={addTask}
       />
 
-      <AddRequestDialog
+      <UnifiedTaskDialog
         open={isRequestDialogOpen}
         onClose={() => setIsRequestDialogOpen(false)}
         onAdd={addTask}

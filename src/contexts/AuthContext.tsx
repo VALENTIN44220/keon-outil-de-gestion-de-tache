@@ -9,7 +9,9 @@ interface Profile {
   avatar_url: string | null;
   job_title: string | null;
   department: string | null;
+  department_id: string | null;
   company: string | null;
+  company_id: string | null;
   manager_id: string | null;
   is_private: boolean;
 }

@@ -16,6 +16,7 @@ export type Database = {
     Tables: {
       assignment_rules: {
         Row: {
+          auto_assign: boolean | null
           category_id: string | null
           created_at: string
           description: string | null
@@ -23,12 +24,14 @@ export type Database = {
           is_active: boolean
           name: string
           priority: number
+          requires_validation: boolean | null
           subcategory_id: string | null
           target_assignee_id: string | null
           target_department_id: string | null
           updated_at: string
         }
         Insert: {
+          auto_assign?: boolean | null
           category_id?: string | null
           created_at?: string
           description?: string | null
@@ -36,12 +39,14 @@ export type Database = {
           is_active?: boolean
           name: string
           priority?: number
+          requires_validation?: boolean | null
           subcategory_id?: string | null
           target_assignee_id?: string | null
           target_department_id?: string | null
           updated_at?: string
         }
         Update: {
+          auto_assign?: boolean | null
           category_id?: string | null
           created_at?: string
           description?: string | null
@@ -49,6 +54,7 @@ export type Database = {
           is_active?: boolean
           name?: string
           priority?: number
+          requires_validation?: boolean | null
           subcategory_id?: string | null
           target_assignee_id?: string | null
           target_department_id?: string | null
@@ -455,6 +461,51 @@ export type Database = {
           },
         ]
       }
+      task_attachments: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          task_id: string
+          type: string
+          uploaded_by: string | null
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          task_id: string
+          type?: string
+          uploaded_by?: string | null
+          url: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          task_id?: string
+          type?: string
+          uploaded_by?: string | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_attachments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_attachments_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_checklists: {
         Row: {
           completed_at: string | null
@@ -552,6 +603,7 @@ export type Database = {
           order_index: number | null
           priority: string
           process_template_id: string | null
+          requires_validation: boolean | null
           subcategory_id: string | null
           title: string
           updated_at: string
@@ -567,6 +619,7 @@ export type Database = {
           order_index?: number | null
           priority?: string
           process_template_id?: string | null
+          requires_validation?: boolean | null
           subcategory_id?: string | null
           title: string
           updated_at?: string
@@ -582,6 +635,7 @@ export type Database = {
           order_index?: number | null
           priority?: string
           process_template_id?: string | null
+          requires_validation?: boolean | null
           subcategory_id?: string | null
           title?: string
           updated_at?: string
@@ -611,18 +665,78 @@ export type Database = {
           },
         ]
       }
+      task_validation_levels: {
+        Row: {
+          comment: string | null
+          created_at: string
+          id: string
+          level: number
+          status: string
+          task_id: string
+          validated_at: string | null
+          validator_department_id: string | null
+          validator_id: string | null
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          level?: number
+          status?: string
+          task_id: string
+          validated_at?: string | null
+          validator_department_id?: string | null
+          validator_id?: string | null
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          level?: number
+          status?: string
+          task_id?: string
+          validated_at?: string | null
+          validator_department_id?: string | null
+          validator_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_validation_levels_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_validation_levels_validator_department_id_fkey"
+            columns: ["validator_department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_validation_levels_validator_id_fkey"
+            columns: ["validator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           assignee_id: string | null
           category: string | null
           category_id: string | null
           created_at: string
+          current_validation_level: number | null
           description: string | null
           due_date: string | null
           id: string
           priority: string
           reporter_id: string | null
           requester_id: string | null
+          requires_validation: boolean | null
           status: string
           subcategory_id: string | null
           target_department_id: string | null
@@ -630,18 +744,24 @@ export type Database = {
           type: string
           updated_at: string
           user_id: string
+          validated_at: string | null
+          validation_comment: string | null
+          validation_requested_at: string | null
+          validator_id: string | null
         }
         Insert: {
           assignee_id?: string | null
           category?: string | null
           category_id?: string | null
           created_at?: string
+          current_validation_level?: number | null
           description?: string | null
           due_date?: string | null
           id?: string
           priority?: string
           reporter_id?: string | null
           requester_id?: string | null
+          requires_validation?: boolean | null
           status?: string
           subcategory_id?: string | null
           target_department_id?: string | null
@@ -649,18 +769,24 @@ export type Database = {
           type?: string
           updated_at?: string
           user_id: string
+          validated_at?: string | null
+          validation_comment?: string | null
+          validation_requested_at?: string | null
+          validator_id?: string | null
         }
         Update: {
           assignee_id?: string | null
           category?: string | null
           category_id?: string | null
           created_at?: string
+          current_validation_level?: number | null
           description?: string | null
           due_date?: string | null
           id?: string
           priority?: string
           reporter_id?: string | null
           requester_id?: string | null
+          requires_validation?: boolean | null
           status?: string
           subcategory_id?: string | null
           target_department_id?: string | null
@@ -668,6 +794,10 @@ export type Database = {
           type?: string
           updated_at?: string
           user_id?: string
+          validated_at?: string | null
+          validation_comment?: string | null
+          validation_requested_at?: string | null
+          validator_id?: string | null
         }
         Relationships: [
           {
@@ -710,6 +840,62 @@ export type Database = {
             columns: ["target_department_id"]
             isOneToOne: false
             referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_validator_id_fkey"
+            columns: ["validator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      template_validation_levels: {
+        Row: {
+          created_at: string
+          id: string
+          level: number
+          task_template_id: string
+          validator_department_id: string | null
+          validator_profile_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          level?: number
+          task_template_id: string
+          validator_department_id?: string | null
+          validator_profile_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          level?: number
+          task_template_id?: string
+          validator_department_id?: string | null
+          validator_profile_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_validation_levels_task_template_id_fkey"
+            columns: ["task_template_id"]
+            isOneToOne: false
+            referencedRelation: "task_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "template_validation_levels_validator_department_id_fkey"
+            columns: ["validator_department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "template_validation_levels_validator_profile_id_fkey"
+            columns: ["validator_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]

@@ -1,4 +1,4 @@
-export type TaskStatus = 'todo' | 'in-progress' | 'done';
+export type TaskStatus = 'todo' | 'in-progress' | 'done' | 'pending-validation' | 'validated' | 'refused';
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
 export type TaskType = 'task' | 'request';
 
@@ -18,6 +18,13 @@ export interface Task {
   requester_id: string | null;
   reporter_id: string | null;
   target_department_id: string | null;
+  // Validation fields
+  validator_id: string | null;
+  validation_requested_at: string | null;
+  validated_at: string | null;
+  validation_comment: string | null;
+  requires_validation: boolean;
+  current_validation_level: number;
   created_at: string;
   updated_at: string;
 }
@@ -27,6 +34,9 @@ export interface TaskStats {
   todo: number;
   inProgress: number;
   done: number;
+  pendingValidation: number;
+  validated: number;
+  refused: number;
   completionRate: number;
 }
 
@@ -40,6 +50,39 @@ export interface AssignmentRule {
   target_assignee_id: string | null;
   priority: number;
   is_active: boolean;
+  requires_validation: boolean;
+  auto_assign: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface TaskAttachment {
+  id: string;
+  task_id: string;
+  name: string;
+  url: string;
+  type: 'link' | 'file';
+  uploaded_by: string | null;
+  created_at: string;
+}
+
+export interface TaskValidationLevel {
+  id: string;
+  task_id: string;
+  level: number;
+  validator_id: string | null;
+  validator_department_id: string | null;
+  status: 'pending' | 'validated' | 'refused';
+  validated_at: string | null;
+  comment: string | null;
+  created_at: string;
+}
+
+export interface TemplateValidationLevel {
+  id: string;
+  task_template_id: string;
+  level: number;
+  validator_profile_id: string | null;
+  validator_department_id: string | null;
+  created_at: string;
 }
