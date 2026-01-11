@@ -3,7 +3,8 @@ import {
   Clock, 
   AlertCircle, 
   TrendingUp,
-  ListTodo
+  ListTodo,
+  ListChecks
 } from 'lucide-react';
 import { TaskStats, Task } from '@/types/task';
 import { StatsCard } from './StatsCard';
@@ -16,9 +17,12 @@ interface DashboardProps {
   recentTasks: Task[];
   onStatusChange: (taskId: string, status: TaskStatus) => void;
   onDelete: (taskId: string) => void;
+  globalProgress?: number;
+  globalStats?: { completed: number; total: number };
+  progressMap?: Record<string, { completed: number; total: number; progress: number }>;
 }
 
-export function Dashboard({ stats, recentTasks, onStatusChange, onDelete }: DashboardProps) {
+export function Dashboard({ stats, recentTasks, onStatusChange, onDelete, globalProgress = 0, globalStats, progressMap }: DashboardProps) {
   const urgentTasks = recentTasks
     .filter(t => (t.priority === 'high' || t.priority === 'urgent') && t.status !== 'done')
     .slice(0, 3);
@@ -68,6 +72,29 @@ export function Dashboard({ stats, recentTasks, onStatusChange, onDelete }: Dash
               {stats.done} tâches terminées sur {stats.total}
             </p>
           </div>
+          
+          {/* Checklist progress */}
+          {globalStats && globalStats.total > 0 && (
+            <div className="mt-6 p-4 bg-muted/50 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <ListChecks className="w-4 h-4 text-primary" />
+                <span className="text-sm font-medium">Sous-actions</span>
+              </div>
+              <div className="flex items-center justify-between text-sm mb-2">
+                <span className="text-muted-foreground">Avancement global</span>
+                <span className="font-medium">{globalProgress}%</span>
+              </div>
+              <div className="h-2 bg-muted rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-primary rounded-full transition-all duration-500"
+                  style={{ width: `${globalProgress}%` }}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                {globalStats.completed}/{globalStats.total} sous-actions terminées
+              </p>
+            </div>
+          )}
           
           {/* Progress bars by status */}
           <div className="mt-6 space-y-3">
@@ -127,6 +154,7 @@ export function Dashboard({ stats, recentTasks, onStatusChange, onDelete }: Dash
                   task={task} 
                   onStatusChange={onStatusChange}
                   onDelete={onDelete}
+                  taskProgress={progressMap?.[task.id]}
                 />
               ))}
             </div>

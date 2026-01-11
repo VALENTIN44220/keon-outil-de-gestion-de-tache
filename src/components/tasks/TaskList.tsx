@@ -8,9 +8,10 @@ interface TaskListProps {
   onDelete: (taskId: string) => void;
   groupBy?: string;
   groupLabels?: Map<string, string>;
+  progressMap?: Record<string, { completed: number; total: number; progress: number }>;
 }
 
-export function TaskList({ tasks, onStatusChange, onDelete, groupBy, groupLabels }: TaskListProps) {
+export function TaskList({ tasks, onStatusChange, onDelete, groupBy, groupLabels, progressMap }: TaskListProps) {
   if (tasks.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -74,6 +75,7 @@ export function TaskList({ tasks, onStatusChange, onDelete, groupBy, groupLabels
                   task={task}
                   onStatusChange={onStatusChange}
                   onDelete={onDelete}
+                  taskProgress={progressMap?.[task.id]}
                 />
               ))}
             </div>
@@ -91,6 +93,7 @@ export function TaskList({ tasks, onStatusChange, onDelete, groupBy, groupLabels
           task={task}
           onStatusChange={onStatusChange}
           onDelete={onDelete}
+          taskProgress={progressMap?.[task.id]}
         />
       ))}
     </div>
