@@ -56,9 +56,10 @@ interface NewRequestDialogProps {
     links?: LinkItem[]
   ) => Promise<void>;
   onTasksCreated?: () => void;
+  initialProcessTemplateId?: string;
 }
 
-export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated }: NewRequestDialogProps) {
+export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initialProcessTemplateId }: NewRequestDialogProps) {
   const { profile: currentUser } = useAuth();
   const { generateTasksFromProcess, getProcessTemplateForSubcategory } = useRequestWorkflow();
   
@@ -111,11 +112,40 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated }: NewRe
     checkLinkedProcess();
   }, [subcategoryId, getProcessTemplateForSubcategory]);
 
+  // Load initial process template if provided
   useEffect(() => {
+    const loadInitialProcess = async () => {
+      if (initialProcessTemplateId && open) {
+        const { data } = await supabase
+          .from('process_templates')
+          .select('id, name, department')
+          .eq('id', initialProcessTemplateId)
+          .single();
+        
+        if (data) {
+          setLinkedProcessId(data.id);
+          setLinkedProcessName(data.name);
+          
+          // Auto-select target department based on process
+          if (data.department) {
+            const { data: deptData } = await supabase
+              .from('departments')
+              .select('id')
+              .eq('name', data.department)
+              .single();
+            if (deptData) {
+              setTargetDepartmentId(deptData.id);
+            }
+          }
+        }
+      }
+    };
+
     if (open) {
       fetchDepartments();
+      loadInitialProcess();
     }
-  }, [open]);
+  }, [open, initialProcessTemplateId]);
 
   // Auto-apply assignment rule
   useEffect(() => {
@@ -226,6 +256,8 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated }: NewRe
     setTargetDepartmentId(null);
     setChecklistItems([]);
     setLinks([]);
+    setLinkedProcessId(null);
+    setLinkedProcessName(null);
   };
 
   const handleAddCategory = async (name: string) => {

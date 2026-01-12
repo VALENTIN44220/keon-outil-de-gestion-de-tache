@@ -32,6 +32,7 @@ const Index = () => {
   const [taskDialogMode, setTaskDialogMode] = useState<ActionType>('personal');
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
+  const [selectedProcessTemplateId, setSelectedProcessTemplateId] = useState<string | undefined>(undefined);
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const [taskView, setTaskView] = useState<TaskView>('grid');
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFiltersState>({
@@ -267,8 +268,9 @@ const Index = () => {
     }
   };
 
-  const handleNewAction = (type: ActionType) => {
+  const handleNewAction = (type: ActionType, processTemplateId?: string) => {
     if (type === 'request') {
+      setSelectedProcessTemplateId(processTemplateId);
       setIsRequestDialogOpen(true);
     } else {
       setTaskDialogMode(type);
@@ -317,9 +319,13 @@ const Index = () => {
 
       <NewRequestDialog
         open={isRequestDialogOpen}
-        onClose={() => setIsRequestDialogOpen(false)}
+        onClose={() => { 
+          setIsRequestDialogOpen(false);
+          setSelectedProcessTemplateId(undefined);
+        }}
         onAdd={addTask}
         onTasksCreated={() => { refetch(); refetchUnassigned(); }}
+        initialProcessTemplateId={selectedProcessTemplateId}
       />
 
       <CreateFromTemplateDialog
