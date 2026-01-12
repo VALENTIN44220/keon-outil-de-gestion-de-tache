@@ -5,7 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ChecklistItem } from '@/types/checklist';
 
 export function useChecklists(taskId?: string) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { toast } = useToast();
   const [items, setItems] = useState<ChecklistItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -69,7 +69,7 @@ export function useChecklists(taskId?: string) {
       .update({
         is_completed: newCompleted,
         completed_at: newCompleted ? new Date().toISOString() : null,
-        completed_by: newCompleted && user ? user.id : null,
+        completed_by: newCompleted && profile ? profile.id : null,
       })
       .eq('id', itemId);
 
@@ -87,7 +87,7 @@ export function useChecklists(taskId?: string) {
                 ...i, 
                 is_completed: newCompleted,
                 completed_at: newCompleted ? new Date().toISOString() : null,
-                completed_by: newCompleted && user ? user.id : null,
+                completed_by: newCompleted && profile ? profile.id : null,
               }
             : i
         )
