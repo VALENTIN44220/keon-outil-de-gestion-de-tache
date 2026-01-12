@@ -57,9 +57,10 @@ interface NewRequestDialogProps {
   ) => Promise<void>;
   onTasksCreated?: () => void;
   initialProcessTemplateId?: string;
+  initialSubProcessTemplateId?: string;
 }
 
-export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initialProcessTemplateId }: NewRequestDialogProps) {
+export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initialProcessTemplateId, initialSubProcessTemplateId }: NewRequestDialogProps) {
   const { profile: currentUser } = useAuth();
   const { generateTasksFromProcess, getProcessTemplateForSubcategory } = useRequestWorkflow();
   
@@ -79,6 +80,8 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
   const [departments, setDepartments] = useState<Department[]>([]);
   const [linkedProcessId, setLinkedProcessId] = useState<string | null>(null);
   const [linkedProcessName, setLinkedProcessName] = useState<string | null>(null);
+  const [linkedSubProcessId, setLinkedSubProcessId] = useState<string | null>(null);
+  const [linkedSubProcessName, setLinkedSubProcessName] = useState<string | null>(null);
 
   const { categories, addCategory, addSubcategory } = useCategories();
   const { findMatchingRule } = useAssignmentRules();
@@ -112,10 +115,54 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
     checkLinkedProcess();
   }, [subcategoryId, getProcessTemplateForSubcategory]);
 
-  // Load initial process template if provided
+  // Load initial process/sub-process template if provided
   useEffect(() => {
-    const loadInitialProcess = async () => {
-      if (initialProcessTemplateId && open) {
+    const loadInitialTemplates = async () => {
+      if (!open) return;
+
+      // Load sub-process template first if provided
+      if (initialSubProcessTemplateId) {
+        const { data: subProcess } = await supabase
+          .from('sub_process_templates')
+          .select('id, name, process_template_id, target_department_id')
+          .eq('id', initialSubProcessTemplateId)
+          .single();
+        
+        if (subProcess) {
+          setLinkedSubProcessId(subProcess.id);
+          setLinkedSubProcessName(subProcess.name);
+          
+          // Set target department from sub-process
+          if (subProcess.target_department_id) {
+            setTargetDepartmentId(subProcess.target_department_id);
+          }
+
+          // Load parent process
+          const { data: process } = await supabase
+            .from('process_templates')
+            .select('id, name, department')
+            .eq('id', subProcess.process_template_id)
+            .single();
+          
+          if (process) {
+            setLinkedProcessId(process.id);
+            setLinkedProcessName(process.name);
+            
+            // Fallback to process department if sub-process doesn't have one
+            if (!subProcess.target_department_id && process.department) {
+              const { data: deptData } = await supabase
+                .from('departments')
+                .select('id')
+                .eq('name', process.department)
+                .single();
+              if (deptData) {
+                setTargetDepartmentId(deptData.id);
+              }
+            }
+          }
+        }
+      } else if (initialProcessTemplateId) {
+        // Only process template selected (no sub-process)
         const { data } = await supabase
           .from('process_templates')
           .select('id, name, department')
@@ -126,7 +173,6 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
           setLinkedProcessId(data.id);
           setLinkedProcessName(data.name);
           
-          // Auto-select target department based on process
           if (data.department) {
             const { data: deptData } = await supabase
               .from('departments')
@@ -143,9 +189,9 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
 
     if (open) {
       fetchDepartments();
-      loadInitialProcess();
+      loadInitialTemplates();
     }
-  }, [open, initialProcessTemplateId]);
+  }, [open, initialProcessTemplateId, initialSubProcessTemplateId]);
 
   // Auto-apply assignment rule
   useEffect(() => {
@@ -197,6 +243,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
           requires_validation: requiresValidation,
           current_validation_level: 0,
           source_process_template_id: linkedProcessId,
+          source_sub_process_template_id: linkedSubProcessId,
         })
         .select()
         .single();
@@ -227,8 +274,16 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
         );
       }
 
-      // If there's a linked process, generate tasks from it
-      if (linkedProcessId && targetDepartmentId) {
+      // If there's a linked sub-process, generate tasks from it
+      if (linkedSubProcessId && targetDepartmentId) {
+        await generateTasksFromProcess({
+          parentRequestId: requestData.id,
+          processTemplateId: linkedProcessId || '',
+          targetDepartmentId,
+          subProcessTemplateId: linkedSubProcessId,
+        });
+      } else if (linkedProcessId && targetDepartmentId) {
+        // Fallback to process level if no sub-process
         await generateTasksFromProcess({
           parentRequestId: requestData.id,
           processTemplateId: linkedProcessId,
@@ -258,6 +313,8 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
     setLinks([]);
     setLinkedProcessId(null);
     setLinkedProcessName(null);
+    setLinkedSubProcessId(null);
+    setLinkedSubProcessName(null);
   };
 
   const handleAddCategory = async (name: string) => {
@@ -322,16 +379,21 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
             onAddSubcategory={handleAddSubcategory}
           />
 
-          {/* Linked process info */}
-          {linkedProcessId && linkedProcessName && (
+          {/* Linked process/sub-process info */}
+          {(linkedProcessId || linkedSubProcessId) && (
             <div className="rounded-lg border border-primary/50 bg-primary/5 p-4">
               <div className="flex items-start gap-2">
                 <Workflow className="h-4 w-4 mt-0.5 text-primary" />
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-primary">Processus associé: {linkedProcessName}</p>
+                  <p className="text-sm font-medium text-primary">
+                    {linkedSubProcessName 
+                      ? `${linkedProcessName} → ${linkedSubProcessName}`
+                      : `Processus: ${linkedProcessName}`
+                    }
+                  </p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Cette demande déclenchera automatiquement la création des tâches du processus.
-                    Elles seront assignées par le responsable du service cible.
+                    Cette demande déclenchera automatiquement la création des tâches du {linkedSubProcessId ? 'sous-processus' : 'processus'}.
+                    Elles seront assignées {linkedSubProcessId ? 'selon la configuration du sous-processus' : 'par le responsable du service cible'}.
                   </p>
                 </div>
               </div>

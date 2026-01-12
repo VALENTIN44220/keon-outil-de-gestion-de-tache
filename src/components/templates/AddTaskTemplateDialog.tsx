@@ -41,6 +41,7 @@ export function AddTaskTemplateDialog({ open, onClose, onAdd, orderIndex }: AddT
       category: selectedCategory?.name || null,
       category_id: categoryId,
       subcategory_id: subcategoryId,
+      sub_process_template_id: null,
       default_duration_days: defaultDurationDays,
       order_index: orderIndex,
     });

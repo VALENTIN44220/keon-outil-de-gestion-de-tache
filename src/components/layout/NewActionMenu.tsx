@@ -7,7 +7,8 @@ import {
   ChevronDown,
   ChevronRight,
   Workflow,
-  FileText
+  FileText,
+  FolderOpen
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -33,32 +34,117 @@ interface ProcessTemplate {
   department: string | null;
 }
 
+interface SubProcessTemplate {
+  id: string;
+  process_template_id: string;
+  name: string;
+  description: string | null;
+  assignment_type: string;
+}
+
+interface ProcessWithSubProcesses extends ProcessTemplate {
+  sub_processes: SubProcessTemplate[];
+}
+
 interface NewActionMenuProps {
   collapsed?: boolean;
-  onAction: (type: ActionType, processTemplateId?: string) => void;
+  onAction: (type: ActionType, subProcessTemplateId?: string, processTemplateId?: string) => void;
 }
 
 export function NewActionMenu({ collapsed, onAction }: NewActionMenuProps) {
   const [open, setOpen] = useState(false);
   const { isManager, isLoading } = useUserPermissions();
-  const [processes, setProcesses] = useState<ProcessTemplate[]>([]);
+  const [processes, setProcesses] = useState<ProcessWithSubProcesses[]>([]);
 
   useEffect(() => {
     fetchProcesses();
   }, []);
 
   const fetchProcesses = async () => {
-    const { data } = await supabase
+    // Fetch processes with their sub-processes
+    const { data: processData } = await supabase
       .from('process_templates')
       .select('id, name, description, department')
       .eq('is_shared', true)
       .order('name');
-    if (data) setProcesses(data);
+    
+    if (!processData) {
+      setProcesses([]);
+      return;
+    }
+
+    // Fetch sub-processes for all processes
+    const { data: subProcessData } = await supabase
+      .from('sub_process_templates')
+      .select('id, process_template_id, name, description, assignment_type')
+      .eq('is_shared', true)
+      .order('order_index');
+
+    // Combine processes with their sub-processes
+    const processesWithSubs: ProcessWithSubProcesses[] = processData.map(process => ({
+      ...process,
+      sub_processes: (subProcessData || []).filter(sp => sp.process_template_id === process.id)
+    }));
+
+    setProcesses(processesWithSubs);
   };
 
-  const handleAction = (type: ActionType, processTemplateId?: string) => {
+  const handleAction = (type: ActionType, subProcessTemplateId?: string, processTemplateId?: string) => {
     setOpen(false);
-    onAction(type, processTemplateId);
+    onAction(type, subProcessTemplateId, processTemplateId);
+  };
+
+  const renderProcessSubMenu = (process: ProcessWithSubProcesses) => {
+    if (process.sub_processes.length === 0) {
+      // No sub-processes, direct click opens process
+      return (
+        <DropdownMenuItem 
+          key={process.id}
+          onClick={() => handleAction('request', undefined, process.id)}
+          className="py-2"
+        >
+          <Workflow className="w-4 h-4 mr-2 text-primary shrink-0" />
+          <div className="flex flex-col min-w-0">
+            <span className="font-medium truncate">{process.name}</span>
+            {process.department && (
+              <span className="text-xs text-muted-foreground">Service: {process.department}</span>
+            )}
+          </div>
+        </DropdownMenuItem>
+      );
+    }
+
+    // Has sub-processes, show nested menu
+    return (
+      <DropdownMenuSub key={process.id}>
+        <DropdownMenuSubTrigger className="py-2">
+          <FolderOpen className="w-4 h-4 mr-2 text-primary shrink-0" />
+          <div className="flex flex-col min-w-0">
+            <span className="font-medium truncate">{process.name}</span>
+            {process.department && (
+              <span className="text-xs text-muted-foreground">Service: {process.department}</span>
+            )}
+          </div>
+        </DropdownMenuSubTrigger>
+        <DropdownMenuSubContent className="w-[280px]">
+          {process.sub_processes.map(subProcess => (
+            <DropdownMenuItem 
+              key={subProcess.id}
+              onClick={() => handleAction('request', subProcess.id, process.id)}
+              className="py-2"
+            >
+              <Workflow className="w-4 h-4 mr-2 text-accent shrink-0" />
+              <div className="flex flex-col min-w-0">
+                <span className="font-medium truncate">{subProcess.name}</span>
+                <span className="text-xs text-muted-foreground">
+                  {subProcess.assignment_type === 'manager' ? 'Affectation par manager' : 'Affectation directe'}
+                </span>
+              </div>
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuSubContent>
+      </DropdownMenuSub>
+    );
   };
 
   if (collapsed) {
@@ -89,20 +175,7 @@ export function NewActionMenu({ collapsed, onAction }: NewActionMenuProps) {
               Demande à un service
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="w-64">
-              {processes.map(process => (
-                <DropdownMenuItem 
-                  key={process.id}
-                  onClick={() => handleAction('request', process.id)}
-                >
-                  <Workflow className="w-4 h-4 mr-2 text-primary" />
-                  <div className="flex flex-col">
-                    <span>{process.name}</span>
-                    {process.department && (
-                      <span className="text-xs text-muted-foreground">{process.department}</span>
-                    )}
-                  </div>
-                </DropdownMenuItem>
-              ))}
+              {processes.map(process => renderProcessSubMenu(process))}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => handleAction('request')}>
                 <FileText className="w-4 h-4 mr-2" />
@@ -161,21 +234,7 @@ export function NewActionMenu({ collapsed, onAction }: NewActionMenuProps) {
           <DropdownMenuSubContent className="w-[280px]">
             {processes.length > 0 ? (
               <>
-                {processes.map(process => (
-                  <DropdownMenuItem 
-                    key={process.id}
-                    onClick={() => handleAction('request', process.id)}
-                    className="py-2"
-                  >
-                    <Workflow className="w-4 h-4 mr-2 text-primary shrink-0" />
-                    <div className="flex flex-col min-w-0">
-                      <span className="font-medium truncate">{process.name}</span>
-                      {process.department && (
-                        <span className="text-xs text-muted-foreground">Service: {process.department}</span>
-                      )}
-                    </div>
-                  </DropdownMenuItem>
-                ))}
+                {processes.map(process => renderProcessSubMenu(process))}
                 <DropdownMenuSeparator />
               </>
             ) : null}

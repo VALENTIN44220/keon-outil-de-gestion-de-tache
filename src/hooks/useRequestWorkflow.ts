@@ -8,6 +8,7 @@ interface GenerateTasksOptions {
   parentRequestId: string;
   processTemplateId: string;
   targetDepartmentId: string;
+  subProcessTemplateId?: string;
 }
 
 export function useRequestWorkflow() {
@@ -18,21 +19,39 @@ export function useRequestWorkflow() {
    * Generate tasks from a process template when a request is created
    */
   const generateTasksFromProcess = async (options: GenerateTasksOptions): Promise<Task[]> => {
-    const { parentRequestId, processTemplateId, targetDepartmentId } = options;
+    const { parentRequestId, processTemplateId, targetDepartmentId, subProcessTemplateId } = options;
 
     if (!user) return [];
 
     try {
-      // Fetch task templates from the process
-      const { data: taskTemplates, error: templatesError } = await supabase
-        .from('task_templates')
-        .select('*')
-        .eq('process_template_id', processTemplateId)
-        .order('order_index', { ascending: true });
+      let taskTemplates: any[] = [];
 
-      if (templatesError) throw templatesError;
+      // If sub-process is specified, fetch tasks from sub-process
+      if (subProcessTemplateId) {
+        const { data, error } = await supabase
+          .from('task_templates')
+          .select('*')
+          .eq('sub_process_template_id', subProcessTemplateId)
+          .order('order_index', { ascending: true });
 
-      if (!taskTemplates || taskTemplates.length === 0) {
+        if (error) throw error;
+        taskTemplates = data || [];
+      }
+
+      // If no tasks from sub-process or no sub-process, try process level
+      if (taskTemplates.length === 0) {
+        const { data, error } = await supabase
+          .from('task_templates')
+          .select('*')
+          .eq('process_template_id', processTemplateId)
+          .is('sub_process_template_id', null)
+          .order('order_index', { ascending: true });
+
+        if (error) throw error;
+        taskTemplates = data || [];
+      }
+
+      if (taskTemplates.length === 0) {
         return [];
       }
 
@@ -61,6 +80,7 @@ export function useRequestWorkflow() {
             target_department_id: targetDepartmentId,
             parent_request_id: parentRequestId,
             source_process_template_id: processTemplateId,
+            source_sub_process_template_id: subProcessTemplateId || null,
             requires_validation: template.requires_validation || false,
             assignee_id: null, // Will be assigned by manager
           })
