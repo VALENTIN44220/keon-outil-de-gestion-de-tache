@@ -20,13 +20,14 @@ import {
 import { CategorySelect } from '@/components/templates/CategorySelect';
 import { useCategories } from '@/hooks/useCategories';
 import { useAssignmentRules } from '@/hooks/useAssignmentRules';
+import { useRequestWorkflow } from '@/hooks/useRequestWorkflow';
 import { supabase } from '@/integrations/supabase/client';
 import { InlineChecklistEditor } from './InlineChecklistEditor';
 import { TaskLinksEditor } from './TaskLinksEditor';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
-import { Info, ArrowRight, Building2 } from 'lucide-react';
+import { Info, ArrowRight, Building2, Workflow } from 'lucide-react';
 
 interface Department {
   id: string;
@@ -53,11 +54,13 @@ interface NewRequestDialogProps {
     task: Omit<Task, 'id' | 'user_id' | 'created_at' | 'updated_at'>, 
     checklistItems?: ChecklistItem[],
     links?: LinkItem[]
-  ) => void;
+  ) => Promise<void>;
+  onTasksCreated?: () => void;
 }
 
-export function NewRequestDialog({ open, onClose, onAdd }: NewRequestDialogProps) {
+export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated }: NewRequestDialogProps) {
   const { profile: currentUser } = useAuth();
+  const { generateTasksFromProcess, getProcessTemplateForSubcategory } = useRequestWorkflow();
   
   // Form state
   const [title, setTitle] = useState('');
@@ -69,9 +72,12 @@ export function NewRequestDialog({ open, onClose, onAdd }: NewRequestDialogProps
   const [targetDepartmentId, setTargetDepartmentId] = useState<string | null>(null);
   const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
   const [links, setLinks] = useState<LinkItem[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Data
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [linkedProcessId, setLinkedProcessId] = useState<string | null>(null);
+  const [linkedProcessName, setLinkedProcessName] = useState<string | null>(null);
 
   const { categories, addCategory, addSubcategory } = useCategories();
   const { findMatchingRule } = useAssignmentRules();
@@ -79,6 +85,31 @@ export function NewRequestDialog({ open, onClose, onAdd }: NewRequestDialogProps
   // Find matching assignment rule
   const matchingRule: AssignmentRule | null = findMatchingRule(categoryId, subcategoryId);
   const requiresValidation = matchingRule?.requires_validation || false;
+
+  // Check if subcategory has a linked process template
+  useEffect(() => {
+    const checkLinkedProcess = async () => {
+      if (!subcategoryId) {
+        setLinkedProcessId(null);
+        setLinkedProcessName(null);
+        return;
+      }
+
+      const processId = await getProcessTemplateForSubcategory(subcategoryId);
+      setLinkedProcessId(processId);
+
+      if (processId) {
+        const { data } = await supabase
+          .from('process_templates')
+          .select('name')
+          .eq('id', processId)
+          .single();
+        setLinkedProcessName(data?.name || null);
+      }
+    };
+
+    checkLinkedProcess();
+  }, [subcategoryId, getProcessTemplateForSubcategory]);
 
   useEffect(() => {
     if (open) {
@@ -101,37 +132,88 @@ export function NewRequestDialog({ open, onClose, onAdd }: NewRequestDialogProps
     if (data) setDepartments(data);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!title.trim() || !targetDepartmentId) return;
 
-    const selectedCategory = categories.find(c => c.id === categoryId);
+    setIsSubmitting(true);
+    
+    try {
+      const selectedCategory = categories.find(c => c.id === categoryId);
 
-    onAdd({
-      title: title.trim(),
-      description: description.trim() || null,
-      priority,
-      status: 'todo',
-      type: 'request',
-      category: selectedCategory?.name || null,
-      category_id: categoryId,
-      subcategory_id: subcategoryId,
-      due_date: dueDate || null,
-      assignee_id: matchingRule?.target_assignee_id || null,
-      requester_id: currentUser?.id || null,
-      reporter_id: null,
-      target_department_id: targetDepartmentId,
-      validator_id: null,
-      validation_requested_at: null,
-      validated_at: null,
-      validation_comment: null,
-      requires_validation: requiresValidation,
-      current_validation_level: 0,
-    }, checklistItems.length > 0 ? checklistItems : undefined, links.length > 0 ? links : undefined);
+      // Create the request task
+      const { data: requestData, error: requestError } = await supabase
+        .from('tasks')
+        .insert({
+          title: title.trim(),
+          description: description.trim() || null,
+          priority,
+          status: 'todo',
+          type: 'request',
+          category: selectedCategory?.name || null,
+          category_id: categoryId,
+          subcategory_id: subcategoryId,
+          due_date: dueDate || null,
+          user_id: (await supabase.auth.getUser()).data.user?.id,
+          assignee_id: matchingRule?.target_assignee_id || null,
+          requester_id: currentUser?.id || null,
+          reporter_id: null,
+          target_department_id: targetDepartmentId,
+          validator_id: null,
+          validation_requested_at: null,
+          validated_at: null,
+          validation_comment: null,
+          requires_validation: requiresValidation,
+          current_validation_level: 0,
+          source_process_template_id: linkedProcessId,
+        })
+        .select()
+        .single();
 
-    resetForm();
-    onClose();
+      if (requestError) throw requestError;
+
+      // Create checklist items
+      if (checklistItems.length > 0) {
+        await supabase.from('task_checklists').insert(
+          checklistItems.map(item => ({
+            task_id: requestData.id,
+            title: item.title,
+            order_index: item.order_index,
+          }))
+        );
+      }
+
+      // Create links/attachments
+      if (links.length > 0) {
+        await supabase.from('task_attachments').insert(
+          links.map(link => ({
+            task_id: requestData.id,
+            name: link.name,
+            url: link.url,
+            type: link.type,
+            uploaded_by: currentUser?.id || null,
+          }))
+        );
+      }
+
+      // If there's a linked process, generate tasks from it
+      if (linkedProcessId && targetDepartmentId) {
+        await generateTasksFromProcess({
+          parentRequestId: requestData.id,
+          processTemplateId: linkedProcessId,
+          targetDepartmentId,
+        });
+      }
+
+      onTasksCreated?.();
+      resetForm();
+      onClose();
+    } catch (error) {
+      console.error('Error creating request:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const resetForm = () => {
@@ -207,6 +289,22 @@ export function NewRequestDialog({ open, onClose, onAdd }: NewRequestDialogProps
             onAddCategory={handleAddCategory}
             onAddSubcategory={handleAddSubcategory}
           />
+
+          {/* Linked process info */}
+          {linkedProcessId && linkedProcessName && (
+            <div className="rounded-lg border border-primary/50 bg-primary/5 p-4">
+              <div className="flex items-start gap-2">
+                <Workflow className="h-4 w-4 mt-0.5 text-primary" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-primary">Processus associé: {linkedProcessName}</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Cette demande déclenchera automatiquement la création des tâches du processus.
+                    Elles seront assignées par le responsable du service cible.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Assignment info based on rule */}
           {matchingRule && (
@@ -312,8 +410,8 @@ export function NewRequestDialog({ open, onClose, onAdd }: NewRequestDialogProps
             <Button type="button" variant="outline" onClick={onClose}>
               Annuler
             </Button>
-            <Button type="submit" disabled={!title.trim() || !targetDepartmentId}>
-              Soumettre la demande
+            <Button type="submit" disabled={!title.trim() || !targetDepartmentId || isSubmitting}>
+              {isSubmitting ? 'Création en cours...' : 'Soumettre la demande'}
             </Button>
           </div>
         </form>

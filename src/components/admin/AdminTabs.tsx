@@ -1,5 +1,5 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building2, Briefcase, Users, Layers, Shield, UserCog, Route } from 'lucide-react';
+import { Building2, Briefcase, Users, Layers, Shield, UserCog, Route, FolderTree } from 'lucide-react';
 import { CompaniesTab } from './CompaniesTab';
 import { DepartmentsTab } from './DepartmentsTab';
 import { JobTitlesTab } from './JobTitlesTab';
@@ -7,6 +7,7 @@ import { HierarchyLevelsTab } from './HierarchyLevelsTab';
 import { PermissionProfilesTab } from './PermissionProfilesTab';
 import { UsersTab } from './UsersTab';
 import { AssignmentRulesTab } from './AssignmentRulesTab';
+import { CategoriesProcessTab } from './CategoriesProcessTab';
 import type { Company, Department, JobTitle, HierarchyLevel, PermissionProfile, UserProfile } from '@/types/admin';
 
 interface AdminTabsProps {
@@ -37,7 +38,7 @@ interface AdminTabsProps {
 export function AdminTabs(props: AdminTabsProps) {
   return (
     <Tabs defaultValue="users" className="space-y-6">
-      <TabsList className="grid w-full grid-cols-7">
+      <TabsList className="grid w-full grid-cols-8">
         <TabsTrigger value="users" className="flex items-center gap-2">
           <UserCog className="h-4 w-4" />
           <span className="hidden sm:inline">Utilisateurs</span>
@@ -65,6 +66,10 @@ export function AdminTabs(props: AdminTabsProps) {
         <TabsTrigger value="assignment-rules" className="flex items-center gap-2">
           <Route className="h-4 w-4" />
           <span className="hidden sm:inline">Affectation</span>
+        </TabsTrigger>
+        <TabsTrigger value="categories-process" className="flex items-center gap-2">
+          <FolderTree className="h-4 w-4" />
+          <span className="hidden sm:inline">Catégories</span>
         </TabsTrigger>
       </TabsList>
 
@@ -133,6 +138,10 @@ export function AdminTabs(props: AdminTabsProps) {
           departments={props.departments}
           users={props.users}
         />
+      </TabsContent>
+
+      <TabsContent value="categories-process">
+        <CategoriesProcessTab />
       </TabsContent>
     </Tabs>
   );

@@ -4,13 +4,15 @@ import {
   AlertCircle, 
   TrendingUp,
   ListTodo,
-  ListChecks
+  ListChecks,
+  UserPlus
 } from 'lucide-react';
 import { TaskStats, Task } from '@/types/task';
 import { StatsCard } from './StatsCard';
 import { ProgressRing } from './ProgressRing';
 import { TaskCard } from '../tasks/TaskCard';
 import { TaskStatus } from '@/types/task';
+import { Button } from '@/components/ui/button';
 
 interface DashboardProps {
   stats: TaskStats;
@@ -20,9 +22,11 @@ interface DashboardProps {
   globalProgress?: number;
   globalStats?: { completed: number; total: number };
   progressMap?: Record<string, { completed: number; total: number; progress: number }>;
+  unassignedCount?: number;
+  onViewUnassigned?: () => void;
 }
 
-export function Dashboard({ stats, recentTasks, onStatusChange, onDelete, globalProgress = 0, globalStats, progressMap }: DashboardProps) {
+export function Dashboard({ stats, recentTasks, onStatusChange, onDelete, globalProgress = 0, globalStats, progressMap, unassignedCount = 0, onViewUnassigned }: DashboardProps) {
   const urgentTasks = recentTasks
     .filter(t => (t.priority === 'high' || t.priority === 'urgent') && t.status !== 'done')
     .slice(0, 3);
@@ -58,6 +62,22 @@ export function Dashboard({ stats, recentTasks, onStatusChange, onDelete, global
           variant="success"
         />
       </div>
+
+      {/* Unassigned tasks alert for managers */}
+      {unassignedCount > 0 && onViewUnassigned && (
+        <div className="bg-warning/10 border border-warning/30 rounded-xl p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <UserPlus className="h-6 w-6 text-warning" />
+            <div>
+              <p className="font-semibold">{unassignedCount} tâche(s) à affecter</p>
+              <p className="text-sm text-muted-foreground">Des demandes attendent d'être assignées dans votre service</p>
+            </div>
+          </div>
+          <Button onClick={onViewUnassigned} variant="outline">
+            Voir les tâches
+          </Button>
+        </div>
+      )}
 
       {/* Main content */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
