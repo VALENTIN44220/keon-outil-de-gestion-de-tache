@@ -28,6 +28,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
 import { Info, ArrowRight, Building2, Workflow } from 'lucide-react';
+import { BEProjectSelect } from '@/components/be/BEProjectSelect';
+import { BELabelSelect } from '@/components/be/BELabelSelect';
 
 interface Department {
   id: string;
@@ -75,6 +77,8 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
   const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
   const [links, setLinks] = useState<LinkItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [beProjectId, setBeProjectId] = useState<string | null>(null);
+  const [beLabelId, setBeLabelId] = useState<string | null>(null);
   
   // Data
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -244,6 +248,8 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
           current_validation_level: 0,
           source_process_template_id: linkedProcessId,
           source_sub_process_template_id: linkedSubProcessId,
+          be_project_id: beProjectId,
+          be_label_id: beLabelId,
         })
         .select()
         .single();
@@ -315,6 +321,8 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
     setLinkedProcessName(null);
     setLinkedSubProcessId(null);
     setLinkedSubProcessName(null);
+    setBeProjectId(null);
+    setBeLabelId(null);
   };
 
   const handleAddCategory = async (name: string) => {
@@ -379,7 +387,18 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
             onAddSubcategory={handleAddSubcategory}
           />
 
-          {/* Linked process/sub-process info */}
+          {/* BE Project Selection */}
+          <div className="grid grid-cols-2 gap-4">
+            <BEProjectSelect
+              value={beProjectId}
+              onChange={setBeProjectId}
+            />
+            <BELabelSelect
+              value={beLabelId}
+              onChange={setBeLabelId}
+            />
+          </div>
+
           {(linkedProcessId || linkedSubProcessId) && (
             <div className="rounded-lg border border-primary/50 bg-primary/5 p-4">
               <div className="flex items-start gap-2">

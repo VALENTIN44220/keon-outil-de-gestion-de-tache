@@ -91,6 +91,169 @@ export type Database = {
           },
         ]
       }
+      be_projects: {
+        Row: {
+          actionnariat: string | null
+          adresse_site: string | null
+          adresse_societe: string | null
+          charge_affaires_id: string | null
+          code_divalto: string | null
+          code_projet: string
+          created_at: string
+          created_by: string | null
+          date_cloture_bancaire: string | null
+          date_cloture_juridique: string | null
+          date_os_etude: string | null
+          date_os_travaux: string | null
+          description: string | null
+          developpeur_id: string | null
+          id: string
+          ingenieur_etudes_id: string | null
+          ingenieur_realisation_id: string | null
+          nom_projet: string
+          pays: string | null
+          pays_site: string | null
+          projeteur_id: string | null
+          regime_icpe: string | null
+          siret: string | null
+          status: string
+          typologie: string | null
+          updated_at: string
+        }
+        Insert: {
+          actionnariat?: string | null
+          adresse_site?: string | null
+          adresse_societe?: string | null
+          charge_affaires_id?: string | null
+          code_divalto?: string | null
+          code_projet: string
+          created_at?: string
+          created_by?: string | null
+          date_cloture_bancaire?: string | null
+          date_cloture_juridique?: string | null
+          date_os_etude?: string | null
+          date_os_travaux?: string | null
+          description?: string | null
+          developpeur_id?: string | null
+          id?: string
+          ingenieur_etudes_id?: string | null
+          ingenieur_realisation_id?: string | null
+          nom_projet: string
+          pays?: string | null
+          pays_site?: string | null
+          projeteur_id?: string | null
+          regime_icpe?: string | null
+          siret?: string | null
+          status?: string
+          typologie?: string | null
+          updated_at?: string
+        }
+        Update: {
+          actionnariat?: string | null
+          adresse_site?: string | null
+          adresse_societe?: string | null
+          charge_affaires_id?: string | null
+          code_divalto?: string | null
+          code_projet?: string
+          created_at?: string
+          created_by?: string | null
+          date_cloture_bancaire?: string | null
+          date_cloture_juridique?: string | null
+          date_os_etude?: string | null
+          date_os_travaux?: string | null
+          description?: string | null
+          developpeur_id?: string | null
+          id?: string
+          ingenieur_etudes_id?: string | null
+          ingenieur_realisation_id?: string | null
+          nom_projet?: string
+          pays?: string | null
+          pays_site?: string | null
+          projeteur_id?: string | null
+          regime_icpe?: string | null
+          siret?: string | null
+          status?: string
+          typologie?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "be_projects_charge_affaires_id_fkey"
+            columns: ["charge_affaires_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "be_projects_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "be_projects_developpeur_id_fkey"
+            columns: ["developpeur_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "be_projects_ingenieur_etudes_id_fkey"
+            columns: ["ingenieur_etudes_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "be_projects_ingenieur_realisation_id_fkey"
+            columns: ["ingenieur_realisation_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "be_projects_projeteur_id_fkey"
+            columns: ["projeteur_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      be_task_labels: {
+        Row: {
+          code: string
+          color: string | null
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          order_index: number
+        }
+        Insert: {
+          code: string
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          order_index?: number
+        }
+        Update: {
+          code?: string
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          order_index?: number
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           created_at: string
@@ -829,6 +992,8 @@ export type Database = {
       tasks: {
         Row: {
           assignee_id: string | null
+          be_label_id: string | null
+          be_project_id: string | null
           category: string | null
           category_id: string | null
           created_at: string
@@ -839,8 +1004,15 @@ export type Database = {
           is_assignment_task: boolean
           parent_request_id: string | null
           priority: string
+          rbe_validated_at: string | null
+          rbe_validation_comment: string | null
+          rbe_validation_status: string | null
+          rbe_validator_id: string | null
           reporter_id: string | null
           requester_id: string | null
+          requester_validated_at: string | null
+          requester_validation_comment: string | null
+          requester_validation_status: string | null
           requires_validation: boolean | null
           source_process_template_id: string | null
           source_sub_process_template_id: string | null
@@ -858,6 +1030,8 @@ export type Database = {
         }
         Insert: {
           assignee_id?: string | null
+          be_label_id?: string | null
+          be_project_id?: string | null
           category?: string | null
           category_id?: string | null
           created_at?: string
@@ -868,8 +1042,15 @@ export type Database = {
           is_assignment_task?: boolean
           parent_request_id?: string | null
           priority?: string
+          rbe_validated_at?: string | null
+          rbe_validation_comment?: string | null
+          rbe_validation_status?: string | null
+          rbe_validator_id?: string | null
           reporter_id?: string | null
           requester_id?: string | null
+          requester_validated_at?: string | null
+          requester_validation_comment?: string | null
+          requester_validation_status?: string | null
           requires_validation?: boolean | null
           source_process_template_id?: string | null
           source_sub_process_template_id?: string | null
@@ -887,6 +1068,8 @@ export type Database = {
         }
         Update: {
           assignee_id?: string | null
+          be_label_id?: string | null
+          be_project_id?: string | null
           category?: string | null
           category_id?: string | null
           created_at?: string
@@ -897,8 +1080,15 @@ export type Database = {
           is_assignment_task?: boolean
           parent_request_id?: string | null
           priority?: string
+          rbe_validated_at?: string | null
+          rbe_validation_comment?: string | null
+          rbe_validation_status?: string | null
+          rbe_validator_id?: string | null
           reporter_id?: string | null
           requester_id?: string | null
+          requester_validated_at?: string | null
+          requester_validation_comment?: string | null
+          requester_validation_status?: string | null
           requires_validation?: boolean | null
           source_process_template_id?: string | null
           source_sub_process_template_id?: string | null
@@ -923,6 +1113,20 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "tasks_be_label_id_fkey"
+            columns: ["be_label_id"]
+            isOneToOne: false
+            referencedRelation: "be_task_labels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_be_project_id_fkey"
+            columns: ["be_project_id"]
+            isOneToOne: false
+            referencedRelation: "be_projects"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "tasks_category_id_fkey"
             columns: ["category_id"]
             isOneToOne: false
@@ -934,6 +1138,13 @@ export type Database = {
             columns: ["parent_request_id"]
             isOneToOne: false
             referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_rbe_validator_id_fkey"
+            columns: ["rbe_validator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
