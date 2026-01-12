@@ -166,7 +166,7 @@ export function ProcessDetailView({
                       onDelete={() => deleteSubProcess(sp.id)}
                       onAddTask={(task) => addTaskToSubProcess(sp.id, task)}
                       onDeleteTask={(taskId) => deleteTaskFromSubProcess(sp.id, taskId)}
-                      canManage={canManage}
+                      canManage={Boolean(sp.can_manage)}
                     />
                   ))
                 )}

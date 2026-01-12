@@ -10,6 +10,7 @@ import { useProcessTemplates } from '@/hooks/useProcessTemplates';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useTasks } from '@/hooks/useTasks';
 import { useTemplatePermissions } from '@/hooks/useTemplatePermissions';
+import { useAuth } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 import { ProcessTemplate, ProcessWithTasks } from '@/types/template';
 
@@ -36,9 +37,13 @@ const Templates = () => {
     deleteTaskTemplate,
   } = useProcessTemplates();
 
+  const { user } = useAuth();
   const { allTasks } = useTasks();
   const { notifications, unreadCount, hasUrgent } = useNotifications(allTasks);
   const { canManageTemplates } = useTemplatePermissions();
+
+  // Création d'un nouveau processus : tout utilisateur connecté
+  const canCreateProcess = Boolean(user);
 
   // Filter processes by search
   const filteredProcesses = processes.filter(p => 
@@ -75,7 +80,7 @@ const Templates = () => {
           title="Modèles de processus"
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
-          onAddTask={canManageTemplates ? () => setIsAddDialogOpen(true) : undefined}
+          onAddTask={canCreateProcess ? () => setIsAddDialogOpen(true) : undefined}
           addButtonLabel="Nouveau processus"
           notifications={notifications}
           unreadCount={unreadCount}
@@ -108,7 +113,7 @@ const Templates = () => {
                     onViewDetails={() => handleViewDetails(process.id)}
                     onAddTask={(task) => addTaskTemplate(process.id, task)}
                     onDeleteTask={(taskId) => deleteTaskTemplate(process.id, taskId)}
-                    canManage={canManageTemplates}
+                    canManage={Boolean(process.can_manage)}
                   />
                 ))}
               </div>
@@ -136,7 +141,7 @@ const Templates = () => {
         onClose={() => setViewingProcess(null)}
         onAddTask={(task) => viewingProcess && addTaskTemplate(viewingProcess.id, task)}
         onDeleteTask={(taskId) => viewingProcess && deleteTaskTemplate(viewingProcess.id, taskId)}
-        canManage={canManageTemplates}
+        canManage={Boolean(viewingProcess?.can_manage)}
       />
     </div>
   );

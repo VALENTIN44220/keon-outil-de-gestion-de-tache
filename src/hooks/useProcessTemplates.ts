@@ -32,18 +32,22 @@ export function useProcessTemplates() {
 
       if (processError) throw processError;
 
-      // Fetch task templates for each process
+      // Fetch task templates + per-process manage permission
       const processesWithTasks: ProcessWithTasks[] = await Promise.all(
         (processData || []).map(async (process) => {
-          const { data: tasks } = await supabase
-            .from('task_templates')
-            .select('*')
-            .eq('process_template_id', process.id)
-            .order('order_index', { ascending: true });
+          const [{ data: tasks }, { data: canManageData }] = await Promise.all([
+            supabase
+              .from('task_templates')
+              .select('*')
+              .eq('process_template_id', process.id)
+              .order('order_index', { ascending: true }),
+            supabase.rpc('can_manage_template', { _creator_id: process.user_id }),
+          ]);
 
           return {
             ...process,
             task_templates: (tasks || []) as TaskTemplate[],
+            can_manage: Boolean(canManageData),
           };
         })
       );
@@ -73,7 +77,7 @@ export function useProcessTemplates() {
 
       if (error) throw error;
 
-      setProcesses(prev => [{ ...data, task_templates: [] }, ...prev]);
+      setProcesses(prev => [{ ...data, task_templates: [], can_manage: true }, ...prev]);
       toast.success('Processus créé avec succès');
       return data;
     } catch (error) {
