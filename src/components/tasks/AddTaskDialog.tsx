@@ -100,6 +100,9 @@ export function AddTaskDialog({ open, onClose, onAdd }: AddTaskDialogProps) {
       validation_comment: null,
       requires_validation: false,
       current_validation_level: 0,
+      parent_request_id: null,
+      is_assignment_task: false,
+      source_process_template_id: null,
     }, checklistItems.length > 0 ? checklistItems : undefined);
 
     // Reset form

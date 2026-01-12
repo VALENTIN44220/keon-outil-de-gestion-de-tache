@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Clock, User, MoreVertical, Trash2, ChevronDown, ChevronRight, ListChecks, FileText } from 'lucide-react';
+import { Clock, User, MoreVertical, Trash2, ChevronDown, ChevronRight, ListChecks, FileText, Eye, Building2 } from 'lucide-react';
 import { Task, TaskStatus } from '@/types/task';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +15,7 @@ import { TaskChecklist } from './TaskChecklist';
 import { TaskProgressBadge } from './TaskProgressBadge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { CreateTemplateFromTaskDialog } from './CreateTemplateFromTaskDialog';
+import { TaskDetailDialog } from './TaskDetailDialog';
 
 interface TaskCardProps {
   task: Task;
@@ -53,8 +54,10 @@ const statusLabels = {
 export function TaskCard({ task, onStatusChange, onDelete, compact = false, taskProgress }: TaskCardProps) {
   const [isChecklistOpen, setIsChecklistOpen] = useState(false);
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
   const dueDate = task.due_date ? new Date(task.due_date) : null;
   const isOverdue = dueDate && dueDate < new Date() && task.status !== 'done';
+  const isRequest = task.type === 'request';
 
   return (
     <div className={cn(
@@ -66,6 +69,12 @@ export function TaskCard({ task, onStatusChange, onDelete, compact = false, task
           {/* Header */}
           <div className="flex items-center gap-2 mb-2">
             <div className={cn("w-2 h-2 rounded-full", statusColors[task.status])} />
+            {isRequest && (
+              <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                <Building2 className="h-3 w-3" />
+                Demande
+              </Badge>
+            )}
             <Badge variant="outline" className={cn("text-xs", priorityColors[task.priority])}>
               {priorityLabels[task.priority]}
             </Badge>
@@ -78,13 +87,18 @@ export function TaskCard({ task, onStatusChange, onDelete, compact = false, task
             )}
           </div>
 
-          {/* Title */}
-          <h3 className={cn(
-            "font-medium text-foreground",
-            compact ? "text-sm mb-0.5" : "mb-1",
-            task.status === 'done' && "line-through text-muted-foreground"
-          )}>
+          {/* Title - clickable for requests */}
+          <h3 
+            className={cn(
+              "font-medium text-foreground",
+              compact ? "text-sm mb-0.5" : "mb-1",
+              task.status === 'done' && "line-through text-muted-foreground",
+              isRequest && "cursor-pointer hover:text-primary transition-colors"
+            )}
+            onClick={isRequest ? () => setIsDetailOpen(true) : undefined}
+          >
             {task.title}
+            {isRequest && <Eye className="inline-block ml-2 h-3.5 w-3.5 opacity-50" />}
           </h3>
 
           {/* Description */}
@@ -157,6 +171,12 @@ export function TaskCard({ task, onStatusChange, onDelete, compact = false, task
               <FileText className="w-4 h-4 mr-2" />
               Créer un modèle
             </DropdownMenuItem>
+            {isRequest && (
+              <DropdownMenuItem onClick={() => setIsDetailOpen(true)}>
+                <Eye className="w-4 h-4 mr-2" />
+                Voir les détails
+              </DropdownMenuItem>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem className="text-destructive" onClick={() => onDelete(task.id)}>
               <Trash2 className="w-4 h-4 mr-2" />
@@ -178,6 +198,14 @@ export function TaskCard({ task, onStatusChange, onDelete, compact = false, task
         open={isTemplateDialogOpen}
         onClose={() => setIsTemplateDialogOpen(false)}
         task={task}
+      />
+
+      {/* Task detail dialog for requests */}
+      <TaskDetailDialog
+        task={task}
+        open={isDetailOpen}
+        onClose={() => setIsDetailOpen(false)}
+        onStatusChange={onStatusChange}
       />
     </div>
   );

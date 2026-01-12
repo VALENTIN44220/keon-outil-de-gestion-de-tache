@@ -25,6 +25,10 @@ export interface Task {
   validation_comment: string | null;
   requires_validation: boolean;
   current_validation_level: number;
+  // Request workflow fields
+  parent_request_id: string | null;
+  is_assignment_task: boolean;
+  source_process_template_id: string | null;
   created_at: string;
   updated_at: string;
 }
