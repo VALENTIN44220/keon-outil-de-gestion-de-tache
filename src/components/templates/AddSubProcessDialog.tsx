@@ -5,8 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { SubProcessTemplate } from '@/types/template';
+import { SubProcessTemplate, TemplateVisibility } from '@/types/template';
+import { VisibilitySelect } from './VisibilitySelect';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface AddSubProcessDialogProps {
   open: boolean;
@@ -31,12 +33,14 @@ interface Profile {
 }
 
 export function AddSubProcessDialog({ open, onClose, onAdd, orderIndex }: AddSubProcessDialogProps) {
+  const { profile } = useAuth();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [assignmentType, setAssignmentType] = useState<'manager' | 'user' | 'role'>('manager');
   const [targetDepartmentId, setTargetDepartmentId] = useState<string>('');
   const [targetJobTitleId, setTargetJobTitleId] = useState<string>('');
   const [targetAssigneeId, setTargetAssigneeId] = useState<string>('');
+  const [visibilityLevel, setVisibilityLevel] = useState<TemplateVisibility>('public');
   
   const [departments, setDepartments] = useState<Department[]>([]);
   const [jobTitles, setJobTitles] = useState<JobTitle[]>([]);
@@ -68,6 +72,7 @@ export function AddSubProcessDialog({ open, onClose, onAdd, orderIndex }: AddSub
     setTargetDepartmentId('');
     setTargetJobTitleId('');
     setTargetAssigneeId('');
+    setVisibilityLevel('public');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -85,6 +90,9 @@ export function AddSubProcessDialog({ open, onClose, onAdd, orderIndex }: AddSub
         target_assignee_id: targetAssigneeId || null,
         order_index: orderIndex,
         is_shared: true,
+        visibility_level: visibilityLevel,
+        creator_company_id: profile?.company_id || null,
+        creator_department_id: profile?.department_id || null,
       });
       resetForm();
       onClose();
@@ -95,7 +103,7 @@ export function AddSubProcessDialog({ open, onClose, onAdd, orderIndex }: AddSub
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Ajouter un sous-processus</DialogTitle>
         </DialogHeader>
@@ -124,6 +132,11 @@ export function AddSubProcessDialog({ open, onClose, onAdd, orderIndex }: AddSub
               maxLength={500}
             />
           </div>
+
+          <VisibilitySelect
+            value={visibilityLevel}
+            onChange={setVisibilityLevel}
+          />
 
           <div className="space-y-2">
             <Label>Type d'affectation *</Label>
@@ -180,9 +193,9 @@ export function AddSubProcessDialog({ open, onClose, onAdd, orderIndex }: AddSub
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">Aucun</SelectItem>
-                  {profiles.map(profile => (
-                    <SelectItem key={profile.id} value={profile.id}>
-                      {profile.display_name || 'Sans nom'}
+                  {profiles.map(p => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.display_name || 'Sans nom'}
                     </SelectItem>
                   ))}
                 </SelectContent>

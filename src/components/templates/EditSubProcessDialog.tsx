@@ -5,8 +5,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { SubProcessTemplate } from '@/types/template';
+import { SubProcessTemplate, TemplateVisibility } from '@/types/template';
+import { VisibilitySelect } from './VisibilitySelect';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { useUserRole } from '@/hooks/useUserRole';
 
 interface EditSubProcessDialogProps {
   subProcess: SubProcessTemplate | null;
@@ -31,17 +34,23 @@ interface Profile {
 }
 
 export function EditSubProcessDialog({ subProcess, open, onClose, onSave }: EditSubProcessDialogProps) {
+  const { user } = useAuth();
+  const { isAdmin } = useUserRole();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [assignmentType, setAssignmentType] = useState<'manager' | 'user' | 'role'>('manager');
   const [targetDepartmentId, setTargetDepartmentId] = useState<string>('');
   const [targetJobTitleId, setTargetJobTitleId] = useState<string>('');
   const [targetAssigneeId, setTargetAssigneeId] = useState<string>('');
+  const [visibilityLevel, setVisibilityLevel] = useState<TemplateVisibility>('public');
   
   const [departments, setDepartments] = useState<Department[]>([]);
   const [jobTitles, setJobTitles] = useState<JobTitle[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Only creator or admin can change visibility
+  const canChangeVisibility = subProcess && (subProcess.user_id === user?.id || isAdmin);
 
   useEffect(() => {
     if (open) {
@@ -57,6 +66,7 @@ export function EditSubProcessDialog({ subProcess, open, onClose, onSave }: Edit
       setTargetDepartmentId(subProcess.target_department_id || '');
       setTargetJobTitleId(subProcess.target_job_title_id || '');
       setTargetAssigneeId(subProcess.target_assignee_id || '');
+      setVisibilityLevel(subProcess.visibility_level || 'public');
     }
   }, [subProcess]);
 
@@ -78,14 +88,20 @@ export function EditSubProcessDialog({ subProcess, open, onClose, onSave }: Edit
 
     setIsSubmitting(true);
     try {
-      await onSave({
+      const updates: Partial<SubProcessTemplate> = {
         name: name.trim(),
         description: description.trim() || null,
         assignment_type: assignmentType,
         target_department_id: targetDepartmentId || null,
         target_job_title_id: targetJobTitleId || null,
         target_assignee_id: targetAssigneeId || null,
-      });
+      };
+
+      if (canChangeVisibility) {
+        updates.visibility_level = visibilityLevel;
+      }
+
+      await onSave(updates);
       onClose();
     } finally {
       setIsSubmitting(false);
@@ -94,7 +110,7 @@ export function EditSubProcessDialog({ subProcess, open, onClose, onSave }: Edit
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Modifier le sous-processus</DialogTitle>
         </DialogHeader>
@@ -123,6 +139,13 @@ export function EditSubProcessDialog({ subProcess, open, onClose, onSave }: Edit
               maxLength={500}
             />
           </div>
+
+          {canChangeVisibility && (
+            <VisibilitySelect
+              value={visibilityLevel}
+              onChange={setVisibilityLevel}
+            />
+          )}
 
           <div className="space-y-2">
             <Label>Type d'affectation *</Label>
@@ -179,9 +202,9 @@ export function EditSubProcessDialog({ subProcess, open, onClose, onSave }: Edit
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">Aucun</SelectItem>
-                  {profiles.map(profile => (
-                    <SelectItem key={profile.id} value={profile.id}>
-                      {profile.display_name || 'Sans nom'}
+                  {profiles.map(p => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.display_name || 'Sans nom'}
                     </SelectItem>
                   ))}
                 </SelectContent>

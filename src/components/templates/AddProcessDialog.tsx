@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ProcessTemplate } from '@/types/template';
+import { ProcessTemplate, TemplateVisibility } from '@/types/template';
+import { VisibilitySelect } from './VisibilitySelect';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface AddProcessDialogProps {
   open: boolean;
@@ -13,10 +15,12 @@ interface AddProcessDialogProps {
 }
 
 export function AddProcessDialog({ open, onClose, onAdd }: AddProcessDialogProps) {
+  const { profile } = useAuth();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [company, setCompany] = useState('');
   const [department, setDepartment] = useState('');
+  const [visibilityLevel, setVisibilityLevel] = useState<TemplateVisibility>('public');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,6 +32,9 @@ export function AddProcessDialog({ open, onClose, onAdd }: AddProcessDialogProps
       description: description.trim() || null,
       company: company.trim() || null,
       department: department.trim() || null,
+      visibility_level: visibilityLevel,
+      creator_company_id: profile?.company_id || null,
+      creator_department_id: profile?.department_id || null,
     });
 
     resetForm();
@@ -39,6 +46,7 @@ export function AddProcessDialog({ open, onClose, onAdd }: AddProcessDialogProps
     setDescription('');
     setCompany('');
     setDepartment('');
+    setVisibilityLevel('public');
   };
 
   return (
@@ -96,6 +104,11 @@ export function AddProcessDialog({ open, onClose, onAdd }: AddProcessDialogProps
               />
             </div>
           </div>
+
+          <VisibilitySelect
+            value={visibilityLevel}
+            onChange={setVisibilityLevel}
+          />
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>

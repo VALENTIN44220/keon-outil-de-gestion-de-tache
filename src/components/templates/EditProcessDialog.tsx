@@ -4,7 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ProcessTemplate } from '@/types/template';
+import { ProcessTemplate, TemplateVisibility } from '@/types/template';
+import { VisibilitySelect } from './VisibilitySelect';
+import { useAuth } from '@/contexts/AuthContext';
+import { useUserRole } from '@/hooks/useUserRole';
 
 interface EditProcessDialogProps {
   process: ProcessTemplate | null;
@@ -14,10 +17,16 @@ interface EditProcessDialogProps {
 }
 
 export function EditProcessDialog({ process, open, onClose, onSave }: EditProcessDialogProps) {
+  const { user } = useAuth();
+  const { isAdmin } = useUserRole();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [company, setCompany] = useState('');
   const [department, setDepartment] = useState('');
+  const [visibilityLevel, setVisibilityLevel] = useState<TemplateVisibility>('public');
+
+  // Only creator or admin can change visibility
+  const canChangeVisibility = process && (process.user_id === user?.id || isAdmin);
 
   useEffect(() => {
     if (process) {
@@ -25,6 +34,7 @@ export function EditProcessDialog({ process, open, onClose, onSave }: EditProces
       setDescription(process.description || '');
       setCompany(process.company || '');
       setDepartment(process.department || '');
+      setVisibilityLevel(process.visibility_level || 'public');
     }
   }, [process]);
 
@@ -32,12 +42,18 @@ export function EditProcessDialog({ process, open, onClose, onSave }: EditProces
     e.preventDefault();
     if (!name.trim()) return;
 
-    onSave({
+    const updates: Partial<ProcessTemplate> = {
       name: name.trim(),
       description: description.trim() || null,
       company: company.trim() || null,
       department: department.trim() || null,
-    });
+    };
+
+    if (canChangeVisibility) {
+      updates.visibility_level = visibilityLevel;
+    }
+
+    onSave(updates);
     onClose();
   };
 
@@ -96,6 +112,13 @@ export function EditProcessDialog({ process, open, onClose, onSave }: EditProces
               />
             </div>
           </div>
+
+          {canChangeVisibility && (
+            <VisibilitySelect
+              value={visibilityLevel}
+              onChange={setVisibilityLevel}
+            />
+          )}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>

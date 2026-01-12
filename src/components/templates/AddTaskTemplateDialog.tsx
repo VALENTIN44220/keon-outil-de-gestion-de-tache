@@ -1,13 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { TaskTemplate } from '@/types/template';
+import { TaskTemplate, TemplateVisibility } from '@/types/template';
 import { CategorySelect } from './CategorySelect';
+import { VisibilitySelect } from './VisibilitySelect';
 import { useCategories } from '@/hooks/useCategories';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface AddTaskTemplateDialogProps {
   open: boolean;
@@ -17,12 +19,14 @@ interface AddTaskTemplateDialogProps {
 }
 
 export function AddTaskTemplateDialog({ open, onClose, onAdd, orderIndex }: AddTaskTemplateDialogProps) {
+  const { profile } = useAuth();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [subcategoryId, setSubcategoryId] = useState<string | null>(null);
   const [defaultDurationDays, setDefaultDurationDays] = useState(7);
+  const [visibilityLevel, setVisibilityLevel] = useState<TemplateVisibility>('public');
 
   const { categories, addCategory, addSubcategory } = useCategories();
 
@@ -44,6 +48,9 @@ export function AddTaskTemplateDialog({ open, onClose, onAdd, orderIndex }: AddT
       sub_process_template_id: null,
       default_duration_days: defaultDurationDays,
       order_index: orderIndex,
+      visibility_level: visibilityLevel,
+      creator_company_id: profile?.company_id || null,
+      creator_department_id: profile?.department_id || null,
     });
 
     resetForm();
@@ -57,6 +64,7 @@ export function AddTaskTemplateDialog({ open, onClose, onAdd, orderIndex }: AddT
     setCategoryId(null);
     setSubcategoryId(null);
     setDefaultDurationDays(7);
+    setVisibilityLevel('public');
   };
 
   const handleAddCategory = async (name: string) => {
@@ -142,6 +150,11 @@ export function AddTaskTemplateDialog({ open, onClose, onAdd, orderIndex }: AddT
             onSubcategoryChange={setSubcategoryId}
             onAddCategory={handleAddCategory}
             onAddSubcategory={handleAddSubcategory}
+          />
+
+          <VisibilitySelect
+            value={visibilityLevel}
+            onChange={setVisibilityLevel}
           />
 
           <DialogFooter>
