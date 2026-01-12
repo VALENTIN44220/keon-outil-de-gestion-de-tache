@@ -64,7 +64,7 @@ interface NewRequestDialogProps {
 
 export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initialProcessTemplateId, initialSubProcessTemplateId }: NewRequestDialogProps) {
   const { profile: currentUser } = useAuth();
-  const { generateTasksFromProcess, getProcessTemplateForSubcategory } = useRequestWorkflow();
+  const { generatePendingAssignments, getProcessTemplateForSubcategory } = useRequestWorkflow();
   
   // Form state
   const [title, setTitle] = useState('');
@@ -315,9 +315,9 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
         );
       }
 
-      // If there's a linked sub-process, generate tasks from it
+      // If there's a linked sub-process, generate pending assignments
       if (linkedSubProcessId && targetDepartmentId) {
-        await generateTasksFromProcess({
+        await generatePendingAssignments({
           parentRequestId: requestData.id,
           processTemplateId: linkedProcessId || '',
           targetDepartmentId,
@@ -325,7 +325,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
         });
       } else if (linkedProcessId && targetDepartmentId) {
         // Fallback to process level if no sub-process
-        await generateTasksFromProcess({
+        await generatePendingAssignments({
           parentRequestId: requestData.id,
           processTemplateId: linkedProcessId,
           targetDepartmentId,
