@@ -457,6 +457,8 @@ export type Database = {
         Row: {
           company: string | null
           created_at: string
+          creator_company_id: string | null
+          creator_department_id: string | null
           department: string | null
           description: string | null
           id: string
@@ -464,10 +466,13 @@ export type Database = {
           name: string
           updated_at: string
           user_id: string
+          visibility_level: Database["public"]["Enums"]["template_visibility"]
         }
         Insert: {
           company?: string | null
           created_at?: string
+          creator_company_id?: string | null
+          creator_department_id?: string | null
           department?: string | null
           description?: string | null
           id?: string
@@ -475,10 +480,13 @@ export type Database = {
           name: string
           updated_at?: string
           user_id: string
+          visibility_level?: Database["public"]["Enums"]["template_visibility"]
         }
         Update: {
           company?: string | null
           created_at?: string
+          creator_company_id?: string | null
+          creator_department_id?: string | null
           department?: string | null
           description?: string | null
           id?: string
@@ -486,8 +494,24 @@ export type Database = {
           name?: string
           updated_at?: string
           user_id?: string
+          visibility_level?: Database["public"]["Enums"]["template_visibility"]
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "process_templates_creator_company_id_fkey"
+            columns: ["creator_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "process_templates_creator_department_id_fkey"
+            columns: ["creator_department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -596,6 +620,8 @@ export type Database = {
         Row: {
           assignment_type: string
           created_at: string
+          creator_company_id: string | null
+          creator_department_id: string | null
           description: string | null
           id: string
           is_shared: boolean
@@ -607,10 +633,13 @@ export type Database = {
           target_job_title_id: string | null
           updated_at: string
           user_id: string
+          visibility_level: Database["public"]["Enums"]["template_visibility"]
         }
         Insert: {
           assignment_type?: string
           created_at?: string
+          creator_company_id?: string | null
+          creator_department_id?: string | null
           description?: string | null
           id?: string
           is_shared?: boolean
@@ -622,10 +651,13 @@ export type Database = {
           target_job_title_id?: string | null
           updated_at?: string
           user_id: string
+          visibility_level?: Database["public"]["Enums"]["template_visibility"]
         }
         Update: {
           assignment_type?: string
           created_at?: string
+          creator_company_id?: string | null
+          creator_department_id?: string | null
           description?: string | null
           id?: string
           is_shared?: boolean
@@ -637,8 +669,23 @@ export type Database = {
           target_job_title_id?: string | null
           updated_at?: string
           user_id?: string
+          visibility_level?: Database["public"]["Enums"]["template_visibility"]
         }
         Relationships: [
+          {
+            foreignKeyName: "sub_process_templates_creator_company_id_fkey"
+            columns: ["creator_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sub_process_templates_creator_department_id_fkey"
+            columns: ["creator_department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sub_process_templates_process_template_id_fkey"
             columns: ["process_template_id"]
@@ -850,6 +897,8 @@ export type Database = {
           category: string | null
           category_id: string | null
           created_at: string
+          creator_company_id: string | null
+          creator_department_id: string | null
           default_duration_days: number | null
           description: string | null
           id: string
@@ -863,11 +912,14 @@ export type Database = {
           title: string
           updated_at: string
           user_id: string
+          visibility_level: Database["public"]["Enums"]["template_visibility"]
         }
         Insert: {
           category?: string | null
           category_id?: string | null
           created_at?: string
+          creator_company_id?: string | null
+          creator_department_id?: string | null
           default_duration_days?: number | null
           description?: string | null
           id?: string
@@ -881,11 +933,14 @@ export type Database = {
           title: string
           updated_at?: string
           user_id: string
+          visibility_level?: Database["public"]["Enums"]["template_visibility"]
         }
         Update: {
           category?: string | null
           category_id?: string | null
           created_at?: string
+          creator_company_id?: string | null
+          creator_department_id?: string | null
           default_duration_days?: number | null
           description?: string | null
           id?: string
@@ -899,6 +954,7 @@ export type Database = {
           title?: string
           updated_at?: string
           user_id?: string
+          visibility_level?: Database["public"]["Enums"]["template_visibility"]
         }
         Relationships: [
           {
@@ -906,6 +962,20 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_templates_creator_company_id_fkey"
+            columns: ["creator_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_templates_creator_department_id_fkey"
+            columns: ["creator_department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
             referencedColumns: ["id"]
           },
           {
@@ -1275,6 +1345,16 @@ export type Database = {
     Functions: {
       can_access_task: { Args: { _task_id: string }; Returns: boolean }
       can_assign_tasks: { Args: never; Returns: boolean }
+      can_manage_template: { Args: { _creator_id: string }; Returns: boolean }
+      can_view_template: {
+        Args: {
+          _creator_company_id: string
+          _creator_department_id: string
+          _creator_id: string
+          _visibility: Database["public"]["Enums"]["template_visibility"]
+        }
+        Returns: boolean
+      }
       current_company_id: { Args: never; Returns: string }
       current_department_id: { Args: never; Returns: string }
       current_profile_id: { Args: never; Returns: string }
@@ -1288,6 +1368,11 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
+      template_visibility:
+        | "private"
+        | "internal_department"
+        | "internal_company"
+        | "public"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1416,6 +1501,12 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "moderator", "user"],
+      template_visibility: [
+        "private",
+        "internal_department",
+        "internal_company",
+        "public",
+      ],
     },
   },
 } as const

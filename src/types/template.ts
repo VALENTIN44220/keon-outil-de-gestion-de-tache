@@ -1,3 +1,19 @@
+export type TemplateVisibility = 'private' | 'internal_department' | 'internal_company' | 'public';
+
+export const VISIBILITY_LABELS: Record<TemplateVisibility, string> = {
+  private: 'Privé',
+  internal_department: 'Service',
+  internal_company: 'Société',
+  public: 'Public',
+};
+
+export const VISIBILITY_DESCRIPTIONS: Record<TemplateVisibility, string> = {
+  private: 'Visible uniquement par vous et les administrateurs',
+  internal_department: 'Visible par les membres de votre service',
+  internal_company: 'Visible par les membres de votre société',
+  public: 'Visible par tous les utilisateurs',
+};
+
 export interface ProcessTemplate {
   id: string;
   name: string;
@@ -6,6 +22,9 @@ export interface ProcessTemplate {
   company: string | null;
   department: string | null;
   is_shared?: boolean;
+  visibility_level: TemplateVisibility;
+  creator_company_id: string | null;
+  creator_department_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -21,6 +40,9 @@ export interface SubProcessTemplate {
   target_job_title_id: string | null;
   order_index: number;
   is_shared: boolean;
+  visibility_level: TemplateVisibility;
+  creator_company_id: string | null;
+  creator_department_id: string | null;
   user_id: string;
   created_at: string;
   updated_at: string;
@@ -38,6 +60,9 @@ export interface TaskTemplate {
   subcategory_id: string | null;
   default_duration_days: number;
   order_index: number;
+  visibility_level: TemplateVisibility;
+  creator_company_id: string | null;
+  creator_department_id: string | null;
   user_id: string;
   created_at: string;
   updated_at: string;
