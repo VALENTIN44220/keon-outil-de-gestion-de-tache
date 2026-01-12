@@ -66,17 +66,30 @@ export interface TaskTemplate {
   user_id: string;
   created_at: string;
   updated_at: string;
+
+  /** UI helper (computed client-side) */
+  can_manage?: boolean;
 }
 
 export interface SubProcessWithTasks extends SubProcessTemplate {
   task_templates: TaskTemplate[];
+
+  /** UI helper (computed client-side) */
+  can_manage?: boolean;
 }
 
 export interface ProcessWithSubProcesses extends ProcessTemplate {
   sub_processes: SubProcessWithTasks[];
+
+  /** UI helper (computed client-side) */
+  can_manage?: boolean;
 }
 
 // Legacy type for backward compatibility
 export interface ProcessWithTasks extends ProcessTemplate {
   task_templates: TaskTemplate[];
+
+  /** UI helper (computed client-side) */
+  can_manage?: boolean;
 }
+

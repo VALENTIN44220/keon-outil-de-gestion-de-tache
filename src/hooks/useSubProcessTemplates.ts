@@ -25,19 +25,23 @@ export function useSubProcessTemplates(processId: string | null) {
 
       if (subProcessError) throw subProcessError;
 
-      // Fetch task templates for each sub-process
+      // Fetch task templates + per-sub-process manage permission
       const subProcessesWithTasks: SubProcessWithTasks[] = await Promise.all(
         (subProcessData || []).map(async (subProcess) => {
-          const { data: tasks } = await supabase
-            .from('task_templates')
-            .select('*')
-            .eq('sub_process_template_id', subProcess.id)
-            .order('order_index', { ascending: true });
+          const [{ data: tasks }, { data: canManageData }] = await Promise.all([
+            supabase
+              .from('task_templates')
+              .select('*')
+              .eq('sub_process_template_id', subProcess.id)
+              .order('order_index', { ascending: true }),
+            supabase.rpc('can_manage_template', { _creator_id: subProcess.user_id }),
+          ]);
 
           return {
             ...subProcess,
             assignment_type: subProcess.assignment_type as 'manager' | 'user' | 'role',
-            task_templates: (tasks || []) as TaskTemplate[],
+            task_templates: (tasks || []).map((t) => ({ ...t })) as TaskTemplate[],
+            can_manage: Boolean(canManageData),
           };
         })
       );
@@ -73,6 +77,7 @@ export function useSubProcessTemplates(processId: string | null) {
         ...data,
         assignment_type: data.assignment_type as 'manager' | 'user' | 'role',
         task_templates: [],
+        can_manage: true,
       };
 
       setSubProcesses(prev => [...prev, newSubProcess]);
