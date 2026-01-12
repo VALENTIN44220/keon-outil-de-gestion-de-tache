@@ -221,6 +221,9 @@ export function NewTaskDialog({ open, onClose, mode, onAdd, onTasksCreated }: Ne
       validation_comment: null,
       requires_validation: false,
       current_validation_level: 0,
+      parent_request_id: null,
+      is_assignment_task: false,
+      source_process_template_id: null,
     }, checklistItems.length > 0 ? checklistItems : undefined, links.length > 0 ? links : undefined);
 
     resetForm();
@@ -257,6 +260,9 @@ export function NewTaskDialog({ open, onClose, mode, onAdd, onTasksCreated }: Ne
         validation_comment: null,
         requires_validation: false,
         current_validation_level: 0,
+        parent_request_id: null,
+        is_assignment_task: false,
+        source_process_template_id: null,
       });
     }
 
