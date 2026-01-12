@@ -5,16 +5,18 @@ import { ProcessList } from '@/components/templates/ProcessList';
 import { TemplateFilters } from '@/components/templates/TemplateFilters';
 import { AddProcessDialog } from '@/components/templates/AddProcessDialog';
 import { EditProcessDialog } from '@/components/templates/EditProcessDialog';
+import { ProcessDetailView } from '@/components/templates/ProcessDetailView';
 import { useProcessTemplates } from '@/hooks/useProcessTemplates';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useTasks } from '@/hooks/useTasks';
 import { Loader2 } from 'lucide-react';
-import { ProcessTemplate } from '@/types/template';
+import { ProcessTemplate, ProcessWithTasks } from '@/types/template';
 
 const Templates = () => {
   const [activeView, setActiveView] = useState('templates');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingProcess, setEditingProcess] = useState<ProcessTemplate | null>(null);
+  const [viewingProcess, setViewingProcess] = useState<ProcessWithTasks | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   
   const {
@@ -46,6 +48,13 @@ const Templates = () => {
     const process = processes.find(p => p.id === id);
     if (process) {
       setEditingProcess(process);
+    }
+  };
+
+  const handleViewDetails = (id: string) => {
+    const process = processes.find(p => p.id === id);
+    if (process) {
+      setViewingProcess(process);
     }
   };
 
@@ -91,6 +100,7 @@ const Templates = () => {
                 processes={filteredProcesses}
                 onDelete={deleteProcess}
                 onEdit={handleEditProcess}
+                onViewDetails={handleViewDetails}
                 onAddTask={addTaskTemplate}
                 onDeleteTask={deleteTaskTemplate}
               />
@@ -110,6 +120,14 @@ const Templates = () => {
         open={!!editingProcess}
         onClose={() => setEditingProcess(null)}
         onSave={handleUpdateProcess}
+      />
+
+      <ProcessDetailView
+        process={viewingProcess}
+        open={!!viewingProcess}
+        onClose={() => setViewingProcess(null)}
+        onAddTask={(task) => viewingProcess && addTaskTemplate(viewingProcess.id, task)}
+        onDeleteTask={(taskId) => viewingProcess && deleteTaskTemplate(viewingProcess.id, taskId)}
       />
     </div>
   );

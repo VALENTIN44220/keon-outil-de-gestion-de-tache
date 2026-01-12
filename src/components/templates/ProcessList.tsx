@@ -5,11 +5,12 @@ interface ProcessListProps {
   processes: ProcessWithTasks[];
   onDelete: (id: string) => void;
   onEdit: (id: string) => void;
+  onViewDetails: (id: string) => void;
   onAddTask: (processId: string, task: Omit<TaskTemplate, 'id' | 'user_id' | 'process_template_id' | 'created_at' | 'updated_at'>) => void;
   onDeleteTask: (processId: string, taskId: string) => void;
 }
 
-export function ProcessList({ processes, onDelete, onEdit, onAddTask, onDeleteTask }: ProcessListProps) {
+export function ProcessList({ processes, onDelete, onEdit, onViewDetails, onAddTask, onDeleteTask }: ProcessListProps) {
   if (processes.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-64 bg-card rounded-xl shadow-sm">
@@ -29,6 +30,7 @@ export function ProcessList({ processes, onDelete, onEdit, onAddTask, onDeleteTa
           process={process}
           onDelete={() => onDelete(process.id)}
           onEdit={() => onEdit(process.id)}
+          onViewDetails={() => onViewDetails(process.id)}
           onAddTask={(task) => onAddTask(process.id, task)}
           onDeleteTask={(taskId) => onDeleteTask(process.id, taskId)}
         />
