@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Task, TaskStatus } from '@/types/task';
+import { Task, TaskStatus, TaskPriority } from '@/types/task';
 import {
   Dialog,
   DialogContent,
@@ -10,6 +10,16 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Building2, 
@@ -22,11 +32,15 @@ import {
   Clock,
   AlertCircle,
   Loader2,
-  ExternalLink
+  Edit,
+  X,
+  Save,
+  ArrowLeft
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface Profile {
   id: string;
@@ -65,8 +79,22 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
   const [childTasks, setChildTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [profiles, setProfiles] = useState<Map<string, string>>(new Map());
+  const [profilesList, setProfilesList] = useState<{ id: string; display_name: string }[]>([]);
   const [departments, setDepartments] = useState<Map<string, string>>(new Map());
   const [processName, setProcessName] = useState<string | null>(null);
+  
+  // Child task editing state
+  const [selectedChildTask, setSelectedChildTask] = useState<Task | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [editForm, setEditForm] = useState({
+    title: '',
+    description: '',
+    status: '' as TaskStatus,
+    priority: '' as TaskPriority,
+    assignee_id: '',
+    due_date: '',
+  });
 
   useEffect(() => {
     if (open && task) {
@@ -99,6 +127,7 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
         const map = new Map<string, string>();
         profilesData.forEach((p) => map.set(p.id, p.display_name || 'Sans nom'));
         setProfiles(map);
+        setProfilesList(profilesData.map(p => ({ id: p.id, display_name: p.display_name || 'Sans nom' })));
       }
 
       // Fetch departments
@@ -131,12 +160,255 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
     }
   };
 
+  const handleOpenChildTask = (childTask: Task) => {
+    setSelectedChildTask(childTask);
+    setEditForm({
+      title: childTask.title,
+      description: childTask.description || '',
+      status: childTask.status,
+      priority: childTask.priority,
+      assignee_id: childTask.assignee_id || '',
+      due_date: childTask.due_date || '',
+    });
+    setIsEditing(false);
+  };
+
+  const handleCloseChildTask = () => {
+    setSelectedChildTask(null);
+    setIsEditing(false);
+  };
+
+  const handleSaveChildTask = async () => {
+    if (!selectedChildTask) return;
+
+    setIsSaving(true);
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({
+          title: editForm.title,
+          description: editForm.description || null,
+          status: editForm.status,
+          priority: editForm.priority,
+          assignee_id: editForm.assignee_id || null,
+          due_date: editForm.due_date || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', selectedChildTask.id);
+
+      if (error) throw error;
+
+      // Update local state
+      setChildTasks(prev => prev.map(t => 
+        t.id === selectedChildTask.id 
+          ? { ...t, ...editForm, assignee_id: editForm.assignee_id || null, due_date: editForm.due_date || null }
+          : t
+      ));
+      setSelectedChildTask(prev => prev ? { ...prev, ...editForm } : null);
+      setIsEditing(false);
+      toast.success('Tâche mise à jour');
+    } catch (error) {
+      console.error('Error updating task:', error);
+      toast.error('Erreur lors de la mise à jour');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   if (!task) return null;
 
   const completedTasks = childTasks.filter((t) => t.status === 'done' || t.status === 'validated').length;
   const progressPercent = childTasks.length > 0 ? Math.round((completedTasks / childTasks.length) * 100) : 0;
 
   const StatusIcon = statusConfig[task.status]?.icon || AlertCircle;
+
+  // Child task detail/edit view
+  if (selectedChildTask) {
+    const ChildStatusIcon = statusConfig[selectedChildTask.status]?.icon || AlertCircle;
+    return (
+      <Dialog open={open} onOpenChange={onClose}>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="icon" onClick={handleCloseChildTask}>
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <div className="flex-1 flex items-center gap-2">
+                <Badge variant={priorityConfig[selectedChildTask.priority].variant}>
+                  <Flag className="h-3 w-3 mr-1" />
+                  {priorityConfig[selectedChildTask.priority].label}
+                </Badge>
+                <Badge variant="outline" className={statusConfig[selectedChildTask.status]?.color}>
+                  <ChildStatusIcon className="h-3 w-3 mr-1" />
+                  {statusConfig[selectedChildTask.status]?.label}
+                </Badge>
+                {selectedChildTask.is_assignment_task && (
+                  <Badge variant="secondary">Affectation</Badge>
+                )}
+              </div>
+              {!isEditing && (
+                <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
+                  <Edit className="h-4 w-4 mr-1" />
+                  Modifier
+                </Button>
+              )}
+            </div>
+            <DialogTitle className="text-xl mt-2">
+              {isEditing ? 'Modifier la tâche' : selectedChildTask.title}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 mt-4">
+            {isEditing ? (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="title">Titre</Label>
+                  <Input
+                    id="title"
+                    value={editForm.title}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, title: e.target.value }))}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    value={editForm.description}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, description: e.target.value }))}
+                    rows={3}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Statut</Label>
+                    <Select
+                      value={editForm.status}
+                      onValueChange={(value: TaskStatus) => setEditForm(prev => ({ ...prev, status: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todo">À faire</SelectItem>
+                        <SelectItem value="in-progress">En cours</SelectItem>
+                        <SelectItem value="done">Terminé</SelectItem>
+                        <SelectItem value="pending-validation">En validation</SelectItem>
+                        <SelectItem value="validated">Validé</SelectItem>
+                        <SelectItem value="refused">Refusé</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Priorité</Label>
+                    <Select
+                      value={editForm.priority}
+                      onValueChange={(value: TaskPriority) => setEditForm(prev => ({ ...prev, priority: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">Basse</SelectItem>
+                        <SelectItem value="medium">Moyenne</SelectItem>
+                        <SelectItem value="high">Haute</SelectItem>
+                        <SelectItem value="urgent">Urgente</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Assigné à</Label>
+                    <Select
+                      value={editForm.assignee_id}
+                      onValueChange={(value) => setEditForm(prev => ({ ...prev, assignee_id: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Non assigné" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Non assigné</SelectItem>
+                        {profilesList.map((profile) => (
+                          <SelectItem key={profile.id} value={profile.id}>
+                            {profile.display_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="due_date">Date d'échéance</Label>
+                    <Input
+                      id="due_date"
+                      type="date"
+                      value={editForm.due_date}
+                      onChange={(e) => setEditForm(prev => ({ ...prev, due_date: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4 border-t">
+                  <Button variant="outline" onClick={() => setIsEditing(false)} disabled={isSaving}>
+                    <X className="h-4 w-4 mr-1" />
+                    Annuler
+                  </Button>
+                  <Button onClick={handleSaveChildTask} disabled={isSaving || !editForm.title.trim()}>
+                    {isSaving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
+                    Enregistrer
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                {selectedChildTask.description && (
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-2">Description</h4>
+                    <p className="text-sm whitespace-pre-wrap">{selectedChildTask.description}</p>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  {selectedChildTask.due_date && (
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <span>Échéance: {format(new Date(selectedChildTask.due_date), 'dd MMMM yyyy', { locale: fr })}</span>
+                    </div>
+                  )}
+                  {selectedChildTask.assignee_id && (
+                    <div className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      <span>Assigné à: {profiles.get(selectedChildTask.assignee_id) || 'N/A'}</span>
+                    </div>
+                  )}
+                  {!selectedChildTask.assignee_id && (
+                    <div className="flex items-center gap-2 text-warning">
+                      <User className="h-4 w-4" />
+                      <span>Non assigné</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4 border-t">
+                  <Button variant="outline" onClick={handleCloseChildTask}>
+                    Retour à la demande
+                  </Button>
+                  <Button onClick={() => { onStatusChange(selectedChildTask.id, 'done'); handleCloseChildTask(); }}>
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    Marquer terminé
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -256,8 +528,9 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
                       return (
                         <div
                           key={childTask.id}
+                          onClick={() => handleOpenChildTask(childTask)}
                           className={cn(
-                            "flex items-center justify-between p-3 rounded-lg border",
+                            "flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors hover:bg-accent/50",
                             childTask.status === 'done' || childTask.status === 'validated'
                               ? 'bg-success/5 border-success/30'
                               : 'bg-card border-border'
@@ -284,6 +557,12 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
                                   <>
                                     <span>•</span>
                                     <span>{format(new Date(childTask.due_date), 'dd MMM', { locale: fr })}</span>
+                                  </>
+                                )}
+                                {childTask.is_assignment_task && (
+                                  <>
+                                    <span>•</span>
+                                    <Badge variant="outline" className="text-[10px] px-1 py-0">Affectation</Badge>
                                   </>
                                 )}
                               </div>
