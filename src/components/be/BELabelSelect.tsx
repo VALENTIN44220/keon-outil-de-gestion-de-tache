@@ -27,7 +27,7 @@ export function BELabelSelect({ value, onChange }: BELabelSelectProps) {
         Étiquette BE
       </Label>
       
-      <Select value={value || ''} onValueChange={(v) => onChange(v || null)}>
+      <Select value={value || '__none__'} onValueChange={(v) => onChange(v === '__none__' ? null : v)}>
         <SelectTrigger>
           <SelectValue placeholder="Sélectionner une étiquette">
             {selectedLabel && (
@@ -44,7 +44,7 @@ export function BELabelSelect({ value, onChange }: BELabelSelectProps) {
           </SelectValue>
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="">
+          <SelectItem value="__none__">
             <span className="text-muted-foreground">Aucune étiquette</span>
           </SelectItem>
           {isLoading ? (

@@ -141,12 +141,12 @@ export function AddSubProcessDialog({ open, onClose, onAdd, orderIndex }: AddSub
 
           <div className="space-y-2">
             <Label>Service cible</Label>
-            <Select value={targetDepartmentId} onValueChange={setTargetDepartmentId}>
+            <Select value={targetDepartmentId || '__none__'} onValueChange={(v) => setTargetDepartmentId(v === '__none__' ? '' : v)}>
               <SelectTrigger>
                 <SelectValue placeholder="Sélectionner un service" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Aucun</SelectItem>
+                <SelectItem value="__none__">Aucun</SelectItem>
                 {departments.map(dept => (
                   <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>
                 ))}
@@ -157,12 +157,12 @@ export function AddSubProcessDialog({ open, onClose, onAdd, orderIndex }: AddSub
           {assignmentType === 'role' && (
             <div className="space-y-2">
               <Label>Poste/Fonction cible</Label>
-              <Select value={targetJobTitleId} onValueChange={setTargetJobTitleId}>
+              <Select value={targetJobTitleId || '__none__'} onValueChange={(v) => setTargetJobTitleId(v === '__none__' ? '' : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Sélectionner un poste" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Aucun</SelectItem>
+                  <SelectItem value="__none__">Aucun</SelectItem>
                   {jobTitles.map(job => (
                     <SelectItem key={job.id} value={job.id}>{job.name}</SelectItem>
                   ))}
@@ -174,12 +174,12 @@ export function AddSubProcessDialog({ open, onClose, onAdd, orderIndex }: AddSub
           {assignmentType === 'user' && (
             <div className="space-y-2">
               <Label>Utilisateur cible</Label>
-              <Select value={targetAssigneeId} onValueChange={setTargetAssigneeId}>
+              <Select value={targetAssigneeId || '__none__'} onValueChange={(v) => setTargetAssigneeId(v === '__none__' ? '' : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Sélectionner un utilisateur" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Aucun</SelectItem>
+                  <SelectItem value="__none__">Aucun</SelectItem>
                   {profiles.map(profile => (
                     <SelectItem key={profile.id} value={profile.id}>
                       {profile.display_name || 'Sans nom'}
