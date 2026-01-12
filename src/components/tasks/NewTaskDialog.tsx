@@ -224,6 +224,17 @@ export function NewTaskDialog({ open, onClose, mode, onAdd, onTasksCreated }: Ne
       parent_request_id: null,
       is_assignment_task: false,
       source_process_template_id: null,
+      // BE Project fields
+      be_project_id: null,
+      be_label_id: null,
+      // Double validation fields
+      rbe_validator_id: null,
+      rbe_validated_at: null,
+      rbe_validation_status: null,
+      rbe_validation_comment: null,
+      requester_validated_at: null,
+      requester_validation_status: null,
+      requester_validation_comment: null,
     }, checklistItems.length > 0 ? checklistItems : undefined, links.length > 0 ? links : undefined);
 
     resetForm();
@@ -263,6 +274,17 @@ export function NewTaskDialog({ open, onClose, mode, onAdd, onTasksCreated }: Ne
         parent_request_id: null,
         is_assignment_task: false,
         source_process_template_id: null,
+        // BE Project fields
+        be_project_id: null,
+        be_label_id: null,
+        // Double validation fields
+        rbe_validator_id: null,
+        rbe_validated_at: null,
+        rbe_validation_status: null,
+        rbe_validation_comment: null,
+        requester_validated_at: null,
+        requester_validation_status: null,
+        requester_validation_comment: null,
       });
     }
 
