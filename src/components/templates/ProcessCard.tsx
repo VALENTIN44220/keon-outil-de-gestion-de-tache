@@ -9,7 +9,7 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { MoreVertical, Trash2, Building2, Briefcase, ListTodo, Edit, Layers, Eye, Lock, Users, Globe, Copy } from 'lucide-react';
+import { MoreVertical, Trash2, Building2, Briefcase, ListTodo, Edit, Layers, Eye, Lock, Users, Globe } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface ProcessCardProps {
@@ -17,7 +17,6 @@ interface ProcessCardProps {
   onDelete: () => void;
   onEdit: () => void;
   onViewDetails: () => void;
-  onDuplicate?: () => void;
   onAddTask: (task: Omit<TaskTemplate, 'id' | 'user_id' | 'process_template_id' | 'created_at' | 'updated_at'>) => void;
   onDeleteTask: (taskId: string) => void;
   canManage?: boolean;
@@ -31,7 +30,7 @@ const visibilityIcons: Record<string, any> = {
   public: Globe,
 };
 
-export function ProcessCard({ process, onDelete, onEdit, onViewDetails, onDuplicate, onAddTask, onDeleteTask, canManage = false, compact = false }: ProcessCardProps) {
+export function ProcessCard({ process, onDelete, onEdit, onViewDetails, onAddTask, onDeleteTask, canManage = false, compact = false }: ProcessCardProps) {
   const [subProcessCount, setSubProcessCount] = useState(0);
 
   useEffect(() => {
@@ -81,10 +80,6 @@ export function ProcessCard({ process, onDelete, onEdit, onViewDetails, onDuplic
                 <Edit className="h-4 w-4 mr-2" />
                 Modifier
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDuplicate?.(); }}>
-                <Copy className="h-4 w-4 mr-2" />
-                Dupliquer
-              </DropdownMenuItem>
               <DropdownMenuItem 
                 onClick={(e) => { e.stopPropagation(); onDelete(); }}
                 className="text-destructive focus:text-destructive"
@@ -129,10 +124,6 @@ export function ProcessCard({ process, onDelete, onEdit, onViewDetails, onDuplic
                 <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
                   <Edit className="h-4 w-4 mr-2" />
                   Modifier
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDuplicate?.(); }}>
-                  <Copy className="h-4 w-4 mr-2" />
-                  Dupliquer
                 </DropdownMenuItem>
                 <DropdownMenuItem 
                   onClick={(e) => { e.stopPropagation(); onDelete(); }}

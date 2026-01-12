@@ -22,7 +22,6 @@ import {
   Loader2,
   ChevronDown,
   ChevronRight,
-  Copy,
 } from 'lucide-react';
 import { VISIBILITY_LABELS } from '@/types/template';
 import { TaskTemplateWithContext } from '@/hooks/useAllTaskTemplates';
@@ -33,7 +32,6 @@ interface TaskTemplatesListProps {
   tasks: TaskTemplateWithContext[];
   isLoading: boolean;
   onDelete: (id: string) => void;
-  onDuplicate: (id: string) => void;
   onRefresh?: () => void;
   viewMode?: 'list' | 'grid';
 }
@@ -63,7 +61,6 @@ export function TaskTemplatesList({
   tasks,
   isLoading,
   onDelete,
-  onDuplicate,
   viewMode = 'list',
 }: TaskTemplatesListProps) {
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
@@ -149,10 +146,6 @@ export function TaskTemplatesList({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => onDuplicate(task.id)}>
-                      <Copy className="h-4 w-4 mr-2" />
-                      Dupliquer
-                    </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => onDelete(task.id)}
                       className="text-destructive focus:text-destructive"
@@ -187,20 +180,16 @@ export function TaskTemplatesList({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => onDuplicate(task.id)}>
-                        <Copy className="h-4 w-4 mr-2" />
-                        Dupliquer
-                      </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => onDelete(task.id)}
                         className="text-destructive focus:text-destructive"
                       >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Supprimer
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Supprimer
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </div>
 
               <div className="flex flex-wrap gap-2 mt-3">
