@@ -65,7 +65,11 @@ export function useProcessTemplates() {
     fetchProcesses();
   }, [fetchProcesses]);
 
-  const addProcess = async (process: Omit<ProcessTemplate, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
+  const addProcess = async (
+    process: Omit<ProcessTemplate, 'id' | 'user_id' | 'created_at' | 'updated_at'>,
+    visibilityCompanyIds?: string[],
+    visibilityDepartmentIds?: string[]
+  ) => {
     if (!user) return;
 
     try {
@@ -76,6 +80,12 @@ export function useProcessTemplates() {
         .single();
 
       if (error) throw error;
+
+      // Save visibility associations if provided
+      if (data && (visibilityCompanyIds?.length || visibilityDepartmentIds?.length)) {
+        const { saveTemplateVisibility } = await import('./useTemplateVisibility');
+        await saveTemplateVisibility('process', data.id, visibilityCompanyIds || [], visibilityDepartmentIds || []);
+      }
 
       setProcesses(prev => [{ ...data, task_templates: [], can_manage: true }, ...prev]);
       toast.success('Processus créé avec succès');
