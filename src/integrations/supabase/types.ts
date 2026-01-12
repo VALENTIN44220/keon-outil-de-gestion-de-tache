@@ -965,6 +965,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_assign_tasks: { Args: never; Returns: boolean }
       current_company_id: { Args: never; Returns: string }
       current_department_id: { Args: never; Returns: string }
       current_profile_id: { Args: never; Returns: string }
