@@ -10,11 +10,13 @@ import { KanbanBoard } from '@/components/tasks/KanbanBoard';
 import { CalendarView } from '@/components/tasks/CalendarView';
 import { CreateFromTemplateDialog } from '@/components/tasks/CreateFromTemplateDialog';
 import { UnassignedTasksView } from '@/components/tasks/UnassignedTasksView';
+import { PendingAssignmentsView } from '@/components/tasks/PendingAssignmentsView';
 import { TeamModule } from '@/components/team/TeamModule';
 import { useTasks } from '@/hooks/useTasks';
 import { useTasksProgress } from '@/hooks/useChecklists';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useUnassignedTasks } from '@/hooks/useUnassignedTasks';
+import { usePendingAssignments } from '@/hooks/usePendingAssignments';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { Button } from '@/components/ui/button';
 import { Loader2, Workflow } from 'lucide-react';
@@ -57,7 +59,9 @@ const Index = () => {
   const { categories } = useCategories();
   const { notifications, unreadCount, hasUrgent } = useNotifications(allTasks);
   const { count: unassignedCount, refetch: refetchUnassigned } = useUnassignedTasks();
+  const { getPendingCount, refetch: refetchPending } = usePendingAssignments();
   const { canAssignToTeam } = useUserPermissions();
+  const pendingCount = getPendingCount();
   
   // Get progress for all tasks
   const taskIds = useMemo(() => allTasks.map(t => t.id), [allTasks]);
@@ -202,12 +206,12 @@ const Index = () => {
             globalProgress={globalProgress}
             globalStats={globalStats}
             progressMap={progressMap}
-            unassignedCount={canAssignToTeam ? unassignedCount : 0}
+            unassignedCount={canAssignToTeam ? (unassignedCount + pendingCount) : 0}
             onViewUnassigned={() => setActiveView('to-assign')}
           />
         );
       case 'to-assign':
-        return <UnassignedTasksView />;
+        return <PendingAssignmentsView />;
       case 'tasks':
         return (
           <>

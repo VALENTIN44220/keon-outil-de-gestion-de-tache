@@ -399,6 +399,101 @@ export type Database = {
           },
         ]
       }
+      pending_task_assignments: {
+        Row: {
+          assigned_at: string | null
+          assigned_by: string | null
+          assignee_id: string | null
+          created_at: string
+          created_task_id: string | null
+          id: string
+          process_template_id: string | null
+          request_id: string
+          status: string
+          sub_process_template_id: string | null
+          task_template_id: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_at?: string | null
+          assigned_by?: string | null
+          assignee_id?: string | null
+          created_at?: string
+          created_task_id?: string | null
+          id?: string
+          process_template_id?: string | null
+          request_id: string
+          status?: string
+          sub_process_template_id?: string | null
+          task_template_id: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_at?: string | null
+          assigned_by?: string | null
+          assignee_id?: string | null
+          created_at?: string
+          created_task_id?: string | null
+          id?: string
+          process_template_id?: string | null
+          request_id?: string
+          status?: string
+          sub_process_template_id?: string | null
+          task_template_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_task_assignments_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_task_assignments_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_task_assignments_created_task_id_fkey"
+            columns: ["created_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_task_assignments_process_template_id_fkey"
+            columns: ["process_template_id"]
+            isOneToOne: false
+            referencedRelation: "process_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_task_assignments_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_task_assignments_sub_process_template_id_fkey"
+            columns: ["sub_process_template_id"]
+            isOneToOne: false
+            referencedRelation: "sub_process_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_task_assignments_task_template_id_fkey"
+            columns: ["task_template_id"]
+            isOneToOne: false
+            referencedRelation: "task_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       permission_profiles: {
         Row: {
           can_assign_to_all: boolean
