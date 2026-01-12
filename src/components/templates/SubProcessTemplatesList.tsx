@@ -22,6 +22,7 @@ import {
   Building2,
   Globe,
   Loader2,
+  Copy,
 } from 'lucide-react';
 import { EditSubProcessDialog } from './EditSubProcessDialog';
 import { supabase } from '@/integrations/supabase/client';
@@ -32,6 +33,7 @@ interface SubProcessTemplatesListProps {
   subProcesses: (SubProcessWithTasks & { process_name?: string | null })[];
   isLoading: boolean;
   onDelete: (id: string) => void;
+  onDuplicate: (id: string) => void;
   onRefresh: () => void;
   viewMode?: 'list' | 'grid';
 }
@@ -53,6 +55,7 @@ export function SubProcessTemplatesList({
   subProcesses,
   isLoading,
   onDelete,
+  onDuplicate,
   onRefresh,
   viewMode = 'list',
 }: SubProcessTemplatesListProps) {
@@ -141,6 +144,10 @@ export function SubProcessTemplatesList({
                         <Edit className="h-4 w-4 mr-2" />
                         Modifier
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onDuplicate(sp.id)}>
+                        <Copy className="h-4 w-4 mr-2" />
+                        Dupliquer
+                      </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => onDelete(sp.id)}
                         className="text-destructive focus:text-destructive"
@@ -178,6 +185,10 @@ export function SubProcessTemplatesList({
                         <DropdownMenuItem onClick={() => setEditingSubProcess(sp)}>
                           <Edit className="h-4 w-4 mr-2" />
                           Modifier
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onDuplicate(sp.id)}>
+                          <Copy className="h-4 w-4 mr-2" />
+                          Dupliquer
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => onDelete(sp.id)}
