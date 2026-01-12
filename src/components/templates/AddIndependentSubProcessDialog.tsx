@@ -6,10 +6,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TemplateVisibility } from '@/types/template';
-import { VisibilitySelect } from './VisibilitySelect';
+import { VisibilitySelectExtended } from './VisibilitySelectExtended';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { saveTemplateVisibility } from '@/hooks/useTemplateVisibility';
 
 interface AddIndependentSubProcessDialogProps {
   open: boolean;
@@ -51,6 +52,8 @@ export function AddIndependentSubProcessDialog({
   const [targetJobTitleId, setTargetJobTitleId] = useState<string>('');
   const [targetAssigneeId, setTargetAssigneeId] = useState<string>('');
   const [visibilityLevel, setVisibilityLevel] = useState<TemplateVisibility>('public');
+  const [visibilityCompanyIds, setVisibilityCompanyIds] = useState<string[]>([]);
+  const [visibilityDepartmentIds, setVisibilityDepartmentIds] = useState<string[]>([]);
 
   const [processes, setProcesses] = useState<ProcessTemplate[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -87,11 +90,23 @@ export function AddIndependentSubProcessDialog({
     setTargetJobTitleId('');
     setTargetAssigneeId('');
     setVisibilityLevel('public');
+    setVisibilityCompanyIds([]);
+    setVisibilityDepartmentIds([]);
+  };
+
+  const isValidVisibility = () => {
+    if (visibilityLevel === 'internal_company' && visibilityCompanyIds.length === 0) {
+      return false;
+    }
+    if (visibilityLevel === 'internal_department' && visibilityDepartmentIds.length === 0) {
+      return false;
+    }
+    return true;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !user) return;
+    if (!name.trim() || !user || !isValidVisibility()) return;
 
     setIsSubmitting(true);
     try {
@@ -101,7 +116,7 @@ export function AddIndependentSubProcessDialog({
         .select('*', { count: 'exact', head: true })
         .eq('process_template_id', processTemplateId || null);
 
-      const { error } = await supabase.from('sub_process_templates').insert({
+      const { data, error } = await supabase.from('sub_process_templates').insert({
         name: name.trim(),
         description: description.trim() || null,
         process_template_id: processTemplateId || null,
@@ -115,9 +130,19 @@ export function AddIndependentSubProcessDialog({
         creator_company_id: profile?.company_id || null,
         creator_department_id: profile?.department_id || null,
         user_id: user.id,
-      });
+      }).select('id').single();
 
       if (error) throw error;
+
+      // Save visibility associations
+      if (data) {
+        await saveTemplateVisibility(
+          'sub_process',
+          data.id,
+          visibilityCompanyIds,
+          visibilityDepartmentIds
+        );
+      }
 
       toast.success('Sous-processus créé avec succès');
       resetForm();
@@ -183,7 +208,14 @@ export function AddIndependentSubProcessDialog({
             </Select>
           </div>
 
-          <VisibilitySelect value={visibilityLevel} onChange={setVisibilityLevel} />
+          <VisibilitySelectExtended
+            value={visibilityLevel}
+            onChange={setVisibilityLevel}
+            selectedCompanyIds={visibilityCompanyIds}
+            onCompanyIdsChange={setVisibilityCompanyIds}
+            selectedDepartmentIds={visibilityDepartmentIds}
+            onDepartmentIdsChange={setVisibilityDepartmentIds}
+          />
 
           <div className="space-y-2">
             <Label>Type d'affectation *</Label>
@@ -270,7 +302,7 @@ export function AddIndependentSubProcessDialog({
             <Button type="button" variant="outline" onClick={onClose}>
               Annuler
             </Button>
-            <Button type="submit" disabled={!name.trim() || isSubmitting}>
+            <Button type="submit" disabled={!name.trim() || isSubmitting || !isValidVisibility()}>
               {isSubmitting ? 'Création...' : 'Créer'}
             </Button>
           </DialogFooter>

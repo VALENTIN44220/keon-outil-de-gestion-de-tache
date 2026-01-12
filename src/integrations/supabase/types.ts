@@ -453,6 +453,78 @@ export type Database = {
         }
         Relationships: []
       }
+      process_template_visible_companies: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          process_template_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          process_template_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          process_template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "process_template_visible_companies_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "process_template_visible_companies_process_template_id_fkey"
+            columns: ["process_template_id"]
+            isOneToOne: false
+            referencedRelation: "process_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      process_template_visible_departments: {
+        Row: {
+          created_at: string
+          department_id: string
+          id: string
+          process_template_id: string
+        }
+        Insert: {
+          created_at?: string
+          department_id: string
+          id?: string
+          process_template_id: string
+        }
+        Update: {
+          created_at?: string
+          department_id?: string
+          id?: string
+          process_template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "process_template_visible_departments_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "process_template_visible_departments_process_template_id_fkey"
+            columns: ["process_template_id"]
+            isOneToOne: false
+            referencedRelation: "process_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       process_templates: {
         Row: {
           company: string | null
@@ -612,6 +684,78 @@ export type Database = {
             columns: ["permission_profile_id"]
             isOneToOne: false
             referencedRelation: "permission_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sub_process_template_visible_companies: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          sub_process_template_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          sub_process_template_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          sub_process_template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sub_process_template_visible_compa_sub_process_template_id_fkey"
+            columns: ["sub_process_template_id"]
+            isOneToOne: false
+            referencedRelation: "sub_process_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sub_process_template_visible_companies_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sub_process_template_visible_departments: {
+        Row: {
+          created_at: string
+          department_id: string
+          id: string
+          sub_process_template_id: string
+        }
+        Insert: {
+          created_at?: string
+          department_id: string
+          id?: string
+          sub_process_template_id: string
+        }
+        Update: {
+          created_at?: string
+          department_id?: string
+          id?: string
+          sub_process_template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sub_process_template_visible_depar_sub_process_template_id_fkey"
+            columns: ["sub_process_template_id"]
+            isOneToOne: false
+            referencedRelation: "sub_process_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sub_process_template_visible_departments_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
             referencedColumns: ["id"]
           },
         ]
@@ -885,6 +1029,78 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "task_template_checklists_task_template_id_fkey"
+            columns: ["task_template_id"]
+            isOneToOne: false
+            referencedRelation: "task_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_template_visible_companies: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          task_template_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          task_template_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          task_template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_template_visible_companies_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_template_visible_companies_task_template_id_fkey"
+            columns: ["task_template_id"]
+            isOneToOne: false
+            referencedRelation: "task_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_template_visible_departments: {
+        Row: {
+          created_at: string
+          department_id: string
+          id: string
+          task_template_id: string
+        }
+        Insert: {
+          created_at?: string
+          department_id: string
+          id?: string
+          task_template_id: string
+        }
+        Update: {
+          created_at?: string
+          department_id?: string
+          id?: string
+          task_template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_template_visible_departments_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_template_visible_departments_task_template_id_fkey"
             columns: ["task_template_id"]
             isOneToOne: false
             referencedRelation: "task_templates"
@@ -1346,15 +1562,27 @@ export type Database = {
       can_access_task: { Args: { _task_id: string }; Returns: boolean }
       can_assign_tasks: { Args: never; Returns: boolean }
       can_manage_template: { Args: { _creator_id: string }; Returns: boolean }
-      can_view_template: {
-        Args: {
-          _creator_company_id: string
-          _creator_department_id: string
-          _creator_id: string
-          _visibility: Database["public"]["Enums"]["template_visibility"]
-        }
-        Returns: boolean
-      }
+      can_view_template:
+        | {
+            Args: {
+              _creator_company_id: string
+              _creator_department_id: string
+              _creator_id: string
+              _visibility: Database["public"]["Enums"]["template_visibility"]
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              _creator_company_id: string
+              _creator_department_id: string
+              _creator_id: string
+              _template_id?: string
+              _template_type?: string
+              _visibility: Database["public"]["Enums"]["template_visibility"]
+            }
+            Returns: boolean
+          }
       current_company_id: { Args: never; Returns: string }
       current_department_id: { Args: never; Returns: string }
       current_profile_id: { Args: never; Returns: string }

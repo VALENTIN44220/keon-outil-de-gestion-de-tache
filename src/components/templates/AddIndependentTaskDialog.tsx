@@ -7,11 +7,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TemplateVisibility } from '@/types/template';
 import { CategorySelect } from './CategorySelect';
-import { VisibilitySelect } from './VisibilitySelect';
+import { VisibilitySelectExtended } from './VisibilitySelectExtended';
 import { useCategories } from '@/hooks/useCategories';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { saveTemplateVisibility } from '@/hooks/useTemplateVisibility';
 
 interface AddIndependentTaskDialogProps {
   open: boolean;
@@ -45,6 +46,8 @@ export function AddIndependentTaskDialog({
   const [subcategoryId, setSubcategoryId] = useState<string | null>(null);
   const [defaultDurationDays, setDefaultDurationDays] = useState(7);
   const [visibilityLevel, setVisibilityLevel] = useState<TemplateVisibility>('public');
+  const [visibilityCompanyIds, setVisibilityCompanyIds] = useState<string[]>([]);
+  const [visibilityDepartmentIds, setVisibilityDepartmentIds] = useState<string[]>([]);
 
   const [processes, setProcesses] = useState<ProcessTemplate[]>([]);
   const [subProcesses, setSubProcesses] = useState<SubProcessTemplate[]>([]);
@@ -90,11 +93,23 @@ export function AddIndependentTaskDialog({
     setSubcategoryId(null);
     setDefaultDurationDays(7);
     setVisibilityLevel('public');
+    setVisibilityCompanyIds([]);
+    setVisibilityDepartmentIds([]);
+  };
+
+  const isValidVisibility = () => {
+    if (visibilityLevel === 'internal_company' && visibilityCompanyIds.length === 0) {
+      return false;
+    }
+    if (visibilityLevel === 'internal_department' && visibilityDepartmentIds.length === 0) {
+      return false;
+    }
+    return true;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !user) return;
+    if (!title.trim() || !user || !isValidVisibility()) return;
 
     setIsSubmitting(true);
     try {
@@ -112,7 +127,7 @@ export function AddIndependentTaskDialog({
       }
       const { count } = await orderQuery;
 
-      const { error } = await supabase.from('task_templates').insert({
+      const { data, error } = await supabase.from('task_templates').insert({
         title: title.trim(),
         description: description.trim() || null,
         process_template_id: processTemplateId || null,
@@ -127,9 +142,19 @@ export function AddIndependentTaskDialog({
         creator_company_id: profile?.company_id || null,
         creator_department_id: profile?.department_id || null,
         user_id: user.id,
-      });
+      }).select('id').single();
 
       if (error) throw error;
+
+      // Save visibility associations
+      if (data) {
+        await saveTemplateVisibility(
+          'task',
+          data.id,
+          visibilityCompanyIds,
+          visibilityDepartmentIds
+        );
+      }
 
       toast.success('Tâche modèle créée avec succès');
       resetForm();
@@ -270,13 +295,20 @@ export function AddIndependentTaskDialog({
             onAddSubcategory={handleAddSubcategory}
           />
 
-          <VisibilitySelect value={visibilityLevel} onChange={setVisibilityLevel} />
+          <VisibilitySelectExtended
+            value={visibilityLevel}
+            onChange={setVisibilityLevel}
+            selectedCompanyIds={visibilityCompanyIds}
+            onCompanyIdsChange={setVisibilityCompanyIds}
+            selectedDepartmentIds={visibilityDepartmentIds}
+            onDepartmentIdsChange={setVisibilityDepartmentIds}
+          />
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
               Annuler
             </Button>
-            <Button type="submit" disabled={!title.trim() || isSubmitting}>
+            <Button type="submit" disabled={!title.trim() || isSubmitting || !isValidVisibility()}>
               {isSubmitting ? 'Création...' : 'Créer'}
             </Button>
           </DialogFooter>
