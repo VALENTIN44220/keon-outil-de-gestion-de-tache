@@ -244,6 +244,16 @@ export function usePendingAssignments(): UsePendingAssignmentsResult {
         .update({ status: 'in_progress' })
         .eq('id', requestId);
 
+      // Mark the assignment task as completed (done)
+      await supabase
+        .from('tasks')
+        .update({ 
+          status: 'done',
+          assignee_id: profile?.id, // Assign to the manager who completed the assignment
+        })
+        .eq('parent_request_id', requestId)
+        .eq('is_assignment_task', true);
+
       // Remove created tasks from local state
       setPendingAssignments(prev =>
         prev.filter(p => !createdTaskIds.some(c => c.pendingId === p.id))
