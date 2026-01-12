@@ -33,6 +33,7 @@ const Index = () => {
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
   const [selectedProcessTemplateId, setSelectedProcessTemplateId] = useState<string | undefined>(undefined);
+  const [selectedSubProcessTemplateId, setSelectedSubProcessTemplateId] = useState<string | undefined>(undefined);
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const [taskView, setTaskView] = useState<TaskView>('grid');
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFiltersState>({
@@ -268,9 +269,10 @@ const Index = () => {
     }
   };
 
-  const handleNewAction = (type: ActionType, processTemplateId?: string) => {
+  const handleNewAction = (type: ActionType, subProcessTemplateId?: string, processTemplateId?: string) => {
     if (type === 'request') {
       setSelectedProcessTemplateId(processTemplateId);
+      setSelectedSubProcessTemplateId(subProcessTemplateId);
       setIsRequestDialogOpen(true);
     } else {
       setTaskDialogMode(type);
@@ -322,10 +324,12 @@ const Index = () => {
         onClose={() => { 
           setIsRequestDialogOpen(false);
           setSelectedProcessTemplateId(undefined);
+          setSelectedSubProcessTemplateId(undefined);
         }}
         onAdd={addTask}
         onTasksCreated={() => { refetch(); refetchUnassigned(); }}
         initialProcessTemplateId={selectedProcessTemplateId}
+        initialSubProcessTemplateId={selectedSubProcessTemplateId}
       />
 
       <CreateFromTemplateDialog

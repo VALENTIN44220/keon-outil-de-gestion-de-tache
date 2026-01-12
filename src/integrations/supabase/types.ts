@@ -429,6 +429,83 @@ export type Database = {
           },
         ]
       }
+      sub_process_templates: {
+        Row: {
+          assignment_type: string
+          created_at: string
+          description: string | null
+          id: string
+          is_shared: boolean
+          name: string
+          order_index: number
+          process_template_id: string
+          target_assignee_id: string | null
+          target_department_id: string | null
+          target_job_title_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          assignment_type?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_shared?: boolean
+          name: string
+          order_index?: number
+          process_template_id: string
+          target_assignee_id?: string | null
+          target_department_id?: string | null
+          target_job_title_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          assignment_type?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_shared?: boolean
+          name?: string
+          order_index?: number
+          process_template_id?: string
+          target_assignee_id?: string | null
+          target_department_id?: string | null
+          target_job_title_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sub_process_templates_process_template_id_fkey"
+            columns: ["process_template_id"]
+            isOneToOne: false
+            referencedRelation: "process_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sub_process_templates_target_assignee_id_fkey"
+            columns: ["target_assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sub_process_templates_target_department_id_fkey"
+            columns: ["target_department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sub_process_templates_target_job_title_id_fkey"
+            columns: ["target_job_title_id"]
+            isOneToOne: false
+            referencedRelation: "job_titles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       subcategories: {
         Row: {
           category_id: string
@@ -618,6 +695,7 @@ export type Database = {
           priority: string
           process_template_id: string | null
           requires_validation: boolean | null
+          sub_process_template_id: string | null
           subcategory_id: string | null
           title: string
           updated_at: string
@@ -635,6 +713,7 @@ export type Database = {
           priority?: string
           process_template_id?: string | null
           requires_validation?: boolean | null
+          sub_process_template_id?: string | null
           subcategory_id?: string | null
           title: string
           updated_at?: string
@@ -652,6 +731,7 @@ export type Database = {
           priority?: string
           process_template_id?: string | null
           requires_validation?: boolean | null
+          sub_process_template_id?: string | null
           subcategory_id?: string | null
           title?: string
           updated_at?: string
@@ -670,6 +750,13 @@ export type Database = {
             columns: ["process_template_id"]
             isOneToOne: false
             referencedRelation: "process_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_templates_sub_process_template_id_fkey"
+            columns: ["sub_process_template_id"]
+            isOneToOne: false
+            referencedRelation: "sub_process_templates"
             referencedColumns: ["id"]
           },
           {
@@ -756,6 +843,7 @@ export type Database = {
           requester_id: string | null
           requires_validation: boolean | null
           source_process_template_id: string | null
+          source_sub_process_template_id: string | null
           status: string
           subcategory_id: string | null
           target_department_id: string | null
@@ -784,6 +872,7 @@ export type Database = {
           requester_id?: string | null
           requires_validation?: boolean | null
           source_process_template_id?: string | null
+          source_sub_process_template_id?: string | null
           status?: string
           subcategory_id?: string | null
           target_department_id?: string | null
@@ -812,6 +901,7 @@ export type Database = {
           requester_id?: string | null
           requires_validation?: boolean | null
           source_process_template_id?: string | null
+          source_sub_process_template_id?: string | null
           status?: string
           subcategory_id?: string | null
           target_department_id?: string | null
@@ -865,6 +955,13 @@ export type Database = {
             columns: ["source_process_template_id"]
             isOneToOne: false
             referencedRelation: "process_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_source_sub_process_template_id_fkey"
+            columns: ["source_sub_process_template_id"]
+            isOneToOne: false
+            referencedRelation: "sub_process_templates"
             referencedColumns: ["id"]
           },
           {
