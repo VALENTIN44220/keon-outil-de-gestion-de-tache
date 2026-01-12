@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Clock, User, MoreVertical, Trash2, ChevronDown, ChevronRight, ListChecks, FileText, Eye, Building2 } from 'lucide-react';
+import { Clock, User, MoreVertical, Trash2, ChevronDown, ChevronRight, ListChecks, FileText, Eye, Building2, Pencil } from 'lucide-react';
 import { Task, TaskStatus } from '@/types/task';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +16,7 @@ import { TaskProgressBadge } from './TaskProgressBadge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { CreateTemplateFromTaskDialog } from './CreateTemplateFromTaskDialog';
 import { TaskDetailDialog } from './TaskDetailDialog';
+import { TaskEditDialog } from './TaskEditDialog';
 
 interface TaskCardProps {
   task: Task;
@@ -23,6 +24,7 @@ interface TaskCardProps {
   onDelete: (taskId: string) => void;
   compact?: boolean;
   taskProgress?: { completed: number; total: number; progress: number };
+  onTaskUpdated?: () => void;
 }
 
 const priorityColors = {
@@ -51,19 +53,32 @@ const statusLabels = {
   done: 'Terminé',
 };
 
-export function TaskCard({ task, onStatusChange, onDelete, compact = false, taskProgress }: TaskCardProps) {
+export function TaskCard({ task, onStatusChange, onDelete, compact = false, taskProgress, onTaskUpdated }: TaskCardProps) {
   const [isChecklistOpen, setIsChecklistOpen] = useState(false);
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
   const dueDate = task.due_date ? new Date(task.due_date) : null;
   const isOverdue = dueDate && dueDate < new Date() && task.status !== 'done';
   const isRequest = task.type === 'request';
 
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Don't open edit if clicking on interactive elements
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('[role="menuitem"]') || target.closest('input') || target.closest('a')) {
+      return;
+    }
+    setIsEditOpen(true);
+  };
+
   return (
-    <div className={cn(
-      "bg-card rounded-xl shadow-card hover:shadow-card-hover transition-all duration-200 animate-slide-up border border-border/50",
-      compact ? "p-3" : "p-4"
-    )}>
+    <div 
+      className={cn(
+        "bg-card rounded-xl shadow-card hover:shadow-card-hover transition-all duration-200 animate-slide-up border border-border/50 cursor-pointer",
+        compact ? "p-3" : "p-4"
+      )}
+      onClick={handleCardClick}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           {/* Header */}
@@ -87,18 +102,16 @@ export function TaskCard({ task, onStatusChange, onDelete, compact = false, task
             )}
           </div>
 
-          {/* Title - clickable for requests */}
+          {/* Title */}
           <h3 
             className={cn(
               "font-medium text-foreground",
               compact ? "text-sm mb-0.5" : "mb-1",
-              task.status === 'done' && "line-through text-muted-foreground",
-              isRequest && "cursor-pointer hover:text-primary transition-colors"
+              task.status === 'done' && "line-through text-muted-foreground"
             )}
-            onClick={isRequest ? () => setIsDetailOpen(true) : undefined}
           >
             {task.title}
-            {isRequest && <Eye className="inline-block ml-2 h-3.5 w-3.5 opacity-50" />}
+            <Pencil className="inline-block ml-2 h-3 w-3 opacity-30" />
           </h3>
 
           {/* Description */}
@@ -167,6 +180,10 @@ export function TaskCard({ task, onStatusChange, onDelete, compact = false, task
               {statusLabels.done}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setIsEditOpen(true)}>
+              <Pencil className="w-4 h-4 mr-2" />
+              Modifier
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setIsTemplateDialogOpen(true)}>
               <FileText className="w-4 h-4 mr-2" />
               Créer un modèle
@@ -206,6 +223,14 @@ export function TaskCard({ task, onStatusChange, onDelete, compact = false, task
         open={isDetailOpen}
         onClose={() => setIsDetailOpen(false)}
         onStatusChange={onStatusChange}
+      />
+
+      {/* Task edit dialog */}
+      <TaskEditDialog
+        task={task}
+        open={isEditOpen}
+        onClose={() => setIsEditOpen(false)}
+        onTaskUpdated={onTaskUpdated || (() => {})}
       />
     </div>
   );
