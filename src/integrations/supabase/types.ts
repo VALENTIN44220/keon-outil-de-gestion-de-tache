@@ -433,6 +433,7 @@ export type Database = {
         Row: {
           category_id: string
           created_at: string
+          default_process_template_id: string | null
           description: string | null
           id: string
           name: string
@@ -441,6 +442,7 @@ export type Database = {
         Insert: {
           category_id: string
           created_at?: string
+          default_process_template_id?: string | null
           description?: string | null
           id?: string
           name: string
@@ -449,6 +451,7 @@ export type Database = {
         Update: {
           category_id?: string
           created_at?: string
+          default_process_template_id?: string | null
           description?: string | null
           id?: string
           name?: string
@@ -460,6 +463,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subcategories_default_process_template_id_fkey"
+            columns: ["default_process_template_id"]
+            isOneToOne: false
+            referencedRelation: "process_templates"
             referencedColumns: ["id"]
           },
         ]
@@ -739,10 +749,13 @@ export type Database = {
           description: string | null
           due_date: string | null
           id: string
+          is_assignment_task: boolean
+          parent_request_id: string | null
           priority: string
           reporter_id: string | null
           requester_id: string | null
           requires_validation: boolean | null
+          source_process_template_id: string | null
           status: string
           subcategory_id: string | null
           target_department_id: string | null
@@ -764,10 +777,13 @@ export type Database = {
           description?: string | null
           due_date?: string | null
           id?: string
+          is_assignment_task?: boolean
+          parent_request_id?: string | null
           priority?: string
           reporter_id?: string | null
           requester_id?: string | null
           requires_validation?: boolean | null
+          source_process_template_id?: string | null
           status?: string
           subcategory_id?: string | null
           target_department_id?: string | null
@@ -789,10 +805,13 @@ export type Database = {
           description?: string | null
           due_date?: string | null
           id?: string
+          is_assignment_task?: boolean
+          parent_request_id?: string | null
           priority?: string
           reporter_id?: string | null
           requester_id?: string | null
           requires_validation?: boolean | null
+          source_process_template_id?: string | null
           status?: string
           subcategory_id?: string | null
           target_department_id?: string | null
@@ -821,6 +840,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "tasks_parent_request_id_fkey"
+            columns: ["parent_request_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "tasks_reporter_id_fkey"
             columns: ["reporter_id"]
             isOneToOne: false
@@ -832,6 +858,13 @@ export type Database = {
             columns: ["requester_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_source_process_template_id_fkey"
+            columns: ["source_process_template_id"]
+            isOneToOne: false
+            referencedRelation: "process_templates"
             referencedColumns: ["id"]
           },
           {

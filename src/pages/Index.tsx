@@ -12,10 +12,13 @@ import { AddTaskDialog } from '@/components/tasks/AddTaskDialog';
 import { NewTaskDialog } from '@/components/tasks/NewTaskDialog';
 import { NewRequestDialog } from '@/components/tasks/NewRequestDialog';
 import { CreateFromTemplateDialog } from '@/components/tasks/CreateFromTemplateDialog';
+import { UnassignedTasksView } from '@/components/tasks/UnassignedTasksView';
 import { ActionType } from '@/components/layout/NewActionMenu';
 import { useTasks } from '@/hooks/useTasks';
 import { useTasksProgress } from '@/hooks/useChecklists';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useUnassignedTasks } from '@/hooks/useUnassignedTasks';
+import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { Button } from '@/components/ui/button';
 import { Loader2, Workflow } from 'lucide-react';
 import { toast } from 'sonner';
@@ -61,6 +64,8 @@ const Index = () => {
 
   const { categories } = useCategories();
   const { notifications, unreadCount, hasUrgent } = useNotifications(allTasks);
+  const { count: unassignedCount, refetch: refetchUnassigned } = useUnassignedTasks();
+  const { canAssignToTeam } = useUserPermissions();
   
   // Get progress for all tasks
   const taskIds = useMemo(() => allTasks.map(t => t.id), [allTasks]);
@@ -131,6 +136,8 @@ const Index = () => {
         return 'Tableau de bord';
       case 'tasks':
         return 'Gestion des tâches';
+      case 'to-assign':
+        return 'Tâches à affecter';
       case 'analytics':
         return 'Analytiques';
       case 'team':
@@ -200,8 +207,12 @@ const Index = () => {
             globalProgress={globalProgress}
             globalStats={globalStats}
             progressMap={progressMap}
+            unassignedCount={canAssignToTeam ? unassignedCount : 0}
+            onViewUnassigned={() => setActiveView('to-assign')}
           />
         );
+      case 'to-assign':
+        return <UnassignedTasksView />;
       case 'tasks':
         return (
           <>
@@ -308,6 +319,7 @@ const Index = () => {
         open={isRequestDialogOpen}
         onClose={() => setIsRequestDialogOpen(false)}
         onAdd={addTask}
+        onTasksCreated={() => { refetch(); refetchUnassigned(); }}
       />
 
       <CreateFromTemplateDialog

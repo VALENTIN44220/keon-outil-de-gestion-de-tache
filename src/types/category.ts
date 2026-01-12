@@ -11,6 +11,7 @@ export interface Subcategory {
   category_id: string;
   name: string;
   description: string | null;
+  default_process_template_id: string | null;
   created_at: string;
   updated_at: string;
 }
