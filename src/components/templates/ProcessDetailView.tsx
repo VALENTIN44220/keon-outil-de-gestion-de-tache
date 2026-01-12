@@ -83,31 +83,49 @@ export function ProcessDetailView({
       <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
         <SheetContent className="w-full sm:max-w-2xl p-0">
           <SheetHeader className="p-6 pb-4 border-b">
-            <SheetTitle className="text-xl">{process.name}</SheetTitle>
-            {process.description && (
-              <p className="text-sm text-muted-foreground">{process.description}</p>
-            )}
-            <div className="flex flex-wrap gap-2 mt-2">
-              {process.company && (
-                <Badge variant="outline" className="text-xs">
-                  <Building2 className="h-3 w-3 mr-1" />
-                  {process.company}
-                </Badge>
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <SheetTitle className="text-xl truncate">{process.name}</SheetTitle>
+                {process.description && (
+                  <p className="text-sm text-muted-foreground">{process.description}</p>
+                )}
+
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {process.company && (
+                    <Badge variant="outline" className="text-xs">
+                      <Building2 className="h-3 w-3 mr-1" />
+                      {process.company}
+                    </Badge>
+                  )}
+                  {process.department && (
+                    <Badge variant="outline" className="text-xs">
+                      <Briefcase className="h-3 w-3 mr-1" />
+                      {process.department}
+                    </Badge>
+                  )}
+                  <Badge variant="secondary" className="text-xs">
+                    <Layers className="h-3 w-3 mr-1" />
+                    {subProcesses.length} sous-processus
+                  </Badge>
+                  <Badge variant="secondary" className="text-xs">
+                    <ListTodo className="h-3 w-3 mr-1" />
+                    {directTasks.length} tâche(s) directes
+                  </Badge>
+                </div>
+              </div>
+
+              {canManage && (
+                <div className="flex shrink-0 flex-col gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setIsAddSubProcessOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Sous-processus
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setIsAddTaskOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Tâche directe
+                  </Button>
+                </div>
               )}
-              {process.department && (
-                <Badge variant="outline" className="text-xs">
-                  <Briefcase className="h-3 w-3 mr-1" />
-                  {process.department}
-                </Badge>
-              )}
-              <Badge variant="secondary" className="text-xs">
-                <Layers className="h-3 w-3 mr-1" />
-                {subProcesses.length} sous-processus
-              </Badge>
-              <Badge variant="secondary" className="text-xs">
-                <ListTodo className="h-3 w-3 mr-1" />
-                {directTasks.length} tâche(s) directes
-              </Badge>
             </div>
           </SheetHeader>
 

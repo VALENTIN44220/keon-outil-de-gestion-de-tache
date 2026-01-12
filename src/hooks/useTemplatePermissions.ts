@@ -27,19 +27,22 @@ export function useTemplatePermissions() {
       try {
         const { data: profile, error } = await supabase
           .from('profiles')
-          .select(`
+          .select(
+            `
             permission_profile_id,
             permission_profiles:permission_profile_id (
               can_manage_templates
             )
-          `)
+          `.trim()
+          )
           .eq('user_id', user.id)
           .single();
 
         if (error) throw error;
-        
-        const permissionProfile = profile?.permission_profiles as { can_manage_templates: boolean } | null;
-        setCanManageTemplates(permissionProfile?.can_manage_templates ?? false);
+
+        const raw = (profile as any)?.permission_profiles;
+        const permissionProfile = Array.isArray(raw) ? raw[0] : raw;
+        setCanManageTemplates(Boolean(permissionProfile?.can_manage_templates));
       } catch (error) {
         console.error('Error fetching template permissions:', error);
         setCanManageTemplates(false);
