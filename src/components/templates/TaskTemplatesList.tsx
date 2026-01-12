@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { TaskTemplate } from '@/types/template';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,7 +11,6 @@ import {
 import {
   MoreVertical,
   Trash2,
-  Edit,
   Layers,
   GitBranch,
   Clock,
@@ -21,18 +19,21 @@ import {
   Building2,
   Globe,
   ListTodo,
+  Loader2,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import { VISIBILITY_LABELS } from '@/types/template';
-import { Loader2 } from 'lucide-react';
 import { TaskTemplateWithContext } from '@/hooks/useAllTaskTemplates';
 import { TemplateChecklistEditor } from './TemplateChecklistEditor';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, ChevronRight } from 'lucide-react';
 
 interface TaskTemplatesListProps {
   tasks: TaskTemplateWithContext[];
   isLoading: boolean;
   onDelete: (id: string) => void;
+  onRefresh?: () => void;
+  viewMode?: 'list' | 'grid';
 }
 
 const priorityColors: Record<string, string> = {
@@ -42,6 +43,13 @@ const priorityColors: Record<string, string> = {
   urgent: 'bg-red-500/10 text-red-600 border-red-500/20',
 };
 
+const priorityLabels: Record<string, string> = {
+  low: 'Basse',
+  medium: 'Moyenne',
+  high: 'Haute',
+  urgent: 'Urgente',
+};
+
 const visibilityIcons: Record<string, any> = {
   private: Lock,
   internal_department: Users,
@@ -49,7 +57,12 @@ const visibilityIcons: Record<string, any> = {
   public: Globe,
 };
 
-export function TaskTemplatesList({ tasks, isLoading, onDelete }: TaskTemplatesListProps) {
+export function TaskTemplatesList({
+  tasks,
+  isLoading,
+  onDelete,
+  viewMode = 'list',
+}: TaskTemplatesListProps) {
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
 
   const toggleExpanded = (id: string) => {
@@ -78,17 +91,74 @@ export function TaskTemplatesList({ tasks, isLoading, onDelete }: TaskTemplatesL
         <ListTodo className="h-12 w-12 text-muted-foreground/50 mb-3" />
         <p className="text-muted-foreground text-lg mb-2">Aucune tâche modèle</p>
         <p className="text-sm text-muted-foreground">
-          Les tâches sont créées depuis un processus ou sous-processus
+          Créez une tâche depuis l'onglet ou un processus/sous-processus
         </p>
       </div>
     );
   }
 
+  const isGridView = viewMode === 'grid';
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className={isGridView ? 'space-y-1' : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'}>
       {tasks.map((task) => {
         const VisibilityIcon = visibilityIcons[task.visibility_level] || Globe;
         const isExpanded = expandedTasks.has(task.id);
+
+        if (isGridView) {
+          return (
+            <Card key={task.id} className="flex items-center gap-3 p-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-sm truncate">{task.title}</span>
+                  <Badge variant="outline" className={`text-xs shrink-0 ${priorityColors[task.priority]}`}>
+                    {priorityLabels[task.priority]}
+                  </Badge>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                  {task.process_name && (
+                    <span className="flex items-center gap-1">
+                      <Layers className="h-3 w-3" />
+                      {task.process_name}
+                    </span>
+                  )}
+                  {task.sub_process_name && (
+                    <span className="flex items-center gap-1">
+                      <GitBranch className="h-3 w-3" />
+                      {task.sub_process_name}
+                    </span>
+                  )}
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {task.default_duration_days}j
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <VisibilityIcon className="h-3 w-3" />
+                    {VISIBILITY_LABELS[task.visibility_level]}
+                  </span>
+                </div>
+              </div>
+              {task.can_manage && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={() => onDelete(task.id)}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Supprimer
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </Card>
+          );
+        }
 
         return (
           <Card key={task.id} className="flex flex-col">
@@ -124,7 +194,7 @@ export function TaskTemplatesList({ tasks, isLoading, onDelete }: TaskTemplatesL
 
               <div className="flex flex-wrap gap-2 mt-3">
                 <Badge variant="outline" className={priorityColors[task.priority]}>
-                  {task.priority}
+                  {priorityLabels[task.priority]}
                 </Badge>
                 {task.process_name && (
                   <Badge variant="outline" className="text-xs">

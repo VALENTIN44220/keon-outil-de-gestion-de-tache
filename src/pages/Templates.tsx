@@ -2,39 +2,40 @@ import { useState } from 'react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { ProcessCard } from '@/components/templates/ProcessCard';
-import { TemplateFilters } from '@/components/templates/TemplateFilters';
+import { TemplateAdvancedFilters, TemplateFiltersState, defaultFilters } from '@/components/templates/TemplateAdvancedFilters';
 import { AddProcessDialog } from '@/components/templates/AddProcessDialog';
 import { EditProcessDialog } from '@/components/templates/EditProcessDialog';
 import { ProcessDetailView } from '@/components/templates/ProcessDetailView';
 import { SubProcessTemplatesList } from '@/components/templates/SubProcessTemplatesList';
 import { TaskTemplatesList } from '@/components/templates/TaskTemplatesList';
+import { AddIndependentSubProcessDialog } from '@/components/templates/AddIndependentSubProcessDialog';
+import { AddIndependentTaskDialog } from '@/components/templates/AddIndependentTaskDialog';
 import { useProcessTemplates } from '@/hooks/useProcessTemplates';
 import { useAllSubProcessTemplates } from '@/hooks/useAllSubProcessTemplates';
 import { useAllTaskTemplates } from '@/hooks/useAllTaskTemplates';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useTasks } from '@/hooks/useTasks';
 import { useAuth } from '@/contexts/AuthContext';
-import { Loader2, Layers, GitBranch, ListTodo } from 'lucide-react';
+import { Loader2, Layers, GitBranch, ListTodo, Plus } from 'lucide-react';
 import { ProcessTemplate, ProcessWithTasks } from '@/types/template';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
 
 const Templates = () => {
   const [activeView, setActiveView] = useState('templates');
   const [activeTab, setActiveTab] = useState<'processes' | 'subprocesses' | 'tasks'>('processes');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isAddSubProcessDialogOpen, setIsAddSubProcessDialogOpen] = useState(false);
+  const [isAddTaskDialogOpen, setIsAddTaskDialogOpen] = useState(false);
   const [editingProcess, setEditingProcess] = useState<ProcessTemplate | null>(null);
   const [viewingProcess, setViewingProcess] = useState<ProcessWithTasks | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [filters, setFilters] = useState<TemplateFiltersState>(defaultFilters);
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
 
   const {
     processes,
     isLoading: isLoadingProcesses,
-    companyFilter,
-    setCompanyFilter,
-    departmentFilter,
-    setDepartmentFilter,
-    companies,
-    departments,
     addProcess,
     updateProcess,
     deleteProcess,
@@ -53,6 +54,7 @@ const Templates = () => {
     tasks: taskTemplates,
     isLoading: isLoadingTasks,
     deleteTask,
+    refetch: refetchTasks,
   } = useAllTaskTemplates();
 
   const { user } = useAuth();
@@ -61,26 +63,44 @@ const Templates = () => {
 
   const canCreateProcess = Boolean(user);
 
-  // Filter processes by search
-  const filteredProcesses = processes.filter(
-    (p) =>
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.description?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Apply filters to processes
+  const filteredProcesses = processes.filter((p) => {
+    if (searchQuery && !p.name.toLowerCase().includes(searchQuery.toLowerCase()) && 
+        !p.description?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    if (filters.companyId && p.creator_company_id !== filters.companyId) return false;
+    if (filters.departmentId && p.creator_department_id !== filters.departmentId) return false;
+    if (filters.creatorId && p.user_id !== filters.creatorId) return false;
+    if (filters.visibility && p.visibility_level !== filters.visibility) return false;
+    if (filters.dateFrom && new Date(p.created_at) < new Date(filters.dateFrom)) return false;
+    if (filters.dateTo && new Date(p.created_at) > new Date(filters.dateTo)) return false;
+    return true;
+  });
 
-  // Filter sub-processes by search
-  const filteredSubProcesses = subProcesses.filter(
-    (sp) =>
-      sp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      sp.description?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Apply filters to sub-processes
+  const filteredSubProcesses = subProcesses.filter((sp) => {
+    if (searchQuery && !sp.name.toLowerCase().includes(searchQuery.toLowerCase()) && 
+        !sp.description?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    if (filters.companyId && sp.creator_company_id !== filters.companyId) return false;
+    if (filters.departmentId && sp.creator_department_id !== filters.departmentId) return false;
+    if (filters.creatorId && sp.user_id !== filters.creatorId) return false;
+    if (filters.visibility && sp.visibility_level !== filters.visibility) return false;
+    if (filters.dateFrom && new Date(sp.created_at) < new Date(filters.dateFrom)) return false;
+    if (filters.dateTo && new Date(sp.created_at) > new Date(filters.dateTo)) return false;
+    return true;
+  });
 
-  // Filter task templates by search
-  const filteredTasks = taskTemplates.filter(
-    (t) =>
-      t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      t.description?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Apply filters to task templates
+  const filteredTasks = taskTemplates.filter((t) => {
+    if (searchQuery && !t.title.toLowerCase().includes(searchQuery.toLowerCase()) && 
+        !t.description?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    if (filters.companyId && t.creator_company_id !== filters.companyId) return false;
+    if (filters.departmentId && t.creator_department_id !== filters.departmentId) return false;
+    if (filters.creatorId && t.user_id !== filters.creatorId) return false;
+    if (filters.visibility && t.visibility_level !== filters.visibility) return false;
+    if (filters.dateFrom && new Date(t.created_at) < new Date(filters.dateFrom)) return false;
+    if (filters.dateTo && new Date(t.created_at) > new Date(filters.dateTo)) return false;
+    return true;
+  });
 
   const handleEditProcess = (id: string) => {
     const process = processes.find((p) => p.id === id);
@@ -103,22 +123,29 @@ const Templates = () => {
     }
   };
 
-  const getAddButtonLabel = () => {
+  const getAddButtonAction = () => {
     switch (activeTab) {
       case 'processes':
-        return 'Nouveau processus';
+        return () => setIsAddDialogOpen(true);
       case 'subprocesses':
-        return undefined; // créés depuis un processus
+        return () => setIsAddSubProcessDialogOpen(true);
       case 'tasks':
-        return undefined; // créées depuis un processus/sous-processus
+        return () => setIsAddTaskDialogOpen(true);
       default:
         return undefined;
     }
   };
 
-  const handleAddClick = () => {
-    if (activeTab === 'processes') {
-      setIsAddDialogOpen(true);
+  const getAddButtonLabel = () => {
+    switch (activeTab) {
+      case 'processes':
+        return 'Nouveau processus';
+      case 'subprocesses':
+        return 'Nouveau sous-processus';
+      case 'tasks':
+        return 'Nouvelle tâche';
+      default:
+        return undefined;
     }
   };
 
@@ -130,7 +157,7 @@ const Templates = () => {
           title="Modèles"
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
-          onAddTask={canCreateProcess && activeTab === 'processes' ? handleAddClick : undefined}
+          onAddTask={canCreateProcess ? getAddButtonAction() : undefined}
           addButtonLabel={getAddButtonLabel()}
           notifications={notifications}
           unreadCount={unreadCount}
@@ -140,7 +167,7 @@ const Templates = () => {
 
         <main className="flex-1 overflow-y-auto p-6">
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
-            <TabsList className="mb-6">
+            <TabsList className="mb-4">
               <TabsTrigger value="processes" className="gap-2">
                 <Layers className="h-4 w-4" />
                 Processus ({processes.length})
@@ -155,36 +182,58 @@ const Templates = () => {
               </TabsTrigger>
             </TabsList>
 
+            <TemplateAdvancedFilters
+              filters={filters}
+              onFiltersChange={setFilters}
+              viewMode={viewMode}
+              onViewModeChange={setViewMode}
+            />
+
             <TabsContent value="processes">
               {isLoadingProcesses ? (
                 <div className="flex items-center justify-center h-64">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
+              ) : filteredProcesses.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-64 bg-card rounded-xl shadow-sm">
+                  <Layers className="h-12 w-12 text-muted-foreground/50 mb-3" />
+                  <p className="text-muted-foreground text-lg mb-4">Aucun processus</p>
+                  <Button onClick={() => setIsAddDialogOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Nouveau processus
+                  </Button>
+                </div>
+              ) : viewMode === 'grid' ? (
+                <div className="space-y-1">
+                  {filteredProcesses.map((process) => (
+                    <ProcessCard
+                      key={process.id}
+                      process={process}
+                      onDelete={() => deleteProcess(process.id)}
+                      onEdit={() => handleEditProcess(process.id)}
+                      onViewDetails={() => handleViewDetails(process.id)}
+                      onAddTask={(task) => addTaskTemplate(process.id, task)}
+                      onDeleteTask={(taskId) => deleteTaskTemplate(process.id, taskId)}
+                      canManage={Boolean(process.can_manage)}
+                      compact
+                    />
+                  ))}
+                </div>
               ) : (
-                <>
-                  <TemplateFilters
-                    companyFilter={companyFilter}
-                    departmentFilter={departmentFilter}
-                    onCompanyChange={setCompanyFilter}
-                    onDepartmentChange={setDepartmentFilter}
-                    companies={companies}
-                    departments={departments}
-                  />
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filteredProcesses.map((process) => (
-                      <ProcessCard
-                        key={process.id}
-                        process={process}
-                        onDelete={() => deleteProcess(process.id)}
-                        onEdit={() => handleEditProcess(process.id)}
-                        onViewDetails={() => handleViewDetails(process.id)}
-                        onAddTask={(task) => addTaskTemplate(process.id, task)}
-                        onDeleteTask={(taskId) => deleteTaskTemplate(process.id, taskId)}
-                        canManage={Boolean(process.can_manage)}
-                      />
-                    ))}
-                  </div>
-                </>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredProcesses.map((process) => (
+                    <ProcessCard
+                      key={process.id}
+                      process={process}
+                      onDelete={() => deleteProcess(process.id)}
+                      onEdit={() => handleEditProcess(process.id)}
+                      onViewDetails={() => handleViewDetails(process.id)}
+                      onAddTask={(task) => addTaskTemplate(process.id, task)}
+                      onDeleteTask={(taskId) => deleteTaskTemplate(process.id, taskId)}
+                      canManage={Boolean(process.can_manage)}
+                    />
+                  ))}
+                </div>
               )}
             </TabsContent>
 
@@ -194,6 +243,7 @@ const Templates = () => {
                 isLoading={isLoadingSubProcesses}
                 onDelete={deleteSubProcess}
                 onRefresh={refetchSubProcesses}
+                viewMode={viewMode}
               />
             </TabsContent>
 
@@ -202,6 +252,8 @@ const Templates = () => {
                 tasks={filteredTasks}
                 isLoading={isLoadingTasks}
                 onDelete={deleteTask}
+                onRefresh={refetchTasks}
+                viewMode={viewMode}
               />
             </TabsContent>
           </Tabs>
@@ -212,6 +264,18 @@ const Templates = () => {
         open={isAddDialogOpen}
         onClose={() => setIsAddDialogOpen(false)}
         onAdd={addProcess}
+      />
+
+      <AddIndependentSubProcessDialog
+        open={isAddSubProcessDialogOpen}
+        onClose={() => setIsAddSubProcessDialogOpen(false)}
+        onSuccess={refetchSubProcesses}
+      />
+
+      <AddIndependentTaskDialog
+        open={isAddTaskDialogOpen}
+        onClose={() => setIsAddTaskDialogOpen(false)}
+        onSuccess={refetchTasks}
       />
 
       <EditProcessDialog

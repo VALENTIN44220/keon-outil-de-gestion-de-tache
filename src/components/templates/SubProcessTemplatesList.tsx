@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { SubProcessWithTasks } from '@/types/template';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -21,18 +21,19 @@ import {
   Lock,
   Building2,
   Globe,
+  Loader2,
 } from 'lucide-react';
 import { EditSubProcessDialog } from './EditSubProcessDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { VISIBILITY_LABELS } from '@/types/template';
-import { Loader2 } from 'lucide-react';
 
 interface SubProcessTemplatesListProps {
   subProcesses: (SubProcessWithTasks & { process_name?: string | null })[];
   isLoading: boolean;
   onDelete: (id: string) => void;
   onRefresh: () => void;
+  viewMode?: 'list' | 'grid';
 }
 
 const assignmentTypeLabels: Record<string, { label: string; icon: any }> = {
@@ -53,6 +54,7 @@ export function SubProcessTemplatesList({
   isLoading,
   onDelete,
   onRefresh,
+  viewMode = 'list',
 }: SubProcessTemplatesListProps) {
   const [editingSubProcess, setEditingSubProcess] = useState<SubProcessWithTasks | null>(null);
 
@@ -87,18 +89,71 @@ export function SubProcessTemplatesList({
         <Layers className="h-12 w-12 text-muted-foreground/50 mb-3" />
         <p className="text-muted-foreground text-lg mb-2">Aucun sous-processus</p>
         <p className="text-sm text-muted-foreground">
-          Les sous-processus sont créés depuis un processus parent
+          Créez un sous-processus depuis l'onglet ou un processus parent
         </p>
       </div>
     );
   }
 
+  const isGridView = viewMode === 'grid';
+
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className={isGridView ? 'space-y-1' : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'}>
         {subProcesses.map((sp) => {
           const AssignmentIcon = assignmentTypeLabels[sp.assignment_type]?.icon || Users;
           const VisibilityIcon = visibilityIcons[sp.visibility_level] || Globe;
+
+          if (isGridView) {
+            return (
+              <Card key={sp.id} className="flex items-center gap-3 p-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-sm truncate">{sp.name}</span>
+                    {sp.process_name && (
+                      <Badge variant="outline" className="text-xs shrink-0">
+                        <Layers className="h-3 w-3 mr-1" />
+                        {sp.process_name}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
+                    <span className="flex items-center gap-1">
+                      <AssignmentIcon className="h-3 w-3" />
+                      {assignmentTypeLabels[sp.assignment_type]?.label}
+                    </span>
+                    <span>{sp.task_templates.length} tâche(s)</span>
+                    <span className="flex items-center gap-1">
+                      <VisibilityIcon className="h-3 w-3" />
+                      {VISIBILITY_LABELS[sp.visibility_level]}
+                    </span>
+                  </div>
+                </div>
+                {sp.can_manage && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+                        <MoreVertical className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setEditingSubProcess(sp)}>
+                        <Edit className="h-4 w-4 mr-2" />
+                        Modifier
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => onDelete(sp.id)}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Supprimer
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </Card>
+            );
+          }
 
           return (
             <Card key={sp.id} className="flex flex-col">
