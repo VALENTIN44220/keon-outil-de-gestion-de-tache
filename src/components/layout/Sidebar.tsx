@@ -49,19 +49,24 @@ export function Sidebar({ activeView, onViewChange, onNewAction }: SidebarProps)
   useEffect(() => {
     async function fetchPermissionProfile() {
       if (profile?.permission_profile_id) {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('permission_profiles')
           .select('name')
           .eq('id', profile.permission_profile_id)
           .single();
         
-        if (data) {
+        if (data && !error) {
           setPermissionProfileName(data.name);
+        } else {
+          console.log('Error fetching permission profile:', error);
+          setPermissionProfileName(null);
         }
+      } else {
+        setPermissionProfileName(null);
       }
     }
     fetchPermissionProfile();
-  }, [profile?.permission_profile_id]);
+  }, [profile?.permission_profile_id, profile?.id]);
 
   // Get user initials from display name
   const getInitials = (name: string | null | undefined) => {
