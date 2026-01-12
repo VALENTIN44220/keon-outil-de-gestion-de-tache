@@ -13,6 +13,7 @@ import { NewTaskDialog } from '@/components/tasks/NewTaskDialog';
 import { NewRequestDialog } from '@/components/tasks/NewRequestDialog';
 import { CreateFromTemplateDialog } from '@/components/tasks/CreateFromTemplateDialog';
 import { UnassignedTasksView } from '@/components/tasks/UnassignedTasksView';
+import { TeamModule } from '@/components/team/TeamModule';
 import { ActionType } from '@/components/layout/NewActionMenu';
 import { useTasks } from '@/hooks/useTasks';
 import { useTasksProgress } from '@/hooks/useChecklists';
@@ -251,11 +252,7 @@ const Index = () => {
           </div>
         );
       case 'team':
-        return (
-          <div className="flex items-center justify-center h-64 bg-card rounded-xl shadow-card">
-            <p className="text-muted-foreground">Module équipe à venir...</p>
-          </div>
-        );
+        return <TeamModule />;
       case 'settings':
         return (
           <div className="flex items-center justify-center h-64 bg-card rounded-xl shadow-card">
