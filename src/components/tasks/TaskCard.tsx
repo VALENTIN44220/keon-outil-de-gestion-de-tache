@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { UserPlus } from 'lucide-react';
 import { Clock, User, MoreVertical, Trash2, ChevronDown, ChevronRight, ListChecks, FileText, Eye, Building2, Pencil } from 'lucide-react';
 import { Task, TaskStatus } from '@/types/task';
 import { cn } from '@/lib/utils';
@@ -61,6 +62,7 @@ export function TaskCard({ task, onStatusChange, onDelete, compact = false, task
   const dueDate = task.due_date ? new Date(task.due_date) : null;
   const isOverdue = dueDate && dueDate < new Date() && task.status !== 'done';
   const isRequest = task.type === 'request';
+  const isAssignmentTask = task.is_assignment_task;
 
   const handleCardClick = (e: React.MouseEvent) => {
     // Don't open edit if clicking on interactive elements
@@ -84,7 +86,13 @@ export function TaskCard({ task, onStatusChange, onDelete, compact = false, task
           {/* Header */}
           <div className="flex items-center gap-2 mb-2">
             <div className={cn("w-2 h-2 rounded-full", statusColors[task.status])} />
-            {isRequest && (
+            {isAssignmentTask && (
+              <Badge className="text-xs flex items-center gap-1 bg-amber-500 hover:bg-amber-600 text-white">
+                <UserPlus className="h-3 w-3" />
+                À affecter
+              </Badge>
+            )}
+            {isRequest && !isAssignmentTask && (
               <Badge variant="secondary" className="text-xs flex items-center gap-1">
                 <Building2 className="h-3 w-3" />
                 Demande
