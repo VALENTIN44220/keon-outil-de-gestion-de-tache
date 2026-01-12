@@ -27,6 +27,7 @@ interface CategorySelectProps {
   onSubcategoryChange: (subcategoryId: string | null) => void;
   onAddCategory?: (name: string) => Promise<void>;
   onAddSubcategory?: (categoryId: string, name: string) => Promise<void>;
+  disabled?: boolean;
 }
 
 export function CategorySelect({
@@ -37,6 +38,7 @@ export function CategorySelect({
   onSubcategoryChange,
   onAddCategory,
   onAddSubcategory,
+  disabled = false,
 }: CategorySelectProps) {
   const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
   const [isAddSubcategoryOpen, setIsAddSubcategoryOpen] = useState(false);
@@ -74,6 +76,7 @@ export function CategorySelect({
               // Reset subcategory when category changes
               onSubcategoryChange(null);
             }}
+            disabled={disabled}
           >
             <SelectTrigger className="flex-1">
               <SelectValue placeholder="Sélectionner une catégorie" />
@@ -87,7 +90,7 @@ export function CategorySelect({
               ))}
             </SelectContent>
           </Select>
-          {onAddCategory && (
+          {onAddCategory && !disabled && (
             <Button
               type="button"
               variant="outline"
@@ -108,6 +111,7 @@ export function CategorySelect({
             <Select
               value={selectedSubcategoryId || 'none'}
               onValueChange={(value) => onSubcategoryChange(value === 'none' ? null : value)}
+              disabled={disabled}
             >
               <SelectTrigger className="flex-1">
                 <SelectValue placeholder="Sélectionner une sous-catégorie" />
@@ -121,7 +125,7 @@ export function CategorySelect({
                 ))}
               </SelectContent>
             </Select>
-            {onAddSubcategory && (
+            {onAddSubcategory && !disabled && (
               <Button
                 type="button"
                 variant="outline"
