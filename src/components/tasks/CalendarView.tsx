@@ -17,6 +17,7 @@ interface CalendarViewProps {
   groupBy?: string;
   groupLabels?: Map<string, string>;
   progressMap?: Record<string, { completed: number; total: number; progress: number }>;
+  onTaskUpdated?: () => void;
 }
 
 const priorityColors: Record<string, string> = {
@@ -26,7 +27,7 @@ const priorityColors: Record<string, string> = {
   low: 'bg-green-500',
 };
 
-export function CalendarView({ tasks, onStatusChange, onDelete, groupBy, groupLabels, progressMap }: CalendarViewProps) {
+export function CalendarView({ tasks, onStatusChange, onDelete, groupBy, groupLabels, progressMap, onTaskUpdated }: CalendarViewProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
 
@@ -148,6 +149,7 @@ export function CalendarView({ tasks, onStatusChange, onDelete, groupBy, groupLa
                   onDelete={onDelete}
                   compact
                   taskProgress={progressMap?.[task.id]}
+                  onTaskUpdated={onTaskUpdated}
                 />
               ))}
             </div>
@@ -251,6 +253,7 @@ export function CalendarView({ tasks, onStatusChange, onDelete, groupBy, groupLa
                 onDelete={onDelete}
                 compact
                 taskProgress={progressMap?.[task.id]}
+                onTaskUpdated={onTaskUpdated}
               />
             ))
           )}
@@ -276,6 +279,7 @@ export function CalendarView({ tasks, onStatusChange, onDelete, groupBy, groupLa
                   onDelete={onDelete}
                   compact
                   taskProgress={progressMap?.[task.id]}
+                  onTaskUpdated={onTaskUpdated}
                 />
               ))}
             </div>

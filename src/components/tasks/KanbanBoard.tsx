@@ -10,6 +10,7 @@ interface KanbanBoardProps {
   groupBy?: string;
   groupLabels?: Map<string, string>;
   progressMap?: Record<string, { completed: number; total: number; progress: number }>;
+  onTaskUpdated?: () => void;
 }
 
 const statusColumns: { status: TaskStatus; label: string; color: string }[] = [
@@ -18,7 +19,7 @@ const statusColumns: { status: TaskStatus; label: string; color: string }[] = [
   { status: 'done', label: 'Terminé', color: 'bg-green-500/10 border-green-500/30' },
 ];
 
-export function KanbanBoard({ tasks, onStatusChange, onDelete, groupBy, groupLabels, progressMap }: KanbanBoardProps) {
+export function KanbanBoard({ tasks, onStatusChange, onDelete, groupBy, groupLabels, progressMap, onTaskUpdated }: KanbanBoardProps) {
   const handleDragStart = (e: React.DragEvent, taskId: string) => {
     e.dataTransfer.setData('taskId', taskId);
   };
@@ -116,6 +117,7 @@ export function KanbanBoard({ tasks, onStatusChange, onDelete, groupBy, groupLab
                             onDelete={onDelete}
                             compact
                             taskProgress={progressMap?.[task.id]}
+                            onTaskUpdated={onTaskUpdated}
                           />
                         </div>
                       ))}
@@ -162,6 +164,7 @@ export function KanbanBoard({ tasks, onStatusChange, onDelete, groupBy, groupLab
                     onDelete={onDelete}
                     compact
                     taskProgress={progressMap?.[task.id]}
+                    onTaskUpdated={onTaskUpdated}
                   />
                 </div>
               ))}

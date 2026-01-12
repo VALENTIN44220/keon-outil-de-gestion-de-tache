@@ -161,6 +161,7 @@ const Index = () => {
             groupBy={advancedFilters.groupBy}
             groupLabels={groupLabels}
             progressMap={progressMap}
+            onTaskUpdated={refetch}
           />
         );
       case 'calendar':
@@ -172,6 +173,7 @@ const Index = () => {
             groupBy={advancedFilters.groupBy}
             groupLabels={groupLabels}
             progressMap={progressMap}
+            onTaskUpdated={refetch}
           />
         );
       default:
@@ -183,6 +185,7 @@ const Index = () => {
             groupBy={advancedFilters.groupBy}
             groupLabels={groupLabels}
             progressMap={progressMap}
+            onTaskUpdated={refetch}
           />
         );
     }
