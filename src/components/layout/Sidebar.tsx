@@ -22,7 +22,7 @@ import keonLogo from '@/assets/keon-logo.jpg';
 interface SidebarProps {
   activeView: string;
   onViewChange: (view: string) => void;
-  onNewAction?: (type: ActionType) => void;
+  onNewAction?: (type: ActionType, processTemplateId?: string) => void;
 }
 
 const menuItems = [
