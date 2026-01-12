@@ -23,6 +23,7 @@ interface SubProcessCardProps {
   onDelete: () => void;
   onAddTask: (task: Omit<TaskTemplate, 'id' | 'user_id' | 'process_template_id' | 'sub_process_template_id' | 'created_at' | 'updated_at'>) => void;
   onDeleteTask: (taskId: string) => void;
+  canManage?: boolean;
 }
 
 const priorityColors: Record<string, string> = {
@@ -43,7 +44,8 @@ export function SubProcessCard({
   onEdit, 
   onDelete, 
   onAddTask, 
-  onDeleteTask 
+  onDeleteTask,
+  canManage = false
 }: SubProcessCardProps) {
   const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
@@ -86,26 +88,28 @@ export function SubProcessCard({
                   </div>
                 </button>
               </CollapsibleTrigger>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
-                    <MoreVertical className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={onEdit}>
-                    <Edit className="h-4 w-4 mr-2" />
-                    Modifier
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={onDelete}
-                    className="text-destructive focus:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Supprimer
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {canManage && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={onEdit}>
+                      <Edit className="h-4 w-4 mr-2" />
+                      Modifier
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={onDelete}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Supprimer
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
 
             <div className="flex flex-wrap gap-1.5 mt-2">
@@ -155,14 +159,16 @@ export function SubProcessCard({
                             >
                               {task.priority}
                             </Badge>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => onDeleteTask(task.id)}
-                            >
-                              <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
-                            </Button>
+                            {canManage && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={() => onDeleteTask(task.id)}
+                              >
+                                <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                              </Button>
+                            )}
                           </div>
                         </div>
                         <CollapsibleContent>
@@ -176,15 +182,17 @@ export function SubProcessCard({
                 )}
               </div>
 
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="w-full mt-3"
-                onClick={() => setIsAddTaskOpen(true)}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Ajouter une tâche
-              </Button>
+              {canManage && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="w-full mt-3"
+                  onClick={() => setIsAddTaskOpen(true)}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Ajouter une tâche
+                </Button>
+              )}
             </CardContent>
           </CollapsibleContent>
         </Card>
