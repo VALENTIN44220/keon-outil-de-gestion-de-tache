@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
-import { ProcessList } from '@/components/templates/ProcessList';
+import { ProcessCard } from '@/components/templates/ProcessCard';
 import { TemplateFilters } from '@/components/templates/TemplateFilters';
 import { AddProcessDialog } from '@/components/templates/AddProcessDialog';
 import { EditProcessDialog } from '@/components/templates/EditProcessDialog';
@@ -9,6 +9,7 @@ import { ProcessDetailView } from '@/components/templates/ProcessDetailView';
 import { useProcessTemplates } from '@/hooks/useProcessTemplates';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useTasks } from '@/hooks/useTasks';
+import { useTemplatePermissions } from '@/hooks/useTemplatePermissions';
 import { Loader2 } from 'lucide-react';
 import { ProcessTemplate, ProcessWithTasks } from '@/types/template';
 
@@ -37,6 +38,7 @@ const Templates = () => {
 
   const { allTasks } = useTasks();
   const { notifications, unreadCount, hasUrgent } = useNotifications(allTasks);
+  const { canManageTemplates } = useTemplatePermissions();
 
   // Filter processes by search
   const filteredProcesses = processes.filter(p => 
@@ -73,7 +75,7 @@ const Templates = () => {
           title="Modèles de processus"
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
-          onAddTask={() => setIsAddDialogOpen(true)}
+          onAddTask={canManageTemplates ? () => setIsAddDialogOpen(true) : undefined}
           addButtonLabel="Nouveau processus"
           notifications={notifications}
           unreadCount={unreadCount}
@@ -96,14 +98,20 @@ const Templates = () => {
                 companies={companies}
                 departments={departments}
               />
-              <ProcessList
-                processes={filteredProcesses}
-                onDelete={deleteProcess}
-                onEdit={handleEditProcess}
-                onViewDetails={handleViewDetails}
-                onAddTask={addTaskTemplate}
-                onDeleteTask={deleteTaskTemplate}
-              />
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredProcesses.map((process) => (
+                  <ProcessCard
+                    key={process.id}
+                    process={process}
+                    onDelete={() => deleteProcess(process.id)}
+                    onEdit={() => handleEditProcess(process.id)}
+                    onViewDetails={() => handleViewDetails(process.id)}
+                    onAddTask={(task) => addTaskTemplate(process.id, task)}
+                    onDeleteTask={(taskId) => deleteTaskTemplate(process.id, taskId)}
+                    canManage={canManageTemplates}
+                  />
+                ))}
+              </div>
             </>
           )}
         </main>
@@ -128,6 +136,7 @@ const Templates = () => {
         onClose={() => setViewingProcess(null)}
         onAddTask={(task) => viewingProcess && addTaskTemplate(viewingProcess.id, task)}
         onDeleteTask={(taskId) => viewingProcess && deleteTaskTemplate(viewingProcess.id, taskId)}
+        canManage={canManageTemplates}
       />
     </div>
   );

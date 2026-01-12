@@ -19,9 +19,10 @@ interface ProcessCardProps {
   onViewDetails: () => void;
   onAddTask: (task: Omit<TaskTemplate, 'id' | 'user_id' | 'process_template_id' | 'created_at' | 'updated_at'>) => void;
   onDeleteTask: (taskId: string) => void;
+  canManage?: boolean;
 }
 
-export function ProcessCard({ process, onDelete, onEdit, onViewDetails, onAddTask, onDeleteTask }: ProcessCardProps) {
+export function ProcessCard({ process, onDelete, onEdit, onViewDetails, onAddTask, onDeleteTask, canManage = false }: ProcessCardProps) {
   const [subProcessCount, setSubProcessCount] = useState(0);
 
   useEffect(() => {
@@ -54,30 +55,32 @@ export function ProcessCard({ process, onDelete, onEdit, onViewDetails, onAddTas
               </CardDescription>
             )}
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onViewDetails(); }}>
-                <Eye className="h-4 w-4 mr-2" />
-                Voir les détails
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
-                <Edit className="h-4 w-4 mr-2" />
-                Modifier
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={(e) => { e.stopPropagation(); onDelete(); }}
-                className="text-destructive focus:text-destructive"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Supprimer
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {canManage && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onViewDetails(); }}>
+                  <Eye className="h-4 w-4 mr-2" />
+                  Voir les détails
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
+                  <Edit className="h-4 w-4 mr-2" />
+                  Modifier
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Supprimer
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
 
         <div className="flex flex-wrap gap-2 mt-3">
@@ -115,7 +118,7 @@ export function ProcessCard({ process, onDelete, onEdit, onViewDetails, onAddTas
           onClick={(e) => { e.stopPropagation(); onViewDetails(); }}
         >
           <Eye className="h-4 w-4 mr-2" />
-          Gérer le processus
+          {canManage ? 'Gérer le processus' : 'Voir le processus'}
         </Button>
       </CardContent>
     </Card>

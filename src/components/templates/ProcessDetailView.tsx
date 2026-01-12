@@ -21,6 +21,7 @@ interface ProcessDetailViewProps {
   onClose: () => void;
   onAddTask: (task: Omit<TaskTemplate, 'id' | 'user_id' | 'process_template_id' | 'created_at' | 'updated_at'>) => void;
   onDeleteTask: (taskId: string) => void;
+  canManage?: boolean;
 }
 
 const priorityColors: Record<string, string> = {
@@ -35,7 +36,8 @@ export function ProcessDetailView({
   open, 
   onClose, 
   onAddTask, 
-  onDeleteTask 
+  onDeleteTask,
+  canManage = false
 }: ProcessDetailViewProps) {
   const [isAddSubProcessOpen, setIsAddSubProcessOpen] = useState(false);
   const [editingSubProcess, setEditingSubProcess] = useState<SubProcessTemplate | null>(null);
@@ -146,18 +148,21 @@ export function ProcessDetailView({
                       onDelete={() => deleteSubProcess(sp.id)}
                       onAddTask={(task) => addTaskToSubProcess(sp.id, task)}
                       onDeleteTask={(taskId) => deleteTaskFromSubProcess(sp.id, taskId)}
+                      canManage={canManage}
                     />
                   ))
                 )}
 
-                <Button 
-                  variant="outline" 
-                  className="w-full"
-                  onClick={() => setIsAddSubProcessOpen(true)}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Ajouter un sous-processus
-                </Button>
+                {canManage && (
+                  <Button 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={() => setIsAddSubProcessOpen(true)}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Ajouter un sous-processus
+                  </Button>
+                )}
               </TabsContent>
 
               <TabsContent value="tasks" className="p-6 pt-4 space-y-2">
@@ -198,14 +203,16 @@ export function ProcessDetailView({
                             >
                               {task.priority}
                             </Badge>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => onDeleteTask(task.id)}
-                            >
-                              <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
-                            </Button>
+                            {canManage && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => onDeleteTask(task.id)}
+                              >
+                                <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                              </Button>
+                            )}
                           </div>
                         </div>
                         <CollapsibleContent>
@@ -218,14 +225,16 @@ export function ProcessDetailView({
                   ))
                 )}
 
-                <Button 
-                  variant="outline" 
-                  className="w-full mt-4"
-                  onClick={() => setIsAddTaskOpen(true)}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Ajouter une tâche directe
-                </Button>
+                {canManage && (
+                  <Button 
+                    variant="outline" 
+                    className="w-full mt-4"
+                    onClick={() => setIsAddTaskOpen(true)}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Ajouter une tâche directe
+                  </Button>
+                )}
               </TabsContent>
             </ScrollArea>
           </Tabs>
