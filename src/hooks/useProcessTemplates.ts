@@ -66,7 +66,11 @@ export function useProcessTemplates() {
   }, [fetchProcesses]);
 
   const addProcess = async (
-    process: Omit<ProcessTemplate, 'id' | 'user_id' | 'created_at' | 'updated_at'>,
+    process: Omit<ProcessTemplate, 'id' | 'user_id' | 'created_at' | 'updated_at'> & {
+      category_id?: string | null;
+      subcategory_id?: string | null;
+      target_department_id?: string | null;
+    },
     visibilityCompanyIds?: string[],
     visibilityDepartmentIds?: string[]
   ) => {
@@ -75,7 +79,13 @@ export function useProcessTemplates() {
     try {
       const { data, error } = await supabase
         .from('process_templates')
-        .insert({ ...process, user_id: user.id })
+        .insert({ 
+          ...process, 
+          user_id: user.id,
+          category_id: process.category_id || null,
+          subcategory_id: process.subcategory_id || null,
+          target_department_id: process.target_department_id || null,
+        })
         .select()
         .single();
 

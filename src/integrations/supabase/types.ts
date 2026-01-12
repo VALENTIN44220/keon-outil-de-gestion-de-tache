@@ -527,6 +527,7 @@ export type Database = {
       }
       process_templates: {
         Row: {
+          category_id: string | null
           company: string | null
           created_at: string
           creator_company_id: string | null
@@ -536,11 +537,14 @@ export type Database = {
           id: string
           is_shared: boolean
           name: string
+          subcategory_id: string | null
+          target_department_id: string | null
           updated_at: string
           user_id: string
           visibility_level: Database["public"]["Enums"]["template_visibility"]
         }
         Insert: {
+          category_id?: string | null
           company?: string | null
           created_at?: string
           creator_company_id?: string | null
@@ -550,11 +554,14 @@ export type Database = {
           id?: string
           is_shared?: boolean
           name: string
+          subcategory_id?: string | null
+          target_department_id?: string | null
           updated_at?: string
           user_id: string
           visibility_level?: Database["public"]["Enums"]["template_visibility"]
         }
         Update: {
+          category_id?: string | null
           company?: string | null
           created_at?: string
           creator_company_id?: string | null
@@ -564,11 +571,20 @@ export type Database = {
           id?: string
           is_shared?: boolean
           name?: string
+          subcategory_id?: string | null
+          target_department_id?: string | null
           updated_at?: string
           user_id?: string
           visibility_level?: Database["public"]["Enums"]["template_visibility"]
         }
         Relationships: [
+          {
+            foreignKeyName: "process_templates_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "process_templates_creator_company_id_fkey"
             columns: ["creator_company_id"]
@@ -579,6 +595,20 @@ export type Database = {
           {
             foreignKeyName: "process_templates_creator_department_id_fkey"
             columns: ["creator_department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "process_templates_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "subcategories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "process_templates_target_department_id_fkey"
+            columns: ["target_department_id"]
             isOneToOne: false
             referencedRelation: "departments"
             referencedColumns: ["id"]

@@ -119,6 +119,9 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
     checkLinkedProcess();
   }, [subcategoryId, getProcessTemplateForSubcategory]);
 
+  // Track if process imposes values (they should be locked)
+  const [processImposedValues, setProcessImposedValues] = useState(false);
+
   // Load initial process/sub-process template if provided
   useEffect(() => {
     const loadInitialTemplates = async () => {
@@ -141,10 +144,10 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
             setTargetDepartmentId(subProcess.target_department_id);
           }
 
-          // Load parent process
+          // Load parent process with category info
           const { data: process } = await supabase
             .from('process_templates')
-            .select('id, name, department')
+            .select('id, name, department, category_id, subcategory_id, target_department_id')
             .eq('id', subProcess.process_template_id)
             .single();
           
@@ -152,8 +155,24 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
             setLinkedProcessId(process.id);
             setLinkedProcessName(process.name);
             
-            // Fallback to process department if sub-process doesn't have one
-            if (!subProcess.target_department_id && process.department) {
+            // Set category and subcategory from process (imposed)
+            if (process.category_id) {
+              setCategoryId(process.category_id);
+              setProcessImposedValues(true);
+            }
+            if (process.subcategory_id) {
+              setSubcategoryId(process.subcategory_id);
+              setProcessImposedValues(true);
+            }
+            
+            // Priority: sub-process target_department > process target_department > process.department legacy
+            if (subProcess.target_department_id) {
+              setTargetDepartmentId(subProcess.target_department_id);
+              setProcessImposedValues(true);
+            } else if (process.target_department_id) {
+              setTargetDepartmentId(process.target_department_id);
+              setProcessImposedValues(true);
+            } else if (process.department) {
               const { data: deptData } = await supabase
                 .from('departments')
                 .select('id')
@@ -161,6 +180,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                 .single();
               if (deptData) {
                 setTargetDepartmentId(deptData.id);
+                setProcessImposedValues(true);
               }
             }
           }
@@ -169,7 +189,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
         // Only process template selected (no sub-process)
         const { data } = await supabase
           .from('process_templates')
-          .select('id, name, department')
+          .select('id, name, department, category_id, subcategory_id, target_department_id')
           .eq('id', initialProcessTemplateId)
           .single();
         
@@ -177,7 +197,21 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
           setLinkedProcessId(data.id);
           setLinkedProcessName(data.name);
           
-          if (data.department) {
+          // Set category and subcategory from process (imposed)
+          if (data.category_id) {
+            setCategoryId(data.category_id);
+            setProcessImposedValues(true);
+          }
+          if (data.subcategory_id) {
+            setSubcategoryId(data.subcategory_id);
+            setProcessImposedValues(true);
+          }
+          
+          // Priority: process target_department_id > process.department legacy
+          if (data.target_department_id) {
+            setTargetDepartmentId(data.target_department_id);
+            setProcessImposedValues(true);
+          } else if (data.department) {
             const { data: deptData } = await supabase
               .from('departments')
               .select('id')
@@ -185,6 +219,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
               .single();
             if (deptData) {
               setTargetDepartmentId(deptData.id);
+              setProcessImposedValues(true);
             }
           }
         }
@@ -323,6 +358,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
     setLinkedSubProcessName(null);
     setBeProjectId(null);
     setBeLabelId(null);
+    setProcessImposedValues(false);
   };
 
   const handleAddCategory = async (name: string) => {
@@ -377,6 +413,15 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
             />
           </div>
 
+          {processImposedValues && (linkedProcessId || linkedSubProcessId) && (
+            <div className="rounded-lg border border-amber-500/50 bg-amber-50 dark:bg-amber-950/20 p-3">
+              <p className="text-sm text-amber-700 dark:text-amber-300 flex items-center gap-2">
+                <Info className="h-4 w-4 shrink-0" />
+                Les champs catégorie, sous-catégorie et service cible sont définis par le processus sélectionné et ne peuvent pas être modifiés.
+              </p>
+            </div>
+          )}
+
           <CategorySelect
             categories={categories}
             selectedCategoryId={categoryId}
@@ -385,6 +430,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
             onSubcategoryChange={setSubcategoryId}
             onAddCategory={handleAddCategory}
             onAddSubcategory={handleAddSubcategory}
+            disabled={processImposedValues}
           />
 
           {/* BE Project Selection */}
@@ -456,7 +502,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
               <Select 
                 value={targetDepartmentId || ''} 
                 onValueChange={(v) => setTargetDepartmentId(v || null)}
-                disabled={matchingRule?.auto_assign && matchingRule?.target_department_id ? true : false}
+                disabled={processImposedValues || (matchingRule?.auto_assign && matchingRule?.target_department_id ? true : false)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Sélectionner un service" />
