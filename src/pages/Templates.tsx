@@ -39,6 +39,7 @@ const Templates = () => {
     addProcess,
     updateProcess,
     deleteProcess,
+    duplicateProcess,
     addTaskTemplate,
     deleteTaskTemplate,
   } = useProcessTemplates();
@@ -47,6 +48,7 @@ const Templates = () => {
     subProcesses,
     isLoading: isLoadingSubProcesses,
     deleteSubProcess,
+    duplicateSubProcess,
     refetch: refetchSubProcesses,
   } = useAllSubProcessTemplates();
 
@@ -54,6 +56,7 @@ const Templates = () => {
     tasks: taskTemplates,
     isLoading: isLoadingTasks,
     deleteTask,
+    duplicateTask,
     refetch: refetchTasks,
   } = useAllTaskTemplates();
 
@@ -212,6 +215,7 @@ const Templates = () => {
                       onDelete={() => deleteProcess(process.id)}
                       onEdit={() => handleEditProcess(process.id)}
                       onViewDetails={() => handleViewDetails(process.id)}
+                      onDuplicate={() => duplicateProcess(process.id)}
                       onAddTask={(task) => addTaskTemplate(process.id, task)}
                       onDeleteTask={(taskId) => deleteTaskTemplate(process.id, taskId)}
                       canManage={Boolean(process.can_manage)}
@@ -228,6 +232,7 @@ const Templates = () => {
                       onDelete={() => deleteProcess(process.id)}
                       onEdit={() => handleEditProcess(process.id)}
                       onViewDetails={() => handleViewDetails(process.id)}
+                      onDuplicate={() => duplicateProcess(process.id)}
                       onAddTask={(task) => addTaskTemplate(process.id, task)}
                       onDeleteTask={(taskId) => deleteTaskTemplate(process.id, taskId)}
                       canManage={Boolean(process.can_manage)}
@@ -242,6 +247,7 @@ const Templates = () => {
                 subProcesses={filteredSubProcesses}
                 isLoading={isLoadingSubProcesses}
                 onDelete={deleteSubProcess}
+                onDuplicate={duplicateSubProcess}
                 onRefresh={refetchSubProcesses}
                 viewMode={viewMode}
               />
@@ -252,6 +258,7 @@ const Templates = () => {
                 tasks={filteredTasks}
                 isLoading={isLoadingTasks}
                 onDelete={deleteTask}
+                onDuplicate={duplicateTask}
                 onRefresh={refetchTasks}
                 viewMode={viewMode}
               />
