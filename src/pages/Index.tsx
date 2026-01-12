@@ -8,13 +8,9 @@ import { AdvancedFilters, AdvancedFiltersState } from '@/components/tasks/Advanc
 import { TaskViewSelector, TaskView } from '@/components/tasks/TaskViewSelector';
 import { KanbanBoard } from '@/components/tasks/KanbanBoard';
 import { CalendarView } from '@/components/tasks/CalendarView';
-import { AddTaskDialog } from '@/components/tasks/AddTaskDialog';
-import { NewTaskDialog } from '@/components/tasks/NewTaskDialog';
-import { NewRequestDialog } from '@/components/tasks/NewRequestDialog';
 import { CreateFromTemplateDialog } from '@/components/tasks/CreateFromTemplateDialog';
 import { UnassignedTasksView } from '@/components/tasks/UnassignedTasksView';
 import { TeamModule } from '@/components/team/TeamModule';
-import { ActionType } from '@/components/layout/NewActionMenu';
 import { useTasks } from '@/hooks/useTasks';
 import { useTasksProgress } from '@/hooks/useChecklists';
 import { useNotifications } from '@/hooks/useNotifications';
@@ -28,12 +24,6 @@ import { useCategories } from '@/hooks/useCategories';
 
 const Index = () => {
   const [activeView, setActiveView] = useState('dashboard');
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [taskDialogMode, setTaskDialogMode] = useState<ActionType>('personal');
-  const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
-  const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
-  const [selectedProcessTemplateId, setSelectedProcessTemplateId] = useState<string | undefined>(undefined);
-  const [selectedSubProcessTemplateId, setSelectedSubProcessTemplateId] = useState<string | undefined>(undefined);
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const [taskView, setTaskView] = useState<TaskView>('grid');
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFiltersState>({
@@ -60,7 +50,6 @@ const Index = () => {
     searchQuery,
     setSearchQuery,
     updateTaskStatus,
-    addTask,
     deleteTask,
     refetch,
   } = useTasks();
@@ -269,23 +258,11 @@ const Index = () => {
     }
   };
 
-  const handleNewAction = (type: ActionType, subProcessTemplateId?: string, processTemplateId?: string) => {
-    if (type === 'request') {
-      setSelectedProcessTemplateId(processTemplateId);
-      setSelectedSubProcessTemplateId(subProcessTemplateId);
-      setIsRequestDialogOpen(true);
-    } else {
-      setTaskDialogMode(type);
-      setIsTaskDialogOpen(true);
-    }
-  };
-
   return (
     <div className="flex h-screen bg-background">
       <Sidebar 
         activeView={activeView} 
         onViewChange={setActiveView} 
-        onNewAction={handleNewAction}
       />
       
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -293,7 +270,6 @@ const Index = () => {
           title={getTitle()}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
-          onAddTask={() => setIsAddDialogOpen(true)}
           notifications={notifications}
           unreadCount={unreadCount}
           hasUrgent={hasUrgent}
@@ -304,33 +280,6 @@ const Index = () => {
           {renderContent()}
         </main>
       </div>
-
-      <AddTaskDialog
-        open={isAddDialogOpen}
-        onClose={() => setIsAddDialogOpen(false)}
-        onAdd={addTask}
-      />
-
-      <NewTaskDialog
-        open={isTaskDialogOpen}
-        onClose={() => setIsTaskDialogOpen(false)}
-        mode={taskDialogMode}
-        onAdd={addTask}
-        onTasksCreated={refetch}
-      />
-
-      <NewRequestDialog
-        open={isRequestDialogOpen}
-        onClose={() => { 
-          setIsRequestDialogOpen(false);
-          setSelectedProcessTemplateId(undefined);
-          setSelectedSubProcessTemplateId(undefined);
-        }}
-        onAdd={addTask}
-        onTasksCreated={() => { refetch(); refetchUnassigned(); }}
-        initialProcessTemplateId={selectedProcessTemplateId}
-        initialSubProcessTemplateId={selectedSubProcessTemplateId}
-      />
 
       <CreateFromTemplateDialog
         open={isTemplateDialogOpen}

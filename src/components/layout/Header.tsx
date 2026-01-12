@@ -18,7 +18,7 @@ interface HeaderProps {
   title: string;
   searchQuery: string;
   onSearchChange: (query: string) => void;
-  onAddTask: () => void;
+  onAddTask?: () => void;
   addButtonLabel?: string;
   notifications?: TaskNotification[];
   unreadCount?: number;
@@ -84,11 +84,13 @@ export function Header({
             onNotificationClick={onNotificationClick}
           />
 
-          {/* Add Task */}
-          <Button onClick={onAddTask} className="gap-2">
-            <Plus className="w-4 h-4" />
-            {addButtonLabel}
-          </Button>
+          {/* Add Task - Only show if onAddTask is provided */}
+          {onAddTask && (
+            <Button onClick={onAddTask} className="gap-2">
+              <Plus className="w-4 h-4" />
+              {addButtonLabel}
+            </Button>
+          )}
 
           {/* User Menu */}
           <DropdownMenu>
