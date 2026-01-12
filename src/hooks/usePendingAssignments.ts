@@ -245,12 +245,18 @@ export function usePendingAssignments(): UsePendingAssignmentsResult {
         .eq('id', requestId);
 
       // Mark the assignment task as completed (done)
+      const assignmentTaskUpdate: { status: string; assignee_id?: string } = { 
+        status: 'done' 
+      };
+      
+      // Only set assignee_id if profile.id is valid
+      if (profile?.id && profile.id.length > 0) {
+        assignmentTaskUpdate.assignee_id = profile.id;
+      }
+      
       await supabase
         .from('tasks')
-        .update({ 
-          status: 'done',
-          assignee_id: profile?.id, // Assign to the manager who completed the assignment
-        })
+        .update(assignmentTaskUpdate)
         .eq('parent_request_id', requestId)
         .eq('is_assignment_task', true);
 
