@@ -10,11 +10,12 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Plus, Search, Pencil, Trash2, Building2, FolderOpen, Loader2, RefreshCw, Download, Upload, Eye } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Building2, FolderOpen, Loader2, RefreshCw, Download, Upload, Eye, FileDown } from 'lucide-react';
 import { BEProjectDialog } from './BEProjectDialog';
 import { SharePointPreviewDialog } from './SharePointPreviewDialog';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { toast } from '@/hooks/use-toast';
 
 export function BEProjectsView() {
   const { projects, isLoading, searchQuery, setSearchQuery, addProject, updateProject, deleteProject, fetchProjects } = useBEProjects();
@@ -93,6 +94,71 @@ export function BEProjectsView() {
     clearPreview();
   };
 
+  const handleExportCSV = () => {
+    if (projects.length === 0) {
+      toast({
+        title: 'Aucun projet',
+        description: 'Aucun projet à exporter',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // CSV headers matching SharePoint column mapping
+    const headers = [
+      'code_projet',
+      'nom_projet',
+      'description',
+      'adresse_site',
+      'adresse_societe',
+      'pays',
+      'pays_site',
+      'code_divalto',
+      'siret',
+      'date_cloture_bancaire',
+      'date_cloture_juridique',
+      'date_os_etude',
+      'date_os_travaux',
+      'actionnariat',
+      'regime_icpe',
+      'typologie',
+      'status',
+    ];
+
+    const csvContent = [
+      headers.join(';'),
+      ...projects.map(project => 
+        headers.map(header => {
+          const value = (project as any)[header];
+          // Escape quotes and handle special characters
+          if (value === null || value === undefined) return '';
+          const strValue = String(value);
+          if (strValue.includes(';') || strValue.includes('"') || strValue.includes('\n')) {
+            return `"${strValue.replace(/"/g, '""')}"`;
+          }
+          return strValue;
+        }).join(';')
+      ),
+    ].join('\n');
+
+    // Add BOM for Excel compatibility with UTF-8
+    const bom = '\uFEFF';
+    const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `projets_be_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: 'Export terminé',
+      description: `${projects.length} projets exportés en CSV`,
+    });
+  };
+
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
       active: { variant: 'default', label: 'Actif' },
@@ -125,6 +191,12 @@ export function BEProjectsView() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {/* Export CSV */}
+          <Button variant="outline" className="gap-2" onClick={handleExportCSV}>
+            <FileDown className="h-4 w-4" />
+            Export CSV
+          </Button>
+
           {/* SharePoint Sync */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
