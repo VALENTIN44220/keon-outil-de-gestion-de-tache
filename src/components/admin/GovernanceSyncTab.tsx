@@ -9,7 +9,8 @@ import {
   Loader2,
   FileSpreadsheet,
   FolderSync,
-  Stethoscope
+  Stethoscope,
+  Eye
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { useGovernanceSync, GovernanceTableStatus } from '@/hooks/useGovernanceSync';
+import { TableViewDialog } from './TableViewDialog';
 
 const GOVERNANCE_TABLES = [
   { name: 'companies', label: 'Sociétés', fileName: 'APP_GESTION_COMPANIES.xlsx' },
@@ -43,6 +45,7 @@ export function GovernanceSyncTab() {
   } = useGovernanceSync();
 
   const [selectedTables, setSelectedTables] = useState<Set<string>>(new Set(GOVERNANCE_TABLES.map(t => t.name)));
+  const [viewingTable, setViewingTable] = useState<{ name: string; label: string } | null>(null);
 
   const toggleTable = (tableName: string) => {
     const newSelected = new Set(selectedTables);
@@ -163,7 +166,7 @@ export function GovernanceSyncTab() {
                 return (
                   <div
                     key={table.name}
-                    className={`flex items-start gap-3 p-3 border rounded-lg transition-colors ${
+                    className={`group flex items-start gap-3 p-3 border rounded-lg transition-colors ${
                       selectedTables.has(table.name) ? 'bg-primary/5 border-primary/30' : 'hover:bg-muted/50'
                     }`}
                   >
@@ -173,12 +176,13 @@ export function GovernanceSyncTab() {
                       onCheckedChange={() => toggleTable(table.name)}
                     />
                     <div className="flex-1 min-w-0">
-                      <Label
-                        htmlFor={table.name}
-                        className="font-medium cursor-pointer text-sm"
+                      <button
+                        onClick={() => setViewingTable({ name: table.name, label: table.label })}
+                        className="font-medium text-sm hover:text-primary hover:underline text-left flex items-center gap-1"
                       >
+                        <Eye className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                         {table.label}
-                      </Label>
+                      </button>
                       <p className="text-xs text-muted-foreground font-mono truncate">
                         {table.fileName}
                       </p>
@@ -294,6 +298,14 @@ export function GovernanceSyncTab() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Table View Dialog */}
+      <TableViewDialog
+        open={!!viewingTable}
+        onOpenChange={(open) => !open && setViewingTable(null)}
+        tableName={viewingTable?.name || ''}
+        tableLabel={viewingTable?.label || ''}
+      />
     </div>
   );
 }
