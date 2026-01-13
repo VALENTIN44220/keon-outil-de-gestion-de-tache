@@ -398,6 +398,7 @@ serve(async (req) => {
         step: 'init',
         siteUrlSet: !!siteUrl,
         filePathSet: !!filePath,
+        filePathValue: filePath || 'NOT SET',
         siteUrlValue: siteUrl ? siteUrl.replace(/\/[^\/]+$/, '/...') : 'NOT SET',
       };
 
@@ -420,8 +421,66 @@ serve(async (req) => {
         const driveId = await getDriveId(token, siteId);
         diagnosticResults.driveId = driveId ? `${driveId.substring(0, 20)}...` : null;
 
+        // List root folder contents to help user find correct path
+        diagnosticResults.step = 'listFiles';
+        try {
+          const listUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/drives/${driveId}/root/children?$select=name,folder,file&$top=20`;
+          const listRes = await fetch(listUrl, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (listRes.ok) {
+            const listData = await listRes.json();
+            diagnosticResults.rootItems = (listData.value || []).map((item: any) => ({
+              name: item.name,
+              type: item.folder ? 'folder' : 'file',
+            }));
+          }
+        } catch (e) {
+          console.log('Could not list root items:', e);
+        }
+
+        // Try to find the Excel file
+        diagnosticResults.step = 'findFile';
+        const cleanPath = filePath.replace(/^\/+/, '');
+        const encodedPath = encodeURIComponent(cleanPath);
+        const fileUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/drives/${driveId}/root:/${encodedPath}`;
+        const fileRes = await fetch(fileUrl, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        
+        if (fileRes.ok) {
+          const fileData = await fileRes.json();
+          diagnosticResults.fileFound = true;
+          diagnosticResults.fileName = fileData.name;
+        } else {
+          diagnosticResults.fileFound = false;
+          diagnosticResults.fileError = await fileRes.text();
+          
+          // Try alternative paths
+          const alternatives = [
+            cleanPath.replace(/^Shared Documents\//, ''),
+            cleanPath.replace(/^Documents\//, ''),
+            `General/${cleanPath.split('/').pop()}`,
+            cleanPath.split('/').pop(), // Just filename
+          ];
+          
+          for (const altPath of alternatives) {
+            if (!altPath || altPath === cleanPath) continue;
+            const altUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/drives/${driveId}/root:/${encodeURIComponent(altPath)}`;
+            const altRes = await fetch(altUrl, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (altRes.ok) {
+              const altData = await altRes.json();
+              diagnosticResults.suggestedPath = altPath;
+              diagnosticResults.foundAlternative = altData.name;
+              break;
+            }
+          }
+        }
+
         diagnosticResults.step = 'complete';
-        diagnosticResults.success = true;
+        diagnosticResults.success = diagnosticResults.fileFound === true;
       } catch (error: unknown) {
         diagnosticResults.error = error instanceof Error ? error.message : String(error);
         diagnosticResults.failedAtStep = diagnosticResults.step;
