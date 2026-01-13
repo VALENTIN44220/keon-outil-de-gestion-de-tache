@@ -456,6 +456,44 @@ export type Database = {
         }
         Relationships: []
       }
+      holidays: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          date: string
+          id: string
+          is_national: boolean | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          date: string
+          id?: string
+          is_national?: boolean | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          date?: string
+          id?: string
+          is_national?: boolean | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "holidays_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_titles: {
         Row: {
           created_at: string
@@ -1765,6 +1803,59 @@ export type Database = {
           },
         ]
       }
+      user_leaves: {
+        Row: {
+          created_at: string
+          description: string | null
+          end_date: string
+          end_half_day: string | null
+          id: string
+          id_lucca: string | null
+          leave_type: string
+          start_date: string
+          start_half_day: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          end_date: string
+          end_half_day?: string | null
+          id?: string
+          id_lucca?: string | null
+          leave_type?: string
+          start_date: string
+          start_half_day?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          end_date?: string
+          end_half_day?: string | null
+          id?: string
+          id_lucca?: string | null
+          leave_type?: string
+          start_date?: string
+          start_half_day?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_leaves_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -1785,6 +1876,54 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      workload_slots: {
+        Row: {
+          created_at: string
+          date: string
+          half_day: string
+          id: string
+          notes: string | null
+          task_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          half_day: string
+          id?: string
+          notes?: string | null
+          task_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          half_day?: string
+          id?: string
+          notes?: string | null
+          task_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workload_slots_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workload_slots_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
