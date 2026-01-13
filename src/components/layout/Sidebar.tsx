@@ -8,8 +8,10 @@ import {
   ChevronRight,
   Workflow,
   ShieldCheck,
+  FolderOpen,
 } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { useAuth } from '@/contexts/AuthContext';
 import { useState, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
@@ -28,7 +30,7 @@ interface SidebarProps {
   onViewChange: (view: string) => void;
 }
 
-const menuItems = [
+const baseMenuItems = [
   { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard, path: '/' },
   { id: 'tasks', label: 'Tâches', icon: CheckSquare, path: '/' },
   { id: 'templates', label: 'Modèles', icon: Workflow, path: '/templates' },
@@ -37,6 +39,7 @@ const menuItems = [
   { id: 'settings', label: 'Paramètres', icon: Settings, path: '/' },
 ];
 
+const projectsMenuItem = { id: 'projects', label: 'Projets BE', icon: FolderOpen, path: '/projects' };
 const adminMenuItem = { id: 'admin', label: 'Administration', icon: ShieldCheck, path: '/admin' };
 
 export function Sidebar({ activeView, onViewChange }: SidebarProps) {
@@ -44,6 +47,7 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
   const [permissionProfileName, setPermissionProfileName] = useState<string | null>(null);
   const navigate = useNavigate();
   const { isAdmin } = useUserRole();
+  const { canViewBEProjects } = useUserPermissions();
   const { profile } = useAuth();
   const { addTask } = useTasks();
 
@@ -54,7 +58,12 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
   const [selectedProcessTemplateId, setSelectedProcessTemplateId] = useState<string | undefined>();
   const [selectedSubProcessTemplateId, setSelectedSubProcessTemplateId] = useState<string | undefined>();
 
-  const allMenuItems = isAdmin ? [...menuItems, adminMenuItem] : menuItems;
+  // Build menu items based on permissions
+  const menuItems = [
+    ...baseMenuItems,
+    ...(canViewBEProjects ? [projectsMenuItem] : []),
+    ...(isAdmin ? [adminMenuItem] : []),
+  ];
 
   // Fetch permission profile name
   useEffect(() => {
@@ -140,7 +149,7 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
 
         {/* Navigation */}
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-          {allMenuItems.map((item) => {
+          {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeView === item.id;
             

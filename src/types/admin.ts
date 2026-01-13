@@ -52,6 +52,11 @@ export interface PermissionProfile {
   can_view_all_tasks: boolean;
   can_manage_all_tasks: boolean;
   can_assign_to_all: boolean;
+  // Permissions projets BE
+  can_view_be_projects: boolean;
+  can_create_be_projects: boolean;
+  can_edit_be_projects: boolean;
+  can_delete_be_projects: boolean;
   created_at: string;
   updated_at: string;
 }

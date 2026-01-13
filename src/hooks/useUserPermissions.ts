@@ -65,11 +65,21 @@ export function useUserPermissions() {
                     permissionProfile?.can_view_subordinates_tasks ||
                     false;
 
+  // BE Projects permissions
+  const canViewBEProjects = permissionProfile?.can_view_be_projects ?? false;
+  const canCreateBEProjects = permissionProfile?.can_create_be_projects ?? false;
+  const canEditBEProjects = permissionProfile?.can_edit_be_projects ?? false;
+  const canDeleteBEProjects = permissionProfile?.can_delete_be_projects ?? false;
+
   return {
     permissionProfile,
     hierarchyLevel,
     isLoading,
     canAssignToTeam,
     isManager,
+    canViewBEProjects,
+    canCreateBEProjects,
+    canEditBEProjects,
+    canDeleteBEProjects,
   };
 }
