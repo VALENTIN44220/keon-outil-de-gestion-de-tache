@@ -97,10 +97,25 @@ async function getSiteId(accessToken: string, siteUrl: string): Promise<string> 
   // Parse site URL to get hostname and site path
   const url = new URL(siteUrl);
   const hostname = url.hostname;
-  const sitePath = url.pathname;
+  // Remove trailing slashes from pathname
+  const sitePath = url.pathname.replace(/\/+$/, '');
+
+  // Microsoft Graph API format for site lookup:
+  // For root site: hostname
+  // For subsite: hostname:/sites/SiteName: (note the trailing colon)
+  let siteIdentifier: string;
+  if (!sitePath || sitePath === '/') {
+    // Root site
+    siteIdentifier = hostname;
+  } else {
+    // Subsite - must have colon after hostname and after path
+    siteIdentifier = `${hostname}:${sitePath}:`;
+  }
+
+  console.log(`Looking up SharePoint site: ${siteIdentifier}`);
 
   const response = await fetch(
-    `https://graph.microsoft.com/v1.0/sites/${hostname}:${sitePath}`,
+    `https://graph.microsoft.com/v1.0/sites/${siteIdentifier}`,
     {
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -110,10 +125,12 @@ async function getSiteId(accessToken: string, siteUrl: string): Promise<string> 
 
   if (!response.ok) {
     const error = await response.text();
-    throw new Error(`Failed to get site ID: ${error}`);
+    console.error(`Site lookup failed for ${siteIdentifier}:`, error);
+    throw new Error(`Failed to get site ID. Check that SHAREPOINT_SITE_URL is correct (e.g., https://company.sharepoint.com/sites/SiteName) and the Azure app has Sites.Read.All permission. Error: ${error}`);
   }
 
   const site = await response.json();
+  console.log(`Site found: ${site.displayName} (ID: ${site.id})`);
   return site.id;
 }
 
