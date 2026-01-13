@@ -397,6 +397,7 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          id_services_lucca: string | null
           name: string
           updated_at: string
         }
@@ -405,6 +406,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          id_services_lucca?: string | null
           name: string
           updated_at?: string
         }
@@ -413,6 +415,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          id_services_lucca?: string | null
           name?: string
           updated_at?: string
         }
@@ -822,6 +825,7 @@ export type Database = {
           display_name: string | null
           hierarchy_level_id: string | null
           id: string
+          id_lucca: string | null
           is_private: boolean
           job_title: string | null
           job_title_id: string | null
@@ -841,6 +845,7 @@ export type Database = {
           display_name?: string | null
           hierarchy_level_id?: string | null
           id?: string
+          id_lucca?: string | null
           is_private?: boolean
           job_title?: string | null
           job_title_id?: string | null
@@ -860,6 +865,7 @@ export type Database = {
           display_name?: string | null
           hierarchy_level_id?: string | null
           id?: string
+          id_lucca?: string | null
           is_private?: boolean
           job_title?: string | null
           job_title_id?: string | null
