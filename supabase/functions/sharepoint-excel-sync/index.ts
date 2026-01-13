@@ -106,22 +106,51 @@ async function getAccessToken(): Promise<{ token: string; diagnostics: any }> {
   return { token: data.access_token, diagnostics };
 }
 
-async function assertGraphAccess(accessToken: string): Promise<void> {
-  // Simple sanity-check to distinguish "bad token/permissions" from "bad site URL".
-  const res = await fetch('https://graph.microsoft.com/v1.0/sites/root?$select=id,webUrl,displayName', {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+async function assertGraphAccess(accessToken: string): Promise<{ method: string; details: any }> {
+  // Try multiple endpoints to diagnose Graph access issues
+  const endpoints = [
+    { name: 'organization', url: 'https://graph.microsoft.com/v1.0/organization?$select=id,displayName' },
+    { name: 'sites/root', url: 'https://graph.microsoft.com/v1.0/sites/root?$select=id,webUrl,displayName' },
+    { name: 'sites-search', url: 'https://graph.microsoft.com/v1.0/sites?search=*&$top=1' },
+  ];
 
-  if (!res.ok) {
-    const txt = await res.text();
-    console.error('Graph access check failed (GET /sites/root):', txt);
-    throw new Error(
-      `Microsoft Graph access failed. Verify the Azure app has Application permissions (not Delegated), admin consent is granted, and at least Sites.Read.All is enabled. Error: ${txt}`
-    );
+  const results: any[] = [];
+
+  for (const endpoint of endpoints) {
+    try {
+      const res = await fetch(endpoint.url, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const txt = await res.text();
+      let data = null;
+      try { data = JSON.parse(txt); } catch { data = txt; }
+      
+      results.push({
+        endpoint: endpoint.name,
+        status: res.status,
+        ok: res.ok,
+        data: res.ok ? data : null,
+        error: !res.ok ? data : null,
+      });
+
+      if (res.ok) {
+        console.log(`Graph access OK via ${endpoint.name}`);
+        return { method: endpoint.name, details: data };
+      }
+    } catch (e) {
+      results.push({
+        endpoint: endpoint.name,
+        status: 0,
+        ok: false,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
   }
 
-  const root = await res.json();
-  console.log(`Graph access OK. Root site: ${root.displayName} (${root.webUrl})`);
+  console.error('All Graph endpoints failed:', JSON.stringify(results));
+  throw new Error(
+    `Microsoft Graph access failed on all endpoints. This may indicate: 1) SharePoint Online is not provisioned in your tenant, 2) Conditional Access policies block app-only access, or 3) A temporary Microsoft service issue. Details: ${JSON.stringify(results)}`
+  );
 }
 
 async function getSiteId(accessToken: string, siteUrl: string): Promise<string> {
@@ -317,8 +346,10 @@ serve(async (req) => {
         diagnosticResults.tokenDiagnostics = diagnostics;
 
         diagnosticResults.step = 'graphAccess';
-        await assertGraphAccess(token);
+        const graphResult = await assertGraphAccess(token);
         diagnosticResults.graphAccessOk = true;
+        diagnosticResults.graphAccessMethod = graphResult.method;
+        diagnosticResults.graphAccessDetails = graphResult.details;
 
         diagnosticResults.step = 'siteId';
         const siteId = await getSiteId(token, siteUrl);
