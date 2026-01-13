@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Label } from '@/components/ui/label';
 import { Plus, Trash2, Layers, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
+import { RefreshButton } from './RefreshButton';
 import type { HierarchyLevel } from '@/types/admin';
 
 interface HierarchyLevelsTabProps {
@@ -15,9 +16,10 @@ interface HierarchyLevelsTabProps {
   onAdd: (name: string, level: number, description?: string) => Promise<HierarchyLevel>;
   onUpdate: (id: string, name: string, level: number, description?: string) => Promise<HierarchyLevel>;
   onDelete: (id: string) => Promise<void>;
+  onRefresh: () => Promise<void> | void;
 }
 
-export function HierarchyLevelsTab({ hierarchyLevels, onAdd, onUpdate, onDelete }: HierarchyLevelsTabProps) {
+export function HierarchyLevelsTab({ hierarchyLevels, onAdd, onUpdate, onDelete, onRefresh }: HierarchyLevelsTabProps) {
   const [name, setName] = useState('');
   const [level, setLevel] = useState('');
   const [description, setDescription] = useState('');
@@ -133,9 +135,12 @@ export function HierarchyLevelsTab({ hierarchyLevels, onAdd, onUpdate, onDelete 
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Niveaux hiérarchiques</CardTitle>
-          <CardDescription>{hierarchyLevels.length} niveau(x) défini(s)</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Niveaux hiérarchiques</CardTitle>
+            <CardDescription>{hierarchyLevels.length} niveau(x) défini(s)</CardDescription>
+          </div>
+          <RefreshButton onRefresh={onRefresh} />
         </CardHeader>
         <CardContent>
           {hierarchyLevels.length === 0 ? (

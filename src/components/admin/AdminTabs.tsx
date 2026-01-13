@@ -93,6 +93,7 @@ export function AdminTabs(props: AdminTabsProps) {
           permissionProfiles={props.permissionProfiles}
           onUserCreated={props.refetch}
           onUserUpdated={props.refetch}
+          onRefresh={props.refetch}
         />
       </TabsContent>
 
@@ -101,7 +102,8 @@ export function AdminTabs(props: AdminTabsProps) {
           companies={props.companies} 
           onAdd={props.addCompany}
           onUpdate={props.updateCompany}
-          onDelete={props.deleteCompany} 
+          onDelete={props.deleteCompany}
+          onRefresh={props.refetch}
         />
       </TabsContent>
 
@@ -111,7 +113,8 @@ export function AdminTabs(props: AdminTabsProps) {
           companies={props.companies}
           onAdd={props.addDepartment}
           onUpdate={props.updateDepartment}
-          onDelete={props.deleteDepartment} 
+          onDelete={props.deleteDepartment}
+          onRefresh={props.refetch}
         />
       </TabsContent>
 
@@ -121,7 +124,8 @@ export function AdminTabs(props: AdminTabsProps) {
           departments={props.departments}
           onAdd={props.addJobTitle}
           onUpdate={props.updateJobTitle}
-          onDelete={props.deleteJobTitle} 
+          onDelete={props.deleteJobTitle}
+          onRefresh={props.refetch}
         />
       </TabsContent>
 
@@ -130,7 +134,8 @@ export function AdminTabs(props: AdminTabsProps) {
           hierarchyLevels={props.hierarchyLevels} 
           onAdd={props.addHierarchyLevel}
           onUpdate={props.updateHierarchyLevel}
-          onDelete={props.deleteHierarchyLevel} 
+          onDelete={props.deleteHierarchyLevel}
+          onRefresh={props.refetch}
         />
       </TabsContent>
 
@@ -139,7 +144,8 @@ export function AdminTabs(props: AdminTabsProps) {
           permissionProfiles={props.permissionProfiles} 
           onAdd={props.addPermissionProfile}
           onUpdate={props.updatePermissionProfile}
-          onDelete={props.deletePermissionProfile} 
+          onDelete={props.deletePermissionProfile}
+          onRefresh={props.refetch}
         />
       </TabsContent>
 

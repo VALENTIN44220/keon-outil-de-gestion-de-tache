@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Plus, Trash2, Shield, Check, X, User, Users, Crown, Pencil, FolderOpen } from 'lucide-react';
 import { toast } from 'sonner';
+import { RefreshButton } from './RefreshButton';
 import type { PermissionProfile } from '@/types/admin';
 
 interface PermissionProfilesTabProps {
@@ -17,6 +18,7 @@ interface PermissionProfilesTabProps {
   onAdd: (profile: Omit<PermissionProfile, 'id' | 'created_at' | 'updated_at'>) => Promise<PermissionProfile>;
   onUpdate: (id: string, profile: Partial<Omit<PermissionProfile, 'id' | 'created_at' | 'updated_at'>>) => Promise<PermissionProfile>;
   onDelete: (id: string) => Promise<void>;
+  onRefresh: () => Promise<void> | void;
 }
 
 const defaultPermissions = {
@@ -36,7 +38,7 @@ const defaultPermissions = {
   can_delete_be_projects: false,
 };
 
-export function PermissionProfilesTab({ permissionProfiles, onAdd, onUpdate, onDelete }: PermissionProfilesTabProps) {
+export function PermissionProfilesTab({ permissionProfiles, onAdd, onUpdate, onDelete, onRefresh }: PermissionProfilesTabProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [permissions, setPermissions] = useState(defaultPermissions);
@@ -352,9 +354,12 @@ export function PermissionProfilesTab({ permissionProfiles, onAdd, onUpdate, onD
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Profils de droits</CardTitle>
-          <CardDescription>{permissionProfiles.length} profil(s) défini(s)</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Profils de droits</CardTitle>
+            <CardDescription>{permissionProfiles.length} profil(s) défini(s)</CardDescription>
+          </div>
+          <RefreshButton onRefresh={onRefresh} />
         </CardHeader>
         <CardContent>
           {permissionProfiles.length === 0 ? (
