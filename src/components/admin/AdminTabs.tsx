@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Building2, Briefcase, Users, Layers, Shield, UserCog, Route, FolderTree, Download, FolderSync } from 'lucide-react';
 import { CompaniesTab } from './CompaniesTab';
@@ -38,8 +39,10 @@ interface AdminTabsProps {
 }
 
 export function AdminTabs(props: AdminTabsProps) {
+  const [activeTab, setActiveTab] = useState('users');
+
   return (
-    <Tabs defaultValue="users" className="space-y-6">
+    <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
       <TabsList className="grid w-full grid-cols-10">
         <TabsTrigger value="users" className="flex items-center gap-2">
           <UserCog className="h-4 w-4" />
