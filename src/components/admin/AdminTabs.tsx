@@ -1,5 +1,5 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building2, Briefcase, Users, Layers, Shield, UserCog, Route, FolderTree, Download } from 'lucide-react';
+import { Building2, Briefcase, Users, Layers, Shield, UserCog, Route, FolderTree, Download, FolderSync } from 'lucide-react';
 import { CompaniesTab } from './CompaniesTab';
 import { DepartmentsTab } from './DepartmentsTab';
 import { JobTitlesTab } from './JobTitlesTab';
@@ -9,6 +9,7 @@ import { UsersTab } from './UsersTab';
 import { AssignmentRulesTab } from './AssignmentRulesTab';
 import { CategoriesProcessTab } from './CategoriesProcessTab';
 import { DataExportTab } from './DataExportTab';
+import { GovernanceSyncTab } from './GovernanceSyncTab';
 import type { Company, Department, JobTitle, HierarchyLevel, PermissionProfile, UserProfile } from '@/types/admin';
 
 interface AdminTabsProps {
@@ -39,7 +40,7 @@ interface AdminTabsProps {
 export function AdminTabs(props: AdminTabsProps) {
   return (
     <Tabs defaultValue="users" className="space-y-6">
-      <TabsList className="grid w-full grid-cols-9">
+      <TabsList className="grid w-full grid-cols-10">
         <TabsTrigger value="users" className="flex items-center gap-2">
           <UserCog className="h-4 w-4" />
           <span className="hidden sm:inline">Utilisateurs</span>
@@ -75,6 +76,10 @@ export function AdminTabs(props: AdminTabsProps) {
         <TabsTrigger value="export" className="flex items-center gap-2">
           <Download className="h-4 w-4" />
           <span className="hidden sm:inline">Export</span>
+        </TabsTrigger>
+        <TabsTrigger value="sharepoint" className="flex items-center gap-2">
+          <FolderSync className="h-4 w-4" />
+          <span className="hidden sm:inline">SharePoint</span>
         </TabsTrigger>
       </TabsList>
 
@@ -151,6 +156,10 @@ export function AdminTabs(props: AdminTabsProps) {
 
       <TabsContent value="export">
         <DataExportTab />
+      </TabsContent>
+
+      <TabsContent value="sharepoint">
+        <GovernanceSyncTab />
       </TabsContent>
     </Tabs>
   );
