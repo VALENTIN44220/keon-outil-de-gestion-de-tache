@@ -238,22 +238,78 @@ async function getDriveId(accessToken: string, siteId: string): Promise<string> 
   return drive.id;
 }
 
+async function getWorksheetName(
+  accessToken: string,
+  siteId: string,
+  driveId: string,
+  filePath: string
+): Promise<string> {
+  // First, check if file exists and get available worksheets
+  const itemPath = filePath.replace(/^\/+/, ''); // Remove leading slashes
+  const encodedPath = encodeURIComponent(itemPath);
+  
+  const worksheetsUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/drives/${driveId}/root:/${encodedPath}:/workbook/worksheets`;
+  console.log(`Fetching worksheets from: ${worksheetsUrl}`);
+  
+  const response = await fetch(worksheetsUrl, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error(`Failed to get worksheets: ${error}`);
+    
+    // Try to check if file exists at all
+    const fileCheckUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/drives/${driveId}/root:/${encodedPath}`;
+    const fileRes = await fetch(fileCheckUrl, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    
+    if (!fileRes.ok) {
+      const fileError = await fileRes.text();
+      throw new Error(`File not found at path '${filePath}'. Make sure SHAREPOINT_EXCEL_FILE_PATH is correct (e.g., 'Documents/MyFile.xlsx' without leading slash). Error: ${fileError}`);
+    }
+    
+    throw new Error(`File exists but cannot access workbook. Ensure it's a valid .xlsx file. Error: ${error}`);
+  }
+
+  const data = await response.json();
+  const worksheets = data.value || [];
+  
+  if (worksheets.length === 0) {
+    throw new Error('No worksheets found in the Excel file');
+  }
+  
+  console.log(`Available worksheets: ${worksheets.map((w: any) => w.name).join(', ')}`);
+  
+  // Return first worksheet name
+  return worksheets[0].name;
+}
+
 async function getExcelData(
   accessToken: string,
   siteId: string,
   driveId: string,
   filePath: string
 ): Promise<ExcelRow> {
-  // Get workbook session
-  const itemPath = encodeURIComponent(filePath);
-  const response = await fetch(
-    `https://graph.microsoft.com/v1.0/sites/${siteId}/drives/${driveId}/root:/${itemPath}:/workbook/worksheets('Feuil1')/usedRange`,
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    }
-  );
+  // Get the first worksheet name dynamically
+  const worksheetName = await getWorksheetName(accessToken, siteId, driveId, filePath);
+  console.log(`Using worksheet: ${worksheetName}`);
+  
+  const itemPath = filePath.replace(/^\/+/, '');
+  const encodedPath = encodeURIComponent(itemPath);
+  const encodedWorksheet = encodeURIComponent(worksheetName);
+  
+  const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/drives/${driveId}/root:/${encodedPath}:/workbook/worksheets('${encodedWorksheet}')/usedRange`;
+  console.log(`Fetching Excel data from: ${url}`);
+  
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
 
   if (!response.ok) {
     const error = await response.text();
@@ -270,22 +326,27 @@ async function updateExcelData(
   filePath: string,
   data: (string | number | null)[][]
 ): Promise<void> {
-  const itemPath = encodeURIComponent(filePath);
+  // Get the first worksheet name dynamically
+  const worksheetName = await getWorksheetName(accessToken, siteId, driveId, filePath);
+  console.log(`Writing to worksheet: ${worksheetName}`);
   
-  // Clear existing data and write new data
-  const response = await fetch(
-    `https://graph.microsoft.com/v1.0/sites/${siteId}/drives/${driveId}/root:/${itemPath}:/workbook/worksheets('Feuil1')/range(address='A1:Q${data.length}')`,
-    {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        values: data,
-      }),
-    }
-  );
+  const itemPath = filePath.replace(/^\/+/, '');
+  const encodedPath = encodeURIComponent(itemPath);
+  const encodedWorksheet = encodeURIComponent(worksheetName);
+  
+  const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/drives/${driveId}/root:/${encodedPath}:/workbook/worksheets('${encodedWorksheet}')/range(address='A1:Q${data.length}')`;
+  console.log(`Updating Excel data at: ${url}`);
+  
+  const response = await fetch(url, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      values: data,
+    }),
+  });
 
   if (!response.ok) {
     const error = await response.text();
