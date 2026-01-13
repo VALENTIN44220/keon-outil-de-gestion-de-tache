@@ -23,6 +23,7 @@ import keonLogo from '@/assets/keon-logo.jpg';
 import { AddTaskDialog } from '@/components/tasks/AddTaskDialog';
 import { NewTaskDialog } from '@/components/tasks/NewTaskDialog';
 import { NewRequestDialog } from '@/components/tasks/NewRequestDialog';
+import { BERequestDialog } from '@/components/tasks/BERequestDialog';
 import { useTasks } from '@/hooks/useTasks';
 
 interface SidebarProps {
@@ -55,6 +56,7 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
   const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
   const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
   const [isRequestDialogOpen, setIsRequestDialogOpen] = useState(false);
+  const [isBERequestDialogOpen, setIsBERequestDialogOpen] = useState(false);
   const [selectedProcessTemplateId, setSelectedProcessTemplateId] = useState<string | undefined>();
   const [selectedSubProcessTemplateId, setSelectedSubProcessTemplateId] = useState<string | undefined>();
 
@@ -110,10 +112,38 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
         setIsNewTaskOpen(true);
         break;
       case 'request':
-        setIsRequestDialogOpen(true);
+        // Check if it's a BE process to open the specialized dialog
+        if (processTemplateId) {
+          checkIfBEProcess(processTemplateId).then(isBE => {
+            if (isBE) {
+              setIsBERequestDialogOpen(true);
+            } else {
+              setIsRequestDialogOpen(true);
+            }
+          });
+        } else {
+          setIsRequestDialogOpen(true);
+        }
+        break;
+      case 'be_request':
+        setIsBERequestDialogOpen(true);
         break;
     }
   }, []);
+
+  const checkIfBEProcess = async (processId: string): Promise<boolean> => {
+    const { data } = await supabase
+      .from('process_templates')
+      .select('name')
+      .eq('id', processId)
+      .single();
+    
+    if (data?.name) {
+      const name = data.name.toLowerCase();
+      return name.includes('bureau') && name.includes('études');
+    }
+    return false;
+  };
 
   return (
     <>
@@ -225,6 +255,12 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
         onAdd={addTask}
         initialProcessTemplateId={selectedProcessTemplateId}
         initialSubProcessTemplateId={selectedSubProcessTemplateId}
+      />
+      
+      <BERequestDialog
+        open={isBERequestDialogOpen}
+        onClose={() => setIsBERequestDialogOpen(false)}
+        processTemplateId={selectedProcessTemplateId}
       />
     </>
   );

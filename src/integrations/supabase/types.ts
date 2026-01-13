@@ -221,6 +221,95 @@ export type Database = {
           },
         ]
       }
+      be_request_details: {
+        Row: {
+          code_affaire: string | null
+          created_at: string
+          demande_ie: string | null
+          demande_projeteur: string | null
+          facturable: string | null
+          id: string
+          montant_prestation: number | null
+          num_cmde_divalto: string | null
+          num_devis_divalto: string | null
+          phase: string | null
+          task_id: string
+          updated_at: string
+        }
+        Insert: {
+          code_affaire?: string | null
+          created_at?: string
+          demande_ie?: string | null
+          demande_projeteur?: string | null
+          facturable?: string | null
+          id?: string
+          montant_prestation?: number | null
+          num_cmde_divalto?: string | null
+          num_devis_divalto?: string | null
+          phase?: string | null
+          task_id: string
+          updated_at?: string
+        }
+        Update: {
+          code_affaire?: string | null
+          created_at?: string
+          demande_ie?: string | null
+          demande_projeteur?: string | null
+          facturable?: string | null
+          id?: string
+          montant_prestation?: number | null
+          num_cmde_divalto?: string | null
+          num_devis_divalto?: string | null
+          phase?: string | null
+          task_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "be_request_details_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: true
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      be_request_sub_processes: {
+        Row: {
+          created_at: string
+          id: string
+          sub_process_template_id: string
+          task_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          sub_process_template_id: string
+          task_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          sub_process_template_id?: string
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "be_request_sub_processes_sub_process_template_id_fkey"
+            columns: ["sub_process_template_id"]
+            isOneToOne: false
+            referencedRelation: "sub_process_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "be_request_sub_processes_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       be_task_labels: {
         Row: {
           code: string

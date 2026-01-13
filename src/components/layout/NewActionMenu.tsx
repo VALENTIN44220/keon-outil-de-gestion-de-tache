@@ -25,7 +25,7 @@ import { cn } from '@/lib/utils';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { supabase } from '@/integrations/supabase/client';
 
-export type ActionType = 'personal' | 'team' | 'request';
+export type ActionType = 'personal' | 'team' | 'request' | 'be_request';
 
 interface ProcessTemplate {
   id: string;
@@ -171,21 +171,25 @@ export function NewActionMenu({ collapsed, onAction }: NewActionMenuProps) {
           <DropdownMenuSeparator />
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
-              <Building2 className="w-4 h-4 mr-2" />
-              Demande à un service
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="w-64">
-              {processes.map(process => renderProcessSubMenu(process))}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => handleAction('request')}>
-                <FileText className="w-4 h-4 mr-2" />
-                Demande personnalisée...
-              </DropdownMenuItem>
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    );
+            <Building2 className="w-4 h-4 mr-2" />
+            Demande à un service
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="w-64">
+            {processes.map(process => renderProcessSubMenu(process))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => handleAction('be_request')}>
+              <Building2 className="w-4 h-4 mr-2 text-blue-500" />
+              Demande Bureau d'Études
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleAction('request')}>
+              <FileText className="w-4 h-4 mr-2" />
+              Demande personnalisée...
+            </DropdownMenuItem>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
   }
 
   return (
@@ -238,6 +242,16 @@ export function NewActionMenu({ collapsed, onAction }: NewActionMenuProps) {
                 <DropdownMenuSeparator />
               </>
             ) : null}
+            <DropdownMenuItem 
+              onClick={() => handleAction('be_request')}
+              className="py-2"
+            >
+              <Building2 className="w-4 h-4 mr-2 shrink-0 text-blue-500" />
+              <div className="flex flex-col">
+                <span className="font-medium">Demande Bureau d'Études</span>
+                <span className="text-xs text-muted-foreground">Formulaire spécialisé BE</span>
+              </div>
+            </DropdownMenuItem>
             <DropdownMenuItem 
               onClick={() => handleAction('request')}
               className="py-2"
