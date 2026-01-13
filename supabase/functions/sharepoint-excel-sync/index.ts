@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,10 +11,6 @@ interface TokenResponse {
   access_token: string;
   token_type: string;
   expires_in: number;
-}
-
-interface ExcelRow {
-  values: (string | number | null)[][];
 }
 
 interface BEProject {
@@ -40,7 +37,7 @@ interface BEProject {
 }
 
 // Column mapping: Excel column index -> DB field name
-const COLUMN_MAPPING = {
+const COLUMN_MAPPING: Record<number, keyof BEProject> = {
   0: 'code_projet',
   1: 'nom_projet',
   2: 'description',
@@ -107,7 +104,6 @@ async function getAccessToken(): Promise<{ token: string; diagnostics: any }> {
 }
 
 async function assertGraphAccess(accessToken: string): Promise<{ method: string; details: any }> {
-  // Try multiple endpoints to diagnose Graph access issues
   const endpoints = [
     { name: 'organization', url: 'https://graph.microsoft.com/v1.0/organization?$select=id,displayName' },
     { name: 'sites/root', url: 'https://graph.microsoft.com/v1.0/sites/root?$select=id,webUrl,displayName' },
@@ -149,20 +145,14 @@ async function assertGraphAccess(accessToken: string): Promise<{ method: string;
 
   console.error('All Graph endpoints failed:', JSON.stringify(results));
   throw new Error(
-    `Microsoft Graph access failed on all endpoints. This may indicate: 1) SharePoint Online is not provisioned in your tenant, 2) Conditional Access policies block app-only access, or 3) A temporary Microsoft service issue. Details: ${JSON.stringify(results)}`
+    `Microsoft Graph access failed on all endpoints. Details: ${JSON.stringify(results)}`
   );
 }
 
 async function getSiteId(accessToken: string, siteUrl: string): Promise<string> {
-  // Parse site URL to get hostname and a *site root* path.
-  // Users often paste URLs that include libraries/folders; Graph needs the site root (e.g. /sites/SiteName).
   const url = new URL(siteUrl);
   const hostname = url.hostname;
-
-  // Remove trailing slashes from pathname
   const rawPath = url.pathname.replace(/\/+$/, '');
-
-  // Keep only the site root segment (supports /sites/<name> and /teams/<name>)
   const match = rawPath.match(/^(\/(sites|teams)\/[^\/]+)(?:\/.*)?$/i);
   const sitePath = match ? match[1] : (rawPath && rawPath !== '/' ? rawPath : '');
 
@@ -171,9 +161,7 @@ async function getSiteId(accessToken: string, siteUrl: string): Promise<string> 
 
   const lookupUrl = `https://graph.microsoft.com/v1.0/sites/${siteIdentifier}`;
   const response = await fetch(lookupUrl, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
+    headers: { Authorization: `Bearer ${accessToken}` },
   });
 
   if (response.ok) {
@@ -185,23 +173,17 @@ async function getSiteId(accessToken: string, siteUrl: string): Promise<string> 
   const errorText = await response.text();
   console.error(`Site lookup failed for ${siteIdentifier}:`, errorText);
 
-  // Fallback: search
   const siteKeyword = (sitePath.split('/').pop() || '').trim();
   if (siteKeyword) {
     const searchUrl = `https://graph.microsoft.com/v1.0/sites?search=${encodeURIComponent(siteKeyword)}`;
     const searchRes = await fetch(searchUrl, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
+      headers: { Authorization: `Bearer ${accessToken}` },
     });
 
-    if (!searchRes.ok) {
-      const searchTxt = await searchRes.text();
-      console.error(`Site search failed (keyword=${siteKeyword}):`, searchTxt);
-    } else {
+    if (searchRes.ok) {
       const searchData = await searchRes.json();
       const candidates: any[] = searchData?.value || [];
-      console.log(`Site search returned ${candidates.length} candidate(s) for keyword=${siteKeyword}`);
+      console.log(`Site search returned ${candidates.length} candidate(s)`);
 
       const normalizedWanted = siteUrl.replace(/\/+$/, '').toLowerCase();
       const best = candidates.find((s) => (s.webUrl || '').replace(/\/+$/, '').toLowerCase() === normalizedWanted)
@@ -214,19 +196,13 @@ async function getSiteId(accessToken: string, siteUrl: string): Promise<string> 
     }
   }
 
-  throw new Error(
-    `Failed to get site ID. Check SHAREPOINT_SITE_URL (must point to the site root like https://company.sharepoint.com/sites/SiteName). Original lookup error: ${errorText}`
-  );
+  throw new Error(`Failed to get site ID. Check SHAREPOINT_SITE_URL. Error: ${errorText}`);
 }
 
 async function getDriveId(accessToken: string, siteId: string): Promise<string> {
   const response = await fetch(
     `https://graph.microsoft.com/v1.0/sites/${siteId}/drive`,
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    }
+    { headers: { Authorization: `Bearer ${accessToken}` } }
   );
 
   if (!response.ok) {
@@ -238,120 +214,87 @@ async function getDriveId(accessToken: string, siteId: string): Promise<string> 
   return drive.id;
 }
 
-async function getWorksheetName(
+// Download Excel file as binary and parse with SheetJS
+async function downloadAndParseExcel(
   accessToken: string,
   siteId: string,
   driveId: string,
   filePath: string
-): Promise<string> {
-  // First, check if file exists and get available worksheets
-  const itemPath = filePath.replace(/^\/+/, ''); // Remove leading slashes
-  const encodedPath = encodeURIComponent(itemPath);
+): Promise<(string | number | null)[][]> {
+  const cleanPath = filePath.replace(/^\/+/, '');
+  const encodedPath = encodeURIComponent(cleanPath);
   
-  const worksheetsUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/drives/${driveId}/root:/${encodedPath}:/workbook/worksheets`;
-  console.log(`Fetching worksheets from: ${worksheetsUrl}`);
+  // Get file content directly (not workbook API)
+  const contentUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/drives/${driveId}/root:/${encodedPath}:/content`;
+  console.log(`Downloading Excel file from: ${contentUrl}`);
   
-  const response = await fetch(worksheetsUrl, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
+  const response = await fetch(contentUrl, {
+    headers: { Authorization: `Bearer ${accessToken}` },
   });
 
   if (!response.ok) {
     const error = await response.text();
-    console.error(`Failed to get worksheets: ${error}`);
-    
-    // Try to check if file exists at all
-    const fileCheckUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/drives/${driveId}/root:/${encodedPath}`;
-    const fileRes = await fetch(fileCheckUrl, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    
-    if (!fileRes.ok) {
-      const fileError = await fileRes.text();
-      throw new Error(`File not found at path '${filePath}'. Make sure SHAREPOINT_EXCEL_FILE_PATH is correct (e.g., 'Documents/MyFile.xlsx' without leading slash). Error: ${fileError}`);
-    }
-    
-    throw new Error(`File exists but cannot access workbook. Ensure it's a valid .xlsx file. Error: ${error}`);
+    throw new Error(`Failed to download Excel file: ${error}`);
   }
 
-  const data = await response.json();
-  const worksheets = data.value || [];
+  const arrayBuffer = await response.arrayBuffer();
+  const data = new Uint8Array(arrayBuffer);
   
-  if (worksheets.length === 0) {
-    throw new Error('No worksheets found in the Excel file');
-  }
+  console.log(`Downloaded ${data.length} bytes, parsing with SheetJS...`);
   
-  console.log(`Available worksheets: ${worksheets.map((w: any) => w.name).join(', ')}`);
+  // Parse with SheetJS
+  const workbook = XLSX.read(data, { type: 'array' });
+  const firstSheetName = workbook.SheetNames[0];
+  console.log(`Using worksheet: ${firstSheetName}`);
   
-  // Return first worksheet name
-  return worksheets[0].name;
+  const worksheet = workbook.Sheets[firstSheetName];
+  const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null });
+  
+  console.log(`Parsed ${jsonData.length} rows from Excel`);
+  
+  return jsonData as (string | number | null)[][];
 }
 
-async function getExcelData(
-  accessToken: string,
-  siteId: string,
-  driveId: string,
-  filePath: string
-): Promise<ExcelRow> {
-  // Get the first worksheet name dynamically
-  const worksheetName = await getWorksheetName(accessToken, siteId, driveId, filePath);
-  console.log(`Using worksheet: ${worksheetName}`);
-  
-  const itemPath = filePath.replace(/^\/+/, '');
-  const encodedPath = encodeURIComponent(itemPath);
-  const encodedWorksheet = encodeURIComponent(worksheetName);
-  
-  const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/drives/${driveId}/root:/${encodedPath}:/workbook/worksheets('${encodedWorksheet}')/usedRange`;
-  console.log(`Fetching Excel data from: ${url}`);
-  
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Failed to get Excel data: ${error}`);
-  }
-
-  return await response.json();
-}
-
-async function updateExcelData(
+// Upload Excel file by creating new content
+async function uploadExcel(
   accessToken: string,
   siteId: string,
   driveId: string,
   filePath: string,
   data: (string | number | null)[][]
 ): Promise<void> {
-  // Get the first worksheet name dynamically
-  const worksheetName = await getWorksheetName(accessToken, siteId, driveId, filePath);
-  console.log(`Writing to worksheet: ${worksheetName}`);
+  const cleanPath = filePath.replace(/^\/+/, '');
+  const encodedPath = encodeURIComponent(cleanPath);
   
-  const itemPath = filePath.replace(/^\/+/, '');
-  const encodedPath = encodeURIComponent(itemPath);
-  const encodedWorksheet = encodeURIComponent(worksheetName);
+  console.log(`Creating Excel file with ${data.length} rows...`);
   
-  const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/drives/${driveId}/root:/${encodedPath}:/workbook/worksheets('${encodedWorksheet}')/range(address='A1:Q${data.length}')`;
-  console.log(`Updating Excel data at: ${url}`);
+  // Create workbook with SheetJS
+  const worksheet = XLSX.utils.aoa_to_sheet(data);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Projets');
   
-  const response = await fetch(url, {
-    method: "PATCH",
+  // Write to binary
+  const excelBuffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
+  
+  // Upload to SharePoint
+  const uploadUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/drives/${driveId}/root:/${encodedPath}:/content`;
+  console.log(`Uploading Excel file to: ${uploadUrl}`);
+  
+  const response = await fetch(uploadUrl, {
+    method: 'PUT',
     headers: {
       Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     },
-    body: JSON.stringify({
-      values: data,
-    }),
+    body: excelBuffer,
   });
 
   if (!response.ok) {
     const error = await response.text();
-    throw new Error(`Failed to update Excel data: ${error}`);
+    throw new Error(`Failed to upload Excel file: ${error}`);
   }
+  
+  console.log('Excel file uploaded successfully');
 }
 
 function excelRowToProject(row: (string | number | null)[]): Partial<BEProject> {
@@ -411,7 +354,6 @@ serve(async (req) => {
         const graphResult = await assertGraphAccess(token);
         diagnosticResults.graphAccessOk = true;
         diagnosticResults.graphAccessMethod = graphResult.method;
-        diagnosticResults.graphAccessDetails = graphResult.details;
 
         diagnosticResults.step = 'siteId';
         const siteId = await getSiteId(token, siteUrl);
@@ -421,7 +363,7 @@ serve(async (req) => {
         const driveId = await getDriveId(token, siteId);
         diagnosticResults.driveId = driveId ? `${driveId.substring(0, 20)}...` : null;
 
-        // List root folder contents to help user find correct path
+        // List root folder contents
         diagnosticResults.step = 'listFiles';
         try {
           const listUrl = `https://graph.microsoft.com/v1.0/sites/${siteId}/drives/${driveId}/root/children?$select=name,folder,file&$top=20`;
@@ -461,7 +403,7 @@ serve(async (req) => {
             cleanPath.replace(/^Shared Documents\//, ''),
             cleanPath.replace(/^Documents\//, ''),
             `General/${cleanPath.split('/').pop()}`,
-            cleanPath.split('/').pop(), // Just filename
+            cleanPath.split('/').pop(),
           ];
           
           for (const altPath of alternatives) {
@@ -471,9 +413,7 @@ serve(async (req) => {
               headers: { Authorization: `Bearer ${token}` },
             });
             if (altRes.ok) {
-              const altData = await altRes.json();
               diagnosticResults.suggestedPath = altPath;
-              diagnosticResults.foundAlternative = altData.name;
               break;
             }
           }
@@ -493,174 +433,168 @@ serve(async (req) => {
     }
 
     // Get Microsoft Graph access token
-    const { token: accessToken, diagnostics: tokenDiagnostics } = await getAccessToken();
+    const { token: accessToken } = await getAccessToken();
     await assertGraphAccess(accessToken);
 
     const siteId = await getSiteId(accessToken, siteUrl);
     const driveId = await getDriveId(accessToken, siteId);
 
-    // Get current DB projects for comparison
-    const { data: dbProjects } = await supabase
-      .from("be_projects")
-      .select("*")
-      .order("code_projet");
-
-    const dbProjectsMap = new Map(
-      (dbProjects || []).map(p => [p.code_projet, p])
-    );
-
     if (action === "import" || action === "sync") {
-      // Get Excel data
-      const excelData = await getExcelData(accessToken, siteId, driveId, filePath);
-      const rows = excelData.values;
+      // Download and parse Excel file using direct download + SheetJS
+      const excelData = await downloadAndParseExcel(accessToken, siteId, driveId, filePath);
 
-      if (rows.length <= 1) {
-        return new Response(
-          JSON.stringify({ 
-            message: "No data to import (only header row found)", 
-            imported: 0,
-            preview: { toImport: [], toUpdate: [], toExport: [], unchanged: 0 }
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
+      // Skip header row
+      const dataRows = excelData.slice(1).filter(row => 
+        row && row.length > 0 && row[0] !== null && row[0] !== ''
+      );
 
-      // Skip header row and parse
-      const dataRows = rows.slice(1);
-      const toImport: Partial<BEProject>[] = [];
-      const toUpdate: { current: BEProject; incoming: Partial<BEProject>; changes: string[] }[] = [];
+      // Get existing projects
+      const { data: existingProjects, error: fetchError } = await supabase
+        .from("be_projects")
+        .select("*");
+
+      if (fetchError) throw fetchError;
+
+      const existingByCode = new Map(
+        (existingProjects || []).map((p) => [p.code_projet, p])
+      );
+
+      const toImport: any[] = [];
+      const toUpdate: any[] = [];
       let unchanged = 0;
 
       for (const row of dataRows) {
-        const projectData = excelRowToProject(row);
-        
-        if (!projectData.code_projet || !projectData.nom_projet) {
-          continue;
-        }
+        const excelProject = excelRowToProject(row);
+        if (!excelProject.code_projet) continue;
 
-        const existing = dbProjectsMap.get(projectData.code_projet);
-        
-        if (existing) {
-          // Check for changes
+        const existing = existingByCode.get(excelProject.code_projet);
+
+        if (!existing) {
+          toImport.push(excelProject);
+        } else {
           const changes: string[] = [];
-          Object.entries(projectData).forEach(([key, value]) => {
-            if (key !== 'code_projet' && (existing as any)[key] !== value) {
+          Object.entries(excelProject).forEach(([key, value]) => {
+            if (key !== 'code_projet' && existing[key] !== value) {
               changes.push(key);
             }
           });
-          
+
           if (changes.length > 0) {
-            toUpdate.push({ current: existing, incoming: projectData, changes });
+            toUpdate.push({
+              current: existing,
+              incoming: excelProject,
+              changes,
+            });
           } else {
             unchanged++;
           }
-        } else {
-          toImport.push(projectData);
         }
       }
 
-      // For sync, also prepare export data (projects in DB but not in Excel)
-      const excelCodes = new Set(dataRows.map(row => row[0]?.toString()).filter(Boolean));
-      const toExport = action === "sync" 
-        ? (dbProjects || []).filter(p => !excelCodes.has(p.code_projet))
-        : [];
+      // For sync, also prepare export data
+      const toExport: any[] = [];
+      if (action === "sync") {
+        const excelCodes = new Set(dataRows.map((r) => r[0]).filter(Boolean));
+        (existingProjects || []).forEach((p) => {
+          if (!excelCodes.has(p.code_projet)) {
+            toExport.push(p);
+          }
+        });
+      }
 
-      // If preview mode, return comparison without making changes
       if (preview) {
         return new Response(
           JSON.stringify({
-            preview: {
-              toImport,
-              toUpdate,
-              toExport,
-              unchanged,
-            }
+            preview: { toImport, toUpdate, toExport, unchanged },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      // Execute actual import
+      // Execute import
       let imported = 0;
       let updated = 0;
 
-      for (const projectData of toImport) {
-        await supabase.from("be_projects").insert(projectData);
-        imported++;
+      for (const project of toImport) {
+        const { error } = await supabase.from("be_projects").insert({
+          ...project,
+          status: project.status || "actif",
+        });
+        if (!error) imported++;
       }
 
-      for (const item of toUpdate) {
-        await supabase
+      for (const { current, incoming } of toUpdate) {
+        const { error } = await supabase
           .from("be_projects")
-          .update(item.incoming)
-          .eq("id", item.current.id);
-        updated++;
+          .update(incoming)
+          .eq("id", current.id);
+        if (!error) updated++;
       }
 
-      if (action === "sync" && dbProjects && dbProjects.length > 0) {
-        // Export all DB projects to Excel
-        const header = Object.values(COLUMN_MAPPING);
-        const excelRows = [header, ...dbProjects.map(projectToExcelRow)];
-        await updateExcelData(accessToken, siteId, driveId, filePath, excelRows);
+      // For sync, also export to Excel
+      if (action === "sync" && toExport.length > 0) {
+        const { data: allProjects } = await supabase
+          .from("be_projects")
+          .select("*")
+          .order("code_projet");
+
+        if (allProjects && allProjects.length > 0) {
+          const headerRow = Object.values(COLUMN_MAPPING);
+          const exportData = [headerRow, ...allProjects.map(projectToExcelRow)];
+          await uploadExcel(accessToken, siteId, driveId, filePath, exportData);
+        }
       }
 
       return new Response(
-        JSON.stringify({ 
-          message: "Import completed", 
-          imported, 
-          updated,
-          action 
-        }),
+        JSON.stringify({ imported, updated, exported: toExport.length }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     if (action === "export") {
-      const projects = dbProjects || [];
+      const { data: projects, error } = await supabase
+        .from("be_projects")
+        .select("*")
+        .order("code_projet");
 
-      // If preview mode, return what will be exported
+      if (error) throw error;
+
       if (preview) {
         return new Response(
           JSON.stringify({
             preview: {
               toImport: [],
               toUpdate: [],
-              toExport: projects,
+              toExport: projects || [],
               unchanged: 0,
-            }
+            },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      if (projects.length === 0) {
-        return new Response(
-          JSON.stringify({ message: "No projects to export", exported: 0 }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      const header = Object.values(COLUMN_MAPPING);
-      const excelRows = [header, ...projects.map(projectToExcelRow)];
+      const headerRow = Object.values(COLUMN_MAPPING);
+      const exportData = [headerRow, ...(projects || []).map(projectToExcelRow)];
       
-      await updateExcelData(accessToken, siteId, driveId, filePath, excelRows);
+      await uploadExcel(accessToken, siteId, driveId, filePath, exportData);
 
       return new Response(
-        JSON.stringify({ message: "Export completed", exported: projects.length }),
+        JSON.stringify({ exported: projects?.length || 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    return new Response(
-      JSON.stringify({ error: "Invalid action. Use 'import', 'export', or 'sync'" }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    throw new Error(`Unknown action: ${action}`);
   } catch (error: unknown) {
     console.error("SharePoint Excel sync error:", error);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({
+        error: error instanceof Error ? error.message : "Unknown error",
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
     );
   }
 });
