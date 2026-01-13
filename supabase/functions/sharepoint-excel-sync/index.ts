@@ -244,70 +244,116 @@ serve(async (req) => {
     const filePath = Deno.env.get("SHAREPOINT_EXCEL_FILE_PATH")!;
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const { action } = await req.json();
+    const { action, preview = false } = await req.json();
 
     // Get Microsoft Graph access token
     const accessToken = await getAccessToken();
     const siteId = await getSiteId(accessToken, siteUrl);
     const driveId = await getDriveId(accessToken, siteId);
 
+    // Get current DB projects for comparison
+    const { data: dbProjects } = await supabase
+      .from("be_projects")
+      .select("*")
+      .order("code_projet");
+
+    const dbProjectsMap = new Map(
+      (dbProjects || []).map(p => [p.code_projet, p])
+    );
+
     if (action === "import" || action === "sync") {
-      // Import from Excel to Supabase
+      // Get Excel data
       const excelData = await getExcelData(accessToken, siteId, driveId, filePath);
       const rows = excelData.values;
 
       if (rows.length <= 1) {
         return new Response(
-          JSON.stringify({ message: "No data to import (only header row found)", imported: 0 }),
+          JSON.stringify({ 
+            message: "No data to import (only header row found)", 
+            imported: 0,
+            preview: { toImport: [], toUpdate: [], toExport: [], unchanged: 0 }
+          }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
-      // Skip header row
+      // Skip header row and parse
       const dataRows = rows.slice(1);
-      let imported = 0;
-      let updated = 0;
+      const toImport: Partial<BEProject>[] = [];
+      const toUpdate: { current: BEProject; incoming: Partial<BEProject>; changes: string[] }[] = [];
+      let unchanged = 0;
 
       for (const row of dataRows) {
         const projectData = excelRowToProject(row);
         
         if (!projectData.code_projet || !projectData.nom_projet) {
-          continue; // Skip rows without required fields
+          continue;
         }
 
-        // Check if project exists
-        const { data: existing } = await supabase
-          .from("be_projects")
-          .select("id")
-          .eq("code_projet", projectData.code_projet)
-          .single();
-
+        const existing = dbProjectsMap.get(projectData.code_projet);
+        
         if (existing) {
-          // Update existing project
-          await supabase
-            .from("be_projects")
-            .update(projectData)
-            .eq("id", existing.id);
-          updated++;
+          // Check for changes
+          const changes: string[] = [];
+          Object.entries(projectData).forEach(([key, value]) => {
+            if (key !== 'code_projet' && (existing as any)[key] !== value) {
+              changes.push(key);
+            }
+          });
+          
+          if (changes.length > 0) {
+            toUpdate.push({ current: existing, incoming: projectData, changes });
+          } else {
+            unchanged++;
+          }
         } else {
-          // Insert new project
-          await supabase.from("be_projects").insert(projectData);
-          imported++;
+          toImport.push(projectData);
         }
       }
 
-      if (action === "sync") {
-        // Also export to Excel (full sync)
-        const { data: projects } = await supabase
-          .from("be_projects")
-          .select("*")
-          .order("code_projet");
+      // For sync, also prepare export data (projects in DB but not in Excel)
+      const excelCodes = new Set(dataRows.map(row => row[0]?.toString()).filter(Boolean));
+      const toExport = action === "sync" 
+        ? (dbProjects || []).filter(p => !excelCodes.has(p.code_projet))
+        : [];
 
-        if (projects && projects.length > 0) {
-          const header = Object.values(COLUMN_MAPPING);
-          const excelRows = [header, ...projects.map(projectToExcelRow)];
-          await updateExcelData(accessToken, siteId, driveId, filePath, excelRows);
-        }
+      // If preview mode, return comparison without making changes
+      if (preview) {
+        return new Response(
+          JSON.stringify({
+            preview: {
+              toImport,
+              toUpdate,
+              toExport,
+              unchanged,
+            }
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Execute actual import
+      let imported = 0;
+      let updated = 0;
+
+      for (const projectData of toImport) {
+        await supabase.from("be_projects").insert(projectData);
+        imported++;
+      }
+
+      for (const item of toUpdate) {
+        await supabase
+          .from("be_projects")
+          .update(item.incoming)
+          .eq("id", item.current.id);
+        updated++;
+      }
+
+      if (action === "sync" && dbProjects && dbProjects.length > 0) {
+        // Export all DB projects to Excel
+        const header = Object.values(COLUMN_MAPPING);
+        const excelRows = [header, ...dbProjects.map(projectToExcelRow)];
+        await updateExcelData(accessToken, siteId, driveId, filePath, excelRows);
       }
 
       return new Response(
@@ -322,15 +368,24 @@ serve(async (req) => {
     }
 
     if (action === "export") {
-      // Export from Supabase to Excel
-      const { data: projects, error } = await supabase
-        .from("be_projects")
-        .select("*")
-        .order("code_projet");
+      const projects = dbProjects || [];
 
-      if (error) throw error;
+      // If preview mode, return what will be exported
+      if (preview) {
+        return new Response(
+          JSON.stringify({
+            preview: {
+              toImport: [],
+              toUpdate: [],
+              toExport: projects,
+              unchanged: 0,
+            }
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
 
-      if (!projects || projects.length === 0) {
+      if (projects.length === 0) {
         return new Response(
           JSON.stringify({ message: "No projects to export", exported: 0 }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }

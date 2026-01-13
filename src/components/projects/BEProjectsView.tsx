@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useBEProjects } from '@/hooks/useBEProjects';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
-import { useSharePointSync } from '@/hooks/useSharePointSync';
+import { useSharePointSync, PreviewData } from '@/hooks/useSharePointSync';
 import { BEProject } from '@/types/beProject';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,19 +10,30 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Plus, Search, Pencil, Trash2, Building2, FolderOpen, Loader2, RefreshCw, Download, Upload } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Building2, FolderOpen, Loader2, RefreshCw, Download, Upload, Eye } from 'lucide-react';
 import { BEProjectDialog } from './BEProjectDialog';
+import { SharePointPreviewDialog } from './SharePointPreviewDialog';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 export function BEProjectsView() {
   const { projects, isLoading, searchQuery, setSearchQuery, addProject, updateProject, deleteProject, fetchProjects } = useBEProjects();
   const { permissionProfile } = useUserPermissions();
-  const { isLoading: isSyncing, importFromSharePoint, exportToSharePoint, fullSync } = useSharePointSync();
+  const { 
+    isLoading: isSyncing, 
+    isPreviewLoading,
+    previewData,
+    getPreview,
+    clearPreview,
+    importFromSharePoint, 
+    exportToSharePoint, 
+    fullSync 
+  } = useSharePointSync();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<BEProject | null>(null);
   const [deletingProject, setDeletingProject] = useState<BEProject | null>(null);
+  const [previewAction, setPreviewAction] = useState<'import' | 'export' | 'sync' | null>(null);
 
   const canCreate = permissionProfile?.can_create_be_projects ?? false;
   const canEdit = permissionProfile?.can_edit_be_projects ?? false;
@@ -55,19 +66,31 @@ export function BEProjectsView() {
     }
   };
 
-  const handleSyncAction = async (action: 'import' | 'export' | 'sync') => {
+  const handlePreviewAction = async (action: 'import' | 'export' | 'sync') => {
+    setPreviewAction(action);
+    await getPreview(action);
+  };
+
+  const handleConfirmSync = async () => {
+    if (!previewAction) return;
+    
     try {
-      if (action === 'import') {
+      if (previewAction === 'import') {
         await importFromSharePoint();
-      } else if (action === 'export') {
+      } else if (previewAction === 'export') {
         await exportToSharePoint();
       } else {
         await fullSync();
       }
-      fetchProjects(); // Refresh projects after sync
+      fetchProjects();
     } catch (error) {
       // Error already handled in hook
     }
+  };
+
+  const handleClosePreview = () => {
+    setPreviewAction(null);
+    clearPreview();
   };
 
   const getStatusBadge = (status: string) => {
@@ -115,15 +138,15 @@ export function BEProjectsView() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleSyncAction('sync')}>
-                <RefreshCw className="h-4 w-4 mr-2" />
+              <DropdownMenuItem onClick={() => handlePreviewAction('sync')}>
+                <Eye className="h-4 w-4 mr-2" />
                 Synchronisation complète
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleSyncAction('import')}>
+              <DropdownMenuItem onClick={() => handlePreviewAction('import')}>
                 <Download className="h-4 w-4 mr-2" />
                 Importer depuis Excel
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleSyncAction('export')}>
+              <DropdownMenuItem onClick={() => handlePreviewAction('export')}>
                 <Upload className="h-4 w-4 mr-2" />
                 Exporter vers Excel
               </DropdownMenuItem>
@@ -257,6 +280,16 @@ export function BEProjectsView() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* SharePoint Preview Dialog */}
+      <SharePointPreviewDialog
+        open={!!previewAction}
+        onClose={handleClosePreview}
+        onConfirm={handleConfirmSync}
+        previewData={previewData}
+        isLoading={isPreviewLoading}
+        action={previewAction || 'import'}
+      />
     </div>
   );
 }
