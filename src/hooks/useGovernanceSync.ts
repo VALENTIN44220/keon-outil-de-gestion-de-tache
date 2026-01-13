@@ -178,18 +178,24 @@ export function useGovernanceSync() {
       
       const importedCount = data.imported?.reduce((sum: number, t: ExportResult) => sum + t.count, 0) || 0;
       const updatedCount = data.updated?.reduce((sum: number, t: ExportResult) => sum + t.count, 0) || 0;
+      const idsGeneratedCount = data.idsGenerated?.reduce((sum: number, t: ExportResult) => sum + t.count, 0) || 0;
       const errorCount = data.errors?.length || 0;
+      
+      const parts = [];
+      if (importedCount > 0) parts.push(`${importedCount} créé(s)`);
+      if (updatedCount > 0) parts.push(`${updatedCount} mis à jour`);
+      if (idsGeneratedCount > 0) parts.push(`${idsGeneratedCount} ID(s) générés`);
       
       if (errorCount > 0) {
         toast({
           title: 'Import partiel',
-          description: `${importedCount} créés, ${updatedCount} mis à jour, ${errorCount} erreur(s)`,
+          description: `${parts.join(', ')}. ${errorCount} erreur(s)`,
           variant: 'destructive',
         });
       } else {
         toast({
           title: 'Import terminé',
-          description: `${importedCount} créés, ${updatedCount} mis à jour`,
+          description: parts.length > 0 ? parts.join(', ') : 'Aucune modification',
         });
       }
       
