@@ -60,16 +60,23 @@ const COLUMN_MAPPING = {
   16: 'status',
 };
 
-async function getAccessToken(): Promise<string> {
+async function getAccessToken(): Promise<{ token: string; diagnostics: any }> {
   const tenantId = Deno.env.get("AZURE_TENANT_ID");
   const clientId = Deno.env.get("AZURE_CLIENT_ID");
   const clientSecret = Deno.env.get("AZURE_CLIENT_SECRET");
 
+  const diagnostics: any = {
+    tenantId: tenantId ? `${tenantId.substring(0, 8)}...` : 'MISSING',
+    clientId: clientId ? `${clientId.substring(0, 8)}...` : 'MISSING',
+    clientSecretSet: !!clientSecret,
+  };
+
   if (!tenantId || !clientId || !clientSecret) {
-    throw new Error("Missing Azure credentials");
+    throw new Error(`Missing Azure credentials: ${JSON.stringify(diagnostics)}`);
   }
 
   const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
+  console.log(`Requesting token from: ${tokenUrl}`);
 
   const response = await fetch(tokenUrl, {
     method: "POST",
@@ -84,13 +91,19 @@ async function getAccessToken(): Promise<string> {
     }),
   });
 
+  const responseText = await response.text();
+  
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Failed to get access token: ${error}`);
+    console.error(`Token request failed (${response.status}):`, responseText);
+    diagnostics.tokenError = responseText;
+    throw new Error(`Failed to get access token: ${responseText}`);
   }
 
-  const data: TokenResponse = await response.json();
-  return data.access_token;
+  const data: TokenResponse = JSON.parse(responseText);
+  diagnostics.tokenObtained = true;
+  console.log('Access token obtained successfully');
+  
+  return { token: data.access_token, diagnostics };
 }
 
 async function assertGraphAccess(accessToken: string): Promise<void> {
@@ -289,8 +302,47 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const { action, preview = false } = await req.json();
 
+    // Handle diagnostic action
+    if (action === "diagnose") {
+      const diagnosticResults: any = {
+        step: 'init',
+        siteUrlSet: !!siteUrl,
+        filePathSet: !!filePath,
+        siteUrlValue: siteUrl ? siteUrl.replace(/\/[^\/]+$/, '/...') : 'NOT SET',
+      };
+
+      try {
+        diagnosticResults.step = 'token';
+        const { token, diagnostics } = await getAccessToken();
+        diagnosticResults.tokenDiagnostics = diagnostics;
+
+        diagnosticResults.step = 'graphAccess';
+        await assertGraphAccess(token);
+        diagnosticResults.graphAccessOk = true;
+
+        diagnosticResults.step = 'siteId';
+        const siteId = await getSiteId(token, siteUrl);
+        diagnosticResults.siteId = siteId ? `${siteId.substring(0, 20)}...` : null;
+
+        diagnosticResults.step = 'driveId';
+        const driveId = await getDriveId(token, siteId);
+        diagnosticResults.driveId = driveId ? `${driveId.substring(0, 20)}...` : null;
+
+        diagnosticResults.step = 'complete';
+        diagnosticResults.success = true;
+      } catch (error: unknown) {
+        diagnosticResults.error = error instanceof Error ? error.message : String(error);
+        diagnosticResults.failedAtStep = diagnosticResults.step;
+      }
+
+      return new Response(
+        JSON.stringify({ diagnostics: diagnosticResults }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Get Microsoft Graph access token
-    const accessToken = await getAccessToken();
+    const { token: accessToken, diagnostics: tokenDiagnostics } = await getAccessToken();
     await assertGraphAccess(accessToken);
 
     const siteId = await getSiteId(accessToken, siteUrl);

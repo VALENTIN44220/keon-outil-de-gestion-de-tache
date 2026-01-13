@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useBEProjects } from '@/hooks/useBEProjects';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
-import { useSharePointSync, PreviewData } from '@/hooks/useSharePointSync';
+import { useSharePointSync, PreviewData, DiagnosticResult } from '@/hooks/useSharePointSync';
 import { BEProject } from '@/types/beProject';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Plus, Search, Pencil, Trash2, Building2, FolderOpen, Loader2, RefreshCw, Download, Upload, Eye, FileDown } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Building2, FolderOpen, Loader2, RefreshCw, Download, Upload, Eye, FileDown, AlertCircle, CheckCircle2, Stethoscope } from 'lucide-react';
 import { BEProjectDialog } from './BEProjectDialog';
 import { SharePointPreviewDialog } from './SharePointPreviewDialog';
 import { format } from 'date-fns';
@@ -23,9 +23,12 @@ export function BEProjectsView() {
   const { 
     isLoading: isSyncing, 
     isPreviewLoading,
+    isDiagnosing,
     previewData,
+    diagnosticResult,
     getPreview,
     clearPreview,
+    runDiagnostic,
     importFromSharePoint, 
     exportToSharePoint, 
     fullSync 
@@ -35,6 +38,12 @@ export function BEProjectsView() {
   const [editingProject, setEditingProject] = useState<BEProject | null>(null);
   const [deletingProject, setDeletingProject] = useState<BEProject | null>(null);
   const [previewAction, setPreviewAction] = useState<'import' | 'export' | 'sync' | null>(null);
+  const [showDiagnosticResult, setShowDiagnosticResult] = useState(false);
+
+  const handleDiagnose = async () => {
+    setShowDiagnosticResult(true);
+    await runDiagnostic();
+  };
 
   const canCreate = permissionProfile?.can_create_be_projects ?? false;
   const canEdit = permissionProfile?.can_edit_be_projects ?? false;
@@ -210,6 +219,10 @@ export function BEProjectsView() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleDiagnose} disabled={isDiagnosing}>
+                <Stethoscope className="h-4 w-4 mr-2" />
+                Diagnostic connexion
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handlePreviewAction('sync')}>
                 <Eye className="h-4 w-4 mr-2" />
                 Synchronisation complète
@@ -362,6 +375,68 @@ export function BEProjectsView() {
         isLoading={isPreviewLoading}
         action={previewAction || 'import'}
       />
+
+      {/* Diagnostic Result Dialog */}
+      <AlertDialog open={showDiagnosticResult && !!diagnosticResult} onOpenChange={() => setShowDiagnosticResult(false)}>
+        <AlertDialogContent className="max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              {diagnosticResult?.success ? (
+                <CheckCircle2 className="h-5 w-5 text-green-600" />
+              ) : (
+                <AlertCircle className="h-5 w-5 text-destructive" />
+              )}
+              Diagnostic SharePoint
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 text-left">
+                {diagnosticResult && (
+                  <>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <span className="text-muted-foreground">Tenant ID:</span>
+                      <span className="font-mono">{diagnosticResult.tokenDiagnostics?.tenantId || 'N/A'}</span>
+                      
+                      <span className="text-muted-foreground">Client ID:</span>
+                      <span className="font-mono">{diagnosticResult.tokenDiagnostics?.clientId || 'N/A'}</span>
+                      
+                      <span className="text-muted-foreground">Secret configuré:</span>
+                      <span>{diagnosticResult.tokenDiagnostics?.clientSecretSet ? '✓ Oui' : '✗ Non'}</span>
+                      
+                      <span className="text-muted-foreground">Token obtenu:</span>
+                      <span>{diagnosticResult.tokenDiagnostics?.tokenObtained ? '✓ Oui' : '✗ Non'}</span>
+                      
+                      <span className="text-muted-foreground">Accès Graph:</span>
+                      <span>{diagnosticResult.graphAccessOk ? '✓ Oui' : '✗ Non'}</span>
+                      
+                      <span className="text-muted-foreground">Site ID:</span>
+                      <span className="font-mono text-xs">{diagnosticResult.siteId || 'N/A'}</span>
+                      
+                      <span className="text-muted-foreground">Drive ID:</span>
+                      <span className="font-mono text-xs">{diagnosticResult.driveId || 'N/A'}</span>
+                    </div>
+                    
+                    {diagnosticResult.error && (
+                      <div className="mt-4 p-3 bg-destructive/10 rounded-md">
+                        <p className="text-sm font-medium text-destructive">Erreur à l'étape: {diagnosticResult.failedAtStep}</p>
+                        <p className="text-xs text-muted-foreground mt-1 break-all">{diagnosticResult.error}</p>
+                      </div>
+                    )}
+                    
+                    {diagnosticResult.success && (
+                      <div className="mt-4 p-3 bg-green-500/10 rounded-md">
+                        <p className="text-sm font-medium text-green-700">La connexion SharePoint est fonctionnelle !</p>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Fermer</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
