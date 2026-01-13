@@ -424,6 +424,7 @@ serve(async (req) => {
       const results: any = {
         imported: [],
         updated: [],
+        idsGenerated: [],
         errors: [],
       };
 
@@ -438,7 +439,14 @@ serve(async (req) => {
           }
 
           const headers = excelData[0] as string[];
-          const dataRows = excelData.slice(1).filter(row => row && row.length > 0 && row[0]);
+          const dataRows = excelData.slice(1).filter(row => row && row.length > 0 && (row[0] || row[1])); // Allow rows without ID if they have other data
+          
+          // Find the ID column index
+          const idColumnIndex = headers.findIndex(h => h === 'id');
+          if (idColumnIndex === -1) {
+            results.errors.push({ table: table.name, error: 'No ID column found in headers' });
+            continue;
+          }
 
           // Get existing data
           const { data: existingData, error: fetchError } = await supabase
@@ -453,11 +461,36 @@ serve(async (req) => {
           const existingIds = new Set((existingData || []).map(r => r.id));
           let importedCount = 0;
           let updatedCount = 0;
+          let idsGeneratedCount = 0;
+          let excelNeedsUpdate = false;
 
-          for (const row of dataRows) {
+          for (let i = 0; i < dataRows.length; i++) {
+            const row = dataRows[i];
             const obj = rowToObject(row, table.columns);
             
+            // Generate UUID if ID is missing or empty
+            if (!obj.id || obj.id === '' || obj.id === null) {
+              // Generate a new UUID
+              obj.id = crypto.randomUUID();
+              // Update the row in excelData for later upload
+              if (row.length <= idColumnIndex) {
+                // Extend row if needed
+                while (row.length <= idColumnIndex) {
+                  row.push(null);
+                }
+              }
+              row[idColumnIndex] = obj.id;
+              excelData[i + 1][idColumnIndex] = obj.id; // +1 because first row is header
+              idsGeneratedCount++;
+              excelNeedsUpdate = true;
+            }
+
+            // Skip rows that still don't have a valid ID (shouldn't happen now)
             if (!obj.id) continue;
+
+            // Check if row has meaningful data (at least one non-id field)
+            const hasData = Object.keys(obj).some(key => key !== 'id' && key !== 'created_at' && key !== 'updated_at' && obj[key] !== null && obj[key] !== undefined);
+            if (!hasData) continue;
 
             if (existingIds.has(obj.id)) {
               const { error: updateError } = await supabase
@@ -467,16 +500,34 @@ serve(async (req) => {
 
               if (!updateError) updatedCount++;
             } else {
+              // Set created_at if not present
+              if (!obj.created_at) {
+                obj.created_at = new Date().toISOString();
+              }
+              
               const { error: insertError } = await supabase
                 .from(table.name)
                 .insert(obj);
 
-              if (!insertError) importedCount++;
+              if (!insertError) {
+                importedCount++;
+                existingIds.add(obj.id); // Add to set to prevent duplicate inserts
+              } else {
+                console.log(`Insert error for ${table.name}:`, insertError.message);
+              }
             }
+          }
+
+          // If we generated IDs, update the Excel file on SharePoint
+          if (excelNeedsUpdate) {
+            await uploadExcel(accessToken, siteId, driveId, filePath, excelData, table.label);
           }
 
           results.imported.push({ table: table.name, count: importedCount });
           results.updated.push({ table: table.name, count: updatedCount });
+          if (idsGeneratedCount > 0) {
+            results.idsGenerated.push({ table: table.name, count: idsGeneratedCount });
+          }
         } catch (e) {
           results.errors.push({
             table: table.name,
