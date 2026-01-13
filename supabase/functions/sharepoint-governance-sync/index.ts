@@ -32,7 +32,7 @@ const GOVERNANCE_TABLES: TableConfig[] = [
     name: 'departments',
     fileName: 'APP_GESTION_DEPARTMENTS.xlsx',
     label: 'Services',
-    columns: ['id', 'name', 'description', 'company_id', 'created_at', 'updated_at'],
+    columns: ['id', 'name', 'description', 'company_id', 'id_services_lucca', 'created_at', 'updated_at'],
   },
   {
     name: 'job_titles',
@@ -67,7 +67,7 @@ const GOVERNANCE_TABLES: TableConfig[] = [
     columns: [
       'id', 'user_id', 'display_name', 'job_title', 'department', 'company',
       'company_id', 'department_id', 'job_title_id', 'hierarchy_level_id',
-      'permission_profile_id', 'manager_id', 'avatar_url',
+      'permission_profile_id', 'manager_id', 'id_lucca', 'avatar_url',
       'is_private', 'must_change_password', 'created_at', 'updated_at'
     ],
   },
