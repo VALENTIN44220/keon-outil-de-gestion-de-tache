@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-
+import { useQueryClient } from '@tanstack/react-query';
 export interface GovernanceTableStatus {
   name: string;
   label: string;
@@ -32,10 +32,25 @@ export interface ExportResult {
 }
 
 export function useGovernanceSync() {
+  const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
   const [isDiagnosing, setIsDiagnosing] = useState(false);
   const [diagnostics, setDiagnostics] = useState<GovernanceDiagnostics | null>(null);
   const [previewData, setPreviewData] = useState<GovernanceTableStatus[] | null>(null);
+
+  // Invalidate all governance-related queries after import
+  const invalidateGovernanceQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ['companies'] });
+    queryClient.invalidateQueries({ queryKey: ['departments'] });
+    queryClient.invalidateQueries({ queryKey: ['job-titles'] });
+    queryClient.invalidateQueries({ queryKey: ['hierarchy-levels'] });
+    queryClient.invalidateQueries({ queryKey: ['permission-profiles'] });
+    queryClient.invalidateQueries({ queryKey: ['profiles'] });
+    queryClient.invalidateQueries({ queryKey: ['users'] });
+    queryClient.invalidateQueries({ queryKey: ['assignment-rules'] });
+    queryClient.invalidateQueries({ queryKey: ['categories'] });
+    queryClient.invalidateQueries({ queryKey: ['admin-data'] });
+  };
 
   const runDiagnostic = async () => {
     setIsDiagnosing(true);
@@ -177,6 +192,9 @@ export function useGovernanceSync() {
           description: `${importedCount} créés, ${updatedCount} mis à jour`,
         });
       }
+      
+      // Invalidate all related queries to refresh the UI
+      invalidateGovernanceQueries();
       
       return data;
     } catch (error: unknown) {
