@@ -378,7 +378,7 @@ export function BEProjectsView() {
 
       {/* Diagnostic Result Dialog */}
       <AlertDialog open={showDiagnosticResult && !!diagnosticResult} onOpenChange={() => setShowDiagnosticResult(false)}>
-        <AlertDialogContent className="max-w-lg">
+        <AlertDialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               {diagnosticResult?.success ? (
@@ -409,16 +409,47 @@ export function BEProjectsView() {
                       <span>{diagnosticResult.graphAccessOk ? '✓ Oui' : '✗ Non'}</span>
                       
                       <span className="text-muted-foreground">Site ID:</span>
-                      <span className="font-mono text-xs">{diagnosticResult.siteId || 'N/A'}</span>
+                      <span className="font-mono text-xs">{String(diagnosticResult.siteId || 'N/A')}</span>
                       
                       <span className="text-muted-foreground">Drive ID:</span>
-                      <span className="font-mono text-xs">{diagnosticResult.driveId || 'N/A'}</span>
+                      <span className="font-mono text-xs">{String(diagnosticResult.driveId || 'N/A')}</span>
+                      
+                      <span className="text-muted-foreground">Chemin fichier:</span>
+                      <span className="font-mono text-xs break-all">{String((diagnosticResult as any).filePathValue || 'N/A')}</span>
+                      
+                      <span className="text-muted-foreground">Fichier trouvé:</span>
+                      <span>{(diagnosticResult as any).fileFound === true ? '✓ Oui' : (diagnosticResult as any).fileFound === false ? '✗ Non' : 'N/A'}</span>
                     </div>
+                    
+                    {/* Root items listing */}
+                    {(diagnosticResult as any).rootItems && Array.isArray((diagnosticResult as any).rootItems) && (diagnosticResult as any).rootItems.length > 0 && (
+                      <div className="mt-4 p-3 bg-muted/50 rounded-md">
+                        <p className="text-sm font-medium mb-2">Éléments à la racine du Drive:</p>
+                        <ul className="text-xs space-y-1">
+                          {((diagnosticResult as any).rootItems as { name: string; type: string }[]).map((item, idx) => (
+                            <li key={idx} className="font-mono">
+                              {item.type === 'folder' ? '📁' : '📄'} {item.name}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    
+                    {/* Suggested path if file not found */}
+                    {(diagnosticResult as any).suggestedPath && (
+                      <div className="mt-4 p-3 bg-yellow-500/10 rounded-md">
+                        <p className="text-sm font-medium text-yellow-700">Chemin alternatif trouvé:</p>
+                        <p className="text-xs font-mono mt-1">{String((diagnosticResult as any).suggestedPath)}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Mettez à jour le secret SHAREPOINT_EXCEL_FILE_PATH avec cette valeur.
+                        </p>
+                      </div>
+                    )}
                     
                     {diagnosticResult.error && (
                       <div className="mt-4 p-3 bg-destructive/10 rounded-md">
-                        <p className="text-sm font-medium text-destructive">Erreur à l'étape: {diagnosticResult.failedAtStep}</p>
-                        <p className="text-xs text-muted-foreground mt-1 break-all">{diagnosticResult.error}</p>
+                        <p className="text-sm font-medium text-destructive">Erreur à l'étape: {String(diagnosticResult.failedAtStep)}</p>
+                        <p className="text-xs text-muted-foreground mt-1 break-all">{String(diagnosticResult.error)}</p>
                       </div>
                     )}
                     
