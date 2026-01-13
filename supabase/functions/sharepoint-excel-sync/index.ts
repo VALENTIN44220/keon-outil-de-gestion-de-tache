@@ -93,45 +93,88 @@ async function getAccessToken(): Promise<string> {
   return data.access_token;
 }
 
-async function getSiteId(accessToken: string, siteUrl: string): Promise<string> {
-  // Parse site URL to get hostname and site path
-  const url = new URL(siteUrl);
-  const hostname = url.hostname;
-  // Remove trailing slashes from pathname
-  const sitePath = url.pathname.replace(/\/+$/, '');
+async function assertGraphAccess(accessToken: string): Promise<void> {
+  // Simple sanity-check to distinguish "bad token/permissions" from "bad site URL".
+  const res = await fetch('https://graph.microsoft.com/v1.0/sites/root?$select=id,webUrl,displayName', {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
 
-  // Microsoft Graph API format for site lookup:
-  // For root site: hostname
-  // For subsite: hostname:/sites/SiteName: (note the trailing colon)
-  let siteIdentifier: string;
-  if (!sitePath || sitePath === '/') {
-    // Root site
-    siteIdentifier = hostname;
-  } else {
-    // Subsite - must have colon after hostname and after path
-    siteIdentifier = `${hostname}:${sitePath}:`;
+  if (!res.ok) {
+    const txt = await res.text();
+    console.error('Graph access check failed (GET /sites/root):', txt);
+    throw new Error(
+      `Microsoft Graph access failed. Verify the Azure app has Application permissions (not Delegated), admin consent is granted, and at least Sites.Read.All is enabled. Error: ${txt}`
+    );
   }
 
+  const root = await res.json();
+  console.log(`Graph access OK. Root site: ${root.displayName} (${root.webUrl})`);
+}
+
+async function getSiteId(accessToken: string, siteUrl: string): Promise<string> {
+  // Parse site URL to get hostname and a *site root* path.
+  // Users often paste URLs that include libraries/folders; Graph needs the site root (e.g. /sites/SiteName).
+  const url = new URL(siteUrl);
+  const hostname = url.hostname;
+
+  // Remove trailing slashes from pathname
+  const rawPath = url.pathname.replace(/\/+$/, '');
+
+  // Keep only the site root segment (supports /sites/<name> and /teams/<name>)
+  const match = rawPath.match(/^(\/(sites|teams)\/[^\/]+)(?:\/.*)?$/i);
+  const sitePath = match ? match[1] : (rawPath && rawPath !== '/' ? rawPath : '');
+
+  const siteIdentifier = sitePath ? `${hostname}:${encodeURI(sitePath)}:` : hostname;
   console.log(`Looking up SharePoint site: ${siteIdentifier}`);
 
-  const response = await fetch(
-    `https://graph.microsoft.com/v1.0/sites/${siteIdentifier}`,
-    {
+  const lookupUrl = `https://graph.microsoft.com/v1.0/sites/${siteIdentifier}`;
+  const response = await fetch(lookupUrl, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (response.ok) {
+    const site = await response.json();
+    console.log(`Site found: ${site.displayName} (ID: ${site.id})`);
+    return site.id;
+  }
+
+  const errorText = await response.text();
+  console.error(`Site lookup failed for ${siteIdentifier}:`, errorText);
+
+  // Fallback: search
+  const siteKeyword = (sitePath.split('/').pop() || '').trim();
+  if (siteKeyword) {
+    const searchUrl = `https://graph.microsoft.com/v1.0/sites?search=${encodeURIComponent(siteKeyword)}`;
+    const searchRes = await fetch(searchUrl, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
-    }
-  );
+    });
 
-  if (!response.ok) {
-    const error = await response.text();
-    console.error(`Site lookup failed for ${siteIdentifier}:`, error);
-    throw new Error(`Failed to get site ID. Check that SHAREPOINT_SITE_URL is correct (e.g., https://company.sharepoint.com/sites/SiteName) and the Azure app has Sites.Read.All permission. Error: ${error}`);
+    if (!searchRes.ok) {
+      const searchTxt = await searchRes.text();
+      console.error(`Site search failed (keyword=${siteKeyword}):`, searchTxt);
+    } else {
+      const searchData = await searchRes.json();
+      const candidates: any[] = searchData?.value || [];
+      console.log(`Site search returned ${candidates.length} candidate(s) for keyword=${siteKeyword}`);
+
+      const normalizedWanted = siteUrl.replace(/\/+$/, '').toLowerCase();
+      const best = candidates.find((s) => (s.webUrl || '').replace(/\/+$/, '').toLowerCase() === normalizedWanted)
+        || candidates.find((s) => (s.webUrl || '').toLowerCase().startsWith(normalizedWanted));
+
+      if (best?.id) {
+        console.log(`Site found via search: ${best.displayName} (ID: ${best.id})`);
+        return best.id;
+      }
+    }
   }
 
-  const site = await response.json();
-  console.log(`Site found: ${site.displayName} (ID: ${site.id})`);
-  return site.id;
+  throw new Error(
+    `Failed to get site ID. Check SHAREPOINT_SITE_URL (must point to the site root like https://company.sharepoint.com/sites/SiteName). Original lookup error: ${errorText}`
+  );
 }
 
 async function getDriveId(accessToken: string, siteId: string): Promise<string> {
@@ -248,6 +291,8 @@ serve(async (req) => {
 
     // Get Microsoft Graph access token
     const accessToken = await getAccessToken();
+    await assertGraphAccess(accessToken);
+
     const siteId = await getSiteId(accessToken, siteUrl);
     const driveId = await getDriveId(accessToken, siteId);
 
