@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Label } from '@/components/ui/label';
 import { Plus, Trash2, Building2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
+import { RefreshButton } from './RefreshButton';
 import type { Company } from '@/types/admin';
 
 interface CompaniesTabProps {
@@ -15,9 +16,10 @@ interface CompaniesTabProps {
   onAdd: (name: string, description?: string) => Promise<Company>;
   onUpdate: (id: string, name: string, description?: string) => Promise<Company>;
   onDelete: (id: string) => Promise<void>;
+  onRefresh: () => Promise<void> | void;
 }
 
-export function CompaniesTab({ companies, onAdd, onUpdate, onDelete }: CompaniesTabProps) {
+export function CompaniesTab({ companies, onAdd, onUpdate, onDelete, onRefresh }: CompaniesTabProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [isAdding, setIsAdding] = useState(false);
@@ -110,9 +112,12 @@ export function CompaniesTab({ companies, onAdd, onUpdate, onDelete }: Companies
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Sociétés existantes</CardTitle>
-          <CardDescription>{companies.length} société(s) enregistrée(s)</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Sociétés existantes</CardTitle>
+            <CardDescription>{companies.length} société(s) enregistrée(s)</CardDescription>
+          </div>
+          <RefreshButton onRefresh={onRefresh} />
         </CardHeader>
         <CardContent>
           {companies.length === 0 ? (

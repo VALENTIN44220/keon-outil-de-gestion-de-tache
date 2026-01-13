@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Label } from '@/components/ui/label';
 import { Plus, Trash2, Users, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
+import { RefreshButton } from './RefreshButton';
 import type { JobTitle, Department } from '@/types/admin';
 
 interface JobTitlesTabProps {
@@ -17,9 +18,10 @@ interface JobTitlesTabProps {
   onAdd: (name: string, department_id?: string, description?: string) => Promise<JobTitle>;
   onUpdate: (id: string, name: string, department_id?: string, description?: string) => Promise<JobTitle>;
   onDelete: (id: string) => Promise<void>;
+  onRefresh: () => Promise<void> | void;
 }
 
-export function JobTitlesTab({ jobTitles, departments, onAdd, onUpdate, onDelete }: JobTitlesTabProps) {
+export function JobTitlesTab({ jobTitles, departments, onAdd, onUpdate, onDelete, onRefresh }: JobTitlesTabProps) {
   const [name, setName] = useState('');
   const [departmentId, setDepartmentId] = useState<string>('');
   const [description, setDescription] = useState('');
@@ -128,9 +130,12 @@ export function JobTitlesTab({ jobTitles, departments, onAdd, onUpdate, onDelete
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Postes existants</CardTitle>
-          <CardDescription>{jobTitles.length} poste(s) enregistré(s)</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Postes existants</CardTitle>
+            <CardDescription>{jobTitles.length} poste(s) enregistré(s)</CardDescription>
+          </div>
+          <RefreshButton onRefresh={onRefresh} />
         </CardHeader>
         <CardContent>
           {jobTitles.length === 0 ? (

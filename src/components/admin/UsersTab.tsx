@@ -7,9 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, UserPlus, Users, Building2, Briefcase, Layers, Shield, ChevronUp, ChevronDown, AlertCircle } from 'lucide-react';
+import { Plus, UserPlus, Users, Building2, Briefcase, Layers, Shield, ChevronUp, ChevronDown, AlertCircle, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { RefreshButton } from './RefreshButton';
 import type { Company, Department, JobTitle, HierarchyLevel, PermissionProfile, UserProfile } from '@/types/admin';
 
 interface UsersTabProps {
@@ -21,6 +22,7 @@ interface UsersTabProps {
   permissionProfiles: PermissionProfile[];
   onUserCreated: () => void;
   onUserUpdated: () => void;
+  onRefresh: () => Promise<void> | void;
 }
 
 export function UsersTab({ 
@@ -32,6 +34,7 @@ export function UsersTab({
   permissionProfiles,
   onUserCreated,
   onUserUpdated,
+  onRefresh,
 }: UsersTabProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -179,6 +182,8 @@ export function UsersTab({
                 Créez et gérez les comptes utilisateurs avec leur structure organisationnelle
               </CardDescription>
             </div>
+            <div className="flex items-center gap-2">
+              <RefreshButton onRefresh={onRefresh} />
             <Dialog open={isDialogOpen} onOpenChange={(open) => {
               setIsDialogOpen(open);
               if (!open) resetForm();
@@ -390,6 +395,7 @@ export function UsersTab({
                 </div>
               </DialogContent>
             </Dialog>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
