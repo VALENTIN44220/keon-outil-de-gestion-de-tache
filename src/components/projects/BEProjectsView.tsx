@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useBEProjects } from '@/hooks/useBEProjects';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
+import { useSharePointSync } from '@/hooks/useSharePointSync';
 import { BEProject } from '@/types/beProject';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,14 +9,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Plus, Search, Pencil, Trash2, Building2, FolderOpen, Loader2 } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Plus, Search, Pencil, Trash2, Building2, FolderOpen, Loader2, RefreshCw, Download, Upload } from 'lucide-react';
 import { BEProjectDialog } from './BEProjectDialog';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 export function BEProjectsView() {
-  const { projects, isLoading, searchQuery, setSearchQuery, addProject, updateProject, deleteProject } = useBEProjects();
+  const { projects, isLoading, searchQuery, setSearchQuery, addProject, updateProject, deleteProject, fetchProjects } = useBEProjects();
   const { permissionProfile } = useUserPermissions();
+  const { isLoading: isSyncing, importFromSharePoint, exportToSharePoint, fullSync } = useSharePointSync();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<BEProject | null>(null);
@@ -52,6 +55,21 @@ export function BEProjectsView() {
     }
   };
 
+  const handleSyncAction = async (action: 'import' | 'export' | 'sync') => {
+    try {
+      if (action === 'import') {
+        await importFromSharePoint();
+      } else if (action === 'export') {
+        await exportToSharePoint();
+      } else {
+        await fullSync();
+      }
+      fetchProjects(); // Refresh projects after sync
+    } catch (error) {
+      // Error already handled in hook
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
       active: { variant: 'default', label: 'Actif' },
@@ -83,12 +101,42 @@ export function BEProjectsView() {
             Gérez les projets du Bureau d'Études
           </p>
         </div>
-        {canCreate && (
-          <Button onClick={handleAddProject} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Nouveau projet
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {/* SharePoint Sync */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2" disabled={isSyncing}>
+                {isSyncing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                SharePoint
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleSyncAction('sync')}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Synchronisation complète
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleSyncAction('import')}>
+                <Download className="h-4 w-4 mr-2" />
+                Importer depuis Excel
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleSyncAction('export')}>
+                <Upload className="h-4 w-4 mr-2" />
+                Exporter vers Excel
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {canCreate && (
+            <Button onClick={handleAddProject} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Nouveau projet
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Search */}
