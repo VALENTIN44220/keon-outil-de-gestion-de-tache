@@ -1,0 +1,214 @@
+import { useState } from 'react';
+import { useBEProjects } from '@/hooks/useBEProjects';
+import { useUserPermissions } from '@/hooks/useUserPermissions';
+import { BEProject } from '@/types/beProject';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Plus, Search, Pencil, Trash2, Building2, FolderOpen, Loader2 } from 'lucide-react';
+import { BEProjectDialog } from './BEProjectDialog';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
+
+export function BEProjectsView() {
+  const { projects, isLoading, searchQuery, setSearchQuery, addProject, updateProject, deleteProject } = useBEProjects();
+  const { permissionProfile } = useUserPermissions();
+  
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<BEProject | null>(null);
+  const [deletingProject, setDeletingProject] = useState<BEProject | null>(null);
+
+  const canCreate = permissionProfile?.can_create_be_projects ?? false;
+  const canEdit = permissionProfile?.can_edit_be_projects ?? false;
+  const canDelete = permissionProfile?.can_delete_be_projects ?? false;
+
+  const handleAddProject = () => {
+    setEditingProject(null);
+    setIsDialogOpen(true);
+  };
+
+  const handleEditProject = (project: BEProject) => {
+    setEditingProject(project);
+    setIsDialogOpen(true);
+  };
+
+  const handleSaveProject = async (projectData: Omit<BEProject, 'id' | 'created_at' | 'updated_at'>) => {
+    if (editingProject) {
+      await updateProject(editingProject.id, projectData);
+    } else {
+      await addProject(projectData);
+    }
+    setIsDialogOpen(false);
+    setEditingProject(null);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (deletingProject) {
+      await deleteProject(deletingProject.id);
+      setDeletingProject(null);
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const variants: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
+      active: { variant: 'default', label: 'Actif' },
+      closed: { variant: 'secondary', label: 'Clôturé' },
+      on_hold: { variant: 'outline', label: 'En attente' },
+    };
+    const config = variants[status] || { variant: 'outline', label: status };
+    return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-display font-bold text-foreground flex items-center gap-2">
+            <FolderOpen className="h-6 w-6" />
+            Projets BE
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Gérez les projets du Bureau d'Études
+          </p>
+        </div>
+        {canCreate && (
+          <Button onClick={handleAddProject} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Nouveau projet
+          </Button>
+        )}
+      </div>
+
+      {/* Search */}
+      <Card>
+        <CardContent className="pt-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Rechercher par code ou nom de projet..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Projects Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Building2 className="h-5 w-5" />
+            Liste des projets ({projects.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {projects.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              {searchQuery ? 'Aucun projet trouvé pour cette recherche' : 'Aucun projet créé'}
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Code</TableHead>
+                  <TableHead>Nom du projet</TableHead>
+                  <TableHead>Statut</TableHead>
+                  <TableHead>Typologie</TableHead>
+                  <TableHead>Pays</TableHead>
+                  <TableHead>Créé le</TableHead>
+                  {(canEdit || canDelete) && <TableHead className="text-right">Actions</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {projects.map((project) => (
+                  <TableRow key={project.id}>
+                    <TableCell className="font-mono font-medium">{project.code_projet}</TableCell>
+                    <TableCell className="font-medium">{project.nom_projet}</TableCell>
+                    <TableCell>{getStatusBadge(project.status)}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {project.typologie || '-'}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {project.pays || '-'}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {format(new Date(project.created_at), 'dd MMM yyyy', { locale: fr })}
+                    </TableCell>
+                    {(canEdit || canDelete) && (
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {canEdit && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleEditProject(project)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {canDelete && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setDeletingProject(project)}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Project Dialog */}
+      <BEProjectDialog
+        open={isDialogOpen}
+        onClose={() => {
+          setIsDialogOpen(false);
+          setEditingProject(null);
+        }}
+        onSave={handleSaveProject}
+        project={editingProject}
+      />
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deletingProject} onOpenChange={() => setDeletingProject(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir supprimer le projet "{deletingProject?.nom_projet}" ({deletingProject?.code_projet}) ?
+              Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}

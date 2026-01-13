@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Trash2, Shield, Check, X, User, Users, Crown, Pencil } from 'lucide-react';
+import { Plus, Trash2, Shield, Check, X, User, Users, Crown, Pencil, FolderOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import type { PermissionProfile } from '@/types/admin';
 
@@ -30,6 +30,10 @@ const defaultPermissions = {
   can_view_all_tasks: false,
   can_manage_all_tasks: false,
   can_assign_to_all: false,
+  can_view_be_projects: true,
+  can_create_be_projects: false,
+  can_edit_be_projects: false,
+  can_delete_be_projects: false,
 };
 
 export function PermissionProfilesTab({ permissionProfiles, onAdd, onUpdate, onDelete }: PermissionProfilesTabProps) {
@@ -84,6 +88,10 @@ export function PermissionProfilesTab({ permissionProfiles, onAdd, onUpdate, onD
       can_view_all_tasks: profile.can_view_all_tasks,
       can_manage_all_tasks: profile.can_manage_all_tasks,
       can_assign_to_all: profile.can_assign_to_all,
+      can_view_be_projects: profile.can_view_be_projects,
+      can_create_be_projects: profile.can_create_be_projects,
+      can_edit_be_projects: profile.can_edit_be_projects,
+      can_delete_be_projects: profile.can_delete_be_projects,
     });
   };
 
@@ -261,6 +269,48 @@ export function PermissionProfilesTab({ permissionProfiles, onAdd, onUpdate, onD
               onCheckedChange={() => onToggle('can_assign_to_all')}
             />
             <Label htmlFor={`${idPrefix}can_assign_to_all`}>Assigner à tous</Label>
+          </div>
+        </div>
+      </div>
+
+      {/* Section: Projets BE */}
+      <div className="space-y-3 p-4 rounded-lg bg-green-50/50 dark:bg-green-950/20 border border-green-200/50 dark:border-green-800/50">
+        <div className="flex items-center gap-2">
+          <FolderOpen className="h-4 w-4 text-green-600" />
+          <h4 className="text-sm font-medium text-green-700 dark:text-green-400">Projets Bureau d'Études</h4>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-4">
+          <div className="flex items-center space-x-2">
+            <Checkbox 
+              id={`${idPrefix}can_view_be_projects`}
+              checked={perms.can_view_be_projects}
+              onCheckedChange={() => onToggle('can_view_be_projects')}
+            />
+            <Label htmlFor={`${idPrefix}can_view_be_projects`}>Voir</Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox 
+              id={`${idPrefix}can_create_be_projects`}
+              checked={perms.can_create_be_projects}
+              onCheckedChange={() => onToggle('can_create_be_projects')}
+            />
+            <Label htmlFor={`${idPrefix}can_create_be_projects`}>Créer</Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox 
+              id={`${idPrefix}can_edit_be_projects`}
+              checked={perms.can_edit_be_projects}
+              onCheckedChange={() => onToggle('can_edit_be_projects')}
+            />
+            <Label htmlFor={`${idPrefix}can_edit_be_projects`}>Modifier</Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox 
+              id={`${idPrefix}can_delete_be_projects`}
+              checked={perms.can_delete_be_projects}
+              onCheckedChange={() => onToggle('can_delete_be_projects')}
+            />
+            <Label htmlFor={`${idPrefix}can_delete_be_projects`}>Supprimer</Label>
           </div>
         </div>
       </div>

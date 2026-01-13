@@ -498,12 +498,16 @@ export type Database = {
         Row: {
           can_assign_to_all: boolean
           can_assign_to_subordinates: boolean
+          can_create_be_projects: boolean | null
+          can_delete_be_projects: boolean | null
+          can_edit_be_projects: boolean | null
           can_manage_all_tasks: boolean
           can_manage_own_tasks: boolean
           can_manage_subordinates_tasks: boolean
           can_manage_templates: boolean
           can_manage_users: boolean
           can_view_all_tasks: boolean
+          can_view_be_projects: boolean | null
           can_view_own_tasks: boolean
           can_view_subordinates_tasks: boolean
           created_at: string
@@ -515,12 +519,16 @@ export type Database = {
         Insert: {
           can_assign_to_all?: boolean
           can_assign_to_subordinates?: boolean
+          can_create_be_projects?: boolean | null
+          can_delete_be_projects?: boolean | null
+          can_edit_be_projects?: boolean | null
           can_manage_all_tasks?: boolean
           can_manage_own_tasks?: boolean
           can_manage_subordinates_tasks?: boolean
           can_manage_templates?: boolean
           can_manage_users?: boolean
           can_view_all_tasks?: boolean
+          can_view_be_projects?: boolean | null
           can_view_own_tasks?: boolean
           can_view_subordinates_tasks?: boolean
           created_at?: string
@@ -532,12 +540,16 @@ export type Database = {
         Update: {
           can_assign_to_all?: boolean
           can_assign_to_subordinates?: boolean
+          can_create_be_projects?: boolean | null
+          can_delete_be_projects?: boolean | null
+          can_edit_be_projects?: boolean | null
           can_manage_all_tasks?: boolean
           can_manage_own_tasks?: boolean
           can_manage_subordinates_tasks?: boolean
           can_manage_templates?: boolean
           can_manage_users?: boolean
           can_view_all_tasks?: boolean
+          can_view_be_projects?: boolean | null
           can_view_own_tasks?: boolean
           can_view_subordinates_tasks?: boolean
           created_at?: string
