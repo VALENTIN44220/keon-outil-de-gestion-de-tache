@@ -31,6 +31,14 @@ export interface ExportResult {
   count: number;
 }
 
+export interface SkippedResult {
+  table: string;
+  count: number;
+  reason: string;
+  names?: string[];
+  hasMore?: boolean;
+}
+
 export function useGovernanceSync() {
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(false);
@@ -179,6 +187,7 @@ export function useGovernanceSync() {
       const importedCount = data.imported?.reduce((sum: number, t: ExportResult) => sum + t.count, 0) || 0;
       const updatedCount = data.updated?.reduce((sum: number, t: ExportResult) => sum + t.count, 0) || 0;
       const idsGeneratedCount = data.idsGenerated?.reduce((sum: number, t: ExportResult) => sum + t.count, 0) || 0;
+      const skippedCount = data.skipped?.reduce((sum: number, t: SkippedResult) => sum + t.count, 0) || 0;
       const errorCount = data.errors?.length || 0;
       
       const parts = [];
@@ -186,16 +195,35 @@ export function useGovernanceSync() {
       if (updatedCount > 0) parts.push(`${updatedCount} mis à jour`);
       if (idsGeneratedCount > 0) parts.push(`${idsGeneratedCount} ID(s) générés`);
       
+      // Show skipped profiles warning
+      if (skippedCount > 0) {
+        const skippedProfiles = data.skipped?.find((s: SkippedResult) => s.table === 'profiles');
+        const profileNames = skippedProfiles?.names?.join(', ') || '';
+        const moreText = skippedProfiles?.hasMore ? ' et plus...' : '';
+        
+        toast({
+          title: `${skippedCount} profil(s) ignoré(s)`,
+          description: `Les profils sans compte utilisateur ne peuvent pas être importés directement. Créez-les via l'onglet "Utilisateurs" : ${profileNames}${moreText}`,
+          variant: 'destructive',
+          duration: 10000,
+        });
+      }
+      
       if (errorCount > 0) {
         toast({
           title: 'Import partiel',
           description: `${parts.join(', ')}. ${errorCount} erreur(s)`,
           variant: 'destructive',
         });
-      } else {
+      } else if (parts.length > 0) {
         toast({
           title: 'Import terminé',
-          description: parts.length > 0 ? parts.join(', ') : 'Aucune modification',
+          description: parts.join(', '),
+        });
+      } else if (skippedCount === 0) {
+        toast({
+          title: 'Import terminé',
+          description: 'Aucune modification',
         });
       }
       

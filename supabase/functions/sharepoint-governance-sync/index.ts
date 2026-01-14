@@ -425,6 +425,7 @@ serve(async (req) => {
         imported: [],
         updated: [],
         idsGenerated: [],
+        skipped: [],
         errors: [],
       };
 
@@ -458,6 +459,11 @@ serve(async (req) => {
           const userIdColumnIndex = table.name === 'profiles' 
             ? headers.findIndex(h => h === 'user_id') 
             : -1;
+          
+          // Find display_name column for profiles
+          const displayNameColumnIndex = table.name === 'profiles'
+            ? headers.findIndex(h => h === 'display_name')
+            : -1;
 
           // Get existing data
           const { data: existingData, error: fetchError } = await supabase
@@ -473,6 +479,8 @@ serve(async (req) => {
           let importedCount = 0;
           let updatedCount = 0;
           let idsGeneratedCount = 0;
+          let skippedCount = 0;
+          const skippedProfiles: string[] = [];
           let excelNeedsUpdate = false;
 
           // Find the original row indices for updating Excel
@@ -488,7 +496,19 @@ serve(async (req) => {
             const obj = rowToObject(row, table.columns);
             const originalExcelRowIndex = originalRowIndices[i];
             
-            // Generate UUID if ID is missing or empty
+            // For profiles: user_id is required and must reference an existing auth.users entry
+            // We cannot create fake user_ids as they violate the foreign key constraint
+            if (table.name === 'profiles') {
+              if (!obj.user_id || obj.user_id === '' || obj.user_id === null) {
+                // Skip this profile - it needs to be created via the admin UI with a real user account
+                const displayName = obj.display_name || `Row ${i + 2}`;
+                skippedProfiles.push(displayName);
+                skippedCount++;
+                continue;
+              }
+            }
+            
+            // Generate UUID if ID is missing or empty (for non-profile tables, or profiles that have user_id)
             if (!obj.id || obj.id === '' || obj.id === null) {
               obj.id = crypto.randomUUID();
               // Update the row in excelData for later upload
@@ -503,27 +523,10 @@ serve(async (req) => {
               excelNeedsUpdate = true;
             }
 
-            // For profiles: generate user_id if missing (required field)
-            if (table.name === 'profiles' && userIdColumnIndex !== -1) {
-              if (!obj.user_id || obj.user_id === '' || obj.user_id === null) {
-                obj.user_id = crypto.randomUUID();
-                // Update the row in excelData for later upload
-                if (row.length <= userIdColumnIndex) {
-                  while (row.length <= userIdColumnIndex) {
-                    row.push(null);
-                  }
-                }
-                row[userIdColumnIndex] = obj.user_id;
-                excelData[originalExcelRowIndex][userIdColumnIndex] = obj.user_id;
-                excelNeedsUpdate = true;
-              }
-            }
-
             // Skip rows that still don't have a valid ID (shouldn't happen now)
             if (!obj.id) continue;
 
             // Check if row has meaningful data (at least one non-id, non-timestamp field with a value)
-            // Be more permissive: just need display_name for profiles, or name for other tables
             const meaningfulFields = table.name === 'profiles' 
               ? ['display_name', 'company', 'department', 'job_title', 'id_lucca']
               : ['name', 'description'];
@@ -537,6 +540,7 @@ serve(async (req) => {
                 .eq('id', obj.id);
 
               if (!updateError) updatedCount++;
+              else console.log(`Update error for ${table.name}:`, updateError.message);
             } else {
               // Set created_at if not present
               if (!obj.created_at) {
@@ -565,6 +569,15 @@ serve(async (req) => {
           results.updated.push({ table: table.name, count: updatedCount });
           if (idsGeneratedCount > 0) {
             results.idsGenerated.push({ table: table.name, count: idsGeneratedCount });
+          }
+          if (skippedCount > 0) {
+            results.skipped.push({ 
+              table: table.name, 
+              count: skippedCount,
+              reason: 'Profils sans user_id - doivent être créés via l\'interface admin',
+              names: skippedProfiles.slice(0, 10), // Limit to first 10
+              hasMore: skippedProfiles.length > 10
+            });
           }
         } catch (e) {
           results.errors.push({

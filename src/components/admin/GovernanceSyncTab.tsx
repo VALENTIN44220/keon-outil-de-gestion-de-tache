@@ -296,6 +296,13 @@ export function GovernanceSyncTab() {
               Les suppressions doivent être effectuées manuellement.
             </p>
           </div>
+          
+          <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+            <p className="text-sm text-blue-800 dark:text-blue-200">
+              <strong>Profils utilisateurs :</strong> Seuls les profils ayant un <code className="bg-blue-100 dark:bg-blue-900 px-1 rounded">user_id</code> peuvent être importés. 
+              Les nouveaux utilisateurs doivent être créés via l'onglet "Utilisateurs" qui génère automatiquement leur compte d'authentification.
+            </p>
+          </div>
         </CardContent>
       </Card>
 
