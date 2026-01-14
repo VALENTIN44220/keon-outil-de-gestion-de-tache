@@ -10,7 +10,7 @@ import {
   ShieldCheck,
   FolderOpen,
   CalendarClock,
-  Menu,
+  FileText,
 } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
@@ -37,6 +37,7 @@ interface SidebarProps {
 const baseMenuItems = [
   { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard, path: '/' },
   { id: 'tasks', label: 'Tâches', icon: CheckSquare, path: '/' },
+  { id: 'requests', label: 'Demandes', icon: FileText, path: '/requests' },
   { id: 'templates', label: 'Modèles', icon: Workflow, path: '/templates' },
   { id: 'workload', label: 'Plan de charge', icon: CalendarClock, path: '/workload' },
   { id: 'analytics', label: 'Analytiques', icon: BarChart3, path: '/' },
