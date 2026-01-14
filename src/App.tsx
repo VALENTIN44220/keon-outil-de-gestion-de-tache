@@ -12,6 +12,7 @@ import Templates from "./pages/Templates";
 import Projects from "./pages/Projects";
 import Admin from "./pages/Admin";
 import Workload from "./pages/Workload";
+import Requests from "./pages/Requests";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -70,6 +71,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Workload />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/requests"
+              element={
+                <ProtectedRoute>
+                  <Requests />
                 </ProtectedRoute>
               }
             />
