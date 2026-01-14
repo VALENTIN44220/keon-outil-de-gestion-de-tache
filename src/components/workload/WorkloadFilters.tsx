@@ -132,12 +132,12 @@ export function WorkloadFilters({
       <div className="h-6 w-px bg-border" />
 
       {/* Company filter */}
-      <Select value={selectedCompanyId || ''} onValueChange={(v) => onCompanyIdChange(v || null)}>
+      <Select value={selectedCompanyId || '__all__'} onValueChange={(v) => onCompanyIdChange(v === '__all__' ? null : v)}>
         <SelectTrigger className="w-[160px]">
           <SelectValue placeholder="Société" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="">Toutes les sociétés</SelectItem>
+          <SelectItem value="__all__">Toutes les sociétés</SelectItem>
           {companies.map(c => (
             <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
           ))}
@@ -173,12 +173,12 @@ export function WorkloadFilters({
       </Popover>
 
       {/* Process filter */}
-      <Select value={selectedProcessId || ''} onValueChange={(v) => onProcessIdChange(v || null)}>
+      <Select value={selectedProcessId || '__all__'} onValueChange={(v) => onProcessIdChange(v === '__all__' ? null : v)}>
         <SelectTrigger className="w-[180px]">
           <SelectValue placeholder="Processus" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="">Tous les processus</SelectItem>
+          <SelectItem value="__all__">Tous les processus</SelectItem>
           {processes.map(p => (
             <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
           ))}
