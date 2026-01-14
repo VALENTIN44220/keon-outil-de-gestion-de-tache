@@ -11,21 +11,26 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Upload, AlertCircle, CheckCircle2, XCircle, Loader2, FileSpreadsheet, Copy, Info } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import type { Company, Department, PermissionProfile } from '@/types/admin';
+import type { Company, Department, JobTitle, PermissionProfile, UserProfile } from '@/types/admin';
 
 interface BulkUserImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   companies: Company[];
   departments: Department[];
+  jobTitles: JobTitle[];
   permissionProfiles: PermissionProfile[];
+  users: UserProfile[];
   onImportComplete: () => void;
 }
 
 interface ParsedUser {
   email: string;
   displayName: string;
+  company?: string;
   department?: string;
+  jobTitle?: string;
+  manager?: string;
   valid: boolean;
   error?: string;
 }
@@ -41,7 +46,9 @@ export function BulkUserImportDialog({
   onOpenChange,
   companies,
   departments,
+  jobTitles,
   permissionProfiles,
+  users,
   onImportComplete,
 }: BulkUserImportDialogProps) {
   const [rawInput, setRawInput] = useState('');
@@ -52,13 +59,15 @@ export function BulkUserImportDialog({
   // Default settings
   const [defaultCompanyId, setDefaultCompanyId] = useState<string>('');
   const [defaultDepartmentId, setDefaultDepartmentId] = useState<string>('');
+  const [defaultJobTitleId, setDefaultJobTitleId] = useState<string>('');
   const [defaultPermissionProfileId, setDefaultPermissionProfileId] = useState<string>('');
+  const [defaultManagerId, setDefaultManagerId] = useState<string>('');
   const [defaultPassword, setDefaultPassword] = useState('Changeme123!');
 
-  const exampleFormat = `email;nom;service
-jean.dupont@exemple.fr;Jean DUPONT;Bureau d'Etudes
-marie.martin@exemple.fr;Marie MARTIN;Comptabilité
-paul.durand@exemple.fr;Paul DURAND;`;
+  const exampleFormat = `email;nom;société;service;poste;manager
+jean.dupont@exemple.fr;Jean DUPONT;KEON Energies;Bureau d'Etudes;Ingénieur;marie.martin@exemple.fr
+marie.martin@exemple.fr;Marie MARTIN;KEON Energies;Direction;;
+paul.durand@exemple.fr;Paul DURAND;;;Technicien;jean.dupont@exemple.fr`;
 
   const parseInput = () => {
     const lines = rawInput.trim().split('\n').filter(l => l.trim());
@@ -74,7 +83,8 @@ paul.durand@exemple.fr;Paul DURAND;`;
     
     // Check if first line is a header
     const firstCells = firstLine.toLowerCase().split(separator);
-    const hasHeader = firstCells.some(c => ['email', 'mail', 'nom', 'name', 'display_name', 'service', 'department'].includes(c.trim()));
+    const headerKeywords = ['email', 'mail', 'nom', 'name', 'display_name', 'service', 'department', 'société', 'societe', 'company', 'poste', 'job', 'manager'];
+    const hasHeader = firstCells.some(c => headerKeywords.includes(c.trim()));
     
     const startIndex = hasHeader ? 1 : 0;
     const parsed: ParsedUser[] = [];
@@ -82,12 +92,18 @@ paul.durand@exemple.fr;Paul DURAND;`;
     // Map columns if header exists
     let emailIdx = 0;
     let nameIdx = 1;
-    let deptIdx = 2;
+    let companyIdx = 2;
+    let deptIdx = 3;
+    let jobTitleIdx = 4;
+    let managerIdx = 5;
     
     if (hasHeader) {
       emailIdx = firstCells.findIndex(c => ['email', 'mail'].includes(c.trim()));
       nameIdx = firstCells.findIndex(c => ['nom', 'name', 'display_name', 'displayname'].includes(c.trim()));
+      companyIdx = firstCells.findIndex(c => ['société', 'societe', 'company', 'entreprise'].includes(c.trim()));
       deptIdx = firstCells.findIndex(c => ['service', 'department', 'dept'].includes(c.trim()));
+      jobTitleIdx = firstCells.findIndex(c => ['poste', 'job', 'job_title', 'jobtitle', 'fonction'].includes(c.trim()));
+      managerIdx = firstCells.findIndex(c => ['manager', 'n+1', 'responsable', 'manager_email'].includes(c.trim()));
       
       if (emailIdx === -1) emailIdx = 0;
       if (nameIdx === -1) nameIdx = 1;
@@ -98,7 +114,10 @@ paul.durand@exemple.fr;Paul DURAND;`;
       
       const email = cells[emailIdx] || '';
       const displayName = cells[nameIdx] || '';
+      const company = companyIdx >= 0 ? cells[companyIdx] : undefined;
       const department = deptIdx >= 0 ? cells[deptIdx] : undefined;
+      const jobTitle = jobTitleIdx >= 0 ? cells[jobTitleIdx] : undefined;
+      const manager = managerIdx >= 0 ? cells[managerIdx] : undefined;
       
       // Validate email
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -107,7 +126,10 @@ paul.durand@exemple.fr;Paul DURAND;`;
       parsed.push({
         email,
         displayName: displayName || email.split('@')[0],
+        company,
         department,
+        jobTitle,
+        manager,
         valid,
         error: valid ? undefined : 'Email invalide',
       });
@@ -128,8 +150,23 @@ paul.durand@exemple.fr;Paul DURAND;`;
     setStep('importing');
     const importResults: ImportResult[] = [];
     
+    // Build a map of created users' emails to their profile IDs for manager resolution
+    const createdUsersMap = new Map<string, string>();
+    
+    // First pass: create all users
     for (const user of validUsers) {
       try {
+        // Find company ID if company name is provided
+        let companyId = defaultCompanyId || undefined;
+        if (user.company) {
+          const foundCompany = companies.find(
+            c => c.name.toLowerCase() === user.company!.toLowerCase()
+          );
+          if (foundCompany) {
+            companyId = foundCompany.id;
+          }
+        }
+        
         // Find department ID if department name is provided
         let departmentId = defaultDepartmentId || undefined;
         if (user.department) {
@@ -141,19 +178,57 @@ paul.durand@exemple.fr;Paul DURAND;`;
           }
         }
         
+        // Find job title ID if job title name is provided
+        let jobTitleId = defaultJobTitleId || undefined;
+        if (user.jobTitle) {
+          const foundJobTitle = jobTitles.find(
+            j => j.name.toLowerCase() === user.jobTitle!.toLowerCase()
+          );
+          if (foundJobTitle) {
+            jobTitleId = foundJobTitle.id;
+          }
+        }
+        
+        // Find manager ID - check existing users first, then check imported batch
+        let managerId = defaultManagerId || undefined;
+        if (user.manager) {
+          // First check existing users by email pattern in display_name or by searching profiles
+          const existingManager = users.find(
+            u => u.display_name?.toLowerCase() === user.manager!.toLowerCase() ||
+                 user.manager!.toLowerCase().includes('@')
+          );
+          
+          if (existingManager) {
+            managerId = existingManager.id;
+          } else {
+            // Check if manager is in our import batch and was already created
+            const managerEmail = user.manager.toLowerCase();
+            if (createdUsersMap.has(managerEmail)) {
+              managerId = createdUsersMap.get(managerEmail);
+            }
+          }
+        }
+        
         const response = await supabase.functions.invoke('create-user', {
           body: {
             email: user.email,
             password: defaultPassword,
             display_name: user.displayName,
-            company_id: defaultCompanyId || undefined,
+            company_id: companyId,
             department_id: departmentId,
+            job_title_id: jobTitleId,
             permission_profile_id: defaultPermissionProfileId || undefined,
+            manager_id: managerId,
           },
         });
 
         if (response.error) {
           throw new Error(response.error.message || 'Erreur de création');
+        }
+
+        // Store the created user's profile ID for manager resolution
+        if (response.data?.profile_id) {
+          createdUsersMap.set(user.email.toLowerCase(), response.data.profile_id);
         }
 
         importResults.push({ email: user.email, success: true });
@@ -163,6 +238,25 @@ paul.durand@exemple.fr;Paul DURAND;`;
           success: false, 
           error: error.message || 'Erreur inconnue' 
         });
+      }
+    }
+    
+    // Second pass: update manager references for users whose managers were created after them
+    for (const user of validUsers) {
+      if (user.manager && !defaultManagerId) {
+        const managerEmail = user.manager.toLowerCase();
+        if (createdUsersMap.has(managerEmail)) {
+          const userProfileId = createdUsersMap.get(user.email.toLowerCase());
+          const managerProfileId = createdUsersMap.get(managerEmail);
+          
+          if (userProfileId && managerProfileId) {
+            // Update the user's manager_id
+            await supabase
+              .from('profiles')
+              .update({ manager_id: managerProfileId })
+              .eq('id', userProfileId);
+          }
+        }
       }
     }
     
@@ -185,6 +279,10 @@ paul.durand@exemple.fr;Paul DURAND;`;
   const filteredDepartments = defaultCompanyId 
     ? departments.filter(d => d.company_id === defaultCompanyId)
     : departments;
+
+  const filteredJobTitles = defaultDepartmentId
+    ? jobTitles.filter(j => j.department_id === defaultDepartmentId)
+    : jobTitles;
 
   const validCount = parsedUsers.filter(u => u.valid).length;
   const invalidCount = parsedUsers.filter(u => !u.valid).length;
@@ -214,9 +312,9 @@ paul.durand@exemple.fr;Paul DURAND;`;
               <Info className="h-4 w-4" />
               <AlertTitle>Format attendu</AlertTitle>
               <AlertDescription className="mt-2">
-                <p className="text-sm mb-2">Copiez-collez une liste avec les colonnes : email, nom, service (optionnel)</p>
+                <p className="text-sm mb-2">Copiez-collez une liste avec les colonnes : email, nom, société, service, poste, manager (tous optionnels sauf email)</p>
                 <p className="text-xs text-muted-foreground mb-2">Séparateurs acceptés : tabulation, point-virgule ou virgule</p>
-                <pre className="bg-muted p-2 rounded text-xs overflow-x-auto">{exampleFormat}</pre>
+                <pre className="bg-muted p-2 rounded text-xs overflow-x-auto whitespace-pre-wrap">{exampleFormat}</pre>
                 <Button 
                   variant="ghost" 
                   size="sm" 
@@ -244,12 +342,13 @@ paul.durand@exemple.fr;Paul DURAND;`;
             {/* Default settings */}
             <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
               <h4 className="font-medium">Paramètres par défaut</h4>
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-2">
                   <Label>Société par défaut</Label>
                   <Select value={defaultCompanyId} onValueChange={(v) => {
                     setDefaultCompanyId(v);
                     setDefaultDepartmentId('');
+                    setDefaultJobTitleId('');
                   }}>
                     <SelectTrigger>
                       <SelectValue placeholder="Sélectionner..." />
@@ -263,13 +362,45 @@ paul.durand@exemple.fr;Paul DURAND;`;
                 </div>
                 <div className="space-y-2">
                   <Label>Service par défaut</Label>
-                  <Select value={defaultDepartmentId} onValueChange={setDefaultDepartmentId}>
+                  <Select value={defaultDepartmentId} onValueChange={(v) => {
+                    setDefaultDepartmentId(v);
+                    setDefaultJobTitleId('');
+                  }}>
                     <SelectTrigger>
                       <SelectValue placeholder="Sélectionner..." />
                     </SelectTrigger>
                     <SelectContent>
                       {filteredDepartments.map((d) => (
                         <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Poste par défaut</Label>
+                  <Select value={defaultJobTitleId} onValueChange={setDefaultJobTitleId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {filteredJobTitles.map((j) => (
+                        <SelectItem key={j.id} value={j.id}>{j.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Manager par défaut</Label>
+                  <Select value={defaultManagerId} onValueChange={setDefaultManagerId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sélectionner..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {users.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.display_name || 'Sans nom'}
+                          {u.job_title?.name && ` - ${u.job_title.name}`}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -296,7 +427,7 @@ paul.durand@exemple.fr;Paul DURAND;`;
                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                     placeholder="Changeme123!"
                   />
-                  <p className="text-xs text-muted-foreground">Même mot de passe pour tous (à changer à la 1ère connexion)</p>
+                  <p className="text-xs text-muted-foreground">Même mot de passe pour tous</p>
                 </div>
               </div>
             </div>
@@ -329,7 +460,10 @@ paul.durand@exemple.fr;Paul DURAND;`;
                     <TableHead className="w-[50px]">État</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Nom</TableHead>
+                    <TableHead>Société</TableHead>
                     <TableHead>Service</TableHead>
+                    <TableHead>Poste</TableHead>
+                    <TableHead>Manager</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -345,14 +479,43 @@ paul.durand@exemple.fr;Paul DURAND;`;
                       <TableCell className="font-mono text-sm">{user.email}</TableCell>
                       <TableCell>{user.displayName}</TableCell>
                       <TableCell>
+                        {user.company ? (
+                          companies.find(c => c.name.toLowerCase() === user.company!.toLowerCase()) ? (
+                            <Badge variant="outline">{user.company}</Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">{user.company} (?)</span>
+                          )
+                        ) : (
+                          <span className="text-muted-foreground text-xs">Défaut</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
                         {user.department ? (
                           departments.find(d => d.name.toLowerCase() === user.department!.toLowerCase()) ? (
                             <Badge variant="outline">{user.department}</Badge>
                           ) : (
-                            <span className="text-muted-foreground">{user.department} (non trouvé)</span>
+                            <span className="text-muted-foreground text-xs">{user.department} (?)</span>
                           )
                         ) : (
-                          <span className="text-muted-foreground">Par défaut</span>
+                          <span className="text-muted-foreground text-xs">Défaut</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {user.jobTitle ? (
+                          jobTitles.find(j => j.name.toLowerCase() === user.jobTitle!.toLowerCase()) ? (
+                            <Badge variant="secondary">{user.jobTitle}</Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">{user.jobTitle} (?)</span>
+                          )
+                        ) : (
+                          <span className="text-muted-foreground text-xs">Défaut</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {user.manager ? (
+                          <span className="text-xs">{user.manager}</span>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">Défaut</span>
                         )}
                       </TableCell>
                     </TableRow>

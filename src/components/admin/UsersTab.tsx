@@ -496,7 +496,9 @@ export function UsersTab({
         onOpenChange={setIsBulkImportOpen}
         companies={companies}
         departments={departments}
+        jobTitles={jobTitles}
         permissionProfiles={permissionProfiles}
+        users={users}
         onImportComplete={onUserCreated}
       />
     </div>
