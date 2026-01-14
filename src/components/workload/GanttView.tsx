@@ -27,6 +27,8 @@ interface GanttViewProps {
   isHalfDayAvailable?: (userId: string, date: string, halfDay: 'morning' | 'afternoon') => boolean;
   getTaskSlotsCount?: (taskId: string, userId: string) => number;
   getTaskDuration?: (taskId: string) => number | null; // Duration in half-days
+  getTaskProgress?: (taskId: string) => { completed: number; total: number } | null;
+  plannedTaskIds?: string[]; // Tasks that already have slots
 }
 
 interface DropContext {
@@ -68,6 +70,8 @@ export function GanttView({
   isHalfDayAvailable,
   getTaskSlotsCount,
   getTaskDuration,
+  getTaskProgress,
+  plannedTaskIds = [],
 }: GanttViewProps) {
   const [draggedSlot, setDraggedSlot] = useState<WorkloadSlot | null>(null);
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
@@ -116,6 +120,12 @@ export function GanttView({
   };
 
   const handleDragOver = (e: React.DragEvent, userId: string, date: string, halfDay: 'morning' | 'afternoon') => {
+    // Block drag over weekends
+    const dayDate = parseISO(date);
+    if (isWeekend(dayDate)) {
+      e.dataTransfer.dropEffect = 'none';
+      return;
+    }
     e.preventDefault();
     setDropTarget({ userId, date, halfDay });
   };
@@ -124,8 +134,12 @@ export function GanttView({
     setDropTarget(null);
   };
 
-  // Check if drop target is available
+  // Check if drop target is available (excludes weekends)
   const checkDropAvailable = useCallback((userId: string, date: string, halfDay: 'morning' | 'afternoon'): boolean => {
+    // Block weekends
+    const dayDate = parseISO(date);
+    if (isWeekend(dayDate)) return false;
+    
     if (!isHalfDayAvailable) return true;
     return isHalfDayAvailable(userId, date, halfDay);
   }, [isHalfDayAvailable]);
@@ -217,42 +231,76 @@ export function GanttView({
     await onSlotRemove(slot.id);
   };
 
-  // Available tasks (not fully scheduled)
+  // Available tasks (not yet planned)
   const availableTasks = tasks.filter(t => 
-    t.status !== 'done' && t.status !== 'validated' && t.assignee_id
+    t.status !== 'done' && 
+    t.status !== 'validated' && 
+    t.assignee_id &&
+    !plannedTaskIds.includes(t.id)
   );
 
   return (
     <TooltipProvider>
       <div className="flex gap-4">
         {/* Tasks sidebar */}
-        <div className="w-64 shrink-0 bg-card rounded-lg border p-4">
-          <h3 className="font-semibold mb-3">Tâches à planifier</h3>
+        <div className="w-72 shrink-0 bg-card rounded-lg border p-4">
+          <h3 className="font-semibold mb-3">Tâches à planifier ({availableTasks.length})</h3>
           <div className="space-y-2 max-h-[600px] overflow-y-auto">
-            {availableTasks.map(task => (
-              <div
-                key={task.id}
-                draggable
-                onDragStart={(e) => handleTaskDragStart(e, task)}
-                className={cn(
-                  "p-2 rounded border cursor-grab active:cursor-grabbing hover:bg-muted transition-colors",
-                  getPriorityColor(task.priority) === 'bg-red-500' && "border-red-300",
-                )}
-              >
-                <div className="flex items-center gap-2">
-                  <div className={cn("w-2 h-2 rounded-full", getPriorityColor(task.priority))} />
-                  <span className="text-sm truncate flex-1">{task.title}</span>
+            {availableTasks.map(task => {
+              const duration = getTaskDuration ? getTaskDuration(task.id) : null;
+              const progress = getTaskProgress ? getTaskProgress(task.id) : null;
+              const progressPercent = progress && progress.total > 0 
+                ? Math.round((progress.completed / progress.total) * 100) 
+                : 0;
+              
+              return (
+                <div
+                  key={task.id}
+                  draggable
+                  onDragStart={(e) => handleTaskDragStart(e, task)}
+                  className={cn(
+                    "p-2 rounded border cursor-grab active:cursor-grabbing hover:bg-muted transition-colors",
+                    getPriorityColor(task.priority) === 'bg-red-500' && "border-red-300",
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className={cn("w-2 h-2 rounded-full shrink-0", getPriorityColor(task.priority))} />
+                    <span className="text-sm truncate flex-1">{task.title}</span>
+                  </div>
+                  
+                  <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                    {duration && (
+                      <span className="bg-muted px-1.5 py-0.5 rounded">
+                        {duration / 2} jour{duration > 2 ? 's' : ''}
+                      </span>
+                    )}
+                    {progress && progress.total > 0 && (
+                      <div className="flex items-center gap-1 flex-1">
+                        <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div 
+                            className={cn(
+                              "h-full rounded-full transition-all",
+                              progressPercent === 100 ? "bg-green-500" : "bg-primary"
+                            )}
+                            style={{ width: `${progressPercent}%` }}
+                          />
+                        </div>
+                        <span>{progressPercent}%</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {task.due_date && (
+                    <span className="text-xs text-muted-foreground block mt-1">
+                      Échéance: {format(parseISO(task.due_date), 'dd/MM', { locale: fr })}
+                    </span>
+                  )}
                 </div>
-                {task.due_date && (
-                  <span className="text-xs text-muted-foreground">
-                    Échéance: {format(parseISO(task.due_date), 'dd/MM', { locale: fr })}
-                  </span>
-                )}
-              </div>
-            ))}
+              );
+            })}
             {availableTasks.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-4">
-                Aucune tâche à planifier
+                Toutes les tâches sont planifiées
               </p>
             )}
           </div>

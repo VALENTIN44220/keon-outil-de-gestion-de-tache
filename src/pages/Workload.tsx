@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useWorkloadPlanning } from '@/hooks/useWorkloadPlanning';
@@ -150,6 +150,19 @@ export default function Workload() {
     return 2;
   }, [slots]);
 
+  // Get task progress from checklists (placeholder - needs checklist data)
+  const getTaskProgress = useCallback((taskId: string): { completed: number; total: number } | null => {
+    // This would need to be integrated with useChecklists hook
+    // For now, return null to indicate no progress data
+    return null;
+  }, []);
+
+  // Get list of task IDs that already have planning slots
+  const plannedTaskIds = useMemo(() => {
+    const uniqueTaskIds = new Set(slots.map(s => s.task_id));
+    return Array.from(uniqueTaskIds);
+  }, [slots]);
+
   return (
     <div className="flex h-screen bg-background">
       <Sidebar 
@@ -227,6 +240,8 @@ export default function Workload() {
                     isHalfDayAvailable={isHalfDayAvailable}
                     getTaskSlotsCount={getTaskSlotsCount}
                     getTaskDuration={getTaskDuration}
+                    getTaskProgress={getTaskProgress}
+                    plannedTaskIds={plannedTaskIds}
                   />
                 </TabsContent>
 
