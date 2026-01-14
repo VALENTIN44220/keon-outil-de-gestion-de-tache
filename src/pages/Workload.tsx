@@ -16,9 +16,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Task } from '@/types/task';
 import { toast } from 'sonner';
+import { Sidebar } from '@/components/layout/Sidebar';
+import { Header } from '@/components/layout/Header';
 
 export default function Workload() {
   const { profile } = useAuth();
+  const [activeView, setActiveView] = useState('workload');
   const [activeTab, setActiveTab] = useState('gantt');
   const [startDate, setStartDate] = useState(() => startOfMonth(new Date()));
   const [endDate, setEndDate] = useState(() => endOfMonth(new Date()));
@@ -107,99 +110,110 @@ export default function Workload() {
   };
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Plan de charge</h1>
+    <div className="flex h-screen bg-background">
+      <Sidebar 
+        activeView={activeView} 
+        onViewChange={setActiveView} 
+      />
+      
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <Header 
+          title="Plan de charge"
+          searchQuery=""
+          onSearchChange={() => {}}
+        />
+        
+        <main className="flex-1 overflow-y-auto p-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
+              <TabsTrigger value="gantt" className="gap-2">
+                <GanttChart className="h-4 w-4" />
+                <span className="hidden sm:inline">Gantt</span>
+              </TabsTrigger>
+              <TabsTrigger value="calendar" className="gap-2">
+                <CalendarDays className="h-4 w-4" />
+                <span className="hidden sm:inline">Calendrier</span>
+              </TabsTrigger>
+              <TabsTrigger value="summary" className="gap-2">
+                <BarChart3 className="h-4 w-4" />
+                <span className="hidden sm:inline">Bilan</span>
+              </TabsTrigger>
+              <TabsTrigger value="leaves" className="gap-2">
+                <Palmtree className="h-4 w-4" />
+                <span className="hidden sm:inline">Congés</span>
+              </TabsTrigger>
+              <TabsTrigger value="holidays" className="gap-2">
+                <CalendarCheck className="h-4 w-4" />
+                <span className="hidden sm:inline">Fériés</span>
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Filters for planning views */}
+            {(activeTab === 'gantt' || activeTab === 'calendar' || activeTab === 'summary') && (
+              <WorkloadFilters
+                startDate={startDate}
+                endDate={endDate}
+                onDateRangeChange={handleDateRangeChange}
+                selectedUserIds={selectedUserIds}
+                onUserIdsChange={setSelectedUserIds}
+                selectedProcessId={selectedProcessId}
+                onProcessIdChange={setSelectedProcessId}
+                selectedCompanyId={selectedCompanyId}
+                onCompanyIdChange={setSelectedCompanyId}
+                teamMembers={teamMembers}
+              />
+            )}
+
+            {isLoading && (activeTab === 'gantt' || activeTab === 'calendar' || activeTab === 'summary') ? (
+              <Card>
+                <CardContent className="flex items-center justify-center h-64">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                <TabsContent value="gantt" className="mt-4">
+                  <GanttView
+                    workloadData={workloadData}
+                    startDate={startDate}
+                    endDate={endDate}
+                    tasks={tasks}
+                    onSlotAdd={handleAddSlot}
+                    onSlotRemove={handleRemoveSlot}
+                    onSlotMove={handleMoveSlot}
+                  />
+                </TabsContent>
+
+                <TabsContent value="calendar" className="mt-4">
+                  <WorkloadCalendarView
+                    workloadData={workloadData}
+                    holidays={holidays}
+                    leaves={leaves}
+                    selectedUserId={selectedCalendarUserId}
+                    onUserSelect={setSelectedCalendarUserId}
+                  />
+                </TabsContent>
+
+                <TabsContent value="summary" className="mt-4">
+                  <WorkloadSummaryView
+                    workloadData={workloadData}
+                    startDate={startDate}
+                    endDate={endDate}
+                  />
+                </TabsContent>
+              </>
+            )}
+
+            <TabsContent value="leaves" className="mt-4">
+              <LeaveManagement />
+            </TabsContent>
+
+            <TabsContent value="holidays" className="mt-4">
+              <HolidayManagement />
+            </TabsContent>
+          </Tabs>
+        </main>
       </div>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
-          <TabsTrigger value="gantt" className="gap-2">
-            <GanttChart className="h-4 w-4" />
-            <span className="hidden sm:inline">Gantt</span>
-          </TabsTrigger>
-          <TabsTrigger value="calendar" className="gap-2">
-            <CalendarDays className="h-4 w-4" />
-            <span className="hidden sm:inline">Calendrier</span>
-          </TabsTrigger>
-          <TabsTrigger value="summary" className="gap-2">
-            <BarChart3 className="h-4 w-4" />
-            <span className="hidden sm:inline">Bilan</span>
-          </TabsTrigger>
-          <TabsTrigger value="leaves" className="gap-2">
-            <Palmtree className="h-4 w-4" />
-            <span className="hidden sm:inline">Congés</span>
-          </TabsTrigger>
-          <TabsTrigger value="holidays" className="gap-2">
-            <CalendarCheck className="h-4 w-4" />
-            <span className="hidden sm:inline">Fériés</span>
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Filters for planning views */}
-        {(activeTab === 'gantt' || activeTab === 'calendar' || activeTab === 'summary') && (
-          <WorkloadFilters
-            startDate={startDate}
-            endDate={endDate}
-            onDateRangeChange={handleDateRangeChange}
-            selectedUserIds={selectedUserIds}
-            onUserIdsChange={setSelectedUserIds}
-            selectedProcessId={selectedProcessId}
-            onProcessIdChange={setSelectedProcessId}
-            selectedCompanyId={selectedCompanyId}
-            onCompanyIdChange={setSelectedCompanyId}
-            teamMembers={teamMembers}
-          />
-        )}
-
-        {isLoading && (activeTab === 'gantt' || activeTab === 'calendar' || activeTab === 'summary') ? (
-          <Card>
-            <CardContent className="flex items-center justify-center h-64">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </CardContent>
-          </Card>
-        ) : (
-          <>
-            <TabsContent value="gantt" className="mt-4">
-              <GanttView
-                workloadData={workloadData}
-                startDate={startDate}
-                endDate={endDate}
-                tasks={tasks}
-                onSlotAdd={handleAddSlot}
-                onSlotRemove={handleRemoveSlot}
-                onSlotMove={handleMoveSlot}
-              />
-            </TabsContent>
-
-            <TabsContent value="calendar" className="mt-4">
-              <WorkloadCalendarView
-                workloadData={workloadData}
-                holidays={holidays}
-                leaves={leaves}
-                selectedUserId={selectedCalendarUserId}
-                onUserSelect={setSelectedCalendarUserId}
-              />
-            </TabsContent>
-
-            <TabsContent value="summary" className="mt-4">
-              <WorkloadSummaryView
-                workloadData={workloadData}
-                startDate={startDate}
-                endDate={endDate}
-              />
-            </TabsContent>
-          </>
-        )}
-
-        <TabsContent value="leaves" className="mt-4">
-          <LeaveManagement />
-        </TabsContent>
-
-        <TabsContent value="holidays" className="mt-4">
-          <HolidayManagement />
-        </TabsContent>
-      </Tabs>
     </div>
   );
 }
