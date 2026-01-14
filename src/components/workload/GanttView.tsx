@@ -26,6 +26,7 @@ interface GanttViewProps {
   onSegmentSlot?: (slot: WorkloadSlot, userId: string, segments: number) => Promise<void>;
   isHalfDayAvailable?: (userId: string, date: string, halfDay: 'morning' | 'afternoon') => boolean;
   getTaskSlotsCount?: (taskId: string, userId: string) => number;
+  getTaskDuration?: (taskId: string) => number | null; // Duration in half-days
 }
 
 interface DropContext {
@@ -33,12 +34,25 @@ interface DropContext {
   userId: string;
   date: string;
   halfDay: 'morning' | 'afternoon';
+  taskDuration: number; // Duration in half-days
 }
 
 interface SegmentContext {
   slot: WorkloadSlot;
   userId: string;
   currentCount: number;
+  taskDuration: number; // Total duration in half-days
+}
+
+// Helper to get valid segment options (divisors of total duration)
+function getValidSegmentOptions(totalHalfDays: number): number[] {
+  const options: number[] = [];
+  for (let i = 1; i <= totalHalfDays; i++) {
+    if (totalHalfDays % i === 0) {
+      options.push(i);
+    }
+  }
+  return options;
 }
 
 export function GanttView({
@@ -53,6 +67,7 @@ export function GanttView({
   onSegmentSlot,
   isHalfDayAvailable,
   getTaskSlotsCount,
+  getTaskDuration,
 }: GanttViewProps) {
   const [draggedSlot, setDraggedSlot] = useState<WorkloadSlot | null>(null);
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
@@ -126,22 +141,30 @@ export function GanttView({
       }
       setDraggedSlot(null);
     } else if (draggedTask) {
-      // Check if target is available - if not, auto-segment
       const isAvailable = checkDropAvailable(userId, date, halfDay);
+      const taskDuration = getTaskDuration ? getTaskDuration(draggedTask.id) : null;
       
-      if (!isAvailable && onMultiSlotAdd) {
-        // Auto-segment: find next available slot and add there
-        await onMultiSlotAdd(draggedTask.id, userId, date, halfDay, 1);
+      if (isAvailable && taskDuration === null) {
+        // No duration defined and slot available - place directly with 1 slot
+        await onSlotAdd(draggedTask.id, userId, date, halfDay);
+        setDraggedTask(null);
+      } else if (isAvailable && taskDuration === 2) {
+        // Duration is 1 day (2 half-days) and slot available - place directly
+        if (onMultiSlotAdd) {
+          await onMultiSlotAdd(draggedTask.id, userId, date, halfDay, 2);
+        }
         setDraggedTask(null);
       } else {
-        // Show dialog to choose number of half-days
+        // Show dialog to choose segmentation
+        const duration = taskDuration || 2; // Default to 1 day if not defined
         setMultiSlotContext({
           task: draggedTask,
           userId,
           date,
           halfDay,
+          taskDuration: duration,
         });
-        setHalfDayCount(1);
+        setHalfDayCount(duration); // Default to full duration (1 segment per half-day)
         setShowMultiSlotDialog(true);
         setDraggedTask(null);
       }
@@ -153,11 +176,9 @@ export function GanttView({
     
     setIsAdding(true);
     try {
-      // Always use multi-slot add to handle segmentation automatically
+      // Add the total duration worth of slots
       if (onMultiSlotAdd) {
-        await onMultiSlotAdd(multiSlotContext.task.id, multiSlotContext.userId, multiSlotContext.date, multiSlotContext.halfDay, halfDayCount);
-      } else if (halfDayCount === 1) {
-        await onSlotAdd(multiSlotContext.task.id, multiSlotContext.userId, multiSlotContext.date, multiSlotContext.halfDay);
+        await onMultiSlotAdd(multiSlotContext.task.id, multiSlotContext.userId, multiSlotContext.date, multiSlotContext.halfDay, multiSlotContext.taskDuration);
       }
       setShowMultiSlotDialog(false);
       setMultiSlotContext(null);
@@ -171,7 +192,8 @@ export function GanttView({
   // Handle right-click to segment
   const handleSegmentRequest = (slot: WorkloadSlot, userId: string) => {
     const currentCount = getTaskSlotsCount ? getTaskSlotsCount(slot.task_id, userId) : 1;
-    setSegmentContext({ slot, userId, currentCount });
+    const taskDuration = getTaskDuration ? getTaskDuration(slot.task_id) : currentCount;
+    setSegmentContext({ slot, userId, currentCount, taskDuration: taskDuration || currentCount });
     setNewSegmentCount(currentCount);
     setShowSegmentDialog(true);
   };
@@ -423,91 +445,85 @@ export function GanttView({
         </div>
       </div>
 
-      {/* Multi-slot dialog */}
+      {/* Multi-slot dialog - Segmentation choice */}
       <Dialog open={showMultiSlotDialog} onOpenChange={setShowMultiSlotDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Planifier des créneaux</DialogTitle>
+            <DialogTitle>Planifier la tâche</DialogTitle>
             <DialogDescription>
-              Choisissez le nombre de demi-journées à planifier. Les créneaux seront automatiquement répartis en évitant les weekends, jours fériés et congés.
+              Choisissez comment segmenter cette tâche. Les créneaux seront automatiquement répartis en évitant les weekends, jours fériés et congés.
             </DialogDescription>
           </DialogHeader>
           
-          {multiSlotContext && (
-            <div className="space-y-4">
-              <div className="p-3 bg-muted rounded-lg">
-                <p className="font-medium">{multiSlotContext.task.title}</p>
-                <p className="text-sm text-muted-foreground">
-                  À partir du {format(parseISO(multiSlotContext.date), 'EEEE d MMMM', { locale: fr })} ({multiSlotContext.halfDay === 'morning' ? 'matin' : 'après-midi'})
-                </p>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="halfDayCount">Nombre de demi-journées</Label>
-                <div className="flex items-center gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="icon"
-                    onClick={() => setHalfDayCount(Math.max(1, halfDayCount - 1))}
-                    disabled={halfDayCount <= 1}
-                  >
-                    -
-                  </Button>
-                  <Input
-                    id="halfDayCount"
-                    type="number"
-                    min={1}
-                    max={40}
-                    value={halfDayCount}
-                    onChange={(e) => setHalfDayCount(Math.max(1, Math.min(40, parseInt(e.target.value) || 1)))}
-                    className="w-20 text-center"
-                  />
-                  <Button 
-                    variant="outline" 
-                    size="icon"
-                    onClick={() => setHalfDayCount(Math.min(40, halfDayCount + 1))}
-                    disabled={halfDayCount >= 40}
-                  >
-                    +
-                  </Button>
-                  <span className="text-sm text-muted-foreground ml-2">
-                    = {(halfDayCount / 2).toFixed(1)} jour(s)
-                  </span>
+          {multiSlotContext && (() => {
+            const totalHalfDays = multiSlotContext.taskDuration;
+            const totalDays = totalHalfDays / 2;
+            const validOptions = getValidSegmentOptions(totalHalfDays);
+            
+            return (
+              <div className="space-y-4">
+                <div className="p-3 bg-muted rounded-lg">
+                  <p className="font-medium">{multiSlotContext.task.title}</p>
+                  <p className="text-sm text-muted-foreground">
+                    À partir du {format(parseISO(multiSlotContext.date), 'EEEE d MMMM', { locale: fr })} ({multiSlotContext.halfDay === 'morning' ? 'matin' : 'après-midi'})
+                  </p>
+                  <div className="mt-2 p-2 bg-primary/10 rounded border border-primary/20">
+                    <p className="text-sm font-medium text-primary">
+                      Durée totale: {totalHalfDays} demi-journée{totalHalfDays > 1 ? 's' : ''} ({totalDays} jour{totalDays > 1 ? 's' : ''})
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Segmentation</Label>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Divisez la tâche en segments égaux :
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {validOptions.map(segments => {
+                      const halfDaysPerSegment = totalHalfDays / segments;
+                      const daysPerSegment = halfDaysPerSegment / 2;
+                      const isSelected = halfDayCount === totalHalfDays / segments * segments; // Check if this results in correct total
+                      
+                      let label = '';
+                      if (segments === 1) {
+                        label = `1 bloc de ${totalDays} jour${totalDays > 1 ? 's' : ''}`;
+                      } else if (halfDaysPerSegment === 1) {
+                        label = `${segments} × ½ journée`;
+                      } else if (halfDaysPerSegment === 2) {
+                        label = `${segments} × 1 jour`;
+                      } else {
+                        label = `${segments} × ${daysPerSegment} jour${daysPerSegment > 1 ? 's' : ''}`;
+                      }
+                      
+                      return (
+                        <Button
+                          key={segments}
+                          variant={halfDayCount === totalHalfDays ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setHalfDayCount(totalHalfDays)}
+                          className={cn(
+                            halfDayCount === totalHalfDays && segments === validOptions[validOptions.length - 1] 
+                              ? "ring-2 ring-primary" 
+                              : ""
+                          )}
+                        >
+                          {label}
+                        </Button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-              
-              <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => setHalfDayCount(2)}
-                >
-                  1 jour
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => setHalfDayCount(4)}
-                >
-                  2 jours
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => setHalfDayCount(10)}
-                >
-                  1 semaine
-                </Button>
-              </div>
-            </div>
-          )}
+            );
+          })()}
           
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowMultiSlotDialog(false)}>
               Annuler
             </Button>
             <Button onClick={handleConfirmMultiSlot} disabled={isAdding}>
-              {isAdding ? 'Ajout...' : `Planifier ${halfDayCount} créneau${halfDayCount > 1 ? 'x' : ''}`}
+              {isAdding ? 'Planification...' : `Planifier ${multiSlotContext?.taskDuration || 0} créneau${(multiSlotContext?.taskDuration || 0) > 1 ? 'x' : ''}`}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -519,85 +535,77 @@ export function GanttView({
           <DialogHeader>
             <DialogTitle>Segmenter la tâche</DialogTitle>
             <DialogDescription>
-              Modifiez le nombre de demi-journées allouées à cette tâche. La segmentation recommencera à partir du premier créneau existant.
+              Redistribuez les créneaux de cette tâche. La somme des créneaux reste égale à la durée totale.
             </DialogDescription>
           </DialogHeader>
           
-          {segmentContext && (
-            <div className="space-y-4">
-              <div className="p-3 bg-muted rounded-lg">
-                <p className="font-medium">{segmentContext.slot.task?.title}</p>
-                <p className="text-sm text-muted-foreground">
-                  Créneaux actuels: {segmentContext.currentCount} demi-journée{segmentContext.currentCount > 1 ? 's' : ''} ({(segmentContext.currentCount / 2).toFixed(1)} jour{segmentContext.currentCount > 2 ? 's' : ''})
-                </p>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="newSegmentCount">Nouveau nombre de demi-journées</Label>
-                <div className="flex items-center gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="icon"
-                    onClick={() => setNewSegmentCount(Math.max(1, newSegmentCount - 1))}
-                    disabled={newSegmentCount <= 1}
-                  >
-                    -
-                  </Button>
-                  <Input
-                    id="newSegmentCount"
-                    type="number"
-                    min={1}
-                    max={40}
-                    value={newSegmentCount}
-                    onChange={(e) => setNewSegmentCount(Math.max(1, Math.min(40, parseInt(e.target.value) || 1)))}
-                    className="w-20 text-center"
-                  />
-                  <Button 
-                    variant="outline" 
-                    size="icon"
-                    onClick={() => setNewSegmentCount(Math.min(40, newSegmentCount + 1))}
-                    disabled={newSegmentCount >= 40}
-                  >
-                    +
-                  </Button>
-                  <span className="text-sm text-muted-foreground ml-2">
-                    = {(newSegmentCount / 2).toFixed(1)} jour(s)
-                  </span>
+          {segmentContext && (() => {
+            const totalHalfDays = segmentContext.taskDuration;
+            const totalDays = totalHalfDays / 2;
+            const validOptions = getValidSegmentOptions(totalHalfDays);
+            
+            return (
+              <div className="space-y-4">
+                <div className="p-3 bg-muted rounded-lg">
+                  <p className="font-medium">{segmentContext.slot.task?.title}</p>
+                  <div className="mt-2 p-2 bg-primary/10 rounded border border-primary/20">
+                    <p className="text-sm font-medium text-primary">
+                      Durée totale: {totalHalfDays} demi-journée{totalHalfDays > 1 ? 's' : ''} ({totalDays} jour{totalDays > 1 ? 's' : ''})
+                    </p>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Actuellement: {segmentContext.currentCount} créneau{segmentContext.currentCount > 1 ? 'x' : ''}
+                  </p>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label>Nouvelle segmentation</Label>
+                  <p className="text-sm text-muted-foreground mb-2">
+                    Choisissez comment diviser les {totalHalfDays} demi-journées :
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {validOptions.map(segments => {
+                      const halfDaysPerSegment = totalHalfDays / segments;
+                      const daysPerSegment = halfDaysPerSegment / 2;
+                      const isSelected = newSegmentCount === segments;
+                      
+                      let label = '';
+                      if (segments === 1) {
+                        label = `1 bloc de ${totalDays} jour${totalDays > 1 ? 's' : ''}`;
+                      } else if (halfDaysPerSegment === 1) {
+                        label = `${segments} × ½ journée`;
+                      } else if (halfDaysPerSegment === 2) {
+                        label = `${segments} × 1 jour`;
+                      } else {
+                        label = `${segments} × ${daysPerSegment} jour${daysPerSegment > 1 ? 's' : ''}`;
+                      }
+                      
+                      return (
+                        <Button
+                          key={segments}
+                          variant={isSelected ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setNewSegmentCount(segments)}
+                        >
+                          {label}
+                        </Button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-              
-              <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => setNewSegmentCount(2)}
-                >
-                  1 jour
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => setNewSegmentCount(4)}
-                >
-                  2 jours
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => setNewSegmentCount(10)}
-                >
-                  1 semaine
-                </Button>
-              </div>
-            </div>
-          )}
+            );
+          })()}
           
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowSegmentDialog(false)}>
               Annuler
             </Button>
-            <Button onClick={handleConfirmSegment} disabled={isAdding || !onSegmentSlot}>
-              {isAdding ? 'Segmentation...' : `Segmenter en ${newSegmentCount} créneau${newSegmentCount > 1 ? 'x' : ''}`}
+            <Button 
+              onClick={handleConfirmSegment} 
+              disabled={isAdding || !onSegmentSlot || newSegmentCount === segmentContext?.currentCount}
+            >
+              {isAdding ? 'Segmentation...' : 'Appliquer la segmentation'}
             </Button>
           </DialogFooter>
         </DialogContent>
