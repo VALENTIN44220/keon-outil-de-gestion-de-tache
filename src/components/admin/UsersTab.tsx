@@ -7,10 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, UserPlus, Users, Building2, Briefcase, Layers, Shield, ChevronUp, ChevronDown, AlertCircle, RefreshCw } from 'lucide-react';
+import { Plus, UserPlus, Users, Building2, Briefcase, Layers, Shield, ChevronUp, ChevronDown, AlertCircle, RefreshCw, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { RefreshButton } from './RefreshButton';
+import { BulkUserImportDialog } from './BulkUserImportDialog';
 import type { Company, Department, JobTitle, HierarchyLevel, PermissionProfile, UserProfile } from '@/types/admin';
 
 interface UsersTabProps {
@@ -37,6 +38,7 @@ export function UsersTab({
   onRefresh,
 }: UsersTabProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   
@@ -184,6 +186,10 @@ export function UsersTab({
             </div>
             <div className="flex items-center gap-2">
               <RefreshButton onRefresh={onRefresh} />
+              <Button variant="outline" onClick={() => setIsBulkImportOpen(true)}>
+                <Upload className="mr-2 h-4 w-4" />
+                Import en masse
+              </Button>
             <Dialog open={isDialogOpen} onOpenChange={(open) => {
               setIsDialogOpen(open);
               if (!open) resetForm();
@@ -483,6 +489,16 @@ export function UsersTab({
           )}
         </CardContent>
       </Card>
+
+      {/* Bulk Import Dialog */}
+      <BulkUserImportDialog
+        open={isBulkImportOpen}
+        onOpenChange={setIsBulkImportOpen}
+        companies={companies}
+        departments={departments}
+        permissionProfiles={permissionProfiles}
+        onImportComplete={onUserCreated}
+      />
     </div>
   );
 }
