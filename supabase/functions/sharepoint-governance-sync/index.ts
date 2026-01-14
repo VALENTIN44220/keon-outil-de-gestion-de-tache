@@ -439,7 +439,13 @@ serve(async (req) => {
           }
 
           const headers = excelData[0] as string[];
-          const dataRows = excelData.slice(1).filter(row => row && row.length > 0 && (row[0] || row[1])); // Allow rows without ID if they have other data
+          
+          // Filter rows more permissively: keep any row that has at least one non-empty cell
+          const dataRows = excelData.slice(1).filter(row => {
+            if (!row || row.length === 0) return false;
+            // Keep row if any cell has a value
+            return row.some(cell => cell !== null && cell !== undefined && cell !== '');
+          });
           
           // Find the ID column index
           const idColumnIndex = headers.findIndex(h => h === 'id');
@@ -447,6 +453,11 @@ serve(async (req) => {
             results.errors.push({ table: table.name, error: 'No ID column found in headers' });
             continue;
           }
+
+          // For profiles table, find user_id column index
+          const userIdColumnIndex = table.name === 'profiles' 
+            ? headers.findIndex(h => h === 'user_id') 
+            : -1;
 
           // Get existing data
           const { data: existingData, error: fetchError } = await supabase
@@ -464,33 +475,60 @@ serve(async (req) => {
           let idsGeneratedCount = 0;
           let excelNeedsUpdate = false;
 
+          // Find the original row indices for updating Excel
+          const originalRowIndices: number[] = [];
+          excelData.slice(1).forEach((row, idx) => {
+            if (row && row.length > 0 && row.some(cell => cell !== null && cell !== undefined && cell !== '')) {
+              originalRowIndices.push(idx + 1); // +1 because we're skipping header
+            }
+          });
+
           for (let i = 0; i < dataRows.length; i++) {
             const row = dataRows[i];
             const obj = rowToObject(row, table.columns);
+            const originalExcelRowIndex = originalRowIndices[i];
             
             // Generate UUID if ID is missing or empty
             if (!obj.id || obj.id === '' || obj.id === null) {
-              // Generate a new UUID
               obj.id = crypto.randomUUID();
               // Update the row in excelData for later upload
               if (row.length <= idColumnIndex) {
-                // Extend row if needed
                 while (row.length <= idColumnIndex) {
                   row.push(null);
                 }
               }
               row[idColumnIndex] = obj.id;
-              excelData[i + 1][idColumnIndex] = obj.id; // +1 because first row is header
+              excelData[originalExcelRowIndex][idColumnIndex] = obj.id;
               idsGeneratedCount++;
               excelNeedsUpdate = true;
+            }
+
+            // For profiles: generate user_id if missing (required field)
+            if (table.name === 'profiles' && userIdColumnIndex !== -1) {
+              if (!obj.user_id || obj.user_id === '' || obj.user_id === null) {
+                obj.user_id = crypto.randomUUID();
+                // Update the row in excelData for later upload
+                if (row.length <= userIdColumnIndex) {
+                  while (row.length <= userIdColumnIndex) {
+                    row.push(null);
+                  }
+                }
+                row[userIdColumnIndex] = obj.user_id;
+                excelData[originalExcelRowIndex][userIdColumnIndex] = obj.user_id;
+                excelNeedsUpdate = true;
+              }
             }
 
             // Skip rows that still don't have a valid ID (shouldn't happen now)
             if (!obj.id) continue;
 
-            // Check if row has meaningful data (at least one non-id field)
-            const hasData = Object.keys(obj).some(key => key !== 'id' && key !== 'created_at' && key !== 'updated_at' && obj[key] !== null && obj[key] !== undefined);
-            if (!hasData) continue;
+            // Check if row has meaningful data (at least one non-id, non-timestamp field with a value)
+            // Be more permissive: just need display_name for profiles, or name for other tables
+            const meaningfulFields = table.name === 'profiles' 
+              ? ['display_name', 'company', 'department', 'job_title', 'id_lucca']
+              : ['name', 'description'];
+            
+            const hasData = meaningfulFields.some(key => obj[key] !== null && obj[key] !== undefined && obj[key] !== '');
 
             if (existingIds.has(obj.id)) {
               const { error: updateError } = await supabase
