@@ -127,14 +127,28 @@ export default function Workload() {
     }
   };
 
-  const handleSegmentSlot = async (slot: WorkloadSlot, userId: string, newCount: number) => {
+  const handleSegmentSlot = async (slot: WorkloadSlot, userId: string, newSegmentCount: number) => {
     try {
-      const created = await segmentTaskSlots(slot.task_id, userId, newCount);
-      toast.success(`Tâche segmentée en ${created.length} créneau${created.length > 1 ? 'x' : ''}`);
+      // newSegmentCount is the number of segments, we need to calculate total half-days
+      const currentCount = getTaskSlotsCount(slot.task_id, userId);
+      // The total half-days stays the same, but we redistribute them
+      const created = await segmentTaskSlots(slot.task_id, userId, currentCount);
+      toast.success(`Tâche redistribuée en ${created.length} créneau${created.length > 1 ? 'x' : ''}`);
     } catch (error: any) {
       toast.error(error.message || 'Erreur lors de la segmentation');
     }
   };
+
+  // Get task duration in half-days (from existing slots or default)
+  const getTaskDuration = useCallback((taskId: string): number | null => {
+    // First check if task already has slots - use that count as duration
+    const existingSlotCount = slots.filter(s => s.task_id === taskId).length;
+    if (existingSlotCount > 0) {
+      return existingSlotCount;
+    }
+    // Default to 2 half-days (1 day) for new tasks
+    return 2;
+  }, [slots]);
 
   return (
     <div className="flex h-screen bg-background">
@@ -212,6 +226,7 @@ export default function Workload() {
                     onSegmentSlot={handleSegmentSlot}
                     isHalfDayAvailable={isHalfDayAvailable}
                     getTaskSlotsCount={getTaskSlotsCount}
+                    getTaskDuration={getTaskDuration}
                   />
                 </TabsContent>
 
