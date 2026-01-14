@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
+import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useWorkloadPlanning } from '@/hooks/useWorkloadPlanning';
 import { WorkloadFilters } from '@/components/workload/WorkloadFilters';
@@ -8,10 +8,12 @@ import { WorkloadCalendarView } from '@/components/workload/WorkloadCalendarView
 import { WorkloadSummaryView } from '@/components/workload/WorkloadSummaryView';
 import { LeaveManagement } from '@/components/workload/LeaveManagement';
 import { HolidayManagement } from '@/components/workload/HolidayManagement';
+import { TeamWorkloadView } from '@/components/team/TeamWorkloadView';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, GanttChart, CalendarDays, BarChart3, Palmtree, CalendarCheck } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import { Loader2, GanttChart, CalendarDays, BarChart3, Palmtree, CalendarCheck, Download, RefreshCw, Users } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Task } from '@/types/task';
@@ -163,6 +165,59 @@ export default function Workload() {
     return Array.from(uniqueTaskIds);
   }, [slots]);
 
+  // Export to ICS format
+  const handleExportICS = () => {
+    try {
+      let icsContent = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//KEON//Plan de charge//FR',
+        'CALSCALE:GREGORIAN',
+        'METHOD:PUBLISH',
+      ];
+
+      slots.forEach(slot => {
+        const task = tasks.find(t => t.id === slot.task_id);
+        if (!task) return;
+
+        const startHour = slot.half_day === 'morning' ? '08' : '14';
+        const endHour = slot.half_day === 'morning' ? '12' : '18';
+        const dateStr = slot.date.replace(/-/g, '');
+
+        icsContent.push(
+          'BEGIN:VEVENT',
+          `UID:${slot.id}@keon.app`,
+          `DTSTART:${dateStr}T${startHour}0000`,
+          `DTEND:${dateStr}T${endHour}0000`,
+          `SUMMARY:${task.title}`,
+          `DESCRIPTION:${task.description || ''}`,
+          'END:VEVENT'
+        );
+      });
+
+      icsContent.push('END:VCALENDAR');
+
+      const blob = new Blob([icsContent.join('\r\n')], { type: 'text/calendar' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `plan-charge-${format(new Date(), 'yyyy-MM-dd')}.ics`;
+      a.click();
+      URL.revokeObjectURL(url);
+      
+      toast.success('Calendrier exporté au format ICS');
+    } catch (error) {
+      toast.error('Erreur lors de l\'export');
+    }
+  };
+
+  // Open Outlook web calendar sync
+  const handleOutlookSync = () => {
+    // Microsoft Graph would require OAuth, for now show info
+    toast.info('Synchronisation Outlook : Importez le fichier ICS exporté dans votre calendrier Outlook');
+    handleExportICS();
+  };
+
   return (
     <div className="flex h-screen bg-background">
       <Sidebar 
@@ -177,30 +232,57 @@ export default function Workload() {
           onSearchChange={() => {}}
         />
         
-        <main className="flex-1 overflow-y-auto p-6">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
-              <TabsTrigger value="gantt" className="gap-2">
-                <GanttChart className="h-4 w-4" />
-                <span className="hidden sm:inline">Gantt</span>
-              </TabsTrigger>
-              <TabsTrigger value="calendar" className="gap-2">
-                <CalendarDays className="h-4 w-4" />
-                <span className="hidden sm:inline">Calendrier</span>
-              </TabsTrigger>
-              <TabsTrigger value="summary" className="gap-2">
-                <BarChart3 className="h-4 w-4" />
-                <span className="hidden sm:inline">Bilan</span>
-              </TabsTrigger>
-              <TabsTrigger value="leaves" className="gap-2">
-                <Palmtree className="h-4 w-4" />
-                <span className="hidden sm:inline">Congés</span>
-              </TabsTrigger>
-              <TabsTrigger value="holidays" className="gap-2">
-                <CalendarCheck className="h-4 w-4" />
-                <span className="hidden sm:inline">Fériés</span>
-              </TabsTrigger>
-            </TabsList>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+              <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-grid">
+                <TabsTrigger value="gantt" className="gap-2">
+                  <GanttChart className="h-4 w-4" />
+                  <span className="hidden sm:inline">Gantt</span>
+                </TabsTrigger>
+                <TabsTrigger value="calendar" className="gap-2">
+                  <CalendarDays className="h-4 w-4" />
+                  <span className="hidden sm:inline">Calendrier</span>
+                </TabsTrigger>
+                <TabsTrigger value="summary" className="gap-2">
+                  <BarChart3 className="h-4 w-4" />
+                  <span className="hidden sm:inline">Bilan</span>
+                </TabsTrigger>
+                <TabsTrigger value="team" className="gap-2">
+                  <Users className="h-4 w-4" />
+                  <span className="hidden sm:inline">Équipe</span>
+                </TabsTrigger>
+                <TabsTrigger value="leaves" className="gap-2">
+                  <Palmtree className="h-4 w-4" />
+                  <span className="hidden sm:inline">Congés</span>
+                </TabsTrigger>
+                <TabsTrigger value="holidays" className="gap-2">
+                  <CalendarCheck className="h-4 w-4" />
+                  <span className="hidden sm:inline">Fériés</span>
+                </TabsTrigger>
+              </TabsList>
+
+              {/* Export / Sync buttons */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <Download className="h-4 w-4" />
+                    <span className="hidden sm:inline">Exporter</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleExportICS}>
+                    <CalendarDays className="h-4 w-4 mr-2" />
+                    Exporter en ICS
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleOutlookSync}>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Synchroniser Outlook
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
 
             {/* Filters for planning views */}
             {(activeTab === 'gantt' || activeTab === 'calendar' || activeTab === 'summary') && (
@@ -261,6 +343,10 @@ export default function Workload() {
                     startDate={startDate}
                     endDate={endDate}
                   />
+                </TabsContent>
+
+                <TabsContent value="team" className="mt-4">
+                  <TeamWorkloadView />
                 </TabsContent>
               </>
             )}

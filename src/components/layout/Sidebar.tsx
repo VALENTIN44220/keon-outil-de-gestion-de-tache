@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   FolderOpen,
   CalendarClock,
+  Menu,
 } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
@@ -26,6 +27,7 @@ import { NewTaskDialog } from '@/components/tasks/NewTaskDialog';
 import { NewRequestDialog } from '@/components/tasks/NewRequestDialog';
 import { BERequestDialog } from '@/components/tasks/BERequestDialog';
 import { useTasks } from '@/hooks/useTasks';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface SidebarProps {
   activeView: string;
@@ -46,13 +48,17 @@ const projectsMenuItem = { id: 'projects', label: 'Projets BE', icon: FolderOpen
 const adminMenuItem = { id: 'admin', label: 'Administration', icon: ShieldCheck, path: '/admin' };
 
 export function Sidebar({ activeView, onViewChange }: SidebarProps) {
-  const [collapsed, setCollapsed] = useState(false);
+  const isMobile = useIsMobile();
+  const [manualCollapsed, setManualCollapsed] = useState(false);
   const [permissionProfileName, setPermissionProfileName] = useState<string | null>(null);
   const navigate = useNavigate();
   const { isAdmin } = useUserRole();
   const { canViewBEProjects } = useUserPermissions();
   const { profile } = useAuth();
   const { addTask } = useTasks();
+  
+  // On mobile/tablet, always collapsed. On desktop, use manual state
+  const collapsed = isMobile || manualCollapsed;
 
   // Dialog states managed internally
   const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
@@ -151,7 +157,7 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
     <>
       <aside 
         className={cn(
-          "bg-sidebar text-sidebar-foreground h-screen flex flex-col transition-all duration-300 ease-in-out",
+          "bg-sidebar text-sidebar-foreground h-screen flex flex-col transition-all duration-300 ease-in-out flex-shrink-0",
           collapsed ? "w-16" : "w-64"
         )}
       >
@@ -162,16 +168,23 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
               <img src={keonLogo} alt="KEON Group" className="h-8 w-auto" />
             </div>
           )}
-          <button
-            onClick={() => setCollapsed(!collapsed)}
-            className="p-1.5 rounded-lg hover:bg-sidebar-accent transition-colors"
-          >
-            {collapsed ? (
-              <ChevronRight className="w-5 h-5" />
-            ) : (
-              <ChevronLeft className="w-5 h-5" />
-            )}
-          </button>
+          {/* Hide collapse button on mobile, show only on desktop */}
+          {!isMobile && (
+            <button
+              onClick={() => setManualCollapsed(!manualCollapsed)}
+              className="p-1.5 rounded-lg hover:bg-sidebar-accent transition-colors"
+            >
+              {collapsed ? (
+                <ChevronRight className="w-5 h-5" />
+              ) : (
+                <ChevronLeft className="w-5 h-5" />
+              )}
+            </button>
+          )}
+          {/* On mobile show icon only */}
+          {isMobile && collapsed && (
+            <img src={keonLogo} alt="KEON" className="h-8 w-8 object-cover rounded" />
+          )}
         </div>
 
         {/* Quick Actions - Always visible */}
