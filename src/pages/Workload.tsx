@@ -39,6 +39,7 @@ export default function Workload() {
     teamMembers,
     isLoading,
     addSlot,
+    addMultipleSlots,
     removeSlot,
     moveSlot,
     refetch,
@@ -83,6 +84,19 @@ export default function Workload() {
         toast.error('Ce créneau est déjà occupé');
       } else {
         toast.error('Erreur lors de l\'ajout du créneau');
+      }
+    }
+  };
+
+  const handleAddMultipleSlots = async (taskId: string, userId: string, date: string, halfDay: 'morning' | 'afternoon', count: number) => {
+    try {
+      const created = await addMultipleSlots(taskId, userId, date, halfDay, count);
+      toast.success(`${created.length} créneau${created.length > 1 ? 'x' : ''} ajouté${created.length > 1 ? 's' : ''}`);
+    } catch (error: any) {
+      if (error.code === '23505') {
+        toast.error('Certains créneaux sont déjà occupés');
+      } else {
+        toast.error('Erreur lors de l\'ajout des créneaux');
       }
     }
   };
@@ -181,6 +195,7 @@ export default function Workload() {
                     onSlotAdd={handleAddSlot}
                     onSlotRemove={handleRemoveSlot}
                     onSlotMove={handleMoveSlot}
+                    onMultiSlotAdd={handleAddMultipleSlots}
                   />
                 </TabsContent>
 
