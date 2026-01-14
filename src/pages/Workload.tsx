@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useWorkloadPlanning } from '@/hooks/useWorkloadPlanning';
@@ -15,6 +15,7 @@ import { Loader2, GanttChart, CalendarDays, BarChart3, Palmtree, CalendarCheck }
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Task } from '@/types/task';
+import { WorkloadSlot } from '@/types/workload';
 import { toast } from 'sonner';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
@@ -42,6 +43,9 @@ export default function Workload() {
     addMultipleSlots,
     removeSlot,
     moveSlot,
+    segmentTaskSlots,
+    isHalfDayAvailable,
+    getTaskSlotsCount,
     refetch,
   } = useWorkloadPlanning({
     startDate,
@@ -123,6 +127,15 @@ export default function Workload() {
     }
   };
 
+  const handleSegmentSlot = async (slot: WorkloadSlot, userId: string, newCount: number) => {
+    try {
+      const created = await segmentTaskSlots(slot.task_id, userId, newCount);
+      toast.success(`Tâche segmentée en ${created.length} créneau${created.length > 1 ? 'x' : ''}`);
+    } catch (error: any) {
+      toast.error(error.message || 'Erreur lors de la segmentation');
+    }
+  };
+
   return (
     <div className="flex h-screen bg-background">
       <Sidebar 
@@ -196,6 +209,9 @@ export default function Workload() {
                     onSlotRemove={handleRemoveSlot}
                     onSlotMove={handleMoveSlot}
                     onMultiSlotAdd={handleAddMultipleSlots}
+                    onSegmentSlot={handleSegmentSlot}
+                    isHalfDayAvailable={isHalfDayAvailable}
+                    getTaskSlotsCount={getTaskSlotsCount}
                   />
                 </TabsContent>
 

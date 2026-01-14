@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback } from 'react';
-import { format, parseISO, differenceInDays, isWeekend } from 'date-fns';
+import { useState, useCallback } from 'react';
+import { format, parseISO, isWeekend } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { TeamMemberWorkload, WorkloadSlot } from '@/types/workload';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -9,8 +9,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger, ContextMenuSeparator } from '@/components/ui/context-menu';
 import { cn } from '@/lib/utils';
 import { Task } from '@/types/task';
+import { Scissors, Trash2 } from 'lucide-react';
 
 interface GanttViewProps {
   workloadData: TeamMemberWorkload[];
@@ -21,6 +23,9 @@ interface GanttViewProps {
   onSlotRemove: (slotId: string) => Promise<void>;
   onSlotMove: (slotId: string, newDate: string, newHalfDay: 'morning' | 'afternoon') => Promise<void>;
   onMultiSlotAdd?: (taskId: string, userId: string, date: string, halfDay: 'morning' | 'afternoon', count: number) => Promise<void>;
+  onSegmentSlot?: (slot: WorkloadSlot, userId: string, segments: number) => Promise<void>;
+  isHalfDayAvailable?: (userId: string, date: string, halfDay: 'morning' | 'afternoon') => boolean;
+  getTaskSlotsCount?: (taskId: string, userId: string) => number;
 }
 
 interface DropContext {
@@ -28,6 +33,12 @@ interface DropContext {
   userId: string;
   date: string;
   halfDay: 'morning' | 'afternoon';
+}
+
+interface SegmentContext {
+  slot: WorkloadSlot;
+  userId: string;
+  currentCount: number;
 }
 
 export function GanttView({
@@ -39,6 +50,9 @@ export function GanttView({
   onSlotRemove,
   onSlotMove,
   onMultiSlotAdd,
+  onSegmentSlot,
+  isHalfDayAvailable,
+  getTaskSlotsCount,
 }: GanttViewProps) {
   const [draggedSlot, setDraggedSlot] = useState<WorkloadSlot | null>(null);
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
@@ -49,6 +63,11 @@ export function GanttView({
   const [multiSlotContext, setMultiSlotContext] = useState<DropContext | null>(null);
   const [halfDayCount, setHalfDayCount] = useState(1);
   const [isAdding, setIsAdding] = useState(false);
+  
+  // Segment dialog state
+  const [showSegmentDialog, setShowSegmentDialog] = useState(false);
+  const [segmentContext, setSegmentContext] = useState<SegmentContext | null>(null);
+  const [newSegmentCount, setNewSegmentCount] = useState(1);
 
   const days = [];
   let currentDate = new Date(startDate);
@@ -90,25 +109,42 @@ export function GanttView({
     setDropTarget(null);
   };
 
+  // Check if drop target is available
+  const checkDropAvailable = useCallback((userId: string, date: string, halfDay: 'morning' | 'afternoon'): boolean => {
+    if (!isHalfDayAvailable) return true;
+    return isHalfDayAvailable(userId, date, halfDay);
+  }, [isHalfDayAvailable]);
+
   const handleDrop = async (e: React.DragEvent, userId: string, date: string, halfDay: 'morning' | 'afternoon') => {
     e.preventDefault();
     setDropTarget(null);
 
     if (draggedSlot) {
-      // Moving existing slot
-      await onSlotMove(draggedSlot.id, date, halfDay);
+      // Moving existing slot - check if target is available
+      if (checkDropAvailable(userId, date, halfDay)) {
+        await onSlotMove(draggedSlot.id, date, halfDay);
+      }
       setDraggedSlot(null);
     } else if (draggedTask) {
-      // Show dialog to choose number of half-days
-      setMultiSlotContext({
-        task: draggedTask,
-        userId,
-        date,
-        halfDay,
-      });
-      setHalfDayCount(1);
-      setShowMultiSlotDialog(true);
-      setDraggedTask(null);
+      // Check if target is available - if not, auto-segment
+      const isAvailable = checkDropAvailable(userId, date, halfDay);
+      
+      if (!isAvailable && onMultiSlotAdd) {
+        // Auto-segment: find next available slot and add there
+        await onMultiSlotAdd(draggedTask.id, userId, date, halfDay, 1);
+        setDraggedTask(null);
+      } else {
+        // Show dialog to choose number of half-days
+        setMultiSlotContext({
+          task: draggedTask,
+          userId,
+          date,
+          halfDay,
+        });
+        setHalfDayCount(1);
+        setShowMultiSlotDialog(true);
+        setDraggedTask(null);
+      }
     }
   };
 
@@ -117,10 +153,11 @@ export function GanttView({
     
     setIsAdding(true);
     try {
-      if (halfDayCount === 1) {
-        await onSlotAdd(multiSlotContext.task.id, multiSlotContext.userId, multiSlotContext.date, multiSlotContext.halfDay);
-      } else if (onMultiSlotAdd) {
+      // Always use multi-slot add to handle segmentation automatically
+      if (onMultiSlotAdd) {
         await onMultiSlotAdd(multiSlotContext.task.id, multiSlotContext.userId, multiSlotContext.date, multiSlotContext.halfDay, halfDayCount);
+      } else if (halfDayCount === 1) {
+        await onSlotAdd(multiSlotContext.task.id, multiSlotContext.userId, multiSlotContext.date, multiSlotContext.halfDay);
       }
       setShowMultiSlotDialog(false);
       setMultiSlotContext(null);
@@ -131,10 +168,31 @@ export function GanttView({
     }
   };
 
-  const handleSlotClick = async (slot: WorkloadSlot) => {
-    if (window.confirm('Supprimer ce créneau ?')) {
-      await onSlotRemove(slot.id);
+  // Handle right-click to segment
+  const handleSegmentRequest = (slot: WorkloadSlot, userId: string) => {
+    const currentCount = getTaskSlotsCount ? getTaskSlotsCount(slot.task_id, userId) : 1;
+    setSegmentContext({ slot, userId, currentCount });
+    setNewSegmentCount(currentCount);
+    setShowSegmentDialog(true);
+  };
+
+  const handleConfirmSegment = async () => {
+    if (!segmentContext || !onSegmentSlot) return;
+    
+    setIsAdding(true);
+    try {
+      await onSegmentSlot(segmentContext.slot, segmentContext.userId, newSegmentCount);
+      setShowSegmentDialog(false);
+      setSegmentContext(null);
+    } catch (error: any) {
+      console.error('Error segmenting slot:', error);
+    } finally {
+      setIsAdding(false);
     }
+  };
+
+  const handleSlotDelete = async (slot: WorkloadSlot) => {
+    await onSlotRemove(slot.id);
   };
 
   // Available tasks (not fully scheduled)
@@ -253,26 +311,43 @@ export function GanttView({
                           </Badge>
                         )}
                         {day.morning.slot && !day.morning.isHoliday && !day.morning.isLeave && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
+                          <ContextMenu>
+                            <ContextMenuTrigger asChild>
                               <div
                                 draggable
                                 onDragStart={(e) => handleDragStart(e, day.morning.slot!)}
-                                onClick={() => handleSlotClick(day.morning.slot!)}
                                 className={cn(
                                   "w-full h-full rounded text-[10px] p-0.5 cursor-pointer hover:opacity-80",
                                   getPriorityColor(day.morning.slot.task?.priority || 'medium'),
                                   "text-white"
                                 )}
                               >
-                                <span className="truncate block">{day.morning.slot.task?.title}</span>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="truncate block">{day.morning.slot.task?.title}</span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>{day.morning.slot.task?.title}</p>
+                                    <p className="text-xs text-muted-foreground">Clic droit pour options</p>
+                                  </TooltipContent>
+                                </Tooltip>
                               </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>{day.morning.slot.task?.title}</p>
-                              <p className="text-xs text-muted-foreground">Cliquez pour supprimer</p>
-                            </TooltipContent>
-                          </Tooltip>
+                            </ContextMenuTrigger>
+                            <ContextMenuContent>
+                              <ContextMenuItem onClick={() => handleSegmentRequest(day.morning.slot!, member.memberId)}>
+                                <Scissors className="h-4 w-4 mr-2" />
+                                Segmenter
+                              </ContextMenuItem>
+                              <ContextMenuSeparator />
+                              <ContextMenuItem 
+                                onClick={() => handleSlotDelete(day.morning.slot!)}
+                                className="text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Supprimer
+                              </ContextMenuItem>
+                            </ContextMenuContent>
+                          </ContextMenu>
                         )}
                       </div>
 
@@ -300,26 +375,43 @@ export function GanttView({
                           </Badge>
                         )}
                         {day.afternoon.slot && !day.afternoon.isHoliday && !day.afternoon.isLeave && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
+                          <ContextMenu>
+                            <ContextMenuTrigger asChild>
                               <div
                                 draggable
                                 onDragStart={(e) => handleDragStart(e, day.afternoon.slot!)}
-                                onClick={() => handleSlotClick(day.afternoon.slot!)}
                                 className={cn(
                                   "w-full h-full rounded text-[10px] p-0.5 cursor-pointer hover:opacity-80",
                                   getPriorityColor(day.afternoon.slot.task?.priority || 'medium'),
                                   "text-white"
                                 )}
                               >
-                                <span className="truncate block">{day.afternoon.slot.task?.title}</span>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="truncate block">{day.afternoon.slot.task?.title}</span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>{day.afternoon.slot.task?.title}</p>
+                                    <p className="text-xs text-muted-foreground">Clic droit pour options</p>
+                                  </TooltipContent>
+                                </Tooltip>
                               </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>{day.afternoon.slot.task?.title}</p>
-                              <p className="text-xs text-muted-foreground">Cliquez pour supprimer</p>
-                            </TooltipContent>
-                          </Tooltip>
+                            </ContextMenuTrigger>
+                            <ContextMenuContent>
+                              <ContextMenuItem onClick={() => handleSegmentRequest(day.afternoon.slot!, member.memberId)}>
+                                <Scissors className="h-4 w-4 mr-2" />
+                                Segmenter
+                              </ContextMenuItem>
+                              <ContextMenuSeparator />
+                              <ContextMenuItem 
+                                onClick={() => handleSlotDelete(day.afternoon.slot!)}
+                                className="text-destructive"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Supprimer
+                              </ContextMenuItem>
+                            </ContextMenuContent>
+                          </ContextMenu>
                         )}
                       </div>
                     </div>
@@ -416,6 +508,96 @@ export function GanttView({
             </Button>
             <Button onClick={handleConfirmMultiSlot} disabled={isAdding}>
               {isAdding ? 'Ajout...' : `Planifier ${halfDayCount} créneau${halfDayCount > 1 ? 'x' : ''}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Segment dialog */}
+      <Dialog open={showSegmentDialog} onOpenChange={setShowSegmentDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Segmenter la tâche</DialogTitle>
+            <DialogDescription>
+              Modifiez le nombre de demi-journées allouées à cette tâche. La segmentation recommencera à partir du premier créneau existant.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {segmentContext && (
+            <div className="space-y-4">
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="font-medium">{segmentContext.slot.task?.title}</p>
+                <p className="text-sm text-muted-foreground">
+                  Créneaux actuels: {segmentContext.currentCount} demi-journée{segmentContext.currentCount > 1 ? 's' : ''} ({(segmentContext.currentCount / 2).toFixed(1)} jour{segmentContext.currentCount > 2 ? 's' : ''})
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="newSegmentCount">Nouveau nombre de demi-journées</Label>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="icon"
+                    onClick={() => setNewSegmentCount(Math.max(1, newSegmentCount - 1))}
+                    disabled={newSegmentCount <= 1}
+                  >
+                    -
+                  </Button>
+                  <Input
+                    id="newSegmentCount"
+                    type="number"
+                    min={1}
+                    max={40}
+                    value={newSegmentCount}
+                    onChange={(e) => setNewSegmentCount(Math.max(1, Math.min(40, parseInt(e.target.value) || 1)))}
+                    className="w-20 text-center"
+                  />
+                  <Button 
+                    variant="outline" 
+                    size="icon"
+                    onClick={() => setNewSegmentCount(Math.min(40, newSegmentCount + 1))}
+                    disabled={newSegmentCount >= 40}
+                  >
+                    +
+                  </Button>
+                  <span className="text-sm text-muted-foreground ml-2">
+                    = {(newSegmentCount / 2).toFixed(1)} jour(s)
+                  </span>
+                </div>
+              </div>
+              
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setNewSegmentCount(2)}
+                >
+                  1 jour
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setNewSegmentCount(4)}
+                >
+                  2 jours
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setNewSegmentCount(10)}
+                >
+                  1 semaine
+                </Button>
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSegmentDialog(false)}>
+              Annuler
+            </Button>
+            <Button onClick={handleConfirmSegment} disabled={isAdding || !onSegmentSlot}>
+              {isAdding ? 'Segmentation...' : `Segmenter en ${newSegmentCount} créneau${newSegmentCount > 1 ? 'x' : ''}`}
             </Button>
           </DialogFooter>
         </DialogContent>

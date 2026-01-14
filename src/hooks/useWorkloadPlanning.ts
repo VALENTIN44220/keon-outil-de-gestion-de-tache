@@ -340,6 +340,80 @@ export function useWorkloadPlanning({
     await fetchData();
   };
 
+  // Remove all slots for a task/user combination
+  const removeTaskSlots = async (taskId: string, userId: string) => {
+    const { error } = await supabase
+      .from('workload_slots')
+      .delete()
+      .eq('task_id', taskId)
+      .eq('user_id', userId);
+    
+    if (error) throw error;
+    await fetchData();
+  };
+
+  // Segment: remove existing slots and recreate with new count
+  const segmentTaskSlots = async (
+    taskId: string, 
+    userId: string, 
+    newCount: number
+  ) => {
+    // Find existing slots for this task/user
+    const existingSlots = slots.filter(s => s.task_id === taskId && s.user_id === userId);
+    
+    if (existingSlots.length === 0) {
+      throw new Error('Aucun créneau existant trouvé');
+    }
+    
+    // Find the earliest slot to start from
+    const sortedSlots = [...existingSlots].sort((a, b) => {
+      const dateCompare = a.date.localeCompare(b.date);
+      if (dateCompare !== 0) return dateCompare;
+      return a.half_day === 'morning' ? -1 : 1;
+    });
+    
+    const firstSlot = sortedSlots[0];
+    const startDate = firstSlot.date;
+    const startHalfDay = firstSlot.half_day as 'morning' | 'afternoon';
+    
+    // Delete all existing slots for this task/user
+    const { error: deleteError } = await supabase
+      .from('workload_slots')
+      .delete()
+      .eq('task_id', taskId)
+      .eq('user_id', userId);
+    
+    if (deleteError) throw deleteError;
+    
+    // Create new slots with the new count
+    const startDateObj = parseISO(startDate);
+    const slotsToCreate = findNextAvailableSlots(userId, startDateObj, startHalfDay, newCount);
+    
+    if (slotsToCreate.length === 0) {
+      throw new Error('Aucun créneau disponible trouvé');
+    }
+    
+    const inserts = slotsToCreate.map(slot => ({
+      task_id: taskId,
+      user_id: userId,
+      date: slot.date,
+      half_day: slot.halfDay,
+    }));
+    
+    const { error: insertError } = await supabase
+      .from('workload_slots')
+      .insert(inserts);
+    
+    if (insertError) throw insertError;
+    await fetchData();
+    return slotsToCreate;
+  };
+
+  // Get count of slots for a task/user
+  const getTaskSlotsCount = useCallback((taskId: string, userId: string): number => {
+    return slots.filter(s => s.task_id === taskId && s.user_id === userId).length;
+  }, [slots]);
+
   const moveSlot = async (slotId: string, newDate: string, newHalfDay: 'morning' | 'afternoon') => {
     const { error } = await supabase
       .from('workload_slots')
@@ -360,9 +434,12 @@ export function useWorkloadPlanning({
     addSlot,
     addMultipleSlots,
     removeSlot,
+    removeTaskSlots,
+    segmentTaskSlots,
     moveSlot,
     isHalfDayAvailable,
     findNextAvailableSlots,
+    getTaskSlotsCount,
     refetch: fetchData,
   };
 }
