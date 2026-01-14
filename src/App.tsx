@@ -11,6 +11,7 @@ import Profile from "./pages/Profile";
 import Templates from "./pages/Templates";
 import Projects from "./pages/Projects";
 import Admin from "./pages/Admin";
+import Workload from "./pages/Workload";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -61,6 +62,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Admin />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/workload"
+              element={
+                <ProtectedRoute>
+                  <Workload />
                 </ProtectedRoute>
               }
             />
