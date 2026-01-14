@@ -4,7 +4,11 @@ import { fr } from 'date-fns/locale';
 import { TeamMemberWorkload, WorkloadSlot } from '@/types/workload';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { Task } from '@/types/task';
 
@@ -16,6 +20,14 @@ interface GanttViewProps {
   onSlotAdd: (taskId: string, userId: string, date: string, halfDay: 'morning' | 'afternoon') => Promise<void>;
   onSlotRemove: (slotId: string) => Promise<void>;
   onSlotMove: (slotId: string, newDate: string, newHalfDay: 'morning' | 'afternoon') => Promise<void>;
+  onMultiSlotAdd?: (taskId: string, userId: string, date: string, halfDay: 'morning' | 'afternoon', count: number) => Promise<void>;
+}
+
+interface DropContext {
+  task: Task;
+  userId: string;
+  date: string;
+  halfDay: 'morning' | 'afternoon';
 }
 
 export function GanttView({
@@ -26,10 +38,17 @@ export function GanttView({
   onSlotAdd,
   onSlotRemove,
   onSlotMove,
+  onMultiSlotAdd,
 }: GanttViewProps) {
   const [draggedSlot, setDraggedSlot] = useState<WorkloadSlot | null>(null);
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
   const [dropTarget, setDropTarget] = useState<{ userId: string; date: string; halfDay: 'morning' | 'afternoon' } | null>(null);
+  
+  // Multi-slot dialog state
+  const [showMultiSlotDialog, setShowMultiSlotDialog] = useState(false);
+  const [multiSlotContext, setMultiSlotContext] = useState<DropContext | null>(null);
+  const [halfDayCount, setHalfDayCount] = useState(1);
+  const [isAdding, setIsAdding] = useState(false);
 
   const days = [];
   let currentDate = new Date(startDate);
@@ -80,9 +99,35 @@ export function GanttView({
       await onSlotMove(draggedSlot.id, date, halfDay);
       setDraggedSlot(null);
     } else if (draggedTask) {
-      // Adding new slot from task
-      await onSlotAdd(draggedTask.id, userId, date, halfDay);
+      // Show dialog to choose number of half-days
+      setMultiSlotContext({
+        task: draggedTask,
+        userId,
+        date,
+        halfDay,
+      });
+      setHalfDayCount(1);
+      setShowMultiSlotDialog(true);
       setDraggedTask(null);
+    }
+  };
+
+  const handleConfirmMultiSlot = async () => {
+    if (!multiSlotContext) return;
+    
+    setIsAdding(true);
+    try {
+      if (halfDayCount === 1) {
+        await onSlotAdd(multiSlotContext.task.id, multiSlotContext.userId, multiSlotContext.date, multiSlotContext.halfDay);
+      } else if (onMultiSlotAdd) {
+        await onMultiSlotAdd(multiSlotContext.task.id, multiSlotContext.userId, multiSlotContext.date, multiSlotContext.halfDay, halfDayCount);
+      }
+      setShowMultiSlotDialog(false);
+      setMultiSlotContext(null);
+    } catch (error: any) {
+      console.error('Error adding slots:', error);
+    } finally {
+      setIsAdding(false);
     }
   };
 
@@ -285,6 +330,96 @@ export function GanttView({
           </div>
         </div>
       </div>
+
+      {/* Multi-slot dialog */}
+      <Dialog open={showMultiSlotDialog} onOpenChange={setShowMultiSlotDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Planifier des créneaux</DialogTitle>
+            <DialogDescription>
+              Choisissez le nombre de demi-journées à planifier. Les créneaux seront automatiquement répartis en évitant les weekends, jours fériés et congés.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {multiSlotContext && (
+            <div className="space-y-4">
+              <div className="p-3 bg-muted rounded-lg">
+                <p className="font-medium">{multiSlotContext.task.title}</p>
+                <p className="text-sm text-muted-foreground">
+                  À partir du {format(parseISO(multiSlotContext.date), 'EEEE d MMMM', { locale: fr })} ({multiSlotContext.halfDay === 'morning' ? 'matin' : 'après-midi'})
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="halfDayCount">Nombre de demi-journées</Label>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="icon"
+                    onClick={() => setHalfDayCount(Math.max(1, halfDayCount - 1))}
+                    disabled={halfDayCount <= 1}
+                  >
+                    -
+                  </Button>
+                  <Input
+                    id="halfDayCount"
+                    type="number"
+                    min={1}
+                    max={40}
+                    value={halfDayCount}
+                    onChange={(e) => setHalfDayCount(Math.max(1, Math.min(40, parseInt(e.target.value) || 1)))}
+                    className="w-20 text-center"
+                  />
+                  <Button 
+                    variant="outline" 
+                    size="icon"
+                    onClick={() => setHalfDayCount(Math.min(40, halfDayCount + 1))}
+                    disabled={halfDayCount >= 40}
+                  >
+                    +
+                  </Button>
+                  <span className="text-sm text-muted-foreground ml-2">
+                    = {(halfDayCount / 2).toFixed(1)} jour(s)
+                  </span>
+                </div>
+              </div>
+              
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setHalfDayCount(2)}
+                >
+                  1 jour
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setHalfDayCount(4)}
+                >
+                  2 jours
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setHalfDayCount(10)}
+                >
+                  1 semaine
+                </Button>
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowMultiSlotDialog(false)}>
+              Annuler
+            </Button>
+            <Button onClick={handleConfirmMultiSlot} disabled={isAdding}>
+              {isAdding ? 'Ajout...' : `Planifier ${halfDayCount} créneau${halfDayCount > 1 ? 'x' : ''}`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </TooltipProvider>
   );
 }

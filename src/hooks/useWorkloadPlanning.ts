@@ -223,6 +223,69 @@ export function useWorkloadPlanning({
     });
   }, [teamMembers, slots, holidays, leaves, startDate, endDate]);
 
+  // Helper to check if a half-day is available
+  const isHalfDayAvailable = useCallback((userId: string, date: string, halfDay: 'morning' | 'afternoon'): boolean => {
+    const dayDate = parseISO(date);
+    
+    // Check weekend
+    if (isWeekend(dayDate)) return false;
+    
+    // Check holiday
+    if (holidays.some(h => h.date === date)) return false;
+    
+    // Check leave
+    const userLeaves = leaves.filter(l => l.user_id === userId);
+    for (const leave of userLeaves) {
+      const start = parseISO(leave.start_date);
+      const end = parseISO(leave.end_date);
+      
+      if (dayDate >= start && dayDate <= end) {
+        // Check specific half-day for start/end dates
+        if (date === leave.start_date && leave.start_half_day === 'afternoon' && halfDay === 'morning') continue;
+        if (date === leave.end_date && leave.end_half_day === 'morning' && halfDay === 'afternoon') continue;
+        return false;
+      }
+    }
+    
+    // Check if slot already exists
+    if (slots.some(s => s.user_id === userId && s.date === date && s.half_day === halfDay)) return false;
+    
+    return true;
+  }, [holidays, leaves, slots]);
+
+  // Find next available half-days starting from a given date
+  const findNextAvailableSlots = useCallback((
+    userId: string, 
+    startFromDate: Date, 
+    startFromHalfDay: 'morning' | 'afternoon',
+    count: number
+  ): Array<{ date: string; halfDay: 'morning' | 'afternoon' }> => {
+    const result: Array<{ date: string; halfDay: 'morning' | 'afternoon' }> = [];
+    let currentDate = new Date(startFromDate);
+    let currentHalfDay: 'morning' | 'afternoon' = startFromHalfDay;
+    let maxIterations = 365; // Safety limit
+    
+    while (result.length < count && maxIterations > 0) {
+      const dateStr = format(currentDate, 'yyyy-MM-dd');
+      
+      if (isHalfDayAvailable(userId, dateStr, currentHalfDay)) {
+        result.push({ date: dateStr, halfDay: currentHalfDay });
+      }
+      
+      // Move to next half-day
+      if (currentHalfDay === 'morning') {
+        currentHalfDay = 'afternoon';
+      } else {
+        currentHalfDay = 'morning';
+        currentDate = addDays(currentDate, 1);
+      }
+      
+      maxIterations--;
+    }
+    
+    return result;
+  }, [isHalfDayAvailable]);
+
   // CRUD operations
   const addSlot = async (taskId: string, userId: string, date: string, halfDay: 'morning' | 'afternoon') => {
     const { data, error } = await supabase
@@ -234,6 +297,37 @@ export function useWorkloadPlanning({
     if (error) throw error;
     await fetchData();
     return data;
+  };
+
+  // Add multiple slots with automatic segmentation around weekends/holidays/leaves
+  const addMultipleSlots = async (
+    taskId: string, 
+    userId: string, 
+    startDate: string, 
+    startHalfDay: 'morning' | 'afternoon',
+    halfDayCount: number
+  ) => {
+    const startDateObj = parseISO(startDate);
+    const slotsToCreate = findNextAvailableSlots(userId, startDateObj, startHalfDay, halfDayCount);
+    
+    if (slotsToCreate.length === 0) {
+      throw new Error('Aucun créneau disponible trouvé');
+    }
+    
+    const inserts = slotsToCreate.map(slot => ({
+      task_id: taskId,
+      user_id: userId,
+      date: slot.date,
+      half_day: slot.halfDay,
+    }));
+    
+    const { error } = await supabase
+      .from('workload_slots')
+      .insert(inserts);
+    
+    if (error) throw error;
+    await fetchData();
+    return slotsToCreate;
   };
 
   const removeSlot = async (slotId: string) => {
@@ -264,8 +358,11 @@ export function useWorkloadPlanning({
     teamMembers,
     isLoading,
     addSlot,
+    addMultipleSlots,
     removeSlot,
     moveSlot,
+    isHalfDayAvailable,
+    findNextAvailableSlots,
     refetch: fetchData,
   };
 }
