@@ -9,6 +9,7 @@ import {
   Workflow,
   ShieldCheck,
   FolderOpen,
+  CalendarClock,
 } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
@@ -35,6 +36,7 @@ const baseMenuItems = [
   { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard, path: '/' },
   { id: 'tasks', label: 'Tâches', icon: CheckSquare, path: '/' },
   { id: 'templates', label: 'Modèles', icon: Workflow, path: '/templates' },
+  { id: 'workload', label: 'Plan de charge', icon: CalendarClock, path: '/workload' },
   { id: 'analytics', label: 'Analytiques', icon: BarChart3, path: '/' },
   { id: 'team', label: 'Équipe', icon: Users, path: '/' },
   { id: 'settings', label: 'Paramètres', icon: Settings, path: '/' },
