@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Task, TaskStatus, TaskPriority, AssignmentRule } from '@/types/task';
+import { cn } from '@/lib/utils';
 import {
   Dialog,
   DialogContent,
@@ -867,22 +868,32 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                       return (
                         <div
                           key={subProcess.id}
-                          className={`
-                            flex items-center space-x-3 p-3 rounded-lg border cursor-pointer
-                            transition-colors
-                            ${isSelected 
-                              ? 'bg-primary/10 border-primary' 
-                              : 'bg-muted/30 border-border hover:bg-muted/50'
-                            }
-                          `}
-                          onClick={() => toggleSubProcess(subProcess.id)}
+                          className={cn(
+                            "flex items-center space-x-3 p-3 rounded-lg border transition-colors",
+                            isSelected
+                              ? "bg-primary/10 border-primary"
+                              : "bg-muted/30 border-border hover:bg-muted/50",
+                          )}
                         >
                           <Checkbox
                             checked={isSelected}
-                            onCheckedChange={() => toggleSubProcess(subProcess.id)}
+                            onCheckedChange={(nextChecked) => {
+                              const shouldSelect = nextChecked === true;
+                              setSelectedSubProcessIds((prev) => {
+                                const exists = prev.includes(subProcess.id);
+                                if (shouldSelect && !exists) return [...prev, subProcess.id];
+                                if (!shouldSelect && exists) return prev.filter((id) => id !== subProcess.id);
+                                return prev;
+                              });
+                            }}
+                            onClick={(e) => e.stopPropagation()}
                           />
-                          <div className="flex-1 min-w-0">
-                            <span className={`text-sm font-medium ${isSelected ? 'text-primary' : ''}`}>
+                          <button
+                            type="button"
+                            className="flex-1 min-w-0 text-left"
+                            onClick={() => toggleSubProcess(subProcess.id)}
+                          >
+                            <span className={cn("text-sm font-medium", isSelected && "text-primary")}>
                               {subProcess.name}
                             </span>
                             {hasCustomFields && (
@@ -890,7 +901,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                                 Champs
                               </Badge>
                             )}
-                          </div>
+                          </button>
                         </div>
                       );
                     })}
