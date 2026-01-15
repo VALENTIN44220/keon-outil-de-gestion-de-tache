@@ -44,7 +44,7 @@ export function AddIndependentTaskDialog({
   const [priority, setPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [subcategoryId, setSubcategoryId] = useState<string | null>(null);
-  const [defaultDurationDays, setDefaultDurationDays] = useState(7);
+  const [defaultDurationDays, setDefaultDurationDays] = useState(1);
   const [visibilityLevel, setVisibilityLevel] = useState<TemplateVisibility>('public');
   const [visibilityCompanyIds, setVisibilityCompanyIds] = useState<string[]>([]);
   const [visibilityDepartmentIds, setVisibilityDepartmentIds] = useState<string[]>([]);

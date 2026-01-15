@@ -35,7 +35,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
 import { Info, ArrowRight, Building2, Workflow, FormInput, CheckSquare, FileText, Paperclip } from 'lucide-react';
 import { BEProjectSelect } from '@/components/be/BEProjectSelect';
-import { BELabelSelect } from '@/components/be/BELabelSelect';
 import { toast } from 'sonner';
 import { TemplateCustomField } from '@/types/customField';
 
@@ -93,7 +92,6 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
   const [links, setLinks] = useState<LinkItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [beProjectId, setBeProjectId] = useState<string | null>(null);
-  const [beLabelId, setBeLabelId] = useState<string | null>(null);
   
   // Process/sub-process state
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -500,7 +498,6 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
           source_process_template_id: linkedProcessId,
           source_sub_process_template_id: linkedSubProcessId,
           be_project_id: beProjectId,
-          be_label_id: beLabelId,
         })
         .select()
         .single();
@@ -627,7 +624,6 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
     setSelectedSubProcessIds([]);
     setHasMultipleSubProcesses(false);
     setBeProjectId(null);
-    setBeLabelId(null);
     setProcessImposedValues(false);
     setCustomFieldValues({});
     setFieldErrors({});
@@ -742,16 +738,10 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                 />
 
                 {/* BE Project Selection */}
-                <div className="grid grid-cols-2 gap-4">
-                  <BEProjectSelect
-                    value={beProjectId}
-                    onChange={setBeProjectId}
-                  />
-                  <BELabelSelect
-                    value={beLabelId}
-                    onChange={setBeLabelId}
-                  />
-                </div>
+                <BEProjectSelect
+                  value={beProjectId}
+                  onChange={setBeProjectId}
+                />
 
                 {(linkedProcessId || linkedSubProcessId) && !hasMultipleSubProcesses && (
                   <div className="rounded-lg border border-primary/50 bg-primary/5 p-4">

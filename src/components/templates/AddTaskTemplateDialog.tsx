@@ -25,7 +25,7 @@ export function AddTaskTemplateDialog({ open, onClose, onAdd, orderIndex }: AddT
   const [priority, setPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [subcategoryId, setSubcategoryId] = useState<string | null>(null);
-  const [defaultDurationDays, setDefaultDurationDays] = useState(7);
+  const [defaultDurationDays, setDefaultDurationDays] = useState(1);
   const [visibilityLevel, setVisibilityLevel] = useState<TemplateVisibility>('public');
 
   const { categories, addCategory, addSubcategory } = useCategories();
