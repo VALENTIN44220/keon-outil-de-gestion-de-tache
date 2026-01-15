@@ -77,9 +77,32 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check if user already exists
-    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-    const existingUser = existingUsers?.users?.find(u => u.email?.toLowerCase() === email.toLowerCase());
+    // Check if user already exists (paginated lookup)
+    // NOTE: listUsers() is paginated; to reliably find a user by email we must scan pages.
+    const normalizedEmail = email.toLowerCase();
+    let existingUser: any = null;
+    let page = 1;
+    const perPage = 1000;
+
+    while (true) {
+      const { data: listData, error: listError } = await supabaseAdmin.auth.admin.listUsers({ page, perPage });
+      if (listError) {
+        return new Response(
+          JSON.stringify({ error: listError.message }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      existingUser = listData?.users?.find((u) => (u.email || '').toLowerCase() === normalizedEmail) ?? null;
+      if (existingUser) break;
+
+      const got = listData?.users?.length ?? 0;
+      if (got < perPage) break; // last page
+      page += 1;
+
+      // Safety guard to avoid infinite loops if something goes wrong
+      if (page > 100) break;
+    }
 
     if (existingUser) {
       // User exists - update profile if upsert_mode is true
