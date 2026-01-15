@@ -8,6 +8,7 @@ import { EditProcessDialog } from '@/components/templates/EditProcessDialog';
 import { ProcessDetailView } from '@/components/templates/ProcessDetailView';
 import { SubProcessTemplatesList } from '@/components/templates/SubProcessTemplatesList';
 import { TaskTemplatesList } from '@/components/templates/TaskTemplatesList';
+import { CustomFieldsTab } from '@/components/templates/CustomFieldsTab';
 import { AddIndependentSubProcessDialog } from '@/components/templates/AddIndependentSubProcessDialog';
 import { AddIndependentTaskDialog } from '@/components/templates/AddIndependentTaskDialog';
 import { useProcessTemplates } from '@/hooks/useProcessTemplates';
@@ -16,14 +17,14 @@ import { useAllTaskTemplates } from '@/hooks/useAllTaskTemplates';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useTasks } from '@/hooks/useTasks';
 import { useAuth } from '@/contexts/AuthContext';
-import { Loader2, Layers, GitBranch, ListTodo, Plus } from 'lucide-react';
+import { Loader2, Layers, GitBranch, ListTodo, Plus, FormInput } from 'lucide-react';
 import { ProcessTemplate, ProcessWithTasks } from '@/types/template';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 
 const Templates = () => {
   const [activeView, setActiveView] = useState('templates');
-  const [activeTab, setActiveTab] = useState<'processes' | 'subprocesses' | 'tasks'>('processes');
+  const [activeTab, setActiveTab] = useState<'processes' | 'subprocesses' | 'tasks' | 'fields'>('processes');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isAddSubProcessDialogOpen, setIsAddSubProcessDialogOpen] = useState(false);
   const [isAddTaskDialogOpen, setIsAddTaskDialogOpen] = useState(false);
@@ -180,6 +181,10 @@ const Templates = () => {
                 <ListTodo className="h-4 w-4" />
                 Tâches ({taskTemplates.length})
               </TabsTrigger>
+              <TabsTrigger value="fields" className="gap-2">
+                <FormInput className="h-4 w-4" />
+                Champs personnalisés
+              </TabsTrigger>
             </TabsList>
 
             <TemplateAdvancedFilters
@@ -251,6 +256,14 @@ const Templates = () => {
               <TaskTemplatesList
                 tasks={filteredTasks}
                 isLoading={isLoadingTasks}
+                onDelete={deleteTask}
+                onRefresh={refetchTasks}
+                viewMode={viewMode}
+              />
+            </TabsContent>
+
+            <TabsContent value="fields">
+              <CustomFieldsTab />
                 onDelete={deleteTask}
                 onRefresh={refetchTasks}
                 viewMode={viewMode}
