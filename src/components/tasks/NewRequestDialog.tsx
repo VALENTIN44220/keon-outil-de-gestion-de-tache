@@ -27,6 +27,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { InlineChecklistEditor } from './InlineChecklistEditor';
 import { TaskLinksEditor } from './TaskLinksEditor';
 import { CustomFieldsRenderer, validateCustomFields } from './CustomFieldsRenderer';
+import { GroupedCustomFieldsRenderer } from './GroupedCustomFieldsRenderer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/contexts/AuthContext';
@@ -331,27 +332,108 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
     });
   };
 
-  // Get all visible custom fields for rendering
-  const getVisibleCustomFields = () => {
-    const allFields: TemplateCustomField[] = [...processFields];
-    
-    // Add fields from selected sub-processes
-    for (const spId of selectedSubProcessIds) {
-      if (subProcessCustomFields[spId]) {
-        allFields.push(...subProcessCustomFields[spId]);
+  // Get all visible custom fields for rendering, properly organized
+  const getVisibleCustomFields = (): { 
+    commonFields: TemplateCustomField[]; 
+    processFields: TemplateCustomField[];
+    subProcessFieldGroups: { subProcessId: string; subProcessName: string; fields: TemplateCustomField[] }[];
+  } => {
+    const commonFieldsSet = new Map<string, TemplateCustomField>();
+    const processSpecificFields: TemplateCustomField[] = [];
+    const subProcessFieldGroups: { subProcessId: string; subProcessName: string; fields: TemplateCustomField[] }[] = [];
+
+    // Process-level fields (common + specific)
+    for (const field of processFields) {
+      if (field.is_common) {
+        commonFieldsSet.set(field.id, field);
+      } else {
+        processSpecificFields.push(field);
+      }
+    }
+
+    // Get relevant sub-process IDs
+    const relevantSubProcessIds = hasMultipleSubProcesses 
+      ? selectedSubProcessIds 
+      : (linkedSubProcessId ? [linkedSubProcessId] : []);
+
+    // Sub-process fields, with common fields deduplicated
+    for (const spId of relevantSubProcessIds) {
+      const spFields = subProcessCustomFields[spId] || [];
+      const spSpecificFields: TemplateCustomField[] = [];
+      
+      for (const field of spFields) {
+        if (field.is_common) {
+          // Only add to common if not already present
+          if (!commonFieldsSet.has(field.id)) {
+            commonFieldsSet.set(field.id, field);
+          }
+        } else {
+          spSpecificFields.push(field);
+        }
+      }
+
+      if (spSpecificFields.length > 0) {
+        const sp = availableSubProcesses.find(s => s.id === spId);
+        subProcessFieldGroups.push({
+          subProcessId: spId,
+          subProcessName: sp?.name || 'Sous-processus',
+          fields: spSpecificFields,
+        });
       }
     }
     
-    // If single sub-process mode
-    if (linkedSubProcessId && subProcessCustomFields[linkedSubProcessId]) {
-      allFields.push(...subProcessCustomFields[linkedSubProcessId]);
-    }
-    
-    return allFields;
+    return {
+      commonFields: Array.from(commonFieldsSet.values()),
+      processFields: processSpecificFields,
+      subProcessFieldGroups,
+    };
   };
 
   const getCustomFieldsCount = () => {
-    return getVisibleCustomFields().length;
+    const { commonFields, processFields: pFields, subProcessFieldGroups } = getVisibleCustomFields();
+    let total = commonFields.length + pFields.length;
+    for (const group of subProcessFieldGroups) {
+      total += group.fields.length;
+    }
+    return total;
+  };
+
+  // Get fields that should be saved for a specific sub-process
+  const getFieldsForSubProcess = (subProcessId: string): string[] => {
+    const fieldIds: string[] = [];
+    
+    // Common fields go to all
+    const { commonFields } = getVisibleCustomFields();
+    for (const field of commonFields) {
+      fieldIds.push(field.id);
+    }
+    
+    // Process-level specific fields go to all
+    for (const field of processFields) {
+      if (!field.is_common) {
+        fieldIds.push(field.id);
+      }
+    }
+    
+    // Sub-process specific fields only for matching sub-process
+    const spFields = subProcessCustomFields[subProcessId] || [];
+    for (const field of spFields) {
+      if (!field.is_common) {
+        fieldIds.push(field.id);
+      }
+    }
+    
+    return fieldIds;
+  };
+
+  // Get all fields as a flat array for validation
+  const getAllFieldsFlat = (): TemplateCustomField[] => {
+    const { commonFields, processFields: pFields, subProcessFieldGroups } = getVisibleCustomFields();
+    const allFields: TemplateCustomField[] = [...commonFields, ...pFields];
+    for (const group of subProcessFieldGroups) {
+      allFields.push(...group.fields);
+    }
+    return allFields;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -374,8 +456,8 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
     }
 
     // Validate custom fields
-    const allFields = getVisibleCustomFields();
-    const { isValid, errors } = validateCustomFields(allFields, customFieldValues);
+    const allFieldsFlat = getAllFieldsFlat();
+    const { isValid, errors } = validateCustomFields(allFieldsFlat, customFieldValues);
     if (!isValid) {
       setFieldErrors(errors);
       toast.error('Veuillez corriger les erreurs dans les champs personnalisés');
@@ -848,13 +930,20 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                       Chargement des champs...
                     </div>
                   ) : (
-                    <CustomFieldsRenderer
-                      fields={getVisibleCustomFields()}
-                      values={customFieldValues}
-                      onChange={handleCustomFieldChange}
-                      errors={fieldErrors}
-                      disabled={isSubmitting}
-                    />
+                    (() => {
+                      const { commonFields, processFields: pFields, subProcessFieldGroups } = getVisibleCustomFields();
+                      return (
+                        <GroupedCustomFieldsRenderer
+                          commonFields={commonFields}
+                          processFields={pFields}
+                          subProcessFieldGroups={subProcessFieldGroups}
+                          values={customFieldValues}
+                          onChange={handleCustomFieldChange}
+                          errors={fieldErrors}
+                          disabled={isSubmitting}
+                        />
+                      );
+                    })()
                   )}
                 </TabsContent>
               )}
