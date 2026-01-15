@@ -6,8 +6,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, UserPlus, Users, Building2, Briefcase, Layers, Shield, ChevronUp, ChevronDown, AlertCircle, RefreshCw, Upload } from 'lucide-react';
+import { Plus, UserPlus, Users, Building2, Briefcase, Layers, Shield, ChevronUp, ChevronDown, AlertCircle, RefreshCw, Upload, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { RefreshButton } from './RefreshButton';
@@ -41,6 +42,47 @@ export function UsersTab({
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  const toggleSelection = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const toggleAll = () => {
+    if (selectedIds.length === users.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(users.map(u => u.id));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    
+    const confirmed = window.confirm(
+      `Êtes-vous sûr de vouloir supprimer ${selectedIds.length} utilisateur(s) ? Cette action supprimera leurs profils.`
+    );
+    
+    if (!confirmed) return;
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .in('id', selectedIds);
+
+      if (error) throw error;
+
+      toast.success(`${selectedIds.length} utilisateur(s) supprimé(s)`);
+      setSelectedIds([]);
+      onUserUpdated();
+    } catch (error: any) {
+      console.error('Error deleting users:', error);
+      toast.error(error.message || 'Erreur lors de la suppression');
+    }
+  };
   
   // New user form
   const [email, setEmail] = useState('');
@@ -185,6 +227,12 @@ export function UsersTab({
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
+              {selectedIds.length > 0 && (
+                <Button variant="destructive" onClick={handleBulkDelete}>
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Supprimer ({selectedIds.length})
+                </Button>
+              )}
               <RefreshButton onRefresh={onRefresh} />
               <Button variant="outline" onClick={() => setIsBulkImportOpen(true)}>
                 <Upload className="mr-2 h-4 w-4" />
@@ -412,6 +460,12 @@ export function UsersTab({
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-12">
+                      <Checkbox
+                        checked={selectedIds.length === users.length && users.length > 0}
+                        onCheckedChange={toggleAll}
+                      />
+                    </TableHead>
                     <TableHead>Nom</TableHead>
                     <TableHead>Société</TableHead>
                     <TableHead>Service</TableHead>
@@ -427,7 +481,13 @@ export function UsersTab({
                   {users.map((user) => {
                     const subordinates = getSubordinates(user.id);
                     return (
-                      <TableRow key={user.id}>
+                      <TableRow key={user.id} data-state={selectedIds.includes(user.id) ? 'selected' : undefined}>
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedIds.includes(user.id)}
+                            onCheckedChange={() => toggleSelection(user.id)}
+                          />
+                        </TableCell>
                         <TableCell className="font-medium">
                           <div className="flex flex-col">
                             <span>{user.display_name || 'Sans nom'}</span>
