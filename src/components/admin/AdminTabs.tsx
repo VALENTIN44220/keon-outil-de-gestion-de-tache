@@ -125,6 +125,7 @@ export function AdminTabs(props: AdminTabsProps) {
         <JobTitlesTab 
           jobTitles={props.jobTitles}
           departments={props.departments}
+          companies={props.companies}
           onAdd={props.addJobTitle}
           onUpdate={props.updateJobTitle}
           onDelete={props.deleteJobTitle}
