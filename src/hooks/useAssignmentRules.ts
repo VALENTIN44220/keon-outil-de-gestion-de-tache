@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import type { AssignmentRule } from '@/types/task';
@@ -42,15 +42,18 @@ export function useAssignmentRules() {
       throw error;
     }
 
-    setRules(prev => [...prev, data as AssignmentRule]);
+    setRules((prev) => [...prev, data as AssignmentRule]);
     toast({
       title: 'Règle créée',
-      description: 'La règle d\'affectation a été créée',
+      description: "La règle d'affectation a été créée",
     });
     return data as AssignmentRule;
   };
 
-  const updateRule = async (id: string, updates: Partial<Omit<AssignmentRule, 'id' | 'created_at' | 'updated_at'>>) => {
+  const updateRule = async (
+    id: string,
+    updates: Partial<Omit<AssignmentRule, 'id' | 'created_at' | 'updated_at'>>
+  ) => {
     const { data, error } = await supabase
       .from('assignment_rules')
       .update(updates)
@@ -67,19 +70,16 @@ export function useAssignmentRules() {
       throw error;
     }
 
-    setRules(prev => prev.map(r => r.id === id ? data as AssignmentRule : r));
+    setRules((prev) => prev.map((r) => (r.id === id ? (data as AssignmentRule) : r)));
     toast({
       title: 'Règle modifiée',
-      description: 'La règle d\'affectation a été mise à jour',
+      description: "La règle d'affectation a été mise à jour",
     });
     return data as AssignmentRule;
   };
 
   const deleteRule = async (id: string) => {
-    const { error } = await supabase
-      .from('assignment_rules')
-      .delete()
-      .eq('id', id);
+    const { error } = await supabase.from('assignment_rules').delete().eq('id', id);
 
     if (error) {
       toast({
@@ -90,32 +90,35 @@ export function useAssignmentRules() {
       throw error;
     }
 
-    setRules(prev => prev.filter(r => r.id !== id));
+    setRules((prev) => prev.filter((r) => r.id !== id));
     toast({
       title: 'Règle supprimée',
-      description: 'La règle d\'affectation a été supprimée',
+      description: "La règle d'affectation a été supprimée",
     });
   };
 
-  // Find matching rule for a category/subcategory
-  const findMatchingRule = (categoryId: string | null, subcategoryId: string | null): AssignmentRule | null => {
-    // Sort by priority (higher first) and specificity (subcategory match > category match)
-    const activeRules = rules.filter(r => r.is_active);
-    
-    // First try to find exact subcategory match
-    if (subcategoryId) {
-      const subcatMatch = activeRules.find(r => r.subcategory_id === subcategoryId);
-      if (subcatMatch) return subcatMatch;
-    }
-    
-    // Then try category match
-    if (categoryId) {
-      const catMatch = activeRules.find(r => r.category_id === categoryId && !r.subcategory_id);
-      if (catMatch) return catMatch;
-    }
-    
-    return null;
-  };
+  // Find matching rule for a category/subcategory (stable reference)
+  const findMatchingRule = useCallback(
+    (categoryId: string | null, subcategoryId: string | null): AssignmentRule | null => {
+      // Sort by priority (higher first) and specificity (subcategory match > category match)
+      const activeRules = rules.filter((r) => r.is_active);
+
+      // First try to find exact subcategory match
+      if (subcategoryId) {
+        const subcatMatch = activeRules.find((r) => r.subcategory_id === subcategoryId);
+        if (subcatMatch) return subcatMatch;
+      }
+
+      // Then try category match
+      if (categoryId) {
+        const catMatch = activeRules.find((r) => r.category_id === categoryId && !r.subcategory_id);
+        if (catMatch) return catMatch;
+      }
+
+      return null;
+    },
+    [rules]
+  );
 
   return {
     rules,

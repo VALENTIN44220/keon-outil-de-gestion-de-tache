@@ -121,8 +121,11 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
   const { categories, addCategory, addSubcategory } = useCategories();
   const { findMatchingRule } = useAssignmentRules();
 
-  // Find matching assignment rule
-  const matchingRule: AssignmentRule | null = findMatchingRule(categoryId, subcategoryId);
+  // Find matching assignment rule (memoized)
+  const matchingRule: AssignmentRule | null = useMemo(
+    () => findMatchingRule(categoryId, subcategoryId),
+    [findMatchingRule, categoryId, subcategoryId]
+  );
   const requiresValidation = matchingRule?.requires_validation || false;
 
   // Fetch custom fields for each available sub-process
@@ -307,12 +310,15 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
     }
   }, [open, initialProcessTemplateId, initialSubProcessTemplateId]);
 
-  // Auto-apply assignment rule
+  // Auto-apply assignment rule (guarded to avoid render loops)
   useEffect(() => {
-    if (matchingRule && matchingRule.auto_assign && matchingRule.target_department_id) {
-      setTargetDepartmentId(matchingRule.target_department_id);
+    const deptId =
+      matchingRule && matchingRule.auto_assign ? matchingRule.target_department_id : null;
+
+    if (deptId && deptId !== targetDepartmentId) {
+      setTargetDepartmentId(deptId);
     }
-  }, [matchingRule]);
+  }, [matchingRule?.id, matchingRule?.auto_assign, matchingRule?.target_department_id, targetDepartmentId]);
 
   const fetchDepartments = async () => {
     const { data } = await supabase
