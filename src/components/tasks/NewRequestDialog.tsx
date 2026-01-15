@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Task, TaskStatus, TaskPriority, AssignmentRule } from '@/types/task';
 import {
   Dialog,
@@ -332,12 +332,8 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
     });
   };
 
-  // Get all visible custom fields for rendering, properly organized
-  const getVisibleCustomFields = (): { 
-    commonFields: TemplateCustomField[]; 
-    processFields: TemplateCustomField[];
-    subProcessFieldGroups: { subProcessId: string; subProcessName: string; fields: TemplateCustomField[] }[];
-  } => {
+  // Memoized visible custom fields to prevent infinite re-renders
+  const visibleCustomFields = useMemo(() => {
     const commonFieldsSet = new Map<string, TemplateCustomField>();
     const processSpecificFields: TemplateCustomField[] = [];
     const subProcessFieldGroups: { subProcessId: string; subProcessName: string; fields: TemplateCustomField[] }[] = [];
@@ -387,24 +383,23 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
       processFields: processSpecificFields,
       subProcessFieldGroups,
     };
-  };
+  }, [processFields, hasMultipleSubProcesses, selectedSubProcessIds, linkedSubProcessId, subProcessCustomFields, availableSubProcesses]);
 
-  const getCustomFieldsCount = () => {
-    const { commonFields, processFields: pFields, subProcessFieldGroups } = getVisibleCustomFields();
+  const customFieldsCount = useMemo(() => {
+    const { commonFields, processFields: pFields, subProcessFieldGroups } = visibleCustomFields;
     let total = commonFields.length + pFields.length;
     for (const group of subProcessFieldGroups) {
       total += group.fields.length;
     }
     return total;
-  };
+  }, [visibleCustomFields]);
 
   // Get fields that should be saved for a specific sub-process
-  const getFieldsForSubProcess = (subProcessId: string): string[] => {
+  const getFieldsForSubProcess = useCallback((subProcessId: string): string[] => {
     const fieldIds: string[] = [];
     
     // Common fields go to all
-    const { commonFields } = getVisibleCustomFields();
-    for (const field of commonFields) {
+    for (const field of visibleCustomFields.commonFields) {
       fieldIds.push(field.id);
     }
     
@@ -424,17 +419,17 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
     }
     
     return fieldIds;
-  };
+  }, [visibleCustomFields.commonFields, processFields, subProcessCustomFields]);
 
   // Get all fields as a flat array for validation
-  const getAllFieldsFlat = (): TemplateCustomField[] => {
-    const { commonFields, processFields: pFields, subProcessFieldGroups } = getVisibleCustomFields();
+  const allFieldsFlat = useMemo((): TemplateCustomField[] => {
+    const { commonFields, processFields: pFields, subProcessFieldGroups } = visibleCustomFields;
     const allFields: TemplateCustomField[] = [...commonFields, ...pFields];
     for (const group of subProcessFieldGroups) {
       allFields.push(...group.fields);
     }
     return allFields;
-  };
+  }, [visibleCustomFields]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -456,7 +451,6 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
     }
 
     // Validate custom fields
-    const allFieldsFlat = getAllFieldsFlat();
     const { isValid, errors } = validateCustomFields(allFieldsFlat, customFieldValues);
     if (!isValid) {
       setFieldErrors(errors);
@@ -652,7 +646,6 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
     return departments.find(d => d.id === depId)?.name || null;
   };
 
-  const customFieldsCount = getCustomFieldsCount();
   const showSubProcessTab = hasMultipleSubProcesses && availableSubProcesses.length > 0;
   const showCustomFieldsTab = customFieldsCount > 0;
 
@@ -930,20 +923,15 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                       Chargement des champs...
                     </div>
                   ) : (
-                    (() => {
-                      const { commonFields, processFields: pFields, subProcessFieldGroups } = getVisibleCustomFields();
-                      return (
-                        <GroupedCustomFieldsRenderer
-                          commonFields={commonFields}
-                          processFields={pFields}
-                          subProcessFieldGroups={subProcessFieldGroups}
-                          values={customFieldValues}
-                          onChange={handleCustomFieldChange}
-                          errors={fieldErrors}
-                          disabled={isSubmitting}
-                        />
-                      );
-                    })()
+                    <GroupedCustomFieldsRenderer
+                      commonFields={visibleCustomFields.commonFields}
+                      processFields={visibleCustomFields.processFields}
+                      subProcessFieldGroups={visibleCustomFields.subProcessFieldGroups}
+                      values={customFieldValues}
+                      onChange={handleCustomFieldChange}
+                      errors={fieldErrors}
+                      disabled={isSubmitting}
+                    />
                   )}
                 </TabsContent>
               )}
