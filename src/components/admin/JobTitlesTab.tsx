@@ -7,21 +7,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Plus, Trash2, Users, Pencil } from 'lucide-react';
+import { Plus, Trash2, Users, Pencil, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { RefreshButton } from './RefreshButton';
-import type { JobTitle, Department } from '@/types/admin';
+import { BulkJobTitleImportDialog } from './BulkJobTitleImportDialog';
+import type { JobTitle, Department, Company } from '@/types/admin';
 
 interface JobTitlesTabProps {
   jobTitles: JobTitle[];
   departments: Department[];
+  companies: Company[];
   onAdd: (name: string, department_id?: string, description?: string) => Promise<JobTitle>;
   onUpdate: (id: string, name: string, department_id?: string, description?: string) => Promise<JobTitle>;
   onDelete: (id: string) => Promise<void>;
   onRefresh: () => Promise<void> | void;
 }
 
-export function JobTitlesTab({ jobTitles, departments, onAdd, onUpdate, onDelete, onRefresh }: JobTitlesTabProps) {
+export function JobTitlesTab({ jobTitles, departments, companies, onAdd, onUpdate, onDelete, onRefresh }: JobTitlesTabProps) {
   const [name, setName] = useState('');
   const [departmentId, setDepartmentId] = useState<string>('');
   const [description, setDescription] = useState('');
@@ -31,6 +33,7 @@ export function JobTitlesTab({ jobTitles, departments, onAdd, onUpdate, onDelete
   const [editDepartmentId, setEditDepartmentId] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
 
   const handleAdd = async () => {
     if (!name.trim()) {
@@ -122,10 +125,16 @@ export function JobTitlesTab({ jobTitles, departments, onAdd, onUpdate, onDelete
               rows={1}
             />
           </div>
-          <Button onClick={handleAdd} disabled={isAdding}>
-            <Plus className="mr-2 h-4 w-4" />
-            Ajouter
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={handleAdd} disabled={isAdding}>
+              <Plus className="mr-2 h-4 w-4" />
+              Ajouter
+            </Button>
+            <Button variant="outline" onClick={() => setIsBulkImportOpen(true)}>
+              <Upload className="mr-2 h-4 w-4" />
+              Import en masse
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -235,6 +244,16 @@ export function JobTitlesTab({ jobTitles, departments, onAdd, onUpdate, onDelete
           </div>
         </DialogContent>
       </Dialog>
+
+      <BulkJobTitleImportDialog
+        open={isBulkImportOpen}
+        onOpenChange={setIsBulkImportOpen}
+        existingJobTitles={jobTitles}
+        departments={departments}
+        companies={companies}
+        onAdd={onAdd}
+        onImportComplete={onRefresh}
+      />
     </div>
   );
 }
