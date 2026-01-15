@@ -656,7 +656,13 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
   const showCustomFieldsTab = customFieldsCount > 0;
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        // Radix calls onOpenChange(true) when opening; we only want to react to close.
+        if (!nextOpen) onClose();
+      }}
+    >
       <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
