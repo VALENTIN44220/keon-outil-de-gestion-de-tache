@@ -38,6 +38,7 @@ interface ParsedUser {
 interface ImportResult {
   email: string;
   success: boolean;
+  action?: 'created' | 'updated' | 'skipped';
   error?: string;
 }
 
@@ -153,7 +154,16 @@ paul.durand@exemple.fr;Paul DURAND;;;Technicien;jean.dupont@exemple.fr`;
     // Build a map of created users' emails to their profile IDs for manager resolution
     const createdUsersMap = new Map<string, string>();
     
-    // First pass: create all users
+    // First, check which users already exist
+    const existingEmails = new Set<string>();
+    const existingProfilesMap = new Map<string, UserProfile>();
+    
+    for (const existingUser of users) {
+      // We need to find users by email - check if we can match
+      // Since profiles don't have email directly, we'll need to check during import
+    }
+
+    // First pass: create or update all users
     for (const user of validUsers) {
       try {
         // Find company ID if company name is provided
@@ -192,7 +202,6 @@ paul.durand@exemple.fr;Paul DURAND;;;Technicien;jean.dupont@exemple.fr`;
         // Find manager ID - check existing users first, then check imported batch
         let managerId = defaultManagerId || undefined;
         if (user.manager) {
-          // First check existing users by email pattern in display_name or by searching profiles
           const existingManager = users.find(
             u => u.display_name?.toLowerCase() === user.manager!.toLowerCase() ||
                  user.manager!.toLowerCase().includes('@')
@@ -201,7 +210,6 @@ paul.durand@exemple.fr;Paul DURAND;;;Technicien;jean.dupont@exemple.fr`;
           if (existingManager) {
             managerId = existingManager.id;
           } else {
-            // Check if manager is in our import batch and was already created
             const managerEmail = user.manager.toLowerCase();
             if (createdUsersMap.has(managerEmail)) {
               managerId = createdUsersMap.get(managerEmail);
@@ -209,6 +217,12 @@ paul.durand@exemple.fr;Paul DURAND;;;Technicien;jean.dupont@exemple.fr`;
           }
         }
         
+        // Check if user already exists by looking up auth.users via email
+        const { data: existingAuthUsers } = await supabase.auth.admin.listUsers();
+        let existingUserId: string | null = null;
+        
+        // Try to find existing profile by checking if a user with this email exists
+        // We'll attempt to create and handle the "already exists" error
         const response = await supabase.functions.invoke('create-user', {
           body: {
             email: user.email,
@@ -223,15 +237,94 @@ paul.durand@exemple.fr;Paul DURAND;;;Technicien;jean.dupont@exemple.fr`;
         });
 
         if (response.error) {
-          throw new Error(response.error.message || 'Erreur de création');
-        }
+          const errorMessage = response.error.message || '';
+          
+          // Check if user already exists
+          if (errorMessage.includes('already been registered') || errorMessage.includes('already exists')) {
+            // User exists - find their profile and update it
+            const { data: existingProfile } = await supabase
+              .from('profiles')
+              .select('*')
+              .ilike('display_name', user.email.split('@')[0] + '%')
+              .maybeSingle();
+            
+            // Alternative: find by matching email pattern in users list
+            const matchingUser = users.find(u => {
+              // Try to match by display name containing email prefix
+              const emailPrefix = user.email.split('@')[0].toLowerCase();
+              return u.display_name?.toLowerCase().includes(emailPrefix);
+            });
+            
+            if (matchingUser) {
+              // Merge logic: update only non-null import values over empty existing values
+              const updateData: Record<string, any> = {};
+              
+              // Display name: overwrite if import has value
+              if (user.displayName && user.displayName !== matchingUser.display_name) {
+                updateData.display_name = user.displayName;
+              }
+              
+              // Company: fill if empty, overwrite if different
+              if (companyId && companyId !== matchingUser.company_id) {
+                updateData.company_id = companyId;
+              }
+              
+              // Department: fill if empty, overwrite if different
+              if (departmentId && departmentId !== matchingUser.department_id) {
+                updateData.department_id = departmentId;
+              }
+              
+              // Job title: fill if empty, overwrite if different
+              if (jobTitleId && jobTitleId !== matchingUser.job_title_id) {
+                updateData.job_title_id = jobTitleId;
+              }
+              
+              // Manager: fill if empty, overwrite if different
+              if (managerId && managerId !== matchingUser.manager_id) {
+                updateData.manager_id = managerId;
+              }
+              
+              // Permission profile: fill if empty, overwrite if different
+              if (defaultPermissionProfileId && defaultPermissionProfileId !== matchingUser.permission_profile_id) {
+                updateData.permission_profile_id = defaultPermissionProfileId;
+              }
+              
+              if (Object.keys(updateData).length > 0) {
+                const { error: updateError } = await supabase
+                  .from('profiles')
+                  .update(updateData)
+                  .eq('id', matchingUser.id);
+                
+                if (updateError) {
+                  throw new Error(updateError.message);
+                }
+                
+                createdUsersMap.set(user.email.toLowerCase(), matchingUser.id);
+                importResults.push({ email: user.email, success: true, action: 'updated' });
+              } else {
+                // No changes needed
+                createdUsersMap.set(user.email.toLowerCase(), matchingUser.id);
+                importResults.push({ email: user.email, success: true, action: 'skipped' });
+              }
+            } else {
+              // Could not find matching profile to update
+              importResults.push({ 
+                email: user.email, 
+                success: false, 
+                error: 'Utilisateur existant mais profil non trouvé pour mise à jour'
+              });
+            }
+          } else {
+            throw new Error(errorMessage || 'Erreur de création');
+          }
+        } else {
+          // Store the created user's profile ID for manager resolution
+          if (response.data?.profile_id) {
+            createdUsersMap.set(user.email.toLowerCase(), response.data.profile_id);
+          }
 
-        // Store the created user's profile ID for manager resolution
-        if (response.data?.profile_id) {
-          createdUsersMap.set(user.email.toLowerCase(), response.data.profile_id);
+          importResults.push({ email: user.email, success: true, action: 'created' });
         }
-
-        importResults.push({ email: user.email, success: true });
       } catch (error: any) {
         importResults.push({ 
           email: user.email, 
@@ -250,7 +343,6 @@ paul.durand@exemple.fr;Paul DURAND;;;Technicien;jean.dupont@exemple.fr`;
           const managerProfileId = createdUsersMap.get(managerEmail);
           
           if (userProfileId && managerProfileId) {
-            // Update the user's manager_id
             await supabase
               .from('profiles')
               .update({ manager_id: managerProfileId })
@@ -549,10 +641,23 @@ paul.durand@exemple.fr;Paul DURAND;;;Technicien;jean.dupont@exemple.fr`;
         {step === 'results' && (
           <div className="space-y-4">
             <div className="flex items-center gap-4">
-              <Badge variant="default" className="bg-green-500">
-                <CheckCircle2 className="h-3 w-3 mr-1" />
-                {successCount} créé(s)
-              </Badge>
+              {results.filter(r => r.success && r.action === 'created').length > 0 && (
+                <Badge variant="default" className="bg-green-500">
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  {results.filter(r => r.success && r.action === 'created').length} créé(s)
+                </Badge>
+              )}
+              {results.filter(r => r.success && r.action === 'updated').length > 0 && (
+                <Badge variant="default" className="bg-blue-500">
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  {results.filter(r => r.success && r.action === 'updated').length} mis à jour
+                </Badge>
+              )}
+              {results.filter(r => r.success && r.action === 'skipped').length > 0 && (
+                <Badge variant="secondary">
+                  {results.filter(r => r.success && r.action === 'skipped').length} inchangé(s)
+                </Badge>
+              )}
               {failCount > 0 && (
                 <Badge variant="destructive">
                   <XCircle className="h-3 w-3 mr-1" />
@@ -583,7 +688,13 @@ paul.durand@exemple.fr;Paul DURAND;;;Technicien;jean.dupont@exemple.fr`;
                       <TableCell className="font-mono text-sm">{result.email}</TableCell>
                       <TableCell>
                         {result.success ? (
-                          <span className="text-green-600">Créé avec succès</span>
+                          result.action === 'created' ? (
+                            <span className="text-green-600">Créé avec succès</span>
+                          ) : result.action === 'updated' ? (
+                            <span className="text-blue-600">Mis à jour</span>
+                          ) : (
+                            <span className="text-muted-foreground">Aucun changement</span>
+                          )
                         ) : (
                           <span className="text-destructive">{result.error}</span>
                         )}
