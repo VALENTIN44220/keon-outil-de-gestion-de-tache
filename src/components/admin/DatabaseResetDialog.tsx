@@ -16,20 +16,53 @@ interface TableOption {
   order: number;
 }
 
+// Order is critical: lower numbers are deleted FIRST (dependencies)
 const TABLES: TableOption[] = [
-  { id: 'tasks', label: 'Tâches', table: 'tasks', description: 'Toutes les tâches et demandes', order: 1 },
-  { id: 'task_checklists', label: 'Checklists tâches', table: 'task_checklists', description: 'Éléments de checklist des tâches', order: 2 },
-  { id: 'task_attachments', label: 'Pièces jointes', table: 'task_attachments', description: 'Fichiers attachés aux tâches', order: 3 },
-  { id: 'workload_slots', label: 'Créneaux charge', table: 'workload_slots', description: 'Planification de charge', order: 4 },
-  { id: 'user_leaves', label: 'Congés', table: 'user_leaves', description: 'Absences et congés', order: 5 },
-  { id: 'be_projects', label: 'Projets BE', table: 'be_projects', description: 'Projets Bureau d\'Études', order: 6 },
-  { id: 'task_templates', label: 'Modèles tâches', table: 'task_templates', description: 'Modèles de tâches', order: 7 },
-  { id: 'sub_process_templates', label: 'Modèles sous-process', table: 'sub_process_templates', description: 'Modèles de sous-processus', order: 8 },
-  { id: 'process_templates', label: 'Modèles processus', table: 'process_templates', description: 'Modèles de processus', order: 9 },
-  { id: 'job_titles', label: 'Postes', table: 'job_titles', description: 'Intitulés de poste', order: 10 },
-  { id: 'departments', label: 'Services', table: 'departments', description: 'Services/Départements', order: 11 },
-  { id: 'companies', label: 'Sociétés', table: 'companies', description: 'Sociétés', order: 12 },
-  { id: 'profiles', label: 'Profils utilisateurs', table: 'profiles', description: 'Profils (attention: données utilisateurs)', order: 13 },
+  // 1. Junction/visibility tables first (no dependencies on them)
+  { id: 'process_template_visible_companies', label: 'Visibilité processus (sociétés)', table: 'process_template_visible_companies', description: 'Liens visibilité processus-sociétés', order: 1 },
+  { id: 'process_template_visible_departments', label: 'Visibilité processus (services)', table: 'process_template_visible_departments', description: 'Liens visibilité processus-services', order: 2 },
+  { id: 'sub_process_template_visible_companies', label: 'Visibilité sous-process (sociétés)', table: 'sub_process_template_visible_companies', description: 'Liens visibilité sous-processus-sociétés', order: 3 },
+  { id: 'sub_process_template_visible_departments', label: 'Visibilité sous-process (services)', table: 'sub_process_template_visible_departments', description: 'Liens visibilité sous-processus-services', order: 4 },
+  { id: 'task_template_visible_companies', label: 'Visibilité tâches (sociétés)', table: 'task_template_visible_companies', description: 'Liens visibilité tâches-sociétés', order: 5 },
+  { id: 'task_template_visible_departments', label: 'Visibilité tâches (services)', table: 'task_template_visible_departments', description: 'Liens visibilité tâches-services', order: 6 },
+  
+  // 2. Task-related tables
+  { id: 'task_checklists', label: 'Checklists tâches', table: 'task_checklists', description: 'Éléments de checklist des tâches', order: 10 },
+  { id: 'task_attachments', label: 'Pièces jointes', table: 'task_attachments', description: 'Fichiers attachés aux tâches', order: 11 },
+  { id: 'task_validation_levels', label: 'Niveaux validation tâches', table: 'task_validation_levels', description: 'Niveaux de validation des tâches', order: 12 },
+  { id: 'workload_slots', label: 'Créneaux charge', table: 'workload_slots', description: 'Planification de charge', order: 13 },
+  { id: 'pending_task_assignments', label: 'Affectations en attente', table: 'pending_task_assignments', description: 'Tâches en attente d\'affectation', order: 14 },
+  { id: 'be_request_details', label: 'Détails demandes BE', table: 'be_request_details', description: 'Détails des demandes BE', order: 15 },
+  { id: 'be_request_sub_processes', label: 'Sous-process demandes BE', table: 'be_request_sub_processes', description: 'Liens demandes-sous-processus BE', order: 16 },
+  { id: 'tasks', label: 'Tâches', table: 'tasks', description: 'Toutes les tâches et demandes', order: 20 },
+  
+  // 3. Template tables (task → sub_process → process)
+  { id: 'template_validation_levels', label: 'Niveaux validation modèles', table: 'template_validation_levels', description: 'Niveaux de validation des modèles', order: 30 },
+  { id: 'task_template_checklists', label: 'Checklists modèles tâches', table: 'task_template_checklists', description: 'Checklists des modèles de tâches', order: 31 },
+  { id: 'task_templates', label: 'Modèles tâches', table: 'task_templates', description: 'Modèles de tâches', order: 32 },
+  { id: 'sub_process_templates', label: 'Modèles sous-process', table: 'sub_process_templates', description: 'Modèles de sous-processus', order: 33 },
+  { id: 'process_templates', label: 'Modèles processus', table: 'process_templates', description: 'Modèles de processus', order: 34 },
+  
+  // 4. Other entities
+  { id: 'user_leaves', label: 'Congés', table: 'user_leaves', description: 'Absences et congés', order: 40 },
+  { id: 'be_projects', label: 'Projets BE', table: 'be_projects', description: 'Projets Bureau d\'Études', order: 41 },
+  { id: 'holidays', label: 'Jours fériés', table: 'holidays', description: 'Jours fériés', order: 42 },
+  { id: 'assignment_rules', label: 'Règles d\'affectation', table: 'assignment_rules', description: 'Règles d\'affectation automatique', order: 43 },
+  
+  // 5. Categories
+  { id: 'subcategories', label: 'Sous-catégories', table: 'subcategories', description: 'Sous-catégories de demandes', order: 50 },
+  { id: 'categories', label: 'Catégories', table: 'categories', description: 'Catégories de demandes', order: 51 },
+  
+  // 6. Organization structure (profiles must be before job_titles/departments/companies)
+  { id: 'profiles', label: 'Profils utilisateurs', table: 'profiles', description: 'Profils (attention: données utilisateurs)', order: 60 },
+  { id: 'job_titles', label: 'Postes', table: 'job_titles', description: 'Intitulés de poste', order: 61 },
+  { id: 'departments', label: 'Services', table: 'departments', description: 'Services/Départements', order: 62 },
+  { id: 'companies', label: 'Sociétés', table: 'companies', description: 'Sociétés', order: 63 },
+  
+  // 7. Reference tables
+  { id: 'hierarchy_levels', label: 'Niveaux hiérarchiques', table: 'hierarchy_levels', description: 'Niveaux de hiérarchie', order: 70 },
+  { id: 'permission_profiles', label: 'Profils de droits', table: 'permission_profiles', description: 'Profils de permissions', order: 71 },
+  { id: 'be_task_labels', label: 'Étiquettes BE', table: 'be_task_labels', description: 'Étiquettes des tâches BE', order: 72 },
 ];
 
 interface DatabaseResetDialogProps {
