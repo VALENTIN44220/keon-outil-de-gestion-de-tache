@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Plus, Trash2, Briefcase, Pencil, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { RefreshButton } from './RefreshButton';
@@ -33,6 +34,45 @@ export function DepartmentsTab({ departments, companies, onAdd, onUpdate, onDele
   const [editDescription, setEditDescription] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const toggleSelection = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const toggleAll = () => {
+    if (selectedIds.length === departments.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(departments.map(d => d.id));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    
+    const confirmed = window.confirm(`Supprimer ${selectedIds.length} service(s) ?`);
+    if (!confirmed) return;
+
+    setIsDeleting(true);
+    let deleted = 0;
+    for (const id of selectedIds) {
+      try {
+        await onDelete(id);
+        deleted++;
+      } catch (error: any) {
+        toast.error(`Erreur: ${error.message}`);
+      }
+    }
+    setSelectedIds([]);
+    setIsDeleting(false);
+    if (deleted > 0) {
+      toast.success(`${deleted} service(s) supprimé(s)`);
+    }
+  };
 
   const handleAdd = async () => {
     if (!name.trim()) {
@@ -143,7 +183,20 @@ export function DepartmentsTab({ departments, companies, onAdd, onUpdate, onDele
             <CardTitle>Services existants</CardTitle>
             <CardDescription>{departments.length} service(s) enregistré(s)</CardDescription>
           </div>
-          <RefreshButton onRefresh={onRefresh} />
+          <div className="flex items-center gap-2">
+            {selectedIds.length > 0 && (
+              <Button 
+                variant="destructive" 
+                size="sm" 
+                onClick={handleBulkDelete}
+                disabled={isDeleting}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Supprimer ({selectedIds.length})
+              </Button>
+            )}
+            <RefreshButton onRefresh={onRefresh} />
+          </div>
         </CardHeader>
         <CardContent>
           {departments.length === 0 ? (
@@ -152,6 +205,12 @@ export function DepartmentsTab({ departments, companies, onAdd, onUpdate, onDele
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[50px]">
+                    <Checkbox
+                      checked={selectedIds.length === departments.length && departments.length > 0}
+                      onCheckedChange={toggleAll}
+                    />
+                  </TableHead>
                   <TableHead>Nom</TableHead>
                   <TableHead>Société</TableHead>
                   <TableHead>Description</TableHead>
@@ -160,7 +219,13 @@ export function DepartmentsTab({ departments, companies, onAdd, onUpdate, onDele
               </TableHeader>
               <TableBody>
                 {departments.map((dept) => (
-                  <TableRow key={dept.id}>
+                  <TableRow key={dept.id} className={selectedIds.includes(dept.id) ? 'bg-muted/50' : ''}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedIds.includes(dept.id)}
+                        onCheckedChange={() => toggleSelection(dept.id)}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">{dept.name}</TableCell>
                     <TableCell>{dept.company?.name || '-'}</TableCell>
                     <TableCell className="text-muted-foreground">{dept.description || '-'}</TableCell>

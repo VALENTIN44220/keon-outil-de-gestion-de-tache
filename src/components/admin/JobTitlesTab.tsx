@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Plus, Trash2, Users, Pencil, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { RefreshButton } from './RefreshButton';
@@ -34,6 +35,45 @@ export function JobTitlesTab({ jobTitles, departments, companies, onAdd, onUpdat
   const [editDescription, setEditDescription] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const toggleSelection = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const toggleAll = () => {
+    if (selectedIds.length === jobTitles.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(jobTitles.map(j => j.id));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    
+    const confirmed = window.confirm(`Supprimer ${selectedIds.length} poste(s) ?`);
+    if (!confirmed) return;
+
+    setIsDeleting(true);
+    let deleted = 0;
+    for (const id of selectedIds) {
+      try {
+        await onDelete(id);
+        deleted++;
+      } catch (error: any) {
+        toast.error(`Erreur: ${error.message}`);
+      }
+    }
+    setSelectedIds([]);
+    setIsDeleting(false);
+    if (deleted > 0) {
+      toast.success(`${deleted} poste(s) supprimé(s)`);
+    }
+  };
 
   const handleAdd = async () => {
     if (!name.trim()) {
@@ -144,7 +184,20 @@ export function JobTitlesTab({ jobTitles, departments, companies, onAdd, onUpdat
             <CardTitle>Postes existants</CardTitle>
             <CardDescription>{jobTitles.length} poste(s) enregistré(s)</CardDescription>
           </div>
-          <RefreshButton onRefresh={onRefresh} />
+          <div className="flex items-center gap-2">
+            {selectedIds.length > 0 && (
+              <Button 
+                variant="destructive" 
+                size="sm" 
+                onClick={handleBulkDelete}
+                disabled={isDeleting}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Supprimer ({selectedIds.length})
+              </Button>
+            )}
+            <RefreshButton onRefresh={onRefresh} />
+          </div>
         </CardHeader>
         <CardContent>
           {jobTitles.length === 0 ? (
@@ -153,6 +206,12 @@ export function JobTitlesTab({ jobTitles, departments, companies, onAdd, onUpdat
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[50px]">
+                    <Checkbox
+                      checked={selectedIds.length === jobTitles.length && jobTitles.length > 0}
+                      onCheckedChange={toggleAll}
+                    />
+                  </TableHead>
                   <TableHead>Nom</TableHead>
                   <TableHead>Service</TableHead>
                   <TableHead>Société</TableHead>
@@ -162,7 +221,13 @@ export function JobTitlesTab({ jobTitles, departments, companies, onAdd, onUpdat
               </TableHeader>
               <TableBody>
                 {jobTitles.map((job) => (
-                  <TableRow key={job.id}>
+                  <TableRow key={job.id} className={selectedIds.includes(job.id) ? 'bg-muted/50' : ''}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedIds.includes(job.id)}
+                        onCheckedChange={() => toggleSelection(job.id)}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">{job.name}</TableCell>
                     <TableCell>{job.department?.name || '-'}</TableCell>
                     <TableCell>{job.department?.company?.name || '-'}</TableCell>
