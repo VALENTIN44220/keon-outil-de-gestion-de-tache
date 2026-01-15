@@ -11,6 +11,7 @@ import { AssignmentRulesTab } from './AssignmentRulesTab';
 import { CategoriesProcessTab } from './CategoriesProcessTab';
 import { DataExportTab } from './DataExportTab';
 import { GovernanceSyncTab } from './GovernanceSyncTab';
+import { DatabaseResetDialog } from './DatabaseResetDialog';
 import type { Company, Department, JobTitle, HierarchyLevel, PermissionProfile, UserProfile } from '@/types/admin';
 
 interface AdminTabsProps {
@@ -42,8 +43,13 @@ export function AdminTabs(props: AdminTabsProps) {
   const [activeTab, setActiveTab] = useState('users');
 
   return (
-    <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-      <TabsList className="grid w-full grid-cols-10">
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <DatabaseResetDialog onReset={props.refetch} />
+      </div>
+      
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-10">
         <TabsTrigger value="users" className="flex items-center gap-2">
           <UserCog className="h-4 w-4" />
           <span className="hidden sm:inline">Utilisateurs</span>
@@ -172,5 +178,6 @@ export function AdminTabs(props: AdminTabsProps) {
         <GovernanceSyncTab />
       </TabsContent>
     </Tabs>
+    </div>
   );
 }
