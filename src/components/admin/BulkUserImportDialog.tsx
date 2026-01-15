@@ -154,15 +154,13 @@ paul.durand@exemple.fr;Paul DURAND;;;Technicien;jean.dupont@exemple.fr`;
     // Build a map of created users' emails to their profile IDs for manager resolution
     const createdUsersMap = new Map<string, string>();
     
-    // First, check which users already exist
-    const existingEmails = new Set<string>();
-    const existingProfilesMap = new Map<string, UserProfile>();
+    // First, build a map of existing users by fetching profiles with their auth emails
+    // We need to get this from the edge function or by checking each email
+    const existingProfilesByEmail = new Map<string, UserProfile>();
     
-    for (const existingUser of users) {
-      // We need to find users by email - check if we can match
-      // Since profiles don't have email directly, we'll need to check during import
-    }
-
+    // Pre-populate with users we know (passed from parent component)
+    // Note: users prop already has profile data, we need to match emails
+    
     // First pass: create or update all users
     for (const user of validUsers) {
       try {
@@ -217,12 +215,8 @@ paul.durand@exemple.fr;Paul DURAND;;;Technicien;jean.dupont@exemple.fr`;
           }
         }
         
-        // Check if user already exists by looking up auth.users via email
-        const { data: existingAuthUsers } = await supabase.auth.admin.listUsers();
-        let existingUserId: string | null = null;
-        
-        // Try to find existing profile by checking if a user with this email exists
-        // We'll attempt to create and handle the "already exists" error
+        // First, check if user already exists by calling edge function with check_only flag
+        // or by using RPC to query auth.users
         const response = await supabase.functions.invoke('create-user', {
           body: {
             email: user.email,
@@ -233,97 +227,21 @@ paul.durand@exemple.fr;Paul DURAND;;;Technicien;jean.dupont@exemple.fr`;
             job_title_id: jobTitleId,
             permission_profile_id: defaultPermissionProfileId || undefined,
             manager_id: managerId,
+            upsert_mode: true, // NEW: Tell edge function to update if exists
           },
         });
 
         if (response.error) {
           const errorMessage = response.error.message || '';
-          
-          // Check if user already exists
-          if (errorMessage.includes('already been registered') || errorMessage.includes('already exists')) {
-            // User exists - find their profile and update it
-            const { data: existingProfile } = await supabase
-              .from('profiles')
-              .select('*')
-              .ilike('display_name', user.email.split('@')[0] + '%')
-              .maybeSingle();
-            
-            // Alternative: find by matching email pattern in users list
-            const matchingUser = users.find(u => {
-              // Try to match by display name containing email prefix
-              const emailPrefix = user.email.split('@')[0].toLowerCase();
-              return u.display_name?.toLowerCase().includes(emailPrefix);
-            });
-            
-            if (matchingUser) {
-              // Merge logic: update only non-null import values over empty existing values
-              const updateData: Record<string, any> = {};
-              
-              // Display name: overwrite if import has value
-              if (user.displayName && user.displayName !== matchingUser.display_name) {
-                updateData.display_name = user.displayName;
-              }
-              
-              // Company: fill if empty, overwrite if different
-              if (companyId && companyId !== matchingUser.company_id) {
-                updateData.company_id = companyId;
-              }
-              
-              // Department: fill if empty, overwrite if different
-              if (departmentId && departmentId !== matchingUser.department_id) {
-                updateData.department_id = departmentId;
-              }
-              
-              // Job title: fill if empty, overwrite if different
-              if (jobTitleId && jobTitleId !== matchingUser.job_title_id) {
-                updateData.job_title_id = jobTitleId;
-              }
-              
-              // Manager: fill if empty, overwrite if different
-              if (managerId && managerId !== matchingUser.manager_id) {
-                updateData.manager_id = managerId;
-              }
-              
-              // Permission profile: fill if empty, overwrite if different
-              if (defaultPermissionProfileId && defaultPermissionProfileId !== matchingUser.permission_profile_id) {
-                updateData.permission_profile_id = defaultPermissionProfileId;
-              }
-              
-              if (Object.keys(updateData).length > 0) {
-                const { error: updateError } = await supabase
-                  .from('profiles')
-                  .update(updateData)
-                  .eq('id', matchingUser.id);
-                
-                if (updateError) {
-                  throw new Error(updateError.message);
-                }
-                
-                createdUsersMap.set(user.email.toLowerCase(), matchingUser.id);
-                importResults.push({ email: user.email, success: true, action: 'updated' });
-              } else {
-                // No changes needed
-                createdUsersMap.set(user.email.toLowerCase(), matchingUser.id);
-                importResults.push({ email: user.email, success: true, action: 'skipped' });
-              }
-            } else {
-              // Could not find matching profile to update
-              importResults.push({ 
-                email: user.email, 
-                success: false, 
-                error: 'Utilisateur existant mais profil non trouvé pour mise à jour'
-              });
-            }
-          } else {
-            throw new Error(errorMessage || 'Erreur de création');
-          }
+          throw new Error(errorMessage || 'Erreur de création');
         } else {
-          // Store the created user's profile ID for manager resolution
+          // Store the created/updated user's profile ID for manager resolution
           if (response.data?.profile_id) {
             createdUsersMap.set(user.email.toLowerCase(), response.data.profile_id);
           }
-
-          importResults.push({ email: user.email, success: true, action: 'created' });
+          
+          const action = response.data?.action || 'created';
+          importResults.push({ email: user.email, success: true, action: action as 'created' | 'updated' | 'skipped' });
         }
       } catch (error: any) {
         importResults.push({ 
