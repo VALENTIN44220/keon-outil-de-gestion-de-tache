@@ -958,6 +958,51 @@ export type Database = {
           },
         ]
       }
+      request_field_values: {
+        Row: {
+          created_at: string
+          field_id: string
+          file_url: string | null
+          id: string
+          task_id: string
+          updated_at: string
+          value: string | null
+        }
+        Insert: {
+          created_at?: string
+          field_id: string
+          file_url?: string | null
+          id?: string
+          task_id: string
+          updated_at?: string
+          value?: string | null
+        }
+        Update: {
+          created_at?: string
+          field_id?: string
+          file_url?: string | null
+          id?: string
+          task_id?: string
+          updated_at?: string
+          value?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "request_field_values_field_id_fkey"
+            columns: ["field_id"]
+            isOneToOne: false
+            referencedRelation: "template_custom_fields"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "request_field_values_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sub_process_template_visible_companies: {
         Row: {
           company_id: string
@@ -1754,6 +1799,110 @@ export type Database = {
           },
         ]
       }
+      template_custom_fields: {
+        Row: {
+          condition_field_id: string | null
+          condition_operator: string | null
+          condition_value: string | null
+          created_at: string
+          created_by: string | null
+          default_value: string | null
+          description: string | null
+          field_type: Database["public"]["Enums"]["custom_field_type"]
+          id: string
+          is_common: boolean
+          is_required: boolean
+          label: string
+          max_value: number | null
+          min_value: number | null
+          name: string
+          options: Json | null
+          order_index: number
+          placeholder: string | null
+          process_template_id: string | null
+          sub_process_template_id: string | null
+          updated_at: string
+          validation_regex: string | null
+        }
+        Insert: {
+          condition_field_id?: string | null
+          condition_operator?: string | null
+          condition_value?: string | null
+          created_at?: string
+          created_by?: string | null
+          default_value?: string | null
+          description?: string | null
+          field_type?: Database["public"]["Enums"]["custom_field_type"]
+          id?: string
+          is_common?: boolean
+          is_required?: boolean
+          label: string
+          max_value?: number | null
+          min_value?: number | null
+          name: string
+          options?: Json | null
+          order_index?: number
+          placeholder?: string | null
+          process_template_id?: string | null
+          sub_process_template_id?: string | null
+          updated_at?: string
+          validation_regex?: string | null
+        }
+        Update: {
+          condition_field_id?: string | null
+          condition_operator?: string | null
+          condition_value?: string | null
+          created_at?: string
+          created_by?: string | null
+          default_value?: string | null
+          description?: string | null
+          field_type?: Database["public"]["Enums"]["custom_field_type"]
+          id?: string
+          is_common?: boolean
+          is_required?: boolean
+          label?: string
+          max_value?: number | null
+          min_value?: number | null
+          name?: string
+          options?: Json | null
+          order_index?: number
+          placeholder?: string | null
+          process_template_id?: string | null
+          sub_process_template_id?: string | null
+          updated_at?: string
+          validation_regex?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_custom_fields_condition_field_id_fkey"
+            columns: ["condition_field_id"]
+            isOneToOne: false
+            referencedRelation: "template_custom_fields"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "template_custom_fields_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "template_custom_fields_process_template_id_fkey"
+            columns: ["process_template_id"]
+            isOneToOne: false
+            referencedRelation: "process_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "template_custom_fields_sub_process_template_id_fkey"
+            columns: ["sub_process_template_id"]
+            isOneToOne: false
+            referencedRelation: "sub_process_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       template_validation_levels: {
         Row: {
           created_at: string
@@ -1967,6 +2116,21 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
+      custom_field_type:
+        | "text"
+        | "textarea"
+        | "number"
+        | "date"
+        | "datetime"
+        | "email"
+        | "phone"
+        | "url"
+        | "checkbox"
+        | "select"
+        | "multiselect"
+        | "user_search"
+        | "department_search"
+        | "file"
       template_visibility:
         | "private"
         | "internal_department"
@@ -2100,6 +2264,22 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "moderator", "user"],
+      custom_field_type: [
+        "text",
+        "textarea",
+        "number",
+        "date",
+        "datetime",
+        "email",
+        "phone",
+        "url",
+        "checkbox",
+        "select",
+        "multiselect",
+        "user_search",
+        "department_search",
+        "file",
+      ],
       template_visibility: [
         "private",
         "internal_department",
