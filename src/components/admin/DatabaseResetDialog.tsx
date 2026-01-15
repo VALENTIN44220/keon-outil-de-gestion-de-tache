@@ -92,11 +92,54 @@ export function DatabaseResetDialog({ onReset }: DatabaseResetDialogProps) {
     }
   };
 
+  const REQUIRED_DEPENDENCIES: Record<string, string[]> = {
+    // Deleting org structure requires deleting templates/tasks that reference it
+    departments: [
+      'process_template_visible_departments',
+      'sub_process_template_visible_departments',
+      'task_template_visible_departments',
+      'sub_process_templates',
+      'process_templates',
+      'task_templates',
+      'job_titles',
+      'profiles',
+    ],
+    companies: [
+      'process_template_visible_companies',
+      'sub_process_template_visible_companies',
+      'task_template_visible_companies',
+      'departments',
+      'job_titles',
+      'profiles',
+    ],
+    job_titles: ['profiles'],
+  };
+
   const handleProceedToConfirm = () => {
     if (selectedTables.length === 0) {
       toast.error('Sélectionnez au moins une table');
       return;
     }
+
+    const required = new Set(selectedTables);
+    const added: string[] = [];
+
+    for (const tableId of selectedTables) {
+      const deps = REQUIRED_DEPENDENCIES[tableId] ?? [];
+      for (const depId of deps) {
+        if (!required.has(depId)) {
+          required.add(depId);
+          added.push(depId);
+        }
+      }
+    }
+
+    if (added.length > 0) {
+      setSelectedTables(Array.from(required));
+      const addedLabels = TABLES.filter(t => added.includes(t.id)).map(t => t.label);
+      toast.info(`Dépendances ajoutées automatiquement : ${addedLabels.join(', ')}`);
+    }
+
     setStep('confirm');
   };
 
@@ -114,19 +157,29 @@ export function DatabaseResetDialog({ onReset }: DatabaseResetDialogProps) {
         .filter(t => selectedTables.includes(t.id))
         .sort((a, b) => a.order - b.order);
 
+      let totalDeleted = 0;
+
       for (const table of tablesToDelete) {
-        const { error } = await supabase
+        const { error, count } = await supabase
           .from(table.table as any)
-          .delete()
+          .delete({ count: 'exact' })
           .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all rows
 
         if (error) {
           console.error(`Error deleting ${table.table}:`, error);
           toast.error(`Erreur lors de la suppression de ${table.label}: ${error.message}`);
+          continue;
+        }
+
+        const deleted = count ?? 0;
+        totalDeleted += deleted;
+
+        if (deleted === 0) {
+          toast.warning(`${table.label} : aucune ligne supprimée (probablement une dépendance à supprimer avant)`);
         }
       }
 
-      toast.success(`${tablesToDelete.length} table(s) vidée(s) avec succès`);
+      toast.success(`RAZ terminée (lignes supprimées: ${totalDeleted})`);
       onReset();
       handleClose();
     } catch (error) {
