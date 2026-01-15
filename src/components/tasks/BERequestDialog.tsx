@@ -25,8 +25,11 @@ import { useRequestWorkflow } from '@/hooks/useRequestWorkflow';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Building2, CheckSquare, FileText, Info } from 'lucide-react';
+import { Building2, CheckSquare, FileText, Info, FormInput } from 'lucide-react';
 import { toast } from 'sonner';
+import { useCustomFields } from '@/hooks/useCustomFields';
+import { CustomFieldsRenderer, validateCustomFields } from '@/components/tasks/CustomFieldsRenderer';
+import { TemplateCustomField } from '@/types/customField';
 
 // Liste des sous-processus BE prédéfinis
 const BE_SUB_PROCESSES = [
@@ -113,6 +116,57 @@ export function BERequestDialog({
   const [targetDepartmentId, setTargetDepartmentId] = useState<string | null>(null);
   const [beProcessId, setBEProcessId] = useState<string | null>(null);
 
+  // Custom fields state
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [subProcessCustomFields, setSubProcessCustomFields] = useState<Record<string, TemplateCustomField[]>>({});
+
+  // Fetch custom fields for the BE process
+  const { fields: processFields, isLoading: loadingProcessFields } = useCustomFields({
+    processTemplateId: beProcessId,
+    includeCommon: true,
+  });
+
+  // Fetch custom fields for each selected sub-process
+  useEffect(() => {
+    const fetchSubProcessFields = async () => {
+      const fieldsMap: Record<string, TemplateCustomField[]> = {};
+      
+      for (const subProcess of availableSubProcesses) {
+        const { data } = await supabase
+          .from('template_custom_fields')
+          .select('*')
+          .eq('sub_process_template_id', subProcess.id)
+          .order('order_index');
+        
+        if (data && data.length > 0) {
+          fieldsMap[subProcess.id] = data.map((field: any) => ({
+            ...field,
+            options: field.options || null,
+          }));
+        }
+      }
+      
+      setSubProcessCustomFields(fieldsMap);
+    };
+
+    if (availableSubProcesses.length > 0) {
+      fetchSubProcessFields();
+    }
+  }, [availableSubProcesses]);
+
+  const handleCustomFieldChange = (fieldId: string, value: any) => {
+    setCustomFieldValues((prev) => ({ ...prev, [fieldId]: value }));
+    // Clear error when value changes
+    if (fieldErrors[fieldId]) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next[fieldId];
+        return next;
+      });
+    }
+  };
+
   // Fetch BE department and process on mount
   useEffect(() => {
     const fetchBEConfig = async () => {
@@ -186,6 +240,26 @@ export function BERequestDialog({
       return;
     }
 
+    // Validate custom fields
+    const allFields = [...processFields];
+    // Add sub-process specific fields
+    for (const spName of selectedSubProcesses) {
+      const matchingSp = availableSubProcesses.find(
+        sp => sp.name.toUpperCase().includes(spName.toUpperCase()) ||
+              spName.toUpperCase().includes(sp.name.toUpperCase())
+      );
+      if (matchingSp && subProcessCustomFields[matchingSp.id]) {
+        allFields.push(...subProcessCustomFields[matchingSp.id]);
+      }
+    }
+
+    const { isValid, errors } = validateCustomFields(allFields, customFieldValues);
+    if (!isValid) {
+      setFieldErrors(errors);
+      toast.error('Veuillez corriger les erreurs dans les champs personnalisés');
+      return;
+    }
+
     setIsSubmitting(true);
     
     try {
@@ -227,6 +301,25 @@ export function BERequestDialog({
       };
 
       await supabase.from('be_request_details').insert(beDetailsPayload);
+
+      // Save custom field values
+      const fieldValuesToInsert = Object.entries(customFieldValues)
+        .filter(([_, value]) => value !== undefined && value !== null && value !== '')
+        .map(([fieldId, value]) => ({
+          task_id: requestData.id,
+          field_id: fieldId,
+          value: typeof value === 'object' ? JSON.stringify(value) : String(value),
+        }));
+
+      if (fieldValuesToInsert.length > 0) {
+        const { error: fieldError } = await supabase
+          .from('request_field_values')
+          .insert(fieldValuesToInsert);
+        
+        if (fieldError) {
+          console.error('Error saving custom field values:', fieldError);
+        }
+      }
 
       // Find matching sub-process templates and create pending assignments for each
       let totalAssignments = 0;
@@ -301,6 +394,40 @@ export function BERequestDialog({
     setDemandeIE('');
     setDemandeProjeteur('');
     setSelectedSubProcesses([]);
+    setCustomFieldValues({});
+    setFieldErrors({});
+  };
+
+  // Get the count of custom fields for the tab badge
+  const getCustomFieldsCount = () => {
+    let count = processFields.length;
+    for (const spName of selectedSubProcesses) {
+      const matchingSp = availableSubProcesses.find(
+        sp => sp.name.toUpperCase().includes(spName.toUpperCase()) ||
+              spName.toUpperCase().includes(sp.name.toUpperCase())
+      );
+      if (matchingSp && subProcessCustomFields[matchingSp.id]) {
+        count += subProcessCustomFields[matchingSp.id].length;
+      }
+    }
+    return count;
+  };
+
+  // Get all visible custom fields for rendering
+  const getVisibleCustomFields = () => {
+    const allFields: TemplateCustomField[] = [...processFields];
+    
+    for (const spName of selectedSubProcesses) {
+      const matchingSp = availableSubProcesses.find(
+        sp => sp.name.toUpperCase().includes(spName.toUpperCase()) ||
+              spName.toUpperCase().includes(sp.name.toUpperCase())
+      );
+      if (matchingSp && subProcessCustomFields[matchingSp.id]) {
+        allFields.push(...subProcessCustomFields[matchingSp.id]);
+      }
+    }
+    
+    return allFields;
   };
 
   return (
@@ -315,7 +442,7 @@ export function BERequestDialog({
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-hidden flex flex-col">
           <Tabs defaultValue="general" className="flex-1 overflow-hidden flex flex-col">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="general" className="flex items-center gap-2">
                 <FileText className="h-4 w-4" />
                 Général
@@ -328,6 +455,12 @@ export function BERequestDialog({
                 <CheckSquare className="h-4 w-4" />
                 Tâches ({selectedSubProcesses.length})
               </TabsTrigger>
+              {getCustomFieldsCount() > 0 && (
+                <TabsTrigger value="customfields" className="flex items-center gap-2">
+                  <FormInput className="h-4 w-4" />
+                  Champs ({getCustomFieldsCount()})
+                </TabsTrigger>
+              )}
             </TabsList>
 
             <ScrollArea className="flex-1 mt-4">
@@ -555,6 +688,31 @@ export function BERequestDialog({
                   )}
                 </div>
               </TabsContent>
+
+              {/* Custom Fields Tab */}
+              {getCustomFieldsCount() > 0 && (
+                <TabsContent value="customfields" className="space-y-4 pr-4">
+                  <div className="rounded-lg border border-primary/50 bg-primary/5 p-3">
+                    <p className="text-sm text-muted-foreground">
+                      Remplissez les champs personnalisés ci-dessous. Les champs marqués d'un * sont obligatoires.
+                    </p>
+                  </div>
+
+                  {loadingProcessFields ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      Chargement des champs...
+                    </div>
+                  ) : (
+                    <CustomFieldsRenderer
+                      fields={getVisibleCustomFields()}
+                      values={customFieldValues}
+                      onChange={handleCustomFieldChange}
+                      errors={fieldErrors}
+                      disabled={isSubmitting}
+                    />
+                  )}
+                </TabsContent>
+              )}
             </ScrollArea>
           </Tabs>
 
