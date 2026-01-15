@@ -9,7 +9,7 @@ import { KanbanBoard } from '@/components/tasks/KanbanBoard';
 import { CalendarView } from '@/components/tasks/CalendarView';
 import { PendingAssignmentsView } from '@/components/tasks/PendingAssignmentsView';
 import { NewRequestDialog } from '@/components/tasks/NewRequestDialog';
-import { BERequestDialog } from '@/components/tasks/BERequestDialog';
+// BERequestDialog removed - unified into NewRequestDialog
 import { AddTaskDialog } from '@/components/tasks/AddTaskDialog';
 import { NewTaskDialog } from '@/components/tasks/NewTaskDialog';
 import { TaskDetailDialog } from '@/components/tasks/TaskDetailDialog';
@@ -99,7 +99,7 @@ const Requests = () => {
   });
   const [profilesMap, setProfilesMap] = useState<Map<string, string>>(new Map());
   const [isNewRequestOpen, setIsNewRequestOpen] = useState(false);
-  const [isBERequestOpen, setIsBERequestOpen] = useState(false);
+  // BERequestDialog state removed - unified into NewRequestDialog
   const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
   const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
   const [requests, setRequests] = useState<Task[]>([]);
@@ -313,9 +313,7 @@ const Requests = () => {
     setIsNewRequestOpen(true);
   };
 
-  const handleOpenBERequest = () => {
-    setIsBERequestOpen(true);
-  };
+  // handleOpenBERequest removed - use unified NewRequestDialog
 
   const handleViewRequest = (request: Task) => {
     setSelectedRequest(request);
@@ -427,26 +425,6 @@ const Requests = () => {
             </CardDescription>
           </CardContent>
         </Card>
-
-        {/* BE Request */}
-        {canViewBEProjects && (
-          <Card 
-            className="cursor-pointer hover:shadow-md transition-shadow border-2 hover:border-blue-500/50"
-            onClick={handleOpenBERequest}
-          >
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-blue-600/10">
-                  <Building2 className="h-5 w-5 text-blue-600" />
-                </div>
-                <CardTitle className="text-base">Demande Bureau d'Études</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <CardDescription>Formulaire spécialisé pour le BE</CardDescription>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Custom request */}
         <Card 
@@ -766,11 +744,7 @@ const Requests = () => {
         onTasksCreated={handleRefresh}
       />
       
-      <BERequestDialog
-        open={isBERequestOpen}
-        onClose={() => setIsBERequestOpen(false)}
-        processTemplateId={selectedProcessTemplateId}
-      />
+      {/* BERequestDialog removed - functionality unified into NewRequestDialog */}
 
       {selectedRequest && (
         <TaskDetailDialog
