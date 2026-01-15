@@ -46,6 +46,7 @@ import {
   FolderOpen,
   Workflow,
   ChevronRight,
+  CheckSquare,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -466,19 +467,23 @@ const Requests = () => {
                 </CardHeader>
                 <CardContent className="pt-0">
                   {process.sub_processes.length > 0 ? (
-                    <div className="space-y-1">
-                      {process.sub_processes.map(subProcess => (
-                        <Button
-                          key={subProcess.id}
-                          variant="ghost"
-                          size="sm"
-                          className="w-full justify-start text-left h-auto py-2"
-                          onClick={() => handleOpenRequest(null as any, subProcess.id, process.id)}
-                        >
-                          <Workflow className="h-3 w-3 mr-2 text-accent shrink-0" />
-                          <span className="truncate text-xs">{subProcess.name}</span>
-                        </Button>
-                      ))}
+                    <div className="space-y-2">
+                      {/* Main button to open dialog with all sub-processes and checkboxes */}
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="w-full justify-center"
+                        onClick={() => handleOpenRequest(null as any, undefined, process.id)}
+                      >
+                        <CheckSquare className="h-4 w-4 mr-2" />
+                        Sélectionner les tâches ({process.sub_processes.length})
+                      </Button>
+                      
+                      {/* Preview of available sub-processes */}
+                      <div className="text-xs text-muted-foreground pt-1 border-t">
+                        {process.sub_processes.slice(0, 3).map(sp => sp.name).join(', ')}
+                        {process.sub_processes.length > 3 && ` +${process.sub_processes.length - 3} autres`}
+                      </div>
                     </div>
                   ) : (
                     <Button
