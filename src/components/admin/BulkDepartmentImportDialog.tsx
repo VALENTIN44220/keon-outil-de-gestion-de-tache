@@ -7,8 +7,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Label } from '@/components/ui/label';
-import { Upload, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { Upload, CheckCircle2, XCircle, Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 import type { Department, Company } from '@/types/admin';
 
 interface BulkDepartmentImportDialogProps {
@@ -28,11 +29,14 @@ interface ParsedDepartment {
   isValid: boolean;
   error?: string;
   isDuplicate?: boolean;
+  existingId?: string;
+  action?: 'create' | 'update' | 'skip';
 }
 
 interface ImportResult {
   name: string;
   success: boolean;
+  action?: 'created' | 'updated' | 'skipped';
   error?: string;
 }
 
@@ -77,7 +81,11 @@ Comptabilité;;Service comptable`;
     const companyMap = new Map<string, string>();
     companies.forEach(c => companyMap.set(c.name.toLowerCase().trim(), c.id));
 
-    const existingNames = new Set(existingDepartments.map(d => `${d.name.toLowerCase().trim()}-${d.company_id || ''}`));
+    const existingMap = new Map<string, Department>();
+    existingDepartments.forEach(d => {
+      const key = `${d.name.toLowerCase().trim()}-${d.company_id || ''}`;
+      existingMap.set(key, d);
+    });
     const parsedInBatch = new Set<string>();
 
     const parsed: ParsedDepartment[] = dataLines.map(line => {
@@ -97,6 +105,8 @@ Comptabilité;;Service comptable`;
       let isValid = true;
       let error: string | undefined;
       let isDuplicate = false;
+      let existingId: string | undefined;
+      let action: 'create' | 'update' | 'skip' | undefined;
 
       const uniqueKey = `${name.toLowerCase()}-${companyId || ''}`;
 
@@ -106,21 +116,31 @@ Comptabilité;;Service comptable`;
       } else if (companyName && !companyId) {
         isValid = false;
         error = `Société "${companyName}" non trouvée`;
-      } else if (existingNames.has(uniqueKey)) {
-        isValid = false;
-        isDuplicate = true;
-        error = 'Service déjà existant';
       } else if (parsedInBatch.has(uniqueKey)) {
         isValid = false;
         isDuplicate = true;
         error = 'Doublon dans l\'import';
+      } else {
+        const existing = existingMap.get(uniqueKey);
+        if (existing) {
+          existingId = existing.id;
+          // Check if there are changes to apply
+          const descChanged = description && description !== (existing.description || '');
+          if (descChanged) {
+            action = 'update';
+          } else {
+            action = 'skip';
+          }
+        } else {
+          action = 'create';
+        }
       }
 
       if (name) {
         parsedInBatch.add(uniqueKey);
       }
 
-      return { name, companyName, companyId, description, isValid, error, isDuplicate };
+      return { name, companyName, companyId, description, isValid, error, isDuplicate, existingId, action };
     });
 
     setParsedDepartments(parsed);
@@ -134,8 +154,23 @@ Comptabilité;;Service comptable`;
 
     for (const dept of validDepartments) {
       try {
-        await onAdd(dept.name, dept.companyId || undefined, dept.description || undefined);
-        importResults.push({ name: dept.name, success: true });
+        if (dept.action === 'create') {
+          await onAdd(dept.name, dept.companyId || undefined, dept.description || undefined);
+          importResults.push({ name: dept.name, success: true, action: 'created' });
+        } else if (dept.action === 'update' && dept.existingId) {
+          const updateData: Record<string, any> = {};
+          if (dept.description) {
+            updateData.description = dept.description;
+          }
+          const { error } = await supabase
+            .from('departments')
+            .update(updateData)
+            .eq('id', dept.existingId);
+          if (error) throw error;
+          importResults.push({ name: dept.name, success: true, action: 'updated' });
+        } else if (dept.action === 'skip') {
+          importResults.push({ name: dept.name, success: true, action: 'skipped' });
+        }
       } catch (error: any) {
         importResults.push({ name: dept.name, success: false, error: error.message });
       }
@@ -144,7 +179,7 @@ Comptabilité;;Service comptable`;
     setResults(importResults);
     setStep('results');
 
-    const successCount = importResults.filter(r => r.success).length;
+    const successCount = importResults.filter(r => r.success && r.action !== 'skipped').length;
     if (successCount > 0) {
       onImportComplete();
     }
@@ -158,9 +193,13 @@ Comptabilité;;Service comptable`;
     setDefaultCompanyId('');
   };
 
-  const validCount = parsedDepartments.filter(d => d.isValid).length;
+  const createCount = parsedDepartments.filter(d => d.isValid && d.action === 'create').length;
+  const updateCount = parsedDepartments.filter(d => d.isValid && d.action === 'update').length;
+  const skipCount = parsedDepartments.filter(d => d.isValid && d.action === 'skip').length;
   const invalidCount = parsedDepartments.filter(d => !d.isValid).length;
-  const successCount = results.filter(r => r.success).length;
+  const createdCount = results.filter(r => r.success && r.action === 'created').length;
+  const updatedCount = results.filter(r => r.success && r.action === 'updated').length;
+  const skippedCount = results.filter(r => r.success && r.action === 'skipped').length;
   const failCount = results.filter(r => !r.success).length;
 
   const getCompanyName = (companyId: string | null) => {
@@ -215,8 +254,10 @@ Comptabilité;;Service comptable`;
 
         {step === 'preview' && (
           <div className="space-y-4">
-            <div className="flex gap-2">
-              <Badge variant="default">{validCount} valide(s)</Badge>
+            <div className="flex gap-2 flex-wrap">
+              {createCount > 0 && <Badge variant="default" className="bg-green-600">{createCount} à créer</Badge>}
+              {updateCount > 0 && <Badge variant="default" className="bg-blue-600">{updateCount} à mettre à jour</Badge>}
+              {skipCount > 0 && <Badge variant="secondary">{skipCount} inchangé(s)</Badge>}
               {invalidCount > 0 && <Badge variant="destructive">{invalidCount} invalide(s)</Badge>}
             </div>
             <ScrollArea className="h-[400px] border rounded-md">
@@ -231,10 +272,16 @@ Comptabilité;;Service comptable`;
                 </TableHeader>
                 <TableBody>
                   {parsedDepartments.map((dept, idx) => (
-                    <TableRow key={idx} className={!dept.isValid ? 'bg-destructive/10' : ''}>
+                    <TableRow key={idx} className={!dept.isValid ? 'bg-destructive/10' : dept.action === 'update' ? 'bg-blue-50' : dept.action === 'skip' ? 'bg-muted/50' : ''}>
                       <TableCell>
                         {dept.isValid ? (
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                          dept.action === 'update' ? (
+                            <RefreshCw className="h-4 w-4 text-blue-600" />
+                          ) : dept.action === 'skip' ? (
+                            <span className="text-muted-foreground text-xs">—</span>
+                          ) : (
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                          )
                         ) : (
                           <XCircle className="h-4 w-4 text-destructive" />
                         )}
@@ -244,6 +291,12 @@ Comptabilité;;Service comptable`;
                           <span className="font-medium">{dept.name || '-'}</span>
                           {dept.error && (
                             <p className="text-xs text-destructive">{dept.error}</p>
+                          )}
+                          {dept.action === 'update' && (
+                            <p className="text-xs text-blue-600">Mise à jour</p>
+                          )}
+                          {dept.action === 'skip' && (
+                            <p className="text-xs text-muted-foreground">Aucun changement</p>
                           )}
                         </div>
                       </TableCell>
@@ -274,8 +327,10 @@ Comptabilité;;Service comptable`;
 
         {step === 'results' && (
           <div className="space-y-4">
-            <div className="flex gap-2">
-              <Badge variant="default" className="bg-green-600">{successCount} importé(s)</Badge>
+            <div className="flex gap-2 flex-wrap">
+              {createdCount > 0 && <Badge variant="default" className="bg-green-600">{createdCount} créé(s)</Badge>}
+              {updatedCount > 0 && <Badge variant="default" className="bg-blue-600">{updatedCount} mis à jour</Badge>}
+              {skippedCount > 0 && <Badge variant="secondary">{skippedCount} inchangé(s)</Badge>}
               {failCount > 0 && <Badge variant="destructive">{failCount} échoué(s)</Badge>}
             </div>
             <ScrollArea className="h-[300px] border rounded-md">
@@ -292,14 +347,26 @@ Comptabilité;;Service comptable`;
                     <TableRow key={idx} className={!result.success ? 'bg-destructive/10' : ''}>
                       <TableCell>
                         {result.success ? (
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
+                          result.action === 'updated' ? (
+                            <RefreshCw className="h-4 w-4 text-blue-600" />
+                          ) : result.action === 'skipped' ? (
+                            <span className="text-muted-foreground text-xs">—</span>
+                          ) : (
+                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                          )
                         ) : (
                           <XCircle className="h-4 w-4 text-destructive" />
                         )}
                       </TableCell>
                       <TableCell className="font-medium">{result.name}</TableCell>
                       <TableCell className="text-muted-foreground">
-                        {result.success ? 'Importé avec succès' : result.error}
+                        {result.success 
+                          ? result.action === 'created' 
+                            ? 'Créé avec succès' 
+                            : result.action === 'updated' 
+                              ? 'Mis à jour' 
+                              : 'Aucun changement'
+                          : result.error}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -325,8 +392,8 @@ Comptabilité;;Service comptable`;
               <Button variant="outline" onClick={() => setStep('input')}>
                 Retour
               </Button>
-              <Button onClick={handleImport} disabled={validCount === 0}>
-                Importer {validCount} service(s)
+              <Button onClick={handleImport} disabled={createCount + updateCount === 0}>
+                Importer {createCount + updateCount} service(s)
               </Button>
             </>
           )}
