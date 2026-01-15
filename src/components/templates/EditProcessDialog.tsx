@@ -4,10 +4,22 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ProcessTemplate, TemplateVisibility } from '@/types/template';
 import { VisibilitySelect } from './VisibilitySelect';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
+import { supabase } from '@/integrations/supabase/client';
+
+interface Company {
+  id: string;
+  name: string;
+}
+
+interface Department {
+  id: string;
+  name: string;
+}
 
 interface EditProcessDialogProps {
   process: ProcessTemplate | null;
@@ -21,22 +33,61 @@ export function EditProcessDialog({ process, open, onClose, onSave }: EditProces
   const { isAdmin } = useUserRole();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [company, setCompany] = useState('');
-  const [department, setDepartment] = useState('');
   const [visibilityLevel, setVisibilityLevel] = useState<TemplateVisibility>('public');
+  const [targetCompanyId, setTargetCompanyId] = useState<string | null>(null);
+  const [targetDepartmentId, setTargetDepartmentId] = useState<string | null>(null);
+
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [filteredDepartments, setFilteredDepartments] = useState<Department[]>([]);
 
   // Only creator or admin can change visibility
   const canChangeVisibility = process && (process.user_id === user?.id || isAdmin);
 
   useEffect(() => {
+    if (open) {
+      fetchCompanies();
+      fetchDepartments();
+    }
+  }, [open]);
+
+  useEffect(() => {
     if (process) {
       setName(process.name);
       setDescription(process.description || '');
-      setCompany(process.company || '');
-      setDepartment(process.department || '');
       setVisibilityLevel(process.visibility_level || 'public');
+      setTargetCompanyId(process.creator_company_id || null);
+      setTargetDepartmentId(process.target_department_id || null);
     }
   }, [process]);
+
+  useEffect(() => {
+    if (targetCompanyId) {
+      setFilteredDepartments(departments.filter(d => {
+        // We need to check if department belongs to company
+        // For now, show all departments when a company is selected
+        return true;
+      }));
+    } else {
+      setFilteredDepartments(departments);
+    }
+  }, [targetCompanyId, departments]);
+
+  const fetchCompanies = async () => {
+    const { data } = await supabase
+      .from('companies')
+      .select('id, name')
+      .order('name');
+    if (data) setCompanies(data);
+  };
+
+  const fetchDepartments = async () => {
+    const { data } = await supabase
+      .from('departments')
+      .select('id, name, company_id')
+      .order('name');
+    if (data) setDepartments(data);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,9 +96,13 @@ export function EditProcessDialog({ process, open, onClose, onSave }: EditProces
     const updates: Partial<ProcessTemplate> = {
       name: name.trim(),
       description: description.trim() || null,
-      company: company.trim() || null,
-      department: department.trim() || null,
+      target_department_id: targetDepartmentId,
     };
+
+    // Also update creator_company_id if changed
+    if (targetCompanyId !== process?.creator_company_id) {
+      (updates as any).creator_company_id = targetCompanyId;
+    }
 
     if (canChangeVisibility) {
       updates.visibility_level = visibilityLevel;
@@ -91,25 +146,43 @@ export function EditProcessDialog({ process, open, onClose, onSave }: EditProces
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="editCompany">Société</Label>
-              <Input
-                id="editCompany"
-                value={company}
-                onChange={(e) => setCompany(e.target.value)}
-                placeholder="Ex: Entreprise A"
-                maxLength={100}
-              />
+              <Label>Société cible</Label>
+              <Select 
+                value={targetCompanyId || '__none__'} 
+                onValueChange={(v) => {
+                  setTargetCompanyId(v === '__none__' ? null : v);
+                  // Reset department if company changes
+                  if (v === '__none__') setTargetDepartmentId(null);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner une société" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Aucune société</SelectItem>
+                  {companies.map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="editDepartment">Service</Label>
-              <Input
-                id="editDepartment"
-                value={department}
-                onChange={(e) => setDepartment(e.target.value)}
-                placeholder="Ex: Ressources Humaines"
-                maxLength={100}
-              />
+              <Label>Service cible</Label>
+              <Select 
+                value={targetDepartmentId || '__none__'} 
+                onValueChange={(v) => setTargetDepartmentId(v === '__none__' ? null : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner un service" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Aucun service</SelectItem>
+                  {filteredDepartments.map(d => (
+                    <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

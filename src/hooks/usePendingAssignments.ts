@@ -31,7 +31,6 @@ export interface PendingAssignment {
     title: string;
     requester_id: string | null;
     be_project_id: string | null;
-    be_label_id: string | null;
   };
   assignee?: {
     id: string;
@@ -70,7 +69,7 @@ export function usePendingAssignments(): UsePendingAssignmentsResult {
         .select(`
           *,
           task_template:task_templates(id, title, description, priority, default_duration_days, requires_validation),
-          request:tasks!request_id(id, title, requester_id, be_project_id, be_label_id),
+          request:tasks!request_id(id, title, requester_id, be_project_id),
           assignee:profiles!assignee_id(id, display_name, avatar_url)
         `)
         .in('status', ['pending', 'assigned'])
@@ -178,7 +177,6 @@ export function usePendingAssignments(): UsePendingAssignmentsResult {
             source_sub_process_template_id: pending.sub_process_template_id,
             requires_validation: template.requires_validation || false,
             be_project_id: request?.be_project_id || null,
-            be_label_id: request?.be_label_id || null,
           })
           .select()
           .single();

@@ -41,7 +41,7 @@ export function CreateTemplateFromTaskDialog({
   const [selectedProcessId, setSelectedProcessId] = useState<string>('new');
   const [newProcessName, setNewProcessName] = useState('');
   const [newProcessDescription, setNewProcessDescription] = useState('');
-  const [defaultDurationDays, setDefaultDurationDays] = useState(7);
+  const [defaultDurationDays, setDefaultDurationDays] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [checklistItems, setChecklistItems] = useState<{ title: string; order_index: number }[]>([]);
 
