@@ -67,11 +67,115 @@ Deno.serve(async (req) => {
       hierarchy_level_id,
       permission_profile_id,
       manager_id,
+      upsert_mode,
     } = await req.json();
 
-    if (!email || !password) {
+    if (!email || (!password && !upsert_mode)) {
       return new Response(
         JSON.stringify({ error: 'Email and password are required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check if user already exists
+    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+    const existingUser = existingUsers?.users?.find(u => u.email?.toLowerCase() === email.toLowerCase());
+
+    if (existingUser) {
+      // User exists - update profile if upsert_mode is true
+      if (upsert_mode) {
+        // Get existing profile
+        const { data: existingProfile } = await supabaseAdmin
+          .from('profiles')
+          .select('*')
+          .eq('user_id', existingUser.id)
+          .maybeSingle();
+
+        if (!existingProfile) {
+          return new Response(
+            JSON.stringify({ error: 'Profile not found for existing user' }),
+            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // Build update object - only update fields that have new values
+        const updateData: Record<string, any> = {};
+        
+        if (display_name && display_name !== existingProfile.display_name) {
+          updateData.display_name = display_name;
+        }
+        if (company_id && company_id !== existingProfile.company_id) {
+          updateData.company_id = company_id;
+        }
+        if (department_id && department_id !== existingProfile.department_id) {
+          updateData.department_id = department_id;
+        }
+        if (job_title_id && job_title_id !== existingProfile.job_title_id) {
+          updateData.job_title_id = job_title_id;
+        }
+        if (hierarchy_level_id && hierarchy_level_id !== existingProfile.hierarchy_level_id) {
+          updateData.hierarchy_level_id = hierarchy_level_id;
+        }
+        if (permission_profile_id && permission_profile_id !== existingProfile.permission_profile_id) {
+          updateData.permission_profile_id = permission_profile_id;
+        }
+        if (manager_id && manager_id !== existingProfile.manager_id) {
+          updateData.manager_id = manager_id;
+        }
+
+        if (Object.keys(updateData).length > 0) {
+          const { error: updateError } = await supabaseAdmin
+            .from('profiles')
+            .update(updateData)
+            .eq('id', existingProfile.id);
+
+          if (updateError) {
+            return new Response(
+              JSON.stringify({ error: updateError.message }),
+              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+
+          return new Response(
+            JSON.stringify({ 
+              success: true, 
+              action: 'updated',
+              user: { 
+                id: existingUser.id, 
+                email: existingUser.email 
+              },
+              profile_id: existingProfile.id
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        } else {
+          // No changes needed
+          return new Response(
+            JSON.stringify({ 
+              success: true, 
+              action: 'skipped',
+              user: { 
+                id: existingUser.id, 
+                email: existingUser.email 
+              },
+              profile_id: existingProfile.id
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      } else {
+        // Not in upsert mode - return error as before
+        return new Response(
+          JSON.stringify({ error: 'A user with this email address has already been registered' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // User does not exist - create new user
+    if (!password) {
+      return new Response(
+        JSON.stringify({ error: 'Password is required for new users' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -94,7 +198,7 @@ Deno.serve(async (req) => {
     }
 
     // Update the profile with additional info
-    const { error: profileError } = await supabaseAdmin
+    const { data: profileData, error: profileError } = await supabaseAdmin
       .from('profiles')
       .update({
         display_name: display_name || email,
@@ -106,7 +210,9 @@ Deno.serve(async (req) => {
         manager_id,
         must_change_password: true,
       })
-      .eq('user_id', userData.user.id);
+      .eq('user_id', userData.user.id)
+      .select('id')
+      .single();
 
     if (profileError) {
       console.error('Profile update error:', profileError);
@@ -115,10 +221,12 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true, 
+        action: 'created',
         user: { 
           id: userData.user.id, 
           email: userData.user.email 
-        } 
+        },
+        profile_id: profileData?.id
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
