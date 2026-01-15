@@ -11,11 +11,13 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { 
   MoreVertical, Plus, Trash2, Edit, ChevronDown, ChevronRight,
-  Users, User, UserCog, Building2
+  Users, User, UserCog, Building2, FormInput
 } from 'lucide-react';
 import { AddTaskTemplateDialog } from './AddTaskTemplateDialog';
 import { TemplateChecklistEditor } from './TemplateChecklistEditor';
+import { SubProcessCustomFieldsEditor } from './SubProcessCustomFieldsEditor';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface SubProcessCardProps {
   subProcess: SubProcessWithTasks;
@@ -125,74 +127,95 @@ export function SubProcessCard({
 
           <CollapsibleContent>
             <CardContent className="pt-2">
-              <div className="space-y-2">
-                {subProcess.task_templates.length === 0 ? (
-                  <p className="text-xs text-muted-foreground text-center py-2">
-                    Aucune tâche dans ce sous-processus
-                  </p>
-                ) : (
-                  subProcess.task_templates.map((task, index) => (
-                    <Collapsible
-                      key={task.id}
-                      open={expandedTasks.has(task.id)}
-                      onOpenChange={() => toggleTaskExpanded(task.id)}
-                    >
-                      <div className="rounded-lg bg-muted/50 overflow-hidden">
-                        <div className="flex items-center justify-between p-2">
-                          <CollapsibleTrigger asChild>
-                            <button className="flex items-center gap-2 flex-1 text-left hover:bg-muted/50 rounded transition-colors">
-                              {expandedTasks.has(task.id) ? (
-                                <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                              ) : (
-                                <ChevronRight className="h-3 w-3 text-muted-foreground" />
-                              )}
-                              <span className="text-xs text-muted-foreground w-4">
-                                {index + 1}.
-                              </span>
-                              <span className="text-sm truncate">{task.title}</span>
-                            </button>
-                          </CollapsibleTrigger>
-                          <div className="flex items-center gap-2">
-                            <Badge 
-                              variant="outline" 
-                              className={`text-xs ${priorityColors[task.priority]}`}
-                            >
-                              {task.priority}
-                            </Badge>
-                            {canManage && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6"
-                                onClick={() => onDeleteTask(task.id)}
-                              >
-                                <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                        <CollapsibleContent>
-                          <div className="px-2 pb-2">
-                            <TemplateChecklistEditor taskTemplateId={task.id} />
-                          </div>
-                        </CollapsibleContent>
-                      </div>
-                    </Collapsible>
-                  ))
-                )}
-              </div>
+              <Tabs defaultValue="tasks" className="w-full">
+                <TabsList className="w-full h-8">
+                  <TabsTrigger value="tasks" className="text-xs flex-1">
+                    Tâches ({subProcess.task_templates.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="fields" className="text-xs flex-1">
+                    <FormInput className="h-3 w-3 mr-1" />
+                    Champs
+                  </TabsTrigger>
+                </TabsList>
 
-              {canManage && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="w-full mt-3"
-                  onClick={() => setIsAddTaskOpen(true)}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Ajouter une tâche
-                </Button>
-              )}
+                <TabsContent value="tasks" className="mt-3">
+                  <div className="space-y-2">
+                    {subProcess.task_templates.length === 0 ? (
+                      <p className="text-xs text-muted-foreground text-center py-2">
+                        Aucune tâche dans ce sous-processus
+                      </p>
+                    ) : (
+                      subProcess.task_templates.map((task, index) => (
+                        <Collapsible
+                          key={task.id}
+                          open={expandedTasks.has(task.id)}
+                          onOpenChange={() => toggleTaskExpanded(task.id)}
+                        >
+                          <div className="rounded-lg bg-muted/50 overflow-hidden">
+                            <div className="flex items-center justify-between p-2">
+                              <CollapsibleTrigger asChild>
+                                <button className="flex items-center gap-2 flex-1 text-left hover:bg-muted/50 rounded transition-colors">
+                                  {expandedTasks.has(task.id) ? (
+                                    <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                                  ) : (
+                                    <ChevronRight className="h-3 w-3 text-muted-foreground" />
+                                  )}
+                                  <span className="text-xs text-muted-foreground w-4">
+                                    {index + 1}.
+                                  </span>
+                                  <span className="text-sm truncate">{task.title}</span>
+                                </button>
+                              </CollapsibleTrigger>
+                              <div className="flex items-center gap-2">
+                                <Badge 
+                                  variant="outline" 
+                                  className={`text-xs ${priorityColors[task.priority]}`}
+                                >
+                                  {task.priority}
+                                </Badge>
+                                {canManage && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={() => onDeleteTask(task.id)}
+                                  >
+                                    <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                            <CollapsibleContent>
+                              <div className="px-2 pb-2">
+                                <TemplateChecklistEditor taskTemplateId={task.id} />
+                              </div>
+                            </CollapsibleContent>
+                          </div>
+                        </Collapsible>
+                      ))
+                    )}
+                  </div>
+
+                  {canManage && (
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full mt-3"
+                      onClick={() => setIsAddTaskOpen(true)}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Ajouter une tâche
+                    </Button>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="fields" className="mt-3">
+                  <SubProcessCustomFieldsEditor 
+                    subProcessTemplateId={subProcess.id}
+                    canManage={canManage}
+                  />
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </CollapsibleContent>
         </Card>
