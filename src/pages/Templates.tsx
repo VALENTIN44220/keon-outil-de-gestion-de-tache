@@ -264,10 +264,6 @@ const Templates = () => {
 
             <TabsContent value="fields">
               <CustomFieldsTab />
-                onDelete={deleteTask}
-                onRefresh={refetchTasks}
-                viewMode={viewMode}
-              />
             </TabsContent>
           </Tabs>
         </main>
