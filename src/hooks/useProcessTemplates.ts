@@ -69,6 +69,7 @@ export function useProcessTemplates() {
     process: Omit<ProcessTemplate, 'id' | 'user_id' | 'created_at' | 'updated_at'> & {
       category_id?: string | null;
       subcategory_id?: string | null;
+      target_company_id?: string | null;
       target_department_id?: string | null;
     },
     visibilityCompanyIds?: string[],
@@ -84,6 +85,7 @@ export function useProcessTemplates() {
           user_id: user.id,
           category_id: process.category_id || null,
           subcategory_id: process.subcategory_id || null,
+          target_company_id: process.target_company_id || null,
           target_department_id: process.target_department_id || null,
         })
         .select()

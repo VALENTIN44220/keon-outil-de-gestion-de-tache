@@ -106,6 +106,7 @@ export function AddProcessDialog({ open, onClose, onAdd }: AddProcessDialogProps
         creator_department_id: profile?.department_id || null,
         category_id: categoryId,
         subcategory_id: subcategoryId,
+        target_company_id: null,
         target_department_id: targetDepartmentId,
       },
       visibilityCompanyIds,
