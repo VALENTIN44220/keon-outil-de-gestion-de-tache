@@ -81,6 +81,7 @@ const Templates = () => {
   const filteredSubProcesses = subProcesses.filter((sp) => {
     if (searchQuery && !sp.name.toLowerCase().includes(searchQuery.toLowerCase()) && 
         !sp.description?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    if (filters.processId && sp.process_template_id !== filters.processId) return false;
     if (filters.companyId && sp.creator_company_id !== filters.companyId) return false;
     if (filters.departmentId && sp.creator_department_id !== filters.departmentId) return false;
     if (filters.creatorId && sp.user_id !== filters.creatorId) return false;
@@ -94,6 +95,8 @@ const Templates = () => {
   const filteredTasks = taskTemplates.filter((t) => {
     if (searchQuery && !t.title.toLowerCase().includes(searchQuery.toLowerCase()) && 
         !t.description?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    if (filters.processId && t.process_template_id !== filters.processId) return false;
+    if (filters.subProcessId && t.sub_process_template_id !== filters.subProcessId) return false;
     if (filters.companyId && t.creator_company_id !== filters.companyId) return false;
     if (filters.departmentId && t.creator_department_id !== filters.departmentId) return false;
     if (filters.creatorId && t.user_id !== filters.creatorId) return false;
@@ -192,6 +195,7 @@ const Templates = () => {
               onFiltersChange={setFilters}
               viewMode={viewMode}
               onViewModeChange={setViewMode}
+              activeTab={activeTab}
             />
 
             <TabsContent value="processes">
