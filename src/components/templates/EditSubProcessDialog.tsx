@@ -42,11 +42,13 @@ export function EditSubProcessDialog({ subProcess, open, onClose, onSave }: Edit
   const [targetDepartmentId, setTargetDepartmentId] = useState<string>('');
   const [targetJobTitleId, setTargetJobTitleId] = useState<string>('');
   const [targetAssigneeId, setTargetAssigneeId] = useState<string>('');
+  const [targetManagerId, setTargetManagerId] = useState<string>('');
   const [visibilityLevel, setVisibilityLevel] = useState<TemplateVisibility>('public');
   
   const [departments, setDepartments] = useState<Department[]>([]);
   const [jobTitles, setJobTitles] = useState<JobTitle[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [managers, setManagers] = useState<Profile[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Only creator or admin can change visibility
@@ -66,6 +68,7 @@ export function EditSubProcessDialog({ subProcess, open, onClose, onSave }: Edit
       setTargetDepartmentId(subProcess.target_department_id || '');
       setTargetJobTitleId(subProcess.target_job_title_id || '');
       setTargetAssigneeId(subProcess.target_assignee_id || '');
+      setTargetManagerId(subProcess.target_manager_id || '');
       setVisibilityLevel(subProcess.visibility_level || 'public');
     }
   }, [subProcess]);
@@ -79,7 +82,10 @@ export function EditSubProcessDialog({ subProcess, open, onClose, onSave }: Edit
     
     if (deptRes.data) setDepartments(deptRes.data);
     if (jobRes.data) setJobTitles(jobRes.data);
-    if (profileRes.data) setProfiles(profileRes.data);
+    if (profileRes.data) {
+      setProfiles(profileRes.data);
+      setManagers(profileRes.data);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -95,6 +101,7 @@ export function EditSubProcessDialog({ subProcess, open, onClose, onSave }: Edit
         target_department_id: targetDepartmentId || null,
         target_job_title_id: targetJobTitleId || null,
         target_assignee_id: targetAssigneeId || null,
+        target_manager_id: assignmentType === 'manager' ? (targetManagerId || null) : null,
       };
 
       if (canChangeVisibility) {
@@ -173,8 +180,28 @@ export function EditSubProcessDialog({ subProcess, open, onClose, onSave }: Edit
                   <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>
                 ))}
               </SelectContent>
-            </Select>
+          </Select>
           </div>
+
+          {assignmentType === 'manager' && (
+            <div className="space-y-2">
+              <Label>Manager cible</Label>
+              <p className="text-xs text-muted-foreground">Le manager qui recevra les tâches à affecter</p>
+              <Select value={targetManagerId || '__none__'} onValueChange={(v) => setTargetManagerId(v === '__none__' ? '' : v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner un manager" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Aucun (premier manager du service)</SelectItem>
+                  {managers.map(p => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.display_name || 'Sans nom'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {assignmentType === 'role' && (
             <div className="space-y-2">

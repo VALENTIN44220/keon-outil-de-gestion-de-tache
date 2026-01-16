@@ -41,6 +41,7 @@ export interface SubProcessTemplate {
   target_assignee_id: string | null;
   target_department_id: string | null;
   target_job_title_id: string | null;
+  target_manager_id: string | null;
   order_index: number;
   is_shared: boolean;
   visibility_level: TemplateVisibility;
