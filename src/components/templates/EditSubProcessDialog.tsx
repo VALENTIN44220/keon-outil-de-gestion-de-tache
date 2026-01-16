@@ -21,6 +21,8 @@ interface EditSubProcessDialogProps {
 interface Department {
   id: string;
   name: string;
+  company_id: string | null;
+  companies?: { name: string } | null;
 }
 
 interface JobTitle {
@@ -75,7 +77,7 @@ export function EditSubProcessDialog({ subProcess, open, onClose, onSave }: Edit
 
   const fetchReferenceData = async () => {
     const [deptRes, jobRes, profileRes] = await Promise.all([
-      supabase.from('departments').select('id, name').order('name'),
+      supabase.from('departments').select('id, name, company_id, companies(name)').order('name'),
       supabase.from('job_titles').select('id, name').order('name'),
       supabase.from('profiles').select('id, display_name').order('display_name'),
     ]);
@@ -177,7 +179,9 @@ export function EditSubProcessDialog({ subProcess, open, onClose, onSave }: Edit
               <SelectContent>
                 <SelectItem value="__none__">Aucun</SelectItem>
                 {departments.map(dept => (
-                  <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>
+                  <SelectItem key={dept.id} value={dept.id}>
+                    {dept.name}{dept.companies?.name ? ` (${dept.companies.name})` : ''}
+                  </SelectItem>
                 ))}
               </SelectContent>
           </Select>
