@@ -4,7 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { Building2, Briefcase, User, Calendar, Eye, Grid3X3, List, X } from 'lucide-react';
+import { Building2, Briefcase, User, Calendar, Eye, Grid3X3, List, X, Layers, GitBranch } from 'lucide-react';
 import { TemplateVisibility, VISIBILITY_LABELS } from '@/types/template';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -15,6 +15,8 @@ export interface TemplateFiltersState {
   visibility: string;
   dateFrom: string;
   dateTo: string;
+  processId: string;
+  subProcessId: string;
 }
 
 interface Company {
@@ -32,11 +34,23 @@ interface Profile {
   display_name: string | null;
 }
 
+interface ProcessTemplate {
+  id: string;
+  name: string;
+}
+
+interface SubProcessTemplate {
+  id: string;
+  name: string;
+  process_template_id: string;
+}
+
 interface TemplateAdvancedFiltersProps {
   filters: TemplateFiltersState;
   onFiltersChange: (filters: TemplateFiltersState) => void;
   viewMode: 'list' | 'grid';
   onViewModeChange: (mode: 'list' | 'grid') => void;
+  activeTab?: 'processes' | 'subprocesses' | 'tasks' | 'fields';
 }
 
 export function TemplateAdvancedFilters({
@@ -44,29 +58,46 @@ export function TemplateAdvancedFilters({
   onFiltersChange,
   viewMode,
   onViewModeChange,
+  activeTab = 'processes',
 }: TemplateAdvancedFiltersProps) {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [processes, setProcesses] = useState<ProcessTemplate[]>([]);
+  const [subProcesses, setSubProcesses] = useState<SubProcessTemplate[]>([]);
 
   useEffect(() => {
     const fetchReferenceData = async () => {
-      const [compRes, deptRes, profileRes] = await Promise.all([
+      const [compRes, deptRes, profileRes, processRes, subProcessRes] = await Promise.all([
         supabase.from('companies').select('id, name').order('name'),
         supabase.from('departments').select('id, name').order('name'),
         supabase.from('profiles').select('id, display_name').order('display_name'),
+        supabase.from('process_templates').select('id, name').order('name'),
+        supabase.from('sub_process_templates').select('id, name, process_template_id').order('name'),
       ]);
 
       if (compRes.data) setCompanies(compRes.data);
       if (deptRes.data) setDepartments(deptRes.data);
       if (profileRes.data) setProfiles(profileRes.data);
+      if (processRes.data) setProcesses(processRes.data);
+      if (subProcessRes.data) setSubProcesses(subProcessRes.data);
     };
 
     fetchReferenceData();
   }, []);
 
+  // Filter sub-processes based on selected process
+  const filteredSubProcesses = filters.processId
+    ? subProcesses.filter((sp) => sp.process_template_id === filters.processId)
+    : subProcesses;
+
   const handleChange = (key: keyof TemplateFiltersState, value: string) => {
-    onFiltersChange({ ...filters, [key]: value });
+    const newFilters = { ...filters, [key]: value };
+    // Reset sub-process filter when process changes
+    if (key === 'processId') {
+      newFilters.subProcessId = '';
+    }
+    onFiltersChange(newFilters);
   };
 
   const clearFilters = () => {
@@ -77,6 +108,8 @@ export function TemplateAdvancedFilters({
       visibility: '',
       dateFrom: '',
       dateTo: '',
+      processId: '',
+      subProcessId: '',
     });
   };
 
@@ -86,12 +119,71 @@ export function TemplateAdvancedFilters({
     filters.creatorId ||
     filters.visibility ||
     filters.dateFrom ||
-    filters.dateTo;
+    filters.dateTo ||
+    filters.processId ||
+    filters.subProcessId;
+
+  // Show process filter for sub-processes and tasks tabs
+  const showProcessFilter = activeTab === 'subprocesses' || activeTab === 'tasks';
+  // Show sub-process filter only for tasks tab
+  const showSubProcessFilter = activeTab === 'tasks';
 
   return (
     <div className="flex flex-col gap-4 mb-6 p-4 bg-card rounded-xl shadow-sm">
       <div className="flex items-center justify-between">
         <div className="flex flex-wrap items-end gap-3">
+          {/* Process Filter - for subprocesses and tasks tabs */}
+          {showProcessFilter && (
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                <Layers className="h-3 w-3" />
+                Processus
+              </Label>
+              <Select
+                value={filters.processId || '__all__'}
+                onValueChange={(v) => handleChange('processId', v === '__all__' ? '' : v)}
+              >
+                <SelectTrigger className="w-48 h-8 text-sm">
+                  <SelectValue placeholder="Tous" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Tous les processus</SelectItem>
+                  {processes.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Sub-Process Filter - only for tasks tab */}
+          {showSubProcessFilter && (
+            <div className="flex flex-col gap-1">
+              <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                <GitBranch className="h-3 w-3" />
+                Sous-processus
+              </Label>
+              <Select
+                value={filters.subProcessId || '__all__'}
+                onValueChange={(v) => handleChange('subProcessId', v === '__all__' ? '' : v)}
+              >
+                <SelectTrigger className="w-48 h-8 text-sm">
+                  <SelectValue placeholder="Tous" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Tous les sous-processus</SelectItem>
+                  {filteredSubProcesses.map((sp) => (
+                    <SelectItem key={sp.id} value={sp.id}>
+                      {sp.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {/* Company Filter */}
           <div className="flex flex-col gap-1">
             <Label className="text-xs text-muted-foreground flex items-center gap-1">
@@ -252,4 +344,6 @@ export const defaultFilters: TemplateFiltersState = {
   visibility: '',
   dateFrom: '',
   dateTo: '',
+  processId: '',
+  subProcessId: '',
 };
