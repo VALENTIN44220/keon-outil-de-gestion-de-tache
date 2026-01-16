@@ -266,12 +266,12 @@ export function BulkCustomFieldImportDialog({
               <TabsContent value="sub_process" className="mt-4 space-y-4">
                 <div className="space-y-2">
                   <Label>Filtrer par processus (optionnel)</Label>
-                  <Select value={processId || ''} onValueChange={setProcessId}>
+                  <Select value={processId || '__all__'} onValueChange={(v) => setProcessId(v === '__all__' ? '' : v)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Tous les processus" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Tous</SelectItem>
+                      <SelectItem value="__all__">Tous</SelectItem>
                       {processes.map((p) => (
                         <SelectItem key={p.id} value={p.id}>
                           {p.name}
