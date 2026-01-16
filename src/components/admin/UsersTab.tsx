@@ -489,21 +489,39 @@ export function UsersTab({
                   {users.map((user) => {
                     const subordinates = getSubordinates(user.id);
                     return (
-                      <TableRow key={user.id} data-state={selectedIds.includes(user.id) ? 'selected' : undefined}>
-                        <TableCell>
+                      <TableRow
+                        key={user.id}
+                        data-state={selectedIds.includes(user.id) ? 'selected' : undefined}
+                        className="cursor-pointer"
+                        onClick={() => openEditDialog(user)}
+                      >
+                        <TableCell onClick={(e) => e.stopPropagation()}>
                           <Checkbox
                             checked={selectedIds.includes(user.id)}
                             onCheckedChange={() => toggleSelection(user.id)}
                           />
                         </TableCell>
                         <TableCell className="font-medium">
-                          <div className="flex flex-col">
+                          <div className="flex flex-col gap-1">
                             <span>{user.display_name || 'Sans nom'}</span>
-                            {user.must_change_password && (
-                              <Badge variant="outline" className="w-fit text-xs mt-1 text-amber-600 border-amber-300">
-                                MDP à changer
-                              </Badge>
-                            )}
+                            <div className="flex flex-wrap items-center gap-2">
+                              {user.must_change_password && (
+                                <Badge variant="outline" className="w-fit text-xs text-amber-600 border-amber-300">
+                                  MDP à changer
+                                </Badge>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-xs"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openEditDialog(user);
+                                }}
+                              >
+                                Modifier
+                              </Button>
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell>{user.company?.name || '-'}</TableCell>
@@ -511,9 +529,7 @@ export function UsersTab({
                         <TableCell>{user.job_title?.name || '-'}</TableCell>
                         <TableCell>
                           {user.hierarchy_level ? (
-                            <Badge variant="outline">
-                              {user.hierarchy_level.name}
-                            </Badge>
+                            <Badge variant="outline">{user.hierarchy_level.name}</Badge>
                           ) : '-'}
                         </TableCell>
                         <TableCell>
@@ -534,12 +550,10 @@ export function UsersTab({
                         </TableCell>
                         <TableCell>
                           {user.permission_profile ? (
-                            <Badge variant="secondary">
-                              {user.permission_profile.name}
-                            </Badge>
+                            <Badge variant="secondary">{user.permission_profile.name}</Badge>
                           ) : '-'}
                         </TableCell>
-                        <TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
                           <Button
                             variant="ghost"
                             size="sm"
