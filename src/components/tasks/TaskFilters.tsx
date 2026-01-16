@@ -11,6 +11,7 @@ interface TaskFiltersProps {
 
 const statusOptions: { value: TaskStatus | 'all'; label: string }[] = [
   { value: 'all', label: 'Tous' },
+  { value: 'to_assign', label: 'À affecter' },
   { value: 'todo', label: 'À faire' },
   { value: 'in-progress', label: 'En cours' },
   { value: 'done', label: 'Terminé' },

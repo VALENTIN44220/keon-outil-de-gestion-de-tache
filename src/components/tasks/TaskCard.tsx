@@ -42,13 +42,15 @@ const priorityLabels = {
   urgent: 'Urgente',
 };
 
-const statusColors = {
+const statusColors: Record<string, string> = {
+  to_assign: 'bg-orange-500/20',
   todo: 'bg-muted',
   'in-progress': 'bg-info',
   done: 'bg-success',
 };
 
-const statusLabels = {
+const statusLabels: Record<string, string> = {
+  to_assign: 'À affecter',
   todo: 'À faire',
   'in-progress': 'En cours',
   done: 'Terminé',
