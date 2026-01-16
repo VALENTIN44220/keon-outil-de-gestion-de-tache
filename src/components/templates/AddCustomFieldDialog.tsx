@@ -26,6 +26,7 @@ import {
   FIELD_TYPE_LABELS,
   FieldOption,
   FieldScope,
+  LOOKUP_TABLES,
 } from '@/types/customField';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Trash2 } from 'lucide-react';
@@ -57,6 +58,11 @@ export function AddCustomFieldDialog({
   const [placeholder, setPlaceholder] = useState('');
   const [defaultValue, setDefaultValue] = useState('');
   const [options, setOptions] = useState<FieldOption[]>([]);
+  
+  // Table lookup configuration
+  const [lookupTable, setLookupTable] = useState<string | null>(null);
+  const [lookupValueColumn, setLookupValueColumn] = useState<string>('id');
+  const [lookupLabelColumn, setLookupLabelColumn] = useState<string>('name');
 
   // Scope
   const [scope, setScope] = useState<FieldScope>(
@@ -111,6 +117,9 @@ export function AddCustomFieldDialog({
     setScope(defaultSubProcessId ? 'sub_process' : defaultProcessId ? 'process' : 'common');
     setProcessId(defaultProcessId || null);
     setSubProcessId(defaultSubProcessId || null);
+    setLookupTable(null);
+    setLookupValueColumn('id');
+    setLookupLabelColumn('name');
   };
 
   const handleClose = () => {
@@ -162,6 +171,10 @@ export function AddCustomFieldDialog({
         sub_process_template_id: scope === 'sub_process' ? subProcessId : null,
         created_by: profile?.id || null,
         order_index: 0,
+        // Table lookup configuration
+        lookup_table: fieldType === 'table_lookup' ? lookupTable : null,
+        lookup_value_column: fieldType === 'table_lookup' ? lookupValueColumn : null,
+        lookup_label_column: fieldType === 'table_lookup' ? lookupLabelColumn : null,
       };
 
       const { error } = await supabase.from('template_custom_fields').insert(insertData);
@@ -286,6 +299,68 @@ export function AddCustomFieldDialog({
                   <p className="text-sm text-muted-foreground">Aucune option définie</p>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* Table lookup configuration */}
+          {fieldType === 'table_lookup' && (
+            <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+              <Label className="text-base font-medium">Configuration de la table source</Label>
+              
+              <div className="space-y-2">
+                <Label>Table *</Label>
+                <Select value={lookupTable || ''} onValueChange={setLookupTable}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner une table" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {LOOKUP_TABLES.map((table) => (
+                      <SelectItem key={table.value} value={table.value}>
+                        {table.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {lookupTable && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Colonne valeur (ID)</Label>
+                      <Select value={lookupValueColumn} onValueChange={setLookupValueColumn}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {LOOKUP_TABLES.find(t => t.value === lookupTable)?.columns.map((col) => (
+                            <SelectItem key={col} value={col}>
+                              {col}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">Valeur stockée (généralement "id")</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Colonne affichée</Label>
+                      <Select value={lookupLabelColumn} onValueChange={setLookupLabelColumn}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {LOOKUP_TABLES.find(t => t.value === lookupTable)?.columns.map((col) => (
+                            <SelectItem key={col} value={col}>
+                              {col}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">Texte affiché à l'utilisateur</p>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
 

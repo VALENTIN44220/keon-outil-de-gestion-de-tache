@@ -53,6 +53,7 @@ import {
   UserSearch,
   Building2,
   Paperclip,
+  Database,
 } from 'lucide-react';
 import { FIELD_TYPE_LABELS, TemplateCustomField, CustomFieldType } from '@/types/customField';
 import { AddCustomFieldDialog } from './AddCustomFieldDialog';
@@ -74,6 +75,7 @@ const FIELD_TYPE_ICON_MAP: Record<CustomFieldType, React.ElementType> = {
   user_search: UserSearch,
   department_search: Building2,
   file: Paperclip,
+  table_lookup: Database,
 };
 
 export function CustomFieldsTab() {

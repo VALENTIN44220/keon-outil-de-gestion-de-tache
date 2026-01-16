@@ -25,6 +25,7 @@ import {
   CustomFieldType,
   FIELD_TYPE_LABELS,
   FieldOption,
+  LOOKUP_TABLES,
 } from '@/types/customField';
 import { Plus, Trash2 } from 'lucide-react';
 
@@ -52,6 +53,9 @@ export function EditCustomFieldDialog({
   const [placeholder, setPlaceholder] = useState('');
   const [defaultValue, setDefaultValue] = useState('');
   const [options, setOptions] = useState<FieldOption[]>([]);
+  const [lookupTable, setLookupTable] = useState<string | null>(null);
+  const [lookupValueColumn, setLookupValueColumn] = useState<string>('id');
+  const [lookupLabelColumn, setLookupLabelColumn] = useState<string>('name');
 
   useEffect(() => {
     if (field) {
@@ -63,6 +67,9 @@ export function EditCustomFieldDialog({
       setPlaceholder(field.placeholder || '');
       setDefaultValue(field.default_value || '');
       setOptions(field.options || []);
+      setLookupTable(field.lookup_table || null);
+      setLookupValueColumn(field.lookup_value_column || 'id');
+      setLookupLabelColumn(field.lookup_label_column || 'name');
     }
   }, [field]);
 
@@ -106,6 +113,9 @@ export function EditCustomFieldDialog({
           options: ['select', 'multiselect'].includes(fieldType)
             ? (options.filter((o) => o.value && o.label) as any)
             : null,
+          lookup_table: fieldType === 'table_lookup' ? lookupTable : null,
+          lookup_value_column: fieldType === 'table_lookup' ? lookupValueColumn : null,
+          lookup_label_column: fieldType === 'table_lookup' ? lookupLabelColumn : null,
         })
         .eq('id', field.id);
 
@@ -226,6 +236,64 @@ export function EditCustomFieldDialog({
                   <p className="text-sm text-muted-foreground">Aucune option définie</p>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* Table lookup configuration */}
+          {fieldType === 'table_lookup' && (
+            <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+              <Label className="text-base font-medium">Configuration de la table source</Label>
+              
+              <div className="space-y-2">
+                <Label>Table *</Label>
+                <Select value={lookupTable || ''} onValueChange={setLookupTable}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner une table" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {LOOKUP_TABLES.map((table) => (
+                      <SelectItem key={table.value} value={table.value}>
+                        {table.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {lookupTable && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Colonne valeur</Label>
+                    <Select value={lookupValueColumn} onValueChange={setLookupValueColumn}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {LOOKUP_TABLES.find(t => t.value === lookupTable)?.columns.map((col) => (
+                          <SelectItem key={col} value={col}>
+                            {col}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Colonne affichée</Label>
+                    <Select value={lookupLabelColumn} onValueChange={setLookupLabelColumn}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {LOOKUP_TABLES.find(t => t.value === lookupTable)?.columns.map((col) => (
+                          <SelectItem key={col} value={col}>
+                            {col}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

@@ -12,7 +12,8 @@ export type CustomFieldType =
   | 'multiselect'
   | 'user_search'
   | 'department_search'
-  | 'file';
+  | 'file'
+  | 'table_lookup';
 
 export const FIELD_TYPE_LABELS: Record<CustomFieldType, string> = {
   text: 'Texte court',
@@ -29,6 +30,7 @@ export const FIELD_TYPE_LABELS: Record<CustomFieldType, string> = {
   user_search: 'Recherche utilisateur',
   department_search: 'Recherche service',
   file: 'Fichier',
+  table_lookup: 'Liste depuis table',
 };
 
 export const FIELD_TYPE_ICONS: Record<CustomFieldType, string> = {
@@ -46,7 +48,20 @@ export const FIELD_TYPE_ICONS: Record<CustomFieldType, string> = {
   user_search: 'UserSearch',
   department_search: 'Building2',
   file: 'Paperclip',
+  table_lookup: 'Database',
 };
+
+// Available tables for table_lookup fields
+export const LOOKUP_TABLES = [
+  { value: 'companies', label: 'Sociétés', columns: ['id', 'name', 'description'] },
+  { value: 'departments', label: 'Services', columns: ['id', 'name', 'description'] },
+  { value: 'profiles', label: 'Utilisateurs', columns: ['id', 'display_name', 'job_title', 'department'] },
+  { value: 'job_titles', label: 'Postes', columns: ['id', 'name', 'description'] },
+  { value: 'categories', label: 'Catégories', columns: ['id', 'name', 'description'] },
+  { value: 'be_projects', label: 'Projets BE', columns: ['id', 'code_projet', 'nom_projet', 'status'] },
+] as const;
+
+export type LookupTableName = typeof LOOKUP_TABLES[number]['value'];
 
 export interface FieldOption {
   value: string;
@@ -76,6 +91,10 @@ export interface TemplateCustomField {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  // Table lookup configuration
+  lookup_table: string | null;
+  lookup_value_column: string | null;
+  lookup_label_column: string | null;
 }
 
 export interface RequestFieldValue {

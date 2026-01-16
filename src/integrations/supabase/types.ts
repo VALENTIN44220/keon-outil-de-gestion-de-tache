@@ -1833,6 +1833,9 @@ export type Database = {
           is_common: boolean
           is_required: boolean
           label: string
+          lookup_label_column: string | null
+          lookup_table: string | null
+          lookup_value_column: string | null
           max_value: number | null
           min_value: number | null
           name: string
@@ -1857,6 +1860,9 @@ export type Database = {
           is_common?: boolean
           is_required?: boolean
           label: string
+          lookup_label_column?: string | null
+          lookup_table?: string | null
+          lookup_value_column?: string | null
           max_value?: number | null
           min_value?: number | null
           name: string
@@ -1881,6 +1887,9 @@ export type Database = {
           is_common?: boolean
           is_required?: boolean
           label?: string
+          lookup_label_column?: string | null
+          lookup_table?: string | null
+          lookup_value_column?: string | null
           max_value?: number | null
           min_value?: number | null
           name?: string
@@ -2151,6 +2160,7 @@ export type Database = {
         | "user_search"
         | "department_search"
         | "file"
+        | "table_lookup"
       template_visibility:
         | "private"
         | "internal_department"
@@ -2299,6 +2309,7 @@ export const Constants = {
         "user_search",
         "department_search",
         "file",
+        "table_lookup",
       ],
       template_visibility: [
         "private",
