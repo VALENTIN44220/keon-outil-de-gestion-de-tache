@@ -317,8 +317,9 @@ export function UsersTab({
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="space-y-2">
                         <Label>Société</Label>
-                        <Select value={companyId} onValueChange={(value) => {
-                          setCompanyId(value);
+                        <Select value={companyId || '_none_'} onValueChange={(value) => {
+                          const newValue = value === '_none_' ? '' : value;
+                          setCompanyId(newValue);
                           setDepartmentId('');
                           setJobTitleId('');
                         }}>
@@ -326,6 +327,7 @@ export function UsersTab({
                             <SelectValue placeholder="Sélectionner..." />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="_none_">-- Aucune --</SelectItem>
                             {companies.map((c) => (
                               <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                             ))}
@@ -334,14 +336,16 @@ export function UsersTab({
                       </div>
                       <div className="space-y-2">
                         <Label>Service</Label>
-                        <Select value={departmentId} onValueChange={(value) => {
-                          setDepartmentId(value);
+                        <Select value={departmentId || '_none_'} onValueChange={(value) => {
+                          const newValue = value === '_none_' ? '' : value;
+                          setDepartmentId(newValue);
                           setJobTitleId('');
                         }}>
                           <SelectTrigger>
                             <SelectValue placeholder="Sélectionner..." />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="_none_">-- Aucun --</SelectItem>
                             {filteredDepartments.map((d) => (
                               <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                             ))}
@@ -350,11 +354,12 @@ export function UsersTab({
                       </div>
                       <div className="space-y-2">
                         <Label>Poste</Label>
-                        <Select value={jobTitleId} onValueChange={setJobTitleId}>
+                        <Select value={jobTitleId || '_none_'} onValueChange={(value) => setJobTitleId(value === '_none_' ? '' : value)}>
                           <SelectTrigger>
                             <SelectValue placeholder="Sélectionner..." />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="_none_">-- Aucun --</SelectItem>
                             {filteredJobTitles.map((j) => (
                               <SelectItem key={j.id} value={j.id}>{j.name}</SelectItem>
                             ))}
@@ -373,11 +378,12 @@ export function UsersTab({
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="space-y-2">
                         <Label>Niveau hiérarchique</Label>
-                        <Select value={hierarchyLevelId} onValueChange={setHierarchyLevelId}>
+                        <Select value={hierarchyLevelId || '_none_'} onValueChange={(value) => setHierarchyLevelId(value === '_none_' ? '' : value)}>
                           <SelectTrigger>
                             <SelectValue placeholder="Sélectionner..." />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="_none_">-- Aucun --</SelectItem>
                             {hierarchyLevels.map((h) => (
                               <SelectItem key={h.id} value={h.id}>
                                 {h.name} (Niveau {h.level})
@@ -391,11 +397,12 @@ export function UsersTab({
                           <ChevronUp className="h-4 w-4" />
                           Manager (N+1)
                         </Label>
-                        <Select value={managerId} onValueChange={setManagerId}>
+                        <Select value={managerId || '_none_'} onValueChange={(value) => setManagerId(value === '_none_' ? '' : value)}>
                           <SelectTrigger>
                             <SelectValue placeholder="Sélectionner..." />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="_none_">-- Aucun --</SelectItem>
                             {possibleManagers.map((u) => (
                               <SelectItem key={u.id} value={u.id}>
                                 {u.display_name || 'Sans nom'}
@@ -416,11 +423,12 @@ export function UsersTab({
                     </h4>
                     <div className="space-y-2">
                       <Label>Profil de droits</Label>
-                      <Select value={permissionProfileId} onValueChange={setPermissionProfileId}>
+                      <Select value={permissionProfileId || '_none_'} onValueChange={(value) => setPermissionProfileId(value === '_none_' ? '' : value)}>
                         <SelectTrigger>
                           <SelectValue placeholder="Sélectionner..." />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="_none_">-- Aucun --</SelectItem>
                           {permissionProfiles.map((p) => (
                             <SelectItem key={p.id} value={p.id}>
                               {p.name}
