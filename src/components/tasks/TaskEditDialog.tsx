@@ -47,6 +47,7 @@ interface TaskEditDialogProps {
 }
 
 const statusOptions: { value: TaskStatus; label: string }[] = [
+  { value: 'to_assign', label: 'À affecter' },
   { value: 'todo', label: 'À faire' },
   { value: 'in-progress', label: 'En cours' },
   { value: 'done', label: 'Terminé' },

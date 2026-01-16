@@ -326,9 +326,12 @@ const Requests = () => {
       case 'done':
         return <CheckCircle2 className="h-4 w-4 text-green-500" />;
       case 'in_progress':
+      case 'in-progress':
         return <Clock className="h-4 w-4 text-blue-500" />;
       case 'review':
         return <AlertCircle className="h-4 w-4 text-yellow-500" />;
+      case 'to_assign':
+        return <Users className="h-4 w-4 text-orange-500" />;
       default:
         return <Clock className="h-4 w-4 text-muted-foreground" />;
     }
@@ -336,8 +339,10 @@ const Requests = () => {
 
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
+      to_assign: 'À affecter',
       todo: 'À faire',
       in_progress: 'En cours',
+      'in-progress': 'En cours',
       review: 'En révision',
       done: 'Terminé',
     };

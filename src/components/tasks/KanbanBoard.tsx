@@ -14,6 +14,7 @@ interface KanbanBoardProps {
 }
 
 const statusColumns: { status: TaskStatus; label: string; color: string }[] = [
+  { status: 'to_assign', label: 'À affecter', color: 'bg-orange-500/10 border-orange-500/30' },
   { status: 'todo', label: 'À faire', color: 'bg-yellow-500/10 border-yellow-500/30' },
   { status: 'in-progress', label: 'En cours', color: 'bg-blue-500/10 border-blue-500/30' },
   { status: 'done', label: 'Terminé', color: 'bg-green-500/10 border-green-500/30' },

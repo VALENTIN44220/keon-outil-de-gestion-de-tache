@@ -1,4 +1,4 @@
-export type TaskStatus = 'todo' | 'in-progress' | 'done' | 'pending-validation' | 'validated' | 'refused';
+export type TaskStatus = 'todo' | 'in-progress' | 'done' | 'pending-validation' | 'validated' | 'refused' | 'to_assign';
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
 export type TaskType = 'task' | 'request';
 export type ValidationStatus = 'pending' | 'approved' | 'rejected';

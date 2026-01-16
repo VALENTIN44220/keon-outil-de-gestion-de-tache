@@ -67,6 +67,7 @@ const priorityConfig: Record<string, { label: string; variant: 'default' | 'seco
 };
 
 const statusConfig: Record<string, { label: string; icon: typeof CheckCircle2; color: string }> = {
+  to_assign: { label: 'À affecter', icon: AlertCircle, color: 'text-orange-500' },
   todo: { label: 'À faire', icon: AlertCircle, color: 'text-muted-foreground' },
   'in-progress': { label: 'En cours', icon: Clock, color: 'text-info' },
   done: { label: 'Terminé', icon: CheckCircle2, color: 'text-success' },
