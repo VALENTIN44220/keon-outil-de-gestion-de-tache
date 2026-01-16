@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { TemplateCustomField, CustomFieldType } from '@/types/customField';
+import { TemplateCustomField, CustomFieldType, LOOKUP_TABLES } from '@/types/customField';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -29,6 +29,7 @@ import {
   Building2,
   Paperclip,
   AlertCircle,
+  Database,
 } from 'lucide-react';
 
 interface CustomFieldsRendererProps {
@@ -49,6 +50,11 @@ interface DepartmentOption {
   name: string;
 }
 
+interface TableLookupOption {
+  id: string;
+  label: string;
+}
+
 const FIELD_ICONS: Record<CustomFieldType, React.ElementType> = {
   text: Type,
   textarea: AlignLeft,
@@ -64,6 +70,7 @@ const FIELD_ICONS: Record<CustomFieldType, React.ElementType> = {
   user_search: UserSearch,
   department_search: Building2,
   file: Paperclip,
+  table_lookup: Database,
 };
 
 export function CustomFieldsRenderer({
@@ -77,6 +84,8 @@ export function CustomFieldsRenderer({
   const [departments, setDepartments] = useState<DepartmentOption[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [loadingDepartments, setLoadingDepartments] = useState(false);
+  const [tableLookupData, setTableLookupData] = useState<Record<string, TableLookupOption[]>>({});
+  const [loadingTableLookup, setLoadingTableLookup] = useState<Record<string, boolean>>({});
 
   // Fetch users for user_search fields
   useEffect(() => {
@@ -109,6 +118,40 @@ export function CustomFieldsRenderer({
         });
     }
   }, [fields, departments.length]);
+
+  // Fetch table lookup data for table_lookup fields
+  useEffect(() => {
+    const tableLookupFields = fields.filter((f) => f.field_type === 'table_lookup' && f.lookup_table);
+    
+    tableLookupFields.forEach((field) => {
+      const fieldKey = field.id;
+      if (tableLookupData[fieldKey] || loadingTableLookup[fieldKey]) return;
+      
+      setLoadingTableLookup(prev => ({ ...prev, [fieldKey]: true }));
+      
+      const tableName = field.lookup_table as string;
+      const valueColumn = field.lookup_value_column || 'id';
+      const labelColumn = field.lookup_label_column || 'name';
+      
+      // Map table names to proper selects
+      let selectQuery = `${valueColumn}, ${labelColumn}`;
+      
+      supabase
+        .from(tableName as any)
+        .select(selectQuery)
+        .order(labelColumn)
+        .then(({ data, error }) => {
+          if (!error && data) {
+            const options = data.map((row: any) => ({
+              id: String(row[valueColumn]),
+              label: String(row[labelColumn] || row[valueColumn]),
+            }));
+            setTableLookupData(prev => ({ ...prev, [fieldKey]: options }));
+          }
+          setLoadingTableLookup(prev => ({ ...prev, [fieldKey]: false }));
+        });
+    });
+  }, [fields]);
 
   // Check if a field should be visible based on conditions
   const isFieldVisible = (field: TemplateCustomField): boolean => {
@@ -437,6 +480,35 @@ export function CustomFieldsRenderer({
               </p>
             )}
           </div>
+        );
+
+      case 'table_lookup':
+        const lookupOptions = tableLookupData[field.id] || [];
+        const isLoadingLookup = loadingTableLookup[field.id];
+        const tableInfo = LOOKUP_TABLES.find(t => t.value === field.lookup_table);
+        
+        return (
+          <Select
+            value={value}
+            onValueChange={handleChange}
+            disabled={disabled || isLoadingLookup}
+          >
+            <SelectTrigger className={baseClass}>
+              <SelectValue placeholder={isLoadingLookup ? 'Chargement...' : (field.placeholder || `Sélectionner ${tableInfo?.label || 'une valeur'}...`)} />
+            </SelectTrigger>
+            <SelectContent>
+              {lookupOptions.map((opt) => (
+                <SelectItem key={opt.id} value={opt.id}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+              {lookupOptions.length === 0 && !isLoadingLookup && (
+                <div className="px-2 py-1 text-sm text-muted-foreground">
+                  Aucune donnée disponible
+                </div>
+              )}
+            </SelectContent>
+          </Select>
         );
 
       default:

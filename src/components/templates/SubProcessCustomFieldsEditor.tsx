@@ -23,6 +23,7 @@ import {
   Building2,
   Paperclip,
   Loader2,
+  Database,
 } from 'lucide-react';
 import { AddCustomFieldDialog } from './AddCustomFieldDialog';
 import { EditCustomFieldDialog } from './EditCustomFieldDialog';
@@ -57,6 +58,7 @@ const FIELD_TYPE_ICON_MAP: Record<CustomFieldType, React.ElementType> = {
   user_search: UserSearch,
   department_search: Building2,
   file: Paperclip,
+  table_lookup: Database,
 };
 
 export function SubProcessCustomFieldsEditor({ 
