@@ -46,8 +46,9 @@ export function useProcessTemplates() {
 
           return {
             ...process,
-            // Ensure target_company_id is included (new column)
+            // Ensure routing fields are included (recent columns)
             target_company_id: process.target_company_id || null,
+            target_department_id: process.target_department_id || null,
             task_templates: (tasks || []) as TaskTemplate[],
             can_manage: Boolean(canManageData),
           } as ProcessWithTasks;
