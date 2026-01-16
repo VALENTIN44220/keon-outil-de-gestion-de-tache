@@ -56,7 +56,7 @@ export function EditProcessDialog({ process, open, onClose, onSave }: EditProces
       setName(process.name);
       setDescription(process.description || '');
       setVisibilityLevel(process.visibility_level || 'public');
-      setTargetCompanyId(process.creator_company_id || null);
+      setTargetCompanyId(process.target_company_id || null);
       setTargetDepartmentId(process.target_department_id || null);
     }
   }, [process]);
@@ -96,13 +96,9 @@ export function EditProcessDialog({ process, open, onClose, onSave }: EditProces
     const updates: Partial<ProcessTemplate> = {
       name: name.trim(),
       description: description.trim() || null,
+      target_company_id: targetCompanyId,
       target_department_id: targetDepartmentId,
     };
-
-    // Also update creator_company_id if changed
-    if (targetCompanyId !== process?.creator_company_id) {
-      (updates as any).creator_company_id = targetCompanyId;
-    }
 
     if (canChangeVisibility) {
       updates.visibility_level = visibilityLevel;

@@ -27,6 +27,7 @@ export interface ProcessTemplate {
   creator_department_id: string | null;
   category_id: string | null;
   subcategory_id: string | null;
+  target_company_id: string | null;
   target_department_id: string | null;
   created_at: string;
   updated_at: string;

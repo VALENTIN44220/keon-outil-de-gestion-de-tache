@@ -775,6 +775,7 @@ export type Database = {
           is_shared: boolean
           name: string
           subcategory_id: string | null
+          target_company_id: string | null
           target_department_id: string | null
           updated_at: string
           user_id: string
@@ -792,6 +793,7 @@ export type Database = {
           is_shared?: boolean
           name: string
           subcategory_id?: string | null
+          target_company_id?: string | null
           target_department_id?: string | null
           updated_at?: string
           user_id: string
@@ -809,6 +811,7 @@ export type Database = {
           is_shared?: boolean
           name?: string
           subcategory_id?: string | null
+          target_company_id?: string | null
           target_department_id?: string | null
           updated_at?: string
           user_id?: string
@@ -841,6 +844,13 @@ export type Database = {
             columns: ["subcategory_id"]
             isOneToOne: false
             referencedRelation: "subcategories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "process_templates_target_company_id_fkey"
+            columns: ["target_company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
           {
