@@ -34,7 +34,7 @@ export function useProcessTemplates() {
 
       // Fetch task templates + per-process manage permission
       const processesWithTasks: ProcessWithTasks[] = await Promise.all(
-        (processData || []).map(async (process) => {
+        (processData || []).map(async (process: any) => {
           const [{ data: tasks }, { data: canManageData }] = await Promise.all([
             supabase
               .from('task_templates')
@@ -46,9 +46,11 @@ export function useProcessTemplates() {
 
           return {
             ...process,
+            // Ensure target_company_id is included (new column)
+            target_company_id: process.target_company_id || null,
             task_templates: (tasks || []) as TaskTemplate[],
             can_manage: Boolean(canManageData),
-          };
+          } as ProcessWithTasks;
         })
       );
 

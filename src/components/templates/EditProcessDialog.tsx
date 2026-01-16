@@ -19,6 +19,7 @@ interface Company {
 interface Department {
   id: string;
   name: string;
+  company_id: string | null;
 }
 
 interface EditProcessDialogProps {
@@ -52,22 +53,21 @@ export function EditProcessDialog({ process, open, onClose, onSave }: EditProces
   }, [open]);
 
   useEffect(() => {
-    if (process) {
+    if (process && open) {
       setName(process.name);
       setDescription(process.description || '');
       setVisibilityLevel(process.visibility_level || 'public');
-      setTargetCompanyId(process.target_company_id || null);
+      // Cast process to any to access target_company_id which may not be in Supabase types yet
+      const processAny = process as any;
+      setTargetCompanyId(processAny.target_company_id || null);
       setTargetDepartmentId(process.target_department_id || null);
     }
-  }, [process]);
+  }, [process, open]);
 
   useEffect(() => {
     if (targetCompanyId) {
-      setFilteredDepartments(departments.filter(d => {
-        // We need to check if department belongs to company
-        // For now, show all departments when a company is selected
-        return true;
-      }));
+      // Filter departments by selected company
+      setFilteredDepartments(departments.filter(d => d.company_id === targetCompanyId));
     } else {
       setFilteredDepartments(departments);
     }
