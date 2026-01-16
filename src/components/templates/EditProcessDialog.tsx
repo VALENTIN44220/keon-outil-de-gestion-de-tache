@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,6 +38,10 @@ export function EditProcessDialog({ process, open, onClose, onSave }: EditProces
   const [targetCompanyId, setTargetCompanyId] = useState<string | null>(null);
   const [targetDepartmentId, setTargetDepartmentId] = useState<string | null>(null);
 
+  // Keep initial routing values to prevent accidental clearing when user edits other fields
+  const initialTargetCompanyIdRef = useRef<string | null>(null);
+  const initialTargetDepartmentIdRef = useRef<string | null>(null);
+
   const [companies, setCompanies] = useState<Company[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [filteredDepartments, setFilteredDepartments] = useState<Department[]>([]);
@@ -57,10 +61,17 @@ export function EditProcessDialog({ process, open, onClose, onSave }: EditProces
       setName(process.name);
       setDescription(process.description || '');
       setVisibilityLevel(process.visibility_level || 'public');
-      // Cast process to any to access target_company_id which may not be in Supabase types yet
+
+      // Cast to any because routing fields were added later than some generated types
       const processAny = process as any;
-      setTargetCompanyId(processAny.target_company_id || null);
-      setTargetDepartmentId(process.target_department_id || null);
+      const nextCompanyId = (processAny.target_company_id ?? null) as string | null;
+      const nextDepartmentId = (processAny.target_department_id ?? process.target_department_id ?? null) as string | null;
+
+      setTargetCompanyId(nextCompanyId);
+      setTargetDepartmentId(nextDepartmentId);
+
+      initialTargetCompanyIdRef.current = nextCompanyId;
+      initialTargetDepartmentIdRef.current = nextDepartmentId;
     }
   }, [process, open]);
 
@@ -93,11 +104,17 @@ export function EditProcessDialog({ process, open, onClose, onSave }: EditProces
     e.preventDefault();
     if (!name.trim()) return;
 
+    // Preserve existing routing values unless user explicitly changes them
+    const finalTargetCompanyId =
+      targetCompanyId ?? initialTargetCompanyIdRef.current ?? null;
+    const finalTargetDepartmentId =
+      targetDepartmentId ?? initialTargetDepartmentIdRef.current ?? null;
+
     const updates: Partial<ProcessTemplate> = {
       name: name.trim(),
       description: description.trim() || null,
-      target_company_id: targetCompanyId,
-      target_department_id: targetDepartmentId,
+      target_company_id: finalTargetCompanyId,
+      target_department_id: finalTargetDepartmentId,
     };
 
     if (canChangeVisibility) {
