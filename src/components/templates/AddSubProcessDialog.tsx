@@ -40,11 +40,13 @@ export function AddSubProcessDialog({ open, onClose, onAdd, orderIndex }: AddSub
   const [targetDepartmentId, setTargetDepartmentId] = useState<string>('');
   const [targetJobTitleId, setTargetJobTitleId] = useState<string>('');
   const [targetAssigneeId, setTargetAssigneeId] = useState<string>('');
+  const [targetManagerId, setTargetManagerId] = useState<string>('');
   const [visibilityLevel, setVisibilityLevel] = useState<TemplateVisibility>('public');
   
   const [departments, setDepartments] = useState<Department[]>([]);
   const [jobTitles, setJobTitles] = useState<JobTitle[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [managers, setManagers] = useState<Profile[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -62,7 +64,11 @@ export function AddSubProcessDialog({ open, onClose, onAdd, orderIndex }: AddSub
     
     if (deptRes.data) setDepartments(deptRes.data);
     if (jobRes.data) setJobTitles(jobRes.data);
-    if (profileRes.data) setProfiles(profileRes.data);
+    if (profileRes.data) {
+      setProfiles(profileRes.data);
+      // Filter managers based on department if selected
+      setManagers(profileRes.data);
+    }
   };
 
   const resetForm = () => {
@@ -72,6 +78,7 @@ export function AddSubProcessDialog({ open, onClose, onAdd, orderIndex }: AddSub
     setTargetDepartmentId('');
     setTargetJobTitleId('');
     setTargetAssigneeId('');
+    setTargetManagerId('');
     setVisibilityLevel('public');
   };
 
@@ -88,6 +95,7 @@ export function AddSubProcessDialog({ open, onClose, onAdd, orderIndex }: AddSub
         target_department_id: targetDepartmentId || null,
         target_job_title_id: targetJobTitleId || null,
         target_assignee_id: targetAssigneeId || null,
+        target_manager_id: assignmentType === 'manager' ? (targetManagerId || null) : null,
         order_index: orderIndex,
         is_shared: true,
         visibility_level: visibilityLevel,
@@ -164,8 +172,28 @@ export function AddSubProcessDialog({ open, onClose, onAdd, orderIndex }: AddSub
                   <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>
                 ))}
               </SelectContent>
-            </Select>
+          </Select>
           </div>
+
+          {assignmentType === 'manager' && (
+            <div className="space-y-2">
+              <Label>Manager cible</Label>
+              <p className="text-xs text-muted-foreground">Le manager qui recevra les tâches à affecter</p>
+              <Select value={targetManagerId || '__none__'} onValueChange={(v) => setTargetManagerId(v === '__none__' ? '' : v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner un manager" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Aucun (premier manager du service)</SelectItem>
+                  {managers.map(p => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.display_name || 'Sans nom'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {assignmentType === 'role' && (
             <div className="space-y-2">

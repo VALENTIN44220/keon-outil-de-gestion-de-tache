@@ -1090,6 +1090,7 @@ export type Database = {
           target_assignee_id: string | null
           target_department_id: string | null
           target_job_title_id: string | null
+          target_manager_id: string | null
           updated_at: string
           user_id: string
           visibility_level: Database["public"]["Enums"]["template_visibility"]
@@ -1108,6 +1109,7 @@ export type Database = {
           target_assignee_id?: string | null
           target_department_id?: string | null
           target_job_title_id?: string | null
+          target_manager_id?: string | null
           updated_at?: string
           user_id: string
           visibility_level?: Database["public"]["Enums"]["template_visibility"]
@@ -1126,6 +1128,7 @@ export type Database = {
           target_assignee_id?: string | null
           target_department_id?: string | null
           target_job_title_id?: string | null
+          target_manager_id?: string | null
           updated_at?: string
           user_id?: string
           visibility_level?: Database["public"]["Enums"]["template_visibility"]
@@ -1171,6 +1174,13 @@ export type Database = {
             columns: ["target_job_title_id"]
             isOneToOne: false
             referencedRelation: "job_titles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sub_process_templates_target_manager_id_fkey"
+            columns: ["target_manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]

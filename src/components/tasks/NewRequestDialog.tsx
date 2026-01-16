@@ -48,6 +48,9 @@ interface SubProcessTemplate {
   name: string;
   process_template_id: string;
   description: string | null;
+  target_manager_id: string | null;
+  target_department_id: string | null;
+  assignment_type: string;
 }
 
 interface ChecklistItem {
@@ -200,7 +203,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
       if (initialSubProcessTemplateId) {
         const { data: subProcess } = await supabase
           .from('sub_process_templates')
-          .select('id, name, process_template_id, target_department_id')
+          .select('id, name, process_template_id, target_department_id, target_manager_id, assignment_type')
           .eq('id', initialSubProcessTemplateId)
           .single();
         
@@ -291,7 +294,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
           // Fetch sub-processes for this process
           const { data: subProcessData } = await supabase
             .from('sub_process_templates')
-            .select('id, name, process_template_id, description')
+            .select('id, name, process_template_id, description, target_manager_id, target_department_id, assignment_type')
             .eq('process_template_id', data.id)
             .order('order_index', { ascending: true });
           
@@ -547,7 +550,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
         }
       }
 
-      // Generate pending assignments based on selection mode
+      // Generate tasks based on selection mode
       if (hasMultipleSubProcesses && selectedSubProcessIds.length > 0) {
         // Multiple sub-processes selected
         let totalAssignments = 0;
@@ -559,13 +562,19 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
             sub_process_template_id: subProcessId,
           });
 
-          // Generate pending assignments for this sub-process
-          if (linkedProcessId && targetDepartmentId) {
+          // Find the sub-process to get its target_manager_id
+          const subProcess = availableSubProcesses.find(sp => sp.id === subProcessId);
+          const subProcessDeptId = subProcess?.target_department_id || targetDepartmentId;
+          const targetManagerId = subProcess?.target_manager_id || undefined;
+
+          // Generate tasks for this sub-process
+          if (linkedProcessId && subProcessDeptId) {
             const count = await generatePendingAssignments({
               parentRequestId: requestData.id,
               processTemplateId: linkedProcessId,
-              targetDepartmentId,
+              targetDepartmentId: subProcessDeptId,
               subProcessTemplateId: subProcessId,
+              targetManagerId,
             });
             totalAssignments += count;
           }
@@ -575,12 +584,22 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
           `Demande créée avec ${selectedSubProcessIds.length} sous-processus sélectionné(s)`
         );
       } else if (linkedSubProcessId && targetDepartmentId) {
-        // Single sub-process mode
+        // Single sub-process mode - fetch target_manager_id
+        const { data: subProcess } = await supabase
+          .from('sub_process_templates')
+          .select('target_manager_id, target_department_id')
+          .eq('id', linkedSubProcessId)
+          .single();
+
+        const subProcessDeptId = subProcess?.target_department_id || targetDepartmentId;
+        const targetManagerId = subProcess?.target_manager_id || undefined;
+
         await generatePendingAssignments({
           parentRequestId: requestData.id,
           processTemplateId: linkedProcessId || '',
-          targetDepartmentId,
+          targetDepartmentId: subProcessDeptId,
           subProcessTemplateId: linkedSubProcessId,
+          targetManagerId,
         });
         toast.success('Demande créée avec succès');
       } else if (linkedProcessId && targetDepartmentId) {
