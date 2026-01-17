@@ -712,7 +712,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
               </TabsTrigger>
             </TabsList>
 
-            <ScrollArea className="flex-1 mt-4 pr-4">
+            <ScrollArea className="flex-1 mt-4 pr-4 h-[calc(90vh-220px)]">
               <TabsContent value="general" className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="title">Titre *</Label>
