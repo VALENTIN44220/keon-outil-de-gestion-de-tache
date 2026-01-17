@@ -110,9 +110,9 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
     <aside 
       data-sidebar-position={isRightSide ? 'right' : 'left'}
       className={cn(
-        "bg-sidebar/80 backdrop-blur-md text-sidebar-foreground h-screen flex flex-col transition-all duration-300 ease-in-out flex-shrink-0 border-sidebar-border",
+        "fixed top-0 bg-sidebar/70 backdrop-blur-xl text-sidebar-foreground h-screen flex flex-col transition-all duration-300 ease-in-out z-40 border-sidebar-border shadow-lg",
         collapsed ? "w-16" : "w-64",
-        isRightSide ? "order-last border-l" : "order-first border-r"
+        isRightSide ? "right-0 border-l" : "left-0 border-r"
       )}
     >
       {/* Logo KEON */}
@@ -137,9 +137,9 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
               className="p-1.5 rounded-lg hover:bg-sidebar-accent transition-colors"
             >
               {collapsed ? (
-                <ChevronRight className="w-5 h-5" />
+                isRightSide ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />
               ) : (
-                <ChevronLeft className="w-5 h-5" />
+                isRightSide ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />
               )}
             </button>
           </div>
