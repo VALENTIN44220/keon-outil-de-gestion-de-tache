@@ -1093,6 +1093,7 @@ export type Database = {
           creator_department_id: string | null
           description: string | null
           id: string
+          is_mandatory: boolean
           is_shared: boolean
           name: string
           order_index: number
@@ -1112,6 +1113,7 @@ export type Database = {
           creator_department_id?: string | null
           description?: string | null
           id?: string
+          is_mandatory?: boolean
           is_shared?: boolean
           name: string
           order_index?: number
@@ -1131,6 +1133,7 @@ export type Database = {
           creator_department_id?: string | null
           description?: string | null
           id?: string
+          is_mandatory?: boolean
           is_shared?: boolean
           name?: string
           order_index?: number
@@ -1463,6 +1466,10 @@ export type Database = {
           title: string
           updated_at: string
           user_id: string
+          validation_level_1: string | null
+          validation_level_2: string | null
+          validator_level_1_id: string | null
+          validator_level_2_id: string | null
           visibility_level: Database["public"]["Enums"]["template_visibility"]
         }
         Insert: {
@@ -1484,6 +1491,10 @@ export type Database = {
           title: string
           updated_at?: string
           user_id: string
+          validation_level_1?: string | null
+          validation_level_2?: string | null
+          validator_level_1_id?: string | null
+          validator_level_2_id?: string | null
           visibility_level?: Database["public"]["Enums"]["template_visibility"]
         }
         Update: {
@@ -1505,6 +1516,10 @@ export type Database = {
           title?: string
           updated_at?: string
           user_id?: string
+          validation_level_1?: string | null
+          validation_level_2?: string | null
+          validator_level_1_id?: string | null
+          validator_level_2_id?: string | null
           visibility_level?: Database["public"]["Enums"]["template_visibility"]
         }
         Relationships: [
@@ -1548,6 +1563,20 @@ export type Database = {
             columns: ["subcategory_id"]
             isOneToOne: false
             referencedRelation: "subcategories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_templates_validator_level_1_id_fkey"
+            columns: ["validator_level_1_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_templates_validator_level_2_id_fkey"
+            columns: ["validator_level_2_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1623,6 +1652,8 @@ export type Database = {
           due_date: string | null
           id: string
           is_assignment_task: boolean
+          is_locked_for_validation: boolean | null
+          original_assignee_id: string | null
           parent_request_id: string | null
           priority: string
           rbe_validated_at: string | null
@@ -1645,9 +1676,21 @@ export type Database = {
           updated_at: string
           user_id: string
           validated_at: string | null
+          validation_1_at: string | null
+          validation_1_by: string | null
+          validation_1_comment: string | null
+          validation_1_status: string | null
+          validation_2_at: string | null
+          validation_2_by: string | null
+          validation_2_comment: string | null
+          validation_2_status: string | null
           validation_comment: string | null
+          validation_level_1: string | null
+          validation_level_2: string | null
           validation_requested_at: string | null
           validator_id: string | null
+          validator_level_1_id: string | null
+          validator_level_2_id: string | null
         }
         Insert: {
           assignee_id?: string | null
@@ -1661,6 +1704,8 @@ export type Database = {
           due_date?: string | null
           id?: string
           is_assignment_task?: boolean
+          is_locked_for_validation?: boolean | null
+          original_assignee_id?: string | null
           parent_request_id?: string | null
           priority?: string
           rbe_validated_at?: string | null
@@ -1683,9 +1728,21 @@ export type Database = {
           updated_at?: string
           user_id: string
           validated_at?: string | null
+          validation_1_at?: string | null
+          validation_1_by?: string | null
+          validation_1_comment?: string | null
+          validation_1_status?: string | null
+          validation_2_at?: string | null
+          validation_2_by?: string | null
+          validation_2_comment?: string | null
+          validation_2_status?: string | null
           validation_comment?: string | null
+          validation_level_1?: string | null
+          validation_level_2?: string | null
           validation_requested_at?: string | null
           validator_id?: string | null
+          validator_level_1_id?: string | null
+          validator_level_2_id?: string | null
         }
         Update: {
           assignee_id?: string | null
@@ -1699,6 +1756,8 @@ export type Database = {
           due_date?: string | null
           id?: string
           is_assignment_task?: boolean
+          is_locked_for_validation?: boolean | null
+          original_assignee_id?: string | null
           parent_request_id?: string | null
           priority?: string
           rbe_validated_at?: string | null
@@ -1721,9 +1780,21 @@ export type Database = {
           updated_at?: string
           user_id?: string
           validated_at?: string | null
+          validation_1_at?: string | null
+          validation_1_by?: string | null
+          validation_1_comment?: string | null
+          validation_1_status?: string | null
+          validation_2_at?: string | null
+          validation_2_by?: string | null
+          validation_2_comment?: string | null
+          validation_2_status?: string | null
           validation_comment?: string | null
+          validation_level_1?: string | null
+          validation_level_2?: string | null
           validation_requested_at?: string | null
           validator_id?: string | null
+          validator_level_1_id?: string | null
+          validator_level_2_id?: string | null
         }
         Relationships: [
           {
@@ -1752,6 +1823,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_original_assignee_id_fkey"
+            columns: ["original_assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -1811,8 +1889,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "tasks_validation_1_by_fkey"
+            columns: ["validation_1_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_validation_2_by_fkey"
+            columns: ["validation_2_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "tasks_validator_id_fkey"
             columns: ["validator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_validator_level_1_id_fkey"
+            columns: ["validator_level_1_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_validator_level_2_id_fkey"
+            columns: ["validator_level_2_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -2166,6 +2272,7 @@ export type Database = {
         | "internal_department"
         | "internal_company"
         | "public"
+      validation_type: "none" | "manager" | "requester" | "free"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2317,6 +2424,7 @@ export const Constants = {
         "internal_company",
         "public",
       ],
+      validation_type: ["none", "manager", "requester", "free"],
     },
   },
 } as const

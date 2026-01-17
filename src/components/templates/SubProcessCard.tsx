@@ -3,6 +3,7 @@ import { SubProcessWithTasks, TaskTemplate } from '@/types/template';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -11,13 +12,15 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { 
   MoreVertical, Plus, Trash2, Edit, ChevronDown, ChevronRight,
-  Users, User, UserCog, Building2, FormInput
+  Users, User, UserCog, Building2, FormInput, Lock
 } from 'lucide-react';
 import { AddTaskTemplateDialog } from './AddTaskTemplateDialog';
 import { TemplateChecklistEditor } from './TemplateChecklistEditor';
 import { SubProcessCustomFieldsEditor } from './SubProcessCustomFieldsEditor';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface SubProcessCardProps {
   subProcess: SubProcessWithTasks;
@@ -26,6 +29,7 @@ interface SubProcessCardProps {
   onAddTask: (task: Omit<TaskTemplate, 'id' | 'user_id' | 'process_template_id' | 'sub_process_template_id' | 'created_at' | 'updated_at'>) => void;
   onDeleteTask: (taskId: string) => void;
   canManage?: boolean;
+  onMandatoryChange?: (id: string, isMandatory: boolean) => void;
 }
 
 const priorityColors: Record<string, string> = {
@@ -47,11 +51,13 @@ export function SubProcessCard({
   onDelete, 
   onAddTask, 
   onDeleteTask,
-  canManage = false
+  canManage = false,
+  onMandatoryChange
 }: SubProcessCardProps) {
   const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [isExpanded, setIsExpanded] = useState(false);
+  const [isMandatory, setIsMandatory] = useState(subProcess.is_mandatory ?? false);
 
   const toggleTaskExpanded = (taskId: string) => {
     setExpandedTasks(prev => {
@@ -63,6 +69,24 @@ export function SubProcessCard({
       }
       return newSet;
     });
+  };
+
+  const handleMandatoryToggle = async (checked: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('sub_process_templates')
+        .update({ is_mandatory: checked })
+        .eq('id', subProcess.id);
+      
+      if (error) throw error;
+      
+      setIsMandatory(checked);
+      onMandatoryChange?.(subProcess.id, checked);
+      toast.success(checked ? 'Sous-processus marqué comme obligatoire' : 'Sous-processus marqué comme optionnel');
+    } catch (error) {
+      console.error('Error updating mandatory status:', error);
+      toast.error('Erreur lors de la mise à jour');
+    }
   };
 
   const AssignmentIcon = assignmentTypeLabels[subProcess.assignment_type]?.icon || Users;
@@ -122,7 +146,29 @@ export function SubProcessCard({
               <Badge variant="secondary" className="text-xs">
                 {subProcess.task_templates.length} tâche(s)
               </Badge>
+              {isMandatory && (
+                <Badge variant="default" className="text-xs bg-primary/80">
+                  <Lock className="h-3 w-3 mr-1" />
+                  Obligatoire
+                </Badge>
+              )}
             </div>
+
+            {canManage && (
+              <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border/50">
+                <Switch
+                  id={`mandatory-${subProcess.id}`}
+                  checked={isMandatory}
+                  onCheckedChange={handleMandatoryToggle}
+                />
+                <label 
+                  htmlFor={`mandatory-${subProcess.id}`}
+                  className="text-xs text-muted-foreground cursor-pointer"
+                >
+                  Sous-processus obligatoire
+                </label>
+              </div>
+            )}
           </CardHeader>
 
           <CollapsibleContent>

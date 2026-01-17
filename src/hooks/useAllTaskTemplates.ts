@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { TaskTemplate } from '@/types/template';
+import { TaskTemplate, ValidationLevelType } from '@/types/template';
 import { toast } from 'sonner';
 
 export interface TaskTemplateWithContext extends TaskTemplate {
@@ -46,6 +46,8 @@ export function useAllTaskTemplates() {
             ...task,
             priority: task.priority as 'low' | 'medium' | 'high' | 'urgent',
             visibility_level: task.visibility_level as TaskTemplate['visibility_level'],
+            validation_level_1: (task.validation_level_1 || 'none') as ValidationLevelType,
+            validation_level_2: (task.validation_level_2 || 'none') as ValidationLevelType,
             process_name: (task as any).process_templates?.name || null,
             sub_process_name: (task as any).sub_process_templates?.name || null,
             can_manage: Boolean(canManageData),

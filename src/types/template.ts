@@ -33,6 +33,15 @@ export interface ProcessTemplate {
   updated_at: string;
 }
 
+export type ValidationLevelType = 'none' | 'manager' | 'requester' | 'free';
+
+export const VALIDATION_TYPE_LABELS: Record<ValidationLevelType, string> = {
+  none: 'Non',
+  manager: 'Manager',
+  requester: 'Demandeur',
+  free: 'Libre',
+};
+
 export interface SubProcessTemplate {
   id: string;
   process_template_id: string;
@@ -45,6 +54,7 @@ export interface SubProcessTemplate {
   target_manager_id: string | null;
   order_index: number;
   is_shared: boolean;
+  is_mandatory: boolean;
   visibility_level: TemplateVisibility;
   creator_company_id: string | null;
   creator_department_id: string | null;
@@ -71,6 +81,12 @@ export interface TaskTemplate {
   user_id: string;
   created_at: string;
   updated_at: string;
+  
+  // Validation fields
+  validation_level_1: ValidationLevelType;
+  validation_level_2: ValidationLevelType;
+  validator_level_1_id: string | null;
+  validator_level_2_id: string | null;
 
   /** UI helper (computed client-side) */
   can_manage?: boolean;

@@ -1,7 +1,8 @@
-export type TaskStatus = 'todo' | 'in-progress' | 'done' | 'pending-validation' | 'validated' | 'refused' | 'to_assign';
+export type TaskStatus = 'todo' | 'in-progress' | 'done' | 'pending_validation_1' | 'pending_validation_2' | 'validated' | 'refused' | 'to_assign';
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
 export type TaskType = 'task' | 'request';
 export type ValidationStatus = 'pending' | 'approved' | 'rejected';
+export type ValidationLevelType = 'none' | 'manager' | 'requester' | 'free';
 
 export interface Task {
   id: string;
@@ -19,13 +20,28 @@ export interface Task {
   requester_id: string | null;
   reporter_id: string | null;
   target_department_id: string | null;
-  // Validation fields
+  // Validation fields (legacy)
   validator_id: string | null;
   validation_requested_at: string | null;
   validated_at: string | null;
   validation_comment: string | null;
   requires_validation: boolean;
   current_validation_level: number;
+  // New validation workflow fields
+  validation_level_1: ValidationLevelType;
+  validation_level_2: ValidationLevelType;
+  validator_level_1_id: string | null;
+  validator_level_2_id: string | null;
+  validation_1_status: 'pending' | 'validated' | 'refused';
+  validation_1_at: string | null;
+  validation_1_by: string | null;
+  validation_1_comment: string | null;
+  validation_2_status: 'pending' | 'validated' | 'refused';
+  validation_2_at: string | null;
+  validation_2_by: string | null;
+  validation_2_comment: string | null;
+  original_assignee_id: string | null;
+  is_locked_for_validation: boolean;
   // Request workflow fields
   parent_request_id: string | null;
   is_assignment_task: boolean;
