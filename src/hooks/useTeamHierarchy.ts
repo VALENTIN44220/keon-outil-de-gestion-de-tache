@@ -96,12 +96,21 @@ export function useTeamHierarchy() {
 
       setAllMembers(enrichedMembers);
 
-      // Find direct managers (N+1, N+2, etc.)
+      // Find direct managers (N+1, N+2, etc.) with circular reference protection
       const managersList: TeamMember[] = [];
+      const visitedManagers = new Set<string>();
+
       let currentManager = enrichedMembers.find(m => m.id === profile.manager_id);
       while (currentManager) {
+        // Break on cycles / self-manager / abnormal depth
+        if (visitedManagers.has(currentManager.id)) break;
+        visitedManagers.add(currentManager.id);
+
         managersList.push(currentManager);
-        currentManager = enrichedMembers.find(m => m.id === currentManager?.manager_id);
+        if (!currentManager.manager_id || currentManager.manager_id === currentManager.id) break;
+
+        currentManager = enrichedMembers.find(m => m.id === currentManager.manager_id);
+        if (managersList.length >= 50) break;
       }
       setManagers(managersList);
 
@@ -169,16 +178,20 @@ export function useTeamHierarchy() {
       
       // For admins with can_view_all_tasks, show everyone starting from root nodes
       // Get permission profile from the enriched members array instead of separate query
-      const currentUserMember = members.find(m => m.id === profile.id);
-      const { data: userPermProfile } = await supabase
-        .from('permission_profiles')
-        .select('can_view_all_tasks')
-        .eq('id', currentUserMember?.permission_profile_id || '')
-        .maybeSingle();
-      
-      const isAdmin = userPermProfile?.can_view_all_tasks || false;
+      const currentUserMember = members.find(m => m.id === profile.id) as TeamMember | undefined;
+
+      let isAdmin = false;
+      if (currentUserMember?.permission_profile_id) {
+        const { data: userPermProfile } = await supabase
+          .from('permission_profiles')
+          .select('can_view_all_tasks')
+          .eq('id', currentUserMember.permission_profile_id)
+          .maybeSingle();
+
+        isAdmin = !!userPermProfile?.can_view_all_tasks;
+      }
+
       console.log('Is admin:', isAdmin, 'Permission profile:', currentUserMember?.permission_profile_id);
-      
       if (isAdmin) {
         // Find all root members (those without manager or whose manager doesn't exist in the list)
         const rootMembers = enrichedMembersTyped.filter(m => 
