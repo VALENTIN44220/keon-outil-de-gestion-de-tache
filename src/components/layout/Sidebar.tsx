@@ -133,14 +133,20 @@ export function Sidebar({
     return name.slice(0, 2).toUpperCase();
   };
 
-// Handle menu item click - update view without forcing navigation for same-page views
+// Handle menu item click - navigate and update view
   const handleMenuClick = (itemId: string, path: string) => {
     // Update the active view
     onViewChange(itemId);
     
-    // Only navigate if the path is different from current (e.g., /admin, /templates, /workload, /requests, /projects)
-    // For views that share the same path '/'), just update the view state
-    if (path !== '/') {
+    // Always navigate to the path - this ensures proper page transition
+    // For items with path '/', navigate to home page if not already there
+    const currentPath = window.location.pathname;
+    if (path === '/') {
+      // Always navigate to home for views that live on the index page
+      if (currentPath !== '/') {
+        navigate('/');
+      }
+    } else if (currentPath !== path) {
       navigate(path);
     }
     // Do NOT auto-collapse - user prefers sidebar to stay open when expanded
