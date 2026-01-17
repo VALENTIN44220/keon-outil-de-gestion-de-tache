@@ -39,7 +39,7 @@ const baseMenuItems = [
   { id: 'settings', label: 'Paramètres', icon: Settings, path: '/' },
 ];
 
-const projectsMenuItem = { id: 'projects', label: 'Projets BE', icon: FolderOpen, path: '/projects' };
+const projectsMenuItem = { id: 'projects', label: 'Projets', icon: FolderOpen, path: '/projects' };
 const adminMenuItem = { id: 'admin', label: 'Administration', icon: ShieldCheck, path: '/admin' };
 
 export function Sidebar({ activeView, onViewChange }: SidebarProps) {

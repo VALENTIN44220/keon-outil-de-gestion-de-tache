@@ -45,7 +45,7 @@ const TABLES: TableOption[] = [
   
   // 4. Other entities
   { id: 'user_leaves', label: 'Congés', table: 'user_leaves', description: 'Absences et congés', order: 40 },
-  { id: 'be_projects', label: 'Projets BE', table: 'be_projects', description: 'Projets Bureau d\'Études', order: 41 },
+  { id: 'be_projects', label: 'Projets', table: 'be_projects', description: 'Projets Bureau d\'Études', order: 41 },
   { id: 'holidays', label: 'Jours fériés', table: 'holidays', description: 'Jours fériés', order: 42 },
   { id: 'assignment_rules', label: 'Règles d\'affectation', table: 'assignment_rules', description: 'Règles d\'affectation automatique', order: 43 },
   

@@ -57,7 +57,7 @@ export function BEProjectSelect({ value, onChange, onProjectCreated }: BEProject
         query = query.or(`nom_projet.ilike.%${searchQuery}%,code_projet.ilike.%${searchQuery}%`);
       }
 
-      const { data, error } = await query.limit(50);
+      const { data, error } = await query;
       if (error) throw error;
       setProjects((data as BEProject[]) || []);
     } catch (error) {
@@ -110,7 +110,7 @@ export function BEProjectSelect({ value, onChange, onProjectCreated }: BEProject
     <div className="space-y-2">
       <Label className="flex items-center gap-2">
         <FolderOpen className="h-4 w-4" />
-        Projet BE
+        Projet
       </Label>
       
       <div className="flex gap-2">
@@ -175,7 +175,7 @@ export function BEProjectSelect({ value, onChange, onProjectCreated }: BEProject
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Créer un nouveau projet BE</DialogTitle>
+            <DialogTitle>Créer un nouveau projet</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 py-4">

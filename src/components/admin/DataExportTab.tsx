@@ -26,7 +26,7 @@ const EXPORTABLE_TABLES: ExportTable[] = [
   { name: 'sub_process_templates', label: 'Sous-processus', description: 'Modèles de sous-processus' },
   { name: 'task_templates', label: 'Modèles de tâches', description: 'Modèles de tâches' },
   { name: 'task_template_checklists', label: 'Checklists modèles', description: 'Sous-actions des modèles' },
-  { name: 'be_projects', label: 'Projets BE', description: 'Projets Bureau d\'Études' },
+  { name: 'be_projects', label: 'Projets', description: 'Projets Bureau d\'Études' },
   { name: 'be_task_labels', label: 'Labels BE', description: 'Labels des tâches BE' },
   { name: 'assignment_rules', label: 'Règles d\'affectation', description: 'Règles d\'assignation automatique' },
   { name: 'tasks', label: 'Tâches', description: 'Toutes les tâches' },
