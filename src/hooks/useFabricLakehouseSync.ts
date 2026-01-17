@@ -1,0 +1,130 @@
+import { useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+
+export interface FabricDiagnostics {
+  success: boolean;
+  workspaceId?: string;
+  lakehouseId?: string;
+  message: string;
+  tablesCount?: number;
+}
+
+export interface TablePreview {
+  table: string;
+  rowCount: number;
+  error?: string;
+}
+
+export interface SyncResult {
+  table: string;
+  success: boolean;
+  rowCount?: number;
+  error?: string;
+}
+
+export interface SyncResponse {
+  success: boolean;
+  syncedTables: number;
+  totalTables: number;
+  totalRows: number;
+  results: SyncResult[];
+}
+
+export function useFabricLakehouseSync() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [isDiagnosing, setIsDiagnosing] = useState(false);
+  const [diagnostics, setDiagnostics] = useState<FabricDiagnostics | null>(null);
+  const [previewData, setPreviewData] = useState<TablePreview[] | null>(null);
+  const [lastSyncResult, setLastSyncResult] = useState<SyncResponse | null>(null);
+
+  const runDiagnostic = async () => {
+    setIsDiagnosing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('fabric-lakehouse-sync', {
+        body: { action: 'diagnose' },
+      });
+
+      if (error) throw error;
+
+      setDiagnostics(data);
+      
+      if (data.success) {
+        toast.success('Connexion au Lakehouse Fabric réussie');
+      } else {
+        toast.error(`Erreur: ${data.message}`);
+      }
+    } catch (error: any) {
+      console.error('Diagnostic error:', error);
+      toast.error(`Erreur de diagnostic: ${error.message}`);
+      setDiagnostics({
+        success: false,
+        message: error.message,
+      });
+    } finally {
+      setIsDiagnosing(false);
+    }
+  };
+
+  const getPreview = async (tables?: string[]) => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('fabric-lakehouse-sync', {
+        body: { action: 'preview', tables },
+      });
+
+      if (error) throw error;
+
+      setPreviewData(data.tables);
+      toast.success(`${data.tables.length} tables à synchroniser (${data.totalRows} lignes)`);
+    } catch (error: any) {
+      console.error('Preview error:', error);
+      toast.error(`Erreur de prévisualisation: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const syncToLakehouse = async (tables?: string[]) => {
+    setIsLoading(true);
+    setLastSyncResult(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('fabric-lakehouse-sync', {
+        body: { action: 'sync', tables },
+      });
+
+      if (error) throw error;
+
+      setLastSyncResult(data);
+      
+      if (data.success) {
+        toast.success(`Synchronisation réussie: ${data.syncedTables}/${data.totalTables} tables (${data.totalRows} lignes)`);
+      } else {
+        const failedCount = data.totalTables - data.syncedTables;
+        toast.warning(`Synchronisation partielle: ${failedCount} tables en erreur`);
+      }
+
+      return data;
+    } catch (error: any) {
+      console.error('Sync error:', error);
+      toast.error(`Erreur de synchronisation: ${error.message}`);
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const clearPreview = () => setPreviewData(null);
+
+  return {
+    isLoading,
+    isDiagnosing,
+    diagnostics,
+    previewData,
+    lastSyncResult,
+    runDiagnostic,
+    getPreview,
+    syncToLakehouse,
+    clearPreview,
+  };
+}
