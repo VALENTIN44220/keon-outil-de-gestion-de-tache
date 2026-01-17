@@ -195,6 +195,77 @@
     box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
   }
 
+  /* 3D Button effect for sidebar icons */
+  .btn-3d {
+    @apply relative bg-white border-2 border-slate-200 rounded-xl;
+    box-shadow: 
+      0 4px 6px -1px rgba(0, 0, 0, 0.1),
+      0 2px 4px -2px rgba(0, 0, 0, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.8),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.05);
+    transition: all 0.15s ease;
+  }
+
+  .btn-3d:hover {
+    box-shadow: 
+      0 6px 12px -2px rgba(0, 0, 0, 0.15),
+      0 3px 6px -3px rgba(0, 0, 0, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.9),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.05);
+    transform: translateY(-1px);
+  }
+
+  .btn-3d:active {
+    box-shadow: 
+      0 1px 2px 0 rgba(0, 0, 0, 0.05),
+      inset 0 2px 4px rgba(0, 0, 0, 0.1);
+    transform: translateY(1px);
+  }
+
+  .btn-3d-active {
+    @apply relative bg-gradient-to-b from-blue-500 to-blue-600 border-2 border-blue-600 rounded-xl text-white;
+    box-shadow: 
+      0 4px 6px -1px rgba(37, 99, 235, 0.3),
+      0 2px 4px -2px rgba(37, 99, 235, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.2),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.1);
+  }
+
+  /* Modern card with subtle gradient */
+  .card-modern {
+    @apply bg-white rounded-2xl border border-slate-200/80;
+    box-shadow: 
+      0 1px 3px rgba(0, 0, 0, 0.04),
+      0 4px 12px rgba(0, 0, 0, 0.03);
+  }
+
+  .card-modern:hover {
+    box-shadow: 
+      0 4px 12px rgba(0, 0, 0, 0.08),
+      0 8px 24px rgba(0, 0, 0, 0.04);
+  }
+
+  /* Gradient progress bars */
+  .progress-gradient-blue {
+    background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%);
+  }
+
+  .progress-gradient-green {
+    background: linear-gradient(90deg, #10b981 0%, #34d399 100%);
+  }
+
+  .progress-gradient-purple {
+    background: linear-gradient(90deg, #8b5cf6 0%, #a78bfa 100%);
+  }
+
+  .progress-gradient-pink {
+    background: linear-gradient(90deg, #ec4899 0%, #f472b6 100%);
+  }
+
+  .progress-gradient-cyan {
+    background: linear-gradient(90deg, #06b6d4 0%, #22d3ee 100%);
+  }
+
   .animate-fade-in {
     animation: fadeIn 0.3s ease-out;
   }
