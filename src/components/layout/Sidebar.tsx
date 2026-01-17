@@ -110,9 +110,12 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
     <aside 
       data-sidebar-position={isRightSide ? 'right' : 'left'}
       className={cn(
-        "fixed top-0 bg-sidebar/50 backdrop-blur-xl text-sidebar-foreground h-screen flex flex-col transition-all duration-300 ease-in-out z-40 border-sidebar-border shadow-lg",
-        collapsed ? "w-16" : "w-64",
-        isRightSide ? "right-0 border-l" : "left-0 border-r"
+        "top-0 bg-sidebar/25 backdrop-blur-xl text-sidebar-foreground h-screen flex flex-col transition-all duration-300 ease-in-out border-sidebar-border",
+        collapsed 
+          ? "relative w-16 flex-shrink-0" 
+          : "fixed w-64 z-40 shadow-lg",
+        isRightSide ? "right-0 border-l" : "left-0 border-r",
+        !collapsed && isRightSide && "order-last"
       )}
     >
       {/* Logo KEON */}
