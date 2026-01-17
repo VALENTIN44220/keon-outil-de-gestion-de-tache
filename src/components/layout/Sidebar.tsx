@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import keonLogo from '@/assets/keon-logo.jpg';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { UserProfilePopover } from './UserProfilePopover';
 interface SidebarProps {
   activeView: string;
   onViewChange: (view: string) => void;
@@ -167,22 +168,27 @@ export function Sidebar({
 
       {/* User section */}
       <div className="p-3 border-t border-sidebar-border">
-        <div className={cn("flex items-center gap-3 px-3 py-2", collapsed && "justify-center")}>
-          <Avatar className="h-9 w-9 flex-shrink-0">
-            <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || 'Utilisateur'} />
-            <AvatarFallback className="bg-gradient-keon text-white text-sm font-medium">
-              {getInitials(profile?.display_name)}
-            </AvatarFallback>
-          </Avatar>
-          {!collapsed && <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">
-                {profile?.display_name || 'Utilisateur'}
-              </p>
-              <p className="text-xs text-sidebar-foreground/60 truncate">
-                {permissionProfileName || profile?.job_title || 'Non défini'}
-              </p>
-            </div>}
-        </div>
+        <UserProfilePopover>
+          <button className={cn(
+            "w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-sidebar-accent transition-colors cursor-pointer",
+            collapsed && "justify-center"
+          )}>
+            <Avatar className="h-9 w-9 flex-shrink-0">
+              <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || 'Utilisateur'} />
+              <AvatarFallback className="bg-gradient-keon text-white text-sm font-medium">
+                {getInitials(profile?.display_name)}
+              </AvatarFallback>
+            </Avatar>
+            {!collapsed && <div className="flex-1 min-w-0 text-left">
+                <p className="text-sm font-medium truncate">
+                  {profile?.display_name || 'Utilisateur'}
+                </p>
+                <p className="text-xs text-sidebar-foreground/60 truncate">
+                  {permissionProfileName || profile?.job_title || 'Non défini'}
+                </p>
+              </div>}
+          </button>
+        </UserProfilePopover>
       </div>
     </aside>;
 }
