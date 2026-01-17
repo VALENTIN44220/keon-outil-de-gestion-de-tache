@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building2, Briefcase, Users, Layers, Shield, UserCog, Route, FolderTree, Download, FolderSync, UsersRound } from 'lucide-react';
+import { Building2, Briefcase, Users, Layers, Shield, UserCog, Route, FolderTree, Download, FolderSync, UsersRound, CloudUpload } from 'lucide-react';
 import { CompaniesTab } from './CompaniesTab';
 import { DepartmentsTab } from './DepartmentsTab';
 import { JobTitlesTab } from './JobTitlesTab';
@@ -12,6 +12,7 @@ import { CategoriesProcessTab } from './CategoriesProcessTab';
 import { DataExportTab } from './DataExportTab';
 import { GovernanceSyncTab } from './GovernanceSyncTab';
 import { CollaboratorGroupsTab } from './CollaboratorGroupsTab';
+import { FabricLakehouseSyncTab } from './FabricLakehouseSyncTab';
 import { DatabaseResetDialog } from './DatabaseResetDialog';
 import type { Company, Department, JobTitle, HierarchyLevel, PermissionProfile, UserProfile } from '@/types/admin';
 
@@ -50,52 +51,56 @@ export function AdminTabs(props: AdminTabsProps) {
       </div>
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-11">
-        <TabsTrigger value="users" className="flex items-center gap-2">
-          <UserCog className="h-4 w-4" />
-          <span className="hidden sm:inline">Utilisateurs</span>
-        </TabsTrigger>
-        <TabsTrigger value="groups" className="flex items-center gap-2">
-          <UsersRound className="h-4 w-4" />
-          <span className="hidden sm:inline">Groupes</span>
-        </TabsTrigger>
-        <TabsTrigger value="companies" className="flex items-center gap-2">
-          <Building2 className="h-4 w-4" />
-          <span className="hidden sm:inline">Sociétés</span>
-        </TabsTrigger>
-        <TabsTrigger value="departments" className="flex items-center gap-2">
-          <Briefcase className="h-4 w-4" />
-          <span className="hidden sm:inline">Services</span>
-        </TabsTrigger>
-        <TabsTrigger value="job-titles" className="flex items-center gap-2">
-          <Users className="h-4 w-4" />
-          <span className="hidden sm:inline">Postes</span>
-        </TabsTrigger>
-        <TabsTrigger value="hierarchy" className="flex items-center gap-2">
-          <Layers className="h-4 w-4" />
-          <span className="hidden sm:inline">Hiérarchie</span>
-        </TabsTrigger>
-        <TabsTrigger value="permissions" className="flex items-center gap-2">
-          <Shield className="h-4 w-4" />
-          <span className="hidden sm:inline">Droits</span>
-        </TabsTrigger>
-        <TabsTrigger value="assignment-rules" className="flex items-center gap-2">
-          <Route className="h-4 w-4" />
-          <span className="hidden sm:inline">Affectation</span>
-        </TabsTrigger>
-        <TabsTrigger value="categories-process" className="flex items-center gap-2">
-          <FolderTree className="h-4 w-4" />
-          <span className="hidden sm:inline">Catégories</span>
-        </TabsTrigger>
-        <TabsTrigger value="export" className="flex items-center gap-2">
-          <Download className="h-4 w-4" />
-          <span className="hidden sm:inline">Export</span>
-        </TabsTrigger>
-        <TabsTrigger value="sharepoint" className="flex items-center gap-2">
-          <FolderSync className="h-4 w-4" />
-          <span className="hidden sm:inline">SharePoint</span>
-        </TabsTrigger>
-      </TabsList>
+        <TabsList className="grid w-full grid-cols-12">
+          <TabsTrigger value="users" className="flex items-center gap-2">
+            <UserCog className="h-4 w-4" />
+            <span className="hidden sm:inline">Utilisateurs</span>
+          </TabsTrigger>
+          <TabsTrigger value="groups" className="flex items-center gap-2">
+            <UsersRound className="h-4 w-4" />
+            <span className="hidden sm:inline">Groupes</span>
+          </TabsTrigger>
+          <TabsTrigger value="companies" className="flex items-center gap-2">
+            <Building2 className="h-4 w-4" />
+            <span className="hidden sm:inline">Sociétés</span>
+          </TabsTrigger>
+          <TabsTrigger value="departments" className="flex items-center gap-2">
+            <Briefcase className="h-4 w-4" />
+            <span className="hidden sm:inline">Services</span>
+          </TabsTrigger>
+          <TabsTrigger value="job-titles" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            <span className="hidden sm:inline">Postes</span>
+          </TabsTrigger>
+          <TabsTrigger value="hierarchy" className="flex items-center gap-2">
+            <Layers className="h-4 w-4" />
+            <span className="hidden sm:inline">Hiérarchie</span>
+          </TabsTrigger>
+          <TabsTrigger value="permissions" className="flex items-center gap-2">
+            <Shield className="h-4 w-4" />
+            <span className="hidden sm:inline">Droits</span>
+          </TabsTrigger>
+          <TabsTrigger value="assignment-rules" className="flex items-center gap-2">
+            <Route className="h-4 w-4" />
+            <span className="hidden sm:inline">Affectation</span>
+          </TabsTrigger>
+          <TabsTrigger value="categories-process" className="flex items-center gap-2">
+            <FolderTree className="h-4 w-4" />
+            <span className="hidden sm:inline">Catégories</span>
+          </TabsTrigger>
+          <TabsTrigger value="export" className="flex items-center gap-2">
+            <Download className="h-4 w-4" />
+            <span className="hidden sm:inline">Export</span>
+          </TabsTrigger>
+          <TabsTrigger value="sharepoint" className="flex items-center gap-2">
+            <FolderSync className="h-4 w-4" />
+            <span className="hidden sm:inline">SharePoint</span>
+          </TabsTrigger>
+          <TabsTrigger value="fabric" className="flex items-center gap-2">
+            <CloudUpload className="h-4 w-4" />
+            <span className="hidden sm:inline">Fabric</span>
+          </TabsTrigger>
+        </TabsList>
 
       <TabsContent value="users">
         <UsersTab
@@ -190,6 +195,10 @@ export function AdminTabs(props: AdminTabsProps) {
 
       <TabsContent value="sharepoint">
         <GovernanceSyncTab />
+      </TabsContent>
+
+      <TabsContent value="fabric">
+        <FabricLakehouseSyncTab />
       </TabsContent>
     </Tabs>
     </div>
