@@ -270,12 +270,12 @@ export function CollaboratorGroupsTab({
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Société</Label>
-                <Select value={companyId} onValueChange={setCompanyId}>
+                <Select value={companyId || "__none__"} onValueChange={(v) => setCompanyId(v === "__none__" ? "" : v)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Sélectionner" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Aucune</SelectItem>
+                    <SelectItem value="__none__">Aucune</SelectItem>
                     {companies.map(c => (
                       <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                     ))}
@@ -284,12 +284,12 @@ export function CollaboratorGroupsTab({
               </div>
               <div className="space-y-2">
                 <Label>Service</Label>
-                <Select value={departmentId} onValueChange={setDepartmentId}>
+                <Select value={departmentId || "__none__"} onValueChange={(v) => setDepartmentId(v === "__none__" ? "" : v)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Sélectionner" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Aucun</SelectItem>
+                    <SelectItem value="__none__">Aucun</SelectItem>
                     {departments.map(d => (
                       <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                     ))}
@@ -334,12 +334,12 @@ export function CollaboratorGroupsTab({
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Société</Label>
-                <Select value={companyId} onValueChange={setCompanyId}>
+                <Select value={companyId || "__none__"} onValueChange={(v) => setCompanyId(v === "__none__" ? "" : v)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Sélectionner" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Aucune</SelectItem>
+                    <SelectItem value="__none__">Aucune</SelectItem>
                     {companies.map(c => (
                       <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                     ))}
@@ -348,12 +348,12 @@ export function CollaboratorGroupsTab({
               </div>
               <div className="space-y-2">
                 <Label>Service</Label>
-                <Select value={departmentId} onValueChange={setDepartmentId}>
+                <Select value={departmentId || "__none__"} onValueChange={(v) => setDepartmentId(v === "__none__" ? "" : v)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Sélectionner" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Aucun</SelectItem>
+                    <SelectItem value="__none__">Aucun</SelectItem>
                     {departments.map(d => (
                       <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                     ))}
