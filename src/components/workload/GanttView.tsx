@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger, ContextMenuSeparator } from '@/components/ui/context-menu';
 import { cn } from '@/lib/utils';
 import { Task } from '@/types/task';
-import { Scissors, Trash2 } from 'lucide-react';
+import { Scissors, Trash2, CheckCircle2 } from 'lucide-react';
 
 interface GanttViewProps {
   workloadData: TeamMemberWorkload[];
@@ -101,11 +101,11 @@ export function GanttView({
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'urgent': return 'bg-red-500';
-      case 'high': return 'bg-orange-500';
-      case 'medium': return 'bg-yellow-500';
-      case 'low': return 'bg-green-500';
-      default: return 'bg-gray-500';
+      case 'urgent': return 'bg-gradient-to-r from-red-500 to-rose-400';
+      case 'high': return 'bg-gradient-to-r from-orange-500 to-amber-400';
+      case 'medium': return 'bg-gradient-to-r from-purple-500 to-pink-400';
+      case 'low': return 'bg-gradient-to-r from-emerald-500 to-teal-400';
+      default: return 'bg-gradient-to-r from-slate-500 to-slate-400';
     }
   };
 
@@ -242,10 +242,14 @@ export function GanttView({
   return (
     <TooltipProvider>
       <div className="flex gap-4">
-        {/* Tasks sidebar */}
-        <div className="w-72 shrink-0 bg-card rounded-lg border p-4">
-          <h3 className="font-semibold mb-3">Tâches à planifier ({availableTasks.length})</h3>
-          <div className="space-y-2 max-h-[600px] overflow-y-auto">
+        {/* Tasks sidebar - modern colorful style */}
+        <div className="w-72 shrink-0 bg-gradient-to-b from-white to-slate-50 dark:from-slate-900 dark:to-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 shadow-lg">
+          <h3 className="font-semibold mb-4 flex items-center gap-2">
+            <div className="w-2 h-5 bg-gradient-to-b from-blue-500 to-cyan-400 rounded-full" />
+            Tâches à planifier 
+            <span className="ml-auto bg-gradient-to-r from-blue-500 to-cyan-400 text-white text-xs font-bold px-2 py-1 rounded-full">{availableTasks.length}</span>
+          </h3>
+          <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
             {availableTasks.map(task => {
               const duration = getTaskDuration ? getTaskDuration(task.id) : null;
               const progress = getTaskProgress ? getTaskProgress(task.id) : null;
@@ -259,8 +263,12 @@ export function GanttView({
                   draggable
                   onDragStart={(e) => handleTaskDragStart(e, task)}
                   className={cn(
-                    "p-2 rounded border cursor-grab active:cursor-grabbing hover:bg-muted transition-colors",
-                    getPriorityColor(task.priority) === 'bg-red-500' && "border-red-300",
+                    "p-3 rounded-xl border-2 cursor-grab active:cursor-grabbing hover:scale-[1.02] hover:shadow-md transition-all duration-200 bg-white dark:bg-slate-800",
+                    task.priority === 'urgent' && "border-red-300 bg-red-50/50 dark:bg-red-900/10",
+                    task.priority === 'high' && "border-orange-300 bg-orange-50/50 dark:bg-orange-900/10",
+                    task.priority === 'medium' && "border-purple-300 bg-purple-50/50 dark:bg-purple-900/10",
+                    task.priority === 'low' && "border-emerald-300 bg-emerald-50/50 dark:bg-emerald-900/10",
+                    !['urgent', 'high', 'medium', 'low'].includes(task.priority) && "border-slate-200"
                   )}
                 >
                   <div className="flex items-center gap-2">
@@ -299,9 +307,14 @@ export function GanttView({
               );
             })}
             {availableTasks.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                Toutes les tâches sont planifiées
-              </p>
+              <div className="text-center py-8">
+                <div className="w-12 h-12 mx-auto mb-3 bg-gradient-to-br from-emerald-400 to-teal-400 rounded-xl flex items-center justify-center">
+                  <CheckCircle2 className="w-6 h-6 text-white" />
+                </div>
+                <p className="text-sm text-muted-foreground font-medium">
+                  Toutes les tâches sont planifiées 🎉
+                </p>
+              </div>
             )}
           </div>
         </div>
