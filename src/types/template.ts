@@ -42,16 +42,26 @@ export const VALIDATION_TYPE_LABELS: Record<ValidationLevelType, string> = {
   free: 'Libre',
 };
 
+export type AssignmentType = 'manager' | 'user' | 'role' | 'group';
+
+export const ASSIGNMENT_TYPE_LABELS: Record<AssignmentType, string> = {
+  manager: 'Par manager',
+  user: 'Utilisateur spécifique',
+  role: 'Par poste',
+  group: 'Groupe de collaborateurs',
+};
+
 export interface SubProcessTemplate {
   id: string;
   process_template_id: string;
   name: string;
   description: string | null;
-  assignment_type: 'manager' | 'user' | 'role';
+  assignment_type: AssignmentType;
   target_assignee_id: string | null;
   target_department_id: string | null;
   target_job_title_id: string | null;
   target_manager_id: string | null;
+  target_group_id: string | null;
   order_index: number;
   is_shared: boolean;
   is_mandatory: boolean;

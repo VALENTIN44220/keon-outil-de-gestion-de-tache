@@ -12,9 +12,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { 
   MoreVertical, Plus, Trash2, Edit, ChevronDown, ChevronRight,
-  Users, User, UserCog, Building2, FormInput, Lock
+  Users, User, UserCog, Building2, FormInput, Lock, Link2, Edit2
 } from 'lucide-react';
 import { AddTaskTemplateDialog } from './AddTaskTemplateDialog';
+import { EditTaskTemplateDialog } from './EditTaskTemplateDialog';
+import { LinkExistingTaskDialog } from './LinkExistingTaskDialog';
 import { TemplateChecklistEditor } from './TemplateChecklistEditor';
 import { SubProcessCustomFieldsEditor } from './SubProcessCustomFieldsEditor';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -24,10 +26,12 @@ import { toast } from 'sonner';
 
 interface SubProcessCardProps {
   subProcess: SubProcessWithTasks;
+  processId: string | null;
   onEdit: () => void;
   onDelete: () => void;
   onAddTask: (task: Omit<TaskTemplate, 'id' | 'user_id' | 'process_template_id' | 'sub_process_template_id' | 'created_at' | 'updated_at'>) => void;
   onDeleteTask: (taskId: string) => void;
+  onRefresh?: () => void;
   canManage?: boolean;
   onMandatoryChange?: (id: string, isMandatory: boolean) => void;
 }
@@ -43,18 +47,23 @@ const assignmentTypeLabels: Record<string, { label: string; icon: any }> = {
   manager: { label: 'Par manager', icon: Users },
   role: { label: 'Par poste', icon: UserCog },
   user: { label: 'Utilisateur', icon: User },
+  group: { label: 'Groupe', icon: Users },
 };
 
 export function SubProcessCard({ 
   subProcess, 
+  processId,
   onEdit, 
   onDelete, 
   onAddTask, 
   onDeleteTask,
+  onRefresh,
   canManage = false,
   onMandatoryChange
 }: SubProcessCardProps) {
   const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
+  const [isLinkTaskOpen, setIsLinkTaskOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<TaskTemplate | null>(null);
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [isExpanded, setIsExpanded] = useState(false);
   const [isMandatory, setIsMandatory] = useState(subProcess.is_mandatory ?? false);
@@ -212,7 +221,7 @@ export function SubProcessCard({
                                   <span className="text-sm truncate">{task.title}</span>
                                 </button>
                               </CollapsibleTrigger>
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1">
                                 <Badge 
                                   variant="outline" 
                                   className={`text-xs ${priorityColors[task.priority]}`}
@@ -220,14 +229,24 @@ export function SubProcessCard({
                                   {task.priority}
                                 </Badge>
                                 {canManage && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6"
-                                    onClick={() => onDeleteTask(task.id)}
-                                  >
-                                    <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
-                                  </Button>
+                                  <>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6"
+                                      onClick={(e) => { e.stopPropagation(); setEditingTask(task); }}
+                                    >
+                                      <Edit2 className="h-3 w-3 text-muted-foreground hover:text-primary" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6"
+                                      onClick={(e) => { e.stopPropagation(); onDeleteTask(task.id); }}
+                                    >
+                                      <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                                    </Button>
+                                  </>
                                 )}
                               </div>
                             </div>
@@ -243,15 +262,26 @@ export function SubProcessCard({
                   </div>
 
                   {canManage && (
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="w-full mt-3"
-                      onClick={() => setIsAddTaskOpen(true)}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Ajouter une tâche
-                    </Button>
+                    <div className="flex gap-2 mt-3">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex-1"
+                        onClick={() => setIsAddTaskOpen(true)}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Nouvelle tâche
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="flex-1"
+                        onClick={() => setIsLinkTaskOpen(true)}
+                      >
+                        <Link2 className="h-4 w-4 mr-2" />
+                        Existante
+                      </Button>
+                    </div>
                   )}
                 </TabsContent>
 
@@ -272,6 +302,22 @@ export function SubProcessCard({
         onClose={() => setIsAddTaskOpen(false)}
         onAdd={onAddTask}
         orderIndex={subProcess.task_templates.length}
+      />
+
+      <LinkExistingTaskDialog
+        open={isLinkTaskOpen}
+        onClose={() => setIsLinkTaskOpen(false)}
+        subProcessId={subProcess.id}
+        processId={processId}
+        existingTaskIds={subProcess.task_templates.map(t => t.id)}
+        onTasksLinked={() => onRefresh?.()}
+      />
+
+      <EditTaskTemplateDialog
+        task={editingTask}
+        open={!!editingTask}
+        onClose={() => setEditingTask(null)}
+        onSave={() => { setEditingTask(null); onRefresh?.(); }}
       />
     </>
   );
