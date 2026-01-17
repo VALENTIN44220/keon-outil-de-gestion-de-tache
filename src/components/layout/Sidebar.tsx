@@ -110,7 +110,7 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
     <aside 
       data-sidebar-position={isRightSide ? 'right' : 'left'}
       className={cn(
-        "fixed top-0 bg-sidebar/70 backdrop-blur-xl text-sidebar-foreground h-screen flex flex-col transition-all duration-300 ease-in-out z-40 border-sidebar-border shadow-lg",
+        "fixed top-0 bg-sidebar/50 backdrop-blur-xl text-sidebar-foreground h-screen flex flex-col transition-all duration-300 ease-in-out z-40 border-sidebar-border shadow-lg",
         collapsed ? "w-16" : "w-64",
         isRightSide ? "right-0 border-l" : "left-0 border-r"
       )}
