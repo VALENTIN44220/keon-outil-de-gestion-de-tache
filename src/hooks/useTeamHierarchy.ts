@@ -163,7 +163,12 @@ export function useTeamHierarchy() {
           relationToUser = 'peer';
         }
 
-        const directSubs = membersPool.filter(m => m.manager_id === member.id && !visited.has(m.id));
+        // Get direct subordinates - exclude self-references
+        const directSubs = membersPool.filter(m => 
+          m.manager_id === member.id && 
+          m.id !== member.id &&  // Exclude self-reference
+          !visited.has(m.id)
+        );
         
         return {
           ...member,
@@ -193,10 +198,17 @@ export function useTeamHierarchy() {
 
       console.log('Is admin:', isAdmin, 'Permission profile:', currentUserMember?.permission_profile_id);
       if (isAdmin) {
-        // Find all root members (those without manager or whose manager doesn't exist in the list)
+        // Find all root members:
+        // - Those without manager_id
+        // - Those whose manager_id doesn't exist in the list
+        // - Those who are their own manager (self-reference)
         const rootMembers = enrichedMembersTyped.filter(m => 
-          !m.manager_id || !enrichedMembersTyped.some(other => other.id === m.manager_id)
+          !m.manager_id || 
+          m.manager_id === m.id ||  // Self-reference = root
+          !enrichedMembersTyped.some(other => other.id === m.manager_id)
         );
+        
+        console.log('Root members found:', rootMembers.length, rootMembers.map(m => m.display_name));
         
         if (rootMembers.length > 0) {
           // Build a virtual root with all top-level members as subordinates
