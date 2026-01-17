@@ -353,27 +353,32 @@ async function checkOneLakeAccess(
 ): Promise<{ success: boolean; message: string }> {
   try {
     const baseUrl = 'https://onelake.dfs.fabric.microsoft.com';
-
-    // OneLake expects both WorkspaceId and ArtifactId in the path when using the DFS endpoint.
-    // Validate the Lakehouse "filesystem" itself.
-    const fsPath = `${baseUrl}/${workspaceId}/${lakehouseId}?resource=filesystem&recursive=false`;
+    const root = lakehouseRootUrl(baseUrl, workspaceId, lakehouseId);
+    
+    // Use ADLS Gen2 Path - List operation on the Files directory
+    // https://learn.microsoft.com/en-us/rest/api/storageservices/datalakestoragegen2/path/list
+    const listPath = `${root}/Files?resource=directory&recursive=false`;
     const headers = {
       'Authorization': `Bearer ${accessToken}`,
-      'x-ms-version': '2023-11-03',
-      'x-ms-date': new Date().toUTCString(),
+      'x-ms-version': '2021-06-08',
     };
 
-    const resp = await fetch(fsPath, {
+    console.log(`Checking OneLake access at: ${listPath}`);
+
+    const resp = await fetch(listPath, {
       method: 'GET',
       headers,
     });
 
-    if (!resp.ok) {
+    console.log(`OneLake response status: ${resp.status}`);
+
+    if (resp.ok || resp.status === 200) {
+      return { success: true, message: 'OneLake access verified' };
+    } else {
       const errorText = await resp.text();
+      console.error(`OneLake access error: ${errorText}`);
       return { success: false, message: `Access denied: ${resp.status} - ${errorText}` };
     }
-
-    return { success: true, message: 'OneLake access verified' };
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return { success: false, message: `Connection error: ${errorMessage}` };
