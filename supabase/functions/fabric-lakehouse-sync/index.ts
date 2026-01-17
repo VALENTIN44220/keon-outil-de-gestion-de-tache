@@ -96,7 +96,19 @@ async function getOneLakeToken(): Promise<string> {
 
 // Convert data to NDJSON format (suitable for Delta/Parquet ingestion)
 function toNDJSON(data: Record<string, unknown>[]): string {
-  return data.map(row => JSON.stringify(row)).join('\n');
+  return data.map((row) => JSON.stringify(row)).join('\n');
+}
+
+function isGuid(value: string): boolean {
+  return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(value);
+}
+
+function lakehouseRootUrl(baseUrl: string, workspaceId: string, lakehouseIdOrName: string): string {
+  // OneLake rule: if you reference by GUIDs, you must NOT include the item type extension (e.g. .Lakehouse)
+  if (isGuid(workspaceId) && isGuid(lakehouseIdOrName)) {
+    return `${baseUrl}/${workspaceId}/${lakehouseIdOrName}`;
+  }
+  return `${baseUrl}/${workspaceId}/${lakehouseIdOrName}.Lakehouse`;
 }
 
 // Create or replace file in OneLake
@@ -109,7 +121,8 @@ async function uploadToOneLake(
 ): Promise<void> {
   const baseUrl = 'https://onelake.dfs.fabric.microsoft.com';
   const filePath = `Tables/_staging/${tableName}/${tableName}_${new Date().toISOString().split('T')[0]}.json`;
-  const fullPath = `${baseUrl}/${workspaceId}/${lakehouseId}.Lakehouse/Files/${filePath}`;
+  const root = lakehouseRootUrl(baseUrl, workspaceId, lakehouseId);
+  const fullPath = `${root}/Files/${filePath}`;
 
   console.log(`Uploading to: ${fullPath}`);
 
@@ -176,7 +189,8 @@ async function uploadDeltaTable(
   schema: { name: string; type: string }[]
 ): Promise<number> {
   const baseUrl = 'https://onelake.dfs.fabric.microsoft.com';
-  const tableBasePath = `${baseUrl}/${workspaceId}/${lakehouseId}.Lakehouse/Tables/${tableName}`;
+  const root = lakehouseRootUrl(baseUrl, workspaceId, lakehouseId);
+  const tableBasePath = `${root}/Tables/${tableName}`;
 
   // Create directory structure
   const timestamp = Date.now();
@@ -339,21 +353,27 @@ async function checkOneLakeAccess(
 ): Promise<{ success: boolean; message: string }> {
   try {
     const baseUrl = 'https://onelake.dfs.fabric.microsoft.com';
-    const path = `${baseUrl}/${workspaceId}/${lakehouseId}.Lakehouse/Tables?resource=filesystem`;
-    
-    const response = await fetch(path, {
+
+    // OneLake expects both WorkspaceId and ArtifactId in the path when using the DFS endpoint.
+    // Validate the Lakehouse "filesystem" itself.
+    const fsPath = `${baseUrl}/${workspaceId}/${lakehouseId}?resource=filesystem&recursive=false`;
+    const headers = {
+      'Authorization': `Bearer ${accessToken}`,
+      'x-ms-version': '2023-11-03',
+      'x-ms-date': new Date().toUTCString(),
+    };
+
+    const resp = await fetch(fsPath, {
       method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-      },
+      headers,
     });
 
-    if (response.ok) {
-      return { success: true, message: 'OneLake access verified' };
-    } else {
-      const errorText = await response.text();
-      return { success: false, message: `Access denied: ${response.status} - ${errorText}` };
+    if (!resp.ok) {
+      const errorText = await resp.text();
+      return { success: false, message: `Access denied: ${resp.status} - ${errorText}` };
     }
+
+    return { success: true, message: 'OneLake access verified' };
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return { success: false, message: `Connection error: ${errorMessage}` };
