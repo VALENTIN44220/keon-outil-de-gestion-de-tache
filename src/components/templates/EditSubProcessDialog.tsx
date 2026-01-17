@@ -5,12 +5,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { SubProcessTemplate, TemplateVisibility, AssignmentType, ASSIGNMENT_TYPE_LABELS } from '@/types/template';
 import { VisibilitySelect } from './VisibilitySelect';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
-
 interface EditSubProcessDialogProps {
   subProcess: SubProcessTemplate | null;
   open: boolean;
@@ -52,6 +52,7 @@ export function EditSubProcessDialog({ subProcess, open, onClose, onSave }: Edit
   const [targetManagerId, setTargetManagerId] = useState<string>('');
   const [targetGroupId, setTargetGroupId] = useState<string>('');
   const [visibilityLevel, setVisibilityLevel] = useState<TemplateVisibility>('public');
+  const [isMandatory, setIsMandatory] = useState(true);
   
   const [departments, setDepartments] = useState<Department[]>([]);
   const [jobTitles, setJobTitles] = useState<JobTitle[]>([]);
@@ -79,6 +80,7 @@ export function EditSubProcessDialog({ subProcess, open, onClose, onSave }: Edit
       setTargetManagerId(subProcess.target_manager_id || '');
       setTargetGroupId(subProcess.target_group_id || '');
       setVisibilityLevel(subProcess.visibility_level || 'public');
+      setIsMandatory(subProcess.is_mandatory !== false);
     }
   }, [subProcess]);
 
@@ -114,6 +116,7 @@ export function EditSubProcessDialog({ subProcess, open, onClose, onSave }: Edit
         target_assignee_id: targetAssigneeId || null,
         target_manager_id: assignmentType === 'manager' ? (targetManagerId || null) : null,
         target_group_id: assignmentType === 'group' ? (targetGroupId || null) : null,
+        is_mandatory: isMandatory,
       };
 
       if (canChangeVisibility) {
@@ -157,6 +160,17 @@ export function EditSubProcessDialog({ subProcess, open, onClose, onSave }: Edit
               rows={2}
               maxLength={500}
             />
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="editSpMandatory"
+              checked={isMandatory}
+              onCheckedChange={(checked) => setIsMandatory(checked === true)}
+            />
+            <Label htmlFor="editSpMandatory" className="cursor-pointer">
+              Sous-processus obligatoire
+            </Label>
           </div>
 
           {canChangeVisibility && (
