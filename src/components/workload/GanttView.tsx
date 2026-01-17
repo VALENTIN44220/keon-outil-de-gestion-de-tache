@@ -393,45 +393,68 @@ export function GanttView({
                             Congé
                           </Badge>
                         )}
-                        {day.morning.slot && !day.morning.isHoliday && !day.morning.isLeave && (
-                          <ContextMenu>
-                            <ContextMenuTrigger asChild>
-                              <div
-                                draggable
-                                onDragStart={(e) => handleDragStart(e, day.morning.slot!)}
-                                className={cn(
-                                  "w-full h-full rounded text-[10px] p-0.5 cursor-pointer hover:opacity-80",
-                                  getPriorityColor(day.morning.slot.task?.priority || 'medium'),
-                                  "text-white"
-                                )}
-                              >
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span className="truncate block">{day.morning.slot.task?.title}</span>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p>{day.morning.slot.task?.title}</p>
-                                    <p className="text-xs text-muted-foreground">Clic droit pour options</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </div>
-                            </ContextMenuTrigger>
-                            <ContextMenuContent>
-                              <ContextMenuItem onClick={() => handleSegmentRequest(day.morning.slot!, member.memberId)}>
-                                <Scissors className="h-4 w-4 mr-2" />
-                                Segmenter
-                              </ContextMenuItem>
-                              <ContextMenuSeparator />
-                              <ContextMenuItem 
-                                onClick={() => handleSlotDelete(day.morning.slot!)}
-                                className="text-destructive"
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Supprimer
-                              </ContextMenuItem>
-                            </ContextMenuContent>
-                          </ContextMenu>
-                        )}
+                        {day.morning.slot && !day.morning.isHoliday && !day.morning.isLeave && (() => {
+                          const slot = day.morning.slot!;
+                          const taskDuration = getTaskDuration ? getTaskDuration(slot.task_id) : null;
+                          const progress = getTaskProgress ? getTaskProgress(slot.task_id) : null;
+                          const progressPercent = progress && progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0;
+                          // Hide progress for tasks <= 1 day (2 half-days)
+                          const showProgress = taskDuration && taskDuration > 2 && progress && progress.total > 0;
+                          
+                          return (
+                            <ContextMenu>
+                              <ContextMenuTrigger asChild>
+                                <div
+                                  draggable
+                                  onDragStart={(e) => handleDragStart(e, slot)}
+                                  className={cn(
+                                    "w-full h-full rounded-md cursor-pointer hover:opacity-90 transition-all shadow-sm",
+                                    getPriorityColor(slot.task?.priority || 'medium'),
+                                    "text-white overflow-hidden"
+                                  )}
+                                >
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <div className="h-full flex flex-col justify-between p-1">
+                                        <span className="text-[9px] font-medium truncate leading-tight">{slot.task?.title}</span>
+                                        {showProgress && (
+                                          <div className="mt-auto">
+                                            <div className="h-1 bg-white/30 rounded-full overflow-hidden">
+                                              <div 
+                                                className="h-full bg-white rounded-full transition-all"
+                                                style={{ width: `${progressPercent}%` }}
+                                              />
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p className="font-medium">{slot.task?.title}</p>
+                                      {taskDuration && <p className="text-xs text-muted-foreground">Durée: {taskDuration / 2} jour{taskDuration > 2 ? 's' : ''}</p>}
+                                      {progress && progress.total > 0 && <p className="text-xs text-muted-foreground">Avancement: {progressPercent}%</p>}
+                                      <p className="text-xs text-muted-foreground mt-1">Clic droit pour options</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </div>
+                              </ContextMenuTrigger>
+                              <ContextMenuContent>
+                                <ContextMenuItem onClick={() => handleSegmentRequest(slot, member.memberId)}>
+                                  <Scissors className="h-4 w-4 mr-2" />
+                                  Segmenter
+                                </ContextMenuItem>
+                                <ContextMenuSeparator />
+                                <ContextMenuItem 
+                                  onClick={() => handleSlotDelete(slot)}
+                                  className="text-destructive"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Supprimer
+                                </ContextMenuItem>
+                              </ContextMenuContent>
+                            </ContextMenu>
+                          );
+                        })()}
                       </div>
 
                       {/* Afternoon */}
@@ -457,45 +480,68 @@ export function GanttView({
                             Congé
                           </Badge>
                         )}
-                        {day.afternoon.slot && !day.afternoon.isHoliday && !day.afternoon.isLeave && (
-                          <ContextMenu>
-                            <ContextMenuTrigger asChild>
-                              <div
-                                draggable
-                                onDragStart={(e) => handleDragStart(e, day.afternoon.slot!)}
-                                className={cn(
-                                  "w-full h-full rounded text-[10px] p-0.5 cursor-pointer hover:opacity-80",
-                                  getPriorityColor(day.afternoon.slot.task?.priority || 'medium'),
-                                  "text-white"
-                                )}
-                              >
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span className="truncate block">{day.afternoon.slot.task?.title}</span>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p>{day.afternoon.slot.task?.title}</p>
-                                    <p className="text-xs text-muted-foreground">Clic droit pour options</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </div>
-                            </ContextMenuTrigger>
-                            <ContextMenuContent>
-                              <ContextMenuItem onClick={() => handleSegmentRequest(day.afternoon.slot!, member.memberId)}>
-                                <Scissors className="h-4 w-4 mr-2" />
-                                Segmenter
-                              </ContextMenuItem>
-                              <ContextMenuSeparator />
-                              <ContextMenuItem 
-                                onClick={() => handleSlotDelete(day.afternoon.slot!)}
-                                className="text-destructive"
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Supprimer
-                              </ContextMenuItem>
-                            </ContextMenuContent>
-                          </ContextMenu>
-                        )}
+                        {day.afternoon.slot && !day.afternoon.isHoliday && !day.afternoon.isLeave && (() => {
+                          const slot = day.afternoon.slot!;
+                          const taskDuration = getTaskDuration ? getTaskDuration(slot.task_id) : null;
+                          const progress = getTaskProgress ? getTaskProgress(slot.task_id) : null;
+                          const progressPercent = progress && progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0;
+                          // Hide progress for tasks <= 1 day (2 half-days)
+                          const showProgress = taskDuration && taskDuration > 2 && progress && progress.total > 0;
+                          
+                          return (
+                            <ContextMenu>
+                              <ContextMenuTrigger asChild>
+                                <div
+                                  draggable
+                                  onDragStart={(e) => handleDragStart(e, slot)}
+                                  className={cn(
+                                    "w-full h-full rounded-md cursor-pointer hover:opacity-90 transition-all shadow-sm",
+                                    getPriorityColor(slot.task?.priority || 'medium'),
+                                    "text-white overflow-hidden"
+                                  )}
+                                >
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <div className="h-full flex flex-col justify-between p-1">
+                                        <span className="text-[9px] font-medium truncate leading-tight">{slot.task?.title}</span>
+                                        {showProgress && (
+                                          <div className="mt-auto">
+                                            <div className="h-1 bg-white/30 rounded-full overflow-hidden">
+                                              <div 
+                                                className="h-full bg-white rounded-full transition-all"
+                                                style={{ width: `${progressPercent}%` }}
+                                              />
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p className="font-medium">{slot.task?.title}</p>
+                                      {taskDuration && <p className="text-xs text-muted-foreground">Durée: {taskDuration / 2} jour{taskDuration > 2 ? 's' : ''}</p>}
+                                      {progress && progress.total > 0 && <p className="text-xs text-muted-foreground">Avancement: {progressPercent}%</p>}
+                                      <p className="text-xs text-muted-foreground mt-1">Clic droit pour options</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </div>
+                              </ContextMenuTrigger>
+                              <ContextMenuContent>
+                                <ContextMenuItem onClick={() => handleSegmentRequest(slot, member.memberId)}>
+                                  <Scissors className="h-4 w-4 mr-2" />
+                                  Segmenter
+                                </ContextMenuItem>
+                                <ContextMenuSeparator />
+                                <ContextMenuItem 
+                                  onClick={() => handleSlotDelete(slot)}
+                                  className="text-destructive"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Supprimer
+                                </ContextMenuItem>
+                              </ContextMenuContent>
+                            </ContextMenu>
+                          );
+                        })()}
                       </div>
                     </div>
                   );
