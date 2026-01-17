@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { SubProcessTemplate, TemplateVisibility } from '@/types/template';
+import { SubProcessTemplate, TemplateVisibility, AssignmentType, ASSIGNMENT_TYPE_LABELS } from '@/types/template';
 import { VisibilitySelect } from './VisibilitySelect';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -35,25 +35,31 @@ interface Profile {
   display_name: string | null;
 }
 
+interface CollaboratorGroup {
+  id: string;
+  name: string;
+}
+
 export function EditSubProcessDialog({ subProcess, open, onClose, onSave }: EditSubProcessDialogProps) {
   const { user } = useAuth();
   const { isAdmin } = useUserRole();
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [assignmentType, setAssignmentType] = useState<'manager' | 'user' | 'role'>('manager');
+  const [assignmentType, setAssignmentType] = useState<AssignmentType>('manager');
   const [targetDepartmentId, setTargetDepartmentId] = useState<string>('');
   const [targetJobTitleId, setTargetJobTitleId] = useState<string>('');
   const [targetAssigneeId, setTargetAssigneeId] = useState<string>('');
   const [targetManagerId, setTargetManagerId] = useState<string>('');
+  const [targetGroupId, setTargetGroupId] = useState<string>('');
   const [visibilityLevel, setVisibilityLevel] = useState<TemplateVisibility>('public');
   
   const [departments, setDepartments] = useState<Department[]>([]);
   const [jobTitles, setJobTitles] = useState<JobTitle[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [managers, setManagers] = useState<Profile[]>([]);
+  const [groups, setGroups] = useState<CollaboratorGroup[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Only creator or admin can change visibility
   const canChangeVisibility = subProcess && (subProcess.user_id === user?.id || isAdmin);
 
   useEffect(() => {
@@ -71,15 +77,17 @@ export function EditSubProcessDialog({ subProcess, open, onClose, onSave }: Edit
       setTargetJobTitleId(subProcess.target_job_title_id || '');
       setTargetAssigneeId(subProcess.target_assignee_id || '');
       setTargetManagerId(subProcess.target_manager_id || '');
+      setTargetGroupId(subProcess.target_group_id || '');
       setVisibilityLevel(subProcess.visibility_level || 'public');
     }
   }, [subProcess]);
 
   const fetchReferenceData = async () => {
-    const [deptRes, jobRes, profileRes] = await Promise.all([
+    const [deptRes, jobRes, profileRes, groupRes] = await Promise.all([
       supabase.from('departments').select('id, name, company_id, companies(name)').order('name'),
       supabase.from('job_titles').select('id, name').order('name'),
       supabase.from('profiles').select('id, display_name').order('display_name'),
+      supabase.from('collaborator_groups').select('id, name').order('name'),
     ]);
     
     if (deptRes.data) setDepartments(deptRes.data);
@@ -88,6 +96,7 @@ export function EditSubProcessDialog({ subProcess, open, onClose, onSave }: Edit
       setProfiles(profileRes.data);
       setManagers(profileRes.data);
     }
+    if (groupRes.data) setGroups(groupRes.data);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -104,6 +113,7 @@ export function EditSubProcessDialog({ subProcess, open, onClose, onSave }: Edit
         target_job_title_id: targetJobTitleId || null,
         target_assignee_id: targetAssigneeId || null,
         target_manager_id: assignmentType === 'manager' ? (targetManagerId || null) : null,
+        target_group_id: assignmentType === 'group' ? (targetGroupId || null) : null,
       };
 
       if (canChangeVisibility) {
@@ -158,14 +168,14 @@ export function EditSubProcessDialog({ subProcess, open, onClose, onSave }: Edit
 
           <div className="space-y-2">
             <Label>Type d'affectation *</Label>
-            <Select value={assignmentType} onValueChange={(v) => setAssignmentType(v as 'manager' | 'user' | 'role')}>
+            <Select value={assignmentType} onValueChange={(v) => setAssignmentType(v as AssignmentType)}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="manager">Par le manager du service</SelectItem>
-                <SelectItem value="role">Par poste/fonction</SelectItem>
-                <SelectItem value="user">Utilisateur spécifique</SelectItem>
+                {Object.entries(ASSIGNMENT_TYPE_LABELS).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -180,11 +190,11 @@ export function EditSubProcessDialog({ subProcess, open, onClose, onSave }: Edit
                 <SelectItem value="__none__">Aucun</SelectItem>
                 {departments.map(dept => (
                   <SelectItem key={dept.id} value={dept.id}>
-                    {dept.name}{dept.companies?.name ? ` (${dept.companies.name})` : ''}
+                    {dept.name} {dept.companies?.name ? `(${dept.companies.name})` : ''}
                   </SelectItem>
                 ))}
               </SelectContent>
-          </Select>
+            </Select>
           </div>
 
           {assignmentType === 'manager' && (
@@ -237,6 +247,23 @@ export function EditSubProcessDialog({ subProcess, open, onClose, onSave }: Edit
                     <SelectItem key={p.id} value={p.id}>
                       {p.display_name || 'Sans nom'}
                     </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {assignmentType === 'group' && (
+            <div className="space-y-2">
+              <Label>Groupe cible</Label>
+              <Select value={targetGroupId || '__none__'} onValueChange={(v) => setTargetGroupId(v === '__none__' ? '' : v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner un groupe" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Aucun</SelectItem>
+                  {groups.map(g => (
+                    <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

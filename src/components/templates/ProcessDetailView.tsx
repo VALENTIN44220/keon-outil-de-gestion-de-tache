@@ -167,10 +167,12 @@ export function ProcessDetailView({
                     <SubProcessCard
                       key={sp.id}
                       subProcess={sp}
+                      processId={process.id}
                       onEdit={() => setEditingSubProcess(sp)}
                       onDelete={() => deleteSubProcess(sp.id)}
                       onAddTask={(task) => addTaskToSubProcess(sp.id, task)}
                       onDeleteTask={(taskId) => deleteTaskFromSubProcess(sp.id, taskId)}
+                      onRefresh={fetchSubProcesses}
                       canManage={Boolean(sp.can_manage)}
                     />
                   ))
