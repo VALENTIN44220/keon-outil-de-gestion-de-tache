@@ -2355,6 +2355,24 @@ export type Database = {
       current_company_id: { Args: never; Returns: string }
       current_department_id: { Args: never; Returns: string }
       current_profile_id: { Args: never; Returns: string }
+      get_all_profiles_for_hierarchy: {
+        Args: never
+        Returns: {
+          avatar_url: string
+          company: string
+          company_id: string
+          department: string
+          department_id: string
+          display_name: string
+          hierarchy_level_id: string
+          id: string
+          job_title: string
+          job_title_id: string
+          manager_id: string
+          permission_profile_id: string
+          user_id: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
