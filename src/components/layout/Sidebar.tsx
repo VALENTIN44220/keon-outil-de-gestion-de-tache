@@ -133,23 +133,21 @@ export function Sidebar({
     return name.slice(0, 2).toUpperCase();
   };
 
-// Handle menu item click - navigate and update view
+// Handle menu item click - navigate and update view, keep sidebar state unchanged
   const handleMenuClick = (itemId: string, path: string) => {
     // Update the active view
     onViewChange(itemId);
     
-    // Always navigate to the path - this ensures proper page transition
-    // For items with path '/', navigate to home page if not already there
+    // Navigate to the appropriate path
     const currentPath = window.location.pathname;
     if (path === '/') {
-      // Always navigate to home for views that live on the index page
       if (currentPath !== '/') {
         navigate('/');
       }
     } else if (currentPath !== path) {
       navigate(path);
     }
-    // Do NOT auto-collapse - user prefers sidebar to stay open when expanded
+    // Sidebar stays in its current state (collapsed or expanded)
   };
 
   return (
