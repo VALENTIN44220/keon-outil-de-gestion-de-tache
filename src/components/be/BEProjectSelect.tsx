@@ -50,7 +50,7 @@ export function BEProjectSelect({ value, onChange, onProjectCreated }: BEProject
       let query = supabase
         .from('be_projects')
         .select('*')
-        .eq('status', 'active')
+        .in('status', ['active', 'actif'])
         .order('nom_projet');
 
       if (searchQuery) {
