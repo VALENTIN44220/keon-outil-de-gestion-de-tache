@@ -32,9 +32,9 @@ export function Dashboard({ stats, recentTasks, onStatusChange, onDelete, global
     .slice(0, 3);
 
   return (
-    <div className="space-y-6">
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="space-y-6 animate-fade-in">
+      {/* Stats Grid with colorful cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
         <StatsCard
           title="Total des tâches"
           value={stats.total}
@@ -81,32 +81,33 @@ export function Dashboard({ stats, recentTasks, onStatusChange, onDelete, global
 
       {/* Main content */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Progress section */}
-        <div className="bg-card rounded-xl p-6 shadow-card">
-          <h2 className="text-lg font-semibold text-foreground mb-4">
+        {/* Progress section - colorful modern style */}
+        <div className="bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-800 rounded-2xl p-6 shadow-lg border border-slate-100 dark:border-slate-700">
+          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+            <div className="w-2 h-6 bg-gradient-to-b from-blue-500 to-cyan-400 rounded-full" />
             Progression globale
           </h2>
           <div className="flex flex-col items-center">
-            <ProgressRing progress={stats.completionRate} size={140} />
+            <ProgressRing progress={stats.completionRate} size={160} />
             <p className="text-sm text-muted-foreground mt-4 text-center">
-              {stats.done} tâches terminées sur {stats.total}
+              <span className="font-semibold text-foreground">{stats.done}</span> tâches terminées sur <span className="font-semibold text-foreground">{stats.total}</span>
             </p>
           </div>
           
-          {/* Checklist progress */}
+          {/* Checklist progress - gradient style */}
           {globalStats && globalStats.total > 0 && (
-            <div className="mt-6 p-4 bg-muted/50 rounded-lg">
+            <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-100 dark:border-blue-800">
               <div className="flex items-center gap-2 mb-2">
-                <ListChecks className="w-4 h-4 text-primary" />
-                <span className="text-sm font-medium">Sous-actions</span>
+                <ListChecks className="w-5 h-5 text-blue-600" />
+                <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">Sous-actions</span>
               </div>
               <div className="flex items-center justify-between text-sm mb-2">
                 <span className="text-muted-foreground">Avancement global</span>
-                <span className="font-medium">{globalProgress}%</span>
+                <span className="font-bold text-blue-600">{globalProgress}%</span>
               </div>
-              <div className="h-2 bg-muted rounded-full overflow-hidden">
+              <div className="h-3 bg-white dark:bg-slate-700 rounded-full overflow-hidden shadow-inner">
                 <div 
-                  className="h-full bg-primary rounded-full transition-all duration-500"
+                  className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full transition-all duration-700 ease-out"
                   style={{ width: `${globalProgress}%` }}
                 />
               </div>
@@ -116,40 +117,54 @@ export function Dashboard({ stats, recentTasks, onStatusChange, onDelete, global
             </div>
           )}
           
-          {/* Progress bars by status */}
-          <div className="mt-6 space-y-3">
-            <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span className="text-muted-foreground">À faire</span>
-                <span className="font-medium">{stats.todo}</span>
+          {/* Progress bars by status - colorful pills */}
+          <div className="mt-6 space-y-4">
+            {/* TODO */}
+            <div className="group">
+              <div className="flex justify-between text-sm mb-1.5">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-gradient-to-r from-amber-400 to-orange-400 shadow-sm" />
+                  <span className="text-muted-foreground group-hover:text-foreground transition-colors">À faire</span>
+                </div>
+                <span className="font-bold text-amber-600">{stats.todo}</span>
               </div>
-              <div className="h-2 bg-muted rounded-full overflow-hidden">
+              <div className="h-2.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
                 <div 
-                  className="h-full bg-warning rounded-full transition-all duration-500"
+                  className="h-full bg-gradient-to-r from-amber-400 to-orange-400 rounded-full transition-all duration-700 ease-out"
                   style={{ width: `${stats.total > 0 ? (stats.todo / stats.total) * 100 : 0}%` }}
                 />
               </div>
             </div>
-            <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span className="text-muted-foreground">En cours</span>
-                <span className="font-medium">{stats.inProgress}</span>
+            
+            {/* IN PROGRESS */}
+            <div className="group">
+              <div className="flex justify-between text-sm mb-1.5">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-gradient-to-r from-pink-400 to-purple-500 shadow-sm" />
+                  <span className="text-muted-foreground group-hover:text-foreground transition-colors">En cours</span>
+                </div>
+                <span className="font-bold text-purple-600">{stats.inProgress}</span>
               </div>
-              <div className="h-2 bg-muted rounded-full overflow-hidden">
+              <div className="h-2.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
                 <div 
-                  className="h-full bg-info rounded-full transition-all duration-500"
+                  className="h-full bg-gradient-to-r from-pink-400 to-purple-500 rounded-full transition-all duration-700 ease-out"
                   style={{ width: `${stats.total > 0 ? (stats.inProgress / stats.total) * 100 : 0}%` }}
                 />
               </div>
             </div>
-            <div>
-              <div className="flex justify-between text-sm mb-1">
-                <span className="text-muted-foreground">Terminées</span>
-                <span className="font-medium">{stats.done}</span>
+            
+            {/* DONE */}
+            <div className="group">
+              <div className="flex justify-between text-sm mb-1.5">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-gradient-to-r from-emerald-400 to-teal-400 shadow-sm" />
+                  <span className="text-muted-foreground group-hover:text-foreground transition-colors">Terminées</span>
+                </div>
+                <span className="font-bold text-emerald-600">{stats.done}</span>
               </div>
-              <div className="h-2 bg-muted rounded-full overflow-hidden">
+              <div className="h-2.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
                 <div 
-                  className="h-full bg-success rounded-full transition-all duration-500"
+                  className="h-full bg-gradient-to-r from-emerald-400 to-teal-400 rounded-full transition-all duration-700 ease-out"
                   style={{ width: `${stats.total > 0 ? (stats.done / stats.total) * 100 : 0}%` }}
                 />
               </div>
@@ -157,32 +172,42 @@ export function Dashboard({ stats, recentTasks, onStatusChange, onDelete, global
           </div>
         </div>
 
-        {/* Urgent tasks */}
-        <div className="lg:col-span-2 bg-card rounded-xl p-6 shadow-card">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-foreground">
+        {/* Urgent tasks - modern card style */}
+        <div className="lg:col-span-2 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-800 rounded-2xl p-6 shadow-lg border border-slate-100 dark:border-slate-700">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+              <div className="w-2 h-6 bg-gradient-to-b from-red-500 to-orange-400 rounded-full" />
               Tâches prioritaires
             </h2>
-            <TrendingUp className="w-5 h-5 text-destructive" />
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50 dark:bg-red-900/20 rounded-full">
+              <TrendingUp className="w-4 h-4 text-red-500" />
+              <span className="text-xs font-medium text-red-600 dark:text-red-400">Urgent</span>
+            </div>
           </div>
           
           {urgentTasks.length > 0 ? (
             <div className="space-y-3">
-              {urgentTasks.map((task) => (
-                <TaskCard 
-                  key={task.id} 
-                  task={task} 
-                  onStatusChange={onStatusChange}
-                  onDelete={onDelete}
-                  taskProgress={progressMap?.[task.id]}
-                />
+              {urgentTasks.map((task, index) => (
+                <div key={task.id} className="animate-fade-in" style={{ animationDelay: `${index * 100}ms` }}>
+                  <TaskCard 
+                    task={task} 
+                    onStatusChange={onStatusChange}
+                    onDelete={onDelete}
+                    taskProgress={progressMap?.[task.id]}
+                  />
+                </div>
               ))}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <CheckCircle2 className="w-12 h-12 text-success mb-3" />
-              <p className="text-muted-foreground">
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="w-16 h-16 bg-gradient-to-br from-emerald-400 to-teal-400 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
+                <CheckCircle2 className="w-8 h-8 text-white" />
+              </div>
+              <p className="text-muted-foreground font-medium">
                 Aucune tâche urgente en attente
+              </p>
+              <p className="text-sm text-muted-foreground/70 mt-1">
+                Vous êtes à jour ! 🎉
               </p>
             </div>
           )}

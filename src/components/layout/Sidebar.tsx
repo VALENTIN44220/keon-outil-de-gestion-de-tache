@@ -133,14 +133,13 @@ export function Sidebar({
     return name.slice(0, 2).toUpperCase();
   };
 
-  // Handle menu item click - collapse sidebar and navigate
+  // Handle menu item click - navigate but keep sidebar state
   const handleMenuClick = (itemId: string, path: string) => {
-    onViewChange(itemId);
+    // Navigate to the correct path first
     navigate(path);
-    // Auto-collapse sidebar on click (desktop only)
-    if (!isMobile) {
-      setManualCollapsed(true);
-    }
+    // Then update the active view
+    onViewChange(itemId);
+    // Do NOT auto-collapse - user prefers sidebar to stay open when expanded
   };
 
   return (
