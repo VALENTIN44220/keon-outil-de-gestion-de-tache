@@ -51,7 +51,8 @@ const statusOptions: { value: TaskStatus; label: string }[] = [
   { value: 'todo', label: 'À faire' },
   { value: 'in-progress', label: 'En cours' },
   { value: 'done', label: 'Terminé' },
-  { value: 'pending-validation', label: 'En attente de validation' },
+  { value: 'pending_validation_1', label: 'En attente validation N1' },
+  { value: 'pending_validation_2', label: 'En attente validation N2' },
   { value: 'validated', label: 'Validé' },
   { value: 'refused', label: 'Refusé' },
 ];

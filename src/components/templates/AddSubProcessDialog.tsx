@@ -98,6 +98,7 @@ export function AddSubProcessDialog({ open, onClose, onAdd, orderIndex }: AddSub
         target_manager_id: assignmentType === 'manager' ? (targetManagerId || null) : null,
         order_index: orderIndex,
         is_shared: true,
+        is_mandatory: false,
         visibility_level: visibilityLevel,
         creator_company_id: profile?.company_id || null,
         creator_department_id: profile?.department_id || null,

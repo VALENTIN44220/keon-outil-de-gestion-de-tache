@@ -1,15 +1,21 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { TaskTemplate, TemplateVisibility } from '@/types/template';
+import { TaskTemplate, TemplateVisibility, ValidationLevelType, VALIDATION_TYPE_LABELS } from '@/types/template';
 import { CategorySelect } from './CategorySelect';
 import { VisibilitySelect } from './VisibilitySelect';
 import { useCategories } from '@/hooks/useCategories';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+
+interface Profile {
+  id: string;
+  display_name: string | null;
+}
 
 interface AddTaskTemplateDialogProps {
   open: boolean;
@@ -27,8 +33,29 @@ export function AddTaskTemplateDialog({ open, onClose, onAdd, orderIndex }: AddT
   const [subcategoryId, setSubcategoryId] = useState<string | null>(null);
   const [defaultDurationDays, setDefaultDurationDays] = useState(1);
   const [visibilityLevel, setVisibilityLevel] = useState<TemplateVisibility>('public');
+  
+  // Validation fields
+  const [validationLevel1, setValidationLevel1] = useState<ValidationLevelType>('none');
+  const [validationLevel2, setValidationLevel2] = useState<ValidationLevelType>('none');
+  const [validatorLevel1Id, setValidatorLevel1Id] = useState<string | null>(null);
+  const [validatorLevel2Id, setValidatorLevel2Id] = useState<string | null>(null);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
 
   const { categories, addCategory, addSubcategory } = useCategories();
+
+  useEffect(() => {
+    if (open) {
+      fetchProfiles();
+    }
+  }, [open]);
+
+  const fetchProfiles = async () => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, display_name')
+      .order('display_name');
+    if (data) setProfiles(data);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,6 +78,10 @@ export function AddTaskTemplateDialog({ open, onClose, onAdd, orderIndex }: AddT
       visibility_level: visibilityLevel,
       creator_company_id: profile?.company_id || null,
       creator_department_id: profile?.department_id || null,
+      validation_level_1: validationLevel1,
+      validation_level_2: validationLevel2,
+      validator_level_1_id: validationLevel1 === 'free' ? validatorLevel1Id : null,
+      validator_level_2_id: validationLevel2 === 'free' ? validatorLevel2Id : null,
     });
 
     resetForm();
@@ -65,6 +96,10 @@ export function AddTaskTemplateDialog({ open, onClose, onAdd, orderIndex }: AddT
     setSubcategoryId(null);
     setDefaultDurationDays(7);
     setVisibilityLevel('public');
+    setValidationLevel1('none');
+    setValidationLevel2('none');
+    setValidatorLevel1Id(null);
+    setValidatorLevel2Id(null);
   };
 
   const handleAddCategory = async (name: string) => {
@@ -156,6 +191,74 @@ export function AddTaskTemplateDialog({ open, onClose, onAdd, orderIndex }: AddT
             value={visibilityLevel}
             onChange={setVisibilityLevel}
           />
+
+          {/* Validation Level 1 */}
+          <div className="space-y-2">
+            <Label>Validation Niveau 1</Label>
+            <Select value={validationLevel1} onValueChange={(v) => setValidationLevel1(v as ValidationLevelType)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(VALIDATION_TYPE_LABELS).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {validationLevel1 === 'free' && (
+            <div className="space-y-2">
+              <Label>Validateur Niveau 1</Label>
+              <Select value={validatorLevel1Id || '__none__'} onValueChange={(v) => setValidatorLevel1Id(v === '__none__' ? null : v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner un validateur" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Non défini</SelectItem>
+                  {profiles.map(p => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.display_name || 'Sans nom'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Validation Level 2 */}
+          <div className="space-y-2">
+            <Label>Validation Niveau 2</Label>
+            <Select value={validationLevel2} onValueChange={(v) => setValidationLevel2(v as ValidationLevelType)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(VALIDATION_TYPE_LABELS).map(([value, label]) => (
+                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {validationLevel2 === 'free' && (
+            <div className="space-y-2">
+              <Label>Validateur Niveau 2</Label>
+              <Select value={validatorLevel2Id || '__none__'} onValueChange={(v) => setValidatorLevel2Id(v === '__none__' ? null : v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner un validateur" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Non défini</SelectItem>
+                  {profiles.map(p => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.display_name || 'Sans nom'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
