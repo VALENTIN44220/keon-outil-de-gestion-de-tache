@@ -77,7 +77,10 @@ export function Sidebar({
   onViewChange
 }: SidebarProps) {
   const isMobile = useIsMobile();
-  const [manualCollapsed, setManualCollapsed] = useState(false);
+  const [manualCollapsed, setManualCollapsed] = useState(() => {
+    const saved = localStorage.getItem('sidebar-collapsed');
+    return saved === 'true';
+  });
   const [permissionProfileName, setPermissionProfileName] = useState<string | null>(null);
   const [isRightSide, setIsRightSide] = useState(() => {
     const saved = localStorage.getItem('sidebar-position');
@@ -90,6 +93,13 @@ export function Sidebar({
 
   // On mobile/tablet, always collapsed. On desktop, use manual state
   const collapsed = isMobile || manualCollapsed;
+
+  // Persist collapsed preference (desktop only)
+  useEffect(() => {
+    if (!isMobile) {
+      localStorage.setItem('sidebar-collapsed', manualCollapsed ? 'true' : 'false');
+    }
+  }, [manualCollapsed, isMobile]);
 
   // Persist sidebar position preference
   const toggleSidebarPosition = () => {
