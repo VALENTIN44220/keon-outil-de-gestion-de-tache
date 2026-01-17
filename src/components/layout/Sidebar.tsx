@@ -11,6 +11,7 @@ import {
   FolderOpen,
   CalendarClock,
   FileText,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
@@ -46,6 +47,10 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
   const isMobile = useIsMobile();
   const [manualCollapsed, setManualCollapsed] = useState(false);
   const [permissionProfileName, setPermissionProfileName] = useState<string | null>(null);
+  const [isRightSide, setIsRightSide] = useState(() => {
+    const saved = localStorage.getItem('sidebar-position');
+    return saved === 'right';
+  });
   const navigate = useNavigate();
   const { isAdmin } = useUserRole();
   const { canViewBEProjects } = useUserPermissions();
@@ -53,6 +58,13 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
   
   // On mobile/tablet, always collapsed. On desktop, use manual state
   const collapsed = isMobile || manualCollapsed;
+
+  // Persist sidebar position preference
+  const toggleSidebarPosition = () => {
+    const newPosition = !isRightSide;
+    setIsRightSide(newPosition);
+    localStorage.setItem('sidebar-position', newPosition ? 'right' : 'left');
+  };
 
   // Build menu items based on permissions
   const menuItems = [
@@ -96,9 +108,11 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
 
   return (
     <aside 
+      data-sidebar-position={isRightSide ? 'right' : 'left'}
       className={cn(
-        "bg-sidebar text-sidebar-foreground h-screen flex flex-col transition-all duration-300 ease-in-out flex-shrink-0",
-        collapsed ? "w-16" : "w-64"
+        "bg-sidebar/80 backdrop-blur-md text-sidebar-foreground h-screen flex flex-col transition-all duration-300 ease-in-out flex-shrink-0 border-sidebar-border",
+        collapsed ? "w-16" : "w-64",
+        isRightSide ? "order-last border-l" : "order-first border-r"
       )}
     >
       {/* Logo KEON */}
@@ -110,16 +124,25 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
         )}
         {/* Hide collapse button on mobile, show only on desktop */}
         {!isMobile && (
-          <button
-            onClick={() => setManualCollapsed(!manualCollapsed)}
-            className="p-1.5 rounded-lg hover:bg-sidebar-accent transition-colors"
-          >
-            {collapsed ? (
-              <ChevronRight className="w-5 h-5" />
-            ) : (
-              <ChevronLeft className="w-5 h-5" />
-            )}
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={toggleSidebarPosition}
+              className="p-1.5 rounded-lg hover:bg-sidebar-accent transition-colors"
+              title={isRightSide ? "Déplacer à gauche" : "Déplacer à droite"}
+            >
+              <ArrowLeftRight className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setManualCollapsed(!manualCollapsed)}
+              className="p-1.5 rounded-lg hover:bg-sidebar-accent transition-colors"
+            >
+              {collapsed ? (
+                <ChevronRight className="w-5 h-5" />
+              ) : (
+                <ChevronLeft className="w-5 h-5" />
+              )}
+            </button>
+          </div>
         )}
         {/* On mobile show icon only */}
         {isMobile && collapsed && (
