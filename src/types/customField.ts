@@ -58,7 +58,7 @@ export const LOOKUP_TABLES = [
   { value: 'profiles', label: 'Utilisateurs', columns: ['id', 'display_name', 'job_title', 'department'] },
   { value: 'job_titles', label: 'Postes', columns: ['id', 'name', 'description'] },
   { value: 'categories', label: 'Catégories', columns: ['id', 'name', 'description'] },
-  { value: 'be_projects', label: 'Projets BE', columns: ['id', 'code_projet', 'nom_projet', 'status'] },
+  { value: 'be_projects', label: 'Projets', columns: ['id', 'code_projet', 'nom_projet', 'status'] },
 ] as const;
 
 export type LookupTableName = typeof LOOKUP_TABLES[number]['value'];

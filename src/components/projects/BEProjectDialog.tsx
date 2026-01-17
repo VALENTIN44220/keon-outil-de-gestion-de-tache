@@ -146,7 +146,7 @@ export function BEProjectDialog({ open, onClose, onSave, project }: BEProjectDia
       <DialogContent className="max-w-2xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>
-            {project ? 'Modifier le projet' : 'Nouveau projet BE'}
+            {project ? 'Modifier le projet' : 'Nouveau projet'}
           </DialogTitle>
         </DialogHeader>
         

@@ -489,7 +489,7 @@ export function BERequestDialog({
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Projet BE</Label>
+                    <Label>Projet</Label>
                     <BEProjectSelect
                       value={beProjectId}
                       onChange={setBeProjectId}
