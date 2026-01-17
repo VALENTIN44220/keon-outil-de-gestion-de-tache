@@ -354,14 +354,14 @@ async function checkOneLakeAccess(
   try {
     const baseUrl = 'https://onelake.dfs.fabric.microsoft.com';
     const root = lakehouseRootUrl(baseUrl, workspaceId, lakehouseId);
-    
-    // Use ADLS Gen2 Filesystem - List Paths operation
-    // https://learn.microsoft.com/en-us/rest/api/storageservices/datalakestoragegen2/path/list
-    // For OneLake, we use resource=filesystem on the lakehouse root to list paths
-    const listPath = `${baseUrl}/${workspaceId}/${lakehouseId}?resource=filesystem&recursive=false`;
+
+    // ADLS Gen2 List Paths (OneLake): list the Files directory in the lakehouse
+    // Endpoint form: GET {root}/Files?resource=filesystem&recursive=false
+    const listPath = `${root}/Files?resource=filesystem&recursive=false`;
     const headers = {
       'Authorization': `Bearer ${accessToken}`,
       'x-ms-version': '2021-06-08',
+      'x-ms-date': new Date().toUTCString(),
     };
 
     console.log(`Checking OneLake access at: ${listPath}`);
