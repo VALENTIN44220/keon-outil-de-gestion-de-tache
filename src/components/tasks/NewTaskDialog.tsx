@@ -224,10 +224,8 @@ export function NewTaskDialog({ open, onClose, mode, onAdd, onTasksCreated }: Ne
       parent_request_id: null,
       is_assignment_task: false,
       source_process_template_id: null,
-      // BE Project fields
       be_project_id: null,
       be_label_id: null,
-      // Double validation fields
       rbe_validator_id: null,
       rbe_validated_at: null,
       rbe_validation_status: null,
@@ -235,6 +233,21 @@ export function NewTaskDialog({ open, onClose, mode, onAdd, onTasksCreated }: Ne
       requester_validated_at: null,
       requester_validation_status: null,
       requester_validation_comment: null,
+      // New validation workflow fields
+      validation_level_1: 'none',
+      validation_level_2: 'none',
+      validator_level_1_id: null,
+      validator_level_2_id: null,
+      validation_1_status: 'pending',
+      validation_1_at: null,
+      validation_1_by: null,
+      validation_1_comment: null,
+      validation_2_status: 'pending',
+      validation_2_at: null,
+      validation_2_by: null,
+      validation_2_comment: null,
+      original_assignee_id: null,
+      is_locked_for_validation: false,
     }, checklistItems.length > 0 ? checklistItems : undefined, links.length > 0 ? links : undefined);
 
     resetForm();
@@ -274,10 +287,8 @@ export function NewTaskDialog({ open, onClose, mode, onAdd, onTasksCreated }: Ne
         parent_request_id: null,
         is_assignment_task: false,
         source_process_template_id: null,
-        // BE Project fields
         be_project_id: null,
         be_label_id: null,
-        // Double validation fields
         rbe_validator_id: null,
         rbe_validated_at: null,
         rbe_validation_status: null,
@@ -285,6 +296,21 @@ export function NewTaskDialog({ open, onClose, mode, onAdd, onTasksCreated }: Ne
         requester_validated_at: null,
         requester_validation_status: null,
         requester_validation_comment: null,
+        // New validation workflow fields
+        validation_level_1: (template as any).validation_level_1 || 'none',
+        validation_level_2: (template as any).validation_level_2 || 'none',
+        validator_level_1_id: (template as any).validator_level_1_id || null,
+        validator_level_2_id: (template as any).validator_level_2_id || null,
+        validation_1_status: 'pending',
+        validation_1_at: null,
+        validation_1_by: null,
+        validation_1_comment: null,
+        validation_2_status: 'pending',
+        validation_2_at: null,
+        validation_2_by: null,
+        validation_2_comment: null,
+        original_assignee_id: null,
+        is_locked_for_validation: false,
       });
     }
 
