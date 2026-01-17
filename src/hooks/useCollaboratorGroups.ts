@@ -33,6 +33,23 @@ export function useCollaboratorGroups() {
   const { user } = useAuth();
   const [groups, setGroups] = useState<CollaboratorGroupWithMembers[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentProfileId, setCurrentProfileId] = useState<string | null>(null);
+
+  // Fetch current user's profile ID
+  useEffect(() => {
+    const fetchProfileId = async () => {
+      if (!user) return;
+      const { data } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+      if (data) {
+        setCurrentProfileId(data.id);
+      }
+    };
+    fetchProfileId();
+  }, [user]);
 
   const fetchGroups = useCallback(async () => {
     setIsLoading(true);
@@ -87,7 +104,7 @@ export function useCollaboratorGroups() {
     companyId?: string, 
     departmentId?: string
   ): Promise<CollaboratorGroup | null> => {
-    if (!user) return null;
+    if (!user || !currentProfileId) return null;
 
     try {
       const { data, error } = await supabase
@@ -97,7 +114,7 @@ export function useCollaboratorGroups() {
           description: description || null,
           company_id: companyId || null,
           department_id: departmentId || null,
-          created_by: user.id,
+          created_by: currentProfileId,
         })
         .select()
         .single();
