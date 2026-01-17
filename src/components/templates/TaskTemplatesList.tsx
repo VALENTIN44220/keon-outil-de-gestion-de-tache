@@ -22,10 +22,12 @@ import {
   Loader2,
   ChevronDown,
   ChevronRight,
+  Edit2,
 } from 'lucide-react';
-import { VISIBILITY_LABELS } from '@/types/template';
+import { VISIBILITY_LABELS, TaskTemplate } from '@/types/template';
 import { TaskTemplateWithContext } from '@/hooks/useAllTaskTemplates';
 import { TemplateChecklistEditor } from './TemplateChecklistEditor';
+import { EditTaskTemplateDialog } from './EditTaskTemplateDialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface TaskTemplatesListProps {
@@ -61,9 +63,11 @@ export function TaskTemplatesList({
   tasks,
   isLoading,
   onDelete,
+  onRefresh,
   viewMode = 'list',
 }: TaskTemplatesListProps) {
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  const [editingTask, setEditingTask] = useState<TaskTemplateWithContext | null>(null);
 
   const toggleExpanded = (id: string) => {
     setExpandedTasks((prev) => {
@@ -75,6 +79,11 @@ export function TaskTemplatesList({
       }
       return newSet;
     });
+  };
+
+  const handleTaskSaved = () => {
+    onRefresh?.();
+    setEditingTask(null);
   };
 
   if (isLoading) {
@@ -132,10 +141,6 @@ export function TaskTemplatesList({
                     <Clock className="h-3 w-3" />
                     {task.default_duration_days}j
                   </span>
-                  <span className="flex items-center gap-1">
-                    <VisibilityIcon className="h-3 w-3" />
-                    {VISIBILITY_LABELS[task.visibility_level]}
-                  </span>
                 </div>
               </div>
               {task.can_manage && (
@@ -146,6 +151,10 @@ export function TaskTemplatesList({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setEditingTask(task)}>
+                      <Edit2 className="h-4 w-4 mr-2" />
+                      Modifier
+                    </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => onDelete(task.id)}
                       className="text-destructive focus:text-destructive"
@@ -180,6 +189,10 @@ export function TaskTemplatesList({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setEditingTask(task)}>
+                        <Edit2 className="h-4 w-4 mr-2" />
+                        Modifier
+                      </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => onDelete(task.id)}
                         className="text-destructive focus:text-destructive"
@@ -239,6 +252,13 @@ export function TaskTemplatesList({
           </Card>
         );
       })}
+
+      <EditTaskTemplateDialog
+        task={editingTask}
+        open={!!editingTask}
+        onClose={() => setEditingTask(null)}
+        onSave={handleTaskSaved}
+      />
     </div>
   );
 }
