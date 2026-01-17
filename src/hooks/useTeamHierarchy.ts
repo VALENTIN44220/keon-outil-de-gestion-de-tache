@@ -110,16 +110,20 @@ export function useTeamHierarchy() {
       }
       setManagers(managersList);
 
-      // Find direct subordinates (all levels)
-      const findAllSubordinates = (managerId: string): TeamMember[] => {
-        const direct = enrichedMembers.filter(m => m.manager_id === managerId);
+      // Find direct subordinates (all levels) with circular reference protection
+      const findAllSubordinates = (managerId: string, visited: Set<string> = new Set()): TeamMember[] => {
+        if (visited.has(managerId)) return []; // Prevent infinite loop
+        visited.add(managerId);
+        
+        const direct = enrichedMembers.filter(m => m.manager_id === managerId && !visited.has(m.id));
         const all: TeamMember[] = [...direct];
         direct.forEach(sub => {
-          all.push(...findAllSubordinates(sub.id));
+          all.push(...findAllSubordinates(sub.id, visited));
         });
         return all;
       };
-      setSubordinates(findAllSubordinates(profile.id));
+      const userSubordinates = findAllSubordinates(profile.id);
+      setSubordinates(userSubordinates);
 
       // Find peers (same manager)
       if (profile.manager_id) {
@@ -130,7 +134,18 @@ export function useTeamHierarchy() {
       }
 
       // Build hierarchy tree
-      const buildTree = (member: TeamMember, membersPool: TeamMember[]): HierarchyNode => {
+      const buildTree = (member: TeamMember, membersPool: TeamMember[], visited: Set<string> = new Set()): HierarchyNode => {
+        if (visited.has(member.id)) {
+          // Return a node without subordinates to break the cycle
+          return {
+            ...member,
+            subordinates: [],
+            isCurrentUser: member.id === profile.id,
+            relationToUser: 'other',
+          };
+        }
+        visited.add(member.id);
+        
         const isCurrentUser = member.id === profile.id;
         let relationToUser: HierarchyNode['relationToUser'] = 'other';
         
@@ -138,31 +153,74 @@ export function useTeamHierarchy() {
           relationToUser = 'self';
         } else if (managersList.some(m => m.id === member.id)) {
           relationToUser = 'manager';
-        } else if (subordinates.some(s => s.id === member.id) || findAllSubordinates(profile.id).some(s => s.id === member.id)) {
+        } else if (userSubordinates.some(s => s.id === member.id)) {
           relationToUser = 'subordinate';
         } else if (profile.manager_id && member.manager_id === profile.manager_id) {
           relationToUser = 'peer';
         }
 
-        const directSubs = membersPool.filter(m => m.manager_id === member.id);
+        const directSubs = membersPool.filter(m => m.manager_id === member.id && !visited.has(m.id));
         
         return {
           ...member,
-          subordinates: directSubs.map(sub => buildTree(sub, membersPool)),
+          subordinates: directSubs.map(sub => buildTree(sub, membersPool, new Set(visited))),
           isCurrentUser,
           relationToUser,
         };
       };
 
-      // Find root (top manager in user's hierarchy)
+      // Find root members (no manager or top of hierarchy)
       const enrichedMembersTyped = enrichedMembers as TeamMember[];
-      let rootMember: TeamMember | undefined = enrichedMembersTyped.find(m => m.id === profile.id);
-      if (managersList.length > 0) {
-        rootMember = managersList[managersList.length - 1];
-      }
       
-      if (rootMember) {
-        setHierarchyTree(buildTree(rootMember, enrichedMembersTyped));
+      // For admins with can_view_all_tasks, show everyone starting from root nodes
+      const { data: userPermProfile } = await supabase
+        .from('permission_profiles')
+        .select('can_view_all_tasks')
+        .eq('id', profile.permission_profile_id || '')
+        .single();
+      
+      const isAdmin = userPermProfile?.can_view_all_tasks || false;
+      
+      if (isAdmin) {
+        // Find all root members (those without manager or whose manager doesn't exist in the list)
+        const rootMembers = enrichedMembersTyped.filter(m => 
+          !m.manager_id || !enrichedMembersTyped.some(other => other.id === m.manager_id)
+        );
+        
+        if (rootMembers.length > 0) {
+          // Build a virtual root with all top-level members as subordinates
+          const virtualRoot: HierarchyNode = {
+            id: 'virtual-root',
+            user_id: '',
+            display_name: 'Organisation',
+            avatar_url: null,
+            job_title: null,
+            job_title_id: null,
+            department: null,
+            department_id: null,
+            company: null,
+            company_id: null,
+            manager_id: null,
+            hierarchy_level_id: null,
+            hierarchy_level: null,
+            job_title_info: null,
+            department_info: null,
+            subordinates: rootMembers.map(m => buildTree(m, enrichedMembersTyped, new Set())),
+            isCurrentUser: false,
+            relationToUser: 'other',
+          };
+          setHierarchyTree(virtualRoot);
+        }
+      } else {
+        // For non-admins, show their own hierarchy branch
+        let rootMember: TeamMember | undefined = enrichedMembersTyped.find(m => m.id === profile.id);
+        if (managersList.length > 0) {
+          rootMember = managersList[managersList.length - 1];
+        }
+        
+        if (rootMember) {
+          setHierarchyTree(buildTree(rootMember, enrichedMembersTyped, new Set()));
+        }
       }
 
     } catch (error) {
