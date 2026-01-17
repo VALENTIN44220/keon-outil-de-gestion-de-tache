@@ -358,7 +358,7 @@ async function checkOneLakeAccess(
     // Use ADLS Gen2 Filesystem - List Paths operation
     // https://learn.microsoft.com/en-us/rest/api/storageservices/datalakestoragegen2/path/list
     // For OneLake, we use resource=filesystem on the lakehouse root to list paths
-    const listPath = `${baseUrl}/${workspaceId}/${lakehouseId}?resource=filesystem`;
+    const listPath = `${baseUrl}/${workspaceId}/${lakehouseId}?resource=filesystem&recursive=false`;
     const headers = {
       'Authorization': `Bearer ${accessToken}`,
       'x-ms-version': '2021-06-08',
