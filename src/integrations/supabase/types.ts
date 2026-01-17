@@ -367,6 +367,97 @@ export type Database = {
         }
         Relationships: []
       }
+      collaborator_group_members: {
+        Row: {
+          created_at: string
+          group_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          group_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          group_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collaborator_group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "collaborator_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collaborator_group_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      collaborator_groups: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          created_by: string | null
+          department_id: string | null
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          department_id?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          department_id?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collaborator_groups_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collaborator_groups_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collaborator_groups_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           created_at: string
@@ -1100,6 +1191,7 @@ export type Database = {
           process_template_id: string
           target_assignee_id: string | null
           target_department_id: string | null
+          target_group_id: string | null
           target_job_title_id: string | null
           target_manager_id: string | null
           updated_at: string
@@ -1120,6 +1212,7 @@ export type Database = {
           process_template_id: string
           target_assignee_id?: string | null
           target_department_id?: string | null
+          target_group_id?: string | null
           target_job_title_id?: string | null
           target_manager_id?: string | null
           updated_at?: string
@@ -1140,6 +1233,7 @@ export type Database = {
           process_template_id?: string
           target_assignee_id?: string | null
           target_department_id?: string | null
+          target_group_id?: string | null
           target_job_title_id?: string | null
           target_manager_id?: string | null
           updated_at?: string
@@ -1180,6 +1274,13 @@ export type Database = {
             columns: ["target_department_id"]
             isOneToOne: false
             referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sub_process_templates_target_group_id_fkey"
+            columns: ["target_group_id"]
+            isOneToOne: false
+            referencedRelation: "collaborator_groups"
             referencedColumns: ["id"]
           },
           {
@@ -1463,6 +1564,7 @@ export type Database = {
           requires_validation: boolean | null
           sub_process_template_id: string | null
           subcategory_id: string | null
+          target_group_id: string | null
           title: string
           updated_at: string
           user_id: string
@@ -1488,6 +1590,7 @@ export type Database = {
           requires_validation?: boolean | null
           sub_process_template_id?: string | null
           subcategory_id?: string | null
+          target_group_id?: string | null
           title: string
           updated_at?: string
           user_id: string
@@ -1513,6 +1616,7 @@ export type Database = {
           requires_validation?: boolean | null
           sub_process_template_id?: string | null
           subcategory_id?: string | null
+          target_group_id?: string | null
           title?: string
           updated_at?: string
           user_id?: string
@@ -1563,6 +1667,13 @@ export type Database = {
             columns: ["subcategory_id"]
             isOneToOne: false
             referencedRelation: "subcategories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_templates_target_group_id_fkey"
+            columns: ["target_group_id"]
+            isOneToOne: false
+            referencedRelation: "collaborator_groups"
             referencedColumns: ["id"]
           },
           {
@@ -1650,6 +1761,7 @@ export type Database = {
           current_validation_level: number | null
           description: string | null
           due_date: string | null
+          group_assignee_ids: string[] | null
           id: string
           is_assignment_task: boolean
           is_locked_for_validation: boolean | null
@@ -1702,6 +1814,7 @@ export type Database = {
           current_validation_level?: number | null
           description?: string | null
           due_date?: string | null
+          group_assignee_ids?: string[] | null
           id?: string
           is_assignment_task?: boolean
           is_locked_for_validation?: boolean | null
@@ -1754,6 +1867,7 @@ export type Database = {
           current_validation_level?: number | null
           description?: string | null
           due_date?: string | null
+          group_assignee_ids?: string[] | null
           id?: string
           is_assignment_task?: boolean
           is_locked_for_validation?: boolean | null

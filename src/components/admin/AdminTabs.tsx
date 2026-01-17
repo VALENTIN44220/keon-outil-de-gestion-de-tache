@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building2, Briefcase, Users, Layers, Shield, UserCog, Route, FolderTree, Download, FolderSync } from 'lucide-react';
+import { Building2, Briefcase, Users, Layers, Shield, UserCog, Route, FolderTree, Download, FolderSync, UsersRound } from 'lucide-react';
 import { CompaniesTab } from './CompaniesTab';
 import { DepartmentsTab } from './DepartmentsTab';
 import { JobTitlesTab } from './JobTitlesTab';
@@ -11,6 +11,7 @@ import { AssignmentRulesTab } from './AssignmentRulesTab';
 import { CategoriesProcessTab } from './CategoriesProcessTab';
 import { DataExportTab } from './DataExportTab';
 import { GovernanceSyncTab } from './GovernanceSyncTab';
+import { CollaboratorGroupsTab } from './CollaboratorGroupsTab';
 import { DatabaseResetDialog } from './DatabaseResetDialog';
 import type { Company, Department, JobTitle, HierarchyLevel, PermissionProfile, UserProfile } from '@/types/admin';
 
@@ -49,10 +50,14 @@ export function AdminTabs(props: AdminTabsProps) {
       </div>
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-10">
+        <TabsList className="grid w-full grid-cols-11">
         <TabsTrigger value="users" className="flex items-center gap-2">
           <UserCog className="h-4 w-4" />
           <span className="hidden sm:inline">Utilisateurs</span>
+        </TabsTrigger>
+        <TabsTrigger value="groups" className="flex items-center gap-2">
+          <UsersRound className="h-4 w-4" />
+          <span className="hidden sm:inline">Groupes</span>
         </TabsTrigger>
         <TabsTrigger value="companies" className="flex items-center gap-2">
           <Building2 className="h-4 w-4" />
@@ -102,6 +107,15 @@ export function AdminTabs(props: AdminTabsProps) {
           permissionProfiles={props.permissionProfiles}
           onUserCreated={props.refetch}
           onUserUpdated={props.refetch}
+          onRefresh={props.refetch}
+        />
+      </TabsContent>
+
+      <TabsContent value="groups">
+        <CollaboratorGroupsTab
+          companies={props.companies}
+          departments={props.departments}
+          users={props.users}
           onRefresh={props.refetch}
         />
       </TabsContent>
