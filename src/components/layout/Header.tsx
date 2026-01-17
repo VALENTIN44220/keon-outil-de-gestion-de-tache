@@ -49,11 +49,11 @@ export function Header({
     .slice(0, 2);
 
   return (
-    <header className="bg-card border-b border-border px-6 py-4">
+    <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 px-6 py-4 sticky top-0 z-30">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">{title}</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
+          <h1 className="text-2xl font-semibold text-slate-800">{title}</h1>
+          <p className="text-sm text-slate-500 mt-0.5">
             {new Date().toLocaleDateString('fr-FR', { 
               weekday: 'long', 
               year: 'numeric', 

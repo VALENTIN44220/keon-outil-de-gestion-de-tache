@@ -10,10 +10,12 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import keonLogo from '@/assets/keon-logo.jpg';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { UserProfilePopover } from './UserProfilePopover';
+
 interface SidebarProps {
   activeView: string;
   onViewChange: (view: string) => void;
 }
+
 const baseMenuItems = [{
   id: 'dashboard',
   label: 'Tableau de bord',
@@ -55,18 +57,21 @@ const baseMenuItems = [{
   icon: Settings,
   path: '/'
 }];
+
 const projectsMenuItem = {
   id: 'projects',
   label: 'Projets',
   icon: FolderOpen,
   path: '/projects'
 };
+
 const adminMenuItem = {
   id: 'admin',
   label: 'Administration',
   icon: ShieldCheck,
   path: '/admin'
 };
+
 export function Sidebar({
   activeView,
   onViewChange
@@ -79,15 +84,9 @@ export function Sidebar({
     return saved === 'right';
   });
   const navigate = useNavigate();
-  const {
-    isAdmin
-  } = useUserRole();
-  const {
-    canViewBEProjects
-  } = useUserPermissions();
-  const {
-    profile
-  } = useAuth();
+  const { isAdmin } = useUserRole();
+  const { canViewBEProjects } = useUserPermissions();
+  const { profile } = useAuth();
 
   // On mobile/tablet, always collapsed. On desktop, use manual state
   const collapsed = isMobile || manualCollapsed;
@@ -106,10 +105,11 @@ export function Sidebar({
   useEffect(() => {
     async function fetchPermissionProfile() {
       if (profile?.permission_profile_id) {
-        const {
-          data,
-          error
-        } = await supabase.from('permission_profiles').select('name').eq('id', profile.permission_profile_id).single();
+        const { data, error } = await supabase
+          .from('permission_profiles')
+          .select('name')
+          .eq('id', profile.permission_profile_id)
+          .single();
         if (data && !error) {
           setPermissionProfileName(data.name);
         } else {
@@ -132,63 +132,135 @@ export function Sidebar({
     }
     return name.slice(0, 2).toUpperCase();
   };
-  return <aside data-sidebar-position={isRightSide ? 'right' : 'left'} className={cn("top-0 bg-sidebar/25 backdrop-blur-xl text-sidebar-foreground h-screen flex flex-col transition-all duration-300 ease-in-out border-sidebar-border", collapsed ? "relative w-16 flex-shrink-0" : "fixed w-64 z-40 shadow-lg", isRightSide ? "right-0 border-l" : "left-0 border-r", !collapsed && isRightSide && "order-last")}>
+
+  // Handle menu item click - collapse sidebar and navigate
+  const handleMenuClick = (itemId: string, path: string) => {
+    onViewChange(itemId);
+    navigate(path);
+    // Auto-collapse sidebar on click (desktop only)
+    if (!isMobile) {
+      setManualCollapsed(true);
+    }
+  };
+
+  return (
+    <aside 
+      data-sidebar-position={isRightSide ? 'right' : 'left'} 
+      className={cn(
+        "top-0 h-screen flex flex-col transition-all duration-300 ease-in-out",
+        // Clean white background when expanded, subtle when collapsed
+        collapsed 
+          ? "relative w-16 flex-shrink-0 bg-slate-50/80 backdrop-blur-sm" 
+          : "fixed w-64 z-40 bg-white shadow-xl",
+        isRightSide ? "right-0 border-l border-slate-200" : "left-0 border-r border-slate-200",
+        !collapsed && isRightSide && "order-last"
+      )}
+    >
       {/* Logo KEON */}
-      <div className="p-4 flex items-center justify-between border-b border-sidebar-border">
-        {!collapsed && <div className="flex items-center gap-2">
+      <div className="p-4 flex items-center justify-between border-b border-slate-200">
+        {!collapsed && (
+          <div className="flex items-center gap-2">
             <img src={keonLogo} alt="KEON Group" className="h-8 w-auto" />
-          </div>}
-        {/* Hide collapse button on mobile, show only on desktop */}
-        {!isMobile && <div className="flex items-center gap-1">
-            <button onClick={toggleSidebarPosition} className="p-1.5 rounded-lg hover:bg-sidebar-accent transition-colors" title={isRightSide ? "Déplacer à gauche" : "Déplacer à droite"}>
-              <ArrowLeftRight className="w-4 h-4" />
+          </div>
+        )}
+        
+        {/* Collapse/Expand button only on desktop */}
+        {!isMobile && (
+          <div className="flex items-center gap-1">
+            {/* Position toggle only visible when expanded */}
+            {!collapsed && (
+              <button 
+                onClick={toggleSidebarPosition} 
+                className="btn-3d p-2 text-blue-700 hover:text-blue-800"
+                title={isRightSide ? "Déplacer à gauche" : "Déplacer à droite"}
+              >
+                <ArrowLeftRight className="w-4 h-4" />
+              </button>
+            )}
+            <button 
+              onClick={() => setManualCollapsed(!manualCollapsed)} 
+              className="btn-3d p-2 text-blue-700 hover:text-blue-800"
+              title={collapsed ? "Étendre" : "Replier"}
+            >
+              {collapsed 
+                ? (isRightSide ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />) 
+                : (isRightSide ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />)
+              }
             </button>
-            <button onClick={() => setManualCollapsed(!manualCollapsed)} className="p-1.5 rounded-lg hover:bg-sidebar-accent transition-colors">
-              {collapsed ? isRightSide ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" /> : isRightSide ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
-            </button>
-          </div>}
+          </div>
+        )}
+        
         {/* On mobile show icon only */}
-        {isMobile && collapsed && <img src={keonLogo} alt="KEON" className="h-8 w-8 object-cover rounded" />}
+        {isMobile && collapsed && (
+          <img src={keonLogo} alt="KEON" className="h-8 w-8 object-cover rounded" />
+        )}
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+      <nav className="flex-1 p-3 space-y-2 overflow-y-auto">
         {menuItems.map(item => {
-        const Icon = item.icon;
-        const isActive = activeView === item.id;
-        return <button key={item.id} onClick={() => {
-          onViewChange(item.id);
-          navigate(item.path);
-        }} className={cn("w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 font-body", isActive ? "bg-sidebar-primary text-sidebar-primary-foreground" : "hover:bg-sidebar-accent text-sidebar-foreground/80 hover:text-sidebar-foreground")}>
-              <Icon className="w-5 h-5 flex-shrink-0 bg-success-foreground text-secondary-foreground" />
-              {!collapsed && <span className="font-medium text-sm text-primary">{item.label}</span>}
-            </button>;
-      })}
+          const Icon = item.icon;
+          const isActive = activeView === item.id;
+          
+          return (
+            <button 
+              key={item.id} 
+              onClick={() => handleMenuClick(item.id, item.path)} 
+              className={cn(
+                "w-full flex items-center gap-3 transition-all duration-200 font-body",
+                collapsed ? "justify-center p-0" : "px-3 py-2.5 rounded-xl"
+              )}
+              title={collapsed ? item.label : undefined}
+            >
+              {/* Icon with 3D button effect */}
+              <div className={cn(
+                "flex items-center justify-center transition-all duration-200",
+                isActive 
+                  ? "btn-3d-active p-2.5" 
+                  : "btn-3d p-2.5 text-blue-700 hover:text-blue-800"
+              )}>
+                <Icon className="w-5 h-5" />
+              </div>
+              
+              {!collapsed && (
+                <span className={cn(
+                  "font-medium text-sm",
+                  isActive ? "text-blue-700" : "text-slate-600"
+                )}>
+                  {item.label}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </nav>
 
       {/* User section */}
-      <div className="p-3 border-t border-sidebar-border">
+      <div className="p-3 border-t border-slate-200">
         <UserProfilePopover>
           <button className={cn(
-            "w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-sidebar-accent transition-colors cursor-pointer",
-            collapsed && "justify-center"
+            "w-full flex items-center gap-3 rounded-xl transition-colors cursor-pointer",
+            collapsed ? "justify-center p-2" : "px-3 py-2 hover:bg-slate-100"
           )}>
-            <Avatar className="h-9 w-9 flex-shrink-0">
+            <Avatar className="h-9 w-9 flex-shrink-0 ring-2 ring-blue-100">
               <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || 'Utilisateur'} />
-              <AvatarFallback className="bg-gradient-keon text-white text-sm font-medium">
+              <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white text-sm font-medium">
                 {getInitials(profile?.display_name)}
               </AvatarFallback>
             </Avatar>
-            {!collapsed && <div className="flex-1 min-w-0 text-left">
-                <p className="text-sm font-medium truncate">
+            {!collapsed && (
+              <div className="flex-1 min-w-0 text-left">
+                <p className="text-sm font-medium text-slate-800 truncate">
                   {profile?.display_name || 'Utilisateur'}
                 </p>
-                <p className="text-xs text-sidebar-foreground/60 truncate">
+                <p className="text-xs text-slate-500 truncate">
                   {permissionProfileName || profile?.job_title || 'Non défini'}
                 </p>
-              </div>}
+              </div>
+            )}
           </button>
         </UserProfilePopover>
       </div>
-    </aside>;
+    </aside>
+  );
 }
