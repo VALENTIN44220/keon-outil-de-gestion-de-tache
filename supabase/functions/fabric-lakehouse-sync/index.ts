@@ -405,9 +405,13 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Get Azure token
-    console.log('Getting Azure token for OneLake...');
-    const accessToken = await getOneLakeToken();
-    console.log('Token obtained successfully');
+  const clientId = Deno.env.get('AZURE_CLIENT_ID');
+  const tenantId = Deno.env.get('AZURE_TENANT_ID');
+  console.log('Getting Azure token for OneLake...');
+  console.log(`Using Service Principal - Client ID: ${clientId}`);
+  console.log(`Using Tenant ID: ${tenantId}`);
+  const accessToken = await getOneLakeToken();
+  console.log('Token obtained successfully');
 
     if (action === 'diagnose') {
       // Check connectivity
