@@ -529,6 +529,168 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Import data from Fabric Lakehouse back to Supabase
+    if (action === 'import') {
+      const tablesToImport = tables && tables.length > 0 ? tables : ALL_TABLES;
+      const results: SyncResult[] = [];
+      const syncBackPath = `${lakehouseRootUrl('https://onelake.dfs.fabric.microsoft.com', workspaceId, lakehouseId)}/Files/_sync_back`;
+
+      for (const tableName of tablesToImport) {
+        try {
+          console.log(`Importing table: ${tableName}`);
+          
+          // Read JSON file from _sync_back folder
+          const filePath = `${syncBackPath}/${tableName}.json`;
+          
+          // First, check if file exists by trying to read its properties
+          const checkResponse = await fetch(`${filePath}?action=getStatus`, {
+            method: 'HEAD',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'x-ms-version': '2021-06-08',
+            },
+          });
+
+          if (!checkResponse.ok && checkResponse.status !== 200) {
+            console.log(`No import file found for ${tableName}, skipping`);
+            results.push({ table: tableName, success: true, rowCount: 0 });
+            continue;
+          }
+
+          // Read the file content
+          const readResponse = await fetch(filePath, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'x-ms-version': '2021-06-08',
+            },
+          });
+
+          if (!readResponse.ok) {
+            console.log(`Could not read ${tableName}.json: ${readResponse.status}`);
+            results.push({ table: tableName, success: true, rowCount: 0 });
+            continue;
+          }
+
+          const fileContent = await readResponse.text();
+          if (!fileContent.trim()) {
+            console.log(`Empty file for ${tableName}, skipping`);
+            results.push({ table: tableName, success: true, rowCount: 0 });
+            continue;
+          }
+
+          // Parse NDJSON or JSON array
+          let records: Record<string, unknown>[];
+          if (fileContent.trim().startsWith('[')) {
+            // JSON array format
+            records = JSON.parse(fileContent);
+          } else {
+            // NDJSON format
+            records = fileContent
+              .trim()
+              .split('\n')
+              .filter(line => line.trim())
+              .map(line => JSON.parse(line));
+          }
+
+          if (records.length === 0) {
+            results.push({ table: tableName, success: true, rowCount: 0 });
+            continue;
+          }
+
+          console.log(`Importing ${records.length} records into ${tableName}`);
+
+          // Upsert data into Supabase (using id as the conflict key)
+          const { error } = await supabase
+            .from(tableName)
+            .upsert(records, { onConflict: 'id' });
+
+          if (error) {
+            console.error(`Error importing ${tableName}:`, error);
+            results.push({ table: tableName, success: false, error: error.message });
+          } else {
+            results.push({ table: tableName, success: true, rowCount: records.length });
+          }
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          console.error(`Error importing ${tableName}:`, error);
+          results.push({ table: tableName, success: false, error: errorMessage });
+        }
+      }
+
+      const successCount = results.filter(r => r.success).length;
+      const totalRows = results.reduce((sum, r) => sum + (r.rowCount || 0), 0);
+      const importedTables = results.filter(r => r.success && (r.rowCount || 0) > 0).length;
+
+      return new Response(JSON.stringify({
+        success: successCount === results.length,
+        importedTables,
+        totalTables: results.length,
+        totalRows,
+        results,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // List files available for import
+    if (action === 'list-import-files') {
+      const syncBackPath = `${lakehouseRootUrl('https://onelake.dfs.fabric.microsoft.com', workspaceId, lakehouseId)}/Files/_sync_back`;
+      
+      try {
+        const listResponse = await fetch(`${syncBackPath}?resource=filesystem&recursive=false`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'x-ms-version': '2021-06-08',
+          },
+        });
+
+        if (!listResponse.ok) {
+          return new Response(JSON.stringify({
+            success: true,
+            files: [],
+            message: 'No _sync_back folder found. Create it in your Lakehouse and add JSON files to import.',
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const listText = await listResponse.text();
+        // Parse the file listing (ADLS Gen2 returns XML or JSON depending on headers)
+        const files: string[] = [];
+        
+        // Try to extract file names from response
+        const pathMatches = listText.matchAll(/"name":"([^"]+\.json)"/g);
+        for (const match of pathMatches) {
+          const fileName = match[1];
+          const tableName = fileName.replace('.json', '');
+          if (ALL_TABLES.includes(tableName)) {
+            files.push(tableName);
+          }
+        }
+
+        return new Response(JSON.stringify({
+          success: true,
+          files,
+          message: files.length > 0 
+            ? `${files.length} fichiers trouvés pour import` 
+            : 'Aucun fichier JSON trouvé dans _sync_back',
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        return new Response(JSON.stringify({
+          success: false,
+          files: [],
+          error: errorMessage,
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
     throw new Error(`Unknown action: ${action}`);
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';

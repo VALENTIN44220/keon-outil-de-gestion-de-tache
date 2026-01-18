@@ -9,13 +9,17 @@ import {
   CloudUpload,
   Stethoscope,
   BarChart3,
-  Clock
+  Clock,
+  Download,
+  FileJson,
+  ArrowDownToLine
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFabricLakehouseSync, TablePreview, SyncResult } from '@/hooks/useFabricLakehouseSync';
 
 const ALL_TABLES = [
@@ -61,17 +65,23 @@ const ALL_TABLES = [
 export function FabricLakehouseSyncTab() {
   const {
     isLoading,
+    isImporting,
     isDiagnosing,
     diagnostics,
     previewData,
     lastSyncResult,
+    lastImportResult,
+    availableImportFiles,
     runDiagnostic,
     getPreview,
     syncToLakehouse,
+    importFromLakehouse,
+    listImportFiles,
     clearPreview,
   } = useFabricLakehouseSync();
 
   const [selectedTables, setSelectedTables] = useState<Set<string>>(new Set(ALL_TABLES.map(t => t.name)));
+  const [selectedImportTables, setSelectedImportTables] = useState<Set<string>>(new Set());
 
   const toggleTable = (tableName: string) => {
     const newSelected = new Set(selectedTables);
@@ -83,8 +93,21 @@ export function FabricLakehouseSyncTab() {
     setSelectedTables(newSelected);
   };
 
+  const toggleImportTable = (tableName: string) => {
+    const newSelected = new Set(selectedImportTables);
+    if (newSelected.has(tableName)) {
+      newSelected.delete(tableName);
+    } else {
+      newSelected.add(tableName);
+    }
+    setSelectedImportTables(newSelected);
+  };
+
   const selectAll = () => setSelectedTables(new Set(ALL_TABLES.map(t => t.name)));
   const deselectAll = () => setSelectedTables(new Set());
+
+  const selectAllImport = () => setSelectedImportTables(new Set(availableImportFiles));
+  const deselectAllImport = () => setSelectedImportTables(new Set());
 
   const handlePreview = async () => {
     const tables = selectedTables.size === ALL_TABLES.length 
@@ -100,6 +123,19 @@ export function FabricLakehouseSyncTab() {
     await syncToLakehouse(tables);
   };
 
+  const handleScanImportFiles = async () => {
+    const result = await listImportFiles();
+    if (result?.files?.length > 0) {
+      setSelectedImportTables(new Set(result.files));
+    }
+  };
+
+  const handleImport = async () => {
+    const tables = Array.from(selectedImportTables);
+    if (tables.length === 0) return;
+    await importFromLakehouse(tables);
+  };
+
   const getTablePreview = (tableName: string): TablePreview | undefined => {
     return previewData?.find(t => t.table === tableName);
   };
@@ -108,9 +144,16 @@ export function FabricLakehouseSyncTab() {
     return lastSyncResult?.results.find(r => r.table === tableName);
   };
 
+  const getTableImportResult = (tableName: string): SyncResult | undefined => {
+    return lastImportResult?.results.find(r => r.table === tableName);
+  };
+
   const totalRows = previewData?.reduce((sum, t) => sum + t.rowCount, 0) || 0;
   const syncProgress = lastSyncResult 
     ? (lastSyncResult.syncedTables / lastSyncResult.totalTables) * 100 
+    : 0;
+  const importProgress = lastImportResult
+    ? (lastImportResult.importedTables / lastImportResult.totalTables) * 100
     : 0;
 
   return (
@@ -118,11 +161,11 @@ export function FabricLakehouseSyncTab() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <CloudUpload className="h-5 w-5" />
-            Synchronisation Microsoft Fabric Lakehouse
+            <Database className="h-5 w-5" />
+            Microsoft Fabric Lakehouse
           </CardTitle>
           <CardDescription>
-            Exportez l'intégralité des données vers votre Lakehouse au format Delta pour analyse Power BI / Fabric
+            Synchronisez les données entre votre application et Microsoft Fabric Lakehouse
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -160,124 +203,275 @@ export function FabricLakehouseSyncTab() {
             )}
           </div>
 
-          {/* Last sync result */}
-          {lastSyncResult && (
-            <div className="p-4 bg-muted/50 rounded-lg space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-medium flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4" />
-                  Dernière synchronisation
-                </span>
-                <Badge variant={lastSyncResult.success ? 'default' : 'destructive'}>
-                  {lastSyncResult.syncedTables}/{lastSyncResult.totalTables} tables
-                </Badge>
-              </div>
-              <Progress value={syncProgress} className="h-2" />
-              <p className="text-sm text-muted-foreground">
-                {lastSyncResult.totalRows.toLocaleString()} lignes synchronisées
-              </p>
-            </div>
-          )}
+          <Tabs defaultValue="export" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="export" className="flex items-center gap-2">
+                <CloudUpload className="h-4 w-4" />
+                Exporter vers Fabric
+              </TabsTrigger>
+              <TabsTrigger value="import" className="flex items-center gap-2">
+                <ArrowDownToLine className="h-4 w-4" />
+                Importer depuis Fabric
+              </TabsTrigger>
+            </TabsList>
 
-          {/* Table selection */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 flex-wrap">
-              <Button variant="outline" size="sm" onClick={selectAll}>
-                Tout sélectionner
-              </Button>
-              <Button variant="outline" size="sm" onClick={deselectAll}>
-                Tout désélectionner
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={handlePreview}
-                disabled={isLoading || selectedTables.size === 0}
-              >
-                {isLoading ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                )}
-                Prévisualiser
-              </Button>
-              {previewData && (
-                <>
-                  <Badge variant="secondary" className="ml-2">
-                    <Database className="h-3 w-3 mr-1" />
-                    {totalRows.toLocaleString()} lignes
-                  </Badge>
-                  <Button variant="ghost" size="sm" onClick={clearPreview}>
-                    Fermer aperçu
-                  </Button>
-                </>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 max-h-96 overflow-y-auto p-1">
-              {ALL_TABLES.map((table) => {
-                const preview = getTablePreview(table.name);
-                const result = getTableResult(table.name);
-                
-                return (
-                  <div
-                    key={table.name}
-                    className={`flex items-center gap-2 p-2 border rounded-lg transition-colors text-sm ${
-                      selectedTables.has(table.name) ? 'bg-primary/5 border-primary/30' : 'hover:bg-muted/50'
-                    }`}
-                  >
-                    <Checkbox
-                      id={table.name}
-                      checked={selectedTables.has(table.name)}
-                      onCheckedChange={() => toggleTable(table.name)}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <label 
-                        htmlFor={table.name}
-                        className="font-medium cursor-pointer truncate block"
-                      >
-                        {table.label}
-                      </label>
-                      <p className="text-xs text-muted-foreground font-mono truncate">
-                        {table.name}
-                      </p>
-                    </div>
-                    
-                    {preview && (
-                      <Badge variant="outline" className="text-xs shrink-0">
-                        {preview.rowCount}
-                      </Badge>
-                    )}
-                    
-                    {result && (
-                      result.success ? (
-                        <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-                      ) : (
-                        <XCircle className="h-4 w-4 text-red-500 shrink-0" />
-                      )
-                    )}
+            {/* EXPORT TAB */}
+            <TabsContent value="export" className="space-y-6 mt-6">
+              {/* Last sync result */}
+              {lastSyncResult && (
+                <div className="p-4 bg-muted/50 rounded-lg space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium flex items-center gap-2">
+                      <BarChart3 className="h-4 w-4" />
+                      Dernière synchronisation
+                    </span>
+                    <Badge variant={lastSyncResult.success ? 'default' : 'destructive'}>
+                      {lastSyncResult.syncedTables}/{lastSyncResult.totalTables} tables
+                    </Badge>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Sync button */}
-          <div className="flex items-center gap-4 pt-4 border-t">
-            <Button
-              onClick={handleSync}
-              disabled={isLoading || selectedTables.size === 0 || !diagnostics?.success}
-              className="flex-1"
-              size="lg"
-            >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Upload className="h-4 w-4 mr-2" />
+                  <Progress value={syncProgress} className="h-2" />
+                  <p className="text-sm text-muted-foreground">
+                    {lastSyncResult.totalRows.toLocaleString()} lignes synchronisées
+                  </p>
+                </div>
               )}
-              Synchroniser vers Fabric ({selectedTables.size} tables)
-            </Button>
-          </div>
+
+              {/* Table selection */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button variant="outline" size="sm" onClick={selectAll}>
+                    Tout sélectionner
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={deselectAll}>
+                    Tout désélectionner
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handlePreview}
+                    disabled={isLoading || selectedTables.size === 0}
+                  >
+                    {isLoading ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                    )}
+                    Prévisualiser
+                  </Button>
+                  {previewData && (
+                    <>
+                      <Badge variant="secondary" className="ml-2">
+                        <Database className="h-3 w-3 mr-1" />
+                        {totalRows.toLocaleString()} lignes
+                      </Badge>
+                      <Button variant="ghost" size="sm" onClick={clearPreview}>
+                        Fermer aperçu
+                      </Button>
+                    </>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 max-h-96 overflow-y-auto p-1">
+                  {ALL_TABLES.map((table) => {
+                    const preview = getTablePreview(table.name);
+                    const result = getTableResult(table.name);
+                    
+                    return (
+                      <div
+                        key={table.name}
+                        className={`flex items-center gap-2 p-2 border rounded-lg transition-colors text-sm ${
+                          selectedTables.has(table.name) ? 'bg-primary/5 border-primary/30' : 'hover:bg-muted/50'
+                        }`}
+                      >
+                        <Checkbox
+                          id={table.name}
+                          checked={selectedTables.has(table.name)}
+                          onCheckedChange={() => toggleTable(table.name)}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <label 
+                            htmlFor={table.name}
+                            className="font-medium cursor-pointer truncate block"
+                          >
+                            {table.label}
+                          </label>
+                          <p className="text-xs text-muted-foreground font-mono truncate">
+                            {table.name}
+                          </p>
+                        </div>
+                        
+                        {preview && (
+                          <Badge variant="outline" className="text-xs shrink-0">
+                            {preview.rowCount}
+                          </Badge>
+                        )}
+                        
+                        {result && (
+                          result.success ? (
+                            <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                          ) : (
+                            <XCircle className="h-4 w-4 text-red-500 shrink-0" />
+                          )
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Sync button */}
+              <div className="flex items-center gap-4 pt-4 border-t">
+                <Button
+                  onClick={handleSync}
+                  disabled={isLoading || selectedTables.size === 0 || !diagnostics?.success}
+                  className="flex-1"
+                  size="lg"
+                >
+                  {isLoading ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Upload className="h-4 w-4 mr-2" />
+                  )}
+                  Synchroniser vers Fabric ({selectedTables.size} tables)
+                </Button>
+              </div>
+            </TabsContent>
+
+            {/* IMPORT TAB */}
+            <TabsContent value="import" className="space-y-6 mt-6">
+              <div className="p-4 bg-amber-50 dark:bg-amber-950 rounded-lg border border-amber-200 dark:border-amber-800">
+                <p className="text-sm text-amber-800 dark:text-amber-200">
+                  <strong>Import depuis Fabric :</strong> Placez vos fichiers JSON dans le dossier 
+                  <code className="mx-1 px-1 bg-amber-200 dark:bg-amber-800 rounded">Files/_sync_back/</code>
+                  du Lakehouse. Nommez-les avec le nom de la table (ex: <code className="px-1 bg-amber-200 dark:bg-amber-800 rounded">be_projects.json</code>).
+                </p>
+              </div>
+
+              {/* Last import result */}
+              {lastImportResult && (
+                <div className="p-4 bg-muted/50 rounded-lg space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium flex items-center gap-2">
+                      <ArrowDownToLine className="h-4 w-4" />
+                      Dernier import
+                    </span>
+                    <Badge variant={lastImportResult.success ? 'default' : 'destructive'}>
+                      {lastImportResult.importedTables}/{lastImportResult.totalTables} tables
+                    </Badge>
+                  </div>
+                  <Progress value={importProgress} className="h-2" />
+                  <p className="text-sm text-muted-foreground">
+                    {lastImportResult.totalRows.toLocaleString()} lignes importées
+                  </p>
+                </div>
+              )}
+
+              {/* Scan for files */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button
+                    variant="outline"
+                    onClick={handleScanImportFiles}
+                    disabled={isLoading || !diagnostics?.success}
+                  >
+                    {isLoading ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <FileJson className="h-4 w-4 mr-2" />
+                    )}
+                    Scanner les fichiers
+                  </Button>
+                  
+                  {availableImportFiles.length > 0 && (
+                    <>
+                      <Button variant="outline" size="sm" onClick={selectAllImport}>
+                        Tout sélectionner
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={deselectAllImport}>
+                        Tout désélectionner
+                      </Button>
+                      <Badge variant="secondary" className="ml-2">
+                        {availableImportFiles.length} fichiers trouvés
+                      </Badge>
+                    </>
+                  )}
+                </div>
+
+                {availableImportFiles.length > 0 && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 max-h-96 overflow-y-auto p-1">
+                    {availableImportFiles.map((tableName) => {
+                      const tableInfo = ALL_TABLES.find(t => t.name === tableName);
+                      const result = getTableImportResult(tableName);
+                      
+                      return (
+                        <div
+                          key={tableName}
+                          className={`flex items-center gap-2 p-2 border rounded-lg transition-colors text-sm ${
+                            selectedImportTables.has(tableName) ? 'bg-primary/5 border-primary/30' : 'hover:bg-muted/50'
+                          }`}
+                        >
+                          <Checkbox
+                            id={`import-${tableName}`}
+                            checked={selectedImportTables.has(tableName)}
+                            onCheckedChange={() => toggleImportTable(tableName)}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <label 
+                              htmlFor={`import-${tableName}`}
+                              className="font-medium cursor-pointer truncate block"
+                            >
+                              {tableInfo?.label || tableName}
+                            </label>
+                            <p className="text-xs text-muted-foreground font-mono truncate">
+                              {tableName}.json
+                            </p>
+                          </div>
+                          
+                          {result && (
+                            result.success ? (
+                              <div className="flex items-center gap-1">
+                                <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                                {result.rowCount !== undefined && result.rowCount > 0 && (
+                                  <Badge variant="outline" className="text-xs">{result.rowCount}</Badge>
+                                )}
+                              </div>
+                            ) : (
+                              <XCircle className="h-4 w-4 text-red-500 shrink-0" />
+                            )
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {availableImportFiles.length === 0 && diagnostics?.success && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <FileJson className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                    <p>Cliquez sur "Scanner les fichiers" pour rechercher les fichiers à importer</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Import button */}
+              <div className="flex items-center gap-4 pt-4 border-t">
+                <Button
+                  onClick={handleImport}
+                  disabled={isImporting || selectedImportTables.size === 0 || !diagnostics?.success}
+                  className="flex-1"
+                  size="lg"
+                  variant="secondary"
+                >
+                  {isImporting ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4 mr-2" />
+                  )}
+                  Importer depuis Fabric ({selectedImportTables.size} tables)
+                </Button>
+              </div>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
 
