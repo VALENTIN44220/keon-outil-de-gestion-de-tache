@@ -715,8 +715,53 @@ export type Database = {
           },
         ]
       }
+      permission_profile_process_templates: {
+        Row: {
+          created_at: string
+          id: string
+          permission_profile_id: string
+          process_template_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          permission_profile_id: string
+          process_template_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          permission_profile_id?: string
+          process_template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "permission_profile_process_templates_permission_profile_id_fkey"
+            columns: ["permission_profile_id"]
+            isOneToOne: false
+            referencedRelation: "permission_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "permission_profile_process_templates_process_template_id_fkey"
+            columns: ["process_template_id"]
+            isOneToOne: false
+            referencedRelation: "process_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       permission_profiles: {
         Row: {
+          can_access_analytics: boolean
+          can_access_dashboard: boolean
+          can_access_projects: boolean
+          can_access_requests: boolean
+          can_access_settings: boolean
+          can_access_tasks: boolean
+          can_access_team: boolean
+          can_access_templates: boolean
+          can_access_workload: boolean
           can_assign_to_all: boolean
           can_assign_to_subordinates: boolean
           can_create_be_projects: boolean | null
@@ -738,6 +783,15 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          can_access_analytics?: boolean
+          can_access_dashboard?: boolean
+          can_access_projects?: boolean
+          can_access_requests?: boolean
+          can_access_settings?: boolean
+          can_access_tasks?: boolean
+          can_access_team?: boolean
+          can_access_templates?: boolean
+          can_access_workload?: boolean
           can_assign_to_all?: boolean
           can_assign_to_subordinates?: boolean
           can_create_be_projects?: boolean | null
@@ -759,6 +813,15 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          can_access_analytics?: boolean
+          can_access_dashboard?: boolean
+          can_access_projects?: boolean
+          can_access_requests?: boolean
+          can_access_settings?: boolean
+          can_access_tasks?: boolean
+          can_access_team?: boolean
+          can_access_templates?: boolean
+          can_access_workload?: boolean
           can_assign_to_all?: boolean
           can_assign_to_subordinates?: boolean
           can_create_be_projects?: boolean | null
@@ -2247,6 +2310,143 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "user_leaves_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_permission_overrides: {
+        Row: {
+          can_access_analytics: boolean | null
+          can_access_dashboard: boolean | null
+          can_access_projects: boolean | null
+          can_access_requests: boolean | null
+          can_access_settings: boolean | null
+          can_access_tasks: boolean | null
+          can_access_team: boolean | null
+          can_access_templates: boolean | null
+          can_access_workload: boolean | null
+          can_assign_to_all: boolean | null
+          can_assign_to_subordinates: boolean | null
+          can_create_be_projects: boolean | null
+          can_delete_be_projects: boolean | null
+          can_edit_be_projects: boolean | null
+          can_manage_all_tasks: boolean | null
+          can_manage_own_tasks: boolean | null
+          can_manage_subordinates_tasks: boolean | null
+          can_manage_templates: boolean | null
+          can_manage_users: boolean | null
+          can_view_all_tasks: boolean | null
+          can_view_be_projects: boolean | null
+          can_view_own_tasks: boolean | null
+          can_view_subordinates_tasks: boolean | null
+          created_at: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          can_access_analytics?: boolean | null
+          can_access_dashboard?: boolean | null
+          can_access_projects?: boolean | null
+          can_access_requests?: boolean | null
+          can_access_settings?: boolean | null
+          can_access_tasks?: boolean | null
+          can_access_team?: boolean | null
+          can_access_templates?: boolean | null
+          can_access_workload?: boolean | null
+          can_assign_to_all?: boolean | null
+          can_assign_to_subordinates?: boolean | null
+          can_create_be_projects?: boolean | null
+          can_delete_be_projects?: boolean | null
+          can_edit_be_projects?: boolean | null
+          can_manage_all_tasks?: boolean | null
+          can_manage_own_tasks?: boolean | null
+          can_manage_subordinates_tasks?: boolean | null
+          can_manage_templates?: boolean | null
+          can_manage_users?: boolean | null
+          can_view_all_tasks?: boolean | null
+          can_view_be_projects?: boolean | null
+          can_view_own_tasks?: boolean | null
+          can_view_subordinates_tasks?: boolean | null
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          can_access_analytics?: boolean | null
+          can_access_dashboard?: boolean | null
+          can_access_projects?: boolean | null
+          can_access_requests?: boolean | null
+          can_access_settings?: boolean | null
+          can_access_tasks?: boolean | null
+          can_access_team?: boolean | null
+          can_access_templates?: boolean | null
+          can_access_workload?: boolean | null
+          can_assign_to_all?: boolean | null
+          can_assign_to_subordinates?: boolean | null
+          can_create_be_projects?: boolean | null
+          can_delete_be_projects?: boolean | null
+          can_edit_be_projects?: boolean | null
+          can_manage_all_tasks?: boolean | null
+          can_manage_own_tasks?: boolean | null
+          can_manage_subordinates_tasks?: boolean | null
+          can_manage_templates?: boolean | null
+          can_manage_users?: boolean | null
+          can_view_all_tasks?: boolean | null
+          can_view_be_projects?: boolean | null
+          can_view_own_tasks?: boolean | null
+          can_view_subordinates_tasks?: boolean | null
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_permission_overrides_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_process_template_overrides: {
+        Row: {
+          created_at: string
+          id: string
+          is_visible: boolean
+          process_template_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_visible?: boolean
+          process_template_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_visible?: boolean
+          process_template_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_process_template_overrides_process_template_id_fkey"
+            columns: ["process_template_id"]
+            isOneToOne: false
+            referencedRelation: "process_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_process_template_overrides_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"

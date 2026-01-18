@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building2, Briefcase, Users, Layers, Shield, UserCog, Route, FolderTree, Download, FolderSync, UsersRound, CloudUpload } from 'lucide-react';
+import { Building2, Briefcase, Users, Layers, Shield, UserCog, Route, FolderTree, Download, FolderSync, UsersRound, CloudUpload, Grid3X3 } from 'lucide-react';
 import { CompaniesTab } from './CompaniesTab';
 import { DepartmentsTab } from './DepartmentsTab';
 import { JobTitlesTab } from './JobTitlesTab';
 import { HierarchyLevelsTab } from './HierarchyLevelsTab';
 import { PermissionProfilesTab } from './PermissionProfilesTab';
+import { PermissionMatrixTab } from './PermissionMatrixTab';
 import { UsersTab } from './UsersTab';
 import { AssignmentRulesTab } from './AssignmentRulesTab';
 import { CategoriesProcessTab } from './CategoriesProcessTab';
@@ -51,7 +52,7 @@ export function AdminTabs(props: AdminTabsProps) {
       </div>
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-12">
+        <TabsList className="flex flex-wrap gap-1">
           <TabsTrigger value="users" className="flex items-center gap-2">
             <UserCog className="h-4 w-4" />
             <span className="hidden sm:inline">Utilisateurs</span>
@@ -78,7 +79,11 @@ export function AdminTabs(props: AdminTabsProps) {
           </TabsTrigger>
           <TabsTrigger value="permissions" className="flex items-center gap-2">
             <Shield className="h-4 w-4" />
-            <span className="hidden sm:inline">Droits</span>
+            <span className="hidden sm:inline">Profils</span>
+          </TabsTrigger>
+          <TabsTrigger value="matrix" className="flex items-center gap-2">
+            <Grid3X3 className="h-4 w-4" />
+            <span className="hidden sm:inline">Matrice</span>
           </TabsTrigger>
           <TabsTrigger value="assignment-rules" className="flex items-center gap-2">
             <Route className="h-4 w-4" />
@@ -174,6 +179,16 @@ export function AdminTabs(props: AdminTabsProps) {
           onAdd={props.addPermissionProfile}
           onUpdate={props.updatePermissionProfile}
           onDelete={props.deletePermissionProfile}
+          onRefresh={props.refetch}
+        />
+      </TabsContent>
+
+      <TabsContent value="matrix">
+        <PermissionMatrixTab 
+          permissionProfiles={props.permissionProfiles}
+          users={props.users}
+          companies={props.companies}
+          departments={props.departments}
           onRefresh={props.refetch}
         />
       </TabsContent>

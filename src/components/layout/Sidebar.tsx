@@ -1,8 +1,8 @@
 import { LayoutDashboard, CheckSquare, BarChart3, Users, Settings, ChevronLeft, ChevronRight, Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText, ArrowLeftRight } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
-import { useUserPermissions } from '@/hooks/useUserPermissions';
+import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
 import { useAuth } from '@/contexts/AuthContext';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,60 +10,68 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import keonLogo from '@/assets/keon-logo.jpg';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { UserProfilePopover } from './UserProfilePopover';
+import type { ScreenPermissionKey } from '@/types/permissions';
 
 interface SidebarProps {
   activeView: string;
   onViewChange: (view: string) => void;
 }
 
-const baseMenuItems = [{
+const allMenuItems = [{
   id: 'dashboard',
   label: 'Tableau de bord',
   icon: LayoutDashboard,
-  path: '/'
+  path: '/',
+  permissionKey: 'can_access_dashboard' as ScreenPermissionKey
 }, {
   id: 'tasks',
   label: 'Tâches',
   icon: CheckSquare,
-  path: '/'
+  path: '/',
+  permissionKey: 'can_access_tasks' as ScreenPermissionKey
 }, {
   id: 'requests',
   label: 'Demandes',
   icon: FileText,
-  path: '/requests'
+  path: '/requests',
+  permissionKey: 'can_access_requests' as ScreenPermissionKey
 }, {
   id: 'templates',
   label: 'Modèles',
   icon: Workflow,
-  path: '/templates'
+  path: '/templates',
+  permissionKey: 'can_access_templates' as ScreenPermissionKey
 }, {
   id: 'workload',
   label: 'Plan de charge',
   icon: CalendarClock,
-  path: '/workload'
+  path: '/workload',
+  permissionKey: 'can_access_workload' as ScreenPermissionKey
 }, {
   id: 'analytics',
   label: 'Analytiques',
   icon: BarChart3,
-  path: '/'
+  path: '/',
+  permissionKey: 'can_access_analytics' as ScreenPermissionKey
 }, {
   id: 'team',
   label: 'Équipe',
   icon: Users,
-  path: '/'
+  path: '/',
+  permissionKey: 'can_access_team' as ScreenPermissionKey
 }, {
   id: 'settings',
   label: 'Paramètres',
   icon: Settings,
-  path: '/'
-}];
-
-const projectsMenuItem = {
+  path: '/',
+  permissionKey: 'can_access_settings' as ScreenPermissionKey
+}, {
   id: 'projects',
   label: 'Projets',
   icon: FolderOpen,
-  path: '/projects'
-};
+  path: '/projects',
+  permissionKey: 'can_access_projects' as ScreenPermissionKey
+}];
 
 const adminMenuItem = {
   id: 'admin',
@@ -88,8 +96,17 @@ export function Sidebar({
   });
   const navigate = useNavigate();
   const { isAdmin } = useUserRole();
-  const { canViewBEProjects } = useUserPermissions();
+  const { effectivePermissions, canAccessScreen } = useEffectivePermissions();
   const { profile } = useAuth();
+
+  // Build menu items based on effective permissions
+  const menuItems = useMemo(() => {
+    const filtered = allMenuItems.filter(item => canAccessScreen(item.permissionKey));
+    if (isAdmin) {
+      return [...filtered, adminMenuItem];
+    }
+    return filtered;
+  }, [effectivePermissions, isAdmin, canAccessScreen]);
 
   // On mobile/tablet, always collapsed. On desktop, use manual state
   const collapsed = isMobile || manualCollapsed;
@@ -107,9 +124,6 @@ export function Sidebar({
     setIsRightSide(newPosition);
     localStorage.setItem('sidebar-position', newPosition ? 'right' : 'left');
   };
-
-  // Build menu items based on permissions
-  const menuItems = [...baseMenuItems, ...(canViewBEProjects ? [projectsMenuItem] : []), ...(isAdmin ? [adminMenuItem] : [])];
 
   // Fetch permission profile name
   useEffect(() => {
