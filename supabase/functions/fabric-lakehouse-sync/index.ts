@@ -254,19 +254,22 @@ async function uploadDeltaTable(
     },
   });
 
-  // Create Delta log entry
-  const deltaLog = {
-    commitInfo: {
-      timestamp,
-      operation: 'WRITE',
-      operationParameters: { mode: 'Overwrite' },
-    },
+  // Create Delta log entries - EACH ACTION MUST BE A SEPARATE LINE (NDJSON format)
+  // Delta Lake protocol requires: protocol, metaData, add actions as separate JSON objects
+  const tableId = crypto.randomUUID();
+  
+  // Each action is a separate JSON object on its own line
+  const protocolAction = JSON.stringify({
     protocol: {
       minReaderVersion: 1,
       minWriterVersion: 2,
     },
+  });
+
+  const metaDataAction = JSON.stringify({
     metaData: {
-      id: crypto.randomUUID(),
+      id: tableId,
+      name: tableName,
       format: { provider: 'json', options: {} },
       schemaString: JSON.stringify({
         type: 'struct',
@@ -281,18 +284,32 @@ async function uploadDeltaTable(
       configuration: {},
       createdTime: timestamp,
     },
+  });
+
+  const addAction = JSON.stringify({
     add: {
       path: dataFileName,
+      partitionValues: {},
       size: contentBytes.length,
       modificationTime: timestamp,
       dataChange: true,
+      stats: JSON.stringify({ numRecords: data.length }),
     },
-  };
+  });
 
-  // Find next log version
+  const commitInfoAction = JSON.stringify({
+    commitInfo: {
+      timestamp,
+      operation: 'WRITE',
+      operationParameters: { mode: 'Overwrite' },
+      isBlindAppend: false,
+    },
+  });
+
+  // Delta log file must be NDJSON: each action on separate line
   const logFileName = '00000000000000000000.json';
   const logPath = `${deltaLogPath}/${logFileName}`;
-  const logContent = JSON.stringify(deltaLog);
+  const logContent = [protocolAction, metaDataAction, addAction, commitInfoAction].join('\n');
   const logBytes = new TextEncoder().encode(logContent);
 
   await fetch(`${logPath}?resource=file`, {
