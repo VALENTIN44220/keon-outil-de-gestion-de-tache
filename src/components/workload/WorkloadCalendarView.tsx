@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isToday, isWeekend, parseISO, addMonths, isSameMonth } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { TeamMemberWorkload } from '@/types/workload';
@@ -9,6 +9,20 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Holiday, UserLeave } from '@/types/workload';
+
+// Couleurs pour les collaborateurs
+const USER_COLORS = [
+  { bg: 'bg-blue-500', text: 'text-white', light: 'bg-blue-100 dark:bg-blue-900/40' },
+  { bg: 'bg-emerald-500', text: 'text-white', light: 'bg-emerald-100 dark:bg-emerald-900/40' },
+  { bg: 'bg-purple-500', text: 'text-white', light: 'bg-purple-100 dark:bg-purple-900/40' },
+  { bg: 'bg-orange-500', text: 'text-white', light: 'bg-orange-100 dark:bg-orange-900/40' },
+  { bg: 'bg-pink-500', text: 'text-white', light: 'bg-pink-100 dark:bg-pink-900/40' },
+  { bg: 'bg-cyan-500', text: 'text-white', light: 'bg-cyan-100 dark:bg-cyan-900/40' },
+  { bg: 'bg-rose-500', text: 'text-white', light: 'bg-rose-100 dark:bg-rose-900/40' },
+  { bg: 'bg-amber-500', text: 'text-white', light: 'bg-amber-100 dark:bg-amber-900/40' },
+  { bg: 'bg-indigo-500', text: 'text-white', light: 'bg-indigo-100 dark:bg-indigo-900/40' },
+  { bg: 'bg-teal-500', text: 'text-white', light: 'bg-teal-100 dark:bg-teal-900/40' },
+];
 
 interface WorkloadCalendarViewProps {
   workloadData: TeamMemberWorkload[];
@@ -32,6 +46,19 @@ export function WorkloadCalendarView({
   endDate: externalEndDate,
 }: WorkloadCalendarViewProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
+
+  // Map user IDs to consistent colors
+  const userColorMap = useMemo(() => {
+    const map = new Map<string, typeof USER_COLORS[0]>();
+    workloadData.forEach((member, index) => {
+      map.set(member.memberId, USER_COLORS[index % USER_COLORS.length]);
+    });
+    return map;
+  }, [workloadData]);
+
+  const getUserColor = useCallback((userId: string) => {
+    return userColorMap.get(userId) || USER_COLORS[0];
+  }, [userColorMap]);
 
   // Calculate date range based on view mode and external dates
   const { rangeStart, rangeEnd, days } = useMemo(() => {
@@ -100,12 +127,15 @@ export function WorkloadCalendarView({
     ? workloadData.find(m => m.memberId === selectedUserId) 
     : null;
 
-  // Get all leaves for all users (for "Tous" view)
+  // Get all leaves for all users (for "Tous" view) - filtered by selectedUserId if set
   const allUserLeaves = useMemo(() => {
     const leavesByDate: Record<string, { userId: string; userName: string; leaveType: string }[]> = {};
     
     leaves.forEach(leave => {
       if (leave.status === 'cancelled') return;
+      
+      // Filter by selected user if one is selected
+      if (selectedUserId && leave.user_id !== selectedUserId) return;
       
       const member = workloadData.find(m => m.memberId === leave.user_id);
       if (!member) return;
@@ -128,7 +158,7 @@ export function WorkloadCalendarView({
     });
     
     return leavesByDate;
-  }, [leaves, workloadData]);
+  }, [leaves, workloadData, selectedUserId]);
 
   const getDayInfo = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
@@ -254,24 +284,41 @@ export function WorkloadCalendarView({
           </div>
         )}
 
-        {/* Show all users' leaves when "Tous" is selected */}
+        {/* Show all users' leaves and tasks when "Tous" is selected */}
         {!selectedUserId && !isWeekendDay && !holiday && !compact && (
           <div className="space-y-1">
-            {/* Display slots count */}
-            <div className="text-[10px] text-muted-foreground">
-              {workloadData.reduce((count, m) => {
-                const d = m.days.find(dd => dd.date === format(day, 'yyyy-MM-dd'));
-                return count + (d?.morning.slot ? 1 : 0) + (d?.afternoon.slot ? 1 : 0);
-              }, 0)} créneaux
-            </div>
-            {/* Display leaves for all users */}
+            {/* Display slots by user with colors */}
+            {workloadData.slice(0, 4).map(member => {
+              const d = member.days.find(dd => dd.date === format(day, 'yyyy-MM-dd'));
+              const hasMorning = d?.morning.slot;
+              const hasAfternoon = d?.afternoon.slot;
+              if (!hasMorning && !hasAfternoon) return null;
+              const color = getUserColor(member.memberId);
+              return (
+                <div 
+                  key={member.memberId} 
+                  className={cn("text-[9px] rounded px-1 truncate cursor-pointer hover:opacity-80", color.light)}
+                  onClick={() => onUserSelect(member.memberId)}
+                >
+                  {member.memberName.split(' ')[0]}: {hasMorning && hasAfternoon ? '1j' : '½j'}
+                </div>
+              );
+            })}
+            {/* Display leaves for all users with colors */}
             {dayLeaves.length > 0 && (
               <div className="mt-1">
-                {dayLeaves.slice(0, 3).map((leave, idx) => (
-                  <div key={`${leave.userId}-${idx}`} className="text-[9px] bg-blue-100 dark:bg-blue-900/30 rounded px-1 truncate">
-                    {leave.userName.split(' ')[0]}
-                  </div>
-                ))}
+                {dayLeaves.slice(0, 3).map((leave, idx) => {
+                  const color = getUserColor(leave.userId);
+                  return (
+                    <div 
+                      key={`${leave.userId}-${idx}`} 
+                      className={cn("text-[9px] rounded px-1 truncate cursor-pointer hover:opacity-80", color.light)}
+                      onClick={() => onUserSelect(leave.userId)}
+                    >
+                      🌴 {leave.userName.split(' ')[0]}
+                    </div>
+                  );
+                })}
                 {dayLeaves.length > 3 && (
                   <div className="text-[9px] text-muted-foreground">
                     +{dayLeaves.length - 3} autre{dayLeaves.length - 3 > 1 ? 's' : ''}
@@ -287,7 +334,19 @@ export function WorkloadCalendarView({
           <div className="space-y-0.5">
             {dayLeaves.length > 0 && (
               <div className="text-[8px] text-blue-600 dark:text-blue-400">
-                {dayLeaves.length} congé{dayLeaves.length > 1 ? 's' : ''}
+                🌴 {dayLeaves.length}
+              </div>
+            )}
+            {/* Show task count in compact */}
+            {workloadData.reduce((count, m) => {
+              const d = m.days.find(dd => dd.date === format(day, 'yyyy-MM-dd'));
+              return count + (d?.morning.slot ? 1 : 0) + (d?.afternoon.slot ? 1 : 0);
+            }, 0) > 0 && (
+              <div className="text-[8px] text-green-600 dark:text-green-400">
+                📋 {workloadData.reduce((count, m) => {
+                  const d = m.days.find(dd => dd.date === format(day, 'yyyy-MM-dd'));
+                  return count + (d?.morning.slot ? 1 : 0) + (d?.afternoon.slot ? 1 : 0);
+                }, 0)}
               </div>
             )}
           </div>
@@ -312,22 +371,26 @@ export function WorkloadCalendarView({
             >
               Tous
             </Button>
-            {workloadData.map(member => (
-              <Button
-                key={member.memberId}
-                variant={selectedUserId === member.memberId ? "secondary" : "ghost"}
-                className="w-full justify-start gap-2"
-                onClick={() => onUserSelect(member.memberId)}
-              >
-                <Avatar className="h-6 w-6">
-                  <AvatarImage src={member.avatarUrl || undefined} />
-                  <AvatarFallback className="text-xs">
-                    {getInitials(member.memberName)}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="truncate">{member.memberName}</span>
-              </Button>
-            ))}
+            {workloadData.map(member => {
+              const color = getUserColor(member.memberId);
+              return (
+                <Button
+                  key={member.memberId}
+                  variant={selectedUserId === member.memberId ? "secondary" : "ghost"}
+                  className="w-full justify-start gap-2"
+                  onClick={() => onUserSelect(member.memberId)}
+                >
+                  <div className={cn("w-3 h-3 rounded-full shrink-0", color.bg)} />
+                  <Avatar className="h-6 w-6">
+                    <AvatarImage src={member.avatarUrl || undefined} />
+                    <AvatarFallback className="text-xs">
+                      {getInitials(member.memberName)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="truncate">{member.memberName}</span>
+                </Button>
+              );
+            })}
           </div>
         </CardContent>
       </Card>

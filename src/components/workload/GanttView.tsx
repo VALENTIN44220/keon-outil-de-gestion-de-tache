@@ -19,6 +19,7 @@ interface GanttViewProps {
   startDate: Date;
   endDate: Date;
   tasks: Task[];
+  viewMode?: 'week' | 'month' | 'quarter';
   onSlotAdd: (taskId: string, userId: string, date: string, halfDay: 'morning' | 'afternoon') => Promise<void>;
   onSlotRemove: (slotId: string) => Promise<void>;
   onSlotMove: (slotId: string, newDate: string, newHalfDay: 'morning' | 'afternoon') => Promise<void>;
@@ -62,6 +63,7 @@ export function GanttView({
   startDate,
   endDate,
   tasks,
+  viewMode = 'month',
   onSlotAdd,
   onSlotRemove,
   onSlotMove,
@@ -94,6 +96,21 @@ export function GanttView({
     days.push(new Date(currentDate));
     currentDate.setDate(currentDate.getDate() + 1);
   }
+
+  // Calculate column width based on view mode
+  const getColumnWidth = () => {
+    switch (viewMode) {
+      case 'week':
+        return 'w-32'; // Larger for week view
+      case 'quarter':
+        return 'w-12'; // Smaller for quarter view
+      case 'month':
+      default:
+        return 'w-24'; // Default for month view
+    }
+  };
+
+  const columnWidth = getColumnWidth();
 
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -331,15 +348,16 @@ export function GanttView({
                   <div
                     key={day.toISOString()}
                     className={cn(
-                      "w-24 shrink-0 text-center text-xs border-r",
+                      columnWidth,
+                      "shrink-0 text-center text-xs border-r",
                       isWeekendDay && "bg-muted/50"
                     )}
                   >
                     <div className="font-medium py-1 border-b">
-                      {format(day, 'EEE', { locale: fr })}
+                      {viewMode === 'quarter' ? format(day, 'E', { locale: fr }).charAt(0) : format(day, 'EEE', { locale: fr })}
                     </div>
                     <div className="py-1">
-                      {format(day, 'dd/MM', { locale: fr })}
+                      {viewMode === 'quarter' ? format(day, 'd') : format(day, 'dd/MM', { locale: fr })}
                     </div>
                   </div>
                 );
@@ -368,12 +386,17 @@ export function GanttView({
                   const isDropTargetMorning = dropTarget?.userId === member.memberId && dropTarget?.date === day.date && dropTarget?.halfDay === 'morning';
                   const isDropTargetAfternoon = dropTarget?.userId === member.memberId && dropTarget?.date === day.date && dropTarget?.halfDay === 'afternoon';
 
+                  // Compact mode for quarter view
+                  const isCompact = viewMode === 'quarter';
+                  const cellHeight = isCompact ? 'min-h-[32px]' : 'min-h-[48px]';
+
                   return (
-                    <div key={day.date} className="w-24 shrink-0 border-r flex">
+                    <div key={day.date} className={cn(columnWidth, "shrink-0 border-r flex")}>
                       {/* Morning */}
                       <div
                         className={cn(
-                          "flex-1 min-h-[48px] p-0.5 border-r border-dashed",
+                          "flex-1 p-0.5 border-r border-dashed",
+                          cellHeight,
                           day.morning.isWeekend && "bg-muted/50",
                           day.morning.isHoliday && "bg-amber-100 dark:bg-amber-900/30",
                           day.morning.isLeave && "bg-blue-100 dark:bg-blue-900/30",
@@ -384,13 +407,19 @@ export function GanttView({
                         onDrop={(e) => handleDrop(e, member.memberId, day.date, 'morning')}
                       >
                         {day.morning.isHoliday && (
-                          <Badge variant="outline" className="text-[10px] w-full justify-center bg-amber-200 dark:bg-amber-800">
-                            Férié
+                          <Badge variant="outline" className={cn(
+                            "w-full justify-center bg-amber-200 dark:bg-amber-800",
+                            isCompact ? "text-[8px] p-0" : "text-[10px]"
+                          )}>
+                            {isCompact ? 'F' : 'Férié'}
                           </Badge>
                         )}
                         {day.morning.isLeave && !day.morning.isHoliday && (
-                          <Badge variant="outline" className="text-[10px] w-full justify-center bg-blue-200 dark:bg-blue-800">
-                            Congé
+                          <Badge variant="outline" className={cn(
+                            "w-full justify-center bg-blue-200 dark:bg-blue-800",
+                            isCompact ? "text-[8px] p-0" : "text-[10px]"
+                          )}>
+                            {isCompact ? 'C' : 'Congé'}
                           </Badge>
                         )}
                         {day.morning.slot && !day.morning.isHoliday && !day.morning.isLeave && (() => {
@@ -398,8 +427,8 @@ export function GanttView({
                           const taskDuration = getTaskDuration ? getTaskDuration(slot.task_id) : null;
                           const progress = getTaskProgress ? getTaskProgress(slot.task_id) : null;
                           const progressPercent = progress && progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0;
-                          // Hide progress for tasks <= 1 day (2 half-days)
-                          const showProgress = taskDuration && taskDuration > 2 && progress && progress.total > 0;
+                          // Hide progress for tasks <= 1 day (2 half-days) or in compact mode
+                          const showProgress = !isCompact && taskDuration && taskDuration > 2 && progress && progress.total > 0;
                           
                           return (
                             <ContextMenu>
@@ -415,8 +444,13 @@ export function GanttView({
                                 >
                                   <Tooltip>
                                     <TooltipTrigger asChild>
-                                      <div className="h-full flex flex-col justify-between p-1">
-                                        <span className="text-[9px] font-medium truncate leading-tight">{slot.task?.title}</span>
+                                      <div className="h-full flex flex-col justify-between p-0.5">
+                                        {!isCompact && (
+                                          <span className="text-[9px] font-medium truncate leading-tight">{slot.task?.title}</span>
+                                        )}
+                                        {isCompact && (
+                                          <span className="text-[7px] font-medium truncate leading-tight">{slot.task?.title?.slice(0, 3)}</span>
+                                        )}
                                         {showProgress && (
                                           <div className="mt-auto">
                                             <div className="h-1 bg-white/30 rounded-full overflow-hidden">
@@ -460,7 +494,8 @@ export function GanttView({
                       {/* Afternoon */}
                       <div
                         className={cn(
-                          "flex-1 min-h-[48px] p-0.5",
+                          "flex-1 p-0.5",
+                          cellHeight,
                           day.afternoon.isWeekend && "bg-muted/50",
                           day.afternoon.isHoliday && "bg-amber-100 dark:bg-amber-900/30",
                           day.afternoon.isLeave && "bg-blue-100 dark:bg-blue-900/30",
@@ -471,13 +506,19 @@ export function GanttView({
                         onDrop={(e) => handleDrop(e, member.memberId, day.date, 'afternoon')}
                       >
                         {day.afternoon.isHoliday && (
-                          <Badge variant="outline" className="text-[10px] w-full justify-center bg-amber-200 dark:bg-amber-800">
-                            Férié
+                          <Badge variant="outline" className={cn(
+                            "w-full justify-center bg-amber-200 dark:bg-amber-800",
+                            isCompact ? "text-[8px] p-0" : "text-[10px]"
+                          )}>
+                            {isCompact ? 'F' : 'Férié'}
                           </Badge>
                         )}
                         {day.afternoon.isLeave && !day.afternoon.isHoliday && (
-                          <Badge variant="outline" className="text-[10px] w-full justify-center bg-blue-200 dark:bg-blue-800">
-                            Congé
+                          <Badge variant="outline" className={cn(
+                            "w-full justify-center bg-blue-200 dark:bg-blue-800",
+                            isCompact ? "text-[8px] p-0" : "text-[10px]"
+                          )}>
+                            {isCompact ? 'C' : 'Congé'}
                           </Badge>
                         )}
                         {day.afternoon.slot && !day.afternoon.isHoliday && !day.afternoon.isLeave && (() => {
@@ -485,8 +526,8 @@ export function GanttView({
                           const taskDuration = getTaskDuration ? getTaskDuration(slot.task_id) : null;
                           const progress = getTaskProgress ? getTaskProgress(slot.task_id) : null;
                           const progressPercent = progress && progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0;
-                          // Hide progress for tasks <= 1 day (2 half-days)
-                          const showProgress = taskDuration && taskDuration > 2 && progress && progress.total > 0;
+                          // Hide progress for tasks <= 1 day (2 half-days) or in compact mode
+                          const showProgress = !isCompact && taskDuration && taskDuration > 2 && progress && progress.total > 0;
                           
                           return (
                             <ContextMenu>
@@ -502,8 +543,13 @@ export function GanttView({
                                 >
                                   <Tooltip>
                                     <TooltipTrigger asChild>
-                                      <div className="h-full flex flex-col justify-between p-1">
-                                        <span className="text-[9px] font-medium truncate leading-tight">{slot.task?.title}</span>
+                                      <div className="h-full flex flex-col justify-between p-0.5">
+                                        {!isCompact && (
+                                          <span className="text-[9px] font-medium truncate leading-tight">{slot.task?.title}</span>
+                                        )}
+                                        {isCompact && (
+                                          <span className="text-[7px] font-medium truncate leading-tight">{slot.task?.title?.slice(0, 3)}</span>
+                                        )}
                                         {showProgress && (
                                           <div className="mt-auto">
                                             <div className="h-1 bg-white/30 rounded-full overflow-hidden">

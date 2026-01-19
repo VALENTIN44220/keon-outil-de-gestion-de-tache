@@ -318,6 +318,7 @@ export default function Workload() {
                     startDate={startDate}
                     endDate={endDate}
                     tasks={tasks}
+                    viewMode={viewMode}
                     onSlotAdd={handleAddSlot}
                     onSlotRemove={handleRemoveSlot}
                     onSlotMove={handleMoveSlot}
