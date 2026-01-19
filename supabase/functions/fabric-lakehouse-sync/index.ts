@@ -613,30 +613,39 @@ Deno.serve(async (req) => {
           
           const files: string[] = [];
           
-          // Parse the response and filter for _sync_back folder
+          // Parse the response and filter for _sync_back and export folders
+          const IMPORT_FOLDERS = ['_sync_back/', 'export/'];
           try {
             const jsonResponse = JSON.parse(altListText);
             if (jsonResponse.paths && Array.isArray(jsonResponse.paths)) {
               for (const path of jsonResponse.paths) {
                 const name = path.name || '';
-                // Only include files in _sync_back folder
-                if (name.includes('_sync_back/') && name.endsWith('.json')) {
+                // Include files in _sync_back or export folder
+                const isInImportFolder = IMPORT_FOLDERS.some(folder => name.includes(folder));
+                if (isInImportFolder && name.endsWith('.json')) {
                   const fileName = name.split('/').pop() || '';
                   const baseName = fileName.replace('.json', '');
-                  files.push(baseName);
-                  console.log(`Found matching file: ${baseName}`);
+                  if (!files.includes(baseName)) {
+                    files.push(baseName);
+                    const folder = IMPORT_FOLDERS.find(f => name.includes(f)) || '';
+                    console.log(`Found matching file in ${folder}: ${baseName}`);
+                  }
                 }
               }
             }
           } catch {
-            // Try regex for _sync_back paths
-            const pathMatches = altListText.matchAll(/"name"\s*:\s*"([^"]*_sync_back\/[^"]+\.json)"/gi);
-            for (const match of pathMatches) {
-              const fileName = match[1].split('/').pop() || '';
-              const baseName = fileName.replace('.json', '');
-              if (!files.includes(baseName)) {
-                files.push(baseName);
-                console.log(`Found file (regex): ${baseName}`);
+            // Try regex for _sync_back and export paths
+            for (const folder of IMPORT_FOLDERS) {
+              const folderEscaped = folder.replace('/', '\\/');
+              const regex = new RegExp(`"name"\\s*:\\s*"([^"]*${folderEscaped}[^"]+\\.json)"`, 'gi');
+              const pathMatches = altListText.matchAll(regex);
+              for (const match of pathMatches) {
+                const fileName = match[1].split('/').pop() || '';
+                const baseName = fileName.replace('.json', '');
+                if (!files.includes(baseName)) {
+                  files.push(baseName);
+                  console.log(`Found file in ${folder} (regex): ${baseName}`);
+                }
               }
             }
           }
@@ -648,7 +657,7 @@ Deno.serve(async (req) => {
             files,
             message: files.length > 0 
               ? `${files.length} fichier(s) trouvé(s) pour import` 
-              : 'Dossier _sync_back non trouvé ou vide. Créez-le dans Files/_sync_back/ et ajoutez des fichiers JSON.',
+              : 'Aucun fichier JSON trouvé. Placez vos fichiers dans Files/_sync_back/ ou Files/export/',
             tablePrefix: TABLE_PREFIX,
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
