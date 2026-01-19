@@ -8,7 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Grid3X3, Monitor, Workflow, User, Plus, Minus, RotateCcw, Check, X, AlertCircle } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Grid3X3, Monitor, Workflow, User, Plus, Minus, RotateCcw, Check, X, AlertCircle, ChevronDown, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { RefreshButton } from './RefreshButton';
 import { supabase } from '@/integrations/supabase/client';
@@ -392,150 +393,183 @@ export function PermissionMatrixTab({
                 Surcharges de droits par utilisateur
               </CardTitle>
               <CardDescription>
-                Accordez ou retirez des droits spécifiques à un utilisateur, indépendamment de son profil
+                Cliquez sur un utilisateur pour configurer ses droits spécifiques
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex gap-4 items-end">
-                <div className="flex-1">
-                  <Label>Sélectionner un utilisateur</Label>
-                  <Select value={selectedUserId || ''} onValueChange={setSelectedUserId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner un utilisateur" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {users.map(u => (
-                        <SelectItem key={u.id} value={u.id}>
-                          {u.display_name || 'Sans nom'} 
-                          {u.permission_profile && (
-                            <span className="text-muted-foreground ml-2">
-                              ({u.permission_profile.name})
-                            </span>
-                          )}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {selectedUserId && (
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={handleResetUserOverrides}
-                    className="text-orange-600"
-                  >
-                    <RotateCcw className="h-4 w-4 mr-2" />
-                    Réinitialiser
-                  </Button>
-                )}
+              {/* Legend */}
+              <div className="flex flex-wrap gap-4 text-xs text-muted-foreground p-3 rounded-lg bg-muted/30">
+                <span className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-muted border border-dashed" /> Hérité du profil
+                </span>
+                <span className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-green-100 ring-2 ring-green-500" /> Accordé
+                </span>
+                <span className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-red-100 ring-2 ring-red-500" /> Retiré
+                </span>
               </div>
 
-              {selectedUser && (
-                <>
-                  <div className="p-4 rounded-lg bg-muted/50 space-y-2">
-                    <p className="text-sm">
-                      <strong>Utilisateur :</strong> {selectedUser.display_name}
-                    </p>
-                    <p className="text-sm">
-                      <strong>Profil de base :</strong>{' '}
-                      <Badge variant="secondary">
-                        {selectedUser.permission_profile?.name || 'Aucun'}
-                      </Badge>
-                    </p>
-                    <div className="flex gap-4 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <div className="w-3 h-3 rounded bg-muted border border-dashed" /> Hérité du profil
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <div className="w-3 h-3 rounded bg-green-100 ring-2 ring-green-500" /> Accordé
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <div className="w-3 h-3 rounded bg-red-100 ring-2 ring-red-500" /> Retiré
-                      </span>
-                    </div>
-                  </div>
+              {/* User Cards Grid */}
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {users.map(user => {
+                  const isExpanded = selectedUserId === user.id;
+                  const userOverrides = getUserOverrides(user.id);
+                  const userProcessOverrides = getUserProcessOverrides(user.id);
+                  const hasOverrides = (userOverrides && Object.values(userOverrides).some(v => v !== null && v !== undefined)) || userProcessOverrides.length > 0;
+                  const profileProcesses = user.permission_profile?.id ? getProfileProcessTemplates(user.permission_profile.id) : [];
 
-                  {/* Screen Access Overrides */}
-                  <div className="space-y-3">
-                    <h4 className="font-medium flex items-center gap-2">
-                      <Monitor className="h-4 w-4" />
-                      Accès aux écrans
-                    </h4>
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      {SCREEN_PERMISSIONS.map(key => {
-                        const profileDefault = (selectedUser.permission_profile as any)?.[key] ?? true;
-                        const overrideValue = selectedUserOverrides?.[key];
-                        
-                        return (
-                          <div 
-                            key={key}
-                            className="flex items-center justify-between p-3 rounded-lg border"
-                          >
-                            <span className="text-sm">{SCREEN_LABELS[key]}</span>
-                            <OverrideCell
-                              overrideValue={overrideValue}
-                              profileDefault={profileDefault}
-                              onChange={() => handleUserOverrideToggle(key, overrideValue ?? null, profileDefault)}
+                  return (
+                    <Collapsible
+                      key={user.id}
+                      open={isExpanded}
+                      onOpenChange={(open) => setSelectedUserId(open ? user.id : null)}
+                    >
+                      <CollapsibleTrigger asChild>
+                        <div
+                          className={`
+                            p-3 rounded-xl border cursor-pointer transition-all
+                            ${isExpanded 
+                              ? 'bg-primary/5 border-primary shadow-md' 
+                              : 'hover:bg-muted/50 hover:border-muted-foreground/20'
+                            }
+                            ${hasOverrides ? 'border-l-4 border-l-orange-400' : ''}
+                          `}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm truncate">
+                                {user.display_name || 'Sans nom'}
+                              </p>
+                              <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
+                                <Building2 className="h-3 w-3" />
+                                {user.company?.name || 'Aucune société'}
+                              </p>
+                            </div>
+                            <ChevronDown 
+                              className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} 
                             />
                           </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+                        </div>
+                      </CollapsibleTrigger>
 
-                  {/* Process Template Overrides */}
-                  <div className="space-y-3">
-                    <h4 className="font-medium flex items-center gap-2">
-                      <Workflow className="h-4 w-4" />
-                      Visibilité des demandes
-                    </h4>
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                      {processTemplates.map(pt => {
-                        const profileHasAccess = selectedProfileProcesses.includes(pt.id);
-                        const override = selectedUserProcessOverrides.find(o => o.process_template_id === pt.id);
-                        const effectiveAccess = override ? override.is_visible : profileHasAccess;
-                        const isOverridden = !!override;
-
-                        return (
-                          <div 
-                            key={pt.id}
-                            className={`
-                              flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all
-                              ${isOverridden 
-                                ? effectiveAccess 
-                                  ? 'bg-green-50 border-green-500 ring-2 ring-green-500' 
-                                  : 'bg-red-50 border-red-500 ring-2 ring-red-500'
-                                : effectiveAccess
-                                  ? 'bg-green-50/50 border-green-200'
-                                  : 'bg-muted/30 border-muted'
-                              }
-                            `}
-                            onClick={() => handleUserProcessToggle(pt.id)}
-                          >
-                            {effectiveAccess ? (
-                              <Check className="h-4 w-4 text-green-600" />
-                            ) : (
-                              <X className="h-4 w-4 text-red-600" />
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-sm truncate">{pt.name}</p>
+                      <CollapsibleContent className="mt-2">
+                        <div className="p-4 rounded-xl border bg-card space-y-4 animate-fade-in">
+                          {/* User Info Header */}
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-1">
+                              <p className="font-medium">{user.display_name}</p>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="secondary" className="text-xs">
+                                  {user.permission_profile?.name || 'Aucun profil'}
+                                </Badge>
+                                {user.department?.name && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {user.department.name}
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
-                            {isOverridden && (
-                              <Badge variant="outline" className="text-xs">
-                                Surcharge
-                              </Badge>
-                            )}
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleResetUserOverrides();
+                              }}
+                              className="text-orange-600 hover:text-orange-700"
+                              disabled={!hasOverrides}
+                            >
+                              <RotateCcw className="h-4 w-4 mr-1" />
+                              Reset
+                            </Button>
                           </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </>
-              )}
 
-              {!selectedUserId && (
+                          {/* Screen Access Overrides */}
+                          <div className="space-y-2">
+                            <h4 className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-2">
+                              <Monitor className="h-3 w-3" />
+                              Accès aux écrans
+                            </h4>
+                            <div className="grid gap-2 grid-cols-3">
+                              {SCREEN_PERMISSIONS.map(key => {
+                                const profileDefault = (user.permission_profile as any)?.[key] ?? true;
+                                const overrideValue = userOverrides?.[key];
+                                
+                                return (
+                                  <div 
+                                    key={key}
+                                    className="flex items-center justify-between p-2 rounded-lg border bg-background text-xs"
+                                  >
+                                    <span className="truncate">{SCREEN_LABELS[key]}</span>
+                                    <OverrideCell
+                                      overrideValue={overrideValue}
+                                      profileDefault={profileDefault}
+                                      onChange={() => handleUserOverrideToggle(key, overrideValue ?? null, profileDefault)}
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Process Template Overrides */}
+                          <div className="space-y-2">
+                            <h4 className="text-xs font-semibold uppercase text-muted-foreground flex items-center gap-2">
+                              <Workflow className="h-3 w-3" />
+                              Visibilité des demandes
+                            </h4>
+                            <div className="grid gap-2 grid-cols-2">
+                              {processTemplates.map(pt => {
+                                const profileHasAccess = profileProcesses.includes(pt.id);
+                                const override = userProcessOverrides.find(o => o.process_template_id === pt.id);
+                                const effectiveAccess = override ? override.is_visible : profileHasAccess;
+                                const isOverridden = !!override;
+
+                                return (
+                                  <div 
+                                    key={pt.id}
+                                    className={`
+                                      flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all text-xs
+                                      ${isOverridden 
+                                        ? effectiveAccess 
+                                          ? 'bg-green-50 border-green-500 ring-1 ring-green-500' 
+                                          : 'bg-red-50 border-red-500 ring-1 ring-red-500'
+                                        : effectiveAccess
+                                          ? 'bg-green-50/50 border-green-200'
+                                          : 'bg-muted/30 border-muted'
+                                      }
+                                    `}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedUserId(user.id);
+                                      handleUserProcessToggle(pt.id);
+                                    }}
+                                  >
+                                    {effectiveAccess ? (
+                                      <Check className="h-3 w-3 text-green-600 flex-shrink-0" />
+                                    ) : (
+                                      <X className="h-3 w-3 text-red-600 flex-shrink-0" />
+                                    )}
+                                    <span className="truncate">{pt.name}</span>
+                                    {isOverridden && (
+                                      <AlertCircle className="h-3 w-3 flex-shrink-0 text-orange-500" />
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      </CollapsibleContent>
+                    </Collapsible>
+                  );
+                })}
+              </div>
+
+              {users.length === 0 && (
                 <p className="text-muted-foreground text-center py-8">
-                  Sélectionnez un utilisateur pour configurer ses surcharges de droits
+                  Aucun utilisateur disponible
                 </p>
               )}
             </CardContent>
