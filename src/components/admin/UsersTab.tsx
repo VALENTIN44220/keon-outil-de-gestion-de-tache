@@ -1,19 +1,30 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, UserPlus, Users, Building2, Briefcase, Layers, Shield, ChevronUp, ChevronDown, AlertCircle, RefreshCw, Upload, Trash2 } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Plus, UserPlus, Users, Building2, Briefcase, Layers, Shield, ChevronUp, ChevronDown, AlertCircle, RefreshCw, Upload, Trash2, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { RefreshButton } from './RefreshButton';
 import { BulkUserImportDialog } from './BulkUserImportDialog';
 import type { Company, Department, JobTitle, HierarchyLevel, PermissionProfile, UserProfile } from '@/types/admin';
+
+// KEON spectrum colors for companies
+const COMPANY_COLORS = [
+  { bg: 'bg-[hsl(185,80%,95%)]', border: 'border-[hsl(185,80%,50%)]', text: 'text-[hsl(185,80%,35%)]' },
+  { bg: 'bg-[hsl(210,80%,95%)]', border: 'border-[hsl(210,80%,55%)]', text: 'text-[hsl(210,80%,40%)]' },
+  { bg: 'bg-[hsl(270,60%,95%)]', border: 'border-[hsl(270,60%,55%)]', text: 'text-[hsl(270,60%,40%)]' },
+  { bg: 'bg-[hsl(10,80%,95%)]', border: 'border-[hsl(10,80%,55%)]', text: 'text-[hsl(10,80%,40%)]' },
+  { bg: 'bg-[hsl(25,90%,95%)]', border: 'border-[hsl(25,90%,55%)]', text: 'text-[hsl(25,90%,40%)]' },
+  { bg: 'bg-[hsl(45,90%,92%)]', border: 'border-[hsl(45,90%,50%)]', text: 'text-[hsl(45,90%,30%)]' },
+  { bg: 'bg-[hsl(145,70%,93%)]', border: 'border-[hsl(145,70%,45%)]', text: 'text-[hsl(145,70%,30%)]' },
+];
 
 interface UsersTabProps {
   users: UserProfile[];
@@ -43,6 +54,29 @@ export function UsersTab({
   const [isCreating, setIsCreating] = useState(false);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Create a stable color map for companies
+  const companyColorMap = useMemo(() => {
+    const map = new Map<string, typeof COMPANY_COLORS[0]>();
+    companies.forEach((company, index) => {
+      map.set(company.id, COMPANY_COLORS[index % COMPANY_COLORS.length]);
+    });
+    return map;
+  }, [companies]);
+
+  // Filter users based on search
+  const filteredUsers = useMemo(() => {
+    if (!searchQuery.trim()) return users;
+    const query = searchQuery.toLowerCase();
+    return users.filter(u => 
+      u.display_name?.toLowerCase().includes(query) ||
+      u.company?.name?.toLowerCase().includes(query) ||
+      u.department?.name?.toLowerCase().includes(query) ||
+      u.job_title?.name?.toLowerCase().includes(query)
+    );
+  }, [users, searchQuery]);
 
   const toggleSelection = (id: string) => {
     setSelectedIds(prev => 
@@ -460,113 +494,191 @@ export function UsersTab({
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          {users.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">Aucun utilisateur</p>
+        <CardContent className="space-y-4">
+          {/* Search and Selection Controls */}
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Rechercher par nom, société, service..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="select-all"
+                checked={selectedIds.length === filteredUsers.length && filteredUsers.length > 0}
+                onCheckedChange={() => {
+                  if (selectedIds.length === filteredUsers.length) {
+                    setSelectedIds([]);
+                  } else {
+                    setSelectedIds(filteredUsers.map(u => u.id));
+                  }
+                }}
+              />
+              <Label htmlFor="select-all" className="text-sm text-muted-foreground">
+                Tout sélectionner ({filteredUsers.length})
+              </Label>
+            </div>
+          </div>
+
+          {/* Company Color Legend */}
+          <div className="flex flex-wrap gap-2 p-3 rounded-lg bg-muted/30">
+            {companies.map(company => {
+              const colors = companyColorMap.get(company.id);
+              return (
+                <div 
+                  key={company.id}
+                  className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${colors?.bg} ${colors?.text} border ${colors?.border}`}
+                >
+                  <Building2 className="h-3 w-3" />
+                  {company.name}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* User Cards Grid */}
+          {filteredUsers.length === 0 ? (
+            <p className="text-muted-foreground text-center py-8">
+              {searchQuery ? 'Aucun utilisateur trouvé' : 'Aucun utilisateur'}
+            </p>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">
-                      <Checkbox
-                        checked={selectedIds.length === users.length && users.length > 0}
-                        onCheckedChange={toggleAll}
-                      />
-                    </TableHead>
-                    <TableHead>Nom</TableHead>
-                    <TableHead>Société</TableHead>
-                    <TableHead>Service</TableHead>
-                    <TableHead>Poste</TableHead>
-                    <TableHead>Niveau</TableHead>
-                    <TableHead>Manager</TableHead>
-                    <TableHead>Subordonnés</TableHead>
-                    <TableHead>Droits</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {users.map((user) => {
-                    const subordinates = getSubordinates(user.id);
-                    return (
-                      <TableRow
-                        key={user.id}
-                        data-state={selectedIds.includes(user.id) ? 'selected' : undefined}
-                        className="cursor-pointer"
-                        onClick={() => openEditDialog(user)}
-                      >
-                        <TableCell onClick={(e) => e.stopPropagation()}>
-                          <Checkbox
-                            checked={selectedIds.includes(user.id)}
-                            onCheckedChange={() => toggleSelection(user.id)}
-                          />
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          <div className="flex flex-col gap-1">
-                            <span>{user.display_name || 'Sans nom'}</span>
-                            <div className="flex flex-wrap items-center gap-2">
-                              {user.must_change_password && (
-                                <Badge variant="outline" className="w-fit text-xs text-amber-600 border-amber-300">
-                                  MDP à changer
-                                </Badge>
-                              )}
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 px-2 text-xs"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openEditDialog(user);
-                                }}
-                              >
-                                Modifier
-                              </Button>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {filteredUsers.map((user) => {
+                const isExpanded = expandedUserId === user.id;
+                const isSelected = selectedIds.includes(user.id);
+                const subordinates = getSubordinates(user.id);
+                const colors = user.company_id ? companyColorMap.get(user.company_id) : null;
+
+                return (
+                  <Collapsible
+                    key={user.id}
+                    open={isExpanded}
+                    onOpenChange={(open) => setExpandedUserId(open ? user.id : null)}
+                  >
+                    <div className={`
+                      rounded-xl border-2 overflow-hidden transition-all
+                      ${colors ? `${colors.bg} ${colors.border}` : 'bg-muted/30 border-muted'}
+                      ${isSelected ? 'ring-2 ring-primary ring-offset-2' : ''}
+                      ${isExpanded ? 'shadow-lg' : 'hover:shadow-md'}
+                    `}>
+                      {/* Collapsed Header - Always visible */}
+                      <CollapsibleTrigger asChild>
+                        <div className="p-3 cursor-pointer">
+                          <div className="flex items-center gap-3">
+                            <div 
+                              className="flex-shrink-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleSelection(user.id);
+                              }}
+                            >
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={() => toggleSelection(user.id)}
+                              />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className={`font-medium text-sm truncate ${colors?.text || 'text-foreground'}`}>
+                                {user.display_name || 'Sans nom'}
+                              </p>
+                              <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
+                                <Building2 className="h-3 w-3 flex-shrink-0" />
+                                {user.company?.name || 'Aucune société'}
+                              </p>
+                            </div>
+                            <ChevronDown 
+                              className={`h-4 w-4 text-muted-foreground transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`} 
+                            />
+                          </div>
+                        </div>
+                      </CollapsibleTrigger>
+
+                      {/* Expanded Content */}
+                      <CollapsibleContent>
+                        <div className="px-3 pb-3 pt-0 space-y-3 animate-fade-in border-t border-current/10">
+                          {/* Organization Info */}
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                              <span className="text-muted-foreground">Service</span>
+                              <p className="font-medium truncate">{user.department?.name || '-'}</p>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Poste</span>
+                              <p className="font-medium truncate">{user.job_title?.name || '-'}</p>
                             </div>
                           </div>
-                        </TableCell>
-                        <TableCell>{user.company?.name || '-'}</TableCell>
-                        <TableCell>{user.department?.name || '-'}</TableCell>
-                        <TableCell>{user.job_title?.name || '-'}</TableCell>
-                        <TableCell>
-                          {user.hierarchy_level ? (
-                            <Badge variant="outline">{user.hierarchy_level.name}</Badge>
-                          ) : '-'}
-                        </TableCell>
-                        <TableCell>
-                          {user.manager ? (
-                            <div className="flex items-center gap-1">
-                              <ChevronUp className="h-3 w-3 text-muted-foreground" />
-                              <span>{user.manager.display_name}</span>
+
+                          {/* Hierarchy Info */}
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                              <span className="text-muted-foreground">Niveau</span>
+                              <p className="font-medium">
+                                {user.hierarchy_level ? (
+                                  <Badge variant="outline" className="text-xs h-5">
+                                    {user.hierarchy_level.name}
+                                  </Badge>
+                                ) : '-'}
+                              </p>
                             </div>
-                          ) : '-'}
-                        </TableCell>
-                        <TableCell>
-                          {subordinates.length > 0 ? (
-                            <div className="flex items-center gap-1">
-                              <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                              <span>{subordinates.length}</span>
+                            <div>
+                              <span className="text-muted-foreground">Droits</span>
+                              <p className="font-medium">
+                                {user.permission_profile ? (
+                                  <Badge variant="secondary" className="text-xs h-5">
+                                    {user.permission_profile.name}
+                                  </Badge>
+                                ) : '-'}
+                              </p>
                             </div>
-                          ) : '-'}
-                        </TableCell>
-                        <TableCell>
-                          {user.permission_profile ? (
-                            <Badge variant="secondary">{user.permission_profile.name}</Badge>
-                          ) : '-'}
-                        </TableCell>
-                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          </div>
+
+                          {/* Manager & Subordinates */}
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                              <span className="text-muted-foreground flex items-center gap-1">
+                                <ChevronUp className="h-3 w-3" /> Manager
+                              </span>
+                              <p className="font-medium truncate">
+                                {user.manager?.display_name || '-'}
+                              </p>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground flex items-center gap-1">
+                                <ChevronDown className="h-3 w-3" /> Subordonnés
+                              </span>
+                              <p className="font-medium">{subordinates.length || '-'}</p>
+                            </div>
+                          </div>
+
+                          {/* Badges */}
+                          {user.must_change_password && (
+                            <Badge variant="outline" className="text-xs text-amber-600 border-amber-300 bg-amber-50">
+                              <AlertCircle className="h-3 w-3 mr-1" />
+                              MDP à changer
+                            </Badge>
+                          )}
+
+                          {/* Actions */}
                           <Button
-                            variant="ghost"
                             size="sm"
-                            onClick={() => openEditDialog(user)}
+                            className="w-full"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEditDialog(user);
+                            }}
                           >
                             Modifier
                           </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+                        </div>
+                      </CollapsibleContent>
+                    </div>
+                  </Collapsible>
+                );
+              })}
             </div>
           )}
         </CardContent>
