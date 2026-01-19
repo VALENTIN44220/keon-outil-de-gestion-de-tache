@@ -26,6 +26,7 @@ export default function Workload() {
   const { profile } = useAuth();
   const [activeView, setActiveView] = useState('workload');
   const [activeTab, setActiveTab] = useState('gantt');
+  const [viewMode, setViewMode] = useState<'week' | 'month' | 'quarter'>('month');
   const [startDate, setStartDate] = useState(() => startOfMonth(new Date()));
   const [endDate, setEndDate] = useState(() => endOfMonth(new Date()));
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
@@ -76,9 +77,12 @@ export default function Workload() {
     }
   }, [profile?.id, teamMembers]);
 
-  const handleDateRangeChange = (start: Date, end: Date) => {
+  const handleDateRangeChange = (start: Date, end: Date, mode?: 'week' | 'month' | 'quarter') => {
     setStartDate(start);
     setEndDate(end);
+    if (mode) {
+      setViewMode(mode);
+    }
   };
 
   const handleAddSlot = async (taskId: string, userId: string, date: string, halfDay: 'morning' | 'afternoon') => {
@@ -334,6 +338,9 @@ export default function Workload() {
                     leaves={leaves}
                     selectedUserId={selectedCalendarUserId}
                     onUserSelect={setSelectedCalendarUserId}
+                    viewMode={viewMode}
+                    startDate={startDate}
+                    endDate={endDate}
                   />
                 </TabsContent>
 

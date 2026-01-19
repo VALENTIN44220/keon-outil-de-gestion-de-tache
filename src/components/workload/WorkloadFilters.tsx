@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 interface WorkloadFiltersProps {
   startDate: Date;
   endDate: Date;
-  onDateRangeChange: (start: Date, end: Date) => void;
+  onDateRangeChange: (start: Date, end: Date, viewMode?: 'week' | 'month' | 'quarter') => void;
   selectedUserIds: string[];
   onUserIdsChange: (ids: string[]) => void;
   selectedProcessId: string | null;
@@ -71,7 +71,7 @@ export function WorkloadFilters({
     }
     
     setDateRange({ from: start, to: end });
-    onDateRangeChange(start, end);
+    onDateRangeChange(start, end, preset);
   };
 
   const handleUserToggle = (userId: string) => {
