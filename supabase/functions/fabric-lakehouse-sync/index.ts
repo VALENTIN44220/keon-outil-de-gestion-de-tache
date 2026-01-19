@@ -453,7 +453,11 @@ Deno.serve(async (req) => {
       const results: SyncResult[] = [];
       const syncBackPath = `${lakehouseRootUrl('https://onelake.dfs.fabric.microsoft.com', workspaceId, lakehouseId)}/Files/_sync_back`;
 
-      for (const tableName of tablesToImport) {
+      for (const inputName of tablesToImport) {
+        // Handle both formats: "LOVABLE_APPTASK_user_leaves" or "user_leaves"
+        const tableName = inputName.startsWith(TABLE_PREFIX) 
+          ? inputName.substring(TABLE_PREFIX.length) 
+          : inputName;
         const fabricTableName = getFabricTableName(tableName);
         
         try {
