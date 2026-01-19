@@ -126,7 +126,7 @@ function lakehouseRootUrl(baseUrl: string, workspaceId: string, lakehouseIdOrNam
 async function writeFileToOneLake(
   accessToken: string,
   filePath: string,
-  content: Uint8Array
+  contentString: string
 ): Promise<void> {
   // Create file
   const createResponse = await fetch(`${filePath}?resource=file`, {
@@ -143,20 +143,20 @@ async function writeFileToOneLake(
     throw new Error(`Failed to create file: ${createResponse.status}`);
   }
 
-  // Append content - use ReadableStream for Deno compatibility
+  // Get content length in bytes (important for UTF-8 characters)
+  const encoder = new TextEncoder();
+  const contentBytes = encoder.encode(contentString);
+  const contentLength = contentBytes.length;
+
+  // Append content - send as string body, Deno handles encoding
   const appendResponse = await fetch(`${filePath}?action=append&position=0`, {
     method: 'PATCH',
     headers: {
       'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/octet-stream',
-      'Content-Length': content.length.toString(),
+      'Content-Length': contentLength.toString(),
     },
-    body: new ReadableStream({
-      start(controller) {
-        controller.enqueue(content);
-        controller.close();
-      }
-    }),
+    body: contentString,
   });
 
   if (!appendResponse.ok && appendResponse.status !== 202) {
@@ -166,7 +166,7 @@ async function writeFileToOneLake(
   }
 
   // Flush
-  const flushResponse = await fetch(`${filePath}?action=flush&position=${content.length}`, {
+  const flushResponse = await fetch(`${filePath}?action=flush&position=${contentLength}`, {
     method: 'PATCH',
     headers: {
       'Authorization': `Bearer ${accessToken}`,
@@ -244,11 +244,10 @@ async function uploadAsCSV(
   }
 
   const csvContent = csvRows.join('\n');
-  const contentBytes = new TextEncoder().encode(csvContent);
 
-  console.log(`Uploading CSV to: ${csvPath} (${data.length} rows, ${contentBytes.length} bytes)`);
+  console.log(`Uploading CSV to: ${csvPath} (${data.length} rows)`);
 
-  await writeFileToOneLake(accessToken, csvPath, contentBytes);
+  await writeFileToOneLake(accessToken, csvPath, csvContent);
 
   return data.length;
 }
@@ -266,10 +265,9 @@ async function uploadAsJSON(
   
   const jsonPath = `${root}/Files/${fabricTableName}.json`;
   const jsonContent = JSON.stringify(data, null, 2);
-  const contentBytes = new TextEncoder().encode(jsonContent);
 
   console.log(`Uploading JSON to: ${jsonPath}`);
-  await writeFileToOneLake(accessToken, jsonPath, contentBytes);
+  await writeFileToOneLake(accessToken, jsonPath, jsonContent);
 }
 
 // Check OneLake connectivity
