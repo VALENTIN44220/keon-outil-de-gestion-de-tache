@@ -56,6 +56,7 @@ export function UsersTab({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCompanyFilter, setSelectedCompanyFilter] = useState<string | null>(null);
 
   // Create a stable color map for companies
   const companyColorMap = useMemo(() => {
@@ -66,17 +67,28 @@ export function UsersTab({
     return map;
   }, [companies]);
 
-  // Filter users based on search
+  // Filter users based on search and company filter
   const filteredUsers = useMemo(() => {
-    if (!searchQuery.trim()) return users;
-    const query = searchQuery.toLowerCase();
-    return users.filter(u => 
-      u.display_name?.toLowerCase().includes(query) ||
-      u.company?.name?.toLowerCase().includes(query) ||
-      u.department?.name?.toLowerCase().includes(query) ||
-      u.job_title?.name?.toLowerCase().includes(query)
-    );
-  }, [users, searchQuery]);
+    let result = users;
+    
+    // Apply company filter
+    if (selectedCompanyFilter) {
+      result = result.filter(u => u.company_id === selectedCompanyFilter);
+    }
+    
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(u => 
+        u.display_name?.toLowerCase().includes(query) ||
+        u.company?.name?.toLowerCase().includes(query) ||
+        u.department?.name?.toLowerCase().includes(query) ||
+        u.job_title?.name?.toLowerCase().includes(query)
+      );
+    }
+    
+    return result;
+  }, [users, searchQuery, selectedCompanyFilter]);
 
   const toggleSelection = (id: string) => {
     setSelectedIds(prev => 
@@ -524,18 +536,34 @@ export function UsersTab({
             </div>
           </div>
 
-          {/* Company Color Legend */}
+          {/* Company Color Legend - Clickable Filters */}
           <div className="flex flex-wrap gap-2 p-3 rounded-lg bg-muted/30">
+            <button
+              onClick={() => setSelectedCompanyFilter(null)}
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition-all
+                ${!selectedCompanyFilter 
+                  ? 'bg-primary text-primary-foreground ring-2 ring-primary ring-offset-1' 
+                  : 'bg-muted hover:bg-muted/80 text-muted-foreground'
+                }`}
+            >
+              Tous ({users.length})
+            </button>
             {companies.map(company => {
               const colors = companyColorMap.get(company.id);
+              const isActive = selectedCompanyFilter === company.id;
+              const count = users.filter(u => u.company_id === company.id).length;
               return (
-                <div 
+                <button 
                   key={company.id}
-                  className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${colors?.bg} ${colors?.text} border ${colors?.border}`}
+                  onClick={() => setSelectedCompanyFilter(isActive ? null : company.id)}
+                  className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition-all cursor-pointer
+                    ${colors?.bg} ${colors?.text} border ${colors?.border}
+                    ${isActive ? 'ring-2 ring-offset-1 ring-primary shadow-md scale-105' : 'hover:scale-105 hover:shadow-sm'}
+                  `}
                 >
                   <Building2 className="h-3 w-3" />
-                  {company.name}
-                </div>
+                  {company.name} ({count})
+                </button>
               );
             })}
           </div>
