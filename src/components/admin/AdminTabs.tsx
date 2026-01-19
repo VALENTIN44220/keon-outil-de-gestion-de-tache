@@ -52,58 +52,45 @@ export function AdminTabs(props: AdminTabsProps) {
       </div>
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="flex flex-wrap gap-1">
-          <TabsTrigger value="users" className="flex items-center gap-2">
+        <TabsList className="h-auto p-1 flex flex-wrap justify-start">
+          <TabsTrigger value="users" className="px-2 py-1.5" title="Utilisateurs">
             <UserCog className="h-4 w-4" />
-            <span className="hidden sm:inline">Utilisateurs</span>
           </TabsTrigger>
-          <TabsTrigger value="groups" className="flex items-center gap-2">
+          <TabsTrigger value="groups" className="px-2 py-1.5" title="Groupes">
             <UsersRound className="h-4 w-4" />
-            <span className="hidden sm:inline">Groupes</span>
           </TabsTrigger>
-          <TabsTrigger value="companies" className="flex items-center gap-2">
+          <TabsTrigger value="companies" className="px-2 py-1.5" title="Sociétés">
             <Building2 className="h-4 w-4" />
-            <span className="hidden sm:inline">Sociétés</span>
           </TabsTrigger>
-          <TabsTrigger value="departments" className="flex items-center gap-2">
+          <TabsTrigger value="departments" className="px-2 py-1.5" title="Services">
             <Briefcase className="h-4 w-4" />
-            <span className="hidden sm:inline">Services</span>
           </TabsTrigger>
-          <TabsTrigger value="job-titles" className="flex items-center gap-2">
+          <TabsTrigger value="job-titles" className="px-2 py-1.5" title="Postes">
             <Users className="h-4 w-4" />
-            <span className="hidden sm:inline">Postes</span>
           </TabsTrigger>
-          <TabsTrigger value="hierarchy" className="flex items-center gap-2">
+          <TabsTrigger value="hierarchy" className="px-2 py-1.5" title="Hiérarchie">
             <Layers className="h-4 w-4" />
-            <span className="hidden sm:inline">Hiérarchie</span>
           </TabsTrigger>
-          <TabsTrigger value="permissions" className="flex items-center gap-2">
+          <TabsTrigger value="permissions" className="px-2 py-1.5" title="Profils de permissions">
             <Shield className="h-4 w-4" />
-            <span className="hidden sm:inline">Profils</span>
           </TabsTrigger>
-          <TabsTrigger value="matrix" className="flex items-center gap-2">
+          <TabsTrigger value="matrix" className="px-2 py-1.5" title="Matrice des permissions">
             <Grid3X3 className="h-4 w-4" />
-            <span className="hidden sm:inline">Matrice</span>
           </TabsTrigger>
-          <TabsTrigger value="assignment-rules" className="flex items-center gap-2">
+          <TabsTrigger value="assignment-rules" className="px-2 py-1.5" title="Règles d'affectation">
             <Route className="h-4 w-4" />
-            <span className="hidden sm:inline">Affectation</span>
           </TabsTrigger>
-          <TabsTrigger value="categories-process" className="flex items-center gap-2">
+          <TabsTrigger value="categories-process" className="px-2 py-1.5" title="Catégories & Processus">
             <FolderTree className="h-4 w-4" />
-            <span className="hidden sm:inline">Catégories</span>
           </TabsTrigger>
-          <TabsTrigger value="export" className="flex items-center gap-2">
+          <TabsTrigger value="export" className="px-2 py-1.5" title="Export de données">
             <Download className="h-4 w-4" />
-            <span className="hidden sm:inline">Export</span>
           </TabsTrigger>
-          <TabsTrigger value="sharepoint" className="flex items-center gap-2">
+          <TabsTrigger value="sharepoint" className="px-2 py-1.5" title="Synchronisation SharePoint">
             <FolderSync className="h-4 w-4" />
-            <span className="hidden sm:inline">SharePoint</span>
           </TabsTrigger>
-          <TabsTrigger value="fabric" className="flex items-center gap-2">
+          <TabsTrigger value="fabric" className="px-2 py-1.5" title="Synchronisation Fabric">
             <CloudUpload className="h-4 w-4" />
-            <span className="hidden sm:inline">Fabric</span>
           </TabsTrigger>
         </TabsList>
 
