@@ -483,6 +483,174 @@ export function FabricLakehouseSyncTab() {
         </CardContent>
       </Card>
 
+      {/* Notebook Example for Enrichment */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Database className="h-5 w-5" />
+            Exemple de Notebook : Synchronisation Lucca → Congés
+          </CardTitle>
+          <CardDescription>
+            Exemple PySpark pour enrichir la table user_leaves avec les données Lucca
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="p-4 bg-purple-50 dark:bg-purple-950 rounded-lg border border-purple-200 dark:border-purple-800">
+            <p className="text-sm text-purple-800 dark:text-purple-200 mb-2">
+              <strong>Workflow bidirectionnel :</strong>
+            </p>
+            <ol className="text-sm text-purple-800 dark:text-purple-200 list-decimal list-inside space-y-1">
+              <li>Exporter les tables depuis Lovable → Fabric (onglet Export)</li>
+              <li>Exécuter le notebook pour enrichir les données avec Lucca</li>
+              <li>Importer les données enrichies depuis Fabric → Lovable (onglet Import)</li>
+            </ol>
+          </div>
+
+          <div className="space-y-2">
+            <h4 className="font-medium">Mapping des colonnes : lucca_leaves_source → user_leaves</h4>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="bg-muted">
+                    <th className="border p-2 text-left">Lucca (source)</th>
+                    <th className="border p-2 text-left">Lovable (cible)</th>
+                    <th className="border p-2 text-left">Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="border p-2 font-mono">id</td>
+                    <td className="border p-2 font-mono">id_lucca</td>
+                    <td className="border p-2">Identifiant Lucca (205-20250114-AM)</td>
+                  </tr>
+                  <tr>
+                    <td className="border p-2 font-mono">ownerId</td>
+                    <td className="border p-2 font-mono">user_id</td>
+                    <td className="border p-2">Jointure avec profiles.id_lucca</td>
+                  </tr>
+                  <tr>
+                    <td className="border p-2 font-mono">date_day</td>
+                    <td className="border p-2 font-mono">start_date / end_date</td>
+                    <td className="border p-2">Date du congé (agréger par période)</td>
+                  </tr>
+                  <tr>
+                    <td className="border p-2 font-mono">halfDay</td>
+                    <td className="border p-2 font-mono">start_half_day / end_half_day</td>
+                    <td className="border p-2">AM ou PM</td>
+                  </tr>
+                  <tr>
+                    <td className="border p-2 font-mono">leaveType</td>
+                    <td className="border p-2 font-mono">leave_type</td>
+                    <td className="border p-2">Type de congé</td>
+                  </tr>
+                  <tr>
+                    <td className="border p-2 font-mono">comment</td>
+                    <td className="border p-2 font-mono">description</td>
+                    <td className="border p-2">Commentaire</td>
+                  </tr>
+                  <tr>
+                    <td className="border p-2 font-mono">isConfirmed</td>
+                    <td className="border p-2 font-mono">status</td>
+                    <td className="border p-2">True → declared / False → pending</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <h4 className="font-medium flex items-center gap-2">
+              Code PySpark (Notebook Fabric)
+              <Badge variant="outline">Python</Badge>
+            </h4>
+            <pre className="p-4 bg-muted rounded-lg text-xs overflow-x-auto whitespace-pre font-mono">
+{`# ========================================
+# Notebook: Sync Lucca Leaves to Lovable
+# ========================================
+
+from pyspark.sql import functions as F
+from pyspark.sql.window import Window
+import json
+
+# 1. Lire les tables sources
+df_lucca = spark.read.table("lucca_leaves_source")
+df_profiles = spark.read.table("LOVABLE_APPTASK_profiles")
+df_existing = spark.read.table("LOVABLE_APPTASK_user_leaves")
+
+# 2. Joindre avec profiles pour obtenir user_id depuis id_lucca
+df_lucca_with_user = df_lucca.alias("l").join(
+    df_profiles.alias("p"),
+    F.col("l.ownerId") == F.col("p.id_lucca"),
+    "left"
+).select(
+    F.col("l.id").alias("id_lucca"),
+    F.col("p.id").alias("user_id"),
+    F.col("l.date_day"),
+    F.col("l.halfDay"),
+    F.col("l.leaveType").alias("leave_type"),
+    F.col("l.comment").alias("description"),
+    F.col("l.isConfirmed"),
+    F.col("l.leavePeriodId")
+)
+
+# 3. Agréger par période de congé (min/max date)
+window = Window.partitionBy("user_id", "leavePeriodId")
+
+df_aggregated = df_lucca_with_user.withColumn(
+    "start_date", F.min("date_day").over(window)
+).withColumn(
+    "end_date", F.max("date_day").over(window)
+).withColumn(
+    "row_num", F.row_number().over(
+        window.orderBy("date_day")
+    )
+).filter(F.col("row_num") == 1).select(
+    F.expr("uuid()").alias("id"),  # Génère un nouvel ID
+    "user_id",
+    "start_date",
+    "end_date",
+    F.when(F.col("halfDay") == "AM", "AM")
+     .when(F.col("halfDay") == "PM", "PM")
+     .otherwise(None).alias("start_half_day"),
+    F.lit(None).alias("end_half_day"),
+    "leave_type",
+    "description",
+    F.when(F.col("isConfirmed") == True, "declared")
+     .otherwise("pending").alias("status"),
+    "id_lucca",
+    F.current_timestamp().alias("created_at"),
+    F.current_timestamp().alias("updated_at")
+)
+
+# 4. Filtrer les nouveaux congés (non existants)
+df_new = df_aggregated.join(
+    df_existing,
+    df_aggregated.id_lucca == df_existing.id_lucca,
+    "left_anti"
+)
+
+# 5. Convertir en JSON pour l'import
+records = df_new.toJSON().collect()
+json_data = [json.loads(r) for r in records]
+
+# 6. Écrire dans _sync_back pour l'import
+output_path = "Files/_sync_back/LOVABLE_APPTASK_user_leaves.json"
+dbutils.fs.put(output_path, json.dumps(json_data, indent=2), True)
+
+print(f"✅ {len(json_data)} nouveaux congés prêts à importer")
+print(f"📁 Fichier: {output_path}")`}
+            </pre>
+          </div>
+
+          <div className="p-4 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
+            <p className="text-sm text-green-800 dark:text-green-200">
+              <strong>Après exécution du notebook :</strong> Retournez dans l'onglet "Importer depuis Fabric", 
+              cliquez sur "Scanner les fichiers" puis "Importer" pour synchroniser les données Lucca dans l'application.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Instructions */}
       <Card>
         <CardHeader>
