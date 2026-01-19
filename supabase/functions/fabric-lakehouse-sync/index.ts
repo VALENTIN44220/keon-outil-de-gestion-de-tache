@@ -558,164 +558,49 @@ Deno.serve(async (req) => {
     if (action === 'list-import-files') {
       const baseUrl = 'https://onelake.dfs.fabric.microsoft.com';
       const root = lakehouseRootUrl(baseUrl, workspaceId, lakehouseId);
-      
+      const syncBackPath = `${root}/Files/_sync_back`;
+
       try {
-        // ADLS Gen2 uses filesystem listing with directory parameter
-        // Format: /{workspace}/{lakehouse}/Files?resource=filesystem&directory=_sync_back&recursive=false
-        const listUrl = `${root}/Files?resource=filesystem&directory=_sync_back&recursive=false`;
-        
-        console.log(`Listing files with ADLS Gen2 API: ${listUrl}`);
-        
-        const listResponse = await fetch(listUrl, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'x-ms-version': '2021-06-08',
-          },
-        });
-
-        console.log(`List response status: ${listResponse.status}`);
-
-        // If directory parameter is not supported, try alternate approach
-        if (!listResponse.ok || listResponse.status === 400) {
-          const errorText = await listResponse.text();
-          console.log(`First approach failed: ${errorText}`);
-          
-          // Alternative: List all files in Files folder and filter
-          const altListUrl = `${root}/Files?resource=filesystem&recursive=true`;
-          console.log(`Trying alternate listing: ${altListUrl}`);
-          
-          const altListResponse = await fetch(altListUrl, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'x-ms-version': '2021-06-08',
-            },
-          });
-          
-          console.log(`Alternate list response status: ${altListResponse.status}`);
-          
-          if (!altListResponse.ok && altListResponse.status !== 200) {
-            const altErrorText = await altListResponse.text();
-            console.log(`Alternate approach also failed: ${altErrorText}`);
-            return new Response(JSON.stringify({
-              success: true,
-              files: [],
-              message: 'Impossible de lister les fichiers. Vérifiez les permissions du Service Principal sur le Lakehouse.',
-              tablePrefix: TABLE_PREFIX,
-            }), {
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            });
-          }
-          
-          const altListText = await altListResponse.text();
-          console.log(`Alternate response (first 1000 chars): ${altListText.substring(0, 1000)}`);
-          
-          const files: string[] = [];
-          
-          // Parse the response and filter strictly for _sync_back folder
-          try {
-            const jsonResponse = JSON.parse(altListText);
-            if (jsonResponse.paths && Array.isArray(jsonResponse.paths)) {
-              for (const path of jsonResponse.paths) {
-                const name = path.name || '';
-                // Only include files in _sync_back folder
-                if (name.includes('_sync_back/') && name.endsWith('.json')) {
-                  const fileName = name.split('/').pop() || '';
-                  const baseName = fileName.replace('.json', '');
-                  if (!files.includes(baseName)) {
-                    files.push(baseName);
-                    console.log(`Found matching file in _sync_back: ${baseName}`);
-                  }
-                }
-              }
-            }
-          } catch {
-            // Try regex for _sync_back paths
-            const pathMatches = altListText.matchAll(/"name"\s*:\s*"([^"]*_sync_back\/[^"]+\.json)"/gi);
-            for (const match of pathMatches) {
-              const fileName = match[1].split('/').pop() || '';
-              const baseName = fileName.replace('.json', '');
-              if (!files.includes(baseName)) {
-                files.push(baseName);
-                console.log(`Found file in _sync_back (regex): ${baseName}`);
-              }
-            }
-          }
-          
-          console.log(`Total files found: ${files.length}`);
-          
-          return new Response(JSON.stringify({
-            success: true,
-            files,
-            message: files.length > 0 
-              ? `${files.length} fichier(s) trouvé(s) pour import` 
-              : 'Dossier _sync_back non trouvé ou vide. Créez-le dans Files/_sync_back/ et ajoutez des fichiers JSON.',
-            tablePrefix: TABLE_PREFIX,
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
-        }
-
-        const listText = await listResponse.text();
-        console.log(`List response (first 500 chars): ${listText.substring(0, 500)}`);
-        
+        // Deterministic approach: check expected files existence in Files/_sync_back
+        // This avoids relying on directory listing APIs that may ignore the `directory` param.
         const files: string[] = [];
-        
-        // Try to parse as JSON first (ADLS Gen2 returns JSON)
-        try {
-          const jsonResponse = JSON.parse(listText);
-            if (jsonResponse.paths && Array.isArray(jsonResponse.paths)) {
-              for (const path of jsonResponse.paths) {
-                const name = path.name || '';
-                // Only include files from the _sync_back folder (even if the API ignores the directory param)
-                if (name.includes('_sync_back/') && name.endsWith('.json')) {
-                  const fileName = name.split('/').pop() || '';
-                  const baseName = fileName.replace('.json', '');
-                  const supabaseTableName = getSupabaseTableName(baseName);
-                  if (ALL_TABLES.includes(supabaseTableName) || ALL_TABLES.includes(baseName)) {
-                    files.push(baseName);
-                    console.log(`Found matching file in _sync_back: ${baseName}`);
-                  } else {
-                    console.log(`File ${baseName} not in known tables, adding anyway`);
-                    files.push(baseName);
-                  }
-                }
-              }
-            }
-        } catch {
-          // Not JSON, try regex patterns for XML/other formats
-          console.log('Response is not JSON, trying regex patterns');
-          
-          // Pattern 1: XML-style response with Name element
-          const xmlMatches = listText.matchAll(/<Name>([^<]+\.json)<\/Name>/g);
-          for (const match of xmlMatches) {
-            const fileName = match[1].split('/').pop() || '';
-            const baseName = fileName.replace('.json', '');
-            files.push(baseName);
-            console.log(`Found file (XML): ${baseName}`);
-          }
-          
-          // Pattern 2: JSON-style in text
-          const jsonMatches = listText.matchAll(/"name"\s*:\s*"([^"]+\.json)"/gi);
-          for (const match of jsonMatches) {
-            const fileName = match[1].split('/').pop() || '';
-            const baseName = fileName.replace('.json', '');
-            if (!files.includes(baseName)) {
-              files.push(baseName);
-              console.log(`Found file (JSON pattern): ${baseName}`);
+
+        // Prefer the prefixed naming convention, but accept non-prefixed too.
+        for (const tableName of ALL_TABLES) {
+          const prefixed = getFabricTableName(tableName);
+          const candidates = [
+            `${syncBackPath}/${prefixed}.json`,
+            `${syncBackPath}/${tableName}.json`,
+          ];
+
+          let found: string | null = null;
+          for (const candidatePath of candidates) {
+            const head = await fetch(`${candidatePath}?action=getStatus`, {
+              method: 'HEAD',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'x-ms-version': '2021-06-08',
+              },
+            });
+
+            if (head.ok || head.status === 200) {
+              // Return the filename (without .json), consistent with existing UI expectations
+              found = candidatePath.endsWith(`/${prefixed}.json`) ? prefixed : tableName;
+              break;
             }
           }
+
+          if (found) files.push(found);
         }
 
-        console.log(`Total files found: ${files.length}`);
+        console.log(`Total files found in _sync_back (existence check): ${files.length}`);
 
         return new Response(JSON.stringify({
           success: true,
           files,
-          message: files.length > 0 
-            ? `${files.length} fichier(s) trouvé(s) pour import` 
-            : 'Aucun fichier JSON trouvé dans _sync_back. Vérifiez que vos fichiers sont bien dans Files/_sync_back/',
+          message: files.length > 0
+            ? `${files.length} fichier(s) trouvé(s) pour import (Files/_sync_back)`
+            : 'Aucun fichier JSON trouvé dans Files/_sync_back. Vérifiez que vos fichiers sont bien dans Files/_sync_back/',
           tablePrefix: TABLE_PREFIX,
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
