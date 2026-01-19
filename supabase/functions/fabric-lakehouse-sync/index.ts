@@ -556,10 +556,15 @@ Deno.serve(async (req) => {
 
     // List files available for import
     if (action === 'list-import-files') {
-      const syncBackPath = `${lakehouseRootUrl('https://onelake.dfs.fabric.microsoft.com', workspaceId, lakehouseId)}/Files/_sync_back`;
+      const baseUrl = 'https://onelake.dfs.fabric.microsoft.com';
+      const root = lakehouseRootUrl(baseUrl, workspaceId, lakehouseId);
+      const syncBackPath = `${root}/Files/_sync_back`;
       
       try {
-        const listResponse = await fetch(`${syncBackPath}?resource=filesystem&recursive=false`, {
+        console.log(`Listing files in: ${syncBackPath}`);
+        
+        // Use directory listing endpoint
+        const listResponse = await fetch(`${syncBackPath}?resource=directory&recursive=false`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -567,11 +572,15 @@ Deno.serve(async (req) => {
           },
         });
 
-        if (!listResponse.ok) {
+        console.log(`List response status: ${listResponse.status}`);
+
+        if (!listResponse.ok && listResponse.status !== 200) {
+          const errorText = await listResponse.text();
+          console.log(`List error: ${errorText}`);
           return new Response(JSON.stringify({
             success: true,
             files: [],
-            message: 'No _sync_back folder found. Create it in your Lakehouse and add JSON files to import.',
+            message: 'Dossier _sync_back non trouvé. Créez-le dans votre Lakehouse et ajoutez des fichiers JSON.',
             tablePrefix: TABLE_PREFIX,
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -579,33 +588,82 @@ Deno.serve(async (req) => {
         }
 
         const listText = await listResponse.text();
+        console.log(`List response (first 500 chars): ${listText.substring(0, 500)}`);
+        
         const files: string[] = [];
         
-        // Extract file names from response
-        const pathMatches = listText.matchAll(/"name":"([^"]+\.json)"/g);
-        for (const match of pathMatches) {
-          const fileName = match[1];
-          const baseName = fileName.replace('.json', '');
+        // Try to parse as JSON first (some ADLS versions return JSON)
+        try {
+          const jsonResponse = JSON.parse(listText);
+          if (jsonResponse.paths && Array.isArray(jsonResponse.paths)) {
+            for (const path of jsonResponse.paths) {
+              const name = path.name || '';
+              if (name.endsWith('.json')) {
+                const fileName = name.split('/').pop() || '';
+                const baseName = fileName.replace('.json', '');
+                const supabaseTableName = getSupabaseTableName(baseName);
+                if (ALL_TABLES.includes(supabaseTableName) || ALL_TABLES.includes(baseName)) {
+                  files.push(baseName);
+                  console.log(`Found matching file: ${baseName}`);
+                } else {
+                  console.log(`File ${baseName} not in known tables, adding anyway`);
+                  files.push(baseName);
+                }
+              }
+            }
+          }
+        } catch {
+          // Not JSON, try regex patterns for XML/other formats
+          console.log('Response is not JSON, trying regex patterns');
           
-          // Check if it matches with or without prefix
-          const supabaseTableName = getSupabaseTableName(baseName);
-          if (ALL_TABLES.includes(supabaseTableName) || ALL_TABLES.includes(baseName)) {
+          // Pattern 1: XML-style response with Name element
+          const xmlMatches = listText.matchAll(/<Name>([^<]+\.json)<\/Name>/g);
+          for (const match of xmlMatches) {
+            const fileName = match[1].split('/').pop() || '';
+            const baseName = fileName.replace('.json', '');
             files.push(baseName);
+            console.log(`Found file (XML): ${baseName}`);
+          }
+          
+          // Pattern 2: JSON-style in text
+          const jsonMatches = listText.matchAll(/"name"\s*:\s*"([^"]+\.json)"/gi);
+          for (const match of jsonMatches) {
+            const fileName = match[1].split('/').pop() || '';
+            const baseName = fileName.replace('.json', '');
+            if (!files.includes(baseName)) {
+              files.push(baseName);
+              console.log(`Found file (JSON pattern): ${baseName}`);
+            }
+          }
+
+          // Pattern 3: Path-based pattern
+          const pathMatches = listText.matchAll(/Files\/_sync_back\/([^"<>\s]+\.json)/g);
+          for (const match of pathMatches) {
+            const fileName = match[1];
+            const baseName = fileName.replace('.json', '');
+            if (!files.includes(baseName)) {
+              files.push(baseName);
+              console.log(`Found file (path pattern): ${baseName}`);
+            }
           }
         }
+
+        console.log(`Total files found: ${files.length}`);
 
         return new Response(JSON.stringify({
           success: true,
           files,
+          rawResponsePreview: listText.substring(0, 300),
           message: files.length > 0 
-            ? `${files.length} fichiers trouvés pour import` 
-            : 'Aucun fichier JSON trouvé dans _sync_back',
+            ? `${files.length} fichier(s) trouvé(s) pour import` 
+            : 'Aucun fichier JSON trouvé dans _sync_back. Vérifiez que vos fichiers sont bien dans Files/_sync_back/',
           tablePrefix: TABLE_PREFIX,
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error('List import files error:', error);
         return new Response(JSON.stringify({
           success: false,
           files: [],
