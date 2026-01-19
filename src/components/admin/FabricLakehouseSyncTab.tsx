@@ -351,6 +351,7 @@ export function FabricLakehouseSyncTab() {
                 <p className="text-sm text-amber-800 dark:text-amber-200">
                   <strong>Import depuis Fabric :</strong> Placez vos fichiers JSON dans le dossier 
                   <code className="mx-1 px-1 bg-amber-200 dark:bg-amber-800 rounded">Files/_sync_back/</code>
+                  ou <code className="mx-1 px-1 bg-amber-200 dark:bg-amber-800 rounded">Files/export/</code>
                   du Lakehouse. Nommez-les avec le nom de la table (ex: <code className="px-1 bg-amber-200 dark:bg-amber-800 rounded">be_projects.json</code>).
                 </p>
               </div>
