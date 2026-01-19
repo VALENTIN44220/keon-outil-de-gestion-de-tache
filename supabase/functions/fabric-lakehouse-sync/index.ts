@@ -558,13 +558,15 @@ Deno.serve(async (req) => {
     if (action === 'list-import-files') {
       const baseUrl = 'https://onelake.dfs.fabric.microsoft.com';
       const root = lakehouseRootUrl(baseUrl, workspaceId, lakehouseId);
-      const syncBackPath = `${root}/Files/_sync_back`;
       
       try {
-        console.log(`Listing files in: ${syncBackPath}`);
+        // ADLS Gen2 uses filesystem listing with directory parameter
+        // Format: /{workspace}/{lakehouse}/Files?resource=filesystem&directory=_sync_back&recursive=false
+        const listUrl = `${root}/Files?resource=filesystem&directory=_sync_back&recursive=false`;
         
-        // Use directory listing endpoint
-        const listResponse = await fetch(`${syncBackPath}?resource=directory&recursive=false`, {
+        console.log(`Listing files with ADLS Gen2 API: ${listUrl}`);
+        
+        const listResponse = await fetch(listUrl, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -574,13 +576,79 @@ Deno.serve(async (req) => {
 
         console.log(`List response status: ${listResponse.status}`);
 
-        if (!listResponse.ok && listResponse.status !== 200) {
+        // If directory parameter is not supported, try alternate approach
+        if (!listResponse.ok || listResponse.status === 400) {
           const errorText = await listResponse.text();
-          console.log(`List error: ${errorText}`);
+          console.log(`First approach failed: ${errorText}`);
+          
+          // Alternative: List all files in Files folder and filter
+          const altListUrl = `${root}/Files?resource=filesystem&recursive=true`;
+          console.log(`Trying alternate listing: ${altListUrl}`);
+          
+          const altListResponse = await fetch(altListUrl, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'x-ms-version': '2021-06-08',
+            },
+          });
+          
+          console.log(`Alternate list response status: ${altListResponse.status}`);
+          
+          if (!altListResponse.ok && altListResponse.status !== 200) {
+            const altErrorText = await altListResponse.text();
+            console.log(`Alternate approach also failed: ${altErrorText}`);
+            return new Response(JSON.stringify({
+              success: true,
+              files: [],
+              message: 'Impossible de lister les fichiers. Vérifiez les permissions du Service Principal sur le Lakehouse.',
+              tablePrefix: TABLE_PREFIX,
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+          
+          const altListText = await altListResponse.text();
+          console.log(`Alternate response (first 1000 chars): ${altListText.substring(0, 1000)}`);
+          
+          const files: string[] = [];
+          
+          // Parse the response and filter for _sync_back folder
+          try {
+            const jsonResponse = JSON.parse(altListText);
+            if (jsonResponse.paths && Array.isArray(jsonResponse.paths)) {
+              for (const path of jsonResponse.paths) {
+                const name = path.name || '';
+                // Only include files in _sync_back folder
+                if (name.includes('_sync_back/') && name.endsWith('.json')) {
+                  const fileName = name.split('/').pop() || '';
+                  const baseName = fileName.replace('.json', '');
+                  files.push(baseName);
+                  console.log(`Found matching file: ${baseName}`);
+                }
+              }
+            }
+          } catch {
+            // Try regex for _sync_back paths
+            const pathMatches = altListText.matchAll(/"name"\s*:\s*"([^"]*_sync_back\/[^"]+\.json)"/gi);
+            for (const match of pathMatches) {
+              const fileName = match[1].split('/').pop() || '';
+              const baseName = fileName.replace('.json', '');
+              if (!files.includes(baseName)) {
+                files.push(baseName);
+                console.log(`Found file (regex): ${baseName}`);
+              }
+            }
+          }
+          
+          console.log(`Total files found: ${files.length}`);
+          
           return new Response(JSON.stringify({
             success: true,
-            files: [],
-            message: 'Dossier _sync_back non trouvé. Créez-le dans votre Lakehouse et ajoutez des fichiers JSON.',
+            files,
+            message: files.length > 0 
+              ? `${files.length} fichier(s) trouvé(s) pour import` 
+              : 'Dossier _sync_back non trouvé ou vide. Créez-le dans Files/_sync_back/ et ajoutez des fichiers JSON.',
             tablePrefix: TABLE_PREFIX,
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -592,7 +660,7 @@ Deno.serve(async (req) => {
         
         const files: string[] = [];
         
-        // Try to parse as JSON first (some ADLS versions return JSON)
+        // Try to parse as JSON first (ADLS Gen2 returns JSON)
         try {
           const jsonResponse = JSON.parse(listText);
           if (jsonResponse.paths && Array.isArray(jsonResponse.paths)) {
@@ -635,17 +703,6 @@ Deno.serve(async (req) => {
               console.log(`Found file (JSON pattern): ${baseName}`);
             }
           }
-
-          // Pattern 3: Path-based pattern
-          const pathMatches = listText.matchAll(/Files\/_sync_back\/([^"<>\s]+\.json)/g);
-          for (const match of pathMatches) {
-            const fileName = match[1];
-            const baseName = fileName.replace('.json', '');
-            if (!files.includes(baseName)) {
-              files.push(baseName);
-              console.log(`Found file (path pattern): ${baseName}`);
-            }
-          }
         }
 
         console.log(`Total files found: ${files.length}`);
@@ -653,7 +710,6 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({
           success: true,
           files,
-          rawResponsePreview: listText.substring(0, 300),
           message: files.length > 0 
             ? `${files.length} fichier(s) trouvé(s) pour import` 
             : 'Aucun fichier JSON trouvé dans _sync_back. Vérifiez que vos fichiers sont bien dans Files/_sync_back/',
