@@ -523,11 +523,86 @@ Deno.serve(async (req) => {
             continue;
           }
 
-          console.log(`Importing ${records.length} records into ${tableName}`);
+          // Transform records to match Supabase constraints
+          const transformedRecords = records.map(record => {
+            const transformed = { ...record };
+            
+            // Transform user_leaves specific fields
+            if (tableName === 'user_leaves') {
+              // Map half_day values: AM -> morning, PM -> afternoon
+              if (transformed.start_half_day === 'AM') {
+                transformed.start_half_day = 'morning';
+              } else if (transformed.start_half_day === 'PM') {
+                transformed.start_half_day = 'afternoon';
+              }
+              
+              if (transformed.end_half_day === 'AM') {
+                transformed.end_half_day = 'morning';
+              } else if (transformed.end_half_day === 'PM') {
+                transformed.end_half_day = 'afternoon';
+              }
+              
+              // Map leave_type: Lucca types to our constraint values
+              const leaveTypeMapping: Record<string, string> = {
+                'Congés payés': 'paid',
+                'Congés payés 2024/2025': 'paid',
+                'Congés payés 2023/2024': 'paid',
+                'Congés payés 2025/2026': 'paid',
+                'CP': 'paid',
+                'RTT': 'rtt',
+                'RTT 2024': 'rtt',
+                'RTT 2025': 'rtt',
+                'Maladie': 'sick',
+                'Arrêt maladie': 'sick',
+                'Congé sans solde': 'unpaid',
+                'CSS': 'unpaid',
+              };
+              
+              if (transformed.leave_type && typeof transformed.leave_type === 'string') {
+                // Check for exact match first
+                if (leaveTypeMapping[transformed.leave_type]) {
+                  transformed.leave_type = leaveTypeMapping[transformed.leave_type];
+                } else {
+                  // Check for partial matches
+                  const lowerType = transformed.leave_type.toLowerCase();
+                  if (lowerType.includes('congés payés') || lowerType.includes('cp')) {
+                    transformed.leave_type = 'paid';
+                  } else if (lowerType.includes('rtt')) {
+                    transformed.leave_type = 'rtt';
+                  } else if (lowerType.includes('maladie') || lowerType.includes('sick')) {
+                    transformed.leave_type = 'sick';
+                  } else if (lowerType.includes('sans solde') || lowerType.includes('css')) {
+                    transformed.leave_type = 'unpaid';
+                  } else {
+                    // Default to 'other' if no match
+                    transformed.leave_type = 'other';
+                  }
+                }
+              }
+              
+              // Map status if needed
+              const statusMapping: Record<string, string> = {
+                'declared': 'declared',
+                'approved': 'declared',
+                'pending': 'declared',
+                'cancelled': 'cancelled',
+                'rejected': 'cancelled',
+              };
+              
+              if (transformed.status && typeof transformed.status === 'string') {
+                const lowerStatus = transformed.status.toLowerCase();
+                transformed.status = statusMapping[lowerStatus] || 'declared';
+              }
+            }
+            
+            return transformed;
+          });
+
+          console.log(`Importing ${transformedRecords.length} records into ${tableName}`);
 
           const { error } = await supabase
             .from(tableName)
-            .upsert(records, { onConflict: 'id' });
+            .upsert(transformedRecords, { onConflict: 'id' });
 
           if (error) {
             console.error(`Error importing ${tableName}:`, error);
