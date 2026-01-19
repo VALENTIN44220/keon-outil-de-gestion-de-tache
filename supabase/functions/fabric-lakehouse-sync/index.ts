@@ -665,23 +665,24 @@ Deno.serve(async (req) => {
         // Try to parse as JSON first (ADLS Gen2 returns JSON)
         try {
           const jsonResponse = JSON.parse(listText);
-          if (jsonResponse.paths && Array.isArray(jsonResponse.paths)) {
-            for (const path of jsonResponse.paths) {
-              const name = path.name || '';
-              if (name.endsWith('.json')) {
-                const fileName = name.split('/').pop() || '';
-                const baseName = fileName.replace('.json', '');
-                const supabaseTableName = getSupabaseTableName(baseName);
-                if (ALL_TABLES.includes(supabaseTableName) || ALL_TABLES.includes(baseName)) {
-                  files.push(baseName);
-                  console.log(`Found matching file: ${baseName}`);
-                } else {
-                  console.log(`File ${baseName} not in known tables, adding anyway`);
-                  files.push(baseName);
+            if (jsonResponse.paths && Array.isArray(jsonResponse.paths)) {
+              for (const path of jsonResponse.paths) {
+                const name = path.name || '';
+                // Only include files from the _sync_back folder (even if the API ignores the directory param)
+                if (name.includes('_sync_back/') && name.endsWith('.json')) {
+                  const fileName = name.split('/').pop() || '';
+                  const baseName = fileName.replace('.json', '');
+                  const supabaseTableName = getSupabaseTableName(baseName);
+                  if (ALL_TABLES.includes(supabaseTableName) || ALL_TABLES.includes(baseName)) {
+                    files.push(baseName);
+                    console.log(`Found matching file in _sync_back: ${baseName}`);
+                  } else {
+                    console.log(`File ${baseName} not in known tables, adding anyway`);
+                    files.push(baseName);
+                  }
                 }
               }
             }
-          }
         } catch {
           // Not JSON, try regex patterns for XML/other formats
           console.log('Response is not JSON, trying regex patterns');
