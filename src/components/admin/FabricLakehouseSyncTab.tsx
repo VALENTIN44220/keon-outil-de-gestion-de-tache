@@ -22,6 +22,9 @@ import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFabricLakehouseSync, TablePreview, SyncResult } from '@/hooks/useFabricLakehouseSync';
 
+// Table prefix for Fabric Lakehouse
+const TABLE_PREFIX = 'LOVABLE_APPTASK_';
+
 const ALL_TABLES = [
   { name: 'assignment_rules', label: 'Règles d\'affectation' },
   { name: 'be_projects', label: 'Projets BE' },
@@ -61,6 +64,11 @@ const ALL_TABLES = [
   { name: 'user_roles', label: 'Rôles utilisateurs' },
   { name: 'workload_slots', label: 'Créneaux charge' },
 ];
+
+// Get Fabric table name with prefix
+const getFabricTableName = (supabaseTableName: string): string => {
+  return `${TABLE_PREFIX}${supabaseTableName}`;
+};
 
 export function FabricLakehouseSyncTab() {
   const {
@@ -295,8 +303,8 @@ export function FabricLakehouseSyncTab() {
                           >
                             {table.label}
                           </label>
-                          <p className="text-xs text-muted-foreground font-mono truncate">
-                            {table.name}
+                          <p className="text-xs text-muted-foreground font-mono truncate" title={getFabricTableName(table.name)}>
+                            {getFabricTableName(table.name)}
                           </p>
                         </div>
                         

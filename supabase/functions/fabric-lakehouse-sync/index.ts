@@ -5,6 +5,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Table prefix for Fabric Lakehouse
+const TABLE_PREFIX = 'LOVABLE_APPTASK_';
+
 // All tables to sync
 const ALL_TABLES = [
   'assignment_rules',
@@ -46,6 +49,19 @@ const ALL_TABLES = [
   'workload_slots',
 ];
 
+// Get Fabric table name with prefix
+function getFabricTableName(supabaseTableName: string): string {
+  return `${TABLE_PREFIX}${supabaseTableName}`;
+}
+
+// Get Supabase table name from Fabric name
+function getSupabaseTableName(fabricTableName: string): string {
+  if (fabricTableName.startsWith(TABLE_PREFIX)) {
+    return fabricTableName.substring(TABLE_PREFIX.length);
+  }
+  return fabricTableName;
+}
+
 interface TokenResponse {
   access_token: string;
   expires_in: number;
@@ -54,6 +70,7 @@ interface TokenResponse {
 
 interface SyncResult {
   table: string;
+  fabricTable: string;
   success: boolean;
   rowCount?: number;
   error?: string;
@@ -94,40 +111,25 @@ async function getOneLakeToken(): Promise<string> {
   return data.access_token;
 }
 
-// Convert data to NDJSON format (suitable for Delta/Parquet ingestion)
-function toNDJSON(data: Record<string, unknown>[]): string {
-  return data.map((row) => JSON.stringify(row)).join('\n');
-}
-
 function isGuid(value: string): boolean {
   return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(value);
 }
 
 function lakehouseRootUrl(baseUrl: string, workspaceId: string, lakehouseIdOrName: string): string {
-  // OneLake rule: if you reference by GUIDs, you must NOT include the item type extension (e.g. .Lakehouse)
   if (isGuid(workspaceId) && isGuid(lakehouseIdOrName)) {
     return `${baseUrl}/${workspaceId}/${lakehouseIdOrName}`;
   }
   return `${baseUrl}/${workspaceId}/${lakehouseIdOrName}.Lakehouse`;
 }
 
-// Create or replace file in OneLake
-async function uploadToOneLake(
+// Helper to create/overwrite a file in OneLake
+async function writeFileToOneLake(
   accessToken: string,
-  workspaceId: string,
-  lakehouseId: string,
-  tableName: string,
-  content: string
+  filePath: string,
+  content: Uint8Array
 ): Promise<void> {
-  const baseUrl = 'https://onelake.dfs.fabric.microsoft.com';
-  const filePath = `Tables/_staging/${tableName}/${tableName}_${new Date().toISOString().split('T')[0]}.json`;
-  const root = lakehouseRootUrl(baseUrl, workspaceId, lakehouseId);
-  const fullPath = `${root}/Files/${filePath}`;
-
-  console.log(`Uploading to: ${fullPath}`);
-
-  // Create file using PUT
-  const createResponse = await fetch(`${fullPath}?resource=file`, {
+  // Create file
+  const createResponse = await fetch(`${filePath}?resource=file`, {
     method: 'PUT',
     headers: {
       'Authorization': `Bearer ${accessToken}`,
@@ -135,35 +137,36 @@ async function uploadToOneLake(
     },
   });
 
-  if (!createResponse.ok && createResponse.status !== 201) {
-    // If file exists, that's OK - we'll overwrite it
-    if (createResponse.status !== 409) {
-      const errorText = await createResponse.text();
-      console.error(`Create file error: ${createResponse.status}`, errorText);
-      throw new Error(`Failed to create file: ${createResponse.status}`);
-    }
+  if (!createResponse.ok && createResponse.status !== 201 && createResponse.status !== 409) {
+    const errorText = await createResponse.text();
+    console.error(`Create file error: ${createResponse.status}`, errorText);
+    throw new Error(`Failed to create file: ${createResponse.status}`);
   }
 
-  // Upload content using PATCH
-  const contentBytes = new TextEncoder().encode(content);
-  const uploadResponse = await fetch(`${fullPath}?action=append&position=0`, {
+  // Append content - use ReadableStream for Deno compatibility
+  const appendResponse = await fetch(`${filePath}?action=append&position=0`, {
     method: 'PATCH',
     headers: {
       'Authorization': `Bearer ${accessToken}`,
       'Content-Type': 'application/octet-stream',
-      'Content-Length': contentBytes.length.toString(),
+      'Content-Length': content.length.toString(),
     },
-    body: contentBytes,
+    body: new ReadableStream({
+      start(controller) {
+        controller.enqueue(content);
+        controller.close();
+      }
+    }),
   });
 
-  if (!uploadResponse.ok && uploadResponse.status !== 202) {
-    const errorText = await uploadResponse.text();
-    console.error(`Append error: ${uploadResponse.status}`, errorText);
-    throw new Error(`Failed to append data: ${uploadResponse.status}`);
+  if (!appendResponse.ok && appendResponse.status !== 202) {
+    const errorText = await appendResponse.text();
+    console.error(`Append error: ${appendResponse.status}`, errorText);
+    throw new Error(`Failed to append data: ${appendResponse.status}`);
   }
 
-  // Flush the file
-  const flushResponse = await fetch(`${fullPath}?action=flush&position=${contentBytes.length}`, {
+  // Flush
+  const flushResponse = await fetch(`${filePath}?action=flush&position=${content.length}`, {
     method: 'PATCH',
     headers: {
       'Authorization': `Bearer ${accessToken}`,
@@ -175,191 +178,98 @@ async function uploadToOneLake(
     console.error(`Flush error: ${flushResponse.status}`, errorText);
     throw new Error(`Failed to flush file: ${flushResponse.status}`);
   }
-
-  console.log(`Successfully uploaded ${tableName}`);
 }
 
-// Upload Delta-formatted data (metadata + NDJSON)
-async function uploadDeltaTable(
+// Create directory in OneLake
+async function createDirectory(accessToken: string, dirPath: string): Promise<void> {
+  try {
+    await fetch(`${dirPath}?resource=directory`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    });
+  } catch {
+    // Directory may already exist
+  }
+}
+
+// Upload data as CSV format (more compatible with Fabric for visualization)
+async function uploadAsCSV(
   accessToken: string,
   workspaceId: string,
   lakehouseId: string,
-  tableName: string,
-  data: Record<string, unknown>[],
-  schema: { name: string; type: string }[]
+  fabricTableName: string,
+  data: Record<string, unknown>[]
 ): Promise<number> {
   const baseUrl = 'https://onelake.dfs.fabric.microsoft.com';
   const root = lakehouseRootUrl(baseUrl, workspaceId, lakehouseId);
-  const tableBasePath = `${root}/Tables/${tableName}`;
-
-  // Create directory structure
-  const timestamp = Date.now();
-  const dataFileName = `part-00000-${timestamp}.json`;
   
-  // First, ensure the table directory exists
-  try {
-    await fetch(`${tableBasePath}?resource=directory`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-      },
-    });
-  } catch {
-    // Directory may already exist
+  // Write to Files folder as CSV (visible in Fabric)
+  const csvPath = `${root}/Files/${fabricTableName}.csv`;
+  
+  if (data.length === 0) {
+    return 0;
   }
 
-  // Create _delta_log directory
-  const deltaLogPath = `${tableBasePath}/_delta_log`;
-  try {
-    await fetch(`${deltaLogPath}?resource=directory`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-      },
+  // Get all column names from the data
+  const allKeys = new Set<string>();
+  data.forEach(row => {
+    Object.keys(row).forEach(key => allKeys.add(key));
+  });
+  const columns = Array.from(allKeys);
+
+  // Create CSV content
+  const csvRows: string[] = [];
+  
+  // Header row
+  csvRows.push(columns.map(col => `"${col}"`).join(','));
+  
+  // Data rows
+  for (const row of data) {
+    const values = columns.map(col => {
+      const value = row[col];
+      if (value === null || value === undefined) {
+        return '';
+      }
+      if (typeof value === 'object') {
+        return `"${JSON.stringify(value).replace(/"/g, '""')}"`;
+      }
+      if (typeof value === 'string') {
+        return `"${value.replace(/"/g, '""')}"`;
+      }
+      return String(value);
     });
-  } catch {
-    // Directory may already exist
+    csvRows.push(values.join(','));
   }
 
-  // Upload data file
-  const ndjsonContent = toNDJSON(data);
-  const dataPath = `${tableBasePath}/${dataFileName}`;
-  
-  // Create file
-  await fetch(`${dataPath}?resource=file`, {
-    method: 'PUT',
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Length': '0',
-    },
-  });
+  const csvContent = csvRows.join('\n');
+  const contentBytes = new TextEncoder().encode(csvContent);
 
-  // Append content
-  const contentBytes = new TextEncoder().encode(ndjsonContent);
-  await fetch(`${dataPath}?action=append&position=0`, {
-    method: 'PATCH',
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/octet-stream',
-      'Content-Length': contentBytes.length.toString(),
-    },
-    body: contentBytes,
-  });
+  console.log(`Uploading CSV to: ${csvPath} (${data.length} rows, ${contentBytes.length} bytes)`);
 
-  // Flush
-  await fetch(`${dataPath}?action=flush&position=${contentBytes.length}`, {
-    method: 'PATCH',
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-    },
-  });
-
-  // Create Delta log entries - EACH ACTION MUST BE A SEPARATE LINE (NDJSON format)
-  // Delta Lake protocol requires: protocol, metaData, add actions as separate JSON objects
-  const tableId = crypto.randomUUID();
-  
-  // Each action is a separate JSON object on its own line
-  const protocolAction = JSON.stringify({
-    protocol: {
-      minReaderVersion: 1,
-      minWriterVersion: 2,
-    },
-  });
-
-  const metaDataAction = JSON.stringify({
-    metaData: {
-      id: tableId,
-      name: tableName,
-      format: { provider: 'json', options: {} },
-      schemaString: JSON.stringify({
-        type: 'struct',
-        fields: schema.map(col => ({
-          name: col.name,
-          type: col.type,
-          nullable: true,
-          metadata: {},
-        })),
-      }),
-      partitionColumns: [],
-      configuration: {},
-      createdTime: timestamp,
-    },
-  });
-
-  const addAction = JSON.stringify({
-    add: {
-      path: dataFileName,
-      partitionValues: {},
-      size: contentBytes.length,
-      modificationTime: timestamp,
-      dataChange: true,
-      stats: JSON.stringify({ numRecords: data.length }),
-    },
-  });
-
-  const commitInfoAction = JSON.stringify({
-    commitInfo: {
-      timestamp,
-      operation: 'WRITE',
-      operationParameters: { mode: 'Overwrite' },
-      isBlindAppend: false,
-    },
-  });
-
-  // Delta log file must be NDJSON: each action on separate line
-  const logFileName = '00000000000000000000.json';
-  const logPath = `${deltaLogPath}/${logFileName}`;
-  const logContent = [protocolAction, metaDataAction, addAction, commitInfoAction].join('\n');
-  const logBytes = new TextEncoder().encode(logContent);
-
-  await fetch(`${logPath}?resource=file`, {
-    method: 'PUT',
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Length': '0',
-    },
-  });
-
-  await fetch(`${logPath}?action=append&position=0`, {
-    method: 'PATCH',
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/octet-stream',
-      'Content-Length': logBytes.length.toString(),
-    },
-    body: logBytes,
-  });
-
-  await fetch(`${logPath}?action=flush&position=${logBytes.length}`, {
-    method: 'PATCH',
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-    },
-  });
+  await writeFileToOneLake(accessToken, csvPath, contentBytes);
 
   return data.length;
 }
 
-// Infer schema from data
-function inferSchema(data: Record<string, unknown>[]): { name: string; type: string }[] {
-  if (data.length === 0) return [];
+// Also upload as JSON for programmatic access
+async function uploadAsJSON(
+  accessToken: string,
+  workspaceId: string,
+  lakehouseId: string,
+  fabricTableName: string,
+  data: Record<string, unknown>[]
+): Promise<void> {
+  const baseUrl = 'https://onelake.dfs.fabric.microsoft.com';
+  const root = lakehouseRootUrl(baseUrl, workspaceId, lakehouseId);
   
-  const sample = data[0];
-  return Object.entries(sample).map(([key, value]) => {
-    let type = 'string';
-    if (typeof value === 'number') {
-      type = Number.isInteger(value) ? 'long' : 'double';
-    } else if (typeof value === 'boolean') {
-      type = 'boolean';
-    } else if (value instanceof Date) {
-      type = 'timestamp';
-    } else if (Array.isArray(value)) {
-      type = 'array';
-    } else if (typeof value === 'object' && value !== null) {
-      type = 'struct';
-    }
-    return { name: key, type };
-  });
+  const jsonPath = `${root}/Files/${fabricTableName}.json`;
+  const jsonContent = JSON.stringify(data, null, 2);
+  const contentBytes = new TextEncoder().encode(jsonContent);
+
+  console.log(`Uploading JSON to: ${jsonPath}`);
+  await writeFileToOneLake(accessToken, jsonPath, contentBytes);
 }
 
 // Check OneLake connectivity
@@ -372,8 +282,6 @@ async function checkOneLakeAccess(
     const baseUrl = 'https://onelake.dfs.fabric.microsoft.com';
     const root = lakehouseRootUrl(baseUrl, workspaceId, lakehouseId);
 
-    // ADLS Gen2 List Paths (OneLake): list the Files directory in the lakehouse
-    // Endpoint form: GET {root}/Files?resource=filesystem&recursive=false
     const listPath = `${root}/Files?resource=filesystem&recursive=false`;
     const headers = {
       'Authorization': `Bearer ${accessToken}`,
@@ -423,16 +331,15 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Get Azure token
-  const clientId = Deno.env.get('AZURE_CLIENT_ID');
-  const tenantId = Deno.env.get('AZURE_TENANT_ID');
-  console.log('Getting Azure token for OneLake...');
-  console.log(`Using Service Principal - Client ID: ${clientId}`);
-  console.log(`Using Tenant ID: ${tenantId}`);
-  const accessToken = await getOneLakeToken();
-  console.log('Token obtained successfully');
+    const clientId = Deno.env.get('AZURE_CLIENT_ID');
+    const tenantId = Deno.env.get('AZURE_TENANT_ID');
+    console.log('Getting Azure token for OneLake...');
+    console.log(`Using Service Principal - Client ID: ${clientId}`);
+    console.log(`Using Tenant ID: ${tenantId}`);
+    const accessToken = await getOneLakeToken();
+    console.log('Token obtained successfully');
 
     if (action === 'diagnose') {
-      // Check connectivity
       const accessCheck = await checkOneLakeAccess(accessToken, workspaceId, lakehouseId);
       
       return new Response(JSON.stringify({
@@ -441,6 +348,7 @@ Deno.serve(async (req) => {
         lakehouseId,
         message: accessCheck.message,
         tablesCount: ALL_TABLES.length,
+        tablePrefix: TABLE_PREFIX,
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -451,8 +359,10 @@ Deno.serve(async (req) => {
       const results: SyncResult[] = [];
 
       for (const tableName of tablesToSync) {
+        const fabricTableName = getFabricTableName(tableName);
+        
         try {
-          console.log(`Syncing table: ${tableName}`);
+          console.log(`Syncing table: ${tableName} -> ${fabricTableName}`);
           
           // Fetch all data from table
           const { data, error } = await supabase
@@ -461,32 +371,39 @@ Deno.serve(async (req) => {
 
           if (error) {
             console.error(`Error fetching ${tableName}:`, error);
-            results.push({ table: tableName, success: false, error: error.message });
+            results.push({ table: tableName, fabricTable: fabricTableName, success: false, error: error.message });
             continue;
           }
 
           if (!data || data.length === 0) {
-            console.log(`Table ${tableName} is empty, skipping`);
-            results.push({ table: tableName, success: true, rowCount: 0 });
+            console.log(`Table ${tableName} is empty, creating empty files`);
+            results.push({ table: tableName, fabricTable: fabricTableName, success: true, rowCount: 0 });
             continue;
           }
 
-          // Infer schema and upload as Delta
-          const schema = inferSchema(data);
-          const rowCount = await uploadDeltaTable(
+          // Upload as CSV (primary - visible in Fabric)
+          const rowCount = await uploadAsCSV(
             accessToken,
             workspaceId,
             lakehouseId,
-            tableName,
-            data,
-            schema
+            fabricTableName,
+            data
           );
 
-          results.push({ table: tableName, success: true, rowCount });
+          // Also upload as JSON for programmatic access
+          await uploadAsJSON(
+            accessToken,
+            workspaceId,
+            lakehouseId,
+            fabricTableName,
+            data
+          );
+
+          results.push({ table: tableName, fabricTable: fabricTableName, success: true, rowCount });
         } catch (error: unknown) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           console.error(`Error syncing ${tableName}:`, error);
-          results.push({ table: tableName, success: false, error: errorMessage });
+          results.push({ table: tableName, fabricTable: fabricTableName, success: false, error: errorMessage });
         }
       }
 
@@ -498,6 +415,7 @@ Deno.serve(async (req) => {
         syncedTables: successCount,
         totalTables: results.length,
         totalRows,
+        tablePrefix: TABLE_PREFIX,
         results,
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -515,6 +433,7 @@ Deno.serve(async (req) => {
 
         preview.push({
           table: tableName,
+          fabricTable: getFabricTableName(tableName),
           rowCount: error ? 0 : (count || 0),
           error: error?.message,
         });
@@ -524,6 +443,7 @@ Deno.serve(async (req) => {
         success: true,
         tables: preview,
         totalRows: preview.reduce((sum, t) => sum + t.rowCount, 0),
+        tablePrefix: TABLE_PREFIX,
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -536,56 +456,59 @@ Deno.serve(async (req) => {
       const syncBackPath = `${lakehouseRootUrl('https://onelake.dfs.fabric.microsoft.com', workspaceId, lakehouseId)}/Files/_sync_back`;
 
       for (const tableName of tablesToImport) {
+        const fabricTableName = getFabricTableName(tableName);
+        
         try {
-          console.log(`Importing table: ${tableName}`);
+          console.log(`Importing table: ${fabricTableName} -> ${tableName}`);
           
-          // Read JSON file from _sync_back folder
-          const filePath = `${syncBackPath}/${tableName}.json`;
-          
-          // First, check if file exists by trying to read its properties
-          const checkResponse = await fetch(`${filePath}?action=getStatus`, {
-            method: 'HEAD',
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'x-ms-version': '2021-06-08',
-            },
-          });
+          // Try both naming conventions: with prefix and without
+          const possibleFiles = [
+            `${syncBackPath}/${fabricTableName}.json`,
+            `${syncBackPath}/${tableName}.json`,
+          ];
 
-          if (!checkResponse.ok && checkResponse.status !== 200) {
+          let fileContent: string | null = null;
+          let usedPath = '';
+
+          for (const filePath of possibleFiles) {
+            const checkResponse = await fetch(`${filePath}?action=getStatus`, {
+              method: 'HEAD',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'x-ms-version': '2021-06-08',
+              },
+            });
+
+            if (checkResponse.ok || checkResponse.status === 200) {
+              const readResponse = await fetch(filePath, {
+                method: 'GET',
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                  'x-ms-version': '2021-06-08',
+                },
+              });
+
+              if (readResponse.ok) {
+                fileContent = await readResponse.text();
+                usedPath = filePath;
+                break;
+              }
+            }
+          }
+
+          if (!fileContent || !fileContent.trim()) {
             console.log(`No import file found for ${tableName}, skipping`);
-            results.push({ table: tableName, success: true, rowCount: 0 });
+            results.push({ table: tableName, fabricTable: fabricTableName, success: true, rowCount: 0 });
             continue;
           }
 
-          // Read the file content
-          const readResponse = await fetch(filePath, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'x-ms-version': '2021-06-08',
-            },
-          });
+          console.log(`Found import file at: ${usedPath}`);
 
-          if (!readResponse.ok) {
-            console.log(`Could not read ${tableName}.json: ${readResponse.status}`);
-            results.push({ table: tableName, success: true, rowCount: 0 });
-            continue;
-          }
-
-          const fileContent = await readResponse.text();
-          if (!fileContent.trim()) {
-            console.log(`Empty file for ${tableName}, skipping`);
-            results.push({ table: tableName, success: true, rowCount: 0 });
-            continue;
-          }
-
-          // Parse NDJSON or JSON array
+          // Parse JSON or NDJSON
           let records: Record<string, unknown>[];
           if (fileContent.trim().startsWith('[')) {
-            // JSON array format
             records = JSON.parse(fileContent);
           } else {
-            // NDJSON format
             records = fileContent
               .trim()
               .split('\n')
@@ -594,27 +517,26 @@ Deno.serve(async (req) => {
           }
 
           if (records.length === 0) {
-            results.push({ table: tableName, success: true, rowCount: 0 });
+            results.push({ table: tableName, fabricTable: fabricTableName, success: true, rowCount: 0 });
             continue;
           }
 
           console.log(`Importing ${records.length} records into ${tableName}`);
 
-          // Upsert data into Supabase (using id as the conflict key)
           const { error } = await supabase
             .from(tableName)
             .upsert(records, { onConflict: 'id' });
 
           if (error) {
             console.error(`Error importing ${tableName}:`, error);
-            results.push({ table: tableName, success: false, error: error.message });
+            results.push({ table: tableName, fabricTable: fabricTableName, success: false, error: error.message });
           } else {
-            results.push({ table: tableName, success: true, rowCount: records.length });
+            results.push({ table: tableName, fabricTable: fabricTableName, success: true, rowCount: records.length });
           }
         } catch (error: unknown) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           console.error(`Error importing ${tableName}:`, error);
-          results.push({ table: tableName, success: false, error: errorMessage });
+          results.push({ table: tableName, fabricTable: fabricTableName, success: false, error: errorMessage });
         }
       }
 
@@ -627,6 +549,7 @@ Deno.serve(async (req) => {
         importedTables,
         totalTables: results.length,
         totalRows,
+        tablePrefix: TABLE_PREFIX,
         results,
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -651,22 +574,25 @@ Deno.serve(async (req) => {
             success: true,
             files: [],
             message: 'No _sync_back folder found. Create it in your Lakehouse and add JSON files to import.',
+            tablePrefix: TABLE_PREFIX,
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
 
         const listText = await listResponse.text();
-        // Parse the file listing (ADLS Gen2 returns XML or JSON depending on headers)
         const files: string[] = [];
         
-        // Try to extract file names from response
+        // Extract file names from response
         const pathMatches = listText.matchAll(/"name":"([^"]+\.json)"/g);
         for (const match of pathMatches) {
           const fileName = match[1];
-          const tableName = fileName.replace('.json', '');
-          if (ALL_TABLES.includes(tableName)) {
-            files.push(tableName);
+          const baseName = fileName.replace('.json', '');
+          
+          // Check if it matches with or without prefix
+          const supabaseTableName = getSupabaseTableName(baseName);
+          if (ALL_TABLES.includes(supabaseTableName) || ALL_TABLES.includes(baseName)) {
+            files.push(baseName);
           }
         }
 
@@ -676,6 +602,7 @@ Deno.serve(async (req) => {
           message: files.length > 0 
             ? `${files.length} fichiers trouvés pour import` 
             : 'Aucun fichier JSON trouvé dans _sync_back',
+          tablePrefix: TABLE_PREFIX,
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -685,6 +612,7 @@ Deno.serve(async (req) => {
           success: false,
           files: [],
           error: errorMessage,
+          tablePrefix: TABLE_PREFIX,
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
