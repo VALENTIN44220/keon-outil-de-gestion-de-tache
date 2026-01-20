@@ -22,6 +22,8 @@ const projectSchema = z.object({
   adresse_societe: z.string().nullable().optional(),
   pays: z.string().nullable().optional(),
   pays_site: z.string().nullable().optional(),
+  region: z.string().nullable().optional(),
+  departement: z.string().nullable().optional(),
   // Identifiants
   code_divalto: z.string().nullable().optional(),
   siret: z.string().nullable().optional(),
@@ -57,6 +59,8 @@ export function BEProjectDialog({ open, onClose, onSave, project }: BEProjectDia
       adresse_societe: null,
       pays: null,
       pays_site: null,
+      region: null,
+      departement: null,
       code_divalto: null,
       siret: null,
       date_cloture_bancaire: null,
@@ -80,6 +84,8 @@ export function BEProjectDialog({ open, onClose, onSave, project }: BEProjectDia
         adresse_societe: project.adresse_societe,
         pays: project.pays,
         pays_site: project.pays_site,
+        region: project.region,
+        departement: project.departement,
         code_divalto: project.code_divalto,
         siret: project.siret,
         date_cloture_bancaire: project.date_cloture_bancaire,
@@ -100,6 +106,8 @@ export function BEProjectDialog({ open, onClose, onSave, project }: BEProjectDia
         adresse_societe: null,
         pays: null,
         pays_site: null,
+        region: null,
+        departement: null,
         code_divalto: null,
         siret: null,
         date_cloture_bancaire: null,
@@ -123,6 +131,8 @@ export function BEProjectDialog({ open, onClose, onSave, project }: BEProjectDia
       adresse_societe: data.adresse_societe || null,
       pays: data.pays || null,
       pays_site: data.pays_site || null,
+      region: data.region || null,
+      departement: data.departement || null,
       code_divalto: data.code_divalto || null,
       siret: data.siret || null,
       date_cloture_bancaire: data.date_cloture_bancaire || null,
@@ -278,14 +288,43 @@ export function BEProjectDialog({ open, onClose, onSave, project }: BEProjectDia
                     )}
                   />
                   
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="pays_site"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Pays du site</FormLabel>
+                          <FormControl>
+                            <Input {...field} value={field.value || ''} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="region"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Région</FormLabel>
+                          <FormControl>
+                            <Input {...field} value={field.value || ''} placeholder="Ex: Île-de-France" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
                   <FormField
                     control={form.control}
-                    name="pays_site"
+                    name="departement"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Pays du site</FormLabel>
+                        <FormLabel>Département</FormLabel>
                         <FormControl>
-                          <Input {...field} value={field.value || ''} />
+                          <Input {...field} value={field.value || ''} placeholder="Ex: 75 - Paris" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
