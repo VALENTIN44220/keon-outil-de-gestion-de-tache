@@ -14,6 +14,7 @@ import { AddTaskDialog } from '@/components/tasks/AddTaskDialog';
 import { NewTaskDialog } from '@/components/tasks/NewTaskDialog';
 import { TaskDetailDialog } from '@/components/tasks/TaskDetailDialog';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useCommentNotifications } from '@/hooks/useCommentNotifications';
 import { useTasksProgress } from '@/hooks/useChecklists';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { usePendingAssignments } from '@/hooks/usePendingAssignments';
@@ -130,6 +131,7 @@ const Requests = () => {
 
   const { categories } = useCategories();
   const { notifications, unreadCount, hasUrgent } = useNotifications(allTasks);
+  const { commentNotifications, markAsRead: markCommentAsRead } = useCommentNotifications();
   const { getPendingCount, refetch: refetchPending } = usePendingAssignments();
   const { canAssignToTeam, canViewBEProjects, isManager } = useUserPermissions();
   const pendingCount = getPendingCount();
@@ -301,6 +303,15 @@ const Requests = () => {
       toast.info(`Demande sélectionnée: ${task.title}`);
     }
   };
+
+  const handleCommentNotificationClick = useCallback((taskId: string, notificationId: string) => {
+    markCommentAsRead(notificationId);
+    const task = requests.find(r => r.id === taskId) || allTasks.find(t => t.id === taskId);
+    if (task) {
+      setSelectedRequest(task);
+      setIsDetailOpen(true);
+    }
+  }, [requests, allTasks, markCommentAsRead]);
 
   const handleRefresh = () => {
     fetchRequests();
@@ -721,9 +732,11 @@ const Requests = () => {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           notifications={notifications}
+          commentNotifications={commentNotifications}
           unreadCount={unreadCount}
           hasUrgent={hasUrgent}
           onNotificationClick={handleNotificationClick}
+          onCommentNotificationClick={handleCommentNotificationClick}
         />
         
         <main className="flex-1 overflow-y-auto p-6">

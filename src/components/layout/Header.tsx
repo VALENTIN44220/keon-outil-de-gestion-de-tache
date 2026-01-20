@@ -13,6 +13,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { TaskNotification } from '@/hooks/useNotifications';
+import { CommentNotification } from '@/hooks/useCommentNotifications';
 
 interface HeaderProps {
   title: string;
@@ -21,9 +22,11 @@ interface HeaderProps {
   onAddTask?: () => void;
   addButtonLabel?: string;
   notifications?: TaskNotification[];
+  commentNotifications?: CommentNotification[];
   unreadCount?: number;
   hasUrgent?: boolean;
   onNotificationClick?: (taskId: string) => void;
+  onCommentNotificationClick?: (taskId: string, notificationId: string) => void;
 }
 
 export function Header({
@@ -33,9 +36,11 @@ export function Header({
   onAddTask,
   addButtonLabel = 'Nouvelle tâche',
   notifications = [],
+  commentNotifications = [],
   unreadCount = 0,
   hasUrgent = false,
   onNotificationClick,
+  onCommentNotificationClick,
 }: HeaderProps) {
   const { user, profile, signOut } = useAuth();
   const navigate = useNavigate();
@@ -79,9 +84,11 @@ export function Header({
           {/* Notifications */}
           <NotificationBell
             notifications={notifications}
+            commentNotifications={commentNotifications}
             unreadCount={unreadCount}
             hasUrgent={hasUrgent}
             onNotificationClick={onNotificationClick}
+            onCommentNotificationClick={onCommentNotificationClick}
           />
 
           {/* Add Task - Only show if onAddTask is provided */}
