@@ -8,6 +8,8 @@ export interface BEProject {
   adresse_societe: string | null;
   pays: string | null;
   pays_site: string | null;
+  region: string | null;
+  departement: string | null;
   // Identifiants externes
   code_divalto: string | null;
   siret: string | null;

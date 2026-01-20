@@ -105,6 +105,7 @@ export type Database = {
           date_cloture_juridique: string | null
           date_os_etude: string | null
           date_os_travaux: string | null
+          departement: string | null
           description: string | null
           developpeur_id: string | null
           id: string
@@ -115,6 +116,7 @@ export type Database = {
           pays_site: string | null
           projeteur_id: string | null
           regime_icpe: string | null
+          region: string | null
           siret: string | null
           status: string
           typologie: string | null
@@ -133,6 +135,7 @@ export type Database = {
           date_cloture_juridique?: string | null
           date_os_etude?: string | null
           date_os_travaux?: string | null
+          departement?: string | null
           description?: string | null
           developpeur_id?: string | null
           id?: string
@@ -143,6 +146,7 @@ export type Database = {
           pays_site?: string | null
           projeteur_id?: string | null
           regime_icpe?: string | null
+          region?: string | null
           siret?: string | null
           status?: string
           typologie?: string | null
@@ -161,6 +165,7 @@ export type Database = {
           date_cloture_juridique?: string | null
           date_os_etude?: string | null
           date_os_travaux?: string | null
+          departement?: string | null
           description?: string | null
           developpeur_id?: string | null
           id?: string
@@ -171,6 +176,7 @@ export type Database = {
           pays_site?: string | null
           projeteur_id?: string | null
           regime_icpe?: string | null
+          region?: string | null
           siret?: string | null
           status?: string
           typologie?: string | null

@@ -13,6 +13,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Plus, Search, Pencil, Trash2, Building2, FolderOpen, Loader2, RefreshCw, Download, Upload, Eye, FileDown, AlertCircle, CheckCircle2, Stethoscope } from 'lucide-react';
 import { BEProjectDialog } from './BEProjectDialog';
 import { SharePointPreviewDialog } from './SharePointPreviewDialog';
+import { ProjectColumnSelector, ALL_PROJECT_COLUMNS, getDefaultVisibleColumns } from './ProjectColumnSelector';
+import { ProjectViewSelector, ProjectView } from './ProjectViewSelector';
+import { ProjectKanbanView, GroupByField } from './ProjectKanbanView';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { toast } from '@/hooks/use-toast';
@@ -39,6 +42,11 @@ export function BEProjectsView() {
   const [deletingProject, setDeletingProject] = useState<BEProject | null>(null);
   const [previewAction, setPreviewAction] = useState<'import' | 'export' | 'sync' | null>(null);
   const [showDiagnosticResult, setShowDiagnosticResult] = useState(false);
+  
+  // View state
+  const [currentView, setCurrentView] = useState<ProjectView>('table');
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(getDefaultVisibleColumns());
+  const [kanbanGroupBy, setKanbanGroupBy] = useState<GroupByField>('status');
 
   const handleDiagnose = async () => {
     setShowDiagnosticResult(true);
@@ -122,6 +130,8 @@ export function BEProjectsView() {
       'adresse_societe',
       'pays',
       'pays_site',
+      'region',
+      'departement',
       'code_divalto',
       'siret',
       'date_cloture_bancaire',
@@ -176,6 +186,28 @@ export function BEProjectsView() {
     };
     const config = variants[status] || { variant: 'outline', label: status };
     return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  const renderCellValue = (project: BEProject, key: string) => {
+    const value = (project as any)[key];
+    
+    if (value === null || value === undefined) return '-';
+    
+    // Special formatting for status
+    if (key === 'status') {
+      return getStatusBadge(value);
+    }
+    
+    // Format dates
+    if (['date_cloture_bancaire', 'date_cloture_juridique', 'date_os_etude', 'date_os_travaux', 'created_at'].includes(key)) {
+      try {
+        return format(new Date(value), 'dd MMM yyyy', { locale: fr });
+      } catch {
+        return value;
+      }
+    }
+    
+    return String(value);
   };
 
   if (isLoading) {
@@ -247,94 +279,102 @@ export function BEProjectsView() {
         </div>
       </div>
 
-      {/* Search */}
+      {/* Search and View Controls */}
       <Card>
         <CardContent className="pt-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Rechercher par code ou nom de projet..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
+          <div className="flex items-center gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Rechercher par code ou nom de projet..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <ProjectViewSelector currentView={currentView} onViewChange={setCurrentView} />
+            {currentView === 'table' && (
+              <ProjectColumnSelector visibleColumns={visibleColumns} onColumnsChange={setVisibleColumns} />
+            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Projects Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Building2 className="h-5 w-5" />
-            Liste des projets ({projects.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {projects.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              {searchQuery ? 'Aucun projet trouvé pour cette recherche' : 'Aucun projet créé'}
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Nom du projet</TableHead>
-                  <TableHead>Statut</TableHead>
-                  <TableHead>Typologie</TableHead>
-                  <TableHead>Pays</TableHead>
-                  <TableHead>Créé le</TableHead>
-                  {(canEdit || canDelete) && <TableHead className="text-right">Actions</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {projects.map((project) => (
-                  <TableRow key={project.id}>
-                    <TableCell className="font-mono font-medium">{project.code_projet}</TableCell>
-                    <TableCell className="font-medium">{project.nom_projet}</TableCell>
-                    <TableCell>{getStatusBadge(project.status)}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {project.typologie || '-'}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {project.pays || '-'}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {format(new Date(project.created_at), 'dd MMM yyyy', { locale: fr })}
-                    </TableCell>
-                    {(canEdit || canDelete) && (
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          {canEdit && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleEditProject(project)}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                          )}
-                          {canDelete && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setDeletingProject(project)}
-                              className="text-destructive hover:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      {/* Projects View */}
+      {currentView === 'kanban' ? (
+        <ProjectKanbanView
+          projects={projects}
+          groupBy={kanbanGroupBy}
+          onGroupByChange={setKanbanGroupBy}
+          onProjectClick={canEdit ? handleEditProject : undefined}
+          canEdit={canEdit}
+        />
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5" />
+              Liste des projets ({projects.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {projects.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                {searchQuery ? 'Aucun projet trouvé pour cette recherche' : 'Aucun projet créé'}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {ALL_PROJECT_COLUMNS.filter(col => visibleColumns.includes(col.key)).map(col => (
+                        <TableHead key={col.key}>{col.label}</TableHead>
+                      ))}
+                      {(canEdit || canDelete) && <TableHead className="text-right">Actions</TableHead>}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {projects.map((project) => (
+                      <TableRow key={project.id}>
+                        {ALL_PROJECT_COLUMNS.filter(col => visibleColumns.includes(col.key)).map(col => (
+                          <TableCell key={col.key} className={col.key === 'code_projet' ? 'font-mono font-medium' : col.key === 'nom_projet' ? 'font-medium' : 'text-muted-foreground'}>
+                            {renderCellValue(project, col.key)}
+                          </TableCell>
+                        ))}
+                        {(canEdit || canDelete) && (
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              {canEdit && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleEditProject(project)}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {canDelete && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setDeletingProject(project)}
+                                  className="text-destructive hover:text-destructive"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Project Dialog */}
       <BEProjectDialog
