@@ -168,14 +168,16 @@ export function useEffectivePermissions() {
     // Start with profile-level visibility
     const visibleSet = new Set<string>(profileProcessTemplates);
 
-    // Apply user-specific overrides
-    userProcessOverrides.forEach(override => {
-      if (override.is_visible) {
-        visibleSet.add(override.process_template_id);
-      } else {
-        visibleSet.delete(override.process_template_id);
-      }
-    });
+    // Apply user-specific overrides (ensure it's an array)
+    if (Array.isArray(userProcessOverrides)) {
+      userProcessOverrides.forEach(override => {
+        if (override.is_visible) {
+          visibleSet.add(override.process_template_id);
+        } else {
+          visibleSet.delete(override.process_template_id);
+        }
+      });
+    }
 
     result.visibleProcessTemplateIds = Array.from(visibleSet);
 
