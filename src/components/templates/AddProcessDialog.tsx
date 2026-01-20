@@ -18,10 +18,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-interface Department {
-  id: string;
-  name: string;
-}
+// Department interface removed - target_department_id is now set at sub-process level
 
 interface AddProcessDialogProps {
   open: boolean;
@@ -49,22 +46,6 @@ export function AddProcessDialog({ open, onClose, onAdd }: AddProcessDialogProps
   const [visibilityDepartmentIds, setVisibilityDepartmentIds] = useState<string[]>([]);
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [subcategoryId, setSubcategoryId] = useState<string | null>(null);
-  const [targetDepartmentId, setTargetDepartmentId] = useState<string | null>(null);
-  const [departments, setDepartments] = useState<Department[]>([]);
-
-  useEffect(() => {
-    if (open) {
-      fetchDepartments();
-    }
-  }, [open]);
-
-  const fetchDepartments = async () => {
-    const { data } = await supabase
-      .from('departments')
-      .select('id, name')
-      .order('name');
-    if (data) setDepartments(data);
-  };
 
   const isValidVisibility = () => {
     if (visibilityLevel === 'internal_company' && visibilityCompanyIds.length === 0) {
@@ -107,7 +88,7 @@ export function AddProcessDialog({ open, onClose, onAdd }: AddProcessDialogProps
         category_id: categoryId,
         subcategory_id: subcategoryId,
         target_company_id: null,
-        target_department_id: targetDepartmentId,
+        target_department_id: null, // Service cible défini au niveau des sous-processus
       },
       visibilityCompanyIds,
       visibilityDepartmentIds
@@ -127,7 +108,6 @@ export function AddProcessDialog({ open, onClose, onAdd }: AddProcessDialogProps
     setVisibilityDepartmentIds([]);
     setCategoryId(null);
     setSubcategoryId(null);
-    setTargetDepartmentId(null);
   };
 
   return (
@@ -172,25 +152,10 @@ export function AddProcessDialog({ open, onClose, onAdd }: AddProcessDialogProps
             onAddSubcategory={handleAddSubcategory}
           />
 
-          <div className="space-y-2">
-            <Label>Service cible (destinataire des demandes)</Label>
-            <Select 
-              value={targetDepartmentId || ''} 
-              onValueChange={(v) => setTargetDepartmentId(v || null)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Sélectionner un service" />
-              </SelectTrigger>
-              <SelectContent>
-                {departments.map(dept => (
-                  <SelectItem key={dept.id} value={dept.id}>
-                    {dept.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Ce service sera automatiquement sélectionné lors d'une demande basée sur ce processus.
+          <div className="p-3 bg-muted/50 rounded-md">
+            <p className="text-sm text-muted-foreground">
+              💡 Le(s) service(s) cible(s) seront définis au niveau des sous-processus. 
+              Un processus peut contenir des sous-processus affectés à différents services.
             </p>
           </div>
 
