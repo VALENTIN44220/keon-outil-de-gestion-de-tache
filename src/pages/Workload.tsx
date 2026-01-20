@@ -301,6 +301,7 @@ export default function Workload() {
                 selectedCompanyId={selectedCompanyId}
                 onCompanyIdChange={setSelectedCompanyId}
                 teamMembers={teamMembers}
+                viewMode={viewMode}
               />
             )}
 

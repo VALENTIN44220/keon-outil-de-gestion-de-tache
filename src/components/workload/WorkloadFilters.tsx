@@ -3,8 +3,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { CalendarIcon, Filter, X } from 'lucide-react';
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addMonths } from 'date-fns';
+import { CalendarIcon, ChevronLeft, ChevronRight, Filter, X } from 'lucide-react';
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addMonths, addWeeks, subWeeks, subMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -21,6 +21,7 @@ interface WorkloadFiltersProps {
   selectedCompanyId: string | null;
   onCompanyIdChange: (id: string | null) => void;
   teamMembers: any[];
+  viewMode?: 'week' | 'month' | 'quarter';
 }
 
 export function WorkloadFilters({
@@ -34,6 +35,7 @@ export function WorkloadFilters({
   selectedCompanyId,
   onCompanyIdChange,
   teamMembers,
+  viewMode = 'month',
 }: WorkloadFiltersProps) {
   const [processes, setProcesses] = useState<any[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
@@ -74,6 +76,34 @@ export function WorkloadFilters({
     onDateRangeChange(start, end, preset);
   };
 
+  const navigatePeriod = (direction: 'prev' | 'next') => {
+    let newStart: Date, newEnd: Date;
+    const offset = direction === 'prev' ? -1 : 1;
+    
+    switch (viewMode) {
+      case 'week':
+        newStart = direction === 'prev' ? subWeeks(startDate, 1) : addWeeks(startDate, 1);
+        newEnd = direction === 'prev' ? subWeeks(endDate, 1) : addWeeks(endDate, 1);
+        break;
+      case 'quarter':
+        newStart = addMonths(startDate, 3 * offset);
+        newEnd = endOfMonth(addMonths(newStart, 2));
+        break;
+      case 'month':
+      default:
+        newStart = addMonths(startDate, offset);
+        newEnd = endOfMonth(newStart);
+        break;
+    }
+    
+    setDateRange({ from: newStart, to: newEnd });
+    onDateRangeChange(newStart, newEnd, viewMode);
+  };
+
+  const goToToday = () => {
+    handlePresetPeriod(viewMode);
+  };
+
   const handleUserToggle = (userId: string) => {
     if (selectedUserIds.includes(userId)) {
       onUserIdsChange(selectedUserIds.filter(id => id !== userId));
@@ -102,6 +132,35 @@ export function WorkloadFilters({
         </Button>
         <Button variant="outline" size="sm" onClick={() => handlePresetPeriod('quarter')}>
           Trimestre
+        </Button>
+      </div>
+
+      {/* Navigation arrows + Today button */}
+      <div className="flex items-center gap-1">
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => navigatePeriod('prev')}
+          title="Période précédente"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={goToToday}
+        >
+          Aujourd'hui
+        </Button>
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-8 w-8"
+          onClick={() => navigatePeriod('next')}
+          title="Période suivante"
+        >
+          <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
 
