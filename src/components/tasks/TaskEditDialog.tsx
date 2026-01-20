@@ -23,10 +23,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { TaskChecklist } from './TaskChecklist';
 import { TaskLinksEditor } from './TaskLinksEditor';
 import { Badge } from '@/components/ui/badge';
-import { Ticket, CheckSquare, Save, Loader2 } from 'lucide-react';
+import { Ticket, CheckSquare, Save, Loader2, Info } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useTaskAttachments } from '@/hooks/useTaskAttachments';
+import { useDueDatePermissionWithManager } from '@/hooks/useDueDatePermission';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface Department {
   id: string;
@@ -81,12 +83,18 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
   const [reporterId, setReporterId] = useState<string | null>(null);
   const [targetDepartmentId, setTargetDepartmentId] = useState<string | null>(null);
   
+  // Assignee manager for due date permission
+  const [assigneeManagerId, setAssigneeManagerId] = useState<string | null>(null);
+  
   // Data
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   
   const { categories, addCategory, addSubcategory } = useCategories();
   const { attachments, addAttachment, deleteAttachment } = useTaskAttachments(task?.id || null);
+  
+  // Due date permission check
+  const { canEditDueDate, reason: dueDateReason } = useDueDatePermissionWithManager(task, assigneeManagerId);
 
   // Initialize form when task changes
   useEffect(() => {
@@ -105,6 +113,7 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
       
       fetchProfiles();
       fetchDepartments();
+      fetchAssigneeManager(task.assignee_id);
     }
   }, [task, open]);
 
@@ -125,6 +134,21 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
       .select('id, name')
       .order('name');
     if (data) setDepartments(data);
+  };
+  
+  const fetchAssigneeManager = async (assigneeProfileId: string | null) => {
+    if (!assigneeProfileId) {
+      setAssigneeManagerId(null);
+      return;
+    }
+    
+    const { data } = await supabase
+      .from('profiles')
+      .select('manager_id')
+      .eq('id', assigneeProfileId)
+      .single();
+    
+    setAssigneeManagerId(data?.manager_id || null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -269,12 +293,28 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="dueDate">Date d'échéance</Label>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="dueDate">Date d'échéance</Label>
+              {!canEditDueDate && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="max-w-xs">{dueDateReason}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
             <Input
               id="dueDate"
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
+              disabled={!canEditDueDate}
+              className={!canEditDueDate ? 'opacity-50 cursor-not-allowed' : ''}
             />
           </div>
 

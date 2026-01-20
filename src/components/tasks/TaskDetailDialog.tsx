@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Task, TaskStatus, TaskPriority } from '@/types/task';
 import {
   Dialog,
@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Building2, 
@@ -38,7 +39,8 @@ import {
   Save,
   ArrowLeft,
   MessageSquare,
-  ListTodo
+  ListTodo,
+  Info
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -46,6 +48,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { TaskCommentsSection } from './TaskCommentsSection';
 import { useTasksProgress } from '@/hooks/useChecklists';
+import { useDueDatePermissionWithManager } from '@/hooks/useDueDatePermission';
 
 interface Profile {
   id: string;
@@ -85,7 +88,7 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
   const [childTasks, setChildTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [profiles, setProfiles] = useState<Map<string, string>>(new Map());
-  const [profilesList, setProfilesList] = useState<{ id: string; display_name: string }[]>([]);
+  const [profilesList, setProfilesList] = useState<{ id: string; display_name: string; manager_id: string | null }[]>([]);
   const [departments, setDepartments] = useState<Map<string, string>>(new Map());
   const [processName, setProcessName] = useState<string | null>(null);
   
@@ -102,6 +105,19 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
     assignee_id: '',
     due_date: '',
   });
+  
+  // Compute assignee manager for due date permission
+  const selectedChildAssigneeManagerId = useMemo(() => {
+    if (!selectedChildTask?.assignee_id) return null;
+    const assigneeProfile = profilesList.find(p => p.id === selectedChildTask.assignee_id);
+    return assigneeProfile?.manager_id || null;
+  }, [selectedChildTask?.assignee_id, profilesList]);
+  
+  // Due date permission for selected child task
+  const { canEditDueDate, reason: dueDateReason } = useDueDatePermissionWithManager(
+    selectedChildTask,
+    selectedChildAssigneeManagerId
+  );
   
   // Fetch checklist progress for child tasks
   const childTaskIds = childTasks.map(t => t.id);
@@ -129,16 +145,20 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
         setChildTasks(children as Task[]);
       }
 
-      // Fetch profiles
+      // Fetch profiles with manager_id for permission checking
       const { data: profilesData } = await supabase
         .from('profiles')
-        .select('id, display_name');
+        .select('id, display_name, manager_id');
 
       if (profilesData) {
         const map = new Map<string, string>();
         profilesData.forEach((p) => map.set(p.id, p.display_name || 'Sans nom'));
         setProfiles(map);
-        setProfilesList(profilesData.map(p => ({ id: p.id, display_name: p.display_name || 'Sans nom' })));
+        setProfilesList(profilesData.map(p => ({ 
+          id: p.id, 
+          display_name: p.display_name || 'Sans nom',
+          manager_id: p.manager_id
+        })));
       }
 
       // Fetch departments
@@ -353,12 +373,28 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="due_date">Date d'échéance</Label>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="due_date">Date d'échéance</Label>
+                      {!canEditDueDate && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="max-w-xs">{dueDateReason}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+                    </div>
                     <Input
                       id="due_date"
                       type="date"
                       value={editForm.due_date}
                       onChange={(e) => setEditForm(prev => ({ ...prev, due_date: e.target.value }))}
+                      disabled={!canEditDueDate}
+                      className={!canEditDueDate ? 'opacity-50 cursor-not-allowed' : ''}
                     />
                   </div>
                 </div>
