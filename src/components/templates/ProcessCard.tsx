@@ -32,17 +32,31 @@ const visibilityIcons: Record<string, any> = {
 
 export function ProcessCard({ process, onDelete, onEdit, onViewDetails, onAddTask, onDeleteTask, canManage = false, compact = false }: ProcessCardProps) {
   const [subProcessCount, setSubProcessCount] = useState(0);
+  const [targetDepartments, setTargetDepartments] = useState<string[]>([]);
 
   useEffect(() => {
-    const fetchSubProcessCount = async () => {
-      const { count } = await supabase
+    const fetchSubProcessData = async () => {
+      // Fetch sub-process count and their target departments
+      const { data: subProcesses } = await supabase
         .from('sub_process_templates')
-        .select('*', { count: 'exact', head: true })
+        .select('id, target_department_id, departments:target_department_id(name)')
         .eq('process_template_id', process.id);
       
-      setSubProcessCount(count || 0);
+      setSubProcessCount(subProcesses?.length || 0);
+      
+      // Extract unique department names from sub-processes
+      if (subProcesses) {
+        const uniqueDepts = new Set<string>();
+        subProcesses.forEach(sp => {
+          const deptData = sp.departments as any;
+          if (deptData?.name) {
+            uniqueDepts.add(deptData.name);
+          }
+        });
+        setTargetDepartments(Array.from(uniqueDepts));
+      }
     };
-    fetchSubProcessCount();
+    fetchSubProcessData();
   }, [process.id]);
 
   const directTaskCount = process.task_templates.filter(t => !t.sub_process_template_id).length;
@@ -148,12 +162,12 @@ export function ProcessCard({ process, onDelete, onEdit, onViewDetails, onAddTas
               {process.company}
             </Badge>
           )}
-          {process.department && (
-            <Badge variant="outline" className="text-xs">
+          {targetDepartments.length > 0 && targetDepartments.map(dept => (
+            <Badge key={dept} variant="secondary" className="text-xs">
               <Briefcase className="h-3 w-3 mr-1" />
-              {process.department}
+              {dept}
             </Badge>
-          )}
+          ))}
         </div>
       </CardHeader>
 

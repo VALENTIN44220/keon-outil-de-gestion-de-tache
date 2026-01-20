@@ -16,11 +16,7 @@ interface Company {
   name: string;
 }
 
-interface Department {
-  id: string;
-  name: string;
-  company_id: string | null;
-}
+// Department interface removed - target departments are now derived from sub-processes
 
 interface EditProcessDialogProps {
   process: ProcessTemplate | null;
@@ -36,15 +32,14 @@ export function EditProcessDialog({ process, open, onClose, onSave }: EditProces
   const [description, setDescription] = useState('');
   const [visibilityLevel, setVisibilityLevel] = useState<TemplateVisibility>('public');
   const [targetCompanyId, setTargetCompanyId] = useState<string | null>(null);
-  const [targetDepartmentId, setTargetDepartmentId] = useState<string | null>(null);
+  
+  // Target departments are now derived from sub-processes (read-only display)
+  const [targetDepartments, setTargetDepartments] = useState<string[]>([]);
 
   // Keep initial routing values to prevent accidental clearing when user edits other fields
   const initialTargetCompanyIdRef = useRef<string | null>(null);
-  const initialTargetDepartmentIdRef = useRef<string | null>(null);
 
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [filteredDepartments, setFilteredDepartments] = useState<Department[]>([]);
 
   // Only creator or admin can change visibility
   const canChangeVisibility = process && (process.user_id === user?.id || isAdmin);
@@ -52,9 +47,11 @@ export function EditProcessDialog({ process, open, onClose, onSave }: EditProces
   useEffect(() => {
     if (open) {
       fetchCompanies();
-      fetchDepartments();
+      if (process) {
+        fetchTargetDepartments(process.id);
+      }
     }
-  }, [open]);
+  }, [open, process]);
 
   useEffect(() => {
     if (process && open) {
@@ -65,24 +62,11 @@ export function EditProcessDialog({ process, open, onClose, onSave }: EditProces
       // Cast to any because routing fields were added later than some generated types
       const processAny = process as any;
       const nextCompanyId = (processAny.target_company_id ?? null) as string | null;
-      const nextDepartmentId = (processAny.target_department_id ?? process.target_department_id ?? null) as string | null;
 
       setTargetCompanyId(nextCompanyId);
-      setTargetDepartmentId(nextDepartmentId);
-
       initialTargetCompanyIdRef.current = nextCompanyId;
-      initialTargetDepartmentIdRef.current = nextDepartmentId;
     }
   }, [process, open]);
-
-  useEffect(() => {
-    if (targetCompanyId) {
-      // Filter departments by selected company
-      setFilteredDepartments(departments.filter(d => d.company_id === targetCompanyId));
-    } else {
-      setFilteredDepartments(departments);
-    }
-  }, [targetCompanyId, departments]);
 
   const fetchCompanies = async () => {
     const { data } = await supabase
@@ -92,12 +76,23 @@ export function EditProcessDialog({ process, open, onClose, onSave }: EditProces
     if (data) setCompanies(data);
   };
 
-  const fetchDepartments = async () => {
-    const { data } = await supabase
-      .from('departments')
-      .select('id, name, company_id')
-      .order('name');
-    if (data) setDepartments(data);
+  const fetchTargetDepartments = async (processId: string) => {
+    // Fetch unique department names from sub-processes
+    const { data: subProcesses } = await supabase
+      .from('sub_process_templates')
+      .select('target_department_id, departments:target_department_id(name)')
+      .eq('process_template_id', processId);
+    
+    if (subProcesses) {
+      const uniqueDepts = new Set<string>();
+      subProcesses.forEach(sp => {
+        const deptData = sp.departments as any;
+        if (deptData?.name) {
+          uniqueDepts.add(deptData.name);
+        }
+      });
+      setTargetDepartments(Array.from(uniqueDepts));
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -107,14 +102,12 @@ export function EditProcessDialog({ process, open, onClose, onSave }: EditProces
     // Preserve existing routing values unless user explicitly changes them
     const finalTargetCompanyId =
       targetCompanyId ?? initialTargetCompanyIdRef.current ?? null;
-    const finalTargetDepartmentId =
-      targetDepartmentId ?? initialTargetDepartmentIdRef.current ?? null;
 
     const updates: Partial<ProcessTemplate> = {
       name: name.trim(),
       description: description.trim() || null,
       target_company_id: finalTargetCompanyId,
-      target_department_id: finalTargetDepartmentId,
+      // target_department_id is now derived from sub-processes, not set at process level
     };
 
     if (canChangeVisibility) {
@@ -157,47 +150,41 @@ export function EditProcessDialog({ process, open, onClose, onSave }: EditProces
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Société cible</Label>
-              <Select 
-                value={targetCompanyId || '__none__'} 
-                onValueChange={(v) => {
-                  setTargetCompanyId(v === '__none__' ? null : v);
-                  // Reset department if company changes
-                  if (v === '__none__') setTargetDepartmentId(null);
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner une société" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Aucune société</SelectItem>
-                  {companies.map(c => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Service cible</Label>
-              <Select 
-                value={targetDepartmentId || '__none__'} 
-                onValueChange={(v) => setTargetDepartmentId(v === '__none__' ? null : v)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner un service" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Aucun service</SelectItem>
-                  {filteredDepartments.map(d => (
-                    <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-2">
+            <Label>Société cible</Label>
+            <Select 
+              value={targetCompanyId || '__none__'} 
+              onValueChange={(v) => {
+                setTargetCompanyId(v === '__none__' ? null : v);
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Sélectionner une société" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Aucune société</SelectItem>
+                {companies.map(c => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
+
+          {targetDepartments.length > 0 && (
+            <div className="space-y-2">
+              <Label>Services cibles (issus des sous-processus)</Label>
+              <div className="flex flex-wrap gap-2 p-2 border rounded-md bg-muted/50">
+                {targetDepartments.map(dept => (
+                  <span key={dept} className="px-2 py-1 bg-primary/10 text-primary rounded text-sm">
+                    {dept}
+                  </span>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Les services cibles sont définis au niveau des sous-processus.
+              </p>
+            </div>
+          )}
 
           {canChangeVisibility && (
             <VisibilitySelect
