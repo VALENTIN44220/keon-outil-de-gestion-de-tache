@@ -3,10 +3,12 @@ import { Task, TaskStatus, TaskPriority, TaskStats } from '@/types/task';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
 
 export function useTasks() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { effectivePermissions, isLoading: permissionsLoading } = useEffectivePermissions();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');
@@ -14,17 +16,25 @@ export function useTasks() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const fetchTasks = useCallback(async () => {
-    if (!user) {
-      setTasks([]);
-      setIsLoading(false);
+    if (!user || permissionsLoading) {
+      if (!user) {
+        setTasks([]);
+        setIsLoading(false);
+      }
       return;
     }
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('tasks')
       .select('*')
-      .eq('user_id', user.id)
       .order('created_at', { ascending: false });
+
+    // Si l'utilisateur a le droit de voir toutes les tâches, ne pas filtrer par user_id
+    if (!effectivePermissions.can_view_all_tasks) {
+      query = query.eq('user_id', user.id);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error('Error fetching tasks:', error);
@@ -37,11 +47,13 @@ export function useTasks() {
       setTasks((data || []) as Task[]);
     }
     setIsLoading(false);
-  }, [user, toast]);
+  }, [user, toast, effectivePermissions.can_view_all_tasks, permissionsLoading]);
 
   useEffect(() => {
-    fetchTasks();
-  }, [fetchTasks]);
+    if (!permissionsLoading) {
+      fetchTasks();
+    }
+  }, [fetchTasks, permissionsLoading]);
 
   const filteredTasks = useMemo(() => {
     return tasks.filter((task) => {
