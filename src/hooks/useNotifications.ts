@@ -6,10 +6,12 @@ export interface TaskNotification {
   id: string;
   taskId: string;
   taskTitle: string;
-  type: 'overdue' | 'due-today' | 'due-soon';
+  type: 'overdue' | 'due-today' | 'due-soon' | 'new-comment';
   message: string;
   priority: 'high' | 'medium' | 'low';
-  dueDate: string;
+  dueDate?: string;
+  authorName?: string;
+  createdAt?: string;
 }
 
 export function useNotifications(tasks: Task[]) {

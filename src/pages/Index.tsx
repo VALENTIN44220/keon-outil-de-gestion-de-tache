@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { Dashboard } from '@/components/dashboard/Dashboard';
@@ -12,9 +12,11 @@ import { CreateFromTemplateDialog } from '@/components/tasks/CreateFromTemplateD
 import { UnassignedTasksView } from '@/components/tasks/UnassignedTasksView';
 import { PendingAssignmentsView } from '@/components/tasks/PendingAssignmentsView';
 import { TeamModule } from '@/components/team/TeamModule';
+import { TaskDetailDialog } from '@/components/tasks/TaskDetailDialog';
 import { useTasks } from '@/hooks/useTasks';
 import { useTasksProgress } from '@/hooks/useChecklists';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useCommentNotifications } from '@/hooks/useCommentNotifications';
 import { useUnassignedTasks } from '@/hooks/useUnassignedTasks';
 import { usePendingAssignments } from '@/hooks/usePendingAssignments';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
@@ -23,6 +25,7 @@ import { Loader2, Workflow } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useCategories } from '@/hooks/useCategories';
+import { Task } from '@/types/task';
 
 const Index = () => {
   const [activeView, setActiveView] = useState('dashboard');
@@ -58,10 +61,15 @@ const Index = () => {
 
   const { categories } = useCategories();
   const { notifications, unreadCount, hasUrgent } = useNotifications(allTasks);
+  const { commentNotifications, markAsRead: markCommentAsRead } = useCommentNotifications();
   const { count: unassignedCount, refetch: refetchUnassigned } = useUnassignedTasks();
   const { getPendingCount, refetch: refetchPending } = usePendingAssignments();
   const { canAssignToTeam } = useUserPermissions();
   const pendingCount = getPendingCount();
+  
+  // State for comment notification task detail
+  const [selectedTaskForComment, setSelectedTaskForComment] = useState<Task | null>(null);
+  const [isCommentDetailOpen, setIsCommentDetailOpen] = useState(false);
   
   // Get progress for all tasks
   const taskIds = useMemo(() => allTasks.map(t => t.id), [allTasks]);
@@ -125,6 +133,19 @@ const Index = () => {
       toast.info(`Tâche sélectionnée: ${task.title}`);
     }
   };
+
+  const handleCommentNotificationClick = useCallback((taskId: string, notificationId: string) => {
+    markCommentAsRead(notificationId);
+    const task = allTasks.find(t => t.id === taskId);
+    if (task) {
+      setSelectedTaskForComment(task);
+      setIsCommentDetailOpen(true);
+    } else {
+      // Task might not be in the current view, navigate anyway
+      setActiveView('tasks');
+      toast.info('Ouverture de la demande...');
+    }
+  }, [allTasks, markCommentAsRead]);
 
   const getTitle = () => {
     switch (activeView) {
@@ -275,9 +296,11 @@ const Index = () => {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           notifications={notifications}
+          commentNotifications={commentNotifications}
           unreadCount={unreadCount}
           hasUrgent={hasUrgent}
           onNotificationClick={handleNotificationClick}
+          onCommentNotificationClick={handleCommentNotificationClick}
         />
         
         <main className="flex-1 overflow-y-auto p-6">
@@ -290,6 +313,18 @@ const Index = () => {
         onClose={() => setIsTemplateDialogOpen(false)}
         onTasksCreated={refetch}
       />
+
+      {selectedTaskForComment && (
+        <TaskDetailDialog
+          task={selectedTaskForComment}
+          open={isCommentDetailOpen}
+          onClose={() => {
+            setIsCommentDetailOpen(false);
+            setSelectedTaskForComment(null);
+          }}
+          onStatusChange={updateTaskStatus}
+        />
+      )}
     </div>
   );
 };
