@@ -13,6 +13,7 @@ import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -35,12 +36,16 @@ import {
   Edit,
   X,
   Save,
-  ArrowLeft
+  ArrowLeft,
+  MessageSquare,
+  ListTodo
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { TaskCommentsSection } from './TaskCommentsSection';
+import { useTasksProgress } from '@/hooks/useChecklists';
 
 interface Profile {
   id: string;
@@ -88,6 +93,7 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
   const [selectedChildTask, setSelectedChildTask] = useState<Task | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState<'tasks' | 'chat'>('tasks');
   const [editForm, setEditForm] = useState({
     title: '',
     description: '',
@@ -96,6 +102,10 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
     assignee_id: '',
     due_date: '',
   });
+  
+  // Fetch checklist progress for child tasks
+  const childTaskIds = childTasks.map(t => t.id);
+  const { progressMap: checklistProgress } = useTasksProgress(childTaskIds);
 
   useEffect(() => {
     if (open && task) {
@@ -394,6 +404,10 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
                   )}
                 </div>
 
+                {/* Chat section for child task */}
+                <Separator />
+                <TaskCommentsSection taskId={selectedChildTask.id} className="min-h-[200px]" />
+
                 <div className="flex justify-end gap-2 pt-4 border-t">
                   <Button variant="outline" onClick={handleCloseChildTask}>
                     Retour à la demande
@@ -485,102 +499,151 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
             </div>
           )}
 
-          {/* Child tasks section */}
+          {/* Child tasks and Chat section for requests */}
           {(task.type === 'request' || childTasks.length > 0) && (
             <>
               <Separator />
               
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h4 className="font-semibold flex items-center gap-2">
-                    <Workflow className="h-4 w-4" />
-                    Tâches liées
+              <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'tasks' | 'chat')} className="w-full">
+                <TabsList className="w-full">
+                  <TabsTrigger value="tasks" className="flex-1 gap-2">
+                    <ListTodo className="h-4 w-4" />
+                    Tâches
                     {childTasks.length > 0 && (
-                      <Badge variant="secondary">{childTasks.length}</Badge>
+                      <Badge variant="secondary" className="ml-1">{completedTasks}/{childTasks.length}</Badge>
                     )}
-                  </h4>
-                  {childTasks.length > 0 && (
-                    <span className="text-sm text-muted-foreground">
-                      {completedTasks}/{childTasks.length} terminées
-                    </span>
-                  )}
-                </div>
+                  </TabsTrigger>
+                  <TabsTrigger value="chat" className="flex-1 gap-2">
+                    <MessageSquare className="h-4 w-4" />
+                    Échanges
+                  </TabsTrigger>
+                </TabsList>
 
-                {/* Progress bar */}
-                {childTasks.length > 0 && (
-                  <div className="mb-4">
-                    <Progress value={progressPercent} className="h-2" />
-                    <p className="text-xs text-muted-foreground mt-1 text-right">{progressPercent}%</p>
-                  </div>
-                )}
+                <TabsContent value="tasks" className="mt-4">
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="font-semibold flex items-center gap-2">
+                        <Workflow className="h-4 w-4" />
+                        Tâches liées
+                      </h4>
+                      <span className="text-sm text-muted-foreground">
+                        {progressPercent}% complété
+                      </span>
+                    </div>
 
-                {isLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                  </div>
-                ) : childTasks.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <p>Aucune tâche liée à cette demande</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {childTasks.map((childTask) => {
-                      const ChildStatusIcon = statusConfig[childTask.status]?.icon || AlertCircle;
-                      return (
-                        <div
-                          key={childTask.id}
-                          onClick={() => handleOpenChildTask(childTask)}
-                          className={cn(
-                            "flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors hover:bg-accent/50",
-                            childTask.status === 'done' || childTask.status === 'validated'
-                              ? 'bg-success/5 border-success/30'
-                              : 'bg-card border-border'
-                          )}
-                        >
-                          <div className="flex items-center gap-3 flex-1">
-                            <ChildStatusIcon
-                              className={cn('h-4 w-4', statusConfig[childTask.status]?.color)}
-                            />
-                            <div className="flex-1 min-w-0">
-                              <p className={cn(
-                                "font-medium text-sm truncate",
-                                (childTask.status === 'done' || childTask.status === 'validated') && 'line-through text-muted-foreground'
-                              )}>
-                                {childTask.title}
-                              </p>
-                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                {childTask.assignee_id ? (
-                                  <span>{profiles.get(childTask.assignee_id)}</span>
-                                ) : (
-                                  <span className="text-warning">Non assigné</span>
-                                )}
-                                {childTask.due_date && (
-                                  <>
-                                    <span>•</span>
-                                    <span>{format(new Date(childTask.due_date), 'dd MMM', { locale: fr })}</span>
-                                  </>
-                                )}
-                                {childTask.is_assignment_task && (
-                                  <>
-                                    <span>•</span>
-                                    <Badge variant="outline" className="text-[10px] px-1 py-0">Affectation</Badge>
-                                  </>
-                                )}
+                    {/* Progress bar */}
+                    {childTasks.length > 0 && (
+                      <div className="mb-4">
+                        <Progress value={progressPercent} className="h-2" />
+                      </div>
+                    )}
+
+                    {isLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                      </div>
+                    ) : childTasks.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <p>Aucune tâche liée à cette demande</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {childTasks.map((childTask) => {
+                          const ChildStatusIcon = statusConfig[childTask.status]?.icon || AlertCircle;
+                          const isCompleted = childTask.status === 'done' || childTask.status === 'validated';
+                          const taskProgress = checklistProgress[childTask.id];
+                          
+                          return (
+                            <div
+                              key={childTask.id}
+                              onClick={() => handleOpenChildTask(childTask)}
+                              className={cn(
+                                "flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors hover:bg-accent/50",
+                                isCompleted
+                                  ? 'bg-success/5 border-success/30'
+                                  : 'bg-card border-border'
+                              )}
+                            >
+                              <div className="flex items-center gap-3 flex-1">
+                                <div className="relative">
+                                  <ChildStatusIcon
+                                    className={cn('h-5 w-5', statusConfig[childTask.status]?.color)}
+                                  />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <p className={cn(
+                                      "font-medium text-sm truncate",
+                                      isCompleted && 'line-through text-muted-foreground'
+                                    )}>
+                                      {childTask.title}
+                                    </p>
+                                    {taskProgress && taskProgress.total > 0 && (
+                                      <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
+                                        {taskProgress.completed}/{taskProgress.total}
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    {childTask.assignee_id ? (
+                                      <span className="flex items-center gap-1">
+                                        <User className="h-3 w-3" />
+                                        {profiles.get(childTask.assignee_id)}
+                                      </span>
+                                    ) : (
+                                      <span className="text-warning flex items-center gap-1">
+                                        <User className="h-3 w-3" />
+                                        Non assigné
+                                      </span>
+                                    )}
+                                    {childTask.due_date && (
+                                      <>
+                                        <span>•</span>
+                                        <span className="flex items-center gap-1">
+                                          <Calendar className="h-3 w-3" />
+                                          {format(new Date(childTask.due_date), 'dd MMM', { locale: fr })}
+                                        </span>
+                                      </>
+                                    )}
+                                  </div>
+                                  {/* Mini progress bar for checklist */}
+                                  {taskProgress && taskProgress.total > 0 && (
+                                    <Progress 
+                                      value={taskProgress.progress} 
+                                      className="h-1 mt-1.5" 
+                                    />
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Badge 
+                                  variant="outline" 
+                                  className={cn("text-xs", statusConfig[childTask.status]?.color)}
+                                >
+                                  {statusConfig[childTask.status]?.label}
+                                </Badge>
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
                               </div>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant={priorityConfig[childTask.priority].variant} className="text-xs">
-                              {priorityConfig[childTask.priority].label}
-                            </Badge>
-                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                          </div>
-                        </div>
-                      );
-                    })}
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                </TabsContent>
+
+                <TabsContent value="chat" className="mt-4">
+                  <TaskCommentsSection taskId={task.id} className="min-h-[300px]" />
+                </TabsContent>
+              </Tabs>
+            </>
+          )}
+
+          {/* Chat section for non-request tasks (simple tasks) */}
+          {task.type !== 'request' && childTasks.length === 0 && (
+            <>
+              <Separator />
+              <TaskCommentsSection taskId={task.id} className="min-h-[200px]" />
             </>
           )}
 
@@ -589,7 +652,7 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
             <Button variant="outline" onClick={onClose}>
               Fermer
             </Button>
-            {task.status !== 'done' && (
+            {task.status !== 'done' && task.status !== 'validated' && (
               <Button onClick={() => { onStatusChange(task.id, 'done'); onClose(); }}>
                 <CheckCircle2 className="h-4 w-4 mr-2" />
                 Marquer terminé
