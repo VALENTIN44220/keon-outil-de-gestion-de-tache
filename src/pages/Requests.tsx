@@ -12,7 +12,7 @@ import { NewRequestDialog } from '@/components/tasks/NewRequestDialog';
 // BERequestDialog removed - unified into NewRequestDialog
 import { AddTaskDialog } from '@/components/tasks/AddTaskDialog';
 import { NewTaskDialog } from '@/components/tasks/NewTaskDialog';
-import { TaskDetailDialog } from '@/components/tasks/TaskDetailDialog';
+import { RequestDetailDialog } from '@/components/tasks/RequestDetailDialog';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useCommentNotifications } from '@/hooks/useCommentNotifications';
 import { useTasksProgress } from '@/hooks/useChecklists';
@@ -770,7 +770,7 @@ const Requests = () => {
       {/* BERequestDialog removed - functionality unified into NewRequestDialog */}
 
       {selectedRequest && (
-        <TaskDetailDialog
+        <RequestDetailDialog
           task={selectedRequest}
           open={isDetailOpen}
           onClose={() => {

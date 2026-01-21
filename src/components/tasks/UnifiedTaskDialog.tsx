@@ -160,6 +160,7 @@ export function UnifiedTaskDialog({ open, onClose, onAdd }: UnifiedTaskDialogPro
       parent_request_id: null,
       is_assignment_task: false,
       source_process_template_id: null,
+      source_sub_process_template_id: null,
       be_project_id: null,
       be_label_id: null,
       rbe_validator_id: null,

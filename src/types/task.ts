@@ -46,6 +46,7 @@ export interface Task {
   parent_request_id: string | null;
   is_assignment_task: boolean;
   source_process_template_id: string | null;
+  source_sub_process_template_id: string | null;
   // BE Project fields
   be_project_id: string | null;
   be_label_id: string | null;
