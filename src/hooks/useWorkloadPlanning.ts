@@ -30,6 +30,51 @@ export function useWorkloadPlanning({
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  const assignTaskToUserFromPlanning = useCallback(
+    async (taskId: string, assigneeProfileId: string) => {
+      // Fetch what's needed to keep task detail consistent (service cible, exécutant, statut)
+      const [{ data: assigneeProfile, error: assigneeError }, { data: taskRow, error: taskError }] =
+        await Promise.all([
+          supabase
+            .from('profiles')
+            .select('department_id')
+            .eq('id', assigneeProfileId)
+            .maybeSingle(),
+          supabase
+            .from('tasks')
+            .select('id, status, target_department_id')
+            .eq('id', taskId)
+            .maybeSingle(),
+        ]);
+
+      if (assigneeError) throw assigneeError;
+      if (taskError) throw taskError;
+      if (!taskRow) throw new Error('Tâche introuvable');
+
+      const update: Record<string, any> = {
+        assignee_id: assigneeProfileId,
+      };
+
+      // Fill target department if missing (used by “Service cible”)
+      if (!taskRow.target_department_id && assigneeProfile?.department_id) {
+        update.target_department_id = assigneeProfile.department_id;
+      }
+
+      // If it was “À affecter”, move it to “À faire” once assigned
+      if (taskRow.status === 'to_assign') {
+        update.status = 'todo';
+      }
+
+      const { error: updateError } = await supabase
+        .from('tasks')
+        .update(update)
+        .eq('id', taskId);
+
+      if (updateError) throw updateError;
+    },
+    []
+  );
+
   const fetchData = useCallback(async () => {
     if (!profile?.id) return;
     
@@ -64,9 +109,9 @@ export function useWorkloadPlanning({
       }
 
       // Apply company filter
-      let membersQuery = supabase
+       let membersQuery = supabase
         .from('profiles')
-        .select('id, display_name, avatar_url, job_title, department, company_id')
+         .select('id, display_name, avatar_url, job_title, department, department_id, company_id')
         .in('id', memberIds);
       
       if (companyId) {
@@ -298,15 +343,11 @@ export function useWorkloadPlanning({
       .single();
     
     if (error) throw error;
-    
-    // Also assign the task to the user if not already assigned
-    const { error: taskError } = await supabase
-      .from('tasks')
-      .update({ assignee_id: userId })
-      .eq('id', taskId);
-    
-    if (taskError) {
-      console.error('Error assigning task:', taskError);
+
+    try {
+      await assignTaskToUserFromPlanning(taskId, userId);
+    } catch (e) {
+      console.error('Error assigning task from planning:', e);
     }
     
     await fetchData();
@@ -340,15 +381,11 @@ export function useWorkloadPlanning({
       .insert(inserts);
     
     if (error) throw error;
-    
-    // Also assign the task to the user if not already assigned
-    const { error: taskError } = await supabase
-      .from('tasks')
-      .update({ assignee_id: userId })
-      .eq('id', taskId);
-    
-    if (taskError) {
-      console.error('Error assigning task:', taskError);
+
+    try {
+      await assignTaskToUserFromPlanning(taskId, userId);
+    } catch (e) {
+      console.error('Error assigning task from planning:', e);
     }
     
     await fetchData();
