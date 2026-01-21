@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSimulation } from '@/contexts/SimulationContext';
 import { Holiday, UserLeave, WorkloadSlot, WorkloadDay, TeamMemberWorkload } from '@/types/workload';
 import { format, addDays, isWeekend, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -20,7 +21,9 @@ export function useWorkloadPlanning({
   processTemplateId,
   companyId,
 }: UseWorkloadPlanningProps) {
-  const { profile } = useAuth();
+  const { profile: authProfile } = useAuth();
+  const { getActiveProfile } = useSimulation();
+  const profile = getActiveProfile() || authProfile;
   const [slots, setSlots] = useState<WorkloadSlot[]>([]);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [leaves, setLeaves] = useState<UserLeave[]>([]);
