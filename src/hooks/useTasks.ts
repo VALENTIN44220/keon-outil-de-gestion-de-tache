@@ -6,7 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
 
 export function useTasks() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { toast } = useToast();
   const { effectivePermissions, isLoading: permissionsLoading } = useEffectivePermissions();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -16,7 +16,7 @@ export function useTasks() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const fetchTasks = useCallback(async () => {
-    if (!user || permissionsLoading) {
+    if (!user || !profile || permissionsLoading) {
       if (!user) {
         setTasks([]);
         setIsLoading(false);
@@ -24,14 +24,24 @@ export function useTasks() {
       return;
     }
 
+    // Fetch only tasks (not requests) that are assigned to the user OR need to be assigned to them
+    // Exclude requests (type='request') and their child tasks from the task management view
     let query = supabase
       .from('tasks')
       .select('*')
+      .eq('type', 'task') // Only show tasks, not requests
       .order('created_at', { ascending: false });
 
-    // Si l'utilisateur a le droit de voir toutes les tâches, ne pas filtrer par user_id
-    if (!effectivePermissions.can_view_all_tasks) {
-      query = query.eq('user_id', user.id);
+    // Filter to show only tasks assigned to the user or to be assigned to them
+    // - assignee_id = current user's profile id (tasks assigned to me)
+    // - OR target_department_id = my department AND assignee_id is null (tasks to assign in my department)
+    // - OR status = 'to_assign' AND target_department_id = my department (pending assignments)
+    if (effectivePermissions.can_view_all_tasks) {
+      // Managers can see all tasks in their department + their own tasks
+      query = query.or(`assignee_id.eq.${profile.id},target_department_id.eq.${profile.department_id}`);
+    } else {
+      // Regular users only see tasks assigned to them
+      query = query.eq('assignee_id', profile.id);
     }
 
     const { data, error } = await query;
@@ -47,7 +57,7 @@ export function useTasks() {
       setTasks((data || []) as Task[]);
     }
     setIsLoading(false);
-  }, [user, toast, effectivePermissions.can_view_all_tasks, permissionsLoading]);
+  }, [user, profile, toast, effectivePermissions.can_view_all_tasks, permissionsLoading]);
 
   useEffect(() => {
     if (!permissionsLoading) {
