@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSimulation } from '@/contexts/SimulationContext';
 import { supabase } from '@/integrations/supabase/client';
 import type { 
   EffectivePermissions, 
@@ -38,7 +39,12 @@ const defaultPermissions: EffectivePermissions = {
 };
 
 export function useEffectivePermissions() {
-  const { profile } = useAuth();
+  const { profile: authProfile } = useAuth();
+  const { isSimulating, simulatedProfile } = useSimulation();
+  
+  // Use simulated profile if in simulation mode, otherwise use auth profile
+  const profile = isSimulating && simulatedProfile ? simulatedProfile : authProfile;
+  
   const [permissionProfile, setPermissionProfile] = useState<PermissionProfile | null>(null);
   const [userOverrides, setUserOverrides] = useState<UserPermissionOverride | null>(null);
   const [profileProcessTemplates, setProfileProcessTemplates] = useState<string[]>([]);
@@ -52,6 +58,7 @@ export function useEffectivePermissions() {
         return;
       }
 
+      setIsLoading(true);
       try {
         // Fetch permission profile
         if (profile.permission_profile_id) {
@@ -104,7 +111,7 @@ export function useEffectivePermissions() {
     }
 
     fetchPermissions();
-  }, [profile?.id, profile?.permission_profile_id]);
+  }, [profile?.id, profile?.permission_profile_id, isSimulating]);
 
   // Compute effective permissions by merging profile defaults with user overrides
   const effectivePermissions = useMemo<EffectivePermissions>(() => {

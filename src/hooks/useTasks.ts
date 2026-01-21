@@ -2,13 +2,19 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Task, TaskStatus, TaskPriority, TaskStats } from '@/types/task';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSimulation } from '@/contexts/SimulationContext';
 import { useToast } from '@/hooks/use-toast';
 import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
 
 export function useTasks() {
-  const { user, profile } = useAuth();
+  const { user, profile: authProfile } = useAuth();
+  const { isSimulating, simulatedProfile } = useSimulation();
   const { toast } = useToast();
   const { effectivePermissions, isLoading: permissionsLoading } = useEffectivePermissions();
+  
+  // Use simulated profile if in simulation mode
+  const profile = isSimulating && simulatedProfile ? simulatedProfile : authProfile;
+  
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');
@@ -57,7 +63,7 @@ export function useTasks() {
       setTasks((data || []) as Task[]);
     }
     setIsLoading(false);
-  }, [user, profile, toast, effectivePermissions.can_view_all_tasks, permissionsLoading]);
+  }, [user, profile, toast, effectivePermissions.can_view_all_tasks, permissionsLoading, isSimulating]);
 
   useEffect(() => {
     if (!permissionsLoading) {
