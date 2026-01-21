@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -12,12 +13,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { 
   MoreVertical, Plus, Trash2, Edit, ChevronDown, ChevronRight,
-  Users, User, UserCog, Building2, FormInput, Lock, Link2, Edit2
+  Users, User, UserCog, FormInput, Lock, Link2, Edit2
 } from 'lucide-react';
 import { AddTaskTemplateDialog } from './AddTaskTemplateDialog';
 import { EditTaskTemplateDialog } from './EditTaskTemplateDialog';
 import { LinkExistingTaskDialog } from './LinkExistingTaskDialog';
-import { TemplateChecklistEditor } from './TemplateChecklistEditor';
 import { SubProcessCustomFieldsEditor } from './SubProcessCustomFieldsEditor';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -194,72 +194,55 @@ export function SubProcessCard({
                 </TabsList>
 
                 <TabsContent value="tasks" className="mt-3">
-                  <div className="space-y-2">
-                    {subProcess.task_templates.length === 0 ? (
-                      <p className="text-xs text-muted-foreground text-center py-2">
-                        Aucune tâche dans ce sous-processus
-                      </p>
-                    ) : (
-                      subProcess.task_templates.map((task, index) => (
-                        <Collapsible
+                  {subProcess.task_templates.length === 0 ? (
+                    <p className="text-xs text-muted-foreground text-center py-2">
+                      Aucune tâche dans ce sous-processus
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                      {subProcess.task_templates.map((task, index) => (
+                        <div 
                           key={task.id}
-                          open={expandedTasks.has(task.id)}
-                          onOpenChange={() => toggleTaskExpanded(task.id)}
+                          className="rounded-lg bg-muted/50 p-2 flex items-center justify-between gap-1"
                         >
-                          <div className="rounded-lg bg-muted/50 overflow-hidden">
-                            <div className="flex items-center justify-between p-2">
-                              <CollapsibleTrigger asChild>
-                                <button className="flex items-center gap-2 flex-1 text-left hover:bg-muted/50 rounded transition-colors">
-                                  {expandedTasks.has(task.id) ? (
-                                    <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                                  ) : (
-                                    <ChevronRight className="h-3 w-3 text-muted-foreground" />
-                                  )}
-                                  <span className="text-xs text-muted-foreground w-4">
-                                    {index + 1}.
-                                  </span>
-                                  <span className="text-sm truncate">{task.title}</span>
-                                </button>
-                              </CollapsibleTrigger>
-                              <div className="flex items-center gap-1">
-                                <Badge 
-                                  variant="outline" 
-                                  className={`text-xs ${priorityColors[task.priority]}`}
-                                >
-                                  {task.priority}
-                                </Badge>
-                                {canManage && (
-                                  <>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-6 w-6"
-                                      onClick={(e) => { e.stopPropagation(); setEditingTask(task); }}
-                                    >
-                                      <Edit2 className="h-3 w-3 text-muted-foreground hover:text-primary" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-6 w-6"
-                                      onClick={(e) => { e.stopPropagation(); onDeleteTask(task.id); }}
-                                    >
-                                      <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
-                                    </Button>
-                                  </>
-                                )}
-                              </div>
-                            </div>
-                            <CollapsibleContent>
-                              <div className="px-2 pb-2">
-                                <TemplateChecklistEditor taskTemplateId={task.id} />
-                              </div>
-                            </CollapsibleContent>
+                          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                            <span className="text-xs text-muted-foreground shrink-0">
+                              {index + 1}.
+                            </span>
+                            <span className="text-sm truncate">{task.title}</span>
                           </div>
-                        </Collapsible>
-                      ))
-                    )}
-                  </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Badge 
+                              variant="outline" 
+                              className={`text-xs ${priorityColors[task.priority]}`}
+                            >
+                              {task.priority}
+                            </Badge>
+                            {canManage && (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={() => setEditingTask(task)}
+                                >
+                                  <Edit2 className="h-3 w-3 text-muted-foreground hover:text-primary" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={() => onDeleteTask(task.id)}
+                                >
+                                  <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   {canManage && (
                     <div className="flex gap-2 mt-3">
@@ -286,10 +269,12 @@ export function SubProcessCard({
                 </TabsContent>
 
                 <TabsContent value="fields" className="mt-3">
-                  <SubProcessCustomFieldsEditor 
-                    subProcessTemplateId={subProcess.id}
-                    canManage={canManage}
-                  />
+                  <ScrollArea className="h-[200px]">
+                    <SubProcessCustomFieldsEditor 
+                      subProcessTemplateId={subProcess.id}
+                      canManage={canManage}
+                    />
+                  </ScrollArea>
                 </TabsContent>
               </Tabs>
             </CardContent>
