@@ -2,6 +2,7 @@ import { LayoutDashboard, CheckSquare, BarChart3, Users, Settings, ChevronLeft, 
 import { useUserRole } from '@/hooks/useUserRole';
 import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSimulation } from '@/contexts/SimulationContext';
 import { useState, useEffect, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -97,7 +98,11 @@ export function Sidebar({
   const navigate = useNavigate();
   const { isAdmin } = useUserRole();
   const { effectivePermissions, canAccessScreen } = useEffectivePermissions();
-  const { profile } = useAuth();
+  const { profile: authProfile } = useAuth();
+  const { isSimulating, simulatedProfile } = useSimulation();
+  
+  // Use simulated profile for display if in simulation mode
+  const profile = isSimulating && simulatedProfile ? simulatedProfile : authProfile;
 
   // Build menu items based on effective permissions
   const menuItems = useMemo(() => {
