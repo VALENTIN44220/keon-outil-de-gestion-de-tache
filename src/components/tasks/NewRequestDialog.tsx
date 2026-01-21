@@ -815,22 +815,29 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Service cible *</Label>
-                    <Select 
-                      value={targetDepartmentId || ''} 
-                      onValueChange={(v) => setTargetDepartmentId(v || null)}
-                      disabled={processImposedValues || (matchingRule?.auto_assign && matchingRule?.target_department_id ? true : false)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner un service" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {departments.map(dept => (
-                          <SelectItem key={dept.id} value={dept.id}>
-                            {dept.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {processImposedValues && targetDepartmentId ? (
+                      <div className="flex items-center h-10 px-3 py-2 rounded-md border border-input bg-muted text-sm">
+                        <Building2 className="h-4 w-4 mr-2 text-muted-foreground" />
+                        {departments.find(d => d.id === targetDepartmentId)?.name || 'Service défini par le processus'}
+                      </div>
+                    ) : (
+                      <Select 
+                        value={targetDepartmentId || ''} 
+                        onValueChange={(v) => setTargetDepartmentId(v || null)}
+                        disabled={matchingRule?.auto_assign && matchingRule?.target_department_id ? true : false}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sélectionner un service" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {departments.map(dept => (
+                            <SelectItem key={dept.id} value={dept.id}>
+                              {dept.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
 
                   <div className="space-y-2">
