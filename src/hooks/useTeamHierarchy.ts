@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSimulation } from '@/contexts/SimulationContext';
 
 export interface TeamMember {
   id: string;
@@ -38,7 +39,12 @@ export interface HierarchyNode extends TeamMember {
 }
 
 export function useTeamHierarchy() {
-  const { profile, user } = useAuth();
+  const { profile: authProfile } = useAuth();
+  const { isSimulating, simulatedProfile } = useSimulation();
+  
+  // Use simulated profile if in simulation mode
+  const profile = isSimulating && simulatedProfile ? simulatedProfile : authProfile;
+  
   const [allMembers, setAllMembers] = useState<TeamMember[]>([]);
   const [hierarchyTree, setHierarchyTree] = useState<HierarchyNode | null>(null);
   const [managers, setManagers] = useState<TeamMember[]>([]);
@@ -49,7 +55,7 @@ export function useTeamHierarchy() {
   useEffect(() => {
     if (!profile?.id) return;
     fetchTeamData();
-  }, [profile?.id]);
+  }, [profile?.id, isSimulating, simulatedProfile?.id]);
 
   const fetchTeamData = async () => {
     if (!profile?.id) return;
