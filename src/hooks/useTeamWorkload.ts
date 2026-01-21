@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSimulation } from '@/contexts/SimulationContext';
 import { Task } from '@/types/task';
 
 export interface MemberWorkload {
@@ -20,7 +21,9 @@ export interface MemberWorkload {
 }
 
 export function useTeamWorkload() {
-  const { profile } = useAuth();
+  const { profile: authProfile } = useAuth();
+  const { getActiveProfile } = useSimulation();
+  const profile = getActiveProfile() || authProfile;
   const [workloads, setWorkloads] = useState<MemberWorkload[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 

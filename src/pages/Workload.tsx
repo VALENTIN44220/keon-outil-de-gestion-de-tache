@@ -16,6 +16,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Loader2, GanttChart, CalendarDays, BarChart3, Palmtree, CalendarCheck, Download, RefreshCw, Users } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSimulation } from '@/contexts/SimulationContext';
 import { Task } from '@/types/task';
 import { WorkloadSlot } from '@/types/workload';
 import { toast } from 'sonner';
@@ -23,7 +24,9 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 
 export default function Workload() {
-  const { profile } = useAuth();
+  const { profile: authProfile } = useAuth();
+  const { getActiveProfile } = useSimulation();
+  const profile = getActiveProfile() || authProfile;
   const [activeView, setActiveView] = useState('workload');
   const [activeTab, setActiveTab] = useState('gantt');
   const [viewMode, setViewMode] = useState<'week' | 'month' | 'quarter'>('month');
