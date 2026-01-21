@@ -5,12 +5,15 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSimulation } from '@/contexts/SimulationContext';
 import { useToast } from '@/hooks/use-toast';
 import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
+import { useTeamHierarchy } from '@/hooks/useTeamHierarchy';
+import { TaskScope } from '@/hooks/useTaskScope';
 
-export function useTasks() {
+export function useTasks(externalScope?: TaskScope) {
   const { user, profile: authProfile } = useAuth();
   const { isSimulating, simulatedProfile } = useSimulation();
   const { toast } = useToast();
   const { effectivePermissions, isLoading: permissionsLoading } = useEffectivePermissions();
+  const { subordinates } = useTeamHierarchy();
   
   // Use simulated profile if in simulation mode
   const profile = isSimulating && simulatedProfile ? simulatedProfile : authProfile;
@@ -20,6 +23,22 @@ export function useTasks() {
   const [statusFilter, setStatusFilter] = useState<TaskStatus | 'all'>('all');
   const [priorityFilter, setPriorityFilter] = useState<TaskPriority | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [scope, setScope] = useState<TaskScope>(externalScope || 'my_tasks');
+
+  // Update internal scope when external changes
+  useEffect(() => {
+    if (externalScope) {
+      setScope(externalScope);
+    }
+  }, [externalScope]);
+
+  // Get team member IDs (self + subordinates)
+  const myTeamIds = useMemo(() => {
+    if (!profile?.id) return [];
+    const ids = [profile.id];
+    subordinates.forEach(sub => ids.push(sub.id));
+    return ids;
+  }, [profile?.id, subordinates]);
 
   const fetchTasks = useCallback(async () => {
     if (!user || !profile || permissionsLoading) {
@@ -30,24 +49,56 @@ export function useTasks() {
       return;
     }
 
-    // Fetch only tasks (not requests) that are assigned to the user OR need to be assigned to them
-    // Exclude requests (type='request') and their child tasks from the task management view
+    setIsLoading(true);
+
+    // Fetch only tasks (not requests)
     let query = supabase
       .from('tasks')
       .select('*')
-      .eq('type', 'task') // Only show tasks, not requests
+      .eq('type', 'task')
       .order('created_at', { ascending: false });
 
-    // Filter to show only tasks assigned to the user or to be assigned to them
-    // - assignee_id = current user's profile id (tasks assigned to me)
-    // - OR target_department_id = my department AND assignee_id is null (tasks to assign in my department)
-    // - OR status = 'to_assign' AND target_department_id = my department (pending assignments)
-    if (effectivePermissions.can_view_all_tasks) {
-      // Managers can see all tasks in their department + their own tasks
-      query = query.or(`assignee_id.eq.${profile.id},target_department_id.eq.${profile.department_id}`);
-    } else {
-      // Regular users only see tasks assigned to them
-      query = query.eq('assignee_id', profile.id);
+    // Apply scope-based filtering
+    switch (scope) {
+      case 'my_tasks':
+        // Only tasks assigned to me
+        query = query.eq('assignee_id', profile.id);
+        break;
+        
+      case 'department_tasks':
+        // Tasks assigned to me or my team members, OR tasks targeted to my department
+        if (effectivePermissions.can_view_subordinates_tasks || effectivePermissions.can_view_all_tasks) {
+          if (myTeamIds.length > 0) {
+            // Tasks assigned to team members OR targeted to my department
+            const assigneeFilter = myTeamIds.map(id => `assignee_id.eq.${id}`).join(',');
+            if (profile.department_id) {
+              query = query.or(`${assigneeFilter},target_department_id.eq.${profile.department_id}`);
+            } else {
+              query = query.or(assigneeFilter);
+            }
+          }
+        } else {
+          // Fallback to just my tasks if no permission
+          query = query.eq('assignee_id', profile.id);
+        }
+        break;
+        
+      case 'all_tasks':
+        // All tasks - only allowed if user has can_view_all_tasks permission
+        if (!effectivePermissions.can_view_all_tasks) {
+          // Fallback to department scope
+          if (effectivePermissions.can_view_subordinates_tasks && myTeamIds.length > 0) {
+            const assigneeFilter = myTeamIds.map(id => `assignee_id.eq.${id}`).join(',');
+            query = query.or(assigneeFilter);
+          } else {
+            query = query.eq('assignee_id', profile.id);
+          }
+        }
+        // No additional filter for admins - they see everything
+        break;
+        
+      default:
+        query = query.eq('assignee_id', profile.id);
     }
 
     const { data, error } = await query;
@@ -63,7 +114,7 @@ export function useTasks() {
       setTasks((data || []) as Task[]);
     }
     setIsLoading(false);
-  }, [user, profile, toast, effectivePermissions.can_view_all_tasks, permissionsLoading, isSimulating]);
+  }, [user, profile, toast, effectivePermissions, permissionsLoading, isSimulating, scope, myTeamIds]);
 
   useEffect(() => {
     if (!permissionsLoading) {
@@ -225,5 +276,7 @@ export function useTasks() {
     addTask,
     deleteTask,
     refetch: fetchTasks,
+    scope,
+    setScope,
   };
 }

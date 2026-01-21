@@ -5,6 +5,10 @@ import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useCategories } from '@/hooks/useCategories';
+import { useAuth } from '@/contexts/AuthContext';
+import { useSimulation } from '@/contexts/SimulationContext';
+import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
+import { useTeamHierarchy } from '@/hooks/useTeamHierarchy';
 import { cn } from '@/lib/utils';
 
 interface Profile {
@@ -13,6 +17,19 @@ interface Profile {
   job_title: string | null;
   company: string | null;
   department: string | null;
+  department_id: string | null;
+  company_id: string | null;
+}
+
+interface Company {
+  id: string;
+  name: string;
+}
+
+interface Department {
+  id: string;
+  name: string;
+  company_id: string | null;
 }
 
 export interface AdvancedFiltersState {
@@ -55,28 +72,84 @@ const FILTER_COLORS = {
 };
 
 export function AdvancedFilters({ filters, onFiltersChange }: AdvancedFiltersProps) {
-  const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [companies, setCompanies] = useState<string[]>([]);
-  const [departments, setDepartments] = useState<string[]>([]);
+  const { profile: authProfile } = useAuth();
+  const { isSimulating, simulatedProfile } = useSimulation();
+  const { effectivePermissions } = useEffectivePermissions();
+  const { subordinates } = useTeamHierarchy();
+  
+  const profile = isSimulating && simulatedProfile ? simulatedProfile : authProfile;
+  
+  const [allProfiles, setAllProfiles] = useState<Profile[]>([]);
+  const [allCompanies, setAllCompanies] = useState<Company[]>([]);
+  const [allDepartments, setAllDepartments] = useState<Department[]>([]);
   const { categories } = useCategories();
 
   useEffect(() => {
-    const fetchProfiles = async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, display_name, job_title, company, department');
+    const fetchData = async () => {
+      const [profilesRes, companiesRes, departmentsRes] = await Promise.all([
+        supabase.from('profiles').select('id, display_name, job_title, company, department, department_id, company_id'),
+        supabase.from('companies').select('id, name'),
+        supabase.from('departments').select('id, name, company_id'),
+      ]);
       
-      if (data) {
-        setProfiles(data);
-        const uniqueCompanies = [...new Set(data.map(p => p.company).filter(Boolean))] as string[];
-        const uniqueDepartments = [...new Set(data.map(p => p.department).filter(Boolean))] as string[];
-        setCompanies(uniqueCompanies);
-        setDepartments(uniqueDepartments);
-      }
+      if (profilesRes.data) setAllProfiles(profilesRes.data);
+      if (companiesRes.data) setAllCompanies(companiesRes.data);
+      if (departmentsRes.data) setAllDepartments(departmentsRes.data);
     };
 
-    fetchProfiles();
+    fetchData();
   }, []);
+
+  // Get team member IDs (self + subordinates)
+  const myTeamIds = new Set<string>();
+  if (profile?.id) {
+    myTeamIds.add(profile.id);
+    subordinates.forEach(sub => myTeamIds.add(sub.id));
+  }
+
+  // Filter profiles based on permissions
+  const filteredProfiles = allProfiles.filter(p => {
+    if (!profile?.id) return false;
+    
+    // Admin/Director: can see all
+    if (effectivePermissions.can_view_all_tasks) {
+      return true;
+    }
+    
+    // Manager: can see self + subordinates
+    if (effectivePermissions.can_view_subordinates_tasks) {
+      return myTeamIds.has(p.id);
+    }
+    
+    // Regular user: only self
+    return p.id === profile.id;
+  });
+
+  // Filter companies based on permissions
+  const filteredCompanies = allCompanies.filter(c => {
+    if (!profile) return false;
+    
+    // Admin/Director: can see all
+    if (effectivePermissions.can_view_all_tasks) {
+      return true;
+    }
+    
+    // Others: only their company
+    return profile.company_id === c.id;
+  });
+
+  // Filter departments based on permissions
+  const filteredDepartments = allDepartments.filter(d => {
+    if (!profile) return false;
+    
+    // Admin/Director: can see all
+    if (effectivePermissions.can_view_all_tasks) {
+      return true;
+    }
+    
+    // Manager: their department only
+    return profile.department_id === d.id;
+  });
 
   const handleChange = (key: keyof AdvancedFiltersState, value: string) => {
     const newFilters = { ...filters, [key]: value };
@@ -155,7 +228,7 @@ export function AdvancedFilters({ filters, onFiltersChange }: AdvancedFiltersPro
           </Select>
         </div>
 
-        {/* Assignee */}
+        {/* Assignee - filtered by permissions */}
         <div className={filterCardClass(FILTER_COLORS.assignee, filters.assigneeId !== 'all')}>
           <Label className="text-xs text-muted-foreground font-medium">Collaborateur</Label>
           <Select value={filters.assigneeId} onValueChange={(v) => handleChange('assigneeId', v)}>
@@ -166,7 +239,7 @@ export function AdvancedFilters({ filters, onFiltersChange }: AdvancedFiltersPro
               <SelectItem value="all">
                 <span className="text-muted-foreground">Tous</span>
               </SelectItem>
-              {profiles.map(p => (
+              {filteredProfiles.map(p => (
                 <SelectItem key={p.id} value={p.id}>
                   {p.display_name || 'Sans nom'}
                 </SelectItem>
@@ -175,7 +248,7 @@ export function AdvancedFilters({ filters, onFiltersChange }: AdvancedFiltersPro
           </Select>
         </div>
 
-        {/* Requester */}
+        {/* Requester - filtered by permissions */}
         <div className={filterCardClass(FILTER_COLORS.requester, filters.requesterId !== 'all')}>
           <Label className="text-xs text-muted-foreground font-medium">Demandeur</Label>
           <Select value={filters.requesterId} onValueChange={(v) => handleChange('requesterId', v)}>
@@ -186,7 +259,7 @@ export function AdvancedFilters({ filters, onFiltersChange }: AdvancedFiltersPro
               <SelectItem value="all">
                 <span className="text-muted-foreground">Tous</span>
               </SelectItem>
-              {profiles.map(p => (
+              {filteredProfiles.map(p => (
                 <SelectItem key={p.id} value={p.id}>
                   {p.display_name || 'Sans nom'}
                 </SelectItem>
@@ -195,7 +268,7 @@ export function AdvancedFilters({ filters, onFiltersChange }: AdvancedFiltersPro
           </Select>
         </div>
 
-        {/* Reporter/Manager */}
+        {/* Reporter/Manager - filtered by permissions */}
         <div className={filterCardClass(FILTER_COLORS.reporter, filters.reporterId !== 'all')}>
           <Label className="text-xs text-muted-foreground font-medium">Manager</Label>
           <Select value={filters.reporterId} onValueChange={(v) => handleChange('reporterId', v)}>
@@ -206,7 +279,7 @@ export function AdvancedFilters({ filters, onFiltersChange }: AdvancedFiltersPro
               <SelectItem value="all">
                 <span className="text-muted-foreground">Tous</span>
               </SelectItem>
-              {profiles.map(p => (
+              {filteredProfiles.map(p => (
                 <SelectItem key={p.id} value={p.id}>
                   {p.display_name || 'Sans nom'}
                 </SelectItem>
@@ -215,7 +288,7 @@ export function AdvancedFilters({ filters, onFiltersChange }: AdvancedFiltersPro
           </Select>
         </div>
 
-        {/* Company */}
+        {/* Company - filtered by permissions */}
         <div className={filterCardClass(FILTER_COLORS.company, filters.company !== 'all')}>
           <Label className="text-xs text-muted-foreground font-medium">Société</Label>
           <Select value={filters.company} onValueChange={(v) => handleChange('company', v)}>
@@ -226,14 +299,14 @@ export function AdvancedFilters({ filters, onFiltersChange }: AdvancedFiltersPro
               <SelectItem value="all">
                 <span className="text-muted-foreground">Toutes</span>
               </SelectItem>
-              {companies.map(c => (
-                <SelectItem key={c} value={c}>{c}</SelectItem>
+              {filteredCompanies.map(c => (
+                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
 
-        {/* Department */}
+        {/* Department - filtered by permissions */}
         <div className={filterCardClass(FILTER_COLORS.department, filters.department !== 'all')}>
           <Label className="text-xs text-muted-foreground font-medium">Service</Label>
           <Select value={filters.department} onValueChange={(v) => handleChange('department', v)}>
@@ -244,8 +317,8 @@ export function AdvancedFilters({ filters, onFiltersChange }: AdvancedFiltersPro
               <SelectItem value="all">
                 <span className="text-muted-foreground">Tous</span>
               </SelectItem>
-              {departments.map(d => (
-                <SelectItem key={d} value={d}>{d}</SelectItem>
+              {filteredDepartments.map(d => (
+                <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>

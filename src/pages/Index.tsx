@@ -6,6 +6,7 @@ import { TaskList } from '@/components/tasks/TaskList';
 import { TaskFilters } from '@/components/tasks/TaskFilters';
 import { AdvancedFilters, AdvancedFiltersState } from '@/components/tasks/AdvancedFilters';
 import { TaskViewSelector, TaskView } from '@/components/tasks/TaskViewSelector';
+import { TaskScopeSelector } from '@/components/tasks/TaskScopeSelector';
 import { KanbanBoard } from '@/components/tasks/KanbanBoard';
 import { CalendarView } from '@/components/tasks/CalendarView';
 import { CreateFromTemplateDialog } from '@/components/tasks/CreateFromTemplateDialog';
@@ -14,6 +15,7 @@ import { PendingAssignmentsView } from '@/components/tasks/PendingAssignmentsVie
 import { TeamModule } from '@/components/team/TeamModule';
 import { TaskDetailDialog } from '@/components/tasks/TaskDetailDialog';
 import { useTasks } from '@/hooks/useTasks';
+import { useTaskScope, TaskScope } from '@/hooks/useTaskScope';
 import { useTasksProgress } from '@/hooks/useChecklists';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useCommentNotifications } from '@/hooks/useCommentNotifications';
@@ -43,6 +45,9 @@ const Index = () => {
   });
   const [profilesMap, setProfilesMap] = useState<Map<string, string>>(new Map());
   
+  // Use task scope hook for scope management
+  const { scope, setScope, availableScopes } = useTaskScope();
+  
   const {
     tasks,
     allTasks,
@@ -57,7 +62,7 @@ const Index = () => {
     updateTaskStatus,
     deleteTask,
     refetch,
-  } = useTasks();
+  } = useTasks(scope);
 
   const { categories } = useCategories();
   const { notifications, unreadCount, hasUrgent } = useNotifications(allTasks);
@@ -147,6 +152,10 @@ const Index = () => {
     }
   }, [allTasks, markCommentAsRead]);
 
+  const handleScopeChange = (newScope: TaskScope) => {
+    setScope(newScope);
+  };
+
   const getTitle = () => {
     switch (activeView) {
       case 'dashboard':
@@ -219,17 +228,27 @@ const Index = () => {
     switch (activeView) {
       case 'dashboard':
         return (
-          <Dashboard 
-            stats={stats} 
-            recentTasks={allTasks.slice(0, 6)}
-            onStatusChange={updateTaskStatus}
-            onDelete={deleteTask}
-            globalProgress={globalProgress}
-            globalStats={globalStats}
-            progressMap={progressMap}
-            unassignedCount={canAssignToTeam ? (unassignedCount + pendingCount) : 0}
-            onViewUnassigned={() => setActiveView('to-assign')}
-          />
+          <>
+            {/* Scope selector for dashboard */}
+            <div className="flex items-center justify-between mb-6">
+              <TaskScopeSelector
+                scope={scope}
+                availableScopes={availableScopes}
+                onScopeChange={handleScopeChange}
+              />
+            </div>
+            <Dashboard 
+              stats={stats} 
+              recentTasks={allTasks.slice(0, 6)}
+              onStatusChange={updateTaskStatus}
+              onDelete={deleteTask}
+              globalProgress={globalProgress}
+              globalStats={globalStats}
+              progressMap={progressMap}
+              unassignedCount={canAssignToTeam ? (unassignedCount + pendingCount) : 0}
+              onViewUnassigned={() => setActiveView('to-assign')}
+            />
+          </>
         );
       case 'to-assign':
         return <PendingAssignmentsView />;
@@ -238,7 +257,12 @@ const Index = () => {
           <>
             <div className="flex flex-col gap-4 mb-6">
               <div className="flex items-center justify-between flex-wrap gap-4">
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 flex-wrap">
+                  <TaskScopeSelector
+                    scope={scope}
+                    availableScopes={availableScopes}
+                    onScopeChange={handleScopeChange}
+                  />
                   <TaskViewSelector currentView={taskView} onViewChange={setTaskView} />
                   <TaskFilters
                     statusFilter={statusFilter}
