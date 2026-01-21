@@ -298,6 +298,17 @@ export function useWorkloadPlanning({
       .single();
     
     if (error) throw error;
+    
+    // Also assign the task to the user if not already assigned
+    const { error: taskError } = await supabase
+      .from('tasks')
+      .update({ assignee_id: userId })
+      .eq('id', taskId);
+    
+    if (taskError) {
+      console.error('Error assigning task:', taskError);
+    }
+    
     await fetchData();
     return data;
   };
@@ -329,6 +340,17 @@ export function useWorkloadPlanning({
       .insert(inserts);
     
     if (error) throw error;
+    
+    // Also assign the task to the user if not already assigned
+    const { error: taskError } = await supabase
+      .from('tasks')
+      .update({ assignee_id: userId })
+      .eq('id', taskId);
+    
+    if (taskError) {
+      console.error('Error assigning task:', taskError);
+    }
+    
     await fetchData();
     return slotsToCreate;
   };
