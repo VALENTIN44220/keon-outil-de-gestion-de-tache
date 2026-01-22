@@ -460,172 +460,82 @@ export function WorkloadCalendarView({
     }
   };
 
-  // Render year view - weeks as columns
+  // Render year view - weeks as rows per member
   const renderYearView = () => {
-    // Group weeks by month
-    const weeksByMonth: Record<string, { weekNum: number; startDate: Date }[]> = {};
+    // Get all weeks of the year
+    const yearStart = startOfYear(currentDate);
+    const yearEnd = endOfYear(currentDate);
+    const yearDays = eachDayOfInterval({ start: yearStart, end: yearEnd });
     
-    days.forEach(day => {
+    // Group by week
+    const allWeeks: { weekNum: number; startDate: Date; endDate: Date }[] = [];
+    let lastWeekNum = -1;
+    yearDays.forEach(day => {
       const weekNum = getWeek(day, { locale: fr });
-      const monthKey = format(startOfMonth(day), 'yyyy-MM');
-      if (!weeksByMonth[monthKey]) {
-        weeksByMonth[monthKey] = [];
+      if (weekNum !== lastWeekNum) {
+        const weekStart = startOfWeek(day, { locale: fr });
+        const weekEnd = endOfWeek(day, { locale: fr });
+        allWeeks.push({ weekNum, startDate: weekStart, endDate: weekEnd });
+        lastWeekNum = weekNum;
       }
-      const weekStart = startOfWeek(day, { locale: fr });
-      if (!weeksByMonth[monthKey].find(w => w.weekNum === weekNum)) {
-        weeksByMonth[monthKey].push({ weekNum, startDate: weekStart });
+    });
+    
+    // Group weeks by month for headers
+    const monthHeaders: { month: string; weekCount: number; startIdx: number }[] = [];
+    allWeeks.forEach((week, idx) => {
+      const monthKey = format(week.startDate, 'MMM yyyy', { locale: fr });
+      const last = monthHeaders[monthHeaders.length - 1];
+      if (last && last.month === monthKey) {
+        last.weekCount++;
+      } else {
+        monthHeaders.push({ month: monthKey, weekCount: 1, startIdx: idx });
       }
     });
 
     return (
       <div className="overflow-x-auto">
-        <div className="grid grid-cols-12 gap-1 min-w-[1200px]">
-          {Array.from({ length: 12 }).map((_, monthIdx) => {
-            const monthDate = new Date(currentDate.getFullYear(), monthIdx, 1);
-            const monthKey = format(monthDate, 'yyyy-MM');
-            const monthWeeks = weeksByMonth[monthKey] || [];
+        {/* Month headers */}
+        <div 
+          className="grid gap-0 min-w-[3000px] sticky top-0 bg-background z-20"
+          style={{ gridTemplateColumns: `140px repeat(${allWeeks.length}, minmax(50px, 1fr))` }}
+        >
+          <div className="h-6 border-b border-r" />
+          {monthHeaders.map(({ month, weekCount, startIdx }) => (
+            <div 
+              key={`${month}-${startIdx}`}
+              className="h-6 flex items-center justify-center text-[10px] font-semibold border-b border-r bg-muted/30 capitalize"
+              style={{ gridColumn: `span ${weekCount}` }}
+            >
+              {month}
+            </div>
+          ))}
+        </div>
+        
+        {/* Week number headers */}
+        <div 
+          className="grid gap-0 min-w-[3000px] sticky top-6 bg-background z-10"
+          style={{ gridTemplateColumns: `140px repeat(${allWeeks.length}, minmax(50px, 1fr))` }}
+        >
+          <div className="h-8 flex items-center font-semibold text-[10px] px-1 border-b border-r">Membres</div>
+          {allWeeks.map(({ weekNum, startDate }) => {
+            const isCurrentWeek = isSameWeek(startDate, new Date(), { locale: fr });
             
             return (
-              <div key={monthKey} className="border rounded-lg p-2 bg-card">
-                <h4 className="text-xs font-semibold mb-2 text-center capitalize">
-                  {format(monthDate, 'MMM', { locale: fr })}
-                </h4>
-                <div className="space-y-1">
-                  {monthWeeks.map(({ weekNum, startDate }) => {
-                    // Count tasks and leaves for this week
-                    const weekEnd = endOfWeek(startDate, { locale: fr });
-                    const weekDays = eachDayOfInterval({ start: startDate, end: weekEnd });
-                    let taskCount = 0;
-                    let leaveCount = 0;
-                    
-                    weekDays.forEach(day => {
-                      const dateStr = format(day, 'yyyy-MM-dd');
-                      const dayLeaves = allUserLeaves[dateStr] || [];
-                      leaveCount += dayLeaves.length;
-                      
-                      workloadData.forEach(member => {
-                        const d = member.days.find(dd => dd.date === dateStr);
-                        if (d?.morning.slot) taskCount++;
-                        if (d?.afternoon.slot) taskCount++;
-                      });
-                    });
-                    
-                    return (
-                      <div
-                        key={weekNum}
-                        onClick={() => handleCellClick(startDate)}
-                        className={cn(
-                          "p-1.5 rounded cursor-pointer transition-all hover:bg-primary/10 border text-center",
-                          taskCount > 0 && "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200",
-                          leaveCount > 0 && taskCount === 0 && "bg-blue-50 dark:bg-blue-900/20 border-blue-200"
-                        )}
-                      >
-                        <div className="text-[10px] font-medium">S{weekNum}</div>
-                        {(taskCount > 0 || leaveCount > 0) && (
-                          <div className="flex justify-center gap-1 mt-0.5">
-                            {taskCount > 0 && (
-                              <span className="text-[8px] text-emerald-600">📋{taskCount}</span>
-                            )}
-                            {leaveCount > 0 && (
-                              <span className="text-[8px] text-blue-600">🌴{leaveCount}</span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+              <div 
+                key={weekNum} 
+                className={cn(
+                  "h-8 flex flex-col items-center justify-center text-center border-b border-r cursor-pointer hover:bg-muted/50 transition-colors",
+                  isCurrentWeek && "bg-primary/10"
+                )}
+                onClick={() => {
+                  setCurrentDate(startDate);
+                  setViewLevel('quarter');
+                }}
+              >
+                <span className="text-[10px] font-medium">S{weekNum}</span>
               </div>
             );
           })}
-        </div>
-      </div>
-    );
-  };
-
-  // Render quarter view - 3 months side by side
-  const renderQuarterView = () => {
-    if (!monthGroups) return null;
-    
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {monthGroups.map(({ month, days: monthDays }) => {
-          const monthStartDay = month.getDay();
-          const monthOffset = monthStartDay === 0 ? 6 : monthStartDay - 1;
-          
-          return (
-            <div key={month.toISOString()} className="border rounded-xl p-3 bg-card">
-              <h4 
-                className="text-sm font-semibold mb-2 capitalize cursor-pointer hover:text-primary transition-colors"
-                onClick={() => handleCellClick(month)}
-              >
-                {format(month, 'MMMM', { locale: fr })}
-              </h4>
-              <div className="grid grid-cols-7 gap-0.5 mb-1">
-                {weekDays.map(day => (
-                  <div key={day} className="text-center text-[9px] font-medium text-muted-foreground py-0.5">
-                    {day.slice(0, 1)}
-                  </div>
-                ))}
-              </div>
-              <div className="grid grid-cols-7 gap-0.5">
-                {Array.from({ length: monthOffset }).map((_, i) => (
-                  <div key={`empty-${i}`} className="h-7 bg-muted/20 rounded" />
-                ))}
-                {monthDays.map(day => {
-                  const { holiday, isWeekendDay, dayLeaves } = getDayInfo(day);
-                  const isTodayDate = isToday(day);
-                  
-                  let taskCount = 0;
-                  workloadData.forEach(member => {
-                    const d = member.days.find(dd => dd.date === format(day, 'yyyy-MM-dd'));
-                    if (d?.morning.slot) taskCount++;
-                    if (d?.afternoon.slot) taskCount++;
-                  });
-                  
-                  return (
-                    <div
-                      key={day.toISOString()}
-                      onClick={() => handleCellClick(day)}
-                      className={cn(
-                        "h-7 rounded flex flex-col items-center justify-center cursor-pointer transition-all hover:ring-1 hover:ring-primary",
-                        isWeekendDay && "bg-muted/40",
-                        isTodayDate && "ring-2 ring-primary bg-primary/10",
-                        holiday && "bg-amber-100 dark:bg-amber-900/30",
-                        taskCount > 0 && !holiday && !isWeekendDay && "bg-emerald-100 dark:bg-emerald-900/30",
-                        dayLeaves.length > 0 && !holiday && !isWeekendDay && taskCount === 0 && "bg-blue-100 dark:bg-blue-900/30"
-                      )}
-                    >
-                      <span className="text-[10px] font-medium">{format(day, 'd')}</span>
-                      {taskCount > 0 && (
-                        <span className="text-[7px] text-emerald-600">•{taskCount}</span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
-
-  // Render month view - grid layout with team rows (like Teamleader)
-  const renderMonthView = () => {
-    const firstDayOfRange = rangeStart.getDay();
-    const startOffset = firstDayOfRange === 0 ? 6 : firstDayOfRange - 1;
-    
-    return (
-      <div className="overflow-x-auto">
-        {/* Header with days */}
-        <div className="grid grid-cols-[180px_repeat(7,1fr)] gap-1 min-w-[900px]">
-          <div className="h-10 flex items-center font-semibold text-sm">Membres</div>
-          {weekDays.map((day, idx) => (
-            <div key={day} className="h-10 flex items-center justify-center text-sm font-medium text-muted-foreground">
-              {day}
-            </div>
-          ))}
         </div>
         
         {/* Rows per team member */}
@@ -633,149 +543,444 @@ export function WorkloadCalendarView({
           const color = getUserColor(member.memberId);
           
           return (
-            <div key={member.memberId} className="grid grid-cols-[180px_repeat(7,1fr)] gap-1 min-w-[900px] border-t py-1">
+            <div 
+              key={member.memberId} 
+              className="grid gap-0 min-w-[3000px] border-b hover:bg-muted/10"
+              style={{ gridTemplateColumns: `140px repeat(${allWeeks.length}, minmax(50px, 1fr))` }}
+            >
               {/* Member info */}
               <div 
                 className={cn(
-                  "flex items-center gap-2 px-2 py-1 rounded-lg cursor-pointer hover:bg-muted/50",
+                  "flex items-center gap-1 px-1 py-0.5 cursor-pointer hover:bg-muted/50 border-r sticky left-0 bg-background z-10",
                   selectedUserId === member.memberId && "bg-muted"
                 )}
                 onClick={() => onUserSelect(member.memberId === selectedUserId ? null : member.memberId)}
               >
-                <div className={cn("w-2 h-8 rounded-full shrink-0", color.bg)} />
+                <div className={cn("w-1.5 h-6 rounded-full shrink-0", color.bg)} />
+                <Avatar className="h-5 w-5">
+                  <AvatarImage src={member.avatarUrl || undefined} />
+                  <AvatarFallback className="text-[7px]">
+                    {getInitials(member.memberName)}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="text-[9px] font-medium truncate">{member.memberName.split(' ')[0]}</span>
+              </div>
+              
+              {/* Week cells */}
+              {allWeeks.map(({ weekNum, startDate, endDate }) => {
+                const weekDays = eachDayOfInterval({ start: startDate, end: endDate });
+                let taskCount = 0;
+                let leaveCount = 0;
+                
+                weekDays.forEach(day => {
+                  const dateStr = format(day, 'yyyy-MM-dd');
+                  const memberDay = member.days.find(d => d.date === dateStr);
+                  
+                  if (memberDay?.morning.slot) taskCount++;
+                  if (memberDay?.afternoon.slot) taskCount++;
+                  if (memberDay?.morning.isLeave) leaveCount++;
+                  if (memberDay?.afternoon.isLeave) leaveCount++;
+                });
+                
+                const isCurrentWeek = isSameWeek(startDate, new Date(), { locale: fr });
+                const hasData = taskCount > 0 || leaveCount > 0;
+                
+                return (
+                  <div 
+                    key={weekNum}
+                    onClick={() => {
+                      setCurrentDate(startDate);
+                      setViewLevel('quarter');
+                    }}
+                    className={cn(
+                      "min-h-[28px] flex items-center justify-center border-r cursor-pointer hover:bg-muted/30 transition-colors",
+                      isCurrentWeek && "bg-primary/5"
+                    )}
+                  >
+                    {taskCount > 0 && (
+                      <div className={cn(
+                        "w-4 h-4 rounded-sm flex items-center justify-center text-white text-[8px] font-bold",
+                        taskCount <= 4 && "bg-emerald-400",
+                        taskCount > 4 && taskCount <= 8 && "bg-amber-400",
+                        taskCount > 8 && "bg-red-400"
+                      )}>
+                        {taskCount}
+                      </div>
+                    )}
+                    {leaveCount > 0 && taskCount === 0 && (
+                      <div className="w-4 h-4 bg-blue-300 rounded-sm flex items-center justify-center text-[8px]">
+                        🌴
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  // Render quarter view - 3 months with day columns
+  const renderQuarterView = () => {
+    // Get all days of the quarter
+    const quarterStart = startOfQuarter(currentDate);
+    const quarterEnd = endOfQuarter(currentDate);
+    const quarterDays = eachDayOfInterval({ start: quarterStart, end: quarterEnd });
+    
+    // Group days by week for display
+    const weekGroups: { weekNum: number; days: Date[] }[] = [];
+    let currentWeekNum = -1;
+    quarterDays.forEach(day => {
+      const weekNum = getWeek(day, { locale: fr });
+      if (weekNum !== currentWeekNum) {
+        weekGroups.push({ weekNum, days: [] });
+        currentWeekNum = weekNum;
+      }
+      weekGroups[weekGroups.length - 1].days.push(day);
+    });
+    
+    return (
+      <div className="overflow-x-auto">
+        {/* Header row with weeks */}
+        <div 
+          className="grid gap-0 min-w-[2000px] sticky top-0 bg-background z-10"
+          style={{ gridTemplateColumns: `160px repeat(${weekGroups.length}, minmax(80px, 1fr))` }}
+        >
+          <div className="h-10 flex items-center font-semibold text-xs px-2 border-b border-r">Membres</div>
+          {weekGroups.map(({ weekNum, days: weekDays }) => {
+            const weekStart = weekDays[0];
+            const weekEnd = weekDays[weekDays.length - 1];
+            
+            return (
+              <div 
+                key={weekNum} 
+                className="h-10 flex flex-col items-center justify-center text-center border-b border-r cursor-pointer hover:bg-muted/50 transition-colors"
+                onClick={() => {
+                  setCurrentDate(weekStart);
+                  setViewLevel('week');
+                }}
+              >
+                <span className="text-[10px] font-semibold">S{weekNum}</span>
+                <span className="text-[8px] text-muted-foreground">
+                  {format(weekStart, 'dd/MM', { locale: fr })} - {format(weekEnd, 'dd/MM', { locale: fr })}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        
+        {/* Rows per team member */}
+        {workloadData.map(member => {
+          const color = getUserColor(member.memberId);
+          
+          return (
+            <div 
+              key={member.memberId} 
+              className="grid gap-0 min-w-[2000px] border-b hover:bg-muted/10"
+              style={{ gridTemplateColumns: `160px repeat(${weekGroups.length}, minmax(80px, 1fr))` }}
+            >
+              {/* Member info */}
+              <div 
+                className={cn(
+                  "flex items-center gap-1.5 px-1.5 py-1 cursor-pointer hover:bg-muted/50 border-r sticky left-0 bg-background z-10",
+                  selectedUserId === member.memberId && "bg-muted"
+                )}
+                onClick={() => onUserSelect(member.memberId === selectedUserId ? null : member.memberId)}
+              >
+                <div className={cn("w-1.5 h-8 rounded-full shrink-0", color.bg)} />
+                <Avatar className="h-6 w-6">
+                  <AvatarImage src={member.avatarUrl || undefined} />
+                  <AvatarFallback className="text-[8px]">
+                    {getInitials(member.memberName)}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="text-[10px] font-medium truncate">{member.memberName.split(' ')[0]}</span>
+              </div>
+              
+              {/* Week cells */}
+              {weekGroups.map(({ weekNum, days: weekDays }) => {
+                // Count tasks and leaves for this week
+                let taskCount = 0;
+                let leaveCount = 0;
+                let holidayCount = 0;
+                
+                weekDays.forEach(day => {
+                  const dateStr = format(day, 'yyyy-MM-dd');
+                  const memberDay = member.days.find(d => d.date === dateStr);
+                  const holiday = holidays.find(h => h.date === dateStr);
+                  
+                  if (holiday) holidayCount++;
+                  if (memberDay?.morning.slot) taskCount++;
+                  if (memberDay?.afternoon.slot) taskCount++;
+                  if (memberDay?.morning.isLeave) leaveCount++;
+                  if (memberDay?.afternoon.isLeave) leaveCount++;
+                });
+                
+                // Get drop targets for week
+                const weekDateStr = format(weekDays[0], 'yyyy-MM-dd');
+                const isDropTarget = dropTarget?.userId === member.memberId && weekDays.some(d => format(d, 'yyyy-MM-dd') === dropTarget?.date);
+                
+                return (
+                  <div 
+                    key={weekNum}
+                    className={cn(
+                      "min-h-[40px] flex items-center justify-center gap-1 border-r p-0.5",
+                      isDropTarget && "bg-primary/20"
+                    )}
+                    onDragOver={(e) => {
+                      // Find first available slot in week
+                      const availableDay = weekDays.find(d => {
+                        const ds = format(d, 'yyyy-MM-dd');
+                        return !isWeekend(d) && !holidays.find(h => h.date === ds);
+                      });
+                      if (availableDay) {
+                        handleDragOver(e, member.memberId, format(availableDay, 'yyyy-MM-dd'), 'morning');
+                      }
+                    }}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => {
+                      const availableDay = weekDays.find(d => {
+                        const ds = format(d, 'yyyy-MM-dd');
+                        return !isWeekend(d) && !holidays.find(h => h.date === ds) && checkDropAvailable(member.memberId, ds, 'morning');
+                      });
+                      if (availableDay) {
+                        handleDrop(e, member.memberId, format(availableDay, 'yyyy-MM-dd'), 'morning');
+                      }
+                    }}
+                  >
+                    {taskCount > 0 && (
+                      <div className={cn(
+                        "h-6 rounded flex items-center justify-center text-white text-[9px] font-medium px-1",
+                        "bg-gradient-to-r from-emerald-500 to-teal-400"
+                      )}>
+                        {taskCount}
+                      </div>
+                    )}
+                    {leaveCount > 0 && (
+                      <div className="h-6 bg-blue-200 dark:bg-blue-800 rounded flex items-center justify-center text-blue-700 dark:text-blue-200 text-[9px] px-1">
+                        🌴{leaveCount}
+                      </div>
+                    )}
+                    {holidayCount > 0 && taskCount === 0 && leaveCount === 0 && (
+                      <span className="text-[8px] text-amber-600">F{holidayCount}</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  // Render month view - full month grid with all days as columns
+  const renderMonthView = () => {
+    // Get all days of the month
+    const monthStart = startOfMonth(currentDate);
+    const monthEnd = endOfMonth(currentDate);
+    const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
+    
+    // Calculate column width based on number of days
+    const numDays = monthDays.length;
+    const colWidth = `minmax(40px, 1fr)`;
+    
+    return (
+      <div className="overflow-x-auto">
+        {/* Header row with dates */}
+        <div 
+          className="grid gap-0.5 min-w-[1200px] sticky top-0 bg-background z-10"
+          style={{ gridTemplateColumns: `180px repeat(${numDays}, ${colWidth})` }}
+        >
+          <div className="h-14 flex items-center font-semibold text-sm px-2 border-b">Membres</div>
+          {monthDays.map(day => {
+            const isTodayDate = isToday(day);
+            const isWeekendDay = isWeekend(day);
+            const holiday = holidays.find(h => h.date === format(day, 'yyyy-MM-dd'));
+            
+            return (
+              <div 
+                key={day.toISOString()} 
+                className={cn(
+                  "h-14 flex flex-col items-center justify-center text-center border-b cursor-pointer hover:bg-muted/50 transition-colors",
+                  isTodayDate && "bg-primary text-primary-foreground rounded-t",
+                  isWeekendDay && !isTodayDate && "bg-muted/40",
+                  holiday && !isTodayDate && "bg-amber-100 dark:bg-amber-900/30"
+                )}
+                onClick={() => handleCellClick(day)}
+              >
+                <span className="text-[10px] font-medium uppercase">{format(day, 'EEE', { locale: fr })}</span>
+                <span className="text-sm font-bold">{format(day, 'd')}</span>
+              </div>
+            );
+          })}
+        </div>
+        
+        {/* Rows per team member */}
+        {workloadData.map(member => {
+          const color = getUserColor(member.memberId);
+          
+          return (
+            <div 
+              key={member.memberId} 
+              className="grid gap-0.5 min-w-[1200px] border-b hover:bg-muted/10"
+              style={{ gridTemplateColumns: `180px repeat(${numDays}, ${colWidth})` }}
+            >
+              {/* Member info */}
+              <div 
+                className={cn(
+                  "flex items-center gap-2 px-2 py-2 cursor-pointer hover:bg-muted/50 sticky left-0 bg-background z-10",
+                  selectedUserId === member.memberId && "bg-muted"
+                )}
+                onClick={() => onUserSelect(member.memberId === selectedUserId ? null : member.memberId)}
+              >
+                <div className={cn("w-2 h-10 rounded-full shrink-0", color.bg)} />
                 <Avatar className="h-7 w-7">
                   <AvatarImage src={member.avatarUrl || undefined} />
                   <AvatarFallback className="text-[10px]">
                     {getInitials(member.memberName)}
                   </AvatarFallback>
                 </Avatar>
-                <div className="min-w-0">
+                <div className="min-w-0 hidden sm:block">
                   <div className="text-xs font-medium truncate">{member.memberName}</div>
                   <div className="text-[10px] text-muted-foreground truncate">{member.jobTitle}</div>
                 </div>
               </div>
               
-              {/* Days grid for this member (current week only in month view) */}
-              {Array.from({ length: 7 }).map((_, dayIdx) => {
-                // Find the date for this cell in current week
-                const weekStart = startOfWeek(currentDate, { locale: fr });
-                const cellDate = new Date(weekStart);
-                cellDate.setDate(cellDate.getDate() + dayIdx);
-                const dateStr = format(cellDate, 'yyyy-MM-dd');
-                
+              {/* Day cells */}
+              {monthDays.map(day => {
+                const dateStr = format(day, 'yyyy-MM-dd');
                 const memberDay = member.days.find(d => d.date === dateStr);
-                const isWeekendDay = isWeekend(cellDate);
+                const isWeekendDay = isWeekend(day);
                 const holiday = holidays.find(h => h.date === dateStr);
+                const isTodayDate = isToday(day);
                 
                 const isDropTargetMorning = dropTarget?.userId === member.memberId && dropTarget?.date === dateStr && dropTarget?.halfDay === 'morning';
                 const isDropTargetAfternoon = dropTarget?.userId === member.memberId && dropTarget?.date === dateStr && dropTarget?.halfDay === 'afternoon';
                 
                 return (
                   <div 
-                    key={dayIdx} 
+                    key={day.toISOString()} 
                     className={cn(
-                      "min-h-[60px] rounded-lg border p-1 flex gap-0.5",
+                      "min-h-[56px] flex flex-col gap-0.5 p-0.5",
                       isWeekendDay && "bg-muted/40",
                       holiday && "bg-amber-50 dark:bg-amber-900/20",
-                      isToday(cellDate) && "ring-2 ring-primary"
+                      isTodayDate && "ring-2 ring-primary ring-inset"
                     )}
-                    onClick={() => handleCellClick(cellDate)}
                   >
-                    {/* Morning slot */}
-                    <div
-                      className={cn(
-                        "flex-1 rounded min-h-[50px] transition-all",
-                        !isWeekendDay && !holiday && "hover:bg-muted/30",
-                        memberDay?.morning.isLeave && "bg-blue-100 dark:bg-blue-900/30",
-                        isDropTargetMorning && "bg-primary/20 ring-2 ring-primary ring-inset"
-                      )}
-                      onDragOver={(e) => handleDragOver(e, member.memberId, dateStr, 'morning')}
-                      onDragLeave={handleDragLeave}
-                      onDrop={(e) => handleDrop(e, member.memberId, dateStr, 'morning')}
-                    >
-                      {memberDay?.morning.slot && !holiday && (
-                        <ContextMenu>
-                          <ContextMenuTrigger asChild>
-                            <div
-                              draggable
-                              onDragStart={(e) => handleDragStart(e, memberDay.morning.slot!)}
-                              className={cn(
-                                "w-full h-full rounded p-1 cursor-pointer text-white text-[9px] font-medium truncate",
-                                getPriorityColor(memberDay.morning.slot.task?.priority || 'medium')
-                              )}
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {memberDay.morning.slot.task?.title}
-                            </div>
-                          </ContextMenuTrigger>
-                          <ContextMenuContent>
-                            <ContextMenuItem onClick={() => handleSegmentRequest(memberDay.morning.slot!, member.memberId)}>
-                              <Scissors className="h-4 w-4 mr-2" />
-                              Segmenter
-                            </ContextMenuItem>
-                            <ContextMenuSeparator />
-                            <ContextMenuItem 
-                              onClick={() => handleSlotDelete(memberDay.morning.slot!)}
-                              className="text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Supprimer
-                            </ContextMenuItem>
-                          </ContextMenuContent>
-                        </ContextMenu>
-                      )}
-                      {memberDay?.morning.isLeave && !holiday && (
-                        <div className="text-[9px] text-blue-600 p-0.5">🌴</div>
-                      )}
-                    </div>
-                    
-                    {/* Afternoon slot */}
-                    <div
-                      className={cn(
-                        "flex-1 rounded min-h-[50px] transition-all",
-                        !isWeekendDay && !holiday && "hover:bg-muted/30",
-                        memberDay?.afternoon.isLeave && "bg-blue-100 dark:bg-blue-900/30",
-                        isDropTargetAfternoon && "bg-primary/20 ring-2 ring-primary ring-inset"
-                      )}
-                      onDragOver={(e) => handleDragOver(e, member.memberId, dateStr, 'afternoon')}
-                      onDragLeave={handleDragLeave}
-                      onDrop={(e) => handleDrop(e, member.memberId, dateStr, 'afternoon')}
-                    >
-                      {memberDay?.afternoon.slot && !holiday && (
-                        <ContextMenu>
-                          <ContextMenuTrigger asChild>
-                            <div
-                              draggable
-                              onDragStart={(e) => handleDragStart(e, memberDay.afternoon.slot!)}
-                              className={cn(
-                                "w-full h-full rounded p-1 cursor-pointer text-white text-[9px] font-medium truncate",
-                                getPriorityColor(memberDay.afternoon.slot.task?.priority || 'medium')
-                              )}
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {memberDay.afternoon.slot.task?.title}
-                            </div>
-                          </ContextMenuTrigger>
-                          <ContextMenuContent>
-                            <ContextMenuItem onClick={() => handleSegmentRequest(memberDay.afternoon.slot!, member.memberId)}>
-                              <Scissors className="h-4 w-4 mr-2" />
-                              Segmenter
-                            </ContextMenuItem>
-                            <ContextMenuSeparator />
-                            <ContextMenuItem 
-                              onClick={() => handleSlotDelete(memberDay.afternoon.slot!)}
-                              className="text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Supprimer
-                            </ContextMenuItem>
-                          </ContextMenuContent>
-                        </ContextMenu>
-                      )}
-                      {memberDay?.afternoon.isLeave && !holiday && (
-                        <div className="text-[9px] text-blue-600 p-0.5">🌴</div>
-                      )}
-                    </div>
+                    {holiday ? (
+                      <div className="flex-1 flex items-center justify-center">
+                        <span className="text-[8px] text-amber-600 font-medium">Férié</span>
+                      </div>
+                    ) : isWeekendDay ? null : (
+                      <>
+                        {/* Morning slot */}
+                        <div
+                          className={cn(
+                            "flex-1 rounded transition-all min-h-[24px]",
+                            memberDay?.morning.isLeave && "bg-blue-200 dark:bg-blue-800",
+                            !memberDay?.morning.slot && !memberDay?.morning.isLeave && "hover:bg-muted/50",
+                            isDropTargetMorning && "bg-primary/20 ring-1 ring-primary"
+                          )}
+                          onDragOver={(e) => handleDragOver(e, member.memberId, dateStr, 'morning')}
+                          onDragLeave={handleDragLeave}
+                          onDrop={(e) => handleDrop(e, member.memberId, dateStr, 'morning')}
+                        >
+                          {memberDay?.morning.slot && (
+                            <ContextMenu>
+                              <ContextMenuTrigger asChild>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div
+                                      draggable
+                                      onDragStart={(e) => handleDragStart(e, memberDay.morning.slot!)}
+                                      className={cn(
+                                        "w-full h-full rounded cursor-pointer text-white text-[8px] font-medium p-0.5 overflow-hidden",
+                                        getPriorityColor(memberDay.morning.slot.task?.priority || 'medium')
+                                      )}
+                                    >
+                                      <span className="truncate block">{memberDay.morning.slot.task?.title?.slice(0, 8)}</span>
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent>{memberDay.morning.slot.task?.title}</TooltipContent>
+                                </Tooltip>
+                              </ContextMenuTrigger>
+                              <ContextMenuContent>
+                                <ContextMenuItem onClick={() => handleSegmentRequest(memberDay.morning.slot!, member.memberId)}>
+                                  <Scissors className="h-4 w-4 mr-2" />Segmenter
+                                </ContextMenuItem>
+                                <ContextMenuSeparator />
+                                <ContextMenuItem onClick={() => handleSlotDelete(memberDay.morning.slot!)} className="text-destructive">
+                                  <Trash2 className="h-4 w-4 mr-2" />Supprimer
+                                </ContextMenuItem>
+                              </ContextMenuContent>
+                            </ContextMenu>
+                          )}
+                          {memberDay?.morning.isLeave && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="text-[8px] text-blue-700 text-center">🌴</div>
+                              </TooltipTrigger>
+                              <TooltipContent>Congé (matin)</TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
+                        
+                        {/* Afternoon slot */}
+                        <div
+                          className={cn(
+                            "flex-1 rounded transition-all min-h-[24px]",
+                            memberDay?.afternoon.isLeave && "bg-blue-200 dark:bg-blue-800",
+                            !memberDay?.afternoon.slot && !memberDay?.afternoon.isLeave && "hover:bg-muted/50",
+                            isDropTargetAfternoon && "bg-primary/20 ring-1 ring-primary"
+                          )}
+                          onDragOver={(e) => handleDragOver(e, member.memberId, dateStr, 'afternoon')}
+                          onDragLeave={handleDragLeave}
+                          onDrop={(e) => handleDrop(e, member.memberId, dateStr, 'afternoon')}
+                        >
+                          {memberDay?.afternoon.slot && (
+                            <ContextMenu>
+                              <ContextMenuTrigger asChild>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div
+                                      draggable
+                                      onDragStart={(e) => handleDragStart(e, memberDay.afternoon.slot!)}
+                                      className={cn(
+                                        "w-full h-full rounded cursor-pointer text-white text-[8px] font-medium p-0.5 overflow-hidden",
+                                        getPriorityColor(memberDay.afternoon.slot.task?.priority || 'medium')
+                                      )}
+                                    >
+                                      <span className="truncate block">{memberDay.afternoon.slot.task?.title?.slice(0, 8)}</span>
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent>{memberDay.afternoon.slot.task?.title}</TooltipContent>
+                                </Tooltip>
+                              </ContextMenuTrigger>
+                              <ContextMenuContent>
+                                <ContextMenuItem onClick={() => handleSegmentRequest(memberDay.afternoon.slot!, member.memberId)}>
+                                  <Scissors className="h-4 w-4 mr-2" />Segmenter
+                                </ContextMenuItem>
+                                <ContextMenuSeparator />
+                                <ContextMenuItem onClick={() => handleSlotDelete(memberDay.afternoon.slot!)} className="text-destructive">
+                                  <Trash2 className="h-4 w-4 mr-2" />Supprimer
+                                </ContextMenuItem>
+                              </ContextMenuContent>
+                            </ContextMenu>
+                          )}
+                          {memberDay?.afternoon.isLeave && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="text-[8px] text-blue-700 text-center">🌴</div>
+                              </TooltipTrigger>
+                              <TooltipContent>Congé (après-midi)</TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
                 );
               })}
