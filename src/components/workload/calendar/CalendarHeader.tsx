@@ -69,11 +69,11 @@ export function CalendarHeader({
       case 'year':
         return format(currentDate, 'yyyy');
       case 'quarter':
-        return `T${getQuarter(currentDate)} ${format(currentDate, 'yyyy')}`;
+        return `T${getQuarter(currentDate)} - ${format(currentDate, 'yyyy')}`;
       case 'month':
-        return format(currentDate, 'MMMM yyyy', { locale: fr });
+        return `${format(currentDate, 'MMMM', { locale: fr })} ${format(currentDate, 'yyyy')}`;
       case 'week':
-        return `Semaine ${getWeek(currentDate, { locale: fr })} • ${format(currentDate, 'MMM yyyy', { locale: fr })}`;
+        return `Semaine ${getWeek(currentDate, { locale: fr })} - ${format(currentDate, 'yyyy')}`;
     }
   };
 
