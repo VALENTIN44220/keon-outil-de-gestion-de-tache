@@ -123,14 +123,44 @@ export function WorkloadFilters({
   return (
     <div className="flex flex-wrap items-center gap-3 p-4 bg-card rounded-lg border">
       {/* Period presets */}
-      <div className="flex items-center gap-2">
-        <Button variant="outline" size="sm" onClick={() => handlePresetPeriod('week')}>
+      <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+        <Button 
+          variant={viewMode === 'week' ? 'default' : 'ghost'} 
+          size="sm" 
+          onClick={() => handlePresetPeriod('week')}
+          className={cn(
+            "transition-all duration-200",
+            viewMode === 'week' 
+              ? "bg-primary text-primary-foreground shadow-sm" 
+              : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+          )}
+        >
           Semaine
         </Button>
-        <Button variant="outline" size="sm" onClick={() => handlePresetPeriod('month')}>
+        <Button 
+          variant={viewMode === 'month' ? 'default' : 'ghost'} 
+          size="sm" 
+          onClick={() => handlePresetPeriod('month')}
+          className={cn(
+            "transition-all duration-200",
+            viewMode === 'month' 
+              ? "bg-primary text-primary-foreground shadow-sm" 
+              : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+          )}
+        >
           Mois
         </Button>
-        <Button variant="outline" size="sm" onClick={() => handlePresetPeriod('quarter')}>
+        <Button 
+          variant={viewMode === 'quarter' ? 'default' : 'ghost'} 
+          size="sm" 
+          onClick={() => handlePresetPeriod('quarter')}
+          className={cn(
+            "transition-all duration-200",
+            viewMode === 'quarter' 
+              ? "bg-primary text-primary-foreground shadow-sm" 
+              : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+          )}
+        >
           Trimestre
         </Button>
       </div>
