@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isToday, isWeekend, parseISO, addMonths, addWeeks, addYears, startOfYear, endOfYear, getWeek, getYear, startOfQuarter, endOfQuarter, isSameMonth, isSameWeek, subMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { TeamMemberWorkload, WorkloadSlot, Holiday, UserLeave } from '@/types/workload';
@@ -101,7 +101,30 @@ export function WorkloadCalendarView({
   plannedTaskIds = [],
 }: WorkloadCalendarViewProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewLevel, setViewLevel] = useState<CalendarViewLevel>('month');
+  const [viewLevel, setViewLevel] = useState<CalendarViewLevel>(() => {
+    switch (externalViewMode) {
+      case 'week': return 'week';
+      case 'quarter': return 'quarter';
+      case 'month':
+      default: return 'month';
+    }
+  });
+  
+  // Synchronize viewLevel when external viewMode changes
+  useEffect(() => {
+    switch (externalViewMode) {
+      case 'week': 
+        setViewLevel('week');
+        break;
+      case 'quarter': 
+        setViewLevel('quarter');
+        break;
+      case 'month':
+      default: 
+        setViewLevel('month');
+        break;
+    }
+  }, [externalViewMode]);
   
   // Drag & drop state
   const [draggedSlot, setDraggedSlot] = useState<WorkloadSlot | null>(null);
