@@ -106,21 +106,22 @@ export function WorkloadSummaryView({
 
   return (
     <div className="space-y-6 p-2">
-      {/* Global KPI Cards - Premium Design */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Global KPI Cards - 2 colonnes uniformes */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Occupation globale */}
         <Card className="relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-blue-500 to-blue-600">
-          <CardContent className="p-5">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-blue-100 text-sm font-medium">Occupation globale</p>
-                <p className="text-4xl font-bold text-white mt-1">{globalOccupancy}%</p>
+              <div className="flex-1">
+                <p className="text-blue-100 text-sm font-medium uppercase tracking-wide">Occupation globale</p>
+                <p className="text-5xl font-bold text-white mt-2">{globalOccupancy}%</p>
+                <p className="text-blue-200 text-xs mt-2">{totalUsed} créneaux utilisés sur {totalSlots}</p>
               </div>
-              <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center">
-                <TrendingUp className="w-7 h-7 text-white" />
+              <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center">
+                <TrendingUp className="w-8 h-8 text-white" />
               </div>
             </div>
-            <div className="mt-4 h-2 bg-white/30 rounded-full overflow-hidden">
+            <div className="mt-4 h-3 bg-white/30 rounded-full overflow-hidden">
               <div 
                 className="h-full bg-white rounded-full transition-all duration-500"
                 style={{ width: `${Math.min(globalOccupancy, 100)}%` }}
@@ -131,48 +132,66 @@ export function WorkloadSummaryView({
 
         {/* Créneaux planifiés */}
         <Card className="relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-purple-500 to-purple-600">
-          <CardContent className="p-5">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-purple-100 text-sm font-medium">Créneaux planifiés</p>
-                <p className="text-4xl font-bold text-white mt-1">{totalUsed}</p>
-                <p className="text-purple-200 text-xs mt-1">sur {totalSlots} disponibles</p>
+              <div className="flex-1">
+                <p className="text-purple-100 text-sm font-medium uppercase tracking-wide">Créneaux planifiés</p>
+                <p className="text-5xl font-bold text-white mt-2">{totalUsed}</p>
+                <p className="text-purple-200 text-xs mt-2">sur {totalSlots} disponibles</p>
               </div>
-              <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center">
-                <Clock className="w-7 h-7 text-white" />
+              <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center">
+                <Clock className="w-8 h-8 text-white" />
               </div>
+            </div>
+            <div className="mt-4 h-3 bg-white/30 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-white rounded-full transition-all duration-500"
+                style={{ width: `${totalSlots > 0 ? Math.min((totalUsed / totalSlots) * 100, 100) : 0}%` }}
+              />
             </div>
           </CardContent>
         </Card>
 
         {/* Jours de congés */}
         <Card className="relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-pink-500 to-pink-600">
-          <CardContent className="p-5">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-pink-100 text-sm font-medium">Jours de congés</p>
-                <p className="text-4xl font-bold text-white mt-1">{Math.round(totalLeave / 2)}</p>
-                <p className="text-pink-200 text-xs mt-1">{totalLeave} demi-journées</p>
+              <div className="flex-1">
+                <p className="text-pink-100 text-sm font-medium uppercase tracking-wide">Jours de congés</p>
+                <p className="text-5xl font-bold text-white mt-2">{Math.round(totalLeave / 2)}</p>
+                <p className="text-pink-200 text-xs mt-2">{totalLeave} demi-journées sur la période</p>
               </div>
-              <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center">
-                <Calendar className="w-7 h-7 text-white" />
+              <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center">
+                <Calendar className="w-8 h-8 text-white" />
               </div>
+            </div>
+            <div className="mt-4 h-3 bg-white/30 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-white rounded-full transition-all duration-500"
+                style={{ width: `${totalSlots > 0 ? Math.min((totalLeave / totalSlots) * 100, 100) : 0}%` }}
+              />
             </div>
           </CardContent>
         </Card>
 
         {/* Membres de l'équipe */}
         <Card className="relative overflow-hidden border-0 shadow-lg bg-gradient-to-br from-teal-500 to-teal-600">
-          <CardContent className="p-5">
+          <CardContent className="p-6">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-teal-100 text-sm font-medium">Membres de l'équipe</p>
-                <p className="text-4xl font-bold text-white mt-1">{workloadData.length}</p>
-                <p className="text-teal-200 text-xs mt-1">{overloadedCount} surchargé{overloadedCount > 1 ? 's' : ''}</p>
+              <div className="flex-1">
+                <p className="text-teal-100 text-sm font-medium uppercase tracking-wide">Membres de l'équipe</p>
+                <p className="text-5xl font-bold text-white mt-2">{workloadData.length}</p>
+                <p className="text-teal-200 text-xs mt-2">{overloadedCount} surchargé{overloadedCount > 1 ? 's' : ''} sur la période</p>
               </div>
-              <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center">
-                <Users className="w-7 h-7 text-white" />
+              <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center">
+                <Users className="w-8 h-8 text-white" />
               </div>
+            </div>
+            <div className="mt-4 h-3 bg-white/30 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-white rounded-full transition-all duration-500"
+                style={{ width: `${workloadData.length > 0 ? Math.min((overloadedCount / workloadData.length) * 100, 100) : 0}%` }}
+              />
             </div>
           </CardContent>
         </Card>
