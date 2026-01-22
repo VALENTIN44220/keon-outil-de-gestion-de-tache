@@ -315,7 +315,7 @@ export function CalendarGrid({
                     className={cn(
                       "p-1.5 border-r last:border-r-0 min-h-[80px] flex flex-col gap-1",
                       isToday(day) && "bg-primary/5",
-                      showHeatmap && getHeatmapColor(dayData?.slots.length || 0, 2)
+                      showHeatmap && getHeatmapColor((dayData?.morning.slot ? 1 : 0) + (dayData?.afternoon.slot ? 1 : 0), 2)
                     )}
                   >
                     {/* Morning */}
