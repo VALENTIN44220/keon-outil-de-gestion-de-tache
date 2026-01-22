@@ -346,6 +346,17 @@ export default function Workload() {
                     viewMode={viewMode}
                     startDate={startDate}
                     endDate={endDate}
+                    tasks={tasks}
+                    onSlotAdd={handleAddSlot}
+                    onSlotRemove={handleRemoveSlot}
+                    onSlotMove={handleMoveSlot}
+                    onMultiSlotAdd={handleAddMultipleSlots}
+                    onSegmentSlot={handleSegmentSlot}
+                    isHalfDayAvailable={isHalfDayAvailable}
+                    getTaskSlotsCount={getTaskSlotsCount}
+                    getTaskDuration={getTaskDuration}
+                    getTaskProgress={getTaskProgress}
+                    plannedTaskIds={plannedTaskIds}
                   />
                 </TabsContent>
 
