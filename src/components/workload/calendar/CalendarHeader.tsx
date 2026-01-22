@@ -90,9 +90,10 @@ export function CalendarHeader({
         {/* Left: Navigation */}
         <div className="flex items-center gap-3">
           {/* View Level Selector */}
-          <div className="flex bg-muted rounded-lg p-1">
+          <div className="flex bg-muted rounded-lg p-1 gap-0.5">
             {viewOptions.map((option) => {
               const Icon = option.icon;
+              const isActive = viewLevel === option.value;
               return (
                 <TooltipProvider key={option.value}>
                   <Tooltip>
@@ -101,9 +102,9 @@ export function CalendarHeader({
                         onClick={() => onViewLevelChange(option.value as ViewLevel)}
                         className={cn(
                           "px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200",
-                          viewLevel === option.value
-                            ? "bg-background text-foreground shadow-sm"
-                            : "text-muted-foreground hover:text-foreground"
+                          isActive
+                            ? "bg-primary text-primary-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground hover:bg-background/50"
                         )}
                       >
                         <span className="hidden sm:inline">{option.label}</span>

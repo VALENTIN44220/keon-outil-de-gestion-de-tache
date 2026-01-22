@@ -498,9 +498,9 @@ export function CalendarGrid({
     return (
       <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
         {/* Header */}
-        <div className="grid border-b" style={{ gridTemplateColumns: `180px repeat(${quarterWeeks.length}, minmax(60px, 1fr))` }}>
-          <div className="p-2 bg-muted/50 font-medium text-xs text-muted-foreground border-r sticky left-0 z-10">
-            Équipe
+        <div className="grid border-b" style={{ gridTemplateColumns: `180px repeat(${quarterWeeks.length}, minmax(80px, 1fr))` }}>
+          <div className="p-3 bg-muted/50 font-medium text-sm text-muted-foreground border-r sticky left-0 z-10">
+            Membres
           </div>
           {quarterWeeks.map((week) => (
             <div 
@@ -508,9 +508,9 @@ export function CalendarGrid({
               onClick={() => onCellClick(week.startDate)}
               className="p-2 text-center border-r last:border-r-0 cursor-pointer hover:bg-muted/30 transition-colors"
             >
-              <p className="text-[10px] text-muted-foreground">S{week.weekNum}</p>
-              <p className="text-xs font-medium">
-                {format(week.startDate, 'd', { locale: fr })}-{format(week.endDate, 'd MMM', { locale: fr })}
+              <p className="text-sm font-semibold text-foreground">S{week.weekNum}</p>
+              <p className="text-[10px] text-muted-foreground">
+                {format(week.startDate, 'dd/MM', { locale: fr })} - {format(week.endDate, 'dd/MM', { locale: fr })}
               </p>
             </div>
           ))}
