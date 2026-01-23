@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Link, File, Trash2, ExternalLink } from 'lucide-react';
+import { Plus, Link, File, Trash2, ExternalLink, Upload, Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 import {
   Select,
   SelectContent,
@@ -25,9 +27,12 @@ interface TaskLinksEditorProps {
 }
 
 export function TaskLinksEditor({ items, onChange, readOnly = false }: TaskLinksEditorProps) {
+  const { toast } = useToast();
   const [newName, setNewName] = useState('');
   const [newUrl, setNewUrl] = useState('');
   const [newType, setNewType] = useState<'link' | 'file'>('link');
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleAddLink = () => {
     if (!newName.trim() || !newUrl.trim()) return;
@@ -53,6 +58,72 @@ export function TaskLinksEditor({ items, onChange, readOnly = false }: TaskLinks
     if (e.key === 'Enter') {
       e.preventDefault();
       handleAddLink();
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+
+    try {
+      // Get user session
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast({
+          title: 'Erreur',
+          description: 'Vous devez être connecté pour télécharger des fichiers',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Generate unique file path
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/${crypto.randomUUID()}.${fileExt}`;
+
+      // Upload to storage
+      const { error: uploadError } = await supabase.storage
+        .from('task-attachments')
+        .upload(fileName, file);
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('task-attachments')
+        .getPublicUrl(fileName);
+
+      // Add to items
+      const newItem: LinkItem = {
+        id: crypto.randomUUID(),
+        name: file.name,
+        url: publicUrl,
+        type: 'file',
+      };
+
+      onChange([...items, newItem]);
+
+      toast({
+        title: 'Fichier téléchargé',
+        description: `${file.name} a été ajouté avec succès`,
+      });
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast({
+        title: 'Erreur de téléchargement',
+        description: 'Impossible de télécharger le fichier',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUploading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -101,9 +172,46 @@ export function TaskLinksEditor({ items, onChange, readOnly = false }: TaskLinks
         </div>
       )}
 
-      {/* Add new link form */}
+      {/* Add new link/file form */}
       {!readOnly && (
         <div className="space-y-3 p-3 rounded-lg border border-dashed">
+          {/* File upload button */}
+          <div className="flex gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              onChange={handleFileUpload}
+              disabled={isUploading}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+            >
+              {isUploading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Téléchargement...
+                </>
+              ) : (
+                <>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Télécharger un fichier
+                </>
+              )}
+            </Button>
+          </div>
+
+          <div className="relative flex items-center">
+            <div className="flex-1 border-t border-muted" />
+            <span className="px-3 text-xs text-muted-foreground bg-background">ou ajouter un lien</span>
+            <div className="flex-1 border-t border-muted" />
+          </div>
+
+          {/* Manual link input */}
           <div className="grid grid-cols-3 gap-2">
             <div className="col-span-2">
               <Input
@@ -125,7 +233,7 @@ export function TaskLinksEditor({ items, onChange, readOnly = false }: TaskLinks
                 </SelectItem>
                 <SelectItem value="file">
                   <span className="flex items-center gap-2">
-                    <File className="h-4 w-4" /> Fichier
+                    <File className="h-4 w-4" /> URL fichier
                   </span>
                 </SelectItem>
               </SelectContent>
@@ -134,7 +242,7 @@ export function TaskLinksEditor({ items, onChange, readOnly = false }: TaskLinks
           <div className="flex gap-2">
             <Input
               className="flex-1"
-              placeholder="URL du lien ou du fichier"
+              placeholder="URL du lien"
               value={newUrl}
               onChange={(e) => setNewUrl(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -150,7 +258,7 @@ export function TaskLinksEditor({ items, onChange, readOnly = false }: TaskLinks
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Ajoutez des liens vers des documents, fichiers partagés ou ressources externes
+            Téléchargez des fichiers ou ajoutez des liens vers des ressources externes
           </p>
         </div>
       )}
