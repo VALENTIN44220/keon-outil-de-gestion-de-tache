@@ -65,12 +65,12 @@ export function Dashboard({ stats, recentTasks, onStatusChange, onDelete, global
 
       {/* Unassigned tasks alert for managers */}
       {unassignedCount > 0 && onViewUnassigned && (
-        <div className="bg-warning/10 border border-warning/30 rounded-xl p-4 flex items-center justify-between">
+        <div className="bg-keon-orange/10 border border-keon-orange/30 rounded-sm p-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <UserPlus className="h-6 w-6 text-warning" />
+            <UserPlus className="h-6 w-6 text-keon-orange" />
             <div>
-              <p className="font-semibold">{unassignedCount} tâche(s) à affecter</p>
-              <p className="text-sm text-muted-foreground">Des demandes attendent d'être assignées dans votre service</p>
+              <p className="font-semibold text-keon-900">{unassignedCount} tâche(s) à affecter</p>
+              <p className="text-sm text-keon-700">Des demandes attendent d'être assignées dans votre service</p>
             </div>
           </div>
           <Button onClick={onViewUnassigned} variant="outline">
@@ -81,56 +81,56 @@ export function Dashboard({ stats, recentTasks, onStatusChange, onDelete, global
 
       {/* Main content */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Progress section - colorful modern style */}
-        <div className="bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-800 rounded-2xl p-6 shadow-lg border border-slate-100 dark:border-slate-700">
-          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-            <div className="w-2 h-6 bg-gradient-to-b from-blue-500 to-cyan-400 rounded-full" />
-            Progression globale
-          </h2>
+        {/* Progress section - KEON style */}
+        <div className="card-keon p-6">
+          <h3 className="text-lg mb-4 flex items-center gap-2">
+            <div className="w-1 h-5 bg-keon-blue rounded-full" />
+            Progression Globale
+          </h3>
           <div className="flex flex-col items-center">
             <ProgressRing progress={stats.completionRate} size={160} />
-            <p className="text-sm text-muted-foreground mt-4 text-center">
-              <span className="font-semibold text-foreground">{stats.done}</span> tâches terminées sur <span className="font-semibold text-foreground">{stats.total}</span>
+            <p className="text-sm text-keon-700 mt-4 text-center">
+              <span className="font-semibold text-keon-900">{stats.done}</span> tâches terminées sur <span className="font-semibold text-keon-900">{stats.total}</span>
             </p>
           </div>
           
-          {/* Checklist progress - gradient style */}
+          {/* Checklist progress - KEON style */}
           {globalStats && globalStats.total > 0 && (
-            <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-100 dark:border-blue-800">
+            <div className="mt-6 p-4 bg-keon-blue/10 rounded-sm border border-keon-blue/30">
               <div className="flex items-center gap-2 mb-2">
-                <ListChecks className="w-5 h-5 text-blue-600" />
-                <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">Sous-actions</span>
+                <ListChecks className="w-5 h-5 text-keon-blue" />
+                <span className="text-sm font-semibold text-keon-900">Sous-actions</span>
               </div>
               <div className="flex items-center justify-between text-sm mb-2">
-                <span className="text-muted-foreground">Avancement global</span>
-                <span className="font-bold text-blue-600">{globalProgress}%</span>
+                <span className="text-keon-700">Avancement global</span>
+                <span className="font-bold text-keon-blue">{globalProgress}%</span>
               </div>
-              <div className="h-3 bg-white dark:bg-slate-700 rounded-full overflow-hidden shadow-inner">
+              <div className="h-2.5 bg-keon-100 rounded-sm overflow-hidden">
                 <div 
-                  className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 rounded-full transition-all duration-700 ease-out"
+                  className="h-full bg-keon-blue rounded-sm transition-all duration-700 ease-out"
                   style={{ width: `${globalProgress}%` }}
                 />
               </div>
-              <p className="text-xs text-muted-foreground mt-2">
+              <p className="text-xs text-keon-500 mt-2">
                 {globalStats.completed}/{globalStats.total} sous-actions terminées
               </p>
             </div>
           )}
           
-          {/* Progress bars by status - colorful pills */}
+          {/* Progress bars by status - KEON style */}
           <div className="mt-6 space-y-4">
             {/* TODO */}
             <div className="group">
               <div className="flex justify-between text-sm mb-1.5">
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-gradient-to-r from-amber-400 to-orange-400 shadow-sm" />
-                  <span className="text-muted-foreground group-hover:text-foreground transition-colors">À faire</span>
+                  <div className="w-3 h-3 rounded-sm bg-keon-orange" />
+                  <span className="text-keon-700 group-hover:text-keon-900 transition-colors">À faire</span>
                 </div>
-                <span className="font-bold text-amber-600">{stats.todo}</span>
+                <span className="font-bold text-keon-orange">{stats.todo}</span>
               </div>
-              <div className="h-2.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+              <div className="h-2 bg-keon-100 rounded-sm overflow-hidden">
                 <div 
-                  className="h-full bg-gradient-to-r from-amber-400 to-orange-400 rounded-full transition-all duration-700 ease-out"
+                  className="h-full bg-keon-orange rounded-sm transition-all duration-700 ease-out"
                   style={{ width: `${stats.total > 0 ? (stats.todo / stats.total) * 100 : 0}%` }}
                 />
               </div>
@@ -140,14 +140,14 @@ export function Dashboard({ stats, recentTasks, onStatusChange, onDelete, global
             <div className="group">
               <div className="flex justify-between text-sm mb-1.5">
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-gradient-to-r from-pink-400 to-purple-500 shadow-sm" />
-                  <span className="text-muted-foreground group-hover:text-foreground transition-colors">En cours</span>
+                  <div className="w-3 h-3 rounded-sm bg-keon-blue" />
+                  <span className="text-keon-700 group-hover:text-keon-900 transition-colors">En cours</span>
                 </div>
-                <span className="font-bold text-purple-600">{stats.inProgress}</span>
+                <span className="font-bold text-keon-blue">{stats.inProgress}</span>
               </div>
-              <div className="h-2.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+              <div className="h-2 bg-keon-100 rounded-sm overflow-hidden">
                 <div 
-                  className="h-full bg-gradient-to-r from-pink-400 to-purple-500 rounded-full transition-all duration-700 ease-out"
+                  className="h-full bg-keon-blue rounded-sm transition-all duration-700 ease-out"
                   style={{ width: `${stats.total > 0 ? (stats.inProgress / stats.total) * 100 : 0}%` }}
                 />
               </div>
@@ -157,14 +157,14 @@ export function Dashboard({ stats, recentTasks, onStatusChange, onDelete, global
             <div className="group">
               <div className="flex justify-between text-sm mb-1.5">
                 <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-gradient-to-r from-emerald-400 to-teal-400 shadow-sm" />
-                  <span className="text-muted-foreground group-hover:text-foreground transition-colors">Terminées</span>
+                  <div className="w-3 h-3 rounded-sm bg-keon-green" />
+                  <span className="text-keon-700 group-hover:text-keon-900 transition-colors">Terminées</span>
                 </div>
-                <span className="font-bold text-emerald-600">{stats.done}</span>
+                <span className="font-bold text-keon-green">{stats.done}</span>
               </div>
-              <div className="h-2.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+              <div className="h-2 bg-keon-100 rounded-sm overflow-hidden">
                 <div 
-                  className="h-full bg-gradient-to-r from-emerald-400 to-teal-400 rounded-full transition-all duration-700 ease-out"
+                  className="h-full bg-keon-green rounded-sm transition-all duration-700 ease-out"
                   style={{ width: `${stats.total > 0 ? (stats.done / stats.total) * 100 : 0}%` }}
                 />
               </div>
@@ -172,16 +172,16 @@ export function Dashboard({ stats, recentTasks, onStatusChange, onDelete, global
           </div>
         </div>
 
-        {/* Urgent tasks - modern card style */}
-        <div className="lg:col-span-2 bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-800 rounded-2xl p-6 shadow-lg border border-slate-100 dark:border-slate-700">
+        {/* Urgent tasks - KEON style */}
+        <div className="lg:col-span-2 card-keon p-6">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-              <div className="w-2 h-6 bg-gradient-to-b from-red-500 to-orange-400 rounded-full" />
-              Tâches prioritaires
-            </h2>
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-red-50 dark:bg-red-900/20 rounded-full">
-              <TrendingUp className="w-4 h-4 text-red-500" />
-              <span className="text-xs font-medium text-red-600 dark:text-red-400">Urgent</span>
+            <h3 className="text-lg flex items-center gap-2">
+              <div className="w-1 h-5 bg-keon-terose rounded-full" />
+              Tâches Prioritaires
+            </h3>
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-keon-terose/10 rounded-sm border border-keon-terose/30">
+              <TrendingUp className="w-4 h-4 text-keon-terose" />
+              <span className="text-xs font-medium text-keon-terose">Urgent</span>
             </div>
           </div>
           
@@ -200,13 +200,13 @@ export function Dashboard({ stats, recentTasks, onStatusChange, onDelete, global
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="w-16 h-16 bg-gradient-to-br from-emerald-400 to-teal-400 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
-                <CheckCircle2 className="w-8 h-8 text-white" />
+              <div className="w-16 h-16 bg-keon-green/20 rounded-sm flex items-center justify-center mb-4">
+                <CheckCircle2 className="w-8 h-8 text-keon-green" />
               </div>
-              <p className="text-muted-foreground font-medium">
+              <p className="text-keon-700 font-medium">
                 Aucune tâche urgente en attente
               </p>
-              <p className="text-sm text-muted-foreground/70 mt-1">
+              <p className="text-sm text-keon-500 mt-1">
                 Vous êtes à jour ! 🎉
               </p>
             </div>

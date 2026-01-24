@@ -13,124 +13,137 @@
 
 @layer base {
   :root {
-    /* KEON Brand Colors */
-    --keon-dark: 200 6% 27%; /* #414648 - Gris foncé principal */
-    --keon-dark-80: 200 6% 37%;
-    --keon-dark-60: 200 6% 52%;
-    --keon-dark-40: 200 6% 67%;
-    --keon-dark-20: 200 6% 82%;
+    /* ================================
+       KEON DESIGN SYSTEM - Couleurs
+       ================================ */
     
-    /* Spectre colors */
-    --keon-cyan: 185 80% 50%;
-    --keon-blue: 210 80% 55%;
-    --keon-purple: 270 60% 55%;
-    --keon-red: 10 80% 55%;
-    --keon-orange: 25 90% 55%;
-    --keon-yellow: 45 90% 55%;
-    --keon-green: 145 70% 45%;
+    /* Palette principale gris KEON (basée sur #414648) */
+    --keon-gray-900: 200 5% 27%;   /* #414648 - Gris foncé principal */
+    --keon-gray-700: 200 3% 43%;   /* #6A6F71 - 80% */
+    --keon-gray-500: 195 3% 56%;   /* #8D9193 - 60% */
+    --keon-gray-300: 200 2% 70%;   /* #B0B3B4 - 40% */
+    --keon-gray-100: 200 2% 84%;   /* #D4D5D6 - 20% */
+    --keon-gray-50: 200 5% 96%;    /* Gris très clair pour fonds */
     
-    --background: 0 0% 98%;
-    --foreground: 200 6% 27%;
+    /* Accents secondaires KEON (usage parcimonieux) */
+    --keon-green: 95 51% 53%;      /* #78C050 */
+    --keon-terose: 354 26% 58%;    /* #B17379 */
+    --keon-blue: 184 55% 54%;      /* #4DBEC8 */
+    --keon-orange: 29 100% 60%;    /* #FF9432 */
+    
+    /* Spectre KEON (accent rare - hero/header uniquement) */
+    --keon-spectre-cyan: 184 55% 54%;
+    --keon-spectre-blue: 210 70% 50%;
+    --keon-spectre-purple: 280 50% 50%;
+    --keon-spectre-red: 0 70% 55%;
+    --keon-spectre-orange: 29 100% 60%;
+    --keon-spectre-yellow: 45 90% 55%;
+    --keon-spectre-green: 95 51% 53%;
+
+    /* Semantic tokens - Mode clair */
+    --background: 0 0% 99%;
+    --foreground: 200 5% 27%;
 
     --card: 0 0% 100%;
-    --card-foreground: 200 6% 27%;
+    --card-foreground: 200 5% 27%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 200 6% 27%;
+    --popover-foreground: 200 5% 27%;
 
-    --primary: 200 6% 27%;
+    --primary: 200 5% 27%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 200 6% 95%;
-    --secondary-foreground: 200 6% 27%;
+    --secondary: 200 5% 96%;
+    --secondary-foreground: 200 5% 27%;
 
-    --muted: 200 6% 95%;
-    --muted-foreground: 200 6% 52%;
+    --muted: 200 2% 92%;
+    --muted-foreground: 200 3% 43%;
 
-    --accent: 185 80% 50%;
+    --accent: 184 55% 54%;
     --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84% 60%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 145 70% 45%;
+    --success: 95 51% 45%;
     --success-foreground: 0 0% 100%;
 
     --warning: 45 90% 55%;
-    --warning-foreground: 200 6% 27%;
+    --warning-foreground: 200 5% 27%;
 
-    --info: 210 80% 55%;
+    --info: 184 55% 54%;
     --info-foreground: 0 0% 100%;
 
-    --border: 200 6% 90%;
-    --input: 200 6% 90%;
-    --ring: 185 80% 50%;
+    --border: 200 2% 84%;
+    --input: 200 2% 84%;
+    --ring: 184 55% 54%;
 
-    --radius: 0.5rem;
+    --radius: 0.25rem;
 
     /* Sidebar - KEON dark theme */
-    --sidebar-background: 200 6% 27%;
+    --sidebar-background: 200 5% 27%;
     --sidebar-foreground: 0 0% 100%;
-    --sidebar-primary: 185 80% 50%;
-    --sidebar-primary-foreground: 200 6% 27%;
-    --sidebar-accent: 200 6% 35%;
+    --sidebar-primary: 184 55% 54%;
+    --sidebar-primary-foreground: 200 5% 27%;
+    --sidebar-accent: 200 5% 35%;
     --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 200 6% 35%;
-    --sidebar-ring: 185 80% 50%;
+    --sidebar-border: 200 5% 35%;
+    --sidebar-ring: 184 55% 54%;
 
-    --chart-1: 185 80% 50%;
-    --chart-2: 145 70% 45%;
-    --chart-3: 45 90% 55%;
-    --chart-4: 10 80% 55%;
-    --chart-5: 270 60% 55%;
+    /* Charts */
+    --chart-1: 184 55% 54%;
+    --chart-2: 95 51% 53%;
+    --chart-3: 29 100% 60%;
+    --chart-4: 354 26% 58%;
+    --chart-5: 200 5% 27%;
   }
 
   .dark {
-    --background: 200 6% 15%;
-    --foreground: 0 0% 95%;
+    --background: 200 5% 12%;
+    --foreground: 0 0% 96%;
 
-    --card: 200 6% 20%;
-    --card-foreground: 0 0% 95%;
+    --card: 200 5% 18%;
+    --card-foreground: 0 0% 96%;
 
-    --popover: 200 6% 20%;
-    --popover-foreground: 0 0% 95%;
+    --popover: 200 5% 18%;
+    --popover-foreground: 0 0% 96%;
 
-    --primary: 185 80% 50%;
-    --primary-foreground: 200 6% 15%;
+    --primary: 184 55% 54%;
+    --primary-foreground: 200 5% 12%;
 
-    --secondary: 200 6% 25%;
-    --secondary-foreground: 0 0% 95%;
+    --secondary: 200 5% 22%;
+    --secondary-foreground: 0 0% 96%;
 
-    --muted: 200 6% 25%;
-    --muted-foreground: 200 6% 65%;
+    --muted: 200 5% 22%;
+    --muted-foreground: 200 2% 70%;
 
-    --accent: 185 80% 50%;
-    --accent-foreground: 200 6% 15%;
+    --accent: 184 55% 54%;
+    --accent-foreground: 200 5% 12%;
 
     --destructive: 0 63% 40%;
     --destructive-foreground: 0 0% 100%;
 
-    --success: 145 70% 45%;
+    --success: 95 51% 45%;
     --success-foreground: 0 0% 100%;
 
     --warning: 45 90% 55%;
-    --warning-foreground: 200 6% 15%;
+    --warning-foreground: 200 5% 12%;
 
-    --info: 210 80% 55%;
+    --info: 184 55% 54%;
     --info-foreground: 0 0% 100%;
 
-    --border: 200 6% 30%;
-    --input: 200 6% 30%;
-    --ring: 185 80% 50%;
+    --border: 200 5% 28%;
+    --input: 200 5% 28%;
+    --ring: 184 55% 54%;
 
-    --sidebar-background: 200 6% 12%;
-    --sidebar-foreground: 0 0% 95%;
-    --sidebar-primary: 185 80% 50%;
-    --sidebar-primary-foreground: 200 6% 12%;
-    --sidebar-accent: 200 6% 20%;
-    --sidebar-accent-foreground: 0 0% 95%;
-    --sidebar-border: 200 6% 25%;
-    --sidebar-ring: 185 80% 50%;
+    --sidebar-background: 200 5% 10%;
+    --sidebar-foreground: 0 0% 96%;
+    --sidebar-primary: 184 55% 54%;
+    --sidebar-primary-foreground: 200 5% 10%;
+    --sidebar-accent: 200 5% 18%;
+    --sidebar-accent-foreground: 0 0% 96%;
+    --sidebar-border: 200 5% 22%;
+    --sidebar-ring: 184 55% 54%;
   }
 }
 
@@ -142,17 +155,202 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-family: 'Roboto', sans-serif;
+    font-weight: 400;
   }
 
+  /* Titres KEON : Oswald, MAJUSCULES, interlettrage +0.05em */
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Oswald', sans-serif;
     font-weight: 500;
     text-transform: uppercase;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.05em;
+    color: hsl(var(--keon-gray-900));
+  }
+
+  h1 { @apply text-3xl md:text-4xl; }
+  h2 { @apply text-2xl md:text-3xl; }
+  h3 { @apply text-xl md:text-2xl; }
+  h4 { @apply text-lg md:text-xl; }
+  h5 { @apply text-base md:text-lg; }
+  h6 { @apply text-sm md:text-base; }
+
+  /* Liens - style KEON sobre */
+  a {
+    @apply text-foreground transition-colors;
+  }
+  a:hover {
+    color: hsl(var(--keon-blue));
+  }
+}
+
+@layer components {
+  /* ================================
+     KEON COMPONENTS
+     ================================ */
+
+  /* Card KEON - angles légèrement marqués, ombre très légère */
+  .card-keon {
+    @apply bg-card border rounded-sm;
+    border-color: hsl(var(--keon-gray-300));
+    box-shadow: 0 1px 3px 0 rgba(65, 70, 72, 0.06);
+  }
+  .card-keon:hover {
+    box-shadow: 0 2px 8px 0 rgba(65, 70, 72, 0.1);
+  }
+
+  /* Séparateur KEON - trait fin gris 40% */
+  .separator-keon {
+    @apply w-full h-px;
+    background-color: hsl(var(--keon-gray-300));
+  }
+
+  /* Bouton primaire KEON */
+  .btn-keon-primary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-sm transition-all;
+    background-color: hsl(var(--keon-gray-900));
+    color: white;
+    border: 1px solid hsl(var(--keon-gray-900));
+  }
+  .btn-keon-primary:hover {
+    background-color: hsl(var(--keon-gray-700));
+    border-color: hsl(var(--keon-gray-700));
+  }
+  .btn-keon-primary:active {
+    background-color: hsl(var(--keon-gray-900));
+  }
+  .btn-keon-primary:focus-visible {
+    outline: 2px solid hsl(var(--keon-blue));
+    outline-offset: 2px;
+  }
+
+  /* Bouton secondaire KEON (outline) */
+  .btn-keon-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-sm transition-all;
+    background-color: transparent;
+    color: hsl(var(--keon-gray-900));
+    border: 1px solid hsl(var(--keon-gray-500));
+  }
+  .btn-keon-secondary:hover {
+    background-color: hsl(var(--keon-gray-50));
+    border-color: hsl(var(--keon-gray-700));
+  }
+  .btn-keon-secondary:active {
+    background-color: hsl(var(--keon-gray-100));
+  }
+  .btn-keon-secondary:focus-visible {
+    outline: 2px solid hsl(var(--keon-blue));
+    outline-offset: 2px;
+  }
+
+  /* Bouton accent KEON (bleu) */
+  .btn-keon-accent {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-sm transition-all;
+    background-color: hsl(var(--keon-blue));
+    color: white;
+    border: 1px solid hsl(var(--keon-blue));
+  }
+  .btn-keon-accent:hover {
+    background-color: hsl(184 55% 48%);
+  }
+  .btn-keon-accent:focus-visible {
+    outline: 2px solid hsl(var(--keon-gray-900));
+    outline-offset: 2px;
+  }
+
+  /* Input KEON */
+  .input-keon {
+    @apply w-full px-3 py-2 text-sm rounded-sm transition-all;
+    background-color: white;
+    border: 1px solid hsl(var(--keon-gray-300));
+    color: hsl(var(--keon-gray-900));
+  }
+  .input-keon::placeholder {
+    color: hsl(var(--keon-gray-500));
+  }
+  .input-keon:hover {
+    border-color: hsl(var(--keon-gray-500));
+  }
+  .input-keon:focus {
+    outline: none;
+    border-color: hsl(var(--keon-blue));
+    box-shadow: 0 0 0 2px hsl(var(--keon-blue) / 0.15);
+  }
+
+  /* Badge KEON */
+  .badge-keon {
+    @apply inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-sm;
+    background-color: hsl(var(--keon-gray-100));
+    color: hsl(var(--keon-gray-700));
+  }
+  .badge-keon-success {
+    background-color: hsl(var(--keon-green) / 0.15);
+    color: hsl(95 51% 40%);
+  }
+  .badge-keon-warning {
+    background-color: hsl(var(--keon-orange) / 0.15);
+    color: hsl(29 100% 45%);
+  }
+  .badge-keon-info {
+    background-color: hsl(var(--keon-blue) / 0.15);
+    color: hsl(184 55% 40%);
+  }
+  .badge-keon-danger {
+    background-color: hsl(var(--keon-terose) / 0.15);
+    color: hsl(354 26% 45%);
+  }
+
+  /* Motif hexagonal KEON (filigrane discret) */
+  .keon-hex-pattern {
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='52' viewBox='0 0 60 52' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 0L60 15v22L30 52 0 37V15z' fill='none' stroke='%23D4D5D6' stroke-width='1' opacity='0.3'/%3E%3C/svg%3E");
+    background-size: 60px 52px;
+  }
+
+  /* Gradient spectre KEON (usage rare - hero/header) */
+  .gradient-keon-spectre {
+    background: linear-gradient(
+      135deg,
+      hsl(var(--keon-spectre-cyan)) 0%,
+      hsl(var(--keon-spectre-blue)) 17%,
+      hsl(var(--keon-spectre-purple)) 33%,
+      hsl(var(--keon-spectre-red)) 50%,
+      hsl(var(--keon-spectre-orange)) 67%,
+      hsl(var(--keon-spectre-yellow)) 83%,
+      hsl(var(--keon-spectre-green)) 100%
+    );
+  }
+
+  /* Bordure spectre */
+  .border-keon-spectre {
+    border-image: linear-gradient(
+      90deg,
+      hsl(var(--keon-spectre-cyan)),
+      hsl(var(--keon-spectre-blue)),
+      hsl(var(--keon-spectre-purple)),
+      hsl(var(--keon-spectre-red)),
+      hsl(var(--keon-spectre-orange)),
+      hsl(var(--keon-spectre-yellow)),
+      hsl(var(--keon-spectre-green))
+    ) 1;
+  }
+
+  /* Ligne accent spectre (fine - 2px) */
+  .line-keon-spectre {
+    height: 2px;
+    background: linear-gradient(
+      90deg,
+      hsl(var(--keon-spectre-cyan)),
+      hsl(var(--keon-spectre-blue)),
+      hsl(var(--keon-spectre-purple)),
+      hsl(var(--keon-spectre-red)),
+      hsl(var(--keon-spectre-orange)),
+      hsl(var(--keon-spectre-yellow)),
+      hsl(var(--keon-spectre-green))
+    );
   }
 }
 
 @layer utilities {
+  /* Typographie KEON */
   .font-display {
     font-family: 'Oswald', sans-serif;
   }
@@ -161,111 +359,57 @@
     font-family: 'Roboto', sans-serif;
   }
 
-  .gradient-keon {
-    background: linear-gradient(
-      135deg,
-      hsl(var(--keon-cyan)) 0%,
-      hsl(var(--keon-blue)) 17%,
-      hsl(var(--keon-purple)) 33%,
-      hsl(var(--keon-red)) 50%,
-      hsl(var(--keon-orange)) 67%,
-      hsl(var(--keon-yellow)) 83%,
-      hsl(var(--keon-green)) 100%
-    );
+  /* Titre KEON (applique toutes les règles) */
+  .keon-title {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: hsl(var(--keon-gray-900));
   }
 
-  .gradient-keon-border {
-    border-image: linear-gradient(
-      135deg,
-      hsl(var(--keon-cyan)),
-      hsl(var(--keon-blue)),
-      hsl(var(--keon-purple)),
-      hsl(var(--keon-red)),
-      hsl(var(--keon-orange)),
-      hsl(var(--keon-yellow)),
-      hsl(var(--keon-green))
-    ) 1;
+  /* Couleurs KEON directes */
+  .text-keon-900 { color: hsl(var(--keon-gray-900)); }
+  .text-keon-700 { color: hsl(var(--keon-gray-700)); }
+  .text-keon-500 { color: hsl(var(--keon-gray-500)); }
+  .text-keon-300 { color: hsl(var(--keon-gray-300)); }
+  .text-keon-blue { color: hsl(var(--keon-blue)); }
+  .text-keon-green { color: hsl(var(--keon-green)); }
+  .text-keon-orange { color: hsl(var(--keon-orange)); }
+  .text-keon-terose { color: hsl(var(--keon-terose)); }
+
+  .bg-keon-900 { background-color: hsl(var(--keon-gray-900)); }
+  .bg-keon-700 { background-color: hsl(var(--keon-gray-700)); }
+  .bg-keon-500 { background-color: hsl(var(--keon-gray-500)); }
+  .bg-keon-300 { background-color: hsl(var(--keon-gray-300)); }
+  .bg-keon-100 { background-color: hsl(var(--keon-gray-100)); }
+  .bg-keon-50 { background-color: hsl(var(--keon-gray-50)); }
+  .bg-keon-blue { background-color: hsl(var(--keon-blue)); }
+  .bg-keon-green { background-color: hsl(var(--keon-green)); }
+  .bg-keon-orange { background-color: hsl(var(--keon-orange)); }
+  .bg-keon-terose { background-color: hsl(var(--keon-terose)); }
+
+  .border-keon-900 { border-color: hsl(var(--keon-gray-900)); }
+  .border-keon-700 { border-color: hsl(var(--keon-gray-700)); }
+  .border-keon-500 { border-color: hsl(var(--keon-gray-500)); }
+  .border-keon-300 { border-color: hsl(var(--keon-gray-300)); }
+  .border-keon-100 { border-color: hsl(var(--keon-gray-100)); }
+
+  /* Ombres KEON (très légères) */
+  .shadow-keon-sm {
+    box-shadow: 0 1px 2px 0 rgba(65, 70, 72, 0.05);
+  }
+  .shadow-keon {
+    box-shadow: 0 1px 3px 0 rgba(65, 70, 72, 0.08), 0 1px 2px -1px rgba(65, 70, 72, 0.08);
+  }
+  .shadow-keon-md {
+    box-shadow: 0 4px 6px -1px rgba(65, 70, 72, 0.08), 0 2px 4px -2px rgba(65, 70, 72, 0.08);
+  }
+  .shadow-keon-lg {
+    box-shadow: 0 10px 15px -3px rgba(65, 70, 72, 0.08), 0 4px 6px -4px rgba(65, 70, 72, 0.08);
   }
 
-  .shadow-card {
-    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-  }
-
-  .shadow-card-hover {
-    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-  }
-
-  /* 3D Button effect for sidebar icons */
-  .btn-3d {
-    @apply relative bg-white border-2 border-slate-200 rounded-xl;
-    box-shadow: 
-      0 4px 6px -1px rgba(0, 0, 0, 0.1),
-      0 2px 4px -2px rgba(0, 0, 0, 0.1),
-      inset 0 1px 0 rgba(255, 255, 255, 0.8),
-      inset 0 -2px 0 rgba(0, 0, 0, 0.05);
-    transition: all 0.15s ease;
-  }
-
-  .btn-3d:hover {
-    box-shadow: 
-      0 6px 12px -2px rgba(0, 0, 0, 0.15),
-      0 3px 6px -3px rgba(0, 0, 0, 0.1),
-      inset 0 1px 0 rgba(255, 255, 255, 0.9),
-      inset 0 -2px 0 rgba(0, 0, 0, 0.05);
-    transform: translateY(-1px);
-  }
-
-  .btn-3d:active {
-    box-shadow: 
-      0 1px 2px 0 rgba(0, 0, 0, 0.05),
-      inset 0 2px 4px rgba(0, 0, 0, 0.1);
-    transform: translateY(1px);
-  }
-
-  .btn-3d-active {
-    @apply relative bg-gradient-to-b from-blue-500 to-blue-600 border-2 border-blue-600 rounded-xl text-white;
-    box-shadow: 
-      0 4px 6px -1px rgba(37, 99, 235, 0.3),
-      0 2px 4px -2px rgba(37, 99, 235, 0.2),
-      inset 0 1px 0 rgba(255, 255, 255, 0.2),
-      inset 0 -2px 0 rgba(0, 0, 0, 0.1);
-  }
-
-  /* Modern card with subtle gradient */
-  .card-modern {
-    @apply bg-white rounded-2xl border border-slate-200/80;
-    box-shadow: 
-      0 1px 3px rgba(0, 0, 0, 0.04),
-      0 4px 12px rgba(0, 0, 0, 0.03);
-  }
-
-  .card-modern:hover {
-    box-shadow: 
-      0 4px 12px rgba(0, 0, 0, 0.08),
-      0 8px 24px rgba(0, 0, 0, 0.04);
-  }
-
-  /* Gradient progress bars */
-  .progress-gradient-blue {
-    background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%);
-  }
-
-  .progress-gradient-green {
-    background: linear-gradient(90deg, #10b981 0%, #34d399 100%);
-  }
-
-  .progress-gradient-purple {
-    background: linear-gradient(90deg, #8b5cf6 0%, #a78bfa 100%);
-  }
-
-  .progress-gradient-pink {
-    background: linear-gradient(90deg, #ec4899 0%, #f472b6 100%);
-  }
-
-  .progress-gradient-cyan {
-    background: linear-gradient(90deg, #06b6d4 0%, #22d3ee 100%);
-  }
-
+  /* Animations */
   .animate-fade-in {
     animation: fadeIn 0.3s ease-out;
   }
@@ -280,12 +424,8 @@
 }
 
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes slideUp {

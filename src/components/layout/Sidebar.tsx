@@ -184,16 +184,15 @@ export function Sidebar({
       data-sidebar-position={isRightSide ? 'right' : 'left'} 
       className={cn(
         "top-0 h-screen flex flex-col transition-all duration-300 ease-in-out",
-        // Clean white background when expanded, subtle when collapsed
         collapsed 
-          ? "relative w-16 flex-shrink-0 bg-slate-50/80 backdrop-blur-sm" 
-          : "fixed w-64 z-40 bg-white shadow-xl",
-        isRightSide ? "right-0 border-l border-slate-200" : "left-0 border-r border-slate-200",
+          ? "relative w-16 flex-shrink-0 bg-keon-50" 
+          : "fixed w-64 z-40 bg-white shadow-keon-lg",
+        isRightSide ? "right-0 border-l border-keon-300" : "left-0 border-r border-keon-300",
         !collapsed && isRightSide && "order-last"
       )}
     >
       {/* Logo KEON */}
-      <div className="p-4 flex items-center justify-between border-b border-slate-200">
+      <div className="p-4 flex items-center justify-between border-b border-keon-300">
         {!collapsed && (
           <div className="flex items-center gap-2">
             <img src={keonLogo} alt="KEON Group" className="h-8 w-auto" />
@@ -207,7 +206,7 @@ export function Sidebar({
             {!collapsed && (
               <button 
                 onClick={toggleSidebarPosition} 
-                className="btn-3d p-2 text-blue-700 hover:text-blue-800"
+                className="p-2 rounded-sm text-keon-700 hover:text-keon-900 hover:bg-keon-100 transition-colors"
                 title={isRightSide ? "Déplacer à gauche" : "Déplacer à droite"}
               >
                 <ArrowLeftRight className="w-4 h-4" />
@@ -215,7 +214,7 @@ export function Sidebar({
             )}
             <button 
               onClick={() => setManualCollapsed(!manualCollapsed)} 
-              className="btn-3d p-2 text-blue-700 hover:text-blue-800"
+              className="p-2 rounded-sm text-keon-700 hover:text-keon-900 hover:bg-keon-100 transition-colors"
               title={collapsed ? "Étendre" : "Replier"}
             >
               {collapsed 
@@ -228,12 +227,12 @@ export function Sidebar({
         
         {/* On mobile show icon only */}
         {isMobile && collapsed && (
-          <img src={keonLogo} alt="KEON" className="h-8 w-8 object-cover rounded" />
+          <img src={keonLogo} alt="KEON" className="h-8 w-8 object-cover rounded-sm" />
         )}
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-3 space-y-2 overflow-y-auto">
+      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
         {menuItems.map(item => {
           const Icon = item.icon;
           const isActive = activeView === item.id;
@@ -244,16 +243,16 @@ export function Sidebar({
               onClick={() => handleMenuClick(item.id, item.path)} 
               className={cn(
                 "w-full flex items-center gap-3 transition-all duration-200 font-body",
-                collapsed ? "justify-center p-0" : "px-3 py-2.5 rounded-xl"
+                collapsed ? "justify-center p-0" : "px-3 py-2.5 rounded-sm"
               )}
               title={collapsed ? item.label : undefined}
             >
-              {/* Icon with 3D button effect */}
+              {/* Icon with KEON styling */}
               <div className={cn(
-                "flex items-center justify-center transition-all duration-200",
+                "flex items-center justify-center p-2.5 rounded-sm transition-all duration-200",
                 isActive 
-                  ? "btn-3d-active p-2.5" 
-                  : "btn-3d p-2.5 text-blue-700 hover:text-blue-800"
+                  ? "bg-keon-900 text-white shadow-keon" 
+                  : "bg-white border border-keon-300 text-keon-700 hover:border-keon-500 hover:text-keon-900 shadow-keon-sm"
               )}>
                 <Icon className="w-5 h-5" />
               </div>
@@ -261,7 +260,7 @@ export function Sidebar({
               {!collapsed && (
                 <span className={cn(
                   "font-medium text-sm",
-                  isActive ? "text-blue-700" : "text-slate-600"
+                  isActive ? "text-keon-900" : "text-keon-700"
                 )}>
                   {item.label}
                 </span>
@@ -272,24 +271,24 @@ export function Sidebar({
       </nav>
 
       {/* User section */}
-      <div className="p-3 border-t border-slate-200">
+      <div className="p-3 border-t border-keon-300">
         <UserProfilePopover>
           <button className={cn(
-            "w-full flex items-center gap-3 rounded-xl transition-colors cursor-pointer",
-            collapsed ? "justify-center p-2" : "px-3 py-2 hover:bg-slate-100"
+            "w-full flex items-center gap-3 rounded-sm transition-colors cursor-pointer",
+            collapsed ? "justify-center p-2" : "px-3 py-2 hover:bg-keon-100"
           )}>
-            <Avatar className="h-9 w-9 flex-shrink-0 ring-2 ring-blue-100">
+            <Avatar className="h-9 w-9 flex-shrink-0 ring-2 ring-keon-100">
               <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || 'Utilisateur'} />
-              <AvatarFallback className="bg-gradient-to-br from-blue-500 to-blue-600 text-white text-sm font-medium">
+              <AvatarFallback className="bg-keon-900 text-white text-sm font-medium">
                 {getInitials(profile?.display_name)}
               </AvatarFallback>
             </Avatar>
             {!collapsed && (
               <div className="flex-1 min-w-0 text-left">
-                <p className="text-sm font-medium text-slate-800 truncate">
+                <p className="text-sm font-medium text-keon-900 truncate">
                   {profile?.display_name || 'Utilisateur'}
                 </p>
-                <p className="text-xs text-slate-500 truncate">
+                <p className="text-xs text-keon-500 truncate">
                   {permissionProfileName || profile?.job_title || 'Non défini'}
                 </p>
               </div>
