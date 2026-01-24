@@ -15,6 +15,7 @@ import Projects from "./pages/Projects";
 import Admin from "./pages/Admin";
 import Workload from "./pages/Workload";
 import Requests from "./pages/Requests";
+import DesignSystem from "./pages/DesignSystem";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -86,6 +87,7 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            <Route path="/design-system" element={<DesignSystem />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

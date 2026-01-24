@@ -54,11 +54,11 @@ export function Header({
     .slice(0, 2);
 
   return (
-    <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 px-6 py-4 sticky top-0 z-30">
+    <header className="bg-white border-b border-keon-300 px-6 py-4 sticky top-0 z-30">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-800">{title}</h1>
-          <p className="text-sm text-slate-500 mt-0.5">
+          <h1 className="text-2xl">{title}</h1>
+          <p className="text-sm text-keon-500 mt-0.5 font-body normal-case">
             {new Date().toLocaleDateString('fr-FR', { 
               weekday: 'long', 
               year: 'numeric', 
@@ -71,7 +71,7 @@ export function Header({
         <div className="flex items-center gap-3">
           {/* Search */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-keon-500" />
             <Input
               type="text"
               placeholder="Rechercher..."
@@ -102,10 +102,10 @@ export function Header({
           {/* User Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-9 w-9 rounded-full">
+              <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0">
                 <Avatar className="h-9 w-9">
                   <AvatarImage src={profile?.avatar_url || undefined} alt={displayName} />
-                  <AvatarFallback className="bg-primary text-primary-foreground">
+                  <AvatarFallback className="bg-keon-900 text-white">
                     {initials}
                   </AvatarFallback>
                 </Avatar>
@@ -114,8 +114,8 @@ export function Header({
             <DropdownMenuContent align="end" className="w-56">
               <div className="flex items-center justify-start gap-2 p-2">
                 <div className="flex flex-col space-y-0.5">
-                  <p className="text-sm font-medium">{displayName}</p>
-                  <p className="text-xs text-muted-foreground">{user?.email}</p>
+                  <p className="text-sm font-medium text-keon-900">{displayName}</p>
+                  <p className="text-xs text-keon-500">{user?.email}</p>
                 </div>
               </div>
               <DropdownMenuSeparator />
@@ -124,7 +124,7 @@ export function Header({
                 Profil
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={signOut} className="text-destructive">
+              <DropdownMenuItem onClick={signOut} className="text-keon-terose">
                 <LogOut className="mr-2 h-4 w-4" />
                 Déconnexion
               </DropdownMenuItem>

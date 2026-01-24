@@ -5,21 +5,22 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-sm text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-keon-blue focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        default: "bg-gradient-to-b from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30 hover:shadow-blue-500/40 hover:from-blue-600 hover:to-blue-700 active:shadow-sm",
-        destructive: "bg-gradient-to-b from-red-500 to-red-600 text-white shadow-lg shadow-red-500/30 hover:shadow-red-500/40 hover:from-red-600 hover:to-red-700",
-        outline: "border-2 border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-700 shadow-sm",
-        secondary: "bg-slate-100 text-slate-700 hover:bg-slate-200",
-        ghost: "hover:bg-slate-100 text-slate-600 hover:text-slate-900",
-        link: "text-blue-600 underline-offset-4 hover:underline",
+        default: "bg-keon-900 text-white shadow-keon hover:bg-keon-700 active:bg-keon-900",
+        destructive: "bg-keon-terose text-white shadow-keon hover:bg-keon-terose/90",
+        outline: "border border-keon-300 bg-white hover:bg-keon-50 hover:border-keon-500 text-keon-900 shadow-keon-sm",
+        secondary: "bg-keon-100 text-keon-900 hover:bg-keon-300",
+        ghost: "hover:bg-keon-100 text-keon-700 hover:text-keon-900",
+        link: "text-keon-blue underline-offset-4 hover:underline",
+        accent: "bg-keon-blue text-white shadow-keon hover:bg-keon-blue/90",
       },
       size: {
         default: "h-10 px-4 py-2",
-        sm: "h-9 rounded-lg px-3",
-        lg: "h-11 rounded-xl px-8",
+        sm: "h-9 rounded-sm px-3",
+        lg: "h-11 rounded-sm px-8",
         icon: "h-10 w-10",
       },
     },
