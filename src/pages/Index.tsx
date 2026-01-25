@@ -1,16 +1,14 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
-import { Dashboard } from '@/components/dashboard/Dashboard';
+import { DashboardToolbar } from '@/components/dashboard/DashboardToolbar';
+import { DashboardStats } from '@/components/dashboard/DashboardStats';
 import { TaskList } from '@/components/tasks/TaskList';
-import { TaskFilters } from '@/components/tasks/TaskFilters';
 import { AdvancedFilters, AdvancedFiltersState } from '@/components/tasks/AdvancedFilters';
-import { TaskViewSelector, TaskView } from '@/components/tasks/TaskViewSelector';
-import { TaskScopeSelector } from '@/components/tasks/TaskScopeSelector';
+import { TaskView } from '@/components/tasks/TaskViewSelector';
 import { KanbanBoard } from '@/components/tasks/KanbanBoard';
 import { CalendarView } from '@/components/tasks/CalendarView';
 import { CreateFromTemplateDialog } from '@/components/tasks/CreateFromTemplateDialog';
-import { UnassignedTasksView } from '@/components/tasks/UnassignedTasksView';
 import { PendingAssignmentsView } from '@/components/tasks/PendingAssignmentsView';
 import { TeamModule } from '@/components/team/TeamModule';
 import { TaskDetailDialog } from '@/components/tasks/TaskDetailDialog';
@@ -23,7 +21,7 @@ import { useUnassignedTasks } from '@/hooks/useUnassignedTasks';
 import { usePendingAssignments } from '@/hooks/usePendingAssignments';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { Button } from '@/components/ui/button';
-import { Loader2, Workflow } from 'lucide-react';
+import { Loader2, Workflow, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useCategories } from '@/hooks/useCategories';
@@ -33,6 +31,8 @@ const Index = () => {
   const [activeView, setActiveView] = useState('dashboard');
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const [taskView, setTaskView] = useState<TaskView>('grid');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [showFullStats, setShowFullStats] = useState(false);
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFiltersState>({
     assigneeId: 'all',
     requesterId: 'all',
@@ -79,6 +79,14 @@ const Index = () => {
   // Get progress for all tasks
   const taskIds = useMemo(() => allTasks.map(t => t.id), [allTasks]);
   const { progressMap, globalProgress, globalStats } = useTasksProgress(taskIds);
+
+  // Check if advanced filters have active values
+  const hasActiveAdvancedFilters = useMemo(() => {
+    return Object.entries(advancedFilters).some(([key, value]) => {
+      if (key === 'groupBy') return value !== 'none';
+      return value !== 'all';
+    });
+  }, [advancedFilters]);
 
   // Fetch profiles for group labels
   useEffect(() => {
@@ -133,7 +141,6 @@ const Index = () => {
   const handleNotificationClick = (taskId: string) => {
     const task = allTasks.find(t => t.id === taskId);
     if (task) {
-      setActiveView('tasks');
       setSearchQuery(task.title);
       toast.info(`Tâche sélectionnée: ${task.title}`);
     }
@@ -146,8 +153,6 @@ const Index = () => {
       setSelectedTaskForComment(task);
       setIsCommentDetailOpen(true);
     } else {
-      // Task might not be in the current view, navigate anyway
-      setActiveView('tasks');
       toast.info('Ouverture de la demande...');
     }
   }, [allTasks, markCommentAsRead]);
@@ -160,8 +165,6 @@ const Index = () => {
     switch (activeView) {
       case 'dashboard':
         return 'Tableau de bord';
-      case 'tasks':
-        return 'Gestion des tâches';
       case 'to-assign':
         return 'Tâches à affecter';
       case 'analytics':
@@ -171,7 +174,7 @@ const Index = () => {
       case 'settings':
         return 'Paramètres';
       default:
-        return 'TaskFlow';
+        return 'Tableau de bord';
     }
   };
 
@@ -216,6 +219,69 @@ const Index = () => {
     }
   };
 
+  const renderDashboardContent = () => (
+    <>
+      {/* Unified Toolbar */}
+      <DashboardToolbar
+        scope={scope}
+        availableScopes={availableScopes}
+        onScopeChange={handleScopeChange}
+        currentView={taskView}
+        onViewChange={setTaskView}
+        statusFilter={statusFilter}
+        priorityFilter={priorityFilter}
+        onStatusChange={setStatusFilter}
+        onPriorityChange={setPriorityFilter}
+        showAdvancedFilters={showAdvancedFilters}
+        onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
+        hasActiveAdvancedFilters={hasActiveAdvancedFilters}
+      />
+
+      {/* Advanced Filters Panel */}
+      {showAdvancedFilters && (
+        <AdvancedFilters
+          filters={advancedFilters}
+          onFiltersChange={setAdvancedFilters}
+        />
+      )}
+
+      {/* Collapsible Stats */}
+      <div className="mb-4">
+        <button
+          onClick={() => setShowFullStats(!showFullStats)}
+          className="flex items-center gap-2 text-sm text-keon-700 hover:text-keon-900 mb-2"
+        >
+          {showFullStats ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          {showFullStats ? 'Masquer les statistiques' : 'Afficher les statistiques détaillées'}
+        </button>
+        
+        <DashboardStats
+          stats={stats}
+          globalProgress={globalProgress}
+          globalStats={globalStats}
+          unassignedCount={canAssignToTeam ? (unassignedCount + pendingCount) : 0}
+          onViewUnassigned={() => setActiveView('to-assign')}
+          collapsed={!showFullStats}
+        />
+      </div>
+
+      {/* Action button */}
+      <div className="flex justify-end mb-4">
+        <Button 
+          variant="outline" 
+          onClick={() => setIsTemplateDialogOpen(true)}
+          className="gap-2 border-keon-300 text-keon-700 hover:bg-keon-100"
+        >
+          <Workflow className="h-4 w-4" />
+          Depuis un modèle
+        </Button>
+      </div>
+
+      {/* Task View */}
+      {renderTaskView()}
+    </>
+  );
+
   const renderContent = () => {
     if (isLoading) {
       return (
@@ -227,67 +293,9 @@ const Index = () => {
 
     switch (activeView) {
       case 'dashboard':
-        return (
-          <>
-            {/* Scope selector for dashboard */}
-            <div className="flex items-center justify-between mb-6">
-              <TaskScopeSelector
-                scope={scope}
-                availableScopes={availableScopes}
-                onScopeChange={handleScopeChange}
-              />
-            </div>
-            <Dashboard 
-              stats={stats} 
-              recentTasks={allTasks.slice(0, 6)}
-              onStatusChange={updateTaskStatus}
-              onDelete={deleteTask}
-              globalProgress={globalProgress}
-              globalStats={globalStats}
-              progressMap={progressMap}
-              unassignedCount={canAssignToTeam ? (unassignedCount + pendingCount) : 0}
-              onViewUnassigned={() => setActiveView('to-assign')}
-            />
-          </>
-        );
+        return renderDashboardContent();
       case 'to-assign':
         return <PendingAssignmentsView />;
-      case 'tasks':
-        return (
-          <>
-            <div className="flex flex-col gap-4 mb-6">
-              <div className="flex items-center justify-between flex-wrap gap-4">
-                <div className="flex items-center gap-4 flex-wrap">
-                  <TaskScopeSelector
-                    scope={scope}
-                    availableScopes={availableScopes}
-                    onScopeChange={handleScopeChange}
-                  />
-                  <TaskViewSelector currentView={taskView} onViewChange={setTaskView} />
-                  <TaskFilters
-                    statusFilter={statusFilter}
-                    priorityFilter={priorityFilter}
-                    onStatusChange={setStatusFilter}
-                    onPriorityChange={setPriorityFilter}
-                  />
-                </div>
-                <Button 
-                  variant="outline" 
-                  onClick={() => setIsTemplateDialogOpen(true)}
-                  className="gap-2"
-                >
-                  <Workflow className="h-4 w-4" />
-                  Depuis un modèle
-                </Button>
-              </div>
-              <AdvancedFilters
-                filters={advancedFilters}
-                onFiltersChange={setAdvancedFilters}
-              />
-            </div>
-            {renderTaskView()}
-          </>
-        );
       case 'analytics':
         return (
           <div className="flex items-center justify-center h-64 bg-card rounded-xl shadow-card">
@@ -303,7 +311,7 @@ const Index = () => {
           </div>
         );
       default:
-        return null;
+        return renderDashboardContent();
     }
   };
 

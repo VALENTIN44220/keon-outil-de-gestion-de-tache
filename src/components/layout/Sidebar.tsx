@@ -1,4 +1,4 @@
-import { LayoutDashboard, CheckSquare, BarChart3, Users, Settings, ChevronLeft, ChevronRight, Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText, ArrowLeftRight } from 'lucide-react';
+import { LayoutDashboard, BarChart3, Users, Settings, ChevronLeft, ChevronRight, Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText, ArrowLeftRight } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,12 +25,6 @@ const allMenuItems = [{
   path: '/',
   permissionKey: 'can_access_dashboard' as ScreenPermissionKey
 }, {
-  id: 'tasks',
-  label: 'Tâches',
-  icon: CheckSquare,
-  path: '/',
-  permissionKey: 'can_access_tasks' as ScreenPermissionKey
-}, {
   id: 'requests',
   label: 'Demandes',
   icon: FileText,
@@ -49,6 +43,12 @@ const allMenuItems = [{
   path: '/workload',
   permissionKey: 'can_access_workload' as ScreenPermissionKey
 }, {
+  id: 'projects',
+  label: 'Projets',
+  icon: FolderOpen,
+  path: '/projects',
+  permissionKey: 'can_access_projects' as ScreenPermissionKey
+}, {
   id: 'analytics',
   label: 'Analytiques',
   icon: BarChart3,
@@ -66,12 +66,6 @@ const allMenuItems = [{
   icon: Settings,
   path: '/',
   permissionKey: 'can_access_settings' as ScreenPermissionKey
-}, {
-  id: 'projects',
-  label: 'Projets',
-  icon: FolderOpen,
-  path: '/projects',
-  permissionKey: 'can_access_projects' as ScreenPermissionKey
 }];
 
 const adminMenuItem = {
