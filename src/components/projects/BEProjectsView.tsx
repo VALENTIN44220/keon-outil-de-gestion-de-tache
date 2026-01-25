@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useBEProjects } from '@/hooks/useBEProjects';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
-import { useSharePointSync, PreviewData, DiagnosticResult } from '@/hooks/useSharePointSync';
+import { useProjectViewConfig } from '@/hooks/useProjectViewConfig';
+import { useSharePointSync } from '@/hooks/useSharePointSync';
 import { BEProject } from '@/types/beProject';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,12 +11,14 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Plus, Search, Pencil, Trash2, Building2, FolderOpen, Loader2, RefreshCw, Download, Upload, Eye, FileDown, AlertCircle, CheckCircle2, Stethoscope } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Building2, FolderOpen, Loader2, RefreshCw, Download, Upload, Eye, FileDown, AlertCircle, CheckCircle2, Stethoscope, Filter } from 'lucide-react';
 import { BEProjectDialog } from './BEProjectDialog';
 import { SharePointPreviewDialog } from './SharePointPreviewDialog';
-import { ProjectColumnSelector, ALL_PROJECT_COLUMNS, getDefaultVisibleColumns } from './ProjectColumnSelector';
+import { ALL_PROJECT_COLUMNS, ColumnDefinition } from './ProjectColumnSelector';
 import { ProjectViewSelector, ProjectView } from './ProjectViewSelector';
 import { ProjectKanbanView, GroupByField } from './ProjectKanbanView';
+import { ProjectViewConfigPanel } from './ProjectViewConfigPanel';
+import { useFilteredProjects } from './ProjectFilters';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { toast } from '@/hooks/use-toast';
@@ -23,6 +26,14 @@ import { toast } from '@/hooks/use-toast';
 export function BEProjectsView() {
   const { projects, isLoading, searchQuery, setSearchQuery, addProject, updateProject, deleteProject, fetchProjects } = useBEProjects();
   const { permissionProfile } = useUserPermissions();
+  const { 
+    activeViewType,
+    isAdmin,
+    saveStandardConfig,
+    saveCustomConfig,
+    switchView,
+    getActiveConfig,
+  } = useProjectViewConfig();
   const { 
     isLoading: isSyncing, 
     isPreviewLoading,
@@ -45,8 +56,26 @@ export function BEProjectsView() {
   
   // View state
   const [currentView, setCurrentView] = useState<ProjectView>('table');
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(getDefaultVisibleColumns());
   const [kanbanGroupBy, setKanbanGroupBy] = useState<GroupByField>('status');
+
+  // Get active config
+  const activeConfig = getActiveConfig();
+  const visibleColumns = activeConfig.visible_columns;
+  const columnOrder = activeConfig.column_order;
+  const columnFilters = activeConfig.column_filters;
+
+  // Apply filters to projects
+  const filteredProjects = useFilteredProjects(projects, columnFilters);
+
+  // Get ordered columns based on config
+  const orderedVisibleColumns = useMemo(() => {
+    return columnOrder
+      .filter(key => visibleColumns.includes(key))
+      .map(key => ALL_PROJECT_COLUMNS.find(c => c.key === key))
+      .filter(Boolean) as ColumnDefinition[];
+  }, [columnOrder, visibleColumns]);
+
+  const activeFiltersCount = Object.keys(columnFilters).filter(k => columnFilters[k]?.value).length;
 
   const handleDiagnose = async () => {
     setShowDiagnosticResult(true);
@@ -112,7 +141,7 @@ export function BEProjectsView() {
   };
 
   const handleExportCSV = () => {
-    if (projects.length === 0) {
+    if (filteredProjects.length === 0) {
       toast({
         title: 'Aucun projet',
         description: 'Aucun projet à exporter',
@@ -121,7 +150,6 @@ export function BEProjectsView() {
       return;
     }
 
-    // CSV headers matching SharePoint column mapping
     const headers = [
       'code_projet',
       'nom_projet',
@@ -146,10 +174,9 @@ export function BEProjectsView() {
 
     const csvContent = [
       headers.join(';'),
-      ...projects.map(project => 
+      ...filteredProjects.map(project => 
         headers.map(header => {
           const value = (project as any)[header];
-          // Escape quotes and handle special characters
           if (value === null || value === undefined) return '';
           const strValue = String(value);
           if (strValue.includes(';') || strValue.includes('"') || strValue.includes('\n')) {
@@ -160,13 +187,12 @@ export function BEProjectsView() {
       ),
     ].join('\n');
 
-    // Add BOM for Excel compatibility with UTF-8
     const bom = '\uFEFF';
     const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `projets_be_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    link.download = `projets_${format(new Date(), 'yyyy-MM-dd')}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -174,7 +200,7 @@ export function BEProjectsView() {
 
     toast({
       title: 'Export terminé',
-      description: `${projects.length} projets exportés en CSV`,
+      description: `${filteredProjects.length} projets exportés en CSV`,
     });
   };
 
@@ -193,12 +219,10 @@ export function BEProjectsView() {
     
     if (value === null || value === undefined) return '-';
     
-    // Special formatting for status
     if (key === 'status') {
       return getStatusBadge(value);
     }
     
-    // Format dates
     if (['date_cloture_bancaire', 'date_cloture_juridique', 'date_os_etude', 'date_os_travaux', 'created_at'].includes(key)) {
       try {
         return format(new Date(value), 'dd MMM yyyy', { locale: fr });
@@ -225,20 +249,18 @@ export function BEProjectsView() {
         <div>
           <h1 className="text-2xl font-display font-bold text-foreground flex items-center gap-2">
             <FolderOpen className="h-6 w-6" />
-            Projets BE
+            PROJETS
           </h1>
           <p className="text-muted-foreground mt-1">
-            Gérez les projets du Bureau d'Études
+            Liste des projets
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Export CSV */}
           <Button variant="outline" className="gap-2" onClick={handleExportCSV}>
             <FileDown className="h-4 w-4" />
             Export CSV
           </Button>
 
-          {/* SharePoint Sync */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="gap-2" disabled={isSyncing}>
@@ -250,7 +272,7 @@ export function BEProjectsView() {
                 SharePoint
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            <DropdownMenuContent align="end" className="bg-background border shadow-lg z-50">
               <DropdownMenuItem onClick={handleDiagnose} disabled={isDiagnosing}>
                 <Stethoscope className="h-4 w-4 mr-2" />
                 Diagnostic connexion
@@ -282,8 +304,8 @@ export function BEProjectsView() {
       {/* Search and View Controls */}
       <Card>
         <CardContent className="pt-4">
-          <div className="flex items-center gap-4">
-            <div className="relative flex-1">
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="relative flex-1 min-w-[250px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Rechercher par code ou nom de projet..."
@@ -294,7 +316,20 @@ export function BEProjectsView() {
             </div>
             <ProjectViewSelector currentView={currentView} onViewChange={setCurrentView} />
             {currentView === 'table' && (
-              <ProjectColumnSelector visibleColumns={visibleColumns} onColumnsChange={setVisibleColumns} />
+              <ProjectViewConfigPanel
+                config={activeConfig}
+                isAdmin={isAdmin}
+                onSaveStandard={saveStandardConfig}
+                onSaveCustom={saveCustomConfig}
+                activeViewType={activeViewType}
+                onSwitchView={switchView}
+              />
+            )}
+            {activeFiltersCount > 0 && (
+              <Badge variant="secondary" className="gap-1">
+                <Filter className="h-3 w-3" />
+                {activeFiltersCount} filtre{activeFiltersCount > 1 ? 's' : ''} actif{activeFiltersCount > 1 ? 's' : ''}
+              </Badge>
             )}
           </div>
         </CardContent>
@@ -303,7 +338,7 @@ export function BEProjectsView() {
       {/* Projects View */}
       {currentView === 'kanban' ? (
         <ProjectKanbanView
-          projects={projects}
+          projects={filteredProjects}
           groupBy={kanbanGroupBy}
           onGroupByChange={setKanbanGroupBy}
           onProjectClick={canEdit ? handleEditProject : undefined}
@@ -314,29 +349,36 @@ export function BEProjectsView() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Building2 className="h-5 w-5" />
-              Liste des projets ({projects.length})
+              Liste des projets ({filteredProjects.length}{filteredProjects.length !== projects.length ? ` / ${projects.length}` : ''})
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {projects.length === 0 ? (
+            {filteredProjects.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                {searchQuery ? 'Aucun projet trouvé pour cette recherche' : 'Aucun projet créé'}
+                {searchQuery || activeFiltersCount > 0 ? 'Aucun projet trouvé pour ces critères' : 'Aucun projet créé'}
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      {ALL_PROJECT_COLUMNS.filter(col => visibleColumns.includes(col.key)).map(col => (
-                        <TableHead key={col.key}>{col.label}</TableHead>
+                      {orderedVisibleColumns.map(col => (
+                        <TableHead key={col.key}>
+                          <div className="flex items-center gap-1">
+                            {col.label}
+                            {columnFilters[col.key]?.value && (
+                              <Filter className="h-3 w-3 text-keon-blue" />
+                            )}
+                          </div>
+                        </TableHead>
                       ))}
                       {(canEdit || canDelete) && <TableHead className="text-right">Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {projects.map((project) => (
+                    {filteredProjects.map((project) => (
                       <TableRow key={project.id}>
-                        {ALL_PROJECT_COLUMNS.filter(col => visibleColumns.includes(col.key)).map(col => (
+                        {orderedVisibleColumns.map(col => (
                           <TableCell key={col.key} className={col.key === 'code_projet' ? 'font-mono font-medium' : col.key === 'nom_projet' ? 'font-medium' : 'text-muted-foreground'}>
                             {renderCellValue(project, col.key)}
                           </TableCell>
@@ -453,49 +495,24 @@ export function BEProjectsView() {
                       
                       <span className="text-muted-foreground">Drive ID:</span>
                       <span className="font-mono text-xs">{String(diagnosticResult.driveId || 'N/A')}</span>
-                      
-                      <span className="text-muted-foreground">Chemin fichier:</span>
-                      <span className="font-mono text-xs break-all">{String((diagnosticResult as any).filePathValue || 'N/A')}</span>
-                      
-                      <span className="text-muted-foreground">Fichier trouvé:</span>
-                      <span>{(diagnosticResult as any).fileFound === true ? '✓ Oui' : (diagnosticResult as any).fileFound === false ? '✗ Non' : 'N/A'}</span>
                     </div>
-                    
-                    {/* Root items listing */}
-                    {(diagnosticResult as any).rootItems && Array.isArray((diagnosticResult as any).rootItems) && (diagnosticResult as any).rootItems.length > 0 && (
-                      <div className="mt-4 p-3 bg-muted/50 rounded-md">
-                        <p className="text-sm font-medium mb-2">Éléments à la racine du Drive:</p>
-                        <ul className="text-xs space-y-1">
-                          {((diagnosticResult as any).rootItems as { name: string; type: string }[]).map((item, idx) => (
-                            <li key={idx} className="font-mono">
-                              {item.type === 'folder' ? '📁' : '📄'} {item.name}
-                            </li>
-                          ))}
-                        </ul>
+
+                    {(diagnosticResult as any).fileInfo && (
+                      <div className="border-t pt-2 mt-2">
+                        <p className="font-medium mb-1">Fichier Excel</p>
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          <span className="text-muted-foreground">Nom:</span>
+                          <span>{(diagnosticResult as any).fileInfo.name}</span>
+                          <span className="text-muted-foreground">Chemin:</span>
+                          <span className="text-xs">{(diagnosticResult as any).fileInfo.path}</span>
+                        </div>
                       </div>
                     )}
-                    
-                    {/* Suggested path if file not found */}
-                    {(diagnosticResult as any).suggestedPath && (
-                      <div className="mt-4 p-3 bg-yellow-500/10 rounded-md">
-                        <p className="text-sm font-medium text-yellow-700">Chemin alternatif trouvé:</p>
-                        <p className="text-xs font-mono mt-1">{String((diagnosticResult as any).suggestedPath)}</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Mettez à jour le secret SHAREPOINT_EXCEL_FILE_PATH avec cette valeur.
-                        </p>
-                      </div>
-                    )}
-                    
+
                     {diagnosticResult.error && (
-                      <div className="mt-4 p-3 bg-destructive/10 rounded-md">
-                        <p className="text-sm font-medium text-destructive">Erreur à l'étape: {String(diagnosticResult.failedAtStep)}</p>
-                        <p className="text-xs text-muted-foreground mt-1 break-all">{String(diagnosticResult.error)}</p>
-                      </div>
-                    )}
-                    
-                    {diagnosticResult.success && (
-                      <div className="mt-4 p-3 bg-green-500/10 rounded-md">
-                        <p className="text-sm font-medium text-green-700">La connexion SharePoint est fonctionnelle !</p>
+                      <div className="border-t pt-2 mt-2 text-destructive">
+                        <p className="font-medium">Erreur:</p>
+                        <p className="text-sm">{diagnosticResult.error}</p>
                       </div>
                     )}
                   </>
