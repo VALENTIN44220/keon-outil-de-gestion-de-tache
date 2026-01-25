@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -146,18 +146,16 @@ export function JobTitlesTab({ jobTitles, departments, companies, onAdd, onUpdat
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
-            <Select value={departmentId} onValueChange={setDepartmentId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Service (optionnel)" />
-              </SelectTrigger>
-              <SelectContent>
-                {departments.map((dept) => (
-                  <SelectItem key={dept.id} value={dept.id}>
-                    {dept.name} {dept.company?.name ? `(${dept.company.name})` : ''}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={departmentId}
+              onValueChange={setDepartmentId}
+              placeholder="Service (optionnel)"
+              searchPlaceholder="Rechercher un service..."
+              options={departments.map((dept) => ({
+                value: dept.id,
+                label: `${dept.name}${dept.company?.name ? ` (${dept.company.name})` : ''}`,
+              }))}
+            />
             <Textarea
               placeholder="Description (optionnel)"
               value={description}
@@ -276,18 +274,16 @@ export function JobTitlesTab({ jobTitles, departments, companies, onAdd, onUpdat
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-department">Service</Label>
-              <Select value={editDepartmentId} onValueChange={setEditDepartmentId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {departments.map((dept) => (
-                    <SelectItem key={dept.id} value={dept.id}>
-                      {dept.name} {dept.company?.name ? `(${dept.company.name})` : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={editDepartmentId}
+                onValueChange={setEditDepartmentId}
+                placeholder="Sélectionner..."
+                searchPlaceholder="Rechercher un service..."
+                options={departments.map((dept) => ({
+                  value: dept.id,
+                  label: `${dept.name}${dept.company?.name ? ` (${dept.company.name})` : ''}`,
+                }))}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-description">Description</Label>

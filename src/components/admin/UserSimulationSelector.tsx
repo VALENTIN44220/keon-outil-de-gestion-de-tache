@@ -1,13 +1,7 @@
 import { useState, useEffect } from 'react';
 import { UserRoundCog, X, Eye, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
@@ -128,31 +122,17 @@ export function UserSimulationSelector() {
             Sélectionnez un utilisateur pour voir l'application comme lui et tester les workflows d'affectation et de validation.
           </p>
 
-          <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-            <SelectTrigger className="bg-white">
-              <SelectValue placeholder="Choisir un utilisateur..." />
-            </SelectTrigger>
-            <SelectContent>
-              {users.map(user => (
-                <SelectItem key={user.id} value={user.id}>
-                  <div className="flex items-center gap-2">
-                    <Avatar className="h-6 w-6">
-                      <AvatarImage src={user.avatar_url || undefined} />
-                      <AvatarFallback className="text-xs">
-                        {getInitials(user.display_name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span>{user.display_name || 'Sans nom'}</span>
-                    {user.department && (
-                      <span className="text-muted-foreground text-xs">
-                        ({user.department})
-                      </span>
-                    )}
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableSelect
+            value={selectedUserId}
+            onValueChange={setSelectedUserId}
+            placeholder="Choisir un utilisateur..."
+            searchPlaceholder="Rechercher un utilisateur..."
+            triggerClassName="bg-white"
+            options={users.map(user => ({
+              value: user.id,
+              label: `${user.display_name || 'Sans nom'}${user.department ? ` (${user.department})` : ''}`,
+            }))}
+          />
 
           <Button
             onClick={handleStartSimulation}

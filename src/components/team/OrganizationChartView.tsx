@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Input } from '@/components/ui/input';
 import { useTeamHierarchy, HierarchyNode, TeamMember } from '@/hooks/useTeamHierarchy';
 import { useAdminData } from '@/hooks/useAdminData';
@@ -311,36 +311,28 @@ export function OrganizationChartView() {
             </div>
 
             {/* Company filter */}
-            <Select 
-              value={selectedCompanyId || '__all__'} 
+            <SearchableSelect
+              value={selectedCompanyId || '__all__'}
               onValueChange={handleCompanyChange}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Toutes les sociétés" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Toutes les sociétés</SelectItem>
-                {companies.map(c => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder="Toutes les sociétés"
+              searchPlaceholder="Rechercher une société..."
+              options={[
+                { value: '__all__', label: 'Toutes les sociétés' },
+                ...companies.map(c => ({ value: c.id, label: c.name })),
+              ]}
+            />
 
             {/* Department filter */}
-            <Select 
-              value={selectedDepartmentId || '__all__'} 
+            <SearchableSelect
+              value={selectedDepartmentId || '__all__'}
               onValueChange={(v) => setSelectedDepartmentId(v === '__all__' ? null : v)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Tous les services" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Tous les services</SelectItem>
-                {filteredDepartments.map(d => (
-                  <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder="Tous les services"
+              searchPlaceholder="Rechercher un service..."
+              options={[
+                { value: '__all__', label: 'Tous les services' },
+                ...filteredDepartments.map(d => ({ value: d.id, label: d.name })),
+              ]}
+            />
 
             {/* Expand/Collapse all */}
             <Button 

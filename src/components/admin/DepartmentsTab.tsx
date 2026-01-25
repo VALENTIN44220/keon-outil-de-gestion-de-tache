@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -145,18 +145,16 @@ export function DepartmentsTab({ departments, companies, onAdd, onUpdate, onDele
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
-            <Select value={companyId} onValueChange={setCompanyId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Société (optionnel)" />
-              </SelectTrigger>
-              <SelectContent>
-                {companies.map((company) => (
-                  <SelectItem key={company.id} value={company.id}>
-                    {company.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={companyId}
+              onValueChange={setCompanyId}
+              placeholder="Société (optionnel)"
+              searchPlaceholder="Rechercher une société..."
+              options={companies.map((company) => ({
+                value: company.id,
+                label: company.name,
+              }))}
+            />
             <Textarea
               placeholder="Description (optionnel)"
               value={description}
@@ -273,18 +271,16 @@ export function DepartmentsTab({ departments, companies, onAdd, onUpdate, onDele
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-company">Société</Label>
-              <Select value={editCompanyId} onValueChange={setEditCompanyId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {companies.map((company) => (
-                    <SelectItem key={company.id} value={company.id}>
-                      {company.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={editCompanyId}
+                onValueChange={setEditCompanyId}
+                placeholder="Sélectionner..."
+                searchPlaceholder="Rechercher une société..."
+                options={companies.map((company) => ({
+                  value: company.id,
+                  label: company.name,
+                }))}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-description">Description</Label>
