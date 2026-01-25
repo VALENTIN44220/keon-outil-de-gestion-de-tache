@@ -183,33 +183,37 @@ export function ProjectViewConfigPanel({
             </TabsList>
 
             <TabsContent value="standard" className="mt-4 space-y-4">
-              <ColumnConfigContent
-                columns={orderedColumns}
-                visibleColumns={localVisibleColumns}
-                filters={localFilters}
-                onToggleColumn={handleToggleColumn}
-                onFilterChange={handleFilterChange}
-                onDragStart={handleDragStart}
-                onDragOver={handleDragOver}
-                onDragEnd={handleDragEnd}
-                draggedColumn={draggedColumn}
-                disabled={!isAdmin}
-              />
+              <div>
+                <ColumnConfigContent
+                  columns={orderedColumns}
+                  visibleColumns={localVisibleColumns}
+                  filters={localFilters}
+                  onToggleColumn={handleToggleColumn}
+                  onFilterChange={handleFilterChange}
+                  onDragStart={handleDragStart}
+                  onDragOver={handleDragOver}
+                  onDragEnd={handleDragEnd}
+                  draggedColumn={draggedColumn}
+                  disabled={!isAdmin}
+                />
+              </div>
             </TabsContent>
 
             <TabsContent value="custom" className="mt-4 space-y-4">
-              <ColumnConfigContent
-                columns={orderedColumns}
-                visibleColumns={localVisibleColumns}
-                filters={localFilters}
-                onToggleColumn={handleToggleColumn}
-                onFilterChange={handleFilterChange}
-                onDragStart={handleDragStart}
-                onDragOver={handleDragOver}
-                onDragEnd={handleDragEnd}
-                draggedColumn={draggedColumn}
-                disabled={false}
-              />
+              <div>
+                <ColumnConfigContent
+                  columns={orderedColumns}
+                  visibleColumns={localVisibleColumns}
+                  filters={localFilters}
+                  onToggleColumn={handleToggleColumn}
+                  onFilterChange={handleFilterChange}
+                  onDragStart={handleDragStart}
+                  onDragOver={handleDragOver}
+                  onDragEnd={handleDragEnd}
+                  draggedColumn={draggedColumn}
+                  disabled={false}
+                />
+              </div>
             </TabsContent>
           </Tabs>
 
@@ -235,7 +239,7 @@ interface ColumnConfigContentProps {
   filters: Record<string, ColumnFilter>;
   onToggleColumn: (key: string) => void;
   onFilterChange: (key: string, filter: ColumnFilter | null) => void;
-  onDragStart: (e: React.DragEvent, key: string) => void;
+  onDragStart: (e: React.DragEvent, columnKey: string) => void;
   onDragOver: (e: React.DragEvent, key: string) => void;
   onDragEnd: () => void;
   draggedColumn: string | null;
@@ -277,9 +281,22 @@ function ColumnConfigContent({
               <div
                 key={column.key}
                 draggable={!disabled}
-                onDragStart={(e) => !disabled && onDragStart(e, column.key)}
-                onDragOver={(e) => onDragOver(e, column.key)}
+                onDragStart={(e) => {
+                  if (!disabled) {
+                    onDragStart(e, column.key);
+                  }
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  if (draggedColumn && draggedColumn !== column.key) {
+                    onDragOver(e, column.key);
+                  }
+                }}
                 onDragEnd={onDragEnd}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  onDragEnd();
+                }}
                 className={`
                   p-2 rounded-sm border border-keon-200 bg-background transition-all
                   ${isDragging ? 'opacity-50 border-keon-blue ring-2 ring-keon-blue/30' : ''}
@@ -291,16 +308,29 @@ function ColumnConfigContent({
                     <GripVertical className="h-4 w-4 text-muted-foreground" />
                   </div>
                   
-                  <Checkbox
-                    checked={isVisible}
-                    onCheckedChange={() => !disabled && onToggleColumn(column.key)}
-                    disabled={disabled || isRequired}
+                  <div 
                     className="flex-shrink-0"
-                  />
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Checkbox
+                      checked={isVisible}
+                      onCheckedChange={() => {
+                        if (!disabled && !isRequired) {
+                          onToggleColumn(column.key);
+                        }
+                      }}
+                      disabled={disabled || isRequired}
+                    />
+                  </div>
                   
                   <div 
                     className="flex-1 flex items-center gap-2 min-w-0 cursor-pointer select-none"
-                    onClick={() => !disabled && !isRequired && onToggleColumn(column.key)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!disabled && !isRequired) {
+                        onToggleColumn(column.key);
+                      }
+                    }}
                   >
                     {isVisible ? (
                       <Eye className="h-3.5 w-3.5 text-keon-500 flex-shrink-0" />
@@ -322,6 +352,7 @@ function ColumnConfigContent({
                     className="h-7 w-7 flex-shrink-0"
                     onClick={(e) => {
                       e.stopPropagation();
+                      e.preventDefault();
                       setExpandedFilter(expandedFilter === column.key ? null : column.key);
                     }}
                     disabled={disabled}
