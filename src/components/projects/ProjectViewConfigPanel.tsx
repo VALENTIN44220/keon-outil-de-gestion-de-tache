@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, forwardRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -8,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetFooter, SheetTrigger } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { GripVertical, Save, Settings2, Filter, X, Eye, EyeOff, LayoutList, User } from 'lucide-react';
 import { ALL_PROJECT_COLUMNS, ColumnDefinition } from './ProjectColumnSelector';
@@ -47,7 +46,7 @@ export function ProjectViewConfigPanel({
   }, [config]);
 
   const handleToggleColumn = (columnKey: string) => {
-    if (['code_projet', 'nom_projet'].includes(columnKey)) return; // Required columns
+    if (['code_projet', 'nom_projet'].includes(columnKey)) return;
     
     setLocalVisibleColumns(prev => 
       prev.includes(columnKey) 
@@ -56,21 +55,29 @@ export function ProjectViewConfigPanel({
     );
   };
 
-  const handleDragStart = (columnKey: string) => {
+  const handleDragStart = (e: React.DragEvent, columnKey: string) => {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', columnKey);
     setDraggedColumn(columnKey);
   };
 
   const handleDragOver = (e: React.DragEvent, targetKey: string) => {
     e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    
     if (!draggedColumn || draggedColumn === targetKey) return;
 
-    const newOrder = [...localColumnOrder];
-    const draggedIndex = newOrder.indexOf(draggedColumn);
-    const targetIndex = newOrder.indexOf(targetKey);
+    setLocalColumnOrder(prev => {
+      const newOrder = [...prev];
+      const draggedIndex = newOrder.indexOf(draggedColumn);
+      const targetIndex = newOrder.indexOf(targetKey);
 
-    newOrder.splice(draggedIndex, 1);
-    newOrder.splice(targetIndex, 0, draggedColumn);
-    setLocalColumnOrder(newOrder);
+      if (draggedIndex === -1 || targetIndex === -1) return prev;
+
+      newOrder.splice(draggedIndex, 1);
+      newOrder.splice(targetIndex, 0, draggedColumn);
+      return newOrder;
+    });
   };
 
   const handleDragEnd = () => {
@@ -158,6 +165,9 @@ export function ProjectViewConfigPanel({
             <SheetTitle className="font-display uppercase tracking-wide">
               Configuration des vues
             </SheetTitle>
+            <SheetDescription>
+              Personnalisez les colonnes visibles, leur ordre et les filtres.
+            </SheetDescription>
           </SheetHeader>
 
           <Tabs value={editingTab} onValueChange={(v) => setEditingTab(v as 'standard' | 'custom')} className="mt-4">
@@ -173,7 +183,7 @@ export function ProjectViewConfigPanel({
             </TabsList>
 
             <TabsContent value="standard" className="mt-4 space-y-4">
-              <ColumnConfigSection
+              <ColumnConfigContent
                 columns={orderedColumns}
                 visibleColumns={localVisibleColumns}
                 filters={localFilters}
@@ -188,7 +198,7 @@ export function ProjectViewConfigPanel({
             </TabsContent>
 
             <TabsContent value="custom" className="mt-4 space-y-4">
-              <ColumnConfigSection
+              <ColumnConfigContent
                 columns={orderedColumns}
                 visibleColumns={localVisibleColumns}
                 filters={localFilters}
@@ -219,20 +229,20 @@ export function ProjectViewConfigPanel({
   );
 }
 
-interface ColumnConfigSectionProps {
+interface ColumnConfigContentProps {
   columns: ColumnDefinition[];
   visibleColumns: string[];
   filters: Record<string, ColumnFilter>;
   onToggleColumn: (key: string) => void;
   onFilterChange: (key: string, filter: ColumnFilter | null) => void;
-  onDragStart: (key: string) => void;
+  onDragStart: (e: React.DragEvent, key: string) => void;
   onDragOver: (e: React.DragEvent, key: string) => void;
   onDragEnd: () => void;
   draggedColumn: string | null;
   disabled: boolean;
 }
 
-function ColumnConfigSection({
+function ColumnConfigContent({
   columns,
   visibleColumns,
   filters,
@@ -243,14 +253,14 @@ function ColumnConfigSection({
   onDragEnd,
   draggedColumn,
   disabled,
-}: ColumnConfigSectionProps) {
+}: ColumnConfigContentProps) {
   const [expandedFilter, setExpandedFilter] = useState<string | null>(null);
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <Label className="text-sm text-muted-foreground">
-          Glissez pour réordonner, cochez pour afficher
+          {disabled ? 'Configuration en lecture seule' : 'Glissez pour réordonner, cochez pour afficher'}
         </Label>
         <Badge variant="outline">{visibleColumns.length} colonnes</Badge>
       </div>
@@ -260,46 +270,60 @@ function ColumnConfigSection({
           {columns.map((column) => {
             const isVisible = visibleColumns.includes(column.key);
             const isRequired = ['code_projet', 'nom_projet'].includes(column.key);
-            const hasFilter = !!filters[column.key];
+            const hasFilter = !!filters[column.key]?.value;
             const isDragging = draggedColumn === column.key;
 
             return (
-              <Card
+              <div
                 key={column.key}
                 draggable={!disabled}
-                onDragStart={() => !disabled && onDragStart(column.key)}
-                onDragOver={(e) => !disabled && onDragOver(e, column.key)}
+                onDragStart={(e) => !disabled && onDragStart(e, column.key)}
+                onDragOver={(e) => onDragOver(e, column.key)}
                 onDragEnd={onDragEnd}
-                className={`p-2 transition-all ${isDragging ? 'opacity-50 border-keon-blue' : ''} ${disabled ? 'opacity-70' : 'cursor-move'}`}
+                className={`
+                  p-2 rounded-sm border border-keon-200 bg-background transition-all
+                  ${isDragging ? 'opacity-50 border-keon-blue ring-2 ring-keon-blue/30' : ''}
+                  ${disabled ? 'opacity-70 cursor-default' : 'cursor-grab active:cursor-grabbing hover:border-keon-400'}
+                `}
               >
                 <div className="flex items-center gap-2">
-                  <GripVertical className={`h-4 w-4 text-muted-foreground ${disabled ? 'invisible' : ''}`} />
+                  <div className={`flex-shrink-0 ${disabled ? 'invisible' : ''}`}>
+                    <GripVertical className="h-4 w-4 text-muted-foreground" />
+                  </div>
                   
                   <Checkbox
                     checked={isVisible}
-                    onCheckedChange={() => onToggleColumn(column.key)}
+                    onCheckedChange={() => !disabled && onToggleColumn(column.key)}
                     disabled={disabled || isRequired}
+                    className="flex-shrink-0"
                   />
                   
-                  <div className="flex-1 flex items-center gap-2">
+                  <div 
+                    className="flex-1 flex items-center gap-2 min-w-0 cursor-pointer select-none"
+                    onClick={() => !disabled && !isRequired && onToggleColumn(column.key)}
+                  >
                     {isVisible ? (
-                      <Eye className="h-3.5 w-3.5 text-keon-500" />
+                      <Eye className="h-3.5 w-3.5 text-keon-500 flex-shrink-0" />
                     ) : (
-                      <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
+                      <EyeOff className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
                     )}
-                    <span className={`text-sm ${isVisible ? 'text-foreground' : 'text-muted-foreground'}`}>
+                    <span className={`text-sm truncate ${isVisible ? 'text-foreground' : 'text-muted-foreground'}`}>
                       {column.label}
                     </span>
                     {isRequired && (
-                      <Badge variant="outline" className="text-xs">Requis</Badge>
+                      <Badge variant="outline" className="text-xs flex-shrink-0">Requis</Badge>
                     )}
                   </div>
                   
                   <Button
+                    type="button"
                     variant={hasFilter ? 'secondary' : 'ghost'}
                     size="icon"
-                    className="h-7 w-7"
-                    onClick={() => setExpandedFilter(expandedFilter === column.key ? null : column.key)}
+                    className="h-7 w-7 flex-shrink-0"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setExpandedFilter(expandedFilter === column.key ? null : column.key);
+                    }}
                     disabled={disabled}
                   >
                     <Filter className={`h-3.5 w-3.5 ${hasFilter ? 'text-keon-blue' : ''}`} />
@@ -320,7 +344,7 @@ function ColumnConfigSection({
                         <SelectTrigger className="w-[140px] h-8">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="bg-background border shadow-lg z-50">
                           <SelectItem value="contains">Contient</SelectItem>
                           <SelectItem value="equals">Égal à</SelectItem>
                           <SelectItem value="startsWith">Commence par</SelectItem>
@@ -339,9 +363,10 @@ function ColumnConfigSection({
                       />
                       {hasFilter && (
                         <Button
+                          type="button"
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8"
+                          className="h-8 w-8 flex-shrink-0"
                           onClick={() => onFilterChange(column.key, null)}
                           disabled={disabled}
                         >
@@ -351,7 +376,7 @@ function ColumnConfigSection({
                     </div>
                   </div>
                 )}
-              </Card>
+              </div>
             );
           })}
         </div>
