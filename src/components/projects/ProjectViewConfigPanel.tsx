@@ -1,4 +1,4 @@
-import { useState, useEffect, forwardRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -56,6 +56,7 @@ export function ProjectViewConfigPanel({
   };
 
   const handleDragStart = (e: React.DragEvent, columnKey: string) => {
+    e.stopPropagation();
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', columnKey);
     setDraggedColumn(columnKey);
@@ -183,8 +184,7 @@ export function ProjectViewConfigPanel({
             </TabsList>
 
             <TabsContent value="standard" className="mt-4 space-y-4">
-              <div>
-                <ColumnConfigContent
+              <ColumnConfigContent
                   columns={orderedColumns}
                   visibleColumns={localVisibleColumns}
                   filters={localFilters}
@@ -195,13 +195,11 @@ export function ProjectViewConfigPanel({
                   onDragEnd={handleDragEnd}
                   draggedColumn={draggedColumn}
                   disabled={!isAdmin}
-                />
-              </div>
+              />
             </TabsContent>
 
             <TabsContent value="custom" className="mt-4 space-y-4">
-              <div>
-                <ColumnConfigContent
+              <ColumnConfigContent
                   columns={orderedColumns}
                   visibleColumns={localVisibleColumns}
                   filters={localFilters}
@@ -212,8 +210,7 @@ export function ProjectViewConfigPanel({
                   onDragEnd={handleDragEnd}
                   draggedColumn={draggedColumn}
                   disabled={false}
-                />
-              </div>
+              />
             </TabsContent>
           </Tabs>
 
@@ -246,7 +243,7 @@ interface ColumnConfigContentProps {
   disabled: boolean;
 }
 
-function ColumnConfigContent({
+const ColumnConfigContent = ({
   columns,
   visibleColumns,
   filters,
@@ -257,7 +254,7 @@ function ColumnConfigContent({
   onDragEnd,
   draggedColumn,
   disabled,
-}: ColumnConfigContentProps) {
+}: ColumnConfigContentProps) => {
   const [expandedFilter, setExpandedFilter] = useState<string | null>(null);
 
   return (
@@ -282,12 +279,14 @@ function ColumnConfigContent({
                 key={column.key}
                 draggable={!disabled}
                 onDragStart={(e) => {
+                  e.stopPropagation();
                   if (!disabled) {
                     onDragStart(e, column.key);
                   }
                 }}
                 onDragOver={(e) => {
                   e.preventDefault();
+                  e.stopPropagation();
                   if (draggedColumn && draggedColumn !== column.key) {
                     onDragOver(e, column.key);
                   }
@@ -295,6 +294,7 @@ function ColumnConfigContent({
                 onDragEnd={onDragEnd}
                 onDrop={(e) => {
                   e.preventDefault();
+                  e.stopPropagation();
                   onDragEnd();
                 }}
                 className={`
@@ -414,4 +414,4 @@ function ColumnConfigContent({
       </ScrollArea>
     </div>
   );
-}
+};
