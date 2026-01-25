@@ -2,13 +2,7 @@ import { useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import {
   Dialog,
   DialogContent,
@@ -68,28 +62,25 @@ export function CategorySelect({
       <div className="space-y-2">
         <Label>Catégorie</Label>
         <div className="flex gap-2">
-          <Select
+          <SearchableSelect
             value={selectedCategoryId || 'none'}
             onValueChange={(value) => {
               const newCategoryId = value === 'none' ? null : value;
               onCategoryChange(newCategoryId);
-              // Reset subcategory when category changes
               onSubcategoryChange(null);
             }}
             disabled={disabled}
-          >
-            <SelectTrigger className="flex-1">
-              <SelectValue placeholder="Sélectionner une catégorie" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">Aucune catégorie</SelectItem>
-              {categories.map((category) => (
-                <SelectItem key={category.id} value={category.id}>
-                  {category.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            placeholder="Sélectionner une catégorie"
+            searchPlaceholder="Rechercher une catégorie..."
+            triggerClassName="flex-1"
+            options={[
+              { value: 'none', label: 'Aucune catégorie' },
+              ...categories.map((category) => ({
+                value: category.id,
+                label: category.name,
+              })),
+            ]}
+          />
           {onAddCategory && !disabled && (
             <Button
               type="button"
@@ -108,23 +99,21 @@ export function CategorySelect({
         <div className="space-y-2">
           <Label>Sous-catégorie</Label>
           <div className="flex gap-2">
-            <Select
+            <SearchableSelect
               value={selectedSubcategoryId || 'none'}
               onValueChange={(value) => onSubcategoryChange(value === 'none' ? null : value)}
               disabled={disabled}
-            >
-              <SelectTrigger className="flex-1">
-                <SelectValue placeholder="Sélectionner une sous-catégorie" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Aucune sous-catégorie</SelectItem>
-                {subcategories.map((subcategory) => (
-                  <SelectItem key={subcategory.id} value={subcategory.id}>
-                    {subcategory.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder="Sélectionner une sous-catégorie"
+              searchPlaceholder="Rechercher une sous-catégorie..."
+              triggerClassName="flex-1"
+              options={[
+                { value: 'none', label: 'Aucune sous-catégorie' },
+                ...subcategories.map((subcategory) => ({
+                  value: subcategory.id,
+                  label: subcategory.name,
+                })),
+              ]}
+            />
             {onAddSubcategory && !disabled && (
               <Button
                 type="button"

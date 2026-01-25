@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Switch } from '@/components/ui/switch';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ArrowLeft, Save, User, Building2, Users, Briefcase, Shield, Camera, Loader2 } from 'lucide-react';
@@ -278,24 +278,21 @@ export default function Profile() {
                   <User className="h-4 w-4 text-muted-foreground" />
                   Manager
                 </Label>
-                <Select
-                  value={formData.manager_id}
+                <SearchableSelect
+                  value={formData.manager_id || 'none'}
                   onValueChange={(value) =>
                     setFormData({ ...formData, manager_id: value === 'none' ? '' : value })
                   }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionnez votre manager" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Aucun manager</SelectItem>
-                    {managers.map((manager) => (
-                      <SelectItem key={manager.id} value={manager.id}>
-                        {manager.display_name || 'Utilisateur sans nom'}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  placeholder="Sélectionnez votre manager"
+                  searchPlaceholder="Rechercher un manager..."
+                  options={[
+                    { value: 'none', label: 'Aucun manager' },
+                    ...managers.map((manager) => ({
+                      value: manager.id,
+                      label: manager.display_name || 'Utilisateur sans nom',
+                    })),
+                  ]}
+                />
               </div>
 
               {/* Profil privé */}
