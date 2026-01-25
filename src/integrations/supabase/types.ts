@@ -1128,6 +1128,42 @@ export type Database = {
           },
         ]
       }
+      project_view_configs: {
+        Row: {
+          column_filters: Json
+          column_order: string[]
+          created_at: string
+          id: string
+          is_active: boolean
+          updated_at: string
+          user_id: string | null
+          view_type: string
+          visible_columns: string[]
+        }
+        Insert: {
+          column_filters?: Json
+          column_order?: string[]
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+          user_id?: string | null
+          view_type: string
+          visible_columns?: string[]
+        }
+        Update: {
+          column_filters?: Json
+          column_order?: string[]
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+          user_id?: string | null
+          view_type?: string
+          visible_columns?: string[]
+        }
+        Relationships: []
+      }
       request_field_values: {
         Row: {
           created_at: string
