@@ -1,8 +1,9 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import type { Json } from '@/integrations/supabase/types';
+import { createProcessWorkflow, createSubProcessWorkflow } from '@/hooks/useAutoWorkflowGeneration';
 import type { 
   WorkflowTemplate, 
   WorkflowNode, 
@@ -27,6 +28,9 @@ export function useWorkflowTemplates({
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Prevent infinite re-generation loops
+  const didAttemptAutoCreateRef = useRef(false);
+
   const fetchWorkflow = useCallback(async () => {
     if (!processTemplateId && !subProcessTemplateId) return;
 
@@ -49,6 +53,106 @@ export function useWorkflowTemplates({
       if (workflowError) throw workflowError;
 
       if (!workflowData) {
+        // Auto-create a minimal workflow when missing (required by business rules)
+        // Only if authenticated and we haven't already attempted during this mount.
+        if (user && !didAttemptAutoCreateRef.current) {
+          didAttemptAutoCreateRef.current = true;
+
+          try {
+            if (subProcessTemplateId) {
+              const [{ data: sp }, { data: tasks }] = await Promise.all([
+                supabase
+                  .from('sub_process_templates')
+                  .select('id, name, target_manager_id, target_department_id')
+                  .eq('id', subProcessTemplateId)
+                  .maybeSingle(),
+                supabase
+                  .from('task_templates')
+                  .select('id, title, default_duration_days')
+                  .eq('sub_process_template_id', subProcessTemplateId)
+                  .order('order_index'),
+              ]);
+
+              if (sp) {
+                await createSubProcessWorkflow(
+                  sp.id,
+                  sp.name,
+                  user.id,
+                  (tasks || []) as any,
+                  {
+                    target_manager_id: (sp as any).target_manager_id,
+                    target_department_id: (sp as any).target_department_id,
+                  }
+                );
+              }
+            } else if (processTemplateId) {
+              const [{ data: p }, { data: subProcesses }] = await Promise.all([
+                supabase
+                  .from('process_templates')
+                  .select('id, name')
+                  .eq('id', processTemplateId)
+                  .maybeSingle(),
+                supabase
+                  .from('sub_process_templates')
+                  .select('id, name')
+                  .eq('process_template_id', processTemplateId)
+                  .order('order_index'),
+              ]);
+
+              if (p) {
+                await createProcessWorkflow(
+                  (p as any).id,
+                  (p as any).name,
+                  user.id,
+                  (subProcesses || []) as any
+                );
+              }
+            }
+          } catch (e) {
+            console.error('Auto-create workflow failed:', e);
+          }
+
+          // Re-run the fetch once after auto-create
+          const { data: createdWorkflow, error: createdWorkflowError } = await query.maybeSingle();
+          if (createdWorkflowError) throw createdWorkflowError;
+          if (!createdWorkflow) {
+            setWorkflow(null);
+            return;
+          }
+
+          // Fetch nodes and edges for created workflow
+          const [{ data: nodesData }, { data: edgesData }] = await Promise.all([
+            supabase
+              .from('workflow_nodes')
+              .select('*')
+              .eq('workflow_id', createdWorkflow.id)
+              .order('created_at'),
+            supabase
+              .from('workflow_edges')
+              .select('*')
+              .eq('workflow_id', createdWorkflow.id),
+          ]);
+
+          setWorkflow({
+            ...createdWorkflow,
+            canvas_settings: createdWorkflow.canvas_settings as WorkflowTemplate['canvas_settings'],
+            status: createdWorkflow.status as WorkflowStatus,
+            nodes: (nodesData || []).map(n => ({
+              ...n,
+              node_type: n.node_type as WorkflowNodeType,
+              config: n.config as WorkflowNodeConfig,
+              style: n.style as Record<string, unknown>,
+            })),
+            edges: (edgesData || []).map(e => ({
+              ...e,
+              condition_expression: e.condition_expression as Record<string, unknown> | null,
+              style: e.style as Record<string, unknown>,
+            })),
+          });
+
+          return;
+        }
+
         setWorkflow(null);
         return;
       }
@@ -88,9 +192,11 @@ export function useWorkflowTemplates({
     } finally {
       setIsLoading(false);
     }
-  }, [processTemplateId, subProcessTemplateId]);
+  }, [processTemplateId, subProcessTemplateId, user]);
 
   useEffect(() => {
+    // Reset auto-create attempt when switching templates
+    didAttemptAutoCreateRef.current = false;
     fetchWorkflow();
   }, [fetchWorkflow]);
 
