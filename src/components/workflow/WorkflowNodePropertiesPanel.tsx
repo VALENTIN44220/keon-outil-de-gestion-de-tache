@@ -817,6 +817,51 @@ export function WorkflowNodePropertiesPanel({
           </div>
         )}
 
+        {notifConfig.recipient_type === 'user' && (
+          <div>
+            <Label>Utilisateur destinataire</Label>
+            <SearchableSelect
+              value={notifConfig.recipient_id || ''}
+              onValueChange={(value) => updateConfig({ recipient_id: value })}
+              options={userOptions}
+              placeholder="Sélectionner un utilisateur..."
+              searchPlaceholder="Rechercher par nom..."
+              emptyMessage="Aucun utilisateur trouvé"
+              disabled={disabled}
+            />
+          </div>
+        )}
+
+        {notifConfig.recipient_type === 'group' && (
+          <div>
+            <Label>Groupe destinataire</Label>
+            <SearchableSelect
+              value={notifConfig.recipient_id || ''}
+              onValueChange={(value) => updateConfig({ recipient_id: value })}
+              options={groupOptions}
+              placeholder="Sélectionner un groupe..."
+              searchPlaceholder="Rechercher un groupe..."
+              emptyMessage="Aucun groupe trouvé"
+              disabled={disabled}
+            />
+          </div>
+        )}
+
+        {notifConfig.recipient_type === 'department' && (
+          <div>
+            <Label>Service destinataire</Label>
+            <SearchableSelect
+              value={notifConfig.recipient_id || ''}
+              onValueChange={(value) => updateConfig({ recipient_id: value })}
+              options={departmentOptions}
+              placeholder="Sélectionner un service..."
+              searchPlaceholder="Rechercher un service..."
+              emptyMessage="Aucun service trouvé"
+              disabled={disabled}
+            />
+          </div>
+        )}
+
         <div>
           <Label>Sujet</Label>
           <Input
