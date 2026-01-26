@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { SubProcessTemplate, TaskTemplate, SubProcessWithTasks } from '@/types/template';
 import { toast } from 'sonner';
+import { createSubProcessWorkflow, addTaskToWorkflow, removeTaskFromWorkflow } from './useAutoWorkflowGeneration';
 
 export function useSubProcessTemplates(processId: string | null) {
   const { user } = useAuth();
@@ -73,6 +74,9 @@ export function useSubProcessTemplates(processId: string | null) {
 
       if (error) throw error;
 
+      // Auto-generate workflow for the new sub-process
+      await createSubProcessWorkflow(data.id, data.name, user.id, []);
+
       const newSubProcess: SubProcessWithTasks = {
         ...data,
         assignment_type: data.assignment_type as 'manager' | 'user' | 'role',
@@ -81,7 +85,7 @@ export function useSubProcessTemplates(processId: string | null) {
       };
 
       setSubProcesses(prev => [...prev, newSubProcess]);
-      toast.success('Sous-processus créé avec succès');
+      toast.success('Sous-processus créé avec workflow');
       return data;
     } catch (error) {
       console.error('Error adding sub-process:', error);
@@ -145,6 +149,9 @@ export function useSubProcessTemplates(processId: string | null) {
 
       if (error) throw error;
 
+      // Add task node to the workflow
+      await addTaskToWorkflow(subProcessId, data.id, data.title, data.default_duration_days || 5);
+
       setSubProcesses(prev => 
         prev.map(sp => {
           if (sp.id === subProcessId) {
@@ -156,7 +163,7 @@ export function useSubProcessTemplates(processId: string | null) {
           return sp;
         })
       );
-      toast.success('Tâche ajoutée au sous-processus');
+      toast.success('Tâche ajoutée au workflow');
       return data;
     } catch (error) {
       console.error('Error adding task to sub-process:', error);
@@ -166,6 +173,9 @@ export function useSubProcessTemplates(processId: string | null) {
 
   const deleteTaskFromSubProcess = async (subProcessId: string, taskId: string) => {
     try {
+      // Remove task node from workflow first
+      await removeTaskFromWorkflow(subProcessId, taskId);
+
       const { error } = await supabase
         .from('task_templates')
         .delete()
@@ -184,7 +194,7 @@ export function useSubProcessTemplates(processId: string | null) {
           return sp;
         })
       );
-      toast.success('Tâche supprimée');
+      toast.success('Tâche supprimée du workflow');
     } catch (error) {
       console.error('Error deleting task:', error);
       toast.error('Erreur lors de la suppression');
