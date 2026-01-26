@@ -14,10 +14,13 @@ import type {
   WorkflowNodeConfig,
   ValidationNodeConfig,
   NotificationNodeConfig,
+  ForkNodeConfig,
+  JoinNodeConfig,
   ApproverType,
   ValidationTriggerMode,
   ValidationPrerequisite,
 } from '@/types/workflow';
+import { handleForkNode, handleJoinNode, completeBranch } from './useParallelWorkflowExecution';
 
 interface ExecutionContext {
   entityType: 'task' | 'request';
@@ -146,7 +149,49 @@ export function useWorkflowExecution() {
         // Condition node: evaluate and branch
         await handleConditionNode(runId, node, config, allNodes, allEdges, context);
         break;
+
+      case 'fork':
+        // Fork node: start parallel branches
+        await handleForkNode(runId, node, config as ForkNodeConfig, allNodes, allEdges, context);
+        break;
+
+      case 'join':
+        // Join node: wait for branches to complete
+        const { canProceed } = await handleJoinNode(runId, node, config as JoinNodeConfig, allNodes, allEdges, context);
+        if (canProceed) {
+          await moveToNextNode(runId, node.id, allNodes, allEdges, context);
+        } else {
+          // Stay paused at join node waiting for more branches
+          await supabase
+            .from('workflow_runs')
+            .update({ 
+              current_node_id: node.id,
+              status: 'running' as const
+            })
+            .eq('id', runId);
+        }
+        break;
+
+      case 'sub_process':
+        // Sub-process node: handle sub-process execution
+        await handleSubProcessNode(runId, node, config, allNodes, allEdges, context);
+        break;
     }
+  };
+
+  // Handle sub-process node
+  const handleSubProcessNode = async (
+    runId: string,
+    node: { id: string },
+    config: unknown,
+    allNodes: Array<{ id: string; node_type: string; config: unknown; task_template_id?: string | null }>,
+    allEdges: Array<{ source_node_id: string; target_node_id: string; source_handle?: string | null }>,
+    context: ExecutionContext
+  ): Promise<void> => {
+    await appendExecutionLog(runId, node.id, 'sub_process_started', { config });
+    
+    // For now, just move to next node - sub-process handling depends on configuration
+    await moveToNextNode(runId, node.id, allNodes, allEdges, context);
   };
 
   // Move to the next node based on edges
@@ -222,6 +267,8 @@ export function useWorkflowExecution() {
     config: ValidationNodeConfig,
     context: ExecutionContext
   ): Promise<void> => {
+    const triggerMode = config.trigger_mode || 'auto';
+
     // Determine approver based on config
     let approverId: string | null = null;
 
@@ -236,7 +283,7 @@ export function useWorkflowExecution() {
             .from('profiles')
             .select('manager_id')
             .eq('id', context.requester_id)
-            .single();
+            .maybeSingle();
           approverId = profile?.manager_id || null;
         }
         break;
@@ -249,8 +296,8 @@ export function useWorkflowExecution() {
         break;
     }
 
-    // Calculate due date if SLA specified
-    const dueAt = config.sla_hours 
+    // Calculate due date if SLA specified (only for auto-trigger)
+    const dueAt = (triggerMode === 'auto' && config.sla_hours) 
       ? new Date(Date.now() + config.sla_hours * 60 * 60 * 1000).toISOString()
       : null;
 
@@ -259,10 +306,14 @@ export function useWorkflowExecution() {
       run_id: runId,
       node_id: node.id,
       approver_type: config.approver_type,
-      approver_id: approverId,
+      approver_id: triggerMode === 'auto' ? approverId : null, // Only set approver for auto mode
       approver_role: config.approver_role || null,
       status: 'pending' as const,
       due_at: dueAt,
+      trigger_mode: triggerMode,
+      triggered_at: triggerMode === 'auto' ? new Date().toISOString() : null,
+      prerequisites_met: triggerMode === 'auto',
+      prerequisite_config: (config.prerequisites || null) as unknown as Json,
     };
 
     const { error } = await supabase
@@ -285,6 +336,7 @@ export function useWorkflowExecution() {
     await appendExecutionLog(runId, node.id, 'validation_created', {
       approver_type: config.approver_type,
       approver_id: approverId,
+      trigger_mode: triggerMode,
       due_at: dueAt
     });
   };

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Task, TaskStatus, TaskPriority } from '@/types/task';
 import {
   Dialog,
@@ -42,6 +42,7 @@ import {
   ListTodo,
   Info
 } from 'lucide-react';
+import { RequestValidationButton } from './RequestValidationButton';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -444,14 +445,29 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
                 <Separator />
                 <TaskCommentsSection taskId={selectedChildTask.id} className="min-h-[200px]" />
 
-                <div className="flex justify-end gap-2 pt-4 border-t">
-                  <Button variant="outline" onClick={handleCloseChildTask}>
-                    Retour à la demande
-                  </Button>
-                  <Button onClick={() => { onStatusChange(selectedChildTask.id, 'done'); handleCloseChildTask(); }}>
-                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                    Marquer terminé
-                  </Button>
+                <div className="flex justify-between items-center gap-2 pt-4 border-t">
+                  <RequestValidationButton 
+                    taskId={selectedChildTask.id} 
+                    taskStatus={selectedChildTask.status}
+                    onValidationTriggered={() => {
+                      // Update local state
+                      setChildTasks(prev => prev.map(t => 
+                        t.id === selectedChildTask.id 
+                          ? { ...t, status: 'pending-validation' as TaskStatus }
+                          : t
+                      ));
+                      setSelectedChildTask(prev => prev ? { ...prev, status: 'pending-validation' as TaskStatus } : null);
+                    }}
+                  />
+                  <div className="flex gap-2">
+                    <Button variant="outline" onClick={handleCloseChildTask}>
+                      Retour à la demande
+                    </Button>
+                    <Button onClick={() => { onStatusChange(selectedChildTask.id, 'done'); handleCloseChildTask(); }}>
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      Marquer terminé
+                    </Button>
+                  </div>
                 </div>
               </>
             )}
