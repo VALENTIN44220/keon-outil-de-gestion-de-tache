@@ -1040,6 +1040,7 @@ export type Database = {
           manager_id: string | null
           must_change_password: boolean
           permission_profile_id: string | null
+          status: string
           updated_at: string
           user_id: string
         }
@@ -1060,6 +1061,7 @@ export type Database = {
           manager_id?: string | null
           must_change_password?: boolean
           permission_profile_id?: string | null
+          status?: string
           updated_at?: string
           user_id: string
         }
@@ -1080,6 +1082,7 @@ export type Database = {
           manager_id?: string | null
           must_change_password?: boolean
           permission_profile_id?: string | null
+          status?: string
           updated_at?: string
           user_id?: string
         }
