@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,8 +10,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Save, X, Plus, Info } from 'lucide-react';
+import { Trash2, Save, X, Plus, Info, ExternalLink, AlertCircle } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import type { 
   WorkflowNode, 
   WorkflowNodeConfig,
@@ -54,6 +56,7 @@ export function WorkflowNodePropertiesPanel({
   subProcesses = [],
   customFields = [],
 }: WorkflowNodePropertiesPanelProps) {
+  const navigate = useNavigate();
   const [label, setLabel] = useState('');
   const [config, setConfig] = useState<WorkflowNodeConfig>({});
   const [isSaving, setIsSaving] = useState(false);
@@ -223,9 +226,18 @@ export function WorkflowNodePropertiesPanel({
 
   const renderSubProcessConfig = () => {
     const spConfig = config as SubProcessNodeConfig;
+    const selectedSubProcess = subProcesses.find(sp => sp.id === spConfig.sub_process_template_id);
     
     return (
       <div className="space-y-4">
+        <Alert className="border-blue-500/50 bg-blue-500/10">
+          <Info className="h-4 w-4 text-blue-500" />
+          <AlertDescription className="text-xs">
+            Ce bloc exécute le workflow défini dans le sous-processus sélectionné.
+            Le sous-processus doit avoir son propre workflow configuré.
+          </AlertDescription>
+        </Alert>
+
         <div>
           <Label>Sous-processus</Label>
           <Select
@@ -252,25 +264,23 @@ export function WorkflowNodePropertiesPanel({
           </Select>
         </div>
 
-        <div className="flex items-center justify-between">
-          <div>
-            <Label>Exécuter toutes les tâches</Label>
-            <p className="text-xs text-muted-foreground">
-              Exécute automatiquement toutes les tâches du sous-processus
-            </p>
-          </div>
-          <Switch
-            checked={spConfig.execute_all_tasks || false}
-            onCheckedChange={(v) => updateConfig({ execute_all_tasks: v })}
-            disabled={disabled}
-          />
-        </div>
+        {selectedSubProcess && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full"
+            onClick={() => navigate(`/templates/workflow/subprocess/${selectedSubProcess.id}`)}
+          >
+            <ExternalLink className="h-4 w-4 mr-2" />
+            Configurer le workflow du sous-processus
+          </Button>
+        )}
 
         <div className="flex items-center justify-between">
           <div>
-            <Label>Branchement dynamique</Label>
+            <Label>Conditionnel</Label>
             <p className="text-xs text-muted-foreground">
-              Crée des branches selon la sélection dans la demande
+              Exécuté uniquement si sélectionné dans la demande
             </p>
           </div>
           <Switch

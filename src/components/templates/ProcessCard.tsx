@@ -137,7 +137,7 @@ export function ProcessCard({ process, onDelete, onEdit, onViewDetails, onAddTas
                   <Eye className="h-4 w-4 mr-2" />
                   Voir les détails
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/templates/workflow/${process.id}`); }}>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/templates/workflow/process/${process.id}`); }}>
                   <Workflow className="h-4 w-4 mr-2" />
                   Éditer le workflow
                 </DropdownMenuItem>
@@ -204,7 +204,7 @@ export function ProcessCard({ process, onDelete, onEdit, onViewDetails, onAddTas
               variant="default" 
               size="sm" 
               className="flex-1"
-              onClick={(e) => { e.stopPropagation(); navigate(`/templates/workflow/${process.id}`); }}
+              onClick={(e) => { e.stopPropagation(); navigate(`/templates/workflow/process/${process.id}`); }}
             >
               <Workflow className="h-4 w-4 mr-2" />
               Workflow
