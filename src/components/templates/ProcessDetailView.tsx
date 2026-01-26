@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Plus, Building2, Briefcase, Layers, ListTodo, Loader2, FormInput } from 'lucide-react';
+import { Plus, Building2, Briefcase, Layers, ListTodo, Loader2, FormInput, Workflow } from 'lucide-react';
 import { useSubProcessTemplates } from '@/hooks/useSubProcessTemplates';
 import { SubProcessCard } from './SubProcessCard';
 import { AddSubProcessDialog } from './AddSubProcessDialog';
@@ -13,6 +13,7 @@ import { EditSubProcessDialog } from './EditSubProcessDialog';
 import { AddTaskTemplateDialog } from './AddTaskTemplateDialog';
 import { TemplateChecklistEditor } from './TemplateChecklistEditor';
 import { ProcessCustomFieldsEditor } from './ProcessCustomFieldsEditor';
+import { WorkflowBuilder } from '@/components/workflow/WorkflowBuilder';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
 
@@ -145,6 +146,10 @@ export function ProcessDetailView({
                   <FormInput className="h-4 w-4 mr-2" />
                   Champs
                 </TabsTrigger>
+                <TabsTrigger value="workflow" className="flex-1">
+                  <Workflow className="h-4 w-4 mr-2" />
+                  Workflow
+                </TabsTrigger>
               </TabsList>
             </div>
 
@@ -264,6 +269,13 @@ export function ProcessDetailView({
 
               <TabsContent value="fields" className="p-6 pt-4">
                 <ProcessCustomFieldsEditor 
+                  processTemplateId={process.id}
+                  canManage={canManage}
+                />
+              </TabsContent>
+
+              <TabsContent value="workflow" className="p-0">
+                <WorkflowBuilder 
                   processTemplateId={process.id}
                   canManage={canManage}
                 />
