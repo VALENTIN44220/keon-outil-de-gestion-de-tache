@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SubProcessWithTasks } from '@/types/template';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,9 +25,14 @@ import {
   Globe,
   Loader2,
   Eye,
+  CheckCircle2,
+  AlertCircle,
+  Circle,
+  ShieldCheck,
 } from 'lucide-react';
 import { ViewSubProcessDialog } from './ViewSubProcessDialog';
 import { VISIBILITY_LABELS } from '@/types/template';
+import { useSubProcessWorkflowStatuses } from '@/hooks/useWorkflowStatus';
 
 interface SubProcessTemplatesListProps {
   subProcesses: (SubProcessWithTasks & { process_name?: string | null })[];
@@ -51,6 +56,14 @@ const visibilityIcons: Record<string, any> = {
   public: Globe,
 };
 
+const workflowStatusConfig = {
+  active: { label: 'Actif', color: 'bg-green-500/15 text-green-700 border-green-500/30', icon: CheckCircle2 },
+  draft: { label: 'Brouillon', color: 'bg-amber-500/15 text-amber-700 border-amber-500/30', icon: Circle },
+  inactive: { label: 'Inactif', color: 'bg-muted text-muted-foreground', icon: Circle },
+  archived: { label: 'Archivé', color: 'bg-muted text-muted-foreground', icon: Circle },
+  none: { label: 'Non configuré', color: 'bg-red-500/15 text-red-700 border-red-500/30', icon: AlertCircle },
+};
+
 export function SubProcessTemplatesList({
   subProcesses,
   isLoading,
@@ -60,6 +73,10 @@ export function SubProcessTemplatesList({
 }: SubProcessTemplatesListProps) {
   const navigate = useNavigate();
   const [viewingSubProcess, setViewingSubProcess] = useState<SubProcessWithTasks | null>(null);
+
+  // Get all sub-process IDs for workflow status lookup
+  const subProcessIds = useMemo(() => subProcesses.map(sp => sp.id), [subProcesses]);
+  const { data: workflowStatuses } = useSubProcessWorkflowStatuses(subProcessIds);
 
   if (isLoading) {
     return (
@@ -83,6 +100,46 @@ export function SubProcessTemplatesList({
 
   const isGridView = viewMode === 'grid';
 
+  const getWorkflowStatusBadge = (subProcessId: string) => {
+    const status = workflowStatuses?.[subProcessId];
+    if (!status?.hasWorkflow) {
+      const config = workflowStatusConfig.none;
+      return (
+        <Badge variant="outline" className={`text-xs ${config.color}`}>
+          <config.icon className="h-3 w-3 mr-1" />
+          {config.label}
+        </Badge>
+      );
+    }
+    const config = workflowStatusConfig[status.status || 'draft'];
+    return (
+      <Badge variant="outline" className={`text-xs ${config.color}`}>
+        <config.icon className="h-3 w-3 mr-1" />
+        {config.label}
+      </Badge>
+    );
+  };
+
+  const getWorkflowDetailsBadges = (subProcessId: string) => {
+    const status = workflowStatuses?.[subProcessId];
+    if (!status?.hasWorkflow) return null;
+    
+    return (
+      <>
+        <Badge variant="secondary" className="text-xs">
+          <Workflow className="h-3 w-3 mr-1" />
+          {status.nodeCount} nœuds
+        </Badge>
+        {status.hasValidation && (
+          <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-700 border-blue-500/30">
+            <ShieldCheck className="h-3 w-3 mr-1" />
+            Validation
+          </Badge>
+        )}
+      </>
+    );
+  };
+
   return (
     <>
       <div className={isGridView ? 'space-y-1' : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'}>
@@ -97,6 +154,7 @@ export function SubProcessTemplatesList({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-sm truncate">{sp.name}</span>
+                    {getWorkflowStatusBadge(sp.id)}
                     {sp.process_name && (
                       <Badge variant="outline" className="text-xs shrink-0">
                         <Layers className="h-3 w-3 mr-1" />
@@ -114,6 +172,12 @@ export function SubProcessTemplatesList({
                       <VisibilityIcon className="h-3 w-3" />
                       {VISIBILITY_LABELS[sp.visibility_level]}
                     </span>
+                    {workflowStatuses?.[sp.id]?.hasValidation && (
+                      <span className="flex items-center gap-1 text-blue-600">
+                        <ShieldCheck className="h-3 w-3" />
+                        Validation
+                      </span>
+                    )}
                   </div>
                 </div>
                 {sp.can_manage && (
@@ -198,7 +262,15 @@ export function SubProcessTemplatesList({
                   )}
                 </div>
 
-                <div className="flex flex-wrap gap-2 mt-3">
+                {/* Workflow Status Section */}
+                <div className="flex items-center gap-2 mb-3 p-2 rounded-md bg-muted/50">
+                  <Workflow className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium text-muted-foreground">Workflow:</span>
+                  {getWorkflowStatusBadge(sp.id)}
+                  {getWorkflowDetailsBadges(sp.id)}
+                </div>
+
+                <div className="flex flex-wrap gap-2">
                   {sp.process_name && (
                     <Badge variant="outline" className="text-xs">
                       <Layers className="h-3 w-3 mr-1" />
