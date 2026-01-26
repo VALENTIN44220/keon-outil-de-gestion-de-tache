@@ -234,9 +234,19 @@ function WorkflowCanvasInner({
     setSelectedNode(null);
   }, []);
 
+  // Handle edge click for deletion - MUST be before conditional returns
+  const onEdgeClick = useCallback(
+    async (event: React.MouseEvent, edge: Edge) => {
+      if (!canManage) return;
+      if (confirm('Supprimer cette liaison ?')) {
+        await onDeleteEdge(edge.id);
+      }
+    },
+    [canManage, onDeleteEdge]
+  );
+
   // Handle publish
   const handlePublish = async () => {
-    // Save current viewport
     const viewport = getViewport();
     await onSaveCanvasSettings({ zoom: viewport.zoom, x: viewport.x, y: viewport.y });
     await onPublish();
@@ -257,18 +267,6 @@ function WorkflowCanvasInner({
       </div>
     );
   }
-
-  // Handle edge click for deletion
-  const onEdgeClick = useCallback(
-    async (event: React.MouseEvent, edge: Edge) => {
-      if (!canManage) return;
-      // Confirm deletion
-      if (confirm('Supprimer cette liaison ?')) {
-        await onDeleteEdge(edge.id);
-      }
-    },
-    [canManage, onDeleteEdge]
-  );
 
   return (
     <div className="flex h-full gap-2">
