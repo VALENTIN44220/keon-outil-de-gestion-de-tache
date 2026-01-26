@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -382,18 +383,17 @@ export function CollaboratorGroupsTab({
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Utilisateur</Label>
-              <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner un utilisateur" />
-                </SelectTrigger>
-                <SelectContent>
-                  {addingMemberToGroup && getAvailableUsers(addingMemberToGroup).map(u => (
-                    <SelectItem key={u.id} value={u.id}>
-                      {u.display_name || 'Sans nom'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={selectedUserId}
+                onValueChange={setSelectedUserId}
+                placeholder="Sélectionner un utilisateur"
+                searchPlaceholder="Rechercher par nom..."
+                emptyMessage="Aucun utilisateur disponible"
+                options={addingMemberToGroup ? getAvailableUsers(addingMemberToGroup).map(u => ({
+                  value: u.id,
+                  label: u.display_name || 'Sans nom'
+                })) : []}
+              />
             </div>
           </div>
           <DialogFooter>
