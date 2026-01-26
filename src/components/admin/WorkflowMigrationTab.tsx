@@ -24,6 +24,7 @@ export function WorkflowMigrationTab() {
   const { generateAllMissingWorkflows, isGenerating, progress } = useWorkflowAutoGeneration();
   const [showConfirm, setShowConfirm] = useState(false);
   const [showAutoGenConfirm, setShowAutoGenConfirm] = useState(false);
+  const [showForceRegenConfirm, setShowForceRegenConfirm] = useState(false);
   const [autoGenResults, setAutoGenResults] = useState<{
     subProcesses: { total: number; created: number; existing: number; errors: number };
     processes: { total: number; created: number; existing: number; errors: number };
@@ -34,9 +35,10 @@ export function WorkflowMigrationTab() {
     await migrateAllProcesses();
   };
 
-  const handleAutoGenerate = async () => {
+  const handleAutoGenerate = async (forceRegenerate = false) => {
     setShowAutoGenConfirm(false);
-    const results = await generateAllMissingWorkflows();
+    setShowForceRegenConfirm(false);
+    const results = await generateAllMissingWorkflows(forceRegenerate);
     setAutoGenResults(results);
   };
 
@@ -164,12 +166,12 @@ export function WorkflowMigrationTab() {
             Génération automatique des workflows
           </CardTitle>
           <CardDescription>
-            Crée automatiquement un workflow de base pour chaque processus et sous-processus 
-            qui n'en possède pas encore, en intégrant leurs tâches existantes.
+            Crée automatiquement un workflow complet pour chaque processus et sous-processus, 
+            incluant: Déclencheur → Tâches → Validation Manager → Notification → Fin.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
             <AlertDialog open={showAutoGenConfirm} onOpenChange={setShowAutoGenConfirm}>
               <AlertDialogTrigger asChild>
                 <Button variant="outline" disabled={isGenerating}>
@@ -190,21 +192,55 @@ export function WorkflowMigrationTab() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Générer les workflows manquants</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Cette action va créer un workflow par défaut pour chaque processus et 
+                    Cette action va créer un workflow complet pour chaque processus et 
                     sous-processus qui n'en possède pas encore.
                     <br /><br />
                     <strong>Contenu généré :</strong>
                     <ul className="list-disc list-inside mt-2 space-y-1">
-                      <li>Nœud Début</li>
-                      <li>Nœuds Tâche pour chaque tâche existante</li>
-                      <li>Nœud Fin</li>
+                      <li>🚀 Nœud Déclencheur (démarrage automatique)</li>
+                      <li>📋 Nœuds Tâche pour chaque tâche existante</li>
+                      <li>✅ Nœud Validation Manager</li>
+                      <li>🔔 Nœud Notification de clôture</li>
+                      <li>🏁 Nœud Fin</li>
                     </ul>
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Annuler</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleAutoGenerate}>
+                  <AlertDialogAction onClick={() => handleAutoGenerate(false)}>
                     Générer
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog open={showForceRegenConfirm} onOpenChange={setShowForceRegenConfirm}>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" disabled={isGenerating}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Régénérer TOUS les workflows
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="text-destructive">⚠️ Attention - Régénération complète</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Cette action va <strong>supprimer et recréer</strong> TOUS les workflows existants.
+                    <br /><br />
+                    <span className="text-destructive font-medium">
+                      Toutes les personnalisations manuelles seront perdues !
+                    </span>
+                    <br /><br />
+                    Utilisez cette option uniquement si vous souhaitez repartir d'une base propre.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Annuler</AlertDialogCancel>
+                  <AlertDialogAction 
+                    onClick={() => handleAutoGenerate(true)}
+                    className="bg-destructive hover:bg-destructive/90"
+                  >
+                    Régénérer tout
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>

@@ -10,11 +10,12 @@ interface TaskTemplateForWorkflow {
 interface SubProcessInfo {
   target_manager_id?: string | null;
   target_department_id?: string | null;
+  name?: string;
 }
 
 /**
- * Creates a default workflow for a sub-process template with its tasks
- * Includes: Start -> Tasks -> Validation Manager -> End
+ * Creates a complete workflow for a sub-process template
+ * Includes: Start -> Tasks -> Validation Manager -> Notification -> End
  */
 export async function createSubProcessWorkflow(
   subProcessId: string,
@@ -61,37 +62,55 @@ export async function createSubProcessWorkflow(
     const yPosition = 200;
     const xSpacing = 250;
 
-    // Start node
+    // 1. START NODE - Trigger
     nodes.push({
       workflow_id: workflow.id,
       node_type: 'start',
-      label: 'Début',
+      label: 'Déclencheur',
       position_x: xPosition,
       position_y: yPosition,
       config: { trigger: 'on_create' } as Json,
     });
     xPosition += xSpacing;
 
-    // Task nodes for each task template
-    for (const task of tasks) {
+    // 2. TASK NODES - One for each task template
+    if (tasks.length > 0) {
+      for (const task of tasks) {
+        nodes.push({
+          workflow_id: workflow.id,
+          node_type: 'task',
+          label: task.title,
+          position_x: xPosition,
+          position_y: yPosition,
+          config: {
+            task_template_id: task.id,
+            task_template_ids: [task.id],
+            task_title: task.title,
+            duration_days: task.default_duration_days || 5,
+            responsible_type: 'assignee',
+          } as Json,
+          task_template_id: task.id,
+        });
+        xPosition += xSpacing;
+      }
+    } else {
+      // Add a placeholder task node if no tasks exist
       nodes.push({
         workflow_id: workflow.id,
         node_type: 'task',
-        label: task.title,
+        label: 'Tâche principale',
         position_x: xPosition,
         position_y: yPosition,
         config: {
-          task_template_id: task.id,
-          task_template_ids: [task.id],
-          task_title: task.title,
-          duration_days: task.default_duration_days || 5,
+          task_title: 'Tâche principale',
+          duration_days: 5,
+          responsible_type: 'assignee',
         } as Json,
-        task_template_id: task.id,
       });
       xPosition += xSpacing;
     }
 
-    // Validation node - Manager validation
+    // 3. VALIDATION NODE - Manager validation
     nodes.push({
       workflow_id: workflow.id,
       node_type: 'validation',
@@ -112,7 +131,24 @@ export async function createSubProcessWorkflow(
     });
     xPosition += xSpacing;
 
-    // End node
+    // 4. NOTIFICATION NODE - Notify requester
+    nodes.push({
+      workflow_id: workflow.id,
+      node_type: 'notification',
+      label: 'Notification de clôture',
+      position_x: xPosition,
+      position_y: yPosition,
+      config: {
+        channels: ['in_app', 'email'],
+        recipient_type: 'requester',
+        subject_template: `[${subProcessName}] Demande traitée`,
+        body_template: `Votre demande concernant "${subProcessName}" a été traitée et validée.\n\nMerci de votre confiance.`,
+        action_url_template: '/requests',
+      } as Json,
+    });
+    xPosition += xSpacing;
+
+    // 5. END NODE
     nodes.push({
       workflow_id: workflow.id,
       node_type: 'end',
@@ -139,6 +175,7 @@ export async function createSubProcessWorkflow(
       source_node_id: string;
       target_node_id: string;
       animated: boolean;
+      label?: string;
     }> = [];
 
     for (let i = 0; i < insertedNodes.length - 1; i++) {
