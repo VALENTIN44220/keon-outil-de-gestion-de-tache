@@ -405,7 +405,8 @@ function getDefaultConfig(type: WorkflowNodeType): WorkflowNodeConfig {
       return { 
         approver_type: 'requester_manager', 
         is_mandatory: true, 
-        approval_mode: 'single' 
+        approval_mode: 'single',
+        trigger_mode: 'auto'  // Default to auto-trigger for backward compatibility
       };
     case 'notification':
       return { 
@@ -419,6 +420,19 @@ function getDefaultConfig(type: WorkflowNodeType): WorkflowNodeConfig {
         field: 'priority', 
         operator: 'equals', 
         branches: { true_label: 'Oui', false_label: 'Non' } 
+      };
+    case 'fork':
+      return {
+        branch_mode: 'static',
+        branches: [
+          { id: 'branch_1', name: 'Branche 1' },
+          { id: 'branch_2', name: 'Branche 2' }
+        ]
+      };
+    case 'join':
+      return {
+        join_type: 'and',  // Wait for all branches by default
+        on_timeout_action: 'notify'
       };
     default:
       return {};

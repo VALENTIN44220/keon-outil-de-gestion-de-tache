@@ -2559,6 +2559,70 @@ export type Database = {
         }
         Relationships: []
       }
+      workflow_branch_instances: {
+        Row: {
+          branch_id: string
+          completed_at: string | null
+          context_data: Json | null
+          created_at: string
+          current_node_id: string | null
+          fork_node_id: string | null
+          id: string
+          run_id: string
+          started_at: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          branch_id: string
+          completed_at?: string | null
+          context_data?: Json | null
+          created_at?: string
+          current_node_id?: string | null
+          fork_node_id?: string | null
+          id?: string
+          run_id: string
+          started_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          branch_id?: string
+          completed_at?: string | null
+          context_data?: Json | null
+          created_at?: string
+          current_node_id?: string | null
+          fork_node_id?: string | null
+          id?: string
+          run_id?: string
+          started_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_branch_instances_current_node_id_fkey"
+            columns: ["current_node_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_branch_instances_fork_node_id_fkey"
+            columns: ["fork_node_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_branch_instances_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workflow_edges: {
         Row: {
           animated: boolean | null
@@ -2693,6 +2757,7 @@ export type Database = {
         Row: {
           action_url: string | null
           body: string
+          branch_id: string | null
           channel: Database["public"]["Enums"]["notification_channel"]
           created_at: string
           error_message: string | null
@@ -2710,6 +2775,7 @@ export type Database = {
         Insert: {
           action_url?: string | null
           body: string
+          branch_id?: string | null
           channel: Database["public"]["Enums"]["notification_channel"]
           created_at?: string
           error_message?: string | null
@@ -2727,6 +2793,7 @@ export type Database = {
         Update: {
           action_url?: string | null
           body?: string
+          branch_id?: string | null
           channel?: Database["public"]["Enums"]["notification_channel"]
           created_at?: string
           error_message?: string | null
@@ -2760,7 +2827,10 @@ export type Database = {
       }
       workflow_runs: {
         Row: {
+          active_branches: Json | null
+          branch_statuses: Json | null
           completed_at: string | null
+          completed_branches: Json | null
           context_data: Json | null
           created_at: string
           current_node_id: string | null
@@ -2776,7 +2846,10 @@ export type Database = {
           workflow_version: number
         }
         Insert: {
+          active_branches?: Json | null
+          branch_statuses?: Json | null
           completed_at?: string | null
+          completed_branches?: Json | null
           context_data?: Json | null
           created_at?: string
           current_node_id?: string | null
@@ -2792,7 +2865,10 @@ export type Database = {
           workflow_version: number
         }
         Update: {
+          active_branches?: Json | null
+          branch_statuses?: Json | null
           completed_at?: string | null
+          completed_branches?: Json | null
           context_data?: Json | null
           created_at?: string
           current_node_id?: string | null
@@ -2936,6 +3012,7 @@ export type Database = {
           approver_id: string | null
           approver_role: string | null
           approver_type: string
+          branch_id: string | null
           created_at: string
           decided_at: string | null
           decided_by: string | null
@@ -2943,16 +3020,22 @@ export type Database = {
           due_at: string | null
           id: string
           node_id: string
+          prerequisite_config: Json | null
+          prerequisites_met: boolean | null
           reminded_at: string | null
           reminder_count: number | null
           run_id: string
           status: Database["public"]["Enums"]["validation_instance_status"]
+          trigger_mode: string | null
+          triggered_at: string | null
+          triggered_by: string | null
           updated_at: string
         }
         Insert: {
           approver_id?: string | null
           approver_role?: string | null
           approver_type: string
+          branch_id?: string | null
           created_at?: string
           decided_at?: string | null
           decided_by?: string | null
@@ -2960,16 +3043,22 @@ export type Database = {
           due_at?: string | null
           id?: string
           node_id: string
+          prerequisite_config?: Json | null
+          prerequisites_met?: boolean | null
           reminded_at?: string | null
           reminder_count?: number | null
           run_id: string
           status?: Database["public"]["Enums"]["validation_instance_status"]
+          trigger_mode?: string | null
+          triggered_at?: string | null
+          triggered_by?: string | null
           updated_at?: string
         }
         Update: {
           approver_id?: string | null
           approver_role?: string | null
           approver_type?: string
+          branch_id?: string | null
           created_at?: string
           decided_at?: string | null
           decided_by?: string | null
@@ -2977,10 +3066,15 @@ export type Database = {
           due_at?: string | null
           id?: string
           node_id?: string
+          prerequisite_config?: Json | null
+          prerequisites_met?: boolean | null
           reminded_at?: string | null
           reminder_count?: number | null
           run_id?: string
           status?: Database["public"]["Enums"]["validation_instance_status"]
+          trigger_mode?: string | null
+          triggered_at?: string | null
+          triggered_by?: string | null
           updated_at?: string
         }
         Relationships: [

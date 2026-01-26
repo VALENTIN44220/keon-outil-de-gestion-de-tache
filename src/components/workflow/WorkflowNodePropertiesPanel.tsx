@@ -19,8 +19,11 @@ import type {
   NotificationNodeConfig,
   ConditionNodeConfig,
   SubProcessNodeConfig,
+  ForkNodeConfig,
+  JoinNodeConfig,
   ApproverType,
-  NotificationChannel
+  NotificationChannel,
+  ValidationTriggerMode
 } from '@/types/workflow';
 import type { TaskTemplate } from '@/types/template';
 import type { TemplateCustomField } from '@/types/customField';
@@ -87,7 +90,7 @@ export function WorkflowNodePropertiesPanel({
   };
 
   const updateConfig = (updates: Partial<WorkflowNodeConfig>) => {
-    setConfig(prev => ({ ...prev, ...updates }));
+    setConfig(prev => ({ ...prev, ...updates }) as WorkflowNodeConfig);
   };
 
   const renderTaskConfig = () => {
@@ -348,6 +351,50 @@ export function WorkflowNodePropertiesPanel({
           </div>
         )}
 
+        {/* NOUVEAU: Mode de déclenchement */}
+        <div className="border-t pt-4 mt-4">
+          <Label className="text-sm font-medium">Mode de déclenchement</Label>
+          <Select
+            value={valConfig.trigger_mode || 'auto'}
+            onValueChange={(v) => updateConfig({ trigger_mode: v as ValidationTriggerMode })}
+            disabled={disabled}
+          >
+            <SelectTrigger className="mt-2">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="auto">Automatique</SelectItem>
+              <SelectItem value="manual">Manuel (par l'exécutant)</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground mt-1">
+            {valConfig.trigger_mode === 'manual' 
+              ? "L'exécutant doit cliquer sur 'Demander validation' pour déclencher"
+              : "La validation se crée automatiquement à l'activation du nœud"
+            }
+          </p>
+        </div>
+
+        {valConfig.trigger_mode === 'manual' && (
+          <div>
+            <Label>Qui peut déclencher</Label>
+            <Select
+              value={valConfig.trigger_allowed_by || 'task_owner'}
+              onValueChange={(v) => updateConfig({ trigger_allowed_by: v as ValidationNodeConfig['trigger_allowed_by'] })}
+              disabled={disabled}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="task_owner">Propriétaire de la tâche</SelectItem>
+                <SelectItem value="requester">Demandeur</SelectItem>
+                <SelectItem value="specific_user">Utilisateur spécifique</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
         <div>
           <Label>SLA (heures)</Label>
           <Input
@@ -378,6 +425,199 @@ export function WorkflowNodePropertiesPanel({
             </SelectContent>
           </Select>
         </div>
+
+        {/* Chaînage de validations */}
+        <div className="flex items-center justify-between">
+          <div>
+            <Label>Déclencher validation suivante</Label>
+            <p className="text-xs text-muted-foreground">
+              Auto-déclenche la prochaine validation (N2) après approbation
+            </p>
+          </div>
+          <Switch
+            checked={valConfig.auto_trigger_next || false}
+            onCheckedChange={(v) => updateConfig({ auto_trigger_next: v })}
+            disabled={disabled}
+          />
+        </div>
+      </div>
+    );
+  };
+
+  const renderForkConfig = () => {
+    const forkConfig = config as ForkNodeConfig;
+    const branches = forkConfig.branches || [];
+
+    const addBranch = () => {
+      const newBranch = {
+        id: `branch_${branches.length + 1}`,
+        name: `Branche ${branches.length + 1}`
+      };
+      updateConfig({ branches: [...branches, newBranch] });
+    };
+
+    const removeBranch = (id: string) => {
+      updateConfig({ branches: branches.filter(b => b.id !== id) });
+    };
+
+    const updateBranchName = (id: string, name: string) => {
+      updateConfig({ 
+        branches: branches.map(b => b.id === id ? { ...b, name } : b) 
+      });
+    };
+
+    return (
+      <div className="space-y-4">
+        <div>
+          <Label>Mode de branchement</Label>
+          <Select
+            value={forkConfig.branch_mode || 'static'}
+            onValueChange={(v) => updateConfig({ branch_mode: v as ForkNodeConfig['branch_mode'] })}
+            disabled={disabled}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="static">Branches fixes</SelectItem>
+              <SelectItem value="dynamic">Dynamique (sous-processus)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {forkConfig.branch_mode === 'dynamic' && (
+          <div className="flex items-center justify-between">
+            <div>
+              <Label>Depuis sous-processus</Label>
+              <p className="text-xs text-muted-foreground">
+                Crée une branche par sous-processus sélectionné
+              </p>
+            </div>
+            <Switch
+              checked={forkConfig.from_sub_processes || false}
+              onCheckedChange={(v) => updateConfig({ from_sub_processes: v })}
+              disabled={disabled}
+            />
+          </div>
+        )}
+
+        {forkConfig.branch_mode === 'static' && (
+          <div>
+            <Label className="flex items-center justify-between">
+              Branches
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm" 
+                onClick={addBranch}
+                disabled={disabled}
+              >
+                <Plus className="h-3 w-3 mr-1" />
+                Ajouter
+              </Button>
+            </Label>
+            <div className="space-y-2 mt-2">
+              {branches.map((branch, idx) => (
+                <div key={branch.id} className="flex items-center gap-2">
+                  <Input
+                    value={branch.name}
+                    onChange={(e) => updateBranchName(branch.id, e.target.value)}
+                    placeholder={`Branche ${idx + 1}`}
+                    disabled={disabled}
+                    className="flex-1"
+                  />
+                  {branches.length > 2 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removeBranch(branch.id)}
+                      disabled={disabled}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderJoinConfig = () => {
+    const joinConfig = config as JoinNodeConfig;
+
+    return (
+      <div className="space-y-4">
+        <div>
+          <Label>Type de synchronisation</Label>
+          <Select
+            value={joinConfig.join_type || 'and'}
+            onValueChange={(v) => updateConfig({ join_type: v as JoinNodeConfig['join_type'] })}
+            disabled={disabled}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="and">Toutes les branches (AND)</SelectItem>
+              <SelectItem value="or">Au moins une branche (OR)</SelectItem>
+              <SelectItem value="n_of_m">N branches sur M</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground mt-1">
+            {joinConfig.join_type === 'and' && "Attend que toutes les branches soient terminées"}
+            {joinConfig.join_type === 'or' && "Continue dès qu'une branche est terminée"}
+            {joinConfig.join_type === 'n_of_m' && "Continue quand N branches sont terminées"}
+          </p>
+        </div>
+
+        {joinConfig.join_type === 'n_of_m' && (
+          <div>
+            <Label>Nombre de branches requises</Label>
+            <Input
+              type="number"
+              min={1}
+              value={joinConfig.required_count || ''}
+              onChange={(e) => updateConfig({ required_count: parseInt(e.target.value) || undefined })}
+              disabled={disabled}
+            />
+          </div>
+        )}
+
+        <div>
+          <Label>Timeout (heures)</Label>
+          <Input
+            type="number"
+            min={0}
+            value={joinConfig.timeout_hours || ''}
+            onChange={(e) => updateConfig({ timeout_hours: parseInt(e.target.value) || undefined })}
+            placeholder="Optionnel"
+            disabled={disabled}
+          />
+        </div>
+
+        {joinConfig.timeout_hours && (
+          <div>
+            <Label>Action si timeout</Label>
+            <Select
+              value={joinConfig.on_timeout_action || 'notify'}
+              onValueChange={(v) => updateConfig({ on_timeout_action: v as JoinNodeConfig['on_timeout_action'] })}
+              disabled={disabled}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="continue">Continuer</SelectItem>
+                <SelectItem value="fail">Échec</SelectItem>
+                <SelectItem value="notify">Notifier</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
     );
   };
@@ -655,6 +895,10 @@ export function WorkflowNodePropertiesPanel({
         return renderNotificationConfig();
       case 'condition':
         return renderConditionConfig();
+      case 'fork':
+        return renderForkConfig();
+      case 'join':
+        return renderJoinConfig();
       case 'start':
       case 'end':
         return (
