@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { SubProcessWithTasks } from '@/types/template';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,6 +8,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -16,6 +18,7 @@ import {
   Users,
   User,
   UserCog,
+  Workflow,
   Layers,
   ListTodo,
   Lock,
@@ -56,6 +59,7 @@ export function SubProcessTemplatesList({
   onRefresh,
   viewMode = 'list',
 }: SubProcessTemplatesListProps) {
+  const navigate = useNavigate();
   const [editingSubProcess, setEditingSubProcess] = useState<SubProcessWithTasks | null>(null);
 
   const handleUpdate = async (id: string, updates: Partial<SubProcessWithTasks>) => {
@@ -141,6 +145,11 @@ export function SubProcessTemplatesList({
                         <Edit className="h-4 w-4 mr-2" />
                         Modifier
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => navigate(`/templates/workflow/subprocess/${sp.id}`)}>
+                        <Workflow className="h-4 w-4 mr-2" />
+                        Workflow
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
                       <DropdownMenuItem
                         onClick={() => onDelete(sp.id)}
                         className="text-destructive focus:text-destructive"
@@ -179,6 +188,11 @@ export function SubProcessTemplatesList({
                           <Edit className="h-4 w-4 mr-2" />
                           Modifier
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => navigate(`/templates/workflow/subprocess/${sp.id}`)}>
+                          <Workflow className="h-4 w-4 mr-2" />
+                          Workflow
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
                         <DropdownMenuItem
                           onClick={() => onDelete(sp.id)}
                           className="text-destructive focus:text-destructive"
