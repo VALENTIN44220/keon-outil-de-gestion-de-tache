@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Trash2, Save, X, Plus, Info, ExternalLink, AlertCircle } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { SearchableSelect, SearchableSelectOption } from '@/components/ui/searchable-select';
 import type { 
   WorkflowNode, 
   WorkflowNodeConfig,
@@ -35,6 +36,21 @@ interface SubProcessOption {
   name: string;
 }
 
+interface UserOption {
+  id: string;
+  display_name: string | null;
+}
+
+interface GroupOption {
+  id: string;
+  name: string;
+}
+
+interface DepartmentOption {
+  id: string;
+  name: string;
+}
+
 interface WorkflowNodePropertiesPanelProps {
   node: WorkflowNode | null;
   onUpdate: (nodeId: string, updates: Partial<WorkflowNode>) => Promise<boolean>;
@@ -44,6 +60,9 @@ interface WorkflowNodePropertiesPanelProps {
   taskTemplates?: TaskTemplate[];
   subProcesses?: SubProcessOption[];
   customFields?: TemplateCustomField[];
+  users?: UserOption[];
+  groups?: GroupOption[];
+  departments?: DepartmentOption[];
 }
 
 export function WorkflowNodePropertiesPanel({
@@ -55,6 +74,9 @@ export function WorkflowNodePropertiesPanel({
   taskTemplates = [],
   subProcesses = [],
   customFields = [],
+  users = [],
+  groups = [],
+  departments = [],
 }: WorkflowNodePropertiesPanelProps) {
   const navigate = useNavigate();
   const [label, setLabel] = useState('');
@@ -67,6 +89,22 @@ export function WorkflowNodePropertiesPanel({
       setConfig(node.config);
     }
   }, [node]);
+
+  // Build options for SearchableSelect - must be at component level, not inside render function
+  const userOptions: SearchableSelectOption[] = useMemo(() => 
+    users.map(u => ({ value: u.id, label: u.display_name || 'Sans nom' })),
+    [users]
+  );
+  
+  const groupOptions: SearchableSelectOption[] = useMemo(() => 
+    groups.map(g => ({ value: g.id, label: g.name })),
+    [groups]
+  );
+  
+  const departmentOptions: SearchableSelectOption[] = useMemo(() => 
+    departments.map(d => ({ value: d.id, label: d.name })),
+    [departments]
+  );
 
   if (!node) {
     return (
@@ -114,6 +152,59 @@ export function WorkflowNodePropertiesPanel({
         task_template_id: newIds[0] || undefined,
         duration_days: totalDuration > 0 ? totalDuration : undefined
       });
+    };
+
+    // Render the responsible selector based on type
+    const renderResponsibleSelector = () => {
+      switch (taskConfig.responsible_type) {
+        case 'user':
+          return (
+            <div className="mt-2">
+              <Label className="text-xs text-muted-foreground">Utilisateur</Label>
+              <SearchableSelect
+                value={taskConfig.responsible_id || ''}
+                onValueChange={(v) => updateConfig({ responsible_id: v })}
+                options={userOptions}
+                placeholder="Sélectionner un utilisateur..."
+                searchPlaceholder="Rechercher..."
+                disabled={disabled}
+                emptyMessage="Aucun utilisateur trouvé"
+              />
+            </div>
+          );
+        case 'group':
+          return (
+            <div className="mt-2">
+              <Label className="text-xs text-muted-foreground">Groupe</Label>
+              <SearchableSelect
+                value={taskConfig.responsible_id || ''}
+                onValueChange={(v) => updateConfig({ responsible_id: v })}
+                options={groupOptions}
+                placeholder="Sélectionner un groupe..."
+                searchPlaceholder="Rechercher..."
+                disabled={disabled}
+                emptyMessage="Aucun groupe trouvé"
+              />
+            </div>
+          );
+        case 'department':
+          return (
+            <div className="mt-2">
+              <Label className="text-xs text-muted-foreground">Service</Label>
+              <SearchableSelect
+                value={taskConfig.responsible_id || ''}
+                onValueChange={(v) => updateConfig({ responsible_id: v })}
+                options={departmentOptions}
+                placeholder="Sélectionner un service..."
+                searchPlaceholder="Rechercher..."
+                disabled={disabled}
+                emptyMessage="Aucun service trouvé"
+              />
+            </div>
+          );
+        default:
+          return null;
+      }
     };
 
     return (
@@ -205,7 +296,13 @@ export function WorkflowNodePropertiesPanel({
           <Label>Responsable</Label>
           <Select
             value={taskConfig.responsible_type || ''}
-            onValueChange={(v) => updateConfig({ responsible_type: v as TaskNodeConfig['responsible_type'] })}
+            onValueChange={(v) => {
+              // Reset responsible_id when type changes
+              updateConfig({ 
+                responsible_type: v as TaskNodeConfig['responsible_type'],
+                responsible_id: undefined 
+              });
+            }}
             disabled={disabled}
           >
             <SelectTrigger>
@@ -219,6 +316,7 @@ export function WorkflowNodePropertiesPanel({
               <SelectItem value="department">Service</SelectItem>
             </SelectContent>
           </Select>
+          {renderResponsibleSelector()}
         </div>
       </div>
     );

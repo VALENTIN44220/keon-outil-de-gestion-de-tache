@@ -38,6 +38,21 @@ interface SubProcessOption {
   name: string;
 }
 
+interface UserOption {
+  id: string;
+  display_name: string | null;
+}
+
+interface GroupOption {
+  id: string;
+  name: string;
+}
+
+interface DepartmentOption {
+  id: string;
+  name: string;
+}
+
 interface WorkflowCanvasProps {
   workflow: WorkflowWithDetails | null;
   isLoading: boolean;
@@ -64,6 +79,9 @@ interface WorkflowCanvasProps {
   taskTemplates?: TaskTemplate[];
   subProcesses?: SubProcessOption[];
   customFields?: TemplateCustomField[];
+  users?: UserOption[];
+  groups?: GroupOption[];
+  departments?: DepartmentOption[];
 }
 
 function WorkflowCanvasInner({
@@ -81,6 +99,9 @@ function WorkflowCanvasInner({
   taskTemplates = [],
   subProcesses = [],
   customFields = [],
+  users = [],
+  groups = [],
+  departments = [],
 }: WorkflowCanvasProps) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition, zoomIn, zoomOut, fitView, getViewport } = useReactFlow();
@@ -376,6 +397,9 @@ function WorkflowCanvasInner({
         taskTemplates={taskTemplates}
         subProcesses={subProcesses}
         customFields={customFields}
+        users={users}
+        groups={groups}
+        departments={departments}
       />
     </div>
   );
