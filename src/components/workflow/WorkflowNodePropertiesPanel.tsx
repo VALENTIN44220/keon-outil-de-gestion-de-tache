@@ -10,10 +10,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Save, X, Plus, Info, ExternalLink, AlertCircle } from 'lucide-react';
+import { Trash2, Save, X, Plus, Info, ExternalLink, AlertCircle, Variable } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { SearchableSelect, SearchableSelectOption } from '@/components/ui/searchable-select';
+import { VariableInsertButton } from './VariableInsertButton';
 import type { 
   WorkflowNode, 
   WorkflowNodeConfig,
@@ -210,15 +211,26 @@ export function WorkflowNodePropertiesPanel({
     return (
       <div className="space-y-4">
         <div>
-          <Label>Titre de la tâche (optionnel)</Label>
+          <Label className="flex items-center justify-between">
+            <span>Titre de la tâche (optionnel)</span>
+            <VariableInsertButton
+              onInsert={(variable) => {
+                const current = taskConfig.task_title || '';
+                updateConfig({ task_title: current + variable });
+              }}
+              customFields={customFields}
+              disabled={disabled}
+            />
+          </Label>
           <Input
             value={taskConfig.task_title || ''}
             onChange={(e) => updateConfig({ task_title: e.target.value })}
-            placeholder="Titre personnalisé..."
+            placeholder="Ex: {processus} - {champ:code_projet}"
             disabled={disabled}
+            className="mt-1"
           />
           <p className="text-xs text-muted-foreground mt-1">
-            Laissez vide pour utiliser le titre du modèle
+            Utilisez les variables pour personnaliser le titre
           </p>
         </div>
 
@@ -750,15 +762,6 @@ export function WorkflowNodePropertiesPanel({
       updateConfig({ channels: newChannels });
     };
 
-    // Build available variables from custom fields
-    const fieldVariables = customFields.map(f => `{champ:${f.name}}`);
-    const systemVariables = ['{processus}', '{tache}', '{demandeur}', '{lien}', '{date}', '{statut}'];
-    const allVariables = [...systemVariables, ...fieldVariables];
-
-    const insertVariable = (variable: string, field: 'subject_template' | 'body_template') => {
-      const current = notifConfig[field] || '';
-      updateConfig({ [field]: current + variable });
-    };
 
     return (
       <div className="space-y-4">
@@ -863,80 +866,48 @@ export function WorkflowNodePropertiesPanel({
         )}
 
         <div>
-          <Label>Sujet</Label>
+          <Label className="flex items-center justify-between">
+            <span>Sujet</span>
+            <VariableInsertButton
+              onInsert={(variable) => {
+                const current = notifConfig.subject_template || '';
+                updateConfig({ subject_template: current + variable });
+              }}
+              customFields={customFields}
+              disabled={disabled}
+            />
+          </Label>
           <Input
             value={notifConfig.subject_template || ''}
             onChange={(e) => updateConfig({ subject_template: e.target.value })}
             placeholder="Ex: Nouvelle demande: {processus}"
             disabled={disabled}
+            className="mt-1"
           />
         </div>
 
         <div>
-          <Label>Message</Label>
+          <Label className="flex items-center justify-between">
+            <span>Message</span>
+            <VariableInsertButton
+              onInsert={(variable) => {
+                const current = notifConfig.body_template || '';
+                updateConfig({ body_template: current + variable });
+              }}
+              customFields={customFields}
+              disabled={disabled}
+            />
+          </Label>
           <Textarea
             value={notifConfig.body_template || ''}
             onChange={(e) => updateConfig({ body_template: e.target.value })}
             placeholder="Contenu du message..."
             rows={4}
             disabled={disabled}
+            className="mt-1"
           />
         </div>
 
-        <div>
-          <Label className="flex items-center gap-2">
-            Variables disponibles
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Info className="h-3 w-3 text-muted-foreground" />
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs">
-                  <p>Cliquez pour insérer dans le message. Les champs personnalisés sont préfixés par "champ:"</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </Label>
-          <div className="flex flex-wrap gap-1 mt-2 p-2 bg-muted/50 rounded-md">
-            {systemVariables.map((v) => (
-              <Button
-                key={v}
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-6 text-xs"
-                onClick={() => insertVariable(v, 'body_template')}
-                disabled={disabled}
-              >
-                {v}
-              </Button>
-            ))}
-          </div>
-          {customFields.length > 0 && (
-            <>
-              <Label className="text-xs text-muted-foreground mt-2 block">
-                Champs de la demande
-              </Label>
-              <ScrollArea className="h-24 mt-1">
-                <div className="flex flex-wrap gap-1 p-2 bg-muted/50 rounded-md">
-                  {customFields.map((field) => (
-                    <Button
-                      key={field.id}
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      className="h-6 text-xs"
-                      onClick={() => insertVariable(`{champ:${field.name}}`, 'body_template')}
-                      disabled={disabled}
-                    >
-                      {field.label}
-                    </Button>
-                  ))}
-                </div>
-              </ScrollArea>
-            </>
-          )}
-        </div>
       </div>
     );
   };
