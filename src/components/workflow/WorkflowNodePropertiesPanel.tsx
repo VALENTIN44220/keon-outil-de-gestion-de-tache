@@ -110,6 +110,11 @@ export function WorkflowNodePropertiesPanel({
     [departments]
   );
 
+  const taskTemplateOptions: SearchableSelectOption[] = useMemo(
+    () => taskTemplates.map(t => ({ value: t.id, label: t.title })),
+    [taskTemplates]
+  );
+
   if (!node) {
     return (
       <Card className="w-80 shrink-0">
@@ -141,6 +146,7 @@ export function WorkflowNodePropertiesPanel({
   const renderTaskConfig = () => {
     const taskConfig = config as TaskNodeConfig;
     const selectedTaskIds = taskConfig.task_template_ids || (taskConfig.task_template_id ? [taskConfig.task_template_id] : []);
+    const selectionMode = taskConfig.selection_mode || 'multiple';
     
     const toggleTaskTemplate = (taskId: string) => {
       const newIds = selectedTaskIds.includes(taskId)
@@ -237,6 +243,31 @@ export function WorkflowNodePropertiesPanel({
           </p>
         </div>
 
+        <div className="border rounded-lg p-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <Label className="font-medium">Bloc unitaire</Label>
+              <p className="text-xs text-muted-foreground">
+                1 seule tâche modèle par bloc (pour chaîner les tâches indépendamment)
+              </p>
+            </div>
+            <Switch
+              checked={selectionMode === 'single'}
+              onCheckedChange={(checked) => {
+                const keep = selectedTaskIds[0];
+                updateConfig({
+                  selection_mode: checked ? 'single' : 'multiple',
+                  task_template_id: checked ? keep : keep,
+                  task_template_ids: checked
+                    ? (keep ? [keep] : [])
+                    : selectedTaskIds,
+                });
+              }}
+              disabled={disabled}
+            />
+          </div>
+        </div>
+
         <div>
           <Label className="flex items-center gap-2">
             Tâches modèles
@@ -252,31 +283,52 @@ export function WorkflowNodePropertiesPanel({
             </TooltipProvider>
           </Label>
           {taskTemplates.length > 0 ? (
-            <ScrollArea className="h-40 border rounded-md p-2 mt-2">
-              <div className="space-y-2">
-                {taskTemplates.map((task) => (
-                  <div key={task.id} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`task-${task.id}`}
-                      checked={selectedTaskIds.includes(task.id)}
-                      onCheckedChange={() => toggleTaskTemplate(task.id)}
-                      disabled={disabled}
-                    />
-                    <label
-                      htmlFor={`task-${task.id}`}
-                      className="text-sm flex-1 cursor-pointer"
-                    >
-                      {task.title}
-                      {task.default_duration_days && (
-                        <span className="text-muted-foreground ml-1">
-                          ({task.default_duration_days}j)
-                        </span>
-                      )}
-                    </label>
-                  </div>
-                ))}
+            selectionMode === 'single' ? (
+              <div className="mt-2">
+                <SearchableSelect
+                  value={selectedTaskIds[0] || ''}
+                  onValueChange={(v) => {
+                    const selected = taskTemplates.find(t => t.id === v);
+                    updateConfig({
+                      task_template_id: v,
+                      task_template_ids: [v],
+                      duration_days: selected?.default_duration_days || undefined,
+                    });
+                  }}
+                  options={taskTemplateOptions}
+                  placeholder="Sélectionner une tâche..."
+                  searchPlaceholder="Rechercher..."
+                  disabled={disabled}
+                  emptyMessage="Aucune tâche trouvée"
+                />
               </div>
-            </ScrollArea>
+            ) : (
+              <ScrollArea className="h-40 border rounded-md p-2 mt-2">
+                <div className="space-y-2">
+                  {taskTemplates.map((task) => (
+                    <div key={task.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`task-${task.id}`}
+                        checked={selectedTaskIds.includes(task.id)}
+                        onCheckedChange={() => toggleTaskTemplate(task.id)}
+                        disabled={disabled}
+                      />
+                      <label
+                        htmlFor={`task-${task.id}`}
+                        className="text-sm flex-1 cursor-pointer"
+                      >
+                        {task.title}
+                        {task.default_duration_days && (
+                          <span className="text-muted-foreground ml-1">
+                            ({task.default_duration_days}j)
+                          </span>
+                        )}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            )
           ) : (
             <p className="text-sm text-muted-foreground mt-2">
               Aucune tâche modèle disponible

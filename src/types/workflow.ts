@@ -49,6 +49,8 @@ export interface EndNodeConfig {
 export interface TaskNodeConfig {
   task_template_id?: string;
   task_template_ids?: string[]; // Support multiple task templates
+  // How task templates are selected for this block
+  selection_mode?: 'single' | 'multiple';
   task_title?: string;
   duration_days?: number;
   responsible_type?: 'requester' | 'assignee' | 'user' | 'group' | 'department';

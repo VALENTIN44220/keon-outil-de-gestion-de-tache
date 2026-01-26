@@ -22,6 +22,7 @@ interface NodePaletteItem {
   icon: React.ReactNode;
   color: string;
   canAdd: boolean;
+  defaultConfig?: Record<string, unknown>;
 }
 
 const paletteItems: NodePaletteItem[] = [
@@ -56,6 +57,15 @@ const paletteItems: NodePaletteItem[] = [
     icon: <CheckSquare className="h-4 w-4" />,
     color: 'bg-blue-100 text-blue-700 border-blue-300',
     canAdd: true,
+  },
+  {
+    type: 'task',
+    label: 'Tâche (unitaire)',
+    description: '1 seule tâche modèle par bloc',
+    icon: <CheckSquare className="h-4 w-4" />,
+    color: 'bg-sky-100 text-sky-700 border-sky-300',
+    canAdd: true,
+    defaultConfig: { selection_mode: 'single' },
   },
   {
     type: 'validation',
@@ -127,6 +137,13 @@ export function WorkflowNodePalette({ onDragStart, disabled = false }: WorkflowN
       return;
     }
     onDragStart(event, item.type, item.label);
+
+    if (item.defaultConfig) {
+      event.dataTransfer.setData(
+        'application/workflow-node-config',
+        JSON.stringify(item.defaultConfig)
+      );
+    }
   };
 
   return (
