@@ -3,8 +3,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Play, CheckCircle2, XCircle, AlertCircle, Workflow, ArrowRight } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { Loader2, Play, CheckCircle2, XCircle, AlertCircle, Workflow, Layers, RefreshCw } from 'lucide-react';
 import { useWorkflowMigration } from '@/hooks/useWorkflowMigration';
+import { useWorkflowAutoGeneration } from '@/hooks/useWorkflowAutoGeneration';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,11 +21,23 @@ import {
 
 export function WorkflowMigrationTab() {
   const { isMigrating, migrationResults, migrateAllProcesses } = useWorkflowMigration();
+  const { generateAllMissingWorkflows, isGenerating, progress } = useWorkflowAutoGeneration();
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showAutoGenConfirm, setShowAutoGenConfirm] = useState(false);
+  const [autoGenResults, setAutoGenResults] = useState<{
+    subProcesses: { total: number; created: number; existing: number; errors: number };
+    processes: { total: number; created: number; existing: number; errors: number };
+  } | null>(null);
 
   const handleMigrate = async () => {
     setShowConfirm(false);
     await migrateAllProcesses();
+  };
+
+  const handleAutoGenerate = async () => {
+    setShowAutoGenConfirm(false);
+    const results = await generateAllMissingWorkflows();
+    setAutoGenResults(results);
   };
 
   const successCount = migrationResults.filter(r => r.workflowCreated).length;
@@ -142,6 +156,101 @@ export function WorkflowMigrationTab() {
         </CardContent>
       </Card>
 
+      {/* Auto-generation section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Layers className="h-5 w-5" />
+            Génération automatique des workflows
+          </CardTitle>
+          <CardDescription>
+            Crée automatiquement un workflow de base pour chaque processus et sous-processus 
+            qui n'en possède pas encore, en intégrant leurs tâches existantes.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-4">
+            <AlertDialog open={showAutoGenConfirm} onOpenChange={setShowAutoGenConfirm}>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" disabled={isGenerating}>
+                  {isGenerating ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Génération...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Générer les workflows manquants
+                    </>
+                  )}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Générer les workflows manquants</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Cette action va créer un workflow par défaut pour chaque processus et 
+                    sous-processus qui n'en possède pas encore.
+                    <br /><br />
+                    <strong>Contenu généré :</strong>
+                    <ul className="list-disc list-inside mt-2 space-y-1">
+                      <li>Nœud Début</li>
+                      <li>Nœuds Tâche pour chaque tâche existante</li>
+                      <li>Nœud Fin</li>
+                    </ul>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Annuler</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleAutoGenerate}>
+                    Générer
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+
+          {isGenerating && progress.total > 0 && (
+            <div className="space-y-2">
+              <Progress value={(progress.current / progress.total) * 100} />
+              <p className="text-sm text-muted-foreground">
+                {progress.current} / {progress.total} éléments traités
+              </p>
+            </div>
+          )}
+
+          {autoGenResults && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="p-4 rounded-lg bg-muted/50">
+                <div className="flex items-center gap-2 mb-3">
+                  <Layers className="h-4 w-4 text-primary" />
+                  <span className="font-medium">Sous-processus</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>Total : {autoGenResults.subProcesses.total}</div>
+                  <div className="text-green-600">Créés : {autoGenResults.subProcesses.created}</div>
+                  <div className="text-blue-600">Existants : {autoGenResults.subProcesses.existing}</div>
+                  <div className="text-red-600">Erreurs : {autoGenResults.subProcesses.errors}</div>
+                </div>
+              </div>
+              <div className="p-4 rounded-lg bg-muted/50">
+                <div className="flex items-center gap-2 mb-3">
+                  <Workflow className="h-4 w-4 text-primary" />
+                  <span className="font-medium">Processus</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>Total : {autoGenResults.processes.total}</div>
+                  <div className="text-green-600">Créés : {autoGenResults.processes.created}</div>
+                  <div className="text-blue-600">Existants : {autoGenResults.processes.existing}</div>
+                  <div className="text-red-600">Erreurs : {autoGenResults.processes.errors}</div>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Fonctionnement de la migration</CardTitle>
@@ -191,8 +300,8 @@ export function WorkflowMigrationTab() {
               <div>
                 <p className="font-medium text-amber-800">Important</p>
                 <p className="text-sm text-amber-700 mt-1">
-                  Après la migration, les anciens paramètres de validation (N1/N2) dans les tâches 
-                  seront masqués. Toute la logique de validation passera par le workflow.
+                  Les paramètres d'affectation et de validation dans les sous-processus sont désormais 
+                  en lecture seule. Toute la configuration se fait via l'éditeur de workflow.
                 </p>
               </div>
             </div>

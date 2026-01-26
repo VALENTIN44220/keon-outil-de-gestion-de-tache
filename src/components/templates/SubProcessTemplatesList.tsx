@@ -14,7 +14,6 @@ import {
 import {
   MoreVertical,
   Trash2,
-  Edit,
   Users,
   User,
   UserCog,
@@ -27,9 +26,7 @@ import {
   Loader2,
   Eye,
 } from 'lucide-react';
-import { EditSubProcessDialog } from './EditSubProcessDialog';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { ViewSubProcessDialog } from './ViewSubProcessDialog';
 import { VISIBILITY_LABELS } from '@/types/template';
 
 interface SubProcessTemplatesListProps {
@@ -62,24 +59,7 @@ export function SubProcessTemplatesList({
   viewMode = 'list',
 }: SubProcessTemplatesListProps) {
   const navigate = useNavigate();
-  const [editingSubProcess, setEditingSubProcess] = useState<SubProcessWithTasks | null>(null);
-
-  const handleUpdate = async (id: string, updates: Partial<SubProcessWithTasks>) => {
-    try {
-      const { error } = await supabase
-        .from('sub_process_templates')
-        .update(updates)
-        .eq('id', id);
-
-      if (error) throw error;
-      toast.success('Sous-processus mis à jour');
-      setEditingSubProcess(null);
-      onRefresh();
-    } catch (error) {
-      console.error('Error updating sub-process:', error);
-      toast.error('Erreur lors de la mise à jour');
-    }
-  };
+  const [viewingSubProcess, setViewingSubProcess] = useState<SubProcessWithTasks | null>(null);
 
   if (isLoading) {
     return (
@@ -142,9 +122,9 @@ export function SubProcessTemplatesList({
                       variant="outline"
                       size="sm"
                       className="h-7 px-2"
-                      onClick={() => setEditingSubProcess(sp)}
+                      onClick={() => setViewingSubProcess(sp)}
                     >
-                      <Edit className="h-3.5 w-3.5" />
+                      <Eye className="h-3.5 w-3.5" />
                     </Button>
                     <Button
                       variant="default"
@@ -197,9 +177,9 @@ export function SubProcessTemplatesList({
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setEditingSubProcess(sp)}>
-                          <Edit className="h-4 w-4 mr-2" />
-                          Modifier
+                        <DropdownMenuItem onClick={() => setViewingSubProcess(sp)}>
+                          <Eye className="h-4 w-4 mr-2" />
+                          Voir les paramètres
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => navigate(`/templates/workflow/subprocess/${sp.id}`)}>
                           <Workflow className="h-4 w-4 mr-2" />
@@ -252,10 +232,10 @@ export function SubProcessTemplatesList({
                     variant="outline" 
                     size="sm" 
                     className="flex-1"
-                    onClick={() => setEditingSubProcess(sp)}
+                    onClick={() => setViewingSubProcess(sp)}
                   >
-                    <Edit className="h-4 w-4 mr-2" />
-                    Modifier
+                    <Eye className="h-4 w-4 mr-2" />
+                    Paramètres
                   </Button>
                   {sp.can_manage && (
                     <Button 
@@ -275,11 +255,10 @@ export function SubProcessTemplatesList({
         })}
       </div>
 
-      <EditSubProcessDialog
-        subProcess={editingSubProcess}
-        open={!!editingSubProcess}
-        onClose={() => setEditingSubProcess(null)}
-        onSave={(updates) => editingSubProcess && handleUpdate(editingSubProcess.id, updates)}
+      <ViewSubProcessDialog
+        subProcess={viewingSubProcess}
+        open={!!viewingSubProcess}
+        onClose={() => setViewingSubProcess(null)}
       />
     </>
   );

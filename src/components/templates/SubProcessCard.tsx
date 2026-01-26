@@ -14,13 +14,14 @@ import {
   DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu';
 import { 
-  MoreVertical, Plus, Trash2, Edit, ChevronDown, ChevronRight,
-  Users, User, UserCog, FormInput, Lock, Link2, Edit2, Workflow
+  MoreVertical, Plus, Trash2, ChevronDown, ChevronRight,
+  Users, User, UserCog, FormInput, Lock, Link2, Edit2, Workflow, Eye
 } from 'lucide-react';
 import { AddTaskTemplateDialog } from './AddTaskTemplateDialog';
 import { EditTaskTemplateDialog } from './EditTaskTemplateDialog';
 import { LinkExistingTaskDialog } from './LinkExistingTaskDialog';
 import { SubProcessCustomFieldsEditor } from './SubProcessCustomFieldsEditor';
+import { ViewSubProcessDialog } from './ViewSubProcessDialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
@@ -70,6 +71,7 @@ export function SubProcessCard({
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [isExpanded, setIsExpanded] = useState(false);
   const [isMandatory, setIsMandatory] = useState(subProcess.is_mandatory ?? false);
+  const [isViewOpen, setIsViewOpen] = useState(false);
 
   const toggleTaskExpanded = (taskId: string) => {
     setExpandedTasks(prev => {
@@ -134,13 +136,13 @@ export function SubProcessCard({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={onEdit}>
-                      <Edit className="h-4 w-4 mr-2" />
-                      Modifier
+                    <DropdownMenuItem onClick={() => setIsViewOpen(true)}>
+                      <Eye className="h-4 w-4 mr-2" />
+                      Voir les paramètres
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => navigate(`/templates/workflow/subprocess/${subProcess.id}`)}>
                       <Workflow className="h-4 w-4 mr-2" />
-                      Workflow
+                      Éditer le workflow
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem 
@@ -311,6 +313,12 @@ export function SubProcessCard({
         open={!!editingTask}
         onClose={() => setEditingTask(null)}
         onSave={() => { setEditingTask(null); onRefresh?.(); }}
+      />
+
+      <ViewSubProcessDialog
+        subProcess={subProcess}
+        open={isViewOpen}
+        onClose={() => setIsViewOpen(false)}
       />
     </>
   );
