@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
-  ensureSubProcessWorkflow, 
-  ensureProcessWorkflow 
+  createSubProcessWorkflow,
+  createProcessWorkflow,
 } from '@/hooks/useAutoWorkflowGeneration';
 import { toast } from 'sonner';
 
@@ -19,7 +19,7 @@ export function useWorkflowAutoGeneration() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
 
-  const generateAllMissingWorkflows = async (): Promise<{
+  const generateAllMissingWorkflows = async (forceRegenerate = false): Promise<{
     subProcesses: MigrationResult;
     processes: MigrationResult;
   }> => {
@@ -36,15 +36,49 @@ export function useWorkflowAutoGeneration() {
     const processResult: MigrationResult = { total: 0, created: 0, existing: 0, errors: 0 };
 
     try {
-      // Fetch all sub-processes
+      // Fetch all sub-processes with their tasks
       const { data: subProcesses } = await supabase
         .from('sub_process_templates')
-        .select('id, name');
+        .select(`
+          id, 
+          name,
+          target_manager_id,
+          target_department_id,
+          task_templates (
+            id,
+            title,
+            default_duration_days
+          )
+        `);
 
-      // Fetch all processes
+      // Fetch all processes with their sub-processes
       const { data: processes } = await supabase
         .from('process_templates')
-        .select('id, name');
+        .select(`
+          id, 
+          name,
+          sub_process_templates (
+            id,
+            name
+          )
+        `);
+
+      // Check existing workflows
+      const { data: existingWorkflows } = await supabase
+        .from('workflow_templates')
+        .select('sub_process_template_id, process_template_id')
+        .eq('is_default', true);
+
+      const existingSubProcessIds = new Set(
+        existingWorkflows
+          ?.filter(w => w.sub_process_template_id)
+          .map(w => w.sub_process_template_id) || []
+      );
+      const existingProcessIds = new Set(
+        existingWorkflows
+          ?.filter(w => w.process_template_id)
+          .map(w => w.process_template_id) || []
+      );
 
       const totalItems = (subProcesses?.length || 0) + (processes?.length || 0);
       setProgress({ current: 0, total: totalItems });
@@ -54,21 +88,37 @@ export function useWorkflowAutoGeneration() {
         subProcessResult.total = subProcesses.length;
         for (const sp of subProcesses) {
           try {
-            const result = await ensureSubProcessWorkflow(sp.id, sp.name, user.id);
-            if (result) {
-              // Check if it was newly created or already existed
-              const { data: existing } = await supabase
+            // Skip if already exists and not forcing regeneration
+            if (existingSubProcessIds.has(sp.id) && !forceRegenerate) {
+              subProcessResult.existing++;
+              setProgress(prev => ({ ...prev, current: prev.current + 1 }));
+              continue;
+            }
+
+            // Delete existing workflow if forcing regeneration
+            if (forceRegenerate && existingSubProcessIds.has(sp.id)) {
+              await supabase
                 .from('workflow_templates')
-                .select('created_at')
-                .eq('id', result)
-                .single();
-              
-              // If created within last second, it's new
-              if (existing && new Date(existing.created_at).getTime() > Date.now() - 2000) {
-                subProcessResult.created++;
-              } else {
-                subProcessResult.existing++;
+                .delete()
+                .eq('sub_process_template_id', sp.id)
+                .eq('is_default', true);
+            }
+
+            const result = await createSubProcessWorkflow(
+              sp.id, 
+              sp.name, 
+              user.id,
+              sp.task_templates || [],
+              {
+                target_manager_id: sp.target_manager_id,
+                target_department_id: sp.target_department_id,
               }
+            );
+            
+            if (result) {
+              subProcessResult.created++;
+            } else {
+              subProcessResult.errors++;
             }
           } catch (error) {
             console.error(`Error generating workflow for sub-process ${sp.id}:`, error);
@@ -83,19 +133,31 @@ export function useWorkflowAutoGeneration() {
         processResult.total = processes.length;
         for (const p of processes) {
           try {
-            const result = await ensureProcessWorkflow(p.id, p.name, user.id);
-            if (result) {
-              const { data: existing } = await supabase
+            if (existingProcessIds.has(p.id) && !forceRegenerate) {
+              processResult.existing++;
+              setProgress(prev => ({ ...prev, current: prev.current + 1 }));
+              continue;
+            }
+
+            if (forceRegenerate && existingProcessIds.has(p.id)) {
+              await supabase
                 .from('workflow_templates')
-                .select('created_at')
-                .eq('id', result)
-                .single();
-              
-              if (existing && new Date(existing.created_at).getTime() > Date.now() - 2000) {
-                processResult.created++;
-              } else {
-                processResult.existing++;
-              }
+                .delete()
+                .eq('process_template_id', p.id)
+                .eq('is_default', true);
+            }
+
+            const result = await createProcessWorkflow(
+              p.id, 
+              p.name, 
+              user.id,
+              p.sub_process_templates || []
+            );
+            
+            if (result) {
+              processResult.created++;
+            } else {
+              processResult.errors++;
             }
           } catch (error) {
             console.error(`Error generating workflow for process ${p.id}:`, error);
