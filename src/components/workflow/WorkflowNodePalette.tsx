@@ -5,7 +5,8 @@ import {
   ShieldCheck, 
   Bell, 
   GitBranch,
-  GripVertical
+  GripVertical,
+  Layers
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import type { WorkflowNodeType } from '@/types/workflow';
@@ -27,6 +28,14 @@ const paletteItems: NodePaletteItem[] = [
     icon: <Play className="h-4 w-4" />,
     color: 'bg-green-100 text-green-700 border-green-300',
     canAdd: false, // Only one allowed, created automatically
+  },
+  {
+    type: 'sub_process',
+    label: 'Sous-processus',
+    description: 'Exécute un sous-processus',
+    icon: <Layers className="h-4 w-4" />,
+    color: 'bg-indigo-100 text-indigo-700 border-indigo-300',
+    canAdd: true,
   },
   {
     type: 'task',

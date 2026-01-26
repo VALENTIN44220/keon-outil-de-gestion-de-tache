@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -14,6 +14,8 @@ import {
 import { Loader2, Plus, Workflow } from 'lucide-react';
 import { WorkflowCanvas } from './WorkflowCanvas';
 import { useWorkflowTemplates } from '@/hooks/useWorkflowTemplates';
+import { useSubProcessTemplates } from '@/hooks/useSubProcessTemplates';
+import { useCustomFields } from '@/hooks/useCustomFields';
 
 interface WorkflowBuilderProps {
   processTemplateId?: string | null;
@@ -44,6 +46,22 @@ export function WorkflowBuilder({
     publishWorkflow,
     saveCanvasSettings,
   } = useWorkflowTemplates({ processTemplateId, subProcessTemplateId });
+
+  // Fetch sub-processes for this process
+  const { subProcesses, fetchSubProcesses } = useSubProcessTemplates(processTemplateId || null);
+  
+  // Fetch custom fields for notification templates
+  const { fields: customFields } = useCustomFields({ processTemplateId });
+
+  // Fetch sub-processes on mount
+  useEffect(() => {
+    if (processTemplateId) {
+      fetchSubProcesses();
+    }
+  }, [processTemplateId, fetchSubProcesses]);
+
+  // Flatten all task templates from all sub-processes
+  const allTaskTemplates = subProcesses.flatMap(sp => sp.task_templates || []);
 
   const handleCreateWorkflow = async () => {
     if (!newName.trim()) return;
@@ -124,7 +142,7 @@ export function WorkflowBuilder({
   }
 
   return (
-    <div className="h-[600px]">
+    <div className="h-full">
       <WorkflowCanvas
         workflow={workflow}
         isLoading={isLoading}
@@ -137,6 +155,9 @@ export function WorkflowBuilder({
         onDeleteEdge={deleteEdge}
         onPublish={publishWorkflow}
         onSaveCanvasSettings={saveCanvasSettings}
+        taskTemplates={allTaskTemplates}
+        subProcesses={subProcesses.map(sp => ({ id: sp.id, name: sp.name }))}
+        customFields={customFields}
       />
     </div>
   );

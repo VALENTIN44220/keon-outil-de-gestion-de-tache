@@ -6,7 +6,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Trash2, Save, X } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
+import { Trash2, Save, X, Plus, Info } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { 
   WorkflowNode, 
   WorkflowNodeConfig,
@@ -14,9 +18,17 @@ import type {
   ValidationNodeConfig,
   NotificationNodeConfig,
   ConditionNodeConfig,
+  SubProcessNodeConfig,
   ApproverType,
   NotificationChannel
 } from '@/types/workflow';
+import type { TaskTemplate } from '@/types/template';
+import type { TemplateCustomField } from '@/types/customField';
+
+interface SubProcessOption {
+  id: string;
+  name: string;
+}
 
 interface WorkflowNodePropertiesPanelProps {
   node: WorkflowNode | null;
@@ -24,6 +36,9 @@ interface WorkflowNodePropertiesPanelProps {
   onDelete: (nodeId: string) => Promise<boolean>;
   onClose: () => void;
   disabled?: boolean;
+  taskTemplates?: TaskTemplate[];
+  subProcesses?: SubProcessOption[];
+  customFields?: TemplateCustomField[];
 }
 
 export function WorkflowNodePropertiesPanel({
@@ -32,6 +47,9 @@ export function WorkflowNodePropertiesPanel({
   onDelete,
   onClose,
   disabled = false,
+  taskTemplates = [],
+  subProcesses = [],
+  customFields = [],
 }: WorkflowNodePropertiesPanelProps) {
   const [label, setLabel] = useState('');
   const [config, setConfig] = useState<WorkflowNodeConfig>({});
@@ -74,17 +92,89 @@ export function WorkflowNodePropertiesPanel({
 
   const renderTaskConfig = () => {
     const taskConfig = config as TaskNodeConfig;
+    const selectedTaskIds = taskConfig.task_template_ids || (taskConfig.task_template_id ? [taskConfig.task_template_id] : []);
+    
+    const toggleTaskTemplate = (taskId: string) => {
+      const newIds = selectedTaskIds.includes(taskId)
+        ? selectedTaskIds.filter(id => id !== taskId)
+        : [...selectedTaskIds, taskId];
+      updateConfig({ task_template_ids: newIds, task_template_id: newIds[0] || undefined });
+    };
+
     return (
       <div className="space-y-4">
         <div>
-          <Label>Titre de la tâche</Label>
+          <Label>Titre de la tâche (optionnel)</Label>
           <Input
             value={taskConfig.task_title || ''}
             onChange={(e) => updateConfig({ task_title: e.target.value })}
-            placeholder="Ex: Vérifier le document"
+            placeholder="Titre personnalisé..."
             disabled={disabled}
           />
+          <p className="text-xs text-muted-foreground mt-1">
+            Laissez vide pour utiliser le titre du modèle
+          </p>
         </div>
+
+        <div>
+          <Label className="flex items-center gap-2">
+            Tâches modèles
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-3 w-3 text-muted-foreground" />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Sélectionnez une ou plusieurs tâches à exécuter</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </Label>
+          {taskTemplates.length > 0 ? (
+            <ScrollArea className="h-40 border rounded-md p-2 mt-2">
+              <div className="space-y-2">
+                {taskTemplates.map((task) => (
+                  <div key={task.id} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`task-${task.id}`}
+                      checked={selectedTaskIds.includes(task.id)}
+                      onCheckedChange={() => toggleTaskTemplate(task.id)}
+                      disabled={disabled}
+                    />
+                    <label
+                      htmlFor={`task-${task.id}`}
+                      className="text-sm flex-1 cursor-pointer"
+                    >
+                      {task.title}
+                      {task.default_duration_days && (
+                        <span className="text-muted-foreground ml-1">
+                          ({task.default_duration_days}j)
+                        </span>
+                      )}
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          ) : (
+            <p className="text-sm text-muted-foreground mt-2">
+              Aucune tâche modèle disponible
+            </p>
+          )}
+          {selectedTaskIds.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {selectedTaskIds.map(id => {
+                const task = taskTemplates.find(t => t.id === id);
+                return task ? (
+                  <Badge key={id} variant="secondary" className="text-xs">
+                    {task.title}
+                  </Badge>
+                ) : null;
+              })}
+            </div>
+          )}
+        </div>
+
         <div>
           <Label>Durée estimée (jours)</Label>
           <Input
@@ -114,6 +204,68 @@ export function WorkflowNodePropertiesPanel({
               <SelectItem value="department">Service</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+      </div>
+    );
+  };
+
+  const renderSubProcessConfig = () => {
+    const spConfig = config as SubProcessNodeConfig;
+    
+    return (
+      <div className="space-y-4">
+        <div>
+          <Label>Sous-processus</Label>
+          <Select
+            value={spConfig.sub_process_template_id || ''}
+            onValueChange={(v) => {
+              const sp = subProcesses.find(s => s.id === v);
+              updateConfig({ 
+                sub_process_template_id: v,
+                sub_process_name: sp?.name 
+              });
+            }}
+            disabled={disabled}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Sélectionner un sous-processus..." />
+            </SelectTrigger>
+            <SelectContent>
+              {subProcesses.map((sp) => (
+                <SelectItem key={sp.id} value={sp.id}>
+                  {sp.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div>
+            <Label>Exécuter toutes les tâches</Label>
+            <p className="text-xs text-muted-foreground">
+              Exécute automatiquement toutes les tâches du sous-processus
+            </p>
+          </div>
+          <Switch
+            checked={spConfig.execute_all_tasks || false}
+            onCheckedChange={(v) => updateConfig({ execute_all_tasks: v })}
+            disabled={disabled}
+          />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div>
+            <Label>Branchement dynamique</Label>
+            <p className="text-xs text-muted-foreground">
+              Crée des branches selon la sélection dans la demande
+            </p>
+          </div>
+          <Switch
+            checked={spConfig.branch_on_selection || false}
+            onCheckedChange={(v) => updateConfig({ branch_on_selection: v })}
+            disabled={disabled}
+          />
         </div>
       </div>
     );
@@ -241,6 +393,16 @@ export function WorkflowNodePropertiesPanel({
       updateConfig({ channels: newChannels });
     };
 
+    // Build available variables from custom fields
+    const fieldVariables = customFields.map(f => `{champ:${f.name}}`);
+    const systemVariables = ['{processus}', '{tache}', '{demandeur}', '{lien}', '{date}', '{statut}'];
+    const allVariables = [...systemVariables, ...fieldVariables];
+
+    const insertVariable = (variable: string, field: 'subject_template' | 'body_template') => {
+      const current = notifConfig[field] || '';
+      updateConfig({ [field]: current + variable });
+    };
+
     return (
       <div className="space-y-4">
         <div>
@@ -306,9 +468,6 @@ export function WorkflowNodePropertiesPanel({
             placeholder="Ex: Nouvelle demande: {processus}"
             disabled={disabled}
           />
-          <p className="text-xs text-muted-foreground mt-1">
-            Variables: {'{processus}'}, {'{tache}'}, {'{demandeur}'}, {'{lien}'}
-          </p>
         </div>
 
         <div>
@@ -321,12 +480,81 @@ export function WorkflowNodePropertiesPanel({
             disabled={disabled}
           />
         </div>
+
+        <div>
+          <Label className="flex items-center gap-2">
+            Variables disponibles
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-3 w-3 text-muted-foreground" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  <p>Cliquez pour insérer dans le message. Les champs personnalisés sont préfixés par "champ:"</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </Label>
+          <div className="flex flex-wrap gap-1 mt-2 p-2 bg-muted/50 rounded-md">
+            {systemVariables.map((v) => (
+              <Button
+                key={v}
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-6 text-xs"
+                onClick={() => insertVariable(v, 'body_template')}
+                disabled={disabled}
+              >
+                {v}
+              </Button>
+            ))}
+          </div>
+          {customFields.length > 0 && (
+            <>
+              <Label className="text-xs text-muted-foreground mt-2 block">
+                Champs de la demande
+              </Label>
+              <ScrollArea className="h-24 mt-1">
+                <div className="flex flex-wrap gap-1 p-2 bg-muted/50 rounded-md">
+                  {customFields.map((field) => (
+                    <Button
+                      key={field.id}
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="h-6 text-xs"
+                      onClick={() => insertVariable(`{champ:${field.name}}`, 'body_template')}
+                      disabled={disabled}
+                    >
+                      {field.label}
+                    </Button>
+                  ))}
+                </div>
+              </ScrollArea>
+            </>
+          )}
+        </div>
       </div>
     );
   };
 
   const renderConditionConfig = () => {
     const condConfig = config as ConditionNodeConfig;
+    
+    // Build field options including custom fields
+    const systemFields = [
+      { value: 'priority', label: 'Priorité' },
+      { value: 'category', label: 'Catégorie' },
+      { value: 'amount', label: 'Montant' },
+      { value: 'department', label: 'Service demandeur' },
+    ];
+    
+    const customFieldOptions = customFields.map(f => ({
+      value: `custom:${f.name}`,
+      label: `📝 ${f.label}`,
+    }));
+
     return (
       <div className="space-y-4">
         <div>
@@ -340,11 +568,17 @@ export function WorkflowNodePropertiesPanel({
               <SelectValue placeholder="Sélectionner un champ..." />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="priority">Priorité</SelectItem>
-              <SelectItem value="category">Catégorie</SelectItem>
-              <SelectItem value="amount">Montant</SelectItem>
-              <SelectItem value="department">Service demandeur</SelectItem>
-              <SelectItem value="custom_field">Champ personnalisé</SelectItem>
+              {systemFields.map((f) => (
+                <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+              ))}
+              {customFieldOptions.length > 0 && (
+                <>
+                  <SelectItem value="---" disabled>— Champs personnalisés —</SelectItem>
+                  {customFieldOptions.map((f) => (
+                    <SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>
+                  ))}
+                </>
+              )}
             </SelectContent>
           </Select>
         </div>
@@ -413,6 +647,8 @@ export function WorkflowNodePropertiesPanel({
     switch (node.node_type) {
       case 'task':
         return renderTaskConfig();
+      case 'sub_process':
+        return renderSubProcessConfig();
       case 'validation':
         return renderValidationConfig();
       case 'notification':
