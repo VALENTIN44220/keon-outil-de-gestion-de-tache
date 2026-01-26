@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -443,20 +444,20 @@ export function UsersTab({
                           <ChevronUp className="h-4 w-4" />
                           Manager (N+1)
                         </Label>
-                        <Select value={managerId || '_none_'} onValueChange={(value) => setManagerId(value === '_none_' ? '' : value)}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Sélectionner..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="_none_">-- Aucun --</SelectItem>
-                            {possibleManagers.map((u) => (
-                              <SelectItem key={u.id} value={u.id}>
-                                {u.display_name || 'Sans nom'}
-                                {u.job_title?.name && ` - ${u.job_title.name}`}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <SearchableSelect
+                          value={managerId || '_none_'}
+                          onValueChange={(value) => setManagerId(value === '_none_' ? '' : value)}
+                          placeholder="Sélectionner..."
+                          searchPlaceholder="Rechercher par nom..."
+                          emptyMessage="Aucun manager trouvé"
+                          options={[
+                            { value: '_none_', label: '-- Aucun --' },
+                            ...possibleManagers.map((u) => ({
+                              value: u.id,
+                              label: `${u.display_name || 'Sans nom'}${u.job_title?.name ? ` - ${u.job_title.name}` : ''}`
+                            }))
+                          ]}
+                        />
                       </div>
                     </div>
                   </div>
