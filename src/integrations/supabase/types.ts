@@ -3252,6 +3252,9 @@ export type Database = {
         | "validation"
         | "notification"
         | "condition"
+        | "sub_process"
+        | "fork"
+        | "join"
       workflow_run_status:
         | "running"
         | "completed"
@@ -3426,6 +3429,9 @@ export const Constants = {
         "validation",
         "notification",
         "condition",
+        "sub_process",
+        "fork",
+        "join",
       ],
       workflow_run_status: [
         "running",

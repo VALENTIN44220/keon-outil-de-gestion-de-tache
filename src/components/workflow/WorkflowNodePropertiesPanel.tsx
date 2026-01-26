@@ -101,7 +101,16 @@ export function WorkflowNodePropertiesPanel({
       const newIds = selectedTaskIds.includes(taskId)
         ? selectedTaskIds.filter(id => id !== taskId)
         : [...selectedTaskIds, taskId];
-      updateConfig({ task_template_ids: newIds, task_template_id: newIds[0] || undefined });
+      
+      // Calculate total duration from selected task templates
+      const selectedTasks = taskTemplates.filter(t => newIds.includes(t.id));
+      const totalDuration = selectedTasks.reduce((sum, t) => sum + (t.default_duration_days || 0), 0);
+      
+      updateConfig({ 
+        task_template_ids: newIds, 
+        task_template_id: newIds[0] || undefined,
+        duration_days: totalDuration > 0 ? totalDuration : undefined
+      });
     };
 
     return (
