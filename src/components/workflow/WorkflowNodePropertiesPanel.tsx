@@ -26,9 +26,11 @@ import type {
   ForkNodeConfig,
   JoinNodeConfig,
   StatusChangeNodeConfig,
+  AssignmentNodeConfig,
   ApproverType,
   NotificationChannel,
-  ValidationTriggerMode
+  ValidationTriggerMode,
+  TaskStatusType
 } from '@/types/workflow';
 import type { TaskTemplate } from '@/types/template';
 import type { TemplateCustomField } from '@/types/customField';
@@ -1068,6 +1070,7 @@ export function WorkflowNodePropertiesPanel({
             <SelectContent>
               <SelectItem value="validation_approved">Validation approuvée</SelectItem>
               <SelectItem value="validation_rejected">Validation rejetée</SelectItem>
+              <SelectItem value="task_completed">Tâche terminée</SelectItem>
               <SelectItem value="manual">Déclenchement manuel</SelectItem>
             </SelectContent>
           </Select>
@@ -1077,13 +1080,14 @@ export function WorkflowNodePropertiesPanel({
           <Label>Nouveau statut de la tâche</Label>
           <Select
             value={statusConfig.new_status || ''}
-            onValueChange={(v) => updateConfig({ new_status: v as StatusChangeNodeConfig['new_status'] })}
+            onValueChange={(v) => updateConfig({ new_status: v as TaskStatusType })}
             disabled={disabled}
           >
             <SelectTrigger>
               <SelectValue placeholder="Sélectionner..." />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="to_assign">À affecter</SelectItem>
               <SelectItem value="todo">À faire</SelectItem>
               <SelectItem value="in-progress">En cours</SelectItem>
               <SelectItem value="done">Terminée</SelectItem>
@@ -1100,6 +1104,108 @@ export function WorkflowNodePropertiesPanel({
           1. Tâche (sortie "Validation") → Validation<br/>
           2. Validation (approuvée) → Changement d'état ("Validée")<br/>
           3. Validation (rejetée) → Changement d'état ("Refusée")
+        </div>
+      </div>
+    );
+  };
+
+  // Assignment Node configuration
+  const renderAssignmentConfig = () => {
+    const assignConfig = config as AssignmentNodeConfig;
+    
+    return (
+      <div className="space-y-4">
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertDescription className="text-xs">
+            Ce bloc affecte une tâche à un utilisateur, groupe ou service spécifique.
+          </AlertDescription>
+        </Alert>
+
+        <div>
+          <Label>Type d'affectation</Label>
+          <Select
+            value={assignConfig.assignment_type || ''}
+            onValueChange={(v) => {
+              updateConfig({ 
+                assignment_type: v as AssignmentNodeConfig['assignment_type'],
+                assignee_id: undefined,
+                group_id: undefined,
+                department_id: undefined
+              });
+            }}
+            disabled={disabled}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Sélectionner..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="user">Utilisateur spécifique</SelectItem>
+              <SelectItem value="group">Groupe</SelectItem>
+              <SelectItem value="department">Service</SelectItem>
+              <SelectItem value="manager">Manager du demandeur</SelectItem>
+              <SelectItem value="requester">Demandeur</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {assignConfig.assignment_type === 'user' && (
+          <div>
+            <Label>Utilisateur</Label>
+            <SearchableSelect
+              value={assignConfig.assignee_id || ''}
+              onValueChange={(value) => updateConfig({ assignee_id: value })}
+              options={userOptions}
+              placeholder="Sélectionner un utilisateur..."
+              searchPlaceholder="Rechercher..."
+              emptyMessage="Aucun utilisateur trouvé"
+              disabled={disabled}
+            />
+          </div>
+        )}
+
+        {assignConfig.assignment_type === 'group' && (
+          <div>
+            <Label>Groupe</Label>
+            <SearchableSelect
+              value={assignConfig.group_id || ''}
+              onValueChange={(value) => updateConfig({ group_id: value })}
+              options={groupOptions}
+              placeholder="Sélectionner un groupe..."
+              searchPlaceholder="Rechercher..."
+              emptyMessage="Aucun groupe trouvé"
+              disabled={disabled}
+            />
+          </div>
+        )}
+
+        {assignConfig.assignment_type === 'department' && (
+          <div>
+            <Label>Service</Label>
+            <SearchableSelect
+              value={assignConfig.department_id || ''}
+              onValueChange={(value) => updateConfig({ department_id: value })}
+              options={departmentOptions}
+              placeholder="Sélectionner un service..."
+              searchPlaceholder="Rechercher..."
+              emptyMessage="Aucun service trouvé"
+              disabled={disabled}
+            />
+          </div>
+        )}
+
+        <div className="flex items-center justify-between pt-2 border-t">
+          <div>
+            <Label className="font-medium">Démarrer automatiquement</Label>
+            <p className="text-xs text-muted-foreground">
+              Passe la tâche de "À affecter" à "À faire"
+            </p>
+          </div>
+          <Switch
+            checked={assignConfig.auto_start === true}
+            onCheckedChange={(checked) => updateConfig({ auto_start: checked })}
+            disabled={disabled}
+          />
         </div>
       </div>
     );
@@ -1123,6 +1229,8 @@ export function WorkflowNodePropertiesPanel({
         return renderJoinConfig();
       case 'status_change':
         return renderStatusChangeConfig();
+      case 'assignment':
+        return renderAssignmentConfig();
       case 'start':
       case 'end':
         return (

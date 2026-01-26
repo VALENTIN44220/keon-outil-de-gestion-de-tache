@@ -15,7 +15,8 @@ import {
   Split,
   Merge,
   Hand,
-  RefreshCw
+  RefreshCw,
+  UserPlus
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import type { 
@@ -26,7 +27,9 @@ import type {
   SubProcessNodeConfig,
   ForkNodeConfig,
   JoinNodeConfig,
-  StatusChangeNodeConfig
+  StatusChangeNodeConfig,
+  AssignmentNodeConfig,
+  TaskStatusType
 } from '@/types/workflow';
 
 interface WorkflowNodeData {
@@ -90,6 +93,11 @@ const nodeColors = {
     bg: 'bg-pink-100 dark:bg-pink-900/30',
     border: 'border-pink-500',
     icon: 'text-pink-600',
+  },
+  assignment: {
+    bg: 'bg-emerald-100 dark:bg-emerald-900/30',
+    border: 'border-emerald-500',
+    icon: 'text-emerald-600',
   },
 };
 
@@ -586,8 +594,9 @@ export const StatusChangeNode = memo(({ data, selected }: CustomNodeProps) => {
   const colors = nodeColors.status_change;
   const config = data.config as StatusChangeNodeConfig;
   
-  const getStatusLabel = (status?: string) => {
+  const getStatusLabel = (status?: TaskStatusType) => {
     switch (status) {
+      case 'to_assign': return 'À affecter';
       case 'todo': return 'À faire';
       case 'in-progress': return 'En cours';
       case 'done': return 'Terminée';
@@ -603,6 +612,7 @@ export const StatusChangeNode = memo(({ data, selected }: CustomNodeProps) => {
     switch (trigger) {
       case 'validation_approved': return '✅ Approuvée';
       case 'validation_rejected': return '❌ Rejetée';
+      case 'task_completed': return '✓ Tâche terminée';
       case 'manual': return '🖐️ Manuel';
       default: return '';
     }
@@ -648,6 +658,62 @@ export const StatusChangeNode = memo(({ data, selected }: CustomNodeProps) => {
 });
 StatusChangeNode.displayName = 'StatusChangeNode';
 
+// Assignment Node - Assigns task to specific user/group/department
+export const AssignmentNode = memo(({ data, selected }: CustomNodeProps) => {
+  const colors = nodeColors.assignment;
+  const config = data.config as AssignmentNodeConfig;
+  
+  const getAssignmentTypeLabel = (type?: string) => {
+    switch (type) {
+      case 'user': return 'Utilisateur';
+      case 'group': return 'Groupe';
+      case 'department': return 'Service';
+      case 'manager': return 'Manager';
+      case 'requester': return 'Demandeur';
+      default: return 'Non défini';
+    }
+  };
+
+  return (
+    <div className={`
+      px-4 py-3 rounded-xl border-2 shadow-lg min-w-[180px] max-w-[250px]
+      ${colors.bg} ${colors.border}
+      ${selected ? 'ring-2 ring-primary ring-offset-2' : ''}
+      transition-all duration-200
+    `}>
+      <Handle
+        type="target"
+        position={Position.Left}
+        className="!w-3 !h-3 !bg-emerald-500 !border-2 !border-white"
+      />
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <div className={`p-1.5 rounded-lg ${colors.bg}`}>
+            <UserPlus className={`h-4 w-4 ${colors.icon}`} />
+          </div>
+          <span className="font-medium text-sm truncate">{data.label}</span>
+        </div>
+        <div className="flex flex-wrap gap-1">
+          <Badge variant="secondary" className="text-xs">
+            → {getAssignmentTypeLabel(config.assignment_type)}
+          </Badge>
+          {config.auto_start && (
+            <Badge variant="outline" className="text-xs">
+              Auto-démarrer
+            </Badge>
+          )}
+        </div>
+      </div>
+      <Handle
+        type="source"
+        position={Position.Right}
+        className="!w-3 !h-3 !bg-emerald-500 !border-2 !border-white"
+      />
+    </div>
+  );
+});
+AssignmentNode.displayName = 'AssignmentNode';
+
 // Export node types map for React Flow
 export const workflowNodeTypes = {
   start: StartNode,
@@ -660,4 +726,5 @@ export const workflowNodeTypes = {
   fork: ForkNode,
   join: JoinNode,
   status_change: StatusChangeNode,
+  assignment: AssignmentNode,
 };

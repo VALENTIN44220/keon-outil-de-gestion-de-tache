@@ -9,7 +9,8 @@ import {
   Layers,
   Split,
   Merge,
-  RefreshCw
+  RefreshCw,
+  UserPlus
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import type { WorkflowNodeType } from '@/types/workflow';
@@ -94,6 +95,14 @@ const paletteItems: NodePaletteItem[] = [
     description: 'Attend les branches parallèles',
     icon: <Merge className="h-4 w-4" />,
     color: 'bg-orange-100 text-orange-700 border-orange-300',
+    canAdd: true,
+  },
+  {
+    type: 'assignment',
+    label: 'Affectation',
+    description: 'Affecte une tâche à un utilisateur',
+    icon: <UserPlus className="h-4 w-4" />,
+    color: 'bg-emerald-100 text-emerald-700 border-emerald-300',
     canAdd: true,
   },
   {
