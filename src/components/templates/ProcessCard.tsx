@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ProcessWithTasks, TaskTemplate, VISIBILITY_LABELS, TemplateVisibility } from '@/types/template';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,7 +10,7 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { MoreVertical, Trash2, Building2, Briefcase, ListTodo, Edit, Layers, Eye, Lock, Users, Globe } from 'lucide-react';
+import { MoreVertical, Trash2, Building2, Briefcase, ListTodo, Edit, Layers, Eye, Lock, Users, Globe, Workflow } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface ProcessCardProps {
@@ -31,6 +32,7 @@ const visibilityIcons: Record<string, any> = {
 };
 
 export function ProcessCard({ process, onDelete, onEdit, onViewDetails, onAddTask, onDeleteTask, canManage = false, compact = false }: ProcessCardProps) {
+  const navigate = useNavigate();
   const [subProcessCount, setSubProcessCount] = useState(0);
   const [targetDepartments, setTargetDepartments] = useState<string[]>([]);
 
@@ -135,6 +137,10 @@ export function ProcessCard({ process, onDelete, onEdit, onViewDetails, onAddTas
                   <Eye className="h-4 w-4 mr-2" />
                   Voir les détails
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/templates/workflow/${process.id}`); }}>
+                  <Workflow className="h-4 w-4 mr-2" />
+                  Éditer le workflow
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
                   <Edit className="h-4 w-4 mr-2" />
                   Modifier
@@ -183,15 +189,28 @@ export function ProcessCard({ process, onDelete, onEdit, onViewDetails, onAddTas
           </div>
         </div>
 
-        <Button 
-          variant="outline" 
-          size="sm" 
-          className="w-full mt-4"
-          onClick={(e) => { e.stopPropagation(); onViewDetails(); }}
-        >
-          <Eye className="h-4 w-4 mr-2" />
-          {canManage ? 'Gérer le processus' : 'Voir le processus'}
-        </Button>
+        <div className="flex gap-2 mt-4">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="flex-1"
+            onClick={(e) => { e.stopPropagation(); onViewDetails(); }}
+          >
+            <Eye className="h-4 w-4 mr-2" />
+            {canManage ? 'Gérer' : 'Voir'}
+          </Button>
+          {canManage && (
+            <Button 
+              variant="default" 
+              size="sm" 
+              className="flex-1"
+              onClick={(e) => { e.stopPropagation(); navigate(`/templates/workflow/${process.id}`); }}
+            >
+              <Workflow className="h-4 w-4 mr-2" />
+              Workflow
+            </Button>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
