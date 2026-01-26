@@ -463,6 +463,11 @@ function getDefaultConfig(type: WorkflowNodeType): WorkflowNodeConfig {
         new_status: 'validated',
         trigger_event: 'validation_approved'
       };
+    case 'assignment':
+      return {
+        assignment_type: 'user',
+        auto_start: true
+      };
     default:
       return {};
   }

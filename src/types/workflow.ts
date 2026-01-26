@@ -10,10 +10,14 @@ export type WorkflowNodeType =
   | 'sub_process'
   | 'fork'   // Parallel split - starts multiple branches
   | 'join'   // Synchronization - waits for branches
-  | 'status_change';  // Change task status based on workflow events
+  | 'status_change'   // Change task status based on workflow events
+  | 'assignment';     // Task assignment to specific user/group/department
+
+// All possible task statuses
+export type TaskStatusType = 'to_assign' | 'todo' | 'in-progress' | 'done' | 'pending-validation' | 'validated' | 'refused' | 'review';
 
 // Task output types for workflow branching
-export type TaskOutputType = 'completed' | 'in_progress' | 'validation_request';
+export type TaskOutputType = 'completed' | 'in_progress' | 'validation_request' | 'assigned';
 
 export type WorkflowStatus = 'draft' | 'active' | 'inactive' | 'archived';
 export type WorkflowRunStatus = 'running' | 'completed' | 'failed' | 'cancelled' | 'paused';
@@ -58,8 +62,17 @@ export interface TaskNodeConfig {
 // Status change node - changes the status of a linked task
 export interface StatusChangeNodeConfig {
   target_task_node_id?: string;  // Reference to a task node in the workflow
-  new_status: 'todo' | 'in-progress' | 'done' | 'pending-validation' | 'validated' | 'refused' | 'review';
-  trigger_event?: 'validation_approved' | 'validation_rejected' | 'manual';
+  new_status: TaskStatusType;
+  trigger_event?: 'validation_approved' | 'validation_rejected' | 'task_completed' | 'manual';
+}
+
+// Assignment node - assigns task to specific user/group/department
+export interface AssignmentNodeConfig {
+  assignment_type: 'user' | 'group' | 'department' | 'manager' | 'requester';
+  assignee_id?: string;        // For user assignment
+  group_id?: string;           // For group assignment  
+  department_id?: string;      // For department assignment
+  auto_start?: boolean;        // Auto-start task after assignment (change status to todo)
 }
 
 export interface SubProcessNodeConfig {
@@ -151,7 +164,8 @@ export type WorkflowNodeConfig =
   | SubProcessNodeConfig
   | ForkNodeConfig
   | JoinNodeConfig
-  | StatusChangeNodeConfig;
+  | StatusChangeNodeConfig
+  | AssignmentNodeConfig;
 
 // Database entities
 export interface WorkflowTemplate {
