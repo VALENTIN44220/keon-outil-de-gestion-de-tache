@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { SubProcessWithTasks, TaskTemplate } from '@/types/template';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,11 +10,12 @@ import {
   DropdownMenu, 
   DropdownMenuContent, 
   DropdownMenuItem, 
-  DropdownMenuTrigger 
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
 } from '@/components/ui/dropdown-menu';
 import { 
   MoreVertical, Plus, Trash2, Edit, ChevronDown, ChevronRight,
-  Users, User, UserCog, FormInput, Lock, Link2, Edit2
+  Users, User, UserCog, FormInput, Lock, Link2, Edit2, Workflow
 } from 'lucide-react';
 import { AddTaskTemplateDialog } from './AddTaskTemplateDialog';
 import { EditTaskTemplateDialog } from './EditTaskTemplateDialog';
@@ -23,7 +25,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-
 interface SubProcessCardProps {
   subProcess: SubProcessWithTasks;
   processId: string | null;
@@ -61,6 +62,7 @@ export function SubProcessCard({
   canManage = false,
   onMandatoryChange
 }: SubProcessCardProps) {
+  const navigate = useNavigate();
   const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
   const [isLinkTaskOpen, setIsLinkTaskOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskTemplate | null>(null);
@@ -135,6 +137,11 @@ export function SubProcessCard({
                       <Edit className="h-4 w-4 mr-2" />
                       Modifier
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => navigate(`/templates/workflow/subprocess/${subProcess.id}`)}>
+                      <Workflow className="h-4 w-4 mr-2" />
+                      Workflow
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
                     <DropdownMenuItem 
                       onClick={onDelete}
                       className="text-destructive focus:text-destructive"

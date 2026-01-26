@@ -90,7 +90,15 @@ const App = () => (
             />
             <Route path="/design-system" element={<DesignSystem />} />
             <Route
-              path="/templates/workflow/:processId"
+              path="/templates/workflow/process/:processId"
+              element={
+                <ProtectedRoute>
+                  <WorkflowEditor />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/templates/workflow/subprocess/:subProcessId"
               element={
                 <ProtectedRoute>
                   <WorkflowEditor />
