@@ -63,6 +63,8 @@ export interface PermissionProfile {
 
 export type AppRole = 'admin' | 'moderator' | 'user';
 
+export type UserStatus = 'active' | 'suspended' | 'deleted';
+
 export interface UserRole {
   id: string;
   user_id: string;
@@ -83,6 +85,7 @@ export interface UserProfile {
   manager_id: string | null;
   must_change_password: boolean;
   is_private: boolean;
+  status: UserStatus;
   created_at: string;
   updated_at: string;
   // Joined data
@@ -94,3 +97,21 @@ export interface UserProfile {
   manager?: UserProfile;
   subordinates?: UserProfile[];
 }
+
+export const USER_STATUS_LABELS: Record<UserStatus, { label: string; description: string; color: string }> = {
+  active: { 
+    label: 'Actif', 
+    description: 'Utilisateur actif, peut recevoir des affectations',
+    color: 'bg-green-100 text-green-800 border-green-300'
+  },
+  suspended: { 
+    label: 'Suspendu', 
+    description: 'Temporairement retiré des nouvelles affectations',
+    color: 'bg-amber-100 text-amber-800 border-amber-300'
+  },
+  deleted: { 
+    label: 'Parti', 
+    description: 'Salarié parti, aucune nouvelle affectation possible',
+    color: 'bg-red-100 text-red-800 border-red-300'
+  },
+};

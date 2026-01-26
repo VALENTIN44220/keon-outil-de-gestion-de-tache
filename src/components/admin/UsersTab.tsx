@@ -9,12 +9,13 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Plus, UserPlus, Users, Building2, Briefcase, Layers, Shield, ChevronUp, ChevronDown, AlertCircle, RefreshCw, Upload, Trash2, Search } from 'lucide-react';
+import { Plus, UserPlus, Users, Building2, Briefcase, Layers, Shield, ChevronUp, ChevronDown, AlertCircle, RefreshCw, Upload, Trash2, Search, UserX, UserCheck, Pause } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { RefreshButton } from './RefreshButton';
 import { BulkUserImportDialog } from './BulkUserImportDialog';
-import type { Company, Department, JobTitle, HierarchyLevel, PermissionProfile, UserProfile } from '@/types/admin';
+import type { Company, Department, JobTitle, HierarchyLevel, PermissionProfile, UserProfile, UserStatus } from '@/types/admin';
+import { USER_STATUS_LABELS } from '@/types/admin';
 
 // KEON spectrum colors for companies
 const COMPANY_COLORS = [
@@ -58,6 +59,7 @@ export function UsersTab({
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCompanyFilter, setSelectedCompanyFilter] = useState<string | null>(null);
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState<UserStatus | 'all'>('all');
 
   // Create a stable color map for companies
   const companyColorMap = useMemo(() => {
@@ -68,9 +70,14 @@ export function UsersTab({
     return map;
   }, [companies]);
 
-  // Filter users based on search and company filter
+  // Filter users based on search, company filter, and status filter
   const filteredUsers = useMemo(() => {
     let result = users;
+    
+    // Apply status filter
+    if (selectedStatusFilter !== 'all') {
+      result = result.filter(u => u.status === selectedStatusFilter);
+    }
     
     // Apply company filter
     if (selectedCompanyFilter) {
@@ -89,7 +96,12 @@ export function UsersTab({
     }
     
     return result;
-  }, [users, searchQuery, selectedCompanyFilter]);
+  }, [users, searchQuery, selectedCompanyFilter, selectedStatusFilter]);
+
+  // Filter possible managers to exclude suspended/deleted users
+  const activeUsers = useMemo(() => {
+    return users.filter(u => u.status === 'active' || !u.status);
+  }, [users]);
 
   const toggleSelection = (id: string) => {
     setSelectedIds(prev => 
@@ -141,6 +153,7 @@ export function UsersTab({
   const [hierarchyLevelId, setHierarchyLevelId] = useState<string>('');
   const [permissionProfileId, setPermissionProfileId] = useState<string>('');
   const [managerId, setManagerId] = useState<string>('');
+  const [userStatus, setUserStatus] = useState<UserStatus>('active');
 
   const resetForm = () => {
     setEmail('');
@@ -152,6 +165,7 @@ export function UsersTab({
     setHierarchyLevelId('');
     setPermissionProfileId('');
     setManagerId('');
+    setUserStatus('active');
     setEditingUser(null);
   };
 
@@ -200,8 +214,32 @@ export function UsersTab({
     }
   };
 
-  const handleUpdateUser = async (userId: string) => {
+  const handleUpdateUser = async (userId: string, oldStatus?: UserStatus) => {
     try {
+      // Check if status changed to 'deleted' and user has open tasks
+      if (userStatus === 'deleted' && oldStatus !== 'deleted') {
+        // Reassign open tasks to manager
+        const userProfile = users.find(u => u.id === userId);
+        const newManagerId = managerId || userProfile?.manager_id;
+        
+        if (newManagerId) {
+          const { error: reassignError } = await supabase
+            .from('tasks')
+            .update({ assignee_id: newManagerId })
+            .eq('assignee_id', userId)
+            .not('status', 'in', '("done","validated")');
+          
+          if (reassignError) {
+            console.error('Error reassigning tasks:', reassignError);
+            toast.warning('Les tâches n\'ont pas pu être réassignées au manager');
+          } else {
+            toast.info('Les tâches ouvertes ont été réassignées au manager');
+          }
+        } else {
+          toast.warning('Aucun manager défini - les tâches ouvertes doivent être réassignées manuellement');
+        }
+      }
+
       const { error } = await supabase
         .from('profiles')
         .update({
@@ -212,6 +250,7 @@ export function UsersTab({
           hierarchy_level_id: hierarchyLevelId || null,
           permission_profile_id: permissionProfileId || null,
           manager_id: managerId || null,
+          status: userStatus,
         })
         .eq('id', userId);
 
@@ -235,6 +274,7 @@ export function UsersTab({
     setHierarchyLevelId(user.hierarchy_level_id || '');
     setPermissionProfileId(user.permission_profile_id || '');
     setManagerId(user.manager_id || '');
+    setUserStatus(user.status || 'active');
     setIsDialogOpen(true);
   };
 
@@ -248,11 +288,13 @@ export function UsersTab({
     ? jobTitles.filter(j => j.department_id === departmentId)
     : jobTitles;
 
-  // Get possible managers (users with higher hierarchy level)
-  const possibleManagers = users.filter(u => {
-    if (editingUser && u.id === editingUser.id) return false;
-    return true;
-  });
+  // Get possible managers (only active users, exclude self)
+  const possibleManagers = useMemo(() => {
+    return activeUsers.filter(u => {
+      if (editingUser && u.id === editingUser.id) return false;
+      return true;
+    });
+  }, [activeUsers, editingUser]);
 
   // Get subordinates for a user
   const getSubordinates = (userId: string) => {
@@ -486,6 +528,50 @@ export function UsersTab({
                       </Select>
                     </div>
                   </div>
+
+                  {/* User Status */}
+                  {editingUser && (
+                    <div className="space-y-4">
+                      <h4 className="font-medium flex items-center gap-2">
+                        <UserCheck className="h-4 w-4" />
+                        Statut de l'utilisateur
+                      </h4>
+                      <div className="grid gap-2">
+                        {(['active', 'suspended', 'deleted'] as UserStatus[]).map((status) => {
+                          const statusInfo = USER_STATUS_LABELS[status];
+                          const isSelected = userStatus === status;
+                          return (
+                            <button
+                              key={status}
+                              type="button"
+                              onClick={() => setUserStatus(status)}
+                              className={`flex items-center gap-3 p-3 rounded-lg border-2 transition-all text-left
+                                ${isSelected 
+                                  ? 'ring-2 ring-primary ring-offset-1 border-primary' 
+                                  : 'border-muted hover:border-muted-foreground/30'
+                                }
+                              `}
+                            >
+                              <div className={`p-2 rounded-full ${statusInfo.color}`}>
+                                {status === 'active' && <UserCheck className="h-4 w-4" />}
+                                {status === 'suspended' && <Pause className="h-4 w-4" />}
+                                {status === 'deleted' && <UserX className="h-4 w-4" />}
+                              </div>
+                              <div>
+                                <p className="font-medium">{statusInfo.label}</p>
+                                <p className="text-xs text-muted-foreground">{statusInfo.description}</p>
+                              </div>
+                            </button>
+                          );
+                        })}
+                        {userStatus === 'deleted' && (
+                          <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded border border-amber-200">
+                            ⚠️ Les tâches ouvertes seront automatiquement réassignées au manager N+1
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex justify-end gap-2">
@@ -496,7 +582,7 @@ export function UsersTab({
                     Annuler
                   </Button>
                   <Button 
-                    onClick={() => editingUser ? handleUpdateUser(editingUser.id) : handleCreateUser()}
+                    onClick={() => editingUser ? handleUpdateUser(editingUser.id, editingUser.status) : handleCreateUser()}
                     disabled={isCreating}
                   >
                     {isCreating ? 'Création...' : (editingUser ? 'Mettre à jour' : 'Créer l\'utilisateur')}
@@ -518,6 +604,41 @@ export function UsersTab({
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
               />
+            </div>
+            {/* Status Filter */}
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setSelectedStatusFilter('all')}
+                className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all
+                  ${selectedStatusFilter === 'all' 
+                    ? 'bg-primary text-primary-foreground' 
+                    : 'bg-muted hover:bg-muted/80 text-muted-foreground'
+                  }`}
+              >
+                Tous
+              </button>
+              {(['active', 'suspended', 'deleted'] as UserStatus[]).map((status) => {
+                const statusInfo = USER_STATUS_LABELS[status];
+                const count = users.filter(u => u.status === status).length;
+                return (
+                  <button
+                    key={status}
+                    onClick={() => setSelectedStatusFilter(selectedStatusFilter === status ? 'all' : status)}
+                    className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all border
+                      ${selectedStatusFilter === status 
+                        ? 'ring-2 ring-primary ring-offset-1' 
+                        : 'hover:opacity-80'
+                      }
+                      ${statusInfo.color}
+                    `}
+                  >
+                    {status === 'active' && <UserCheck className="h-3 w-3" />}
+                    {status === 'suspended' && <Pause className="h-3 w-3" />}
+                    {status === 'deleted' && <UserX className="h-3 w-3" />}
+                    {statusInfo.label} ({count})
+                  </button>
+                );
+              })}
             </div>
             <div className="flex items-center gap-2">
               <Checkbox
@@ -611,9 +732,21 @@ export function UsersTab({
                               />
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className={`font-medium text-sm truncate ${colors?.text || 'text-foreground'}`}>
-                                {user.display_name || 'Sans nom'}
-                              </p>
+                              <div className="flex items-center gap-2">
+                                <p className={`font-medium text-sm truncate ${colors?.text || 'text-foreground'}`}>
+                                  {user.display_name || 'Sans nom'}
+                                </p>
+                                {user.status && user.status !== 'active' && (
+                                  <Badge 
+                                    variant="outline" 
+                                    className={`text-[10px] h-4 px-1 ${USER_STATUS_LABELS[user.status]?.color}`}
+                                  >
+                                    {user.status === 'suspended' && <Pause className="h-2.5 w-2.5 mr-0.5" />}
+                                    {user.status === 'deleted' && <UserX className="h-2.5 w-2.5 mr-0.5" />}
+                                    {USER_STATUS_LABELS[user.status]?.label}
+                                  </Badge>
+                                )}
+                              </div>
                               <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
                                 <Building2 className="h-3 w-3 flex-shrink-0" />
                                 {user.company?.name || 'Aucune société'}
