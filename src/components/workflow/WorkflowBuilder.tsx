@@ -16,6 +16,7 @@ import { WorkflowCanvas } from './WorkflowCanvas';
 import { useWorkflowTemplates } from '@/hooks/useWorkflowTemplates';
 import { useSubProcessTemplates } from '@/hooks/useSubProcessTemplates';
 import { useCustomFields } from '@/hooks/useCustomFields';
+import { supabase } from '@/integrations/supabase/client';
 
 interface WorkflowBuilderProps {
   processTemplateId?: string | null;
@@ -52,6 +53,28 @@ export function WorkflowBuilder({
   
   // Fetch custom fields for notification templates
   const { fields: customFields } = useCustomFields({ processTemplateId });
+
+  // State for reference data (users, groups, departments)
+  const [users, setUsers] = useState<{ id: string; display_name: string | null }[]>([]);
+  const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
+  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
+
+  // Fetch reference data for task assignment
+  useEffect(() => {
+    const fetchReferenceData = async () => {
+      const [usersRes, groupsRes, deptsRes] = await Promise.all([
+        supabase.from('profiles').select('id, display_name').order('display_name'),
+        supabase.from('collaborator_groups').select('id, name').order('name'),
+        supabase.from('departments').select('id, name').order('name'),
+      ]);
+      
+      if (usersRes.data) setUsers(usersRes.data);
+      if (groupsRes.data) setGroups(groupsRes.data);
+      if (deptsRes.data) setDepartments(deptsRes.data);
+    };
+    
+    fetchReferenceData();
+  }, []);
 
   // Fetch sub-processes on mount
   useEffect(() => {
@@ -158,6 +181,9 @@ export function WorkflowBuilder({
         taskTemplates={allTaskTemplates}
         subProcesses={subProcesses.map(sp => ({ id: sp.id, name: sp.name }))}
         customFields={customFields}
+        users={users}
+        groups={groups}
+        departments={departments}
       />
     </div>
   );
