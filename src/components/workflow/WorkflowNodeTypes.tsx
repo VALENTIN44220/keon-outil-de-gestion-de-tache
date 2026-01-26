@@ -14,7 +14,8 @@ import {
   Layers,
   Split,
   Merge,
-  Hand
+  Hand,
+  RefreshCw
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import type { 
@@ -24,7 +25,8 @@ import type {
   TaskNodeConfig, 
   SubProcessNodeConfig,
   ForkNodeConfig,
-  JoinNodeConfig
+  JoinNodeConfig,
+  StatusChangeNodeConfig
 } from '@/types/workflow';
 
 interface WorkflowNodeData {
@@ -84,6 +86,11 @@ const nodeColors = {
     border: 'border-orange-500',
     icon: 'text-orange-600',
   },
+  status_change: {
+    bg: 'bg-pink-100 dark:bg-pink-900/30',
+    border: 'border-pink-500',
+    icon: 'text-pink-600',
+  },
 };
 
 // Start Node
@@ -138,10 +145,20 @@ export const EndNode = memo(({ data, selected }: CustomNodeProps) => {
 });
 EndNode.displayName = 'EndNode';
 
-// Task Node
+// Task Node with multiple outputs
 export const TaskNode = memo(({ data, selected }: CustomNodeProps) => {
   const colors = nodeColors.task;
   const config = data.config as TaskNodeConfig;
+  const requiresValidation = config.requires_validation === true;
+  
+  // Define outputs based on configuration
+  const outputs = requiresValidation 
+    ? [{ id: 'validation_request', label: 'Validation', color: '!bg-amber-500' }]
+    : [
+        { id: 'completed', label: 'Terminée', color: '!bg-green-500', top: '25%' },
+        { id: 'in_progress', label: 'En cours', color: '!bg-blue-500', top: '50%' },
+        { id: 'validation_request', label: 'Validation', color: '!bg-amber-500', top: '75%' },
+      ];
   
   return (
     <div className={`
@@ -168,20 +185,64 @@ export const TaskNode = memo(({ data, selected }: CustomNodeProps) => {
             <span>{config.duration_days}j</span>
           </div>
         )}
-        {config.responsible_type && (
-          <Badge variant="secondary" className="text-xs">
-            {config.responsible_type === 'user' && <User className="h-3 w-3 mr-1" />}
-            {config.responsible_type === 'group' && <Users className="h-3 w-3 mr-1" />}
-            {config.responsible_type === 'department' && <Building2 className="h-3 w-3 mr-1" />}
-            {config.responsible_type}
-          </Badge>
+        <div className="flex flex-wrap gap-1">
+          {config.responsible_type && (
+            <Badge variant="secondary" className="text-xs">
+              {config.responsible_type === 'user' && <User className="h-3 w-3 mr-1" />}
+              {config.responsible_type === 'group' && <Users className="h-3 w-3 mr-1" />}
+              {config.responsible_type === 'department' && <Building2 className="h-3 w-3 mr-1" />}
+              {config.responsible_type}
+            </Badge>
+          )}
+          {requiresValidation && (
+            <Badge variant="outline" className="text-xs text-amber-600 border-amber-400">
+              <ShieldCheck className="h-3 w-3 mr-1" />
+              Validation requise
+            </Badge>
+          )}
+        </div>
+        {/* Output labels */}
+        {!requiresValidation && (
+          <div className="text-[10px] text-muted-foreground space-y-0.5 mt-1 text-right pr-1">
+            <div>✓ Terminée</div>
+            <div>⏳ En cours</div>
+            <div>🔒 Validation</div>
+          </div>
         )}
       </div>
-      <Handle
-        type="source"
-        position={Position.Right}
-        className="!w-3 !h-3 !bg-blue-500 !border-2 !border-white"
-      />
+      {/* Multiple output handles */}
+      {requiresValidation ? (
+        <Handle
+          type="source"
+          position={Position.Right}
+          id="validation_request"
+          className="!w-3 !h-3 !bg-amber-500 !border-2 !border-white"
+        />
+      ) : (
+        <>
+          <Handle
+            type="source"
+            position={Position.Right}
+            id="completed"
+            style={{ top: '25%' }}
+            className="!w-3 !h-3 !bg-green-500 !border-2 !border-white"
+          />
+          <Handle
+            type="source"
+            position={Position.Right}
+            id="in_progress"
+            style={{ top: '50%' }}
+            className="!w-3 !h-3 !bg-blue-500 !border-2 !border-white"
+          />
+          <Handle
+            type="source"
+            position={Position.Right}
+            id="validation_request"
+            style={{ top: '75%' }}
+            className="!w-3 !h-3 !bg-amber-500 !border-2 !border-white"
+          />
+        </>
+      )}
     </div>
   );
 });
@@ -520,6 +581,73 @@ export const JoinNode = memo(({ data, selected }: CustomNodeProps) => {
 });
 JoinNode.displayName = 'JoinNode';
 
+// Status Change Node - Changes task status based on workflow events
+export const StatusChangeNode = memo(({ data, selected }: CustomNodeProps) => {
+  const colors = nodeColors.status_change;
+  const config = data.config as StatusChangeNodeConfig;
+  
+  const getStatusLabel = (status?: string) => {
+    switch (status) {
+      case 'todo': return 'À faire';
+      case 'in-progress': return 'En cours';
+      case 'done': return 'Terminée';
+      case 'pending-validation': return 'En attente validation';
+      case 'validated': return 'Validée';
+      case 'refused': return 'Refusée';
+      case 'review': return 'En revue';
+      default: return 'Non défini';
+    }
+  };
+
+  const getTriggerLabel = (trigger?: string) => {
+    switch (trigger) {
+      case 'validation_approved': return '✅ Approuvée';
+      case 'validation_rejected': return '❌ Rejetée';
+      case 'manual': return '🖐️ Manuel';
+      default: return '';
+    }
+  };
+
+  return (
+    <div className={`
+      px-4 py-3 rounded-xl border-2 shadow-lg min-w-[180px] max-w-[250px]
+      ${colors.bg} ${colors.border}
+      ${selected ? 'ring-2 ring-primary ring-offset-2' : ''}
+      transition-all duration-200
+    `}>
+      <Handle
+        type="target"
+        position={Position.Left}
+        className="!w-3 !h-3 !bg-pink-500 !border-2 !border-white"
+      />
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <div className={`p-1.5 rounded-lg ${colors.bg}`}>
+            <RefreshCw className={`h-4 w-4 ${colors.icon}`} />
+          </div>
+          <span className="font-medium text-sm truncate">{data.label}</span>
+        </div>
+        <div className="flex flex-wrap gap-1">
+          <Badge variant="secondary" className="text-xs">
+            → {getStatusLabel(config.new_status)}
+          </Badge>
+          {config.trigger_event && (
+            <Badge variant="outline" className="text-xs">
+              {getTriggerLabel(config.trigger_event)}
+            </Badge>
+          )}
+        </div>
+      </div>
+      <Handle
+        type="source"
+        position={Position.Right}
+        className="!w-3 !h-3 !bg-pink-500 !border-2 !border-white"
+      />
+    </div>
+  );
+});
+StatusChangeNode.displayName = 'StatusChangeNode';
+
 // Export node types map for React Flow
 export const workflowNodeTypes = {
   start: StartNode,
@@ -531,4 +659,5 @@ export const workflowNodeTypes = {
   sub_process: SubProcessNode,
   fork: ForkNode,
   join: JoinNode,
+  status_change: StatusChangeNode,
 };

@@ -422,7 +422,7 @@ function getDefaultConfig(type: WorkflowNodeType): WorkflowNodeConfig {
     case 'end':
       return { final_status: 'completed' };
     case 'task':
-      return { duration_days: 1, responsible_type: 'assignee' };
+      return { duration_days: 1, responsible_type: 'assignee', requires_validation: false };
     case 'sub_process':
       return { execute_all_tasks: true, branch_on_selection: false };
     case 'validation':
@@ -457,6 +457,11 @@ function getDefaultConfig(type: WorkflowNodeType): WorkflowNodeConfig {
       return {
         join_type: 'and',  // Wait for all branches by default
         on_timeout_action: 'notify'
+      };
+    case 'status_change':
+      return {
+        new_status: 'validated',
+        trigger_event: 'validation_approved'
       };
     default:
       return {};

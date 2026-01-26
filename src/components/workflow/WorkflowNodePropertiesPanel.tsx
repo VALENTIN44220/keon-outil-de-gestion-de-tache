@@ -25,6 +25,7 @@ import type {
   SubProcessNodeConfig,
   ForkNodeConfig,
   JoinNodeConfig,
+  StatusChangeNodeConfig,
   ApproverType,
   NotificationChannel,
   ValidationTriggerMode
@@ -329,6 +330,31 @@ export function WorkflowNodePropertiesPanel({
             </SelectContent>
           </Select>
           {renderResponsibleSelector()}
+        </div>
+
+        {/* Validation requirement option */}
+        <div className="border-t pt-4 mt-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <Label className="font-medium">Validation requise</Label>
+              <p className="text-xs text-muted-foreground">
+                L'exécutant ne pourra que demander une validation
+              </p>
+            </div>
+            <Switch
+              checked={taskConfig.requires_validation === true}
+              onCheckedChange={(checked) => updateConfig({ requires_validation: checked })}
+              disabled={disabled}
+            />
+          </div>
+          {taskConfig.requires_validation && (
+            <Alert className="mt-2">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="text-xs">
+                Seule la sortie "Demande de validation" sera disponible. Connectez un bloc Validation ensuite, puis un bloc "Changement d'état" pour valider/refuser la tâche.
+              </AlertDescription>
+            </Alert>
+          )}
         </div>
       </div>
     );
@@ -1016,6 +1042,69 @@ export function WorkflowNodePropertiesPanel({
     );
   };
 
+  // Status Change Node configuration
+  const renderStatusChangeConfig = () => {
+    const statusConfig = config as StatusChangeNodeConfig;
+    
+    return (
+      <div className="space-y-4">
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertDescription className="text-xs">
+            Ce bloc modifie le statut d'une tâche en fonction d'un événement du workflow (ex: après validation).
+          </AlertDescription>
+        </Alert>
+
+        <div>
+          <Label>Événement déclencheur</Label>
+          <Select
+            value={statusConfig.trigger_event || ''}
+            onValueChange={(v) => updateConfig({ trigger_event: v as StatusChangeNodeConfig['trigger_event'] })}
+            disabled={disabled}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Sélectionner..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="validation_approved">Validation approuvée</SelectItem>
+              <SelectItem value="validation_rejected">Validation rejetée</SelectItem>
+              <SelectItem value="manual">Déclenchement manuel</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <Label>Nouveau statut de la tâche</Label>
+          <Select
+            value={statusConfig.new_status || ''}
+            onValueChange={(v) => updateConfig({ new_status: v as StatusChangeNodeConfig['new_status'] })}
+            disabled={disabled}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Sélectionner..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todo">À faire</SelectItem>
+              <SelectItem value="in-progress">En cours</SelectItem>
+              <SelectItem value="done">Terminée</SelectItem>
+              <SelectItem value="pending-validation">En attente validation</SelectItem>
+              <SelectItem value="validated">Validée</SelectItem>
+              <SelectItem value="refused">Refusée</SelectItem>
+              <SelectItem value="review">En revue</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded-md">
+          <strong>Usage typique :</strong><br/>
+          1. Tâche (sortie "Validation") → Validation<br/>
+          2. Validation (approuvée) → Changement d'état ("Validée")<br/>
+          3. Validation (rejetée) → Changement d'état ("Refusée")
+        </div>
+      </div>
+    );
+  };
+
   const renderConfigPanel = () => {
     switch (node.node_type) {
       case 'task':
@@ -1032,6 +1121,8 @@ export function WorkflowNodePropertiesPanel({
         return renderForkConfig();
       case 'join':
         return renderJoinConfig();
+      case 'status_change':
+        return renderStatusChangeConfig();
       case 'start':
       case 'end':
         return (
