@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import type { Json } from '@/integrations/supabase/types';
 import type { 
   WorkflowTemplate, 
   WorkflowNode, 
@@ -196,16 +197,18 @@ export function useWorkflowTemplates({
     if (!workflow) return null;
 
     try {
+      const insertData = {
+        workflow_id: workflow.id,
+        node_type: nodeType as 'start' | 'end' | 'task' | 'validation' | 'notification' | 'condition',
+        label,
+        position_x: position.x,
+        position_y: position.y,
+        config: config as Json,
+      };
+
       const { data, error } = await supabase
         .from('workflow_nodes')
-        .insert({
-          workflow_id: workflow.id,
-          node_type: nodeType as 'start' | 'end' | 'task' | 'validation' | 'notification' | 'condition',
-          label,
-          position_x: position.x,
-          position_y: position.y,
-          config: config as object,
-        })
+        .insert([insertData])
         .select()
         .single();
 
@@ -391,16 +394,18 @@ export function useWorkflowTemplates({
       }
 
       // Create version snapshot
+      const versionData = {
+        workflow_id: workflow.id,
+        version: workflow.version,
+        nodes_snapshot: workflow.nodes as unknown as Json,
+        edges_snapshot: workflow.edges as unknown as Json,
+        settings_snapshot: workflow.canvas_settings as unknown as Json,
+        published_by: user?.id,
+      };
+
       const { error: versionError } = await supabase
         .from('workflow_template_versions')
-        .insert({
-          workflow_id: workflow.id,
-          version: workflow.version,
-          nodes_snapshot: workflow.nodes as unknown as object,
-          edges_snapshot: workflow.edges as unknown as object,
-          settings_snapshot: workflow.canvas_settings as unknown as object,
-          published_by: user?.id,
-        });
+        .insert([versionData]);
 
       if (versionError) throw versionError;
 
