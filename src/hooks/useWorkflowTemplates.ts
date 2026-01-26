@@ -305,7 +305,18 @@ export function useWorkflowTemplates({
     try {
       const insertData = {
         workflow_id: workflow.id,
-        node_type: nodeType as 'start' | 'end' | 'task' | 'validation' | 'notification' | 'condition',
+        node_type: nodeType as
+          | 'start'
+          | 'end'
+          | 'task'
+          | 'validation'
+          | 'notification'
+          | 'condition'
+          | 'sub_process'
+          | 'fork'
+          | 'join'
+          | 'status_change'
+          | 'assignment',
         label,
         position_x: position.x,
         position_y: position.y,

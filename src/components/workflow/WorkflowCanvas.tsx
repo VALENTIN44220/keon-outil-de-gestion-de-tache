@@ -177,6 +177,7 @@ function WorkflowCanvasInner({
 
       const type = event.dataTransfer.getData('application/workflow-node-type') as WorkflowNodeType;
       const label = event.dataTransfer.getData('application/workflow-node-label');
+      const configStr = event.dataTransfer.getData('application/workflow-node-config');
 
       if (!type || !reactFlowWrapper.current) return;
 
@@ -185,7 +186,21 @@ function WorkflowCanvasInner({
         y: event.clientY,
       });
 
-      await onAddNode(type, position, label, getDefaultConfig(type));
+      let overrideConfig: Partial<WorkflowNodeConfig> = {};
+      if (configStr) {
+        try {
+          overrideConfig = JSON.parse(configStr) as Partial<WorkflowNodeConfig>;
+        } catch {
+          // ignore malformed config
+        }
+      }
+
+      const mergedConfig = ({
+        ...getDefaultConfig(type),
+        ...overrideConfig,
+      } as unknown) as WorkflowNodeConfig;
+
+      await onAddNode(type, position, label, mergedConfig);
     },
     [screenToFlowPosition, onAddNode]
   );
