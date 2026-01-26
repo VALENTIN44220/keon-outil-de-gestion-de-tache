@@ -11,10 +11,21 @@ import {
   Users,
   Building2,
   Clock,
-  Layers
+  Layers,
+  Split,
+  Merge,
+  Hand
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import type { WorkflowNodeConfig, ValidationNodeConfig, NotificationNodeConfig, TaskNodeConfig, SubProcessNodeConfig } from '@/types/workflow';
+import type { 
+  WorkflowNodeConfig, 
+  ValidationNodeConfig, 
+  NotificationNodeConfig, 
+  TaskNodeConfig, 
+  SubProcessNodeConfig,
+  ForkNodeConfig,
+  JoinNodeConfig
+} from '@/types/workflow';
 
 interface WorkflowNodeData {
   label: string;
@@ -62,6 +73,16 @@ const nodeColors = {
     bg: 'bg-indigo-100 dark:bg-indigo-900/30',
     border: 'border-indigo-500',
     icon: 'text-indigo-600',
+  },
+  fork: {
+    bg: 'bg-teal-100 dark:bg-teal-900/30',
+    border: 'border-teal-500',
+    icon: 'text-teal-600',
+  },
+  join: {
+    bg: 'bg-orange-100 dark:bg-orange-900/30',
+    border: 'border-orange-500',
+    icon: 'text-orange-600',
   },
 };
 
@@ -209,6 +230,12 @@ export const ValidationNode = memo(({ data, selected }: CustomNodeProps) => {
           {config.is_mandatory && (
             <Badge variant="destructive" className="text-xs">
               Obligatoire
+            </Badge>
+          )}
+          {config.trigger_mode === 'manual' && (
+            <Badge variant="secondary" className="text-xs">
+              <Hand className="h-3 w-3 mr-1" />
+              Manuel
             </Badge>
           )}
         </div>
@@ -360,6 +387,139 @@ export const SubProcessNode = memo(({ data, selected }: CustomNodeProps) => {
 });
 SubProcessNode.displayName = 'SubProcessNode';
 
+// Fork Node - Parallel Split
+export const ForkNode = memo(({ data, selected }: CustomNodeProps) => {
+  const colors = nodeColors.fork;
+  const config = data.config as ForkNodeConfig;
+  const branchCount = config.branches?.length || 2;
+  
+  return (
+    <div className={`
+      px-4 py-3 rounded-xl border-2 shadow-lg min-w-[180px] max-w-[250px]
+      ${colors.bg} ${colors.border}
+      ${selected ? 'ring-2 ring-primary ring-offset-2' : ''}
+      transition-all duration-200
+    `}>
+      <Handle
+        type="target"
+        position={Position.Left}
+        className="!w-3 !h-3 !bg-teal-500 !border-2 !border-white"
+      />
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <div className={`p-1.5 rounded-lg ${colors.bg}`}>
+            <Split className={`h-4 w-4 ${colors.icon}`} />
+          </div>
+          <span className="font-medium text-sm truncate">{data.label}</span>
+        </div>
+        <div className="flex flex-wrap gap-1">
+          <Badge variant="secondary" className="text-xs">
+            {branchCount} branches
+          </Badge>
+          {config.from_sub_processes && (
+            <Badge variant="outline" className="text-xs">
+              Sous-processus
+            </Badge>
+          )}
+        </div>
+      </div>
+      {/* Multiple output handles for parallel branches */}
+      {config.branches?.map((branch, index) => (
+        <Handle
+          key={branch.id}
+          type="source"
+          position={Position.Right}
+          id={branch.id}
+          style={{ top: `${((index + 1) / (branchCount + 1)) * 100}%` }}
+          className="!w-3 !h-3 !bg-teal-500 !border-2 !border-white"
+        />
+      ))}
+      {(!config.branches || config.branches.length === 0) && (
+        <>
+          <Handle
+            type="source"
+            position={Position.Right}
+            id="branch_1"
+            style={{ top: '33%' }}
+            className="!w-3 !h-3 !bg-teal-500 !border-2 !border-white"
+          />
+          <Handle
+            type="source"
+            position={Position.Right}
+            id="branch_2"
+            style={{ top: '66%' }}
+            className="!w-3 !h-3 !bg-teal-500 !border-2 !border-white"
+          />
+        </>
+      )}
+    </div>
+  );
+});
+ForkNode.displayName = 'ForkNode';
+
+// Join Node - Synchronization
+export const JoinNode = memo(({ data, selected }: CustomNodeProps) => {
+  const colors = nodeColors.join;
+  const config = data.config as JoinNodeConfig;
+  
+  const getJoinTypeLabel = () => {
+    switch (config.join_type) {
+      case 'and': return 'Toutes les branches';
+      case 'or': return 'Au moins une';
+      case 'n_of_m': return `${config.required_count || 1} branche(s)`;
+      default: return 'Synchronisation';
+    }
+  };
+
+  return (
+    <div className={`
+      px-4 py-3 rounded-xl border-2 shadow-lg min-w-[180px] max-w-[250px]
+      ${colors.bg} ${colors.border}
+      ${selected ? 'ring-2 ring-primary ring-offset-2' : ''}
+      transition-all duration-200
+    `}>
+      {/* Multiple input handles for parallel branches */}
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="branch_1"
+        style={{ top: '33%' }}
+        className="!w-3 !h-3 !bg-orange-500 !border-2 !border-white"
+      />
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="branch_2"
+        style={{ top: '66%' }}
+        className="!w-3 !h-3 !bg-orange-500 !border-2 !border-white"
+      />
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <div className={`p-1.5 rounded-lg ${colors.bg}`}>
+            <Merge className={`h-4 w-4 ${colors.icon}`} />
+          </div>
+          <span className="font-medium text-sm truncate">{data.label}</span>
+        </div>
+        <Badge variant="secondary" className="text-xs">
+          {getJoinTypeLabel()}
+        </Badge>
+        {config.timeout_hours && (
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Clock className="h-3 w-3" />
+            <span>Timeout: {config.timeout_hours}h</span>
+          </div>
+        )}
+      </div>
+      <Handle
+        type="source"
+        position={Position.Right}
+        className="!w-3 !h-3 !bg-orange-500 !border-2 !border-white"
+      />
+    </div>
+  );
+});
+JoinNode.displayName = 'JoinNode';
+
 // Export node types map for React Flow
 export const workflowNodeTypes = {
   start: StartNode,
@@ -369,4 +529,6 @@ export const workflowNodeTypes = {
   notification: NotificationNode,
   condition: ConditionNode,
   sub_process: SubProcessNode,
+  fork: ForkNode,
+  join: JoinNode,
 };

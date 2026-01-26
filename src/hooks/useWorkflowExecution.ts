@@ -14,6 +14,9 @@ import type {
   WorkflowNodeConfig,
   ValidationNodeConfig,
   NotificationNodeConfig,
+  ApproverType,
+  ValidationTriggerMode,
+  ValidationPrerequisite,
 } from '@/types/workflow';
 
 interface ExecutionContext {
@@ -565,8 +568,10 @@ export function useWorkflowExecution() {
       return (data || []).map(v => ({
         ...v,
         status: v.status as ValidationInstanceStatus,
-        approver_type: v.approver_type as 'user' | 'role' | 'group' | 'requester_manager' | 'target_manager' | 'department',
-      }));
+        approver_type: v.approver_type as ApproverType,
+        trigger_mode: (v.trigger_mode || 'auto') as ValidationTriggerMode,
+        prerequisite_config: v.prerequisite_config as unknown as ValidationPrerequisite[] | null,
+      })) as WorkflowValidationInstance[];
     } catch (error) {
       console.error('Error fetching pending validations:', error);
       return [];

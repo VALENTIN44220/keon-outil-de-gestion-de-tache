@@ -1,10 +1,21 @@
 // Workflow Builder Types
 
-export type WorkflowNodeType = 'start' | 'end' | 'task' | 'validation' | 'notification' | 'condition' | 'sub_process';
+export type WorkflowNodeType = 
+  | 'start' 
+  | 'end' 
+  | 'task' 
+  | 'validation' 
+  | 'notification' 
+  | 'condition' 
+  | 'sub_process'
+  | 'fork'   // Parallel split - starts multiple branches
+  | 'join';  // Synchronization - waits for branches
+
 export type WorkflowStatus = 'draft' | 'active' | 'inactive' | 'archived';
 export type WorkflowRunStatus = 'running' | 'completed' | 'failed' | 'cancelled' | 'paused';
 export type ValidationInstanceStatus = 'pending' | 'approved' | 'rejected' | 'expired' | 'skipped';
 export type NotificationChannel = 'in_app' | 'email' | 'teams';
+export type ValidationTriggerMode = 'auto' | 'manual';
 
 // Approver types for validation nodes
 export type ApproverType = 
@@ -14,6 +25,9 @@ export type ApproverType =
   | 'requester_manager' 
   | 'target_manager' 
   | 'department';
+
+// Branch status for parallel execution
+export type BranchStatus = 'running' | 'completed' | 'failed' | 'waiting' | 'paused';
 
 // Node configurations
 export interface StartNodeConfig {
@@ -41,6 +55,35 @@ export interface SubProcessNodeConfig {
   branch_on_selection?: boolean; // If true, creates branches based on request sub-process selection
 }
 
+// Fork node - starts parallel branches
+export interface ForkNodeConfig {
+  branch_mode: 'static' | 'dynamic';  // static = fixed branches, dynamic = based on sub-processes
+  branches?: Array<{
+    id: string;
+    name: string;
+    condition?: string;  // Optional condition for this branch
+  }>;
+  // For dynamic mode - create branches from selected sub-processes
+  from_sub_processes?: boolean;
+}
+
+// Join node - synchronizes parallel branches  
+export interface JoinNodeConfig {
+  join_type: 'and' | 'or' | 'n_of_m';  // and = all branches, or = any branch, n_of_m = specific count
+  required_count?: number;  // For n_of_m mode
+  timeout_hours?: number;   // Optional timeout for waiting
+  on_timeout_action?: 'continue' | 'fail' | 'notify';
+  required_branch_ids?: string[];  // Specific branches required (for and/n_of_m)
+}
+
+// Validation prerequisites
+export interface ValidationPrerequisite {
+  type: 'task_completed' | 'validation_approved' | 'condition_true' | 'all_prerequisites';
+  task_node_id?: string;      // For task_completed
+  validation_node_id?: string; // For validation_approved
+  condition_expression?: string; // For condition_true
+}
+
 export interface ValidationNodeConfig {
   approver_type: ApproverType;
   approver_id?: string;
@@ -52,6 +95,16 @@ export interface ValidationNodeConfig {
   reminder_hours?: number;
   allow_delegation?: boolean;
   on_timeout_action?: 'auto_approve' | 'auto_reject' | 'escalate' | 'notify';
+  // NEW: Trigger mode configuration
+  trigger_mode: ValidationTriggerMode;  // 'auto' or 'manual'
+  // For manual mode - who can trigger
+  trigger_allowed_by?: 'task_owner' | 'requester' | 'specific_user';
+  trigger_user_id?: string;  // For specific_user mode
+  // Prerequisites (for auto mode with conditions)
+  prerequisites?: ValidationPrerequisite[];
+  // For chained validations (e.g., N1 -> N2)
+  auto_trigger_next?: boolean;  // Auto-trigger next validation on approval
+  next_validation_node_id?: string;  // Which validation to trigger next
 }
 
 export interface NotificationNodeConfig {
@@ -81,7 +134,9 @@ export type WorkflowNodeConfig =
   | ValidationNodeConfig 
   | NotificationNodeConfig 
   | ConditionNodeConfig
-  | SubProcessNodeConfig;
+  | SubProcessNodeConfig
+  | ForkNodeConfig
+  | JoinNodeConfig;
 
 // Database entities
 export interface WorkflowTemplate {
@@ -135,6 +190,21 @@ export interface WorkflowEdge {
   created_at: string;
 }
 
+// Branch instance for parallel execution
+export interface WorkflowBranchInstance {
+  id: string;
+  run_id: string;
+  branch_id: string;
+  fork_node_id: string | null;
+  current_node_id: string | null;
+  status: BranchStatus;
+  context_data: Record<string, unknown>;
+  started_at: string;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface WorkflowRun {
   id: string;
   workflow_id: string;
@@ -150,6 +220,10 @@ export interface WorkflowRun {
     action: string;
     details?: Record<string, unknown>;
   }>;
+  // Parallel execution tracking
+  active_branches: string[];
+  completed_branches: string[];
+  branch_statuses: Record<string, BranchStatus>;
   started_at: string;
   completed_at: string | null;
   started_by: string | null;
@@ -171,6 +245,14 @@ export interface WorkflowValidationInstance {
   due_at: string | null;
   reminded_at: string | null;
   reminder_count: number;
+  // Parallel execution
+  branch_id: string | null;
+  // Trigger mode
+  trigger_mode: ValidationTriggerMode;
+  triggered_at: string | null;
+  triggered_by: string | null;
+  prerequisites_met: boolean;
+  prerequisite_config: ValidationPrerequisite[] | null;
   created_at: string;
   updated_at: string;
 }
@@ -190,6 +272,7 @@ export interface WorkflowNotification {
   sent_at: string | null;
   error_message: string | null;
   retry_count: number;
+  branch_id: string | null;
   created_at: string;
 }
 
@@ -227,4 +310,15 @@ export interface WorkflowFlowEdge {
 export interface WorkflowWithDetails extends WorkflowTemplate {
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
+}
+
+// Pending validation awaiting manual trigger
+export interface PendingManualValidation {
+  id: string;
+  run_id: string;
+  node_id: string;
+  task_id: string;
+  validation_config: ValidationNodeConfig;
+  can_trigger: boolean;
+  reason?: string;
 }

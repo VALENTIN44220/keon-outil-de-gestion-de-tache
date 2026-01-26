@@ -6,7 +6,9 @@ import {
   Bell, 
   GitBranch,
   GripVertical,
-  Layers
+  Layers,
+  Split,
+  Merge
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import type { WorkflowNodeType } from '@/types/workflow';
@@ -28,6 +30,14 @@ const paletteItems: NodePaletteItem[] = [
     icon: <Play className="h-4 w-4" />,
     color: 'bg-green-100 text-green-700 border-green-300',
     canAdd: false, // Only one allowed, created automatically
+  },
+  {
+    type: 'fork',
+    label: 'Fork / Parallèle',
+    description: 'Démarre des branches parallèles',
+    icon: <Split className="h-4 w-4" />,
+    color: 'bg-teal-100 text-teal-700 border-teal-300',
+    canAdd: true,
   },
   {
     type: 'sub_process',
@@ -67,6 +77,14 @@ const paletteItems: NodePaletteItem[] = [
     description: 'Branchement conditionnel',
     icon: <GitBranch className="h-4 w-4" />,
     color: 'bg-cyan-100 text-cyan-700 border-cyan-300',
+    canAdd: true,
+  },
+  {
+    type: 'join',
+    label: 'Join / Synchronisation',
+    description: 'Attend les branches parallèles',
+    icon: <Merge className="h-4 w-4" />,
+    color: 'bg-orange-100 text-orange-700 border-orange-300',
     canAdd: true,
   },
   {
