@@ -1,6 +1,6 @@
 // Workflow Builder Types
 
-export type WorkflowNodeType = 'start' | 'end' | 'task' | 'validation' | 'notification' | 'condition';
+export type WorkflowNodeType = 'start' | 'end' | 'task' | 'validation' | 'notification' | 'condition' | 'sub_process';
 export type WorkflowStatus = 'draft' | 'active' | 'inactive' | 'archived';
 export type WorkflowRunStatus = 'running' | 'completed' | 'failed' | 'cancelled' | 'paused';
 export type ValidationInstanceStatus = 'pending' | 'approved' | 'rejected' | 'expired' | 'skipped';
@@ -26,11 +26,19 @@ export interface EndNodeConfig {
 
 export interface TaskNodeConfig {
   task_template_id?: string;
+  task_template_ids?: string[]; // Support multiple task templates
   task_title?: string;
   duration_days?: number;
   responsible_type?: 'requester' | 'assignee' | 'user' | 'group' | 'department';
   responsible_id?: string;
   tags?: string[];
+}
+
+export interface SubProcessNodeConfig {
+  sub_process_template_id?: string;
+  sub_process_name?: string;
+  execute_all_tasks?: boolean;
+  branch_on_selection?: boolean; // If true, creates branches based on request sub-process selection
 }
 
 export interface ValidationNodeConfig {
@@ -72,7 +80,8 @@ export type WorkflowNodeConfig =
   | TaskNodeConfig 
   | ValidationNodeConfig 
   | NotificationNodeConfig 
-  | ConditionNodeConfig;
+  | ConditionNodeConfig
+  | SubProcessNodeConfig;
 
 // Database entities
 export interface WorkflowTemplate {

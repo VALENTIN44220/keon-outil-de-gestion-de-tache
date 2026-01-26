@@ -10,10 +10,11 @@ import {
   User,
   Users,
   Building2,
-  Clock
+  Clock,
+  Layers
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import type { WorkflowNodeConfig, ValidationNodeConfig, NotificationNodeConfig, TaskNodeConfig } from '@/types/workflow';
+import type { WorkflowNodeConfig, ValidationNodeConfig, NotificationNodeConfig, TaskNodeConfig, SubProcessNodeConfig } from '@/types/workflow';
 
 interface WorkflowNodeData {
   label: string;
@@ -56,6 +57,11 @@ const nodeColors = {
     bg: 'bg-cyan-100 dark:bg-cyan-900/30',
     border: 'border-cyan-500',
     icon: 'text-cyan-600',
+  },
+  sub_process: {
+    bg: 'bg-indigo-100 dark:bg-indigo-900/30',
+    border: 'border-indigo-500',
+    icon: 'text-indigo-600',
   },
 };
 
@@ -309,6 +315,51 @@ export const ConditionNode = memo(({ data, selected }: CustomNodeProps) => {
 });
 ConditionNode.displayName = 'ConditionNode';
 
+// Sub-Process Node
+export const SubProcessNode = memo(({ data, selected }: CustomNodeProps) => {
+  const colors = nodeColors.sub_process;
+  const config = data.config as SubProcessNodeConfig;
+  
+  return (
+    <div className={`
+      px-4 py-3 rounded-xl border-2 shadow-lg min-w-[180px] max-w-[250px]
+      ${colors.bg} ${colors.border}
+      ${selected ? 'ring-2 ring-primary ring-offset-2' : ''}
+      transition-all duration-200
+    `}>
+      <Handle
+        type="target"
+        position={Position.Left}
+        className="!w-3 !h-3 !bg-indigo-500 !border-2 !border-white"
+      />
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <div className={`p-1.5 rounded-lg ${colors.bg}`}>
+            <Layers className={`h-4 w-4 ${colors.icon}`} />
+          </div>
+          <span className="font-medium text-sm truncate">{data.label}</span>
+        </div>
+        {config.sub_process_name && (
+          <Badge variant="secondary" className="text-xs">
+            {config.sub_process_name}
+          </Badge>
+        )}
+        {config.branch_on_selection && (
+          <Badge variant="outline" className="text-xs">
+            🔀 Branchement dynamique
+          </Badge>
+        )}
+      </div>
+      <Handle
+        type="source"
+        position={Position.Right}
+        className="!w-3 !h-3 !bg-indigo-500 !border-2 !border-white"
+      />
+    </div>
+  );
+});
+SubProcessNode.displayName = 'SubProcessNode';
+
 // Export node types map for React Flow
 export const workflowNodeTypes = {
   start: StartNode,
@@ -317,4 +368,5 @@ export const workflowNodeTypes = {
   validation: ValidationNode,
   notification: NotificationNode,
   condition: ConditionNode,
+  sub_process: SubProcessNode,
 };

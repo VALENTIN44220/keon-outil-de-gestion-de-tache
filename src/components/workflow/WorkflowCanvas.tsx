@@ -30,6 +30,13 @@ import type {
   WorkflowNodeType,
   WorkflowNodeConfig 
 } from '@/types/workflow';
+import type { TaskTemplate } from '@/types/template';
+import type { TemplateCustomField } from '@/types/customField';
+
+interface SubProcessOption {
+  id: string;
+  name: string;
+}
 
 interface WorkflowCanvasProps {
   workflow: WorkflowWithDetails | null;
@@ -54,6 +61,9 @@ interface WorkflowCanvasProps {
   onDeleteEdge: (edgeId: string) => Promise<boolean>;
   onPublish: () => Promise<boolean>;
   onSaveCanvasSettings: (settings: { zoom: number; x: number; y: number }) => Promise<void>;
+  taskTemplates?: TaskTemplate[];
+  subProcesses?: SubProcessOption[];
+  customFields?: TemplateCustomField[];
 }
 
 function WorkflowCanvasInner({
@@ -68,6 +78,9 @@ function WorkflowCanvasInner({
   onDeleteEdge,
   onPublish,
   onSaveCanvasSettings,
+  taskTemplates = [],
+  subProcesses = [],
+  customFields = [],
 }: WorkflowCanvasProps) {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition, zoomIn, zoomOut, fitView, getViewport } = useReactFlow();
@@ -245,6 +258,18 @@ function WorkflowCanvasInner({
     );
   }
 
+  // Handle edge click for deletion
+  const onEdgeClick = useCallback(
+    async (event: React.MouseEvent, edge: Edge) => {
+      if (!canManage) return;
+      // Confirm deletion
+      if (confirm('Supprimer cette liaison ?')) {
+        await onDeleteEdge(edge.id);
+      }
+    },
+    [canManage, onDeleteEdge]
+  );
+
   return (
     <div className="flex h-full gap-2">
       {canManage && (
@@ -259,6 +284,7 @@ function WorkflowCanvasInner({
           onEdgesChange={canManage ? handleEdgesChange : undefined}
           onConnect={canManage ? onConnect : undefined}
           onNodeClick={onNodeClick}
+          onEdgeClick={onEdgeClick}
           onPaneClick={onPaneClick}
           onDrop={canManage ? onDrop : undefined}
           onDragOver={canManage ? onDragOver : undefined}
@@ -349,6 +375,9 @@ function WorkflowCanvasInner({
         onDelete={onDeleteNode}
         onClose={() => setSelectedNode(null)}
         disabled={!canManage}
+        taskTemplates={taskTemplates}
+        subProcesses={subProcesses}
+        customFields={customFields}
       />
     </div>
   );
@@ -372,6 +401,8 @@ function getDefaultConfig(type: WorkflowNodeType): WorkflowNodeConfig {
       return { final_status: 'completed' };
     case 'task':
       return { duration_days: 1, responsible_type: 'assignee' };
+    case 'sub_process':
+      return { execute_all_tasks: true, branch_on_selection: false };
     case 'validation':
       return { 
         approver_type: 'requester_manager', 
