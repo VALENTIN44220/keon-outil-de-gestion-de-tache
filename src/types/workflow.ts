@@ -1,0 +1,221 @@
+// Workflow Builder Types
+
+export type WorkflowNodeType = 'start' | 'end' | 'task' | 'validation' | 'notification' | 'condition';
+export type WorkflowStatus = 'draft' | 'active' | 'inactive' | 'archived';
+export type WorkflowRunStatus = 'running' | 'completed' | 'failed' | 'cancelled' | 'paused';
+export type ValidationInstanceStatus = 'pending' | 'approved' | 'rejected' | 'expired' | 'skipped';
+export type NotificationChannel = 'in_app' | 'email' | 'teams';
+
+// Approver types for validation nodes
+export type ApproverType = 
+  | 'user' 
+  | 'role' 
+  | 'group' 
+  | 'requester_manager' 
+  | 'target_manager' 
+  | 'department';
+
+// Node configurations
+export interface StartNodeConfig {
+  trigger?: 'manual' | 'on_create' | 'on_status_change';
+}
+
+export interface EndNodeConfig {
+  final_status?: 'completed' | 'cancelled';
+}
+
+export interface TaskNodeConfig {
+  task_template_id?: string;
+  task_title?: string;
+  duration_days?: number;
+  responsible_type?: 'requester' | 'assignee' | 'user' | 'group' | 'department';
+  responsible_id?: string;
+  tags?: string[];
+}
+
+export interface ValidationNodeConfig {
+  approver_type: ApproverType;
+  approver_id?: string;
+  approver_role?: string;
+  is_mandatory: boolean;
+  approval_mode: 'single' | 'all' | 'quorum';
+  quorum_count?: number;
+  sla_hours?: number;
+  reminder_hours?: number;
+  allow_delegation?: boolean;
+  on_timeout_action?: 'auto_approve' | 'auto_reject' | 'escalate' | 'notify';
+}
+
+export interface NotificationNodeConfig {
+  channels: NotificationChannel[];
+  recipient_type: 'requester' | 'assignee' | 'approvers' | 'user' | 'group' | 'department' | 'email';
+  recipient_id?: string;
+  recipient_email?: string;
+  subject_template: string;
+  body_template: string;
+  action_url_template?: string;
+}
+
+export interface ConditionNodeConfig {
+  field: string;
+  operator: 'equals' | 'not_equals' | 'contains' | 'greater_than' | 'less_than' | 'is_empty' | 'is_not_empty';
+  value?: string | number | boolean;
+  branches: {
+    true_label: string;
+    false_label: string;
+  };
+}
+
+export type WorkflowNodeConfig = 
+  | StartNodeConfig 
+  | EndNodeConfig 
+  | TaskNodeConfig 
+  | ValidationNodeConfig 
+  | NotificationNodeConfig 
+  | ConditionNodeConfig;
+
+// Database entities
+export interface WorkflowTemplate {
+  id: string;
+  process_template_id: string | null;
+  sub_process_template_id: string | null;
+  name: string;
+  description: string | null;
+  version: number;
+  status: WorkflowStatus;
+  is_default: boolean;
+  canvas_settings: {
+    zoom: number;
+    x: number;
+    y: number;
+  };
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  published_at: string | null;
+}
+
+export interface WorkflowNode {
+  id: string;
+  workflow_id: string;
+  node_type: WorkflowNodeType;
+  label: string;
+  position_x: number;
+  position_y: number;
+  config: WorkflowNodeConfig;
+  task_template_id: string | null;
+  width: number | null;
+  height: number | null;
+  style: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkflowEdge {
+  id: string;
+  workflow_id: string;
+  source_node_id: string;
+  target_node_id: string;
+  source_handle: string | null;
+  target_handle: string | null;
+  branch_label: string | null;
+  condition_expression: Record<string, unknown> | null;
+  label: string | null;
+  style: Record<string, unknown>;
+  animated: boolean;
+  created_at: string;
+}
+
+export interface WorkflowRun {
+  id: string;
+  workflow_id: string;
+  workflow_version: number;
+  trigger_entity_type: 'task' | 'request';
+  trigger_entity_id: string;
+  status: WorkflowRunStatus;
+  current_node_id: string | null;
+  context_data: Record<string, unknown>;
+  execution_log: Array<{
+    timestamp: string;
+    node_id: string;
+    action: string;
+    details?: Record<string, unknown>;
+  }>;
+  started_at: string;
+  completed_at: string | null;
+  started_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkflowValidationInstance {
+  id: string;
+  run_id: string;
+  node_id: string;
+  approver_type: ApproverType;
+  approver_id: string | null;
+  approver_role: string | null;
+  status: ValidationInstanceStatus;
+  decision_comment: string | null;
+  decided_by: string | null;
+  decided_at: string | null;
+  due_at: string | null;
+  reminded_at: string | null;
+  reminder_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkflowNotification {
+  id: string;
+  run_id: string;
+  node_id: string;
+  channel: NotificationChannel;
+  recipient_type: string;
+  recipient_id: string | null;
+  recipient_email: string | null;
+  subject: string;
+  body: string;
+  action_url: string | null;
+  status: 'pending' | 'sent' | 'failed';
+  sent_at: string | null;
+  error_message: string | null;
+  retry_count: number;
+  created_at: string;
+}
+
+// React Flow compatible types
+export interface WorkflowFlowNode {
+  id: string;
+  type: WorkflowNodeType;
+  position: { x: number; y: number };
+  data: {
+    label: string;
+    config: WorkflowNodeConfig;
+    task_template_id?: string | null;
+  };
+  style?: Record<string, unknown>;
+  width?: number;
+  height?: number;
+}
+
+export interface WorkflowFlowEdge {
+  id: string;
+  source: string;
+  target: string;
+  sourceHandle?: string;
+  targetHandle?: string;
+  label?: string;
+  animated?: boolean;
+  style?: Record<string, unknown>;
+  data?: {
+    branch_label?: string;
+    condition_expression?: Record<string, unknown>;
+  };
+}
+
+// Full workflow with nodes and edges
+export interface WorkflowWithDetails extends WorkflowTemplate {
+  nodes: WorkflowNode[];
+  edges: WorkflowEdge[];
+}
