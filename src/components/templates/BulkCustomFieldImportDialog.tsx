@@ -91,12 +91,13 @@ export function BulkCustomFieldImportDialog({
       const parsed: ParsedField[] = [];
       
       for (const line of lines) {
-        // Expected format: name | label | type | required (yes/no)
-        // Or simple: name | label
-        const parts = line.split(/[|\t]/).map((p) => p.trim());
+        // Expected format: name, label, type, required (yes/no)
+        // Or simple: name, label
+        // Support comma, semicolon, pipe, or tab as separators
+        const parts = line.split(/[,;|\t]/).map((p) => p.trim());
         
         if (parts.length < 2) {
-          throw new Error(`Format invalide : "${line}". Attendu : nom | libellé [| type | requis]`);
+          throw new Error(`Format invalide : "${line}". Attendu : nom, libellé [, type, requis]`);
         }
 
         const name = parts[0].replace(/\s+/g, '_').toLowerCase();
@@ -220,14 +221,18 @@ export function BulkCustomFieldImportDialog({
           <Alert>
             <Info className="h-4 w-4" />
             <AlertDescription>
-              <strong>Format attendu :</strong> nom | libellé | type | requis (un champ par ligne)
+              <strong>Format attendu :</strong> nom, libellé, type, requis (un champ par ligne)
               <br />
               <span className="text-muted-foreground">
-                Exemple : code_projet | Code projet | text | oui
+                Exemple : code_projet, Code projet, text, oui
               </span>
               <br />
               <span className="text-muted-foreground">
                 Types disponibles : {Object.values(FIELD_TYPE_LABELS).join(', ')}
+              </span>
+              <br />
+              <span className="text-muted-foreground text-xs">
+                Séparateurs acceptés : virgule, point-virgule, pipe (|), tabulation
               </span>
             </AlertDescription>
           </Alert>
@@ -305,7 +310,7 @@ export function BulkCustomFieldImportDialog({
             <Textarea
               value={rawData}
               onChange={(e) => handleDataChange(e.target.value)}
-              placeholder={`code_projet | Code projet | text | oui\ndate_debut | Date de début | date | non\ntype_demande | Type de demande | select | oui`}
+              placeholder={`code_projet, Code projet, text, oui\ndate_debut, Date de début, date, non\ntype_demande, Type de demande, select, oui`}
               rows={8}
               className="font-mono text-sm"
             />
