@@ -7,14 +7,21 @@ interface TaskTemplateForWorkflow {
   default_duration_days?: number | null;
 }
 
+interface SubProcessInfo {
+  target_manager_id?: string | null;
+  target_department_id?: string | null;
+}
+
 /**
  * Creates a default workflow for a sub-process template with its tasks
+ * Includes: Start -> Tasks -> Validation Manager -> End
  */
 export async function createSubProcessWorkflow(
   subProcessId: string,
   subProcessName: string,
   userId: string,
-  tasks: TaskTemplateForWorkflow[] = []
+  tasks: TaskTemplateForWorkflow[] = [],
+  subProcessInfo?: SubProcessInfo
 ): Promise<string | null> {
   try {
     // Create the workflow template
@@ -83,6 +90,27 @@ export async function createSubProcessWorkflow(
       });
       xPosition += xSpacing;
     }
+
+    // Validation node - Manager validation
+    nodes.push({
+      workflow_id: workflow.id,
+      node_type: 'validation',
+      label: 'Validation Manager',
+      position_x: xPosition,
+      position_y: yPosition,
+      config: {
+        approver_type: subProcessInfo?.target_manager_id ? 'user' : 'requester_manager',
+        approver_id: subProcessInfo?.target_manager_id || null,
+        is_mandatory: true,
+        approval_mode: 'single',
+        sla_hours: 48,
+        reminder_hours: 24,
+        allow_delegation: true,
+        on_timeout_action: 'notify',
+        trigger_mode: 'auto',
+      } as Json,
+    });
+    xPosition += xSpacing;
 
     // End node
     nodes.push({
@@ -276,6 +304,13 @@ export async function ensureSubProcessWorkflow(
     return existingWorkflow.id;
   }
 
+  // Fetch sub-process info for manager configuration
+  const { data: subProcessInfo } = await supabase
+    .from('sub_process_templates')
+    .select('target_manager_id, target_department_id')
+    .eq('id', subProcessId)
+    .maybeSingle();
+
   // Fetch tasks for this sub-process
   const { data: tasks } = await supabase
     .from('task_templates')
@@ -283,7 +318,13 @@ export async function ensureSubProcessWorkflow(
     .eq('sub_process_template_id', subProcessId)
     .order('order_index');
 
-  return createSubProcessWorkflow(subProcessId, subProcessName, userId, tasks || []);
+  return createSubProcessWorkflow(
+    subProcessId, 
+    subProcessName, 
+    userId, 
+    tasks || [],
+    subProcessInfo || undefined
+  );
 }
 
 /**
