@@ -217,8 +217,22 @@ export function TaskValidationWorkflow({
     }
   };
 
+  // Le workflow de validation hérité est maintenant masqué - géré via le nouveau workflow graphique
   if (!requiresValidation) {
     return null;
+  }
+
+  // Si aucune validation n'est en cours ou passée, afficher un message de redirection
+  const hasActiveValidation = status.includes('pending_validation') || status === 'validated' || status === 'refused';
+  
+  if (!hasActiveValidation) {
+    return (
+      <div className="p-3 bg-muted/50 rounded-lg border border-dashed">
+        <p className="text-sm text-muted-foreground">
+          💡 La validation est maintenant gérée via le <strong>workflow graphique</strong> du processus.
+        </p>
+      </div>
+    );
   }
 
   return (
