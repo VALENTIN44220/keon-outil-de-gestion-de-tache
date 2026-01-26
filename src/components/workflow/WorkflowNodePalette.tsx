@@ -8,7 +8,8 @@ import {
   GripVertical,
   Layers,
   Split,
-  Merge
+  Merge,
+  RefreshCw
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import type { WorkflowNodeType } from '@/types/workflow';
@@ -50,7 +51,7 @@ const paletteItems: NodePaletteItem[] = [
   {
     type: 'task',
     label: 'Tâche',
-    description: 'Exécution d\'une tâche',
+    description: 'Tâche avec 3 sorties possibles',
     icon: <CheckSquare className="h-4 w-4" />,
     color: 'bg-blue-100 text-blue-700 border-blue-300',
     canAdd: true,
@@ -61,6 +62,14 @@ const paletteItems: NodePaletteItem[] = [
     description: 'Approbation requise',
     icon: <ShieldCheck className="h-4 w-4" />,
     color: 'bg-amber-100 text-amber-700 border-amber-300',
+    canAdd: true,
+  },
+  {
+    type: 'status_change',
+    label: 'Changement d\'état',
+    description: 'Modifie le statut d\'une tâche',
+    icon: <RefreshCw className="h-4 w-4" />,
+    color: 'bg-pink-100 text-pink-700 border-pink-300',
     canAdd: true,
   },
   {

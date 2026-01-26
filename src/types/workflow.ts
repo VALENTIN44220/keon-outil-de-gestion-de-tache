@@ -9,7 +9,11 @@ export type WorkflowNodeType =
   | 'condition' 
   | 'sub_process'
   | 'fork'   // Parallel split - starts multiple branches
-  | 'join';  // Synchronization - waits for branches
+  | 'join'   // Synchronization - waits for branches
+  | 'status_change';  // Change task status based on workflow events
+
+// Task output types for workflow branching
+export type TaskOutputType = 'completed' | 'in_progress' | 'validation_request';
 
 export type WorkflowStatus = 'draft' | 'active' | 'inactive' | 'archived';
 export type WorkflowRunStatus = 'running' | 'completed' | 'failed' | 'cancelled' | 'paused';
@@ -46,6 +50,16 @@ export interface TaskNodeConfig {
   responsible_type?: 'requester' | 'assignee' | 'user' | 'group' | 'department';
   responsible_id?: string;
   tags?: string[];
+  // Task output configuration
+  requires_validation?: boolean;  // If true, user can only select "validation_request"
+  enabled_outputs?: TaskOutputType[];  // Which outputs are enabled for this task
+}
+
+// Status change node - changes the status of a linked task
+export interface StatusChangeNodeConfig {
+  target_task_node_id?: string;  // Reference to a task node in the workflow
+  new_status: 'todo' | 'in-progress' | 'done' | 'pending-validation' | 'validated' | 'refused' | 'review';
+  trigger_event?: 'validation_approved' | 'validation_rejected' | 'manual';
 }
 
 export interface SubProcessNodeConfig {
@@ -136,7 +150,8 @@ export type WorkflowNodeConfig =
   | ConditionNodeConfig
   | SubProcessNodeConfig
   | ForkNodeConfig
-  | JoinNodeConfig;
+  | JoinNodeConfig
+  | StatusChangeNodeConfig;
 
 // Database entities
 export interface WorkflowTemplate {
