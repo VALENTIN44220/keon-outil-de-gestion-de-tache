@@ -199,71 +199,12 @@ export function EditTaskTemplateDialog({ task, open, onClose, onSave }: EditTask
             onChange={setVisibilityLevel}
           />
 
-          <div className="space-y-2">
-            <Label>Validation Niveau 1</Label>
-            <Select value={validationLevel1} onValueChange={(v) => setValidationLevel1(v as ValidationLevelType)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(VALIDATION_TYPE_LABELS).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {/* Note: Les champs de validation N1/N2 sont maintenant gérés via le workflow graphique */}
+          <div className="p-3 bg-muted/50 rounded-lg border border-dashed">
+            <p className="text-sm text-muted-foreground">
+              💡 La validation est maintenant configurée via l'onglet <strong>Workflow</strong> du processus parent.
+            </p>
           </div>
-
-          {validationLevel1 === 'free' && (
-            <div className="space-y-2">
-              <Label>Validateur Niveau 1</Label>
-              <Select value={validatorLevel1Id || '__none__'} onValueChange={(v) => setValidatorLevel1Id(v === '__none__' ? null : v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner un validateur" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Non défini</SelectItem>
-                  {profiles.map(p => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.display_name || 'Sans nom'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <Label>Validation Niveau 2</Label>
-            <Select value={validationLevel2} onValueChange={(v) => setValidationLevel2(v as ValidationLevelType)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(VALIDATION_TYPE_LABELS).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>{label}</SelectItem>
-              ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {validationLevel2 === 'free' && (
-            <div className="space-y-2">
-              <Label>Validateur Niveau 2</Label>
-              <Select value={validatorLevel2Id || '__none__'} onValueChange={(v) => setValidatorLevel2Id(v === '__none__' ? null : v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner un validateur" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Non défini</SelectItem>
-                  {profiles.map(p => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.display_name || 'Sans nom'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
