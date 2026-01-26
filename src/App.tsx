@@ -16,6 +16,7 @@ import Admin from "./pages/Admin";
 import Workload from "./pages/Workload";
 import Requests from "./pages/Requests";
 import DesignSystem from "./pages/DesignSystem";
+import WorkflowEditor from "./pages/WorkflowEditor";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -88,6 +89,14 @@ const App = () => (
               }
             />
             <Route path="/design-system" element={<DesignSystem />} />
+            <Route
+              path="/templates/workflow/:processId"
+              element={
+                <ProtectedRoute>
+                  <WorkflowEditor />
+                </ProtectedRoute>
+              }
+            />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
