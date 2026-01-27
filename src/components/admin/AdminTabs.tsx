@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building2, Briefcase, Users, Layers, Shield, UserCog, Route, FolderTree, Download, FolderSync, UsersRound, CloudUpload, Grid3X3, UserRoundCog, Workflow } from 'lucide-react';
+import { Building2, Briefcase, Users, Layers, Shield, UserCog, Route, Download, FolderSync, UsersRound, CloudUpload, Grid3X3, UserRoundCog, Workflow } from 'lucide-react';
 import { CompaniesTab } from './CompaniesTab';
 import { DepartmentsTab } from './DepartmentsTab';
 import { JobTitlesTab } from './JobTitlesTab';
@@ -9,7 +9,7 @@ import { PermissionProfilesTab } from './PermissionProfilesTab';
 import { PermissionMatrixTab } from './PermissionMatrixTab';
 import { UsersTab } from './UsersTab';
 import { AssignmentRulesTab } from './AssignmentRulesTab';
-import { CategoriesProcessTab } from './CategoriesProcessTab';
+
 import { DataExportTab } from './DataExportTab';
 import { GovernanceSyncTab } from './GovernanceSyncTab';
 import { CollaboratorGroupsTab } from './CollaboratorGroupsTab';
@@ -81,9 +81,6 @@ export function AdminTabs(props: AdminTabsProps) {
           </TabsTrigger>
           <TabsTrigger value="assignment-rules" className="px-2 py-1.5" title="Règles d'affectation">
             <Route className="h-4 w-4" />
-          </TabsTrigger>
-          <TabsTrigger value="categories-process" className="px-2 py-1.5" title="Catégories & Processus">
-            <FolderTree className="h-4 w-4" />
           </TabsTrigger>
           <TabsTrigger value="export" className="px-2 py-1.5" title="Export de données">
             <Download className="h-4 w-4" />
@@ -195,9 +192,6 @@ export function AdminTabs(props: AdminTabsProps) {
         />
       </TabsContent>
 
-      <TabsContent value="categories-process">
-        <CategoriesProcessTab />
-      </TabsContent>
 
       <TabsContent value="export">
         <DataExportTab />
