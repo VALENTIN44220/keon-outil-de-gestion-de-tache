@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ProcessWithTasks, TaskTemplate, VISIBILITY_LABELS, TemplateVisibility } from '@/types/template';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -10,8 +10,9 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { MoreVertical, Trash2, Building2, Briefcase, ListTodo, Edit, Layers, Eye, Lock, Users, Globe, Workflow } from 'lucide-react';
+import { MoreVertical, Trash2, Building2, Briefcase, ListTodo, Edit, Layers, Eye, Lock, Users, Globe, Workflow, CheckCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { cn } from '@/lib/utils';
 
 interface ProcessCardProps {
   process: ProcessWithTasks;
@@ -31,13 +32,20 @@ const visibilityIcons: Record<string, any> = {
   public: Globe,
 };
 
+interface WorkflowStatus {
+  status: 'active' | 'draft' | 'none';
+  nodeCount: number;
+  hasValidation: boolean;
+}
+
 export function ProcessCard({ process, onDelete, onEdit, onViewDetails, onAddTask, onDeleteTask, canManage = false, compact = false }: ProcessCardProps) {
   const navigate = useNavigate();
   const [subProcessCount, setSubProcessCount] = useState(0);
   const [targetDepartments, setTargetDepartments] = useState<string[]>([]);
+  const [workflowStatus, setWorkflowStatus] = useState<WorkflowStatus>({ status: 'none', nodeCount: 0, hasValidation: false });
 
   useEffect(() => {
-    const fetchSubProcessData = async () => {
+    const fetchData = async () => {
       // Fetch sub-process count and their target departments
       const { data: subProcesses } = await supabase
         .from('sub_process_templates')
@@ -57,13 +65,43 @@ export function ProcessCard({ process, onDelete, onEdit, onViewDetails, onAddTas
         });
         setTargetDepartments(Array.from(uniqueDepts));
       }
+
+      // Fetch workflow status
+      const { data: workflowData } = await supabase
+        .from('workflow_templates')
+        .select('id, status, workflow_nodes(id, type)')
+        .eq('process_template_id', process.id)
+        .maybeSingle();
+
+      if (workflowData) {
+        const nodes = (workflowData as any).workflow_nodes || [];
+        const hasValidation = nodes.some((n: any) => n.type === 'validation');
+        const status = workflowData.status;
+        const isActive = status !== 'draft' && status !== 'archived' && status !== 'inactive';
+        setWorkflowStatus({
+          status: isActive ? 'active' : (status === 'draft' ? 'draft' : 'none'),
+          nodeCount: nodes.length,
+          hasValidation
+        });
+      }
     };
-    fetchSubProcessData();
+    fetchData();
   }, [process.id]);
 
   const directTaskCount = process.task_templates.filter(t => !t.sub_process_template_id).length;
   const VisibilityIcon = visibilityIcons[process.visibility_level] || Globe;
 
+  // Get workflow status badge
+  const getWorkflowBadge = () => {
+    if (workflowStatus.status === 'active') {
+      return <Badge className="bg-success/20 text-success border-success/30 text-[10px] px-1.5 py-0">Actif</Badge>;
+    } else if (workflowStatus.status === 'draft') {
+      return <Badge className="bg-warning/20 text-warning border-warning/30 text-[10px] px-1.5 py-0">Brouillon</Badge>;
+    }
+    return null;
+  };
+
+  // Compact list view (horizontal)
   if (compact) {
     return (
       <Card 
@@ -73,6 +111,7 @@ export function ProcessCard({ process, onDelete, onEdit, onViewDetails, onAddTas
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="font-medium text-sm truncate">{process.name}</span>
+            {getWorkflowBadge()}
             <Badge variant="outline" className="text-xs shrink-0">
               <VisibilityIcon className="h-3 w-3 mr-1" />
               {VISIBILITY_LABELS[process.visibility_level as TemplateVisibility]}
@@ -110,106 +149,124 @@ export function ProcessCard({ process, onDelete, onEdit, onViewDetails, onAddTas
     );
   }
 
+  // Grid card view (default) - Condensed style like screenshot
   return (
     <Card 
-      className="flex flex-col cursor-pointer hover:shadow-md transition-shadow"
+      className="flex flex-col cursor-pointer hover:shadow-md transition-all hover:border-primary/30 bg-card"
       onClick={onViewDetails}
     >
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <CardTitle className="text-lg line-clamp-1">{process.name}</CardTitle>
-            {process.description && (
-              <CardDescription className="mt-1 line-clamp-2">
-                {process.description}
-              </CardDescription>
-            )}
+      <CardContent className="p-3 space-y-2">
+        {/* Header: Name + Workflow Badge + Target Dept */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-semibold text-sm truncate">{process.name}</h3>
+              {getWorkflowBadge()}
+              {targetDepartments.length > 0 && (
+                <Badge variant="secondary" className="bg-info/20 text-info border-info/30 text-[10px] px-1.5 py-0 shrink-0">
+                  {targetDepartments[0]}
+                </Badge>
+              )}
+            </div>
           </div>
-          {canManage && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onViewDetails(); }}>
-                  <Eye className="h-4 w-4 mr-2" />
-                  Voir les détails
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/templates/workflow/process/${process.id}`); }}>
-                  <Workflow className="h-4 w-4 mr-2" />
-                  Éditer le workflow
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
-                  <Edit className="h-4 w-4 mr-2" />
-                  Modifier
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={(e) => { e.stopPropagation(); onDelete(); }}
-                  className="text-destructive focus:text-destructive"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Supprimer
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+              <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0">
+                <MoreVertical className="h-3.5 w-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onViewDetails(); }}>
+                <Eye className="h-4 w-4 mr-2" />
+                Voir les détails
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/templates/workflow/process/${process.id}`); }}>
+                <Workflow className="h-4 w-4 mr-2" />
+                Éditer le workflow
+              </DropdownMenuItem>
+              {canManage && (
+                <>
+                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
+                    <Edit className="h-4 w-4 mr-2" />
+                    Modifier
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Supprimer
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {/* Meta info row */}
+        <div className="flex items-center gap-2 text-[11px] text-muted-foreground flex-wrap">
+          {process.department && (
+            <span className="flex items-center gap-1">
+              <Briefcase className="h-3 w-3" />
+              Par {process.department.toLowerCase()}
+            </span>
+          )}
+          <span className="flex items-center gap-1">
+            <ListTodo className="h-3 w-3" />
+            {subProcessCount + directTaskCount} tâche(s)
+          </span>
+          <span className="flex items-center gap-1">
+            <VisibilityIcon className="h-3 w-3" />
+            {process.visibility_level === 'public' ? 'Public' : 'Privé'}
+          </span>
+          {workflowStatus.hasValidation && (
+            <span className="flex items-center gap-1 text-success">
+              <CheckCircle className="h-3 w-3" />
+              Validation
+            </span>
           )}
         </div>
 
-        <div className="flex flex-wrap gap-2 mt-3">
-          <Badge variant="outline" className="text-xs">
-            <VisibilityIcon className="h-3 w-3 mr-1" />
-            {VISIBILITY_LABELS[process.visibility_level as TemplateVisibility]}
-          </Badge>
-          {process.company && (
-            <Badge variant="outline" className="text-xs">
-              <Building2 className="h-3 w-3 mr-1" />
-              {process.company}
-            </Badge>
-          )}
-          {targetDepartments.length > 0 && targetDepartments.map(dept => (
-            <Badge key={dept} variant="secondary" className="text-xs">
-              <Briefcase className="h-3 w-3 mr-1" />
-              {dept}
-            </Badge>
-          ))}
-        </div>
-      </CardHeader>
-
-      <CardContent className="flex-1">
-        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-          <div className="flex items-center gap-1.5">
-            <Layers className="h-4 w-4" />
-            <span>{subProcessCount} sous-processus</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <ListTodo className="h-4 w-4" />
-            <span>{directTaskCount} tâche(s)</span>
-          </div>
-        </div>
-
-        <div className="flex gap-2 mt-4">
+        {/* Action buttons */}
+        <div className="flex items-center gap-1.5 pt-1">
+          <Button 
+            variant="default" 
+            size="sm" 
+            className="h-7 px-2.5 text-xs"
+            onClick={(e) => { e.stopPropagation(); onViewDetails(); }}
+          >
+            <Eye className="h-3 w-3 mr-1" />
+            {canManage ? 'Gérer' : 'Voir'}
+          </Button>
           <Button 
             variant="outline" 
             size="sm" 
-            className="flex-1"
-            onClick={(e) => { e.stopPropagation(); onViewDetails(); }}
+            className="h-7 px-2.5 text-xs bg-success/10 border-success/30 text-success hover:bg-success/20"
+            onClick={(e) => { e.stopPropagation(); navigate(`/templates/workflow/process/${process.id}`); }}
           >
-            <Eye className="h-4 w-4 mr-2" />
-            {canManage ? 'Gérer' : 'Voir'}
+            <Workflow className="h-3 w-3 mr-1" />
           </Button>
-          {canManage && (
-            <Button 
-              variant="default" 
-              size="sm" 
-              className="flex-1"
-              onClick={(e) => { e.stopPropagation(); navigate(`/templates/workflow/process/${process.id}`); }}
-            >
-              <Workflow className="h-4 w-4 mr-2" />
-              Workflow
-            </Button>
-          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+              <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                <MoreVertical className="h-3.5 w-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
+                <Edit className="h-4 w-4 mr-2" />
+                Modifier
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Supprimer
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </CardContent>
     </Card>
