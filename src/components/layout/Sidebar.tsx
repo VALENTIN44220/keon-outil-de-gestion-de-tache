@@ -1,4 +1,5 @@
-import { LayoutDashboard, BarChart3, Users, Settings, ChevronLeft, ChevronRight, Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText, ArrowLeftRight } from 'lucide-react';
+import React from 'react';
+import { LayoutDashboard, BarChart3, Users, ChevronLeft, ChevronRight, Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText, ArrowLeftRight } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
 import { useAuth } from '@/contexts/AuthContext';
@@ -69,6 +70,58 @@ const adminMenuItem = {
   path: '/admin'
 };
 
+// Color assignments for menu items - using new premium palette
+const menuColors: Record<string, { bg: string; text: string; border: string; iconBg: string }> = {
+  dashboard: { 
+    bg: 'bg-primary/10', 
+    text: 'text-primary', 
+    border: 'border-primary',
+    iconBg: 'bg-gradient-to-br from-primary to-primary/80'
+  },
+  requests: { 
+    bg: 'bg-warning/10', 
+    text: 'text-warning', 
+    border: 'border-warning',
+    iconBg: 'bg-gradient-to-br from-warning to-warning/80'
+  },
+  templates: { 
+    bg: 'bg-success/10', 
+    text: 'text-success', 
+    border: 'border-success',
+    iconBg: 'bg-gradient-to-br from-success to-success/80'
+  },
+  workload: { 
+    bg: 'bg-accent/10', 
+    text: 'text-accent', 
+    border: 'border-accent',
+    iconBg: 'bg-gradient-to-br from-accent to-accent/80'
+  },
+  projects: { 
+    bg: 'bg-info/10', 
+    text: 'text-info', 
+    border: 'border-info',
+    iconBg: 'bg-gradient-to-br from-info to-info/80'
+  },
+  analytics: { 
+    bg: 'bg-info/10', 
+    text: 'text-info', 
+    border: 'border-info',
+    iconBg: 'bg-gradient-to-br from-info to-info/80'
+  },
+  team: { 
+    bg: 'bg-accent/10', 
+    text: 'text-accent', 
+    border: 'border-accent',
+    iconBg: 'bg-gradient-to-br from-accent to-accent/80'
+  },
+  admin: { 
+    bg: 'bg-destructive/10', 
+    text: 'text-destructive', 
+    border: 'border-destructive',
+    iconBg: 'bg-gradient-to-br from-destructive to-destructive/80'
+  },
+};
+
 export function Sidebar({
   activeView,
   onViewChange
@@ -89,10 +142,8 @@ export function Sidebar({
   const { profile: authProfile } = useAuth();
   const { isSimulating, simulatedProfile } = useSimulation();
   
-  // Use simulated profile for display if in simulation mode
   const profile = isSimulating && simulatedProfile ? simulatedProfile : authProfile;
 
-  // Build menu items based on effective permissions
   const menuItems = useMemo(() => {
     const filtered = allMenuItems.filter(item => canAccessScreen(item.permissionKey));
     if (isAdmin) {
@@ -101,24 +152,20 @@ export function Sidebar({
     return filtered;
   }, [effectivePermissions, isAdmin, canAccessScreen]);
 
-  // On mobile/tablet, always collapsed. On desktop, use manual state
   const collapsed = isMobile || manualCollapsed;
 
-  // Persist collapsed preference (desktop only)
   useEffect(() => {
     if (!isMobile) {
       localStorage.setItem('sidebar-collapsed', manualCollapsed ? 'true' : 'false');
     }
   }, [manualCollapsed, isMobile]);
 
-  // Persist sidebar position preference
   const toggleSidebarPosition = () => {
     const newPosition = !isRightSide;
     setIsRightSide(newPosition);
     localStorage.setItem('sidebar-position', newPosition ? 'right' : 'left');
   };
 
-  // Fetch permission profile name
   useEffect(() => {
     async function fetchPermissionProfile() {
       if (profile?.permission_profile_id) {
@@ -130,7 +177,6 @@ export function Sidebar({
         if (data && !error) {
           setPermissionProfileName(data.name);
         } else {
-          console.log('Error fetching permission profile:', error);
           setPermissionProfileName(null);
         }
       } else {
@@ -140,7 +186,6 @@ export function Sidebar({
     fetchPermissionProfile();
   }, [profile?.permission_profile_id, profile?.id]);
 
-  // Get user initials from display name
   const getInitials = (name: string | null | undefined) => {
     if (!name) return '?';
     const parts = name.trim().split(' ');
@@ -150,12 +195,8 @@ export function Sidebar({
     return name.slice(0, 2).toUpperCase();
   };
 
-// Handle menu item click - navigate and update view, keep sidebar state unchanged
   const handleMenuClick = (itemId: string, path: string) => {
-    // Update the active view
     onViewChange(itemId);
-    
-    // Navigate to the appropriate path
     const currentPath = window.location.pathname;
     if (path === '/') {
       if (currentPath !== '/') {
@@ -164,20 +205,6 @@ export function Sidebar({
     } else if (currentPath !== path) {
       navigate(path);
     }
-    // Sidebar stays in its current state (collapsed or expanded)
-  };
-
-  // Color assignments for menu items
-  const menuColors: Record<string, { active: string; hover: string; icon: string }> = {
-    dashboard: { active: 'bg-keon-blue', hover: 'hover:border-keon-blue hover:text-keon-blue', icon: 'text-keon-blue' },
-    requests: { active: 'bg-keon-orange', hover: 'hover:border-keon-orange hover:text-keon-orange', icon: 'text-keon-orange' },
-    templates: { active: 'bg-keon-green', hover: 'hover:border-keon-green hover:text-keon-green', icon: 'text-keon-green' },
-    workload: { active: 'bg-purple-500', hover: 'hover:border-purple-500 hover:text-purple-500', icon: 'text-purple-500' },
-    projects: { active: 'bg-keon-terose', hover: 'hover:border-keon-terose hover:text-keon-terose', icon: 'text-keon-terose' },
-    analytics: { active: 'bg-cyan-500', hover: 'hover:border-cyan-500 hover:text-cyan-500', icon: 'text-cyan-500' },
-    team: { active: 'bg-indigo-500', hover: 'hover:border-indigo-500 hover:text-indigo-500', icon: 'text-indigo-500' },
-    
-    admin: { active: 'bg-red-500', hover: 'hover:border-red-500 hover:text-red-500', icon: 'text-red-500' },
   };
 
   return (
@@ -186,29 +213,36 @@ export function Sidebar({
       className={cn(
         "top-0 h-screen flex flex-col transition-all duration-300 ease-in-out",
         collapsed 
-          ? "relative w-16 flex-shrink-0 bg-gradient-to-b from-keon-50 to-white" 
-          : "fixed w-64 z-40 bg-gradient-to-b from-white to-keon-50 shadow-keon-lg",
-        isRightSide ? "right-0 border-l border-keon-200" : "left-0 border-r border-keon-200",
-        !collapsed && isRightSide && "order-last"
+          ? "relative w-[72px] flex-shrink-0 bg-white" 
+          : "fixed w-64 z-40 bg-white shadow-premium-xl",
+        isRightSide ? "right-0" : "left-0",
+        "border-r border-border"
       )}
     >
-      {/* Logo KEON with colored accent */}
-      <div className="p-4 flex items-center justify-between border-b border-keon-200 relative">
-        <div className="absolute bottom-0 left-0 right-0 h-0.5 line-keon-spectre opacity-60" />
+      {/* Logo with gradient accent */}
+      <div className="p-4 flex items-center justify-between relative">
+        {/* Gradient accent line at bottom */}
+        <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-primary via-accent to-success opacity-80" />
+        
         {!collapsed && (
-          <div className="flex items-center gap-2">
-            <img src={keonLogo} alt="KEON Group" className="h-8 w-auto" />
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <img src={keonLogo} alt="KEON Group" className="h-10 w-auto rounded-lg shadow-sm" />
+              <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-success rounded-full border-2 border-white" />
+            </div>
+            <div className="flex flex-col">
+              <span className="font-display text-sm font-semibold text-foreground tracking-wide">KEON</span>
+              <span className="text-[10px] text-muted-foreground">Task Manager</span>
+            </div>
           </div>
         )}
         
-        {/* Collapse/Expand button only on desktop */}
         {!isMobile && (
           <div className="flex items-center gap-1">
-            {/* Position toggle only visible when expanded */}
             {!collapsed && (
               <button 
                 onClick={toggleSidebarPosition} 
-                className="p-2 rounded-sm text-keon-500 hover:text-keon-blue hover:bg-keon-blue/10 transition-colors"
+                className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all duration-200"
                 title={isRightSide ? "Déplacer à gauche" : "Déplacer à droite"}
               >
                 <ArrowLeftRight className="w-4 h-4" />
@@ -216,7 +250,7 @@ export function Sidebar({
             )}
             <button 
               onClick={() => setManualCollapsed(!manualCollapsed)} 
-              className="p-2 rounded-sm text-keon-500 hover:text-keon-blue hover:bg-keon-blue/10 transition-colors"
+              className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all duration-200"
               title={collapsed ? "Étendre" : "Replier"}
             >
               {collapsed 
@@ -227,81 +261,106 @@ export function Sidebar({
           </div>
         )}
         
-        {/* On mobile show icon only */}
         {isMobile && collapsed && (
-          <img src={keonLogo} alt="KEON" className="h-8 w-8 object-cover rounded-sm" />
+          <img src={keonLogo} alt="KEON" className="h-10 w-10 object-cover rounded-lg mx-auto" />
         )}
       </div>
 
-      {/* Navigation with colorful icons */}
-      <nav className="flex-1 p-3 space-y-1.5 overflow-y-auto">
-        {menuItems.map(item => {
+      {/* Separator with subtle gradient */}
+      <div className="px-3 my-2">
+        <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 px-3 space-y-1 overflow-y-auto">
+        {menuItems.map((item, index) => {
           const Icon = item.icon;
           const isActive = activeView === item.id;
-          const colors = menuColors[item.id] || menuColors.settings;
+          const colors = menuColors[item.id] || menuColors.dashboard;
+          
+          // Add separator before admin
+          const showSeparator = item.id === 'admin' && index > 0;
           
           return (
-            <button 
-              key={item.id} 
-              onClick={() => handleMenuClick(item.id, item.path)} 
-              className={cn(
-                "w-full flex items-center gap-3 transition-all duration-200 font-body group",
-                collapsed ? "justify-center p-0" : "px-3 py-2.5 rounded-lg",
-                !collapsed && isActive && "bg-gradient-to-r from-keon-100/80 to-transparent"
+            <React.Fragment key={item.id}>
+              {showSeparator && (
+                <div className="py-2">
+                  <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+                </div>
               )}
-              title={collapsed ? item.label : undefined}
-            >
-              {/* Icon with colored styling */}
-              <div className={cn(
-                "flex items-center justify-center p-2.5 rounded-lg transition-all duration-200 relative overflow-hidden",
-                isActive 
-                  ? cn(colors.active, "text-white shadow-md") 
-                  : cn("bg-white border-2 border-keon-200 text-keon-500 shadow-sm", colors.hover),
-                "group-hover:scale-105"
-              )}>
-                <Icon className="w-5 h-5 relative z-10" />
-                {isActive && (
-                  <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent" />
+              <button 
+                onClick={() => handleMenuClick(item.id, item.path)} 
+                className={cn(
+                  "w-full flex items-center gap-3 transition-all duration-200 font-body group relative",
+                  collapsed ? "justify-center p-2" : "px-3 py-2.5 rounded-xl",
+                  isActive && !collapsed && [colors.bg, "border-l-4", colors.border],
+                  !isActive && !collapsed && "hover:bg-muted border-l-4 border-transparent",
                 )}
-              </div>
-              
-              {!collapsed && (
-                <span className={cn(
-                  "font-medium text-sm transition-colors",
-                  isActive ? "text-keon-900 font-semibold" : "text-keon-600 group-hover:text-keon-900"
+                title={collapsed ? item.label : undefined}
+              >
+                {/* Icon container */}
+                <div className={cn(
+                  "flex items-center justify-center rounded-xl transition-all duration-200 relative",
+                  collapsed ? "p-3" : "p-2",
+                  isActive 
+                    ? [colors.iconBg, "text-white shadow-md"]
+                    : "bg-muted text-muted-foreground group-hover:bg-muted group-hover:text-foreground",
                 )}>
-                  {item.label}
-                </span>
-              )}
+                  <Icon className={cn("relative z-10", collapsed ? "w-5 h-5" : "w-4 h-4")} />
+                  {/* Glow effect on active */}
+                  {isActive && (
+                    <div className={cn("absolute inset-0 rounded-xl blur-sm opacity-50", colors.iconBg)} />
+                  )}
+                </div>
+                
+                {!collapsed && (
+                  <>
+                    <span className={cn(
+                      "font-medium text-sm transition-colors flex-1 text-left",
+                      isActive ? [colors.text, "font-semibold"] : "text-muted-foreground group-hover:text-foreground"
+                    )}>
+                      {item.label}
+                    </span>
 
-              {/* Active indicator */}
-              {!collapsed && isActive && (
-                <div className={cn("ml-auto w-1.5 h-1.5 rounded-full", colors.active)} />
-              )}
-            </button>
+                    {/* Active indicator dot */}
+                    {isActive && (
+                      <div className={cn("w-2 h-2 rounded-full", colors.iconBg)} />
+                    )}
+                  </>
+                )}
+              </button>
+            </React.Fragment>
           );
         })}
       </nav>
 
-      {/* User section with gradient */}
-      <div className="p-3 border-t border-keon-200 bg-gradient-to-t from-keon-100/50 to-transparent">
+      {/* Separator */}
+      <div className="px-3 my-2">
+        <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+      </div>
+
+      {/* User section */}
+      <div className="p-3">
         <UserProfilePopover>
           <button className={cn(
-            "w-full flex items-center gap-3 rounded-lg transition-all cursor-pointer group",
-            collapsed ? "justify-center p-2" : "px-3 py-2.5 hover:bg-white/80"
+            "w-full flex items-center gap-3 rounded-xl transition-all duration-200 cursor-pointer group",
+            collapsed ? "justify-center p-2" : "px-3 py-3 hover:bg-muted"
           )}>
-            <Avatar className="h-10 w-10 flex-shrink-0 ring-2 ring-keon-blue/30 group-hover:ring-keon-blue/50 transition-all">
+            <Avatar className={cn(
+              "flex-shrink-0 ring-2 ring-primary/20 group-hover:ring-primary/40 transition-all",
+              collapsed ? "h-10 w-10" : "h-10 w-10"
+            )}>
               <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || 'Utilisateur'} />
-              <AvatarFallback className="bg-gradient-to-br from-keon-blue to-keon-green text-white text-sm font-semibold">
+              <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-white text-sm font-semibold">
                 {getInitials(profile?.display_name)}
               </AvatarFallback>
             </Avatar>
             {!collapsed && (
               <div className="flex-1 min-w-0 text-left">
-                <p className="text-sm font-semibold text-keon-900 truncate group-hover:text-keon-blue transition-colors">
+                <p className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition-colors">
                   {profile?.display_name || 'Utilisateur'}
                 </p>
-                <p className="text-xs text-keon-500 truncate">
+                <p className="text-xs text-muted-foreground truncate">
                   {permissionProfileName || profile?.job_title || 'Non défini'}
                 </p>
               </div>

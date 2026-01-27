@@ -54,14 +54,16 @@ export function Header({
     .slice(0, 2);
 
   return (
-    <header className="bg-gradient-to-r from-white via-white to-keon-50 border-b border-keon-200 px-6 py-4 sticky top-0 z-30 relative">
-      {/* Subtle spectre accent line */}
-      <div className="absolute bottom-0 left-0 right-0 h-0.5 line-keon-spectre opacity-40" />
+    <header className="header-premium border-b border-border px-6 py-4 sticky top-0 z-30 relative">
+      {/* Gradient accent line at bottom */}
+      <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-primary via-accent to-success opacity-60" />
       
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl bg-gradient-to-r from-keon-900 via-keon-700 to-keon-blue bg-clip-text text-transparent">{title}</h1>
-          <p className="text-sm text-keon-500 mt-0.5 font-body normal-case">
+          <h1 className="text-2xl font-display font-semibold tracking-wide text-foreground">
+            {title}
+          </h1>
+          <p className="text-sm text-muted-foreground mt-0.5 font-body normal-case">
             {new Date().toLocaleDateString('fr-FR', { 
               weekday: 'long', 
               year: 'numeric', 
@@ -72,15 +74,15 @@ export function Header({
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-keon-500" />
+          {/* Search with icon integrated */}
+          <div className="relative group">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
             <Input
               type="text"
               placeholder="Rechercher..."
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="pl-9 w-64"
+              className="pl-10 w-64 bg-white"
             />
           </div>
 
@@ -94,7 +96,7 @@ export function Header({
             onCommentNotificationClick={onCommentNotificationClick}
           />
 
-          {/* Add Task - Only show if onAddTask is provided */}
+          {/* Add Task Button */}
           {onAddTask && (
             <Button onClick={onAddTask} className="gap-2">
               <Plus className="w-4 h-4" />
@@ -105,29 +107,35 @@ export function Header({
           {/* User Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0 ring-2 ring-keon-200 hover:ring-keon-blue transition-all">
-                <Avatar className="h-10 w-10">
+              <Button variant="ghost" className="relative h-11 w-11 rounded-full p-0 ring-2 ring-border hover:ring-primary/30 transition-all">
+                <Avatar className="h-11 w-11">
                   <AvatarImage src={profile?.avatar_url || undefined} alt={displayName} />
-                  <AvatarFallback className="bg-gradient-to-br from-keon-blue to-keon-green text-white font-semibold">
+                  <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-white font-semibold">
                     {initials}
                   </AvatarFallback>
                 </Avatar>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <div className="flex items-center justify-start gap-2 p-2">
+            <DropdownMenuContent align="end" className="w-56 shadow-premium-lg border-border bg-white">
+              <div className="flex items-center justify-start gap-2 p-3">
+                <Avatar className="h-10 w-10">
+                  <AvatarImage src={profile?.avatar_url || undefined} alt={displayName} />
+                  <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-white font-semibold text-sm">
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
                 <div className="flex flex-col space-y-0.5">
-                  <p className="text-sm font-medium text-keon-900">{displayName}</p>
-                  <p className="text-xs text-keon-500">{user?.email}</p>
+                  <p className="text-sm font-semibold text-foreground">{displayName}</p>
+                  <p className="text-xs text-muted-foreground">{user?.email}</p>
                 </div>
               </div>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => navigate('/profile')}>
+              <DropdownMenuSeparator className="bg-border" />
+              <DropdownMenuItem onClick={() => navigate('/profile')} className="cursor-pointer">
                 <User className="mr-2 h-4 w-4" />
                 Profil
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={signOut} className="text-keon-terose">
+              <DropdownMenuSeparator className="bg-border" />
+              <DropdownMenuItem onClick={signOut} className="text-destructive cursor-pointer focus:text-destructive">
                 <LogOut className="mr-2 h-4 w-4" />
                 Déconnexion
               </DropdownMenuItem>

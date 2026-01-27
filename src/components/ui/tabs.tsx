@@ -12,7 +12,7 @@ const TabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      "inline-flex h-11 items-center justify-center rounded-xl bg-gradient-to-r from-keon-100 to-keon-50 p-1 text-keon-600 border border-keon-200",
+      "inline-flex h-12 items-center gap-1 rounded-xl bg-muted/50 p-1 text-muted-foreground",
       className,
     )}
     {...props}
@@ -27,10 +27,14 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      "inline-flex items-center justify-center whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium ring-offset-background transition-all",
-      "data-[state=active]:bg-white data-[state=active]:text-keon-blue data-[state=active]:shadow-md data-[state=active]:border data-[state=active]:border-keon-blue/30",
-      "data-[state=inactive]:text-keon-600 data-[state=inactive]:hover:text-keon-900 data-[state=inactive]:hover:bg-white/50",
-      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-keon-blue focus-visible:ring-offset-2",
+      "inline-flex items-center justify-center whitespace-nowrap rounded-lg px-4 py-2.5 text-sm font-medium ring-offset-background transition-all duration-200",
+      // Active state
+      "data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-md",
+      "data-[state=active]:border-b-2 data-[state=active]:border-primary",
+      // Inactive state
+      "data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-white/50",
+      // Focus
+      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
       "disabled:pointer-events-none disabled:opacity-50",
       className,
     )}
@@ -46,7 +50,7 @@ const TabsContent = React.forwardRef<
   <TabsPrimitive.Content
     ref={ref}
     className={cn(
-      "mt-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+      "mt-4 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 animate-fade-in",
       className,
     )}
     {...props}
