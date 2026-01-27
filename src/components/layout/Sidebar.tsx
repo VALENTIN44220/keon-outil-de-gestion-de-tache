@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, BarChart3, Users, ChevronLeft, ChevronRight, Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText, ArrowLeftRight } from 'lucide-react';
+import { LayoutDashboard, BarChart3, Users, ChevronLeft, ChevronRight, Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText, ArrowLeftRight, Calendar } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
 import { useAuth } from '@/contexts/AuthContext';
@@ -42,6 +42,12 @@ const allMenuItems = [{
   label: 'Plan de charge',
   icon: CalendarClock,
   path: '/workload',
+  permissionKey: 'can_access_workload' as ScreenPermissionKey
+}, {
+  id: 'calendar',
+  label: 'Calendrier',
+  icon: Calendar,
+  path: '/calendar',
   permissionKey: 'can_access_workload' as ScreenPermissionKey
 }, {
   id: 'projects',
@@ -89,6 +95,12 @@ const menuColors: Record<string, { bg: string; text: string; border: string; ico
     text: 'text-accent', 
     border: 'border-accent',
     iconBg: 'bg-gradient-to-br from-accent to-accent/80'
+  },
+  calendar: { 
+    bg: 'bg-[#0078D4]/10', 
+    text: 'text-[#0078D4]', 
+    border: 'border-[#0078D4]',
+    iconBg: 'bg-gradient-to-br from-[#0078D4] to-[#0078D4]/80'
   },
   projects: { 
     bg: 'bg-info/10', 

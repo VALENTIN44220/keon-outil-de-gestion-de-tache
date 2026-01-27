@@ -15,6 +15,7 @@ import Projects from "./pages/Projects";
 import Admin from "./pages/Admin";
 import Workload from "./pages/Workload";
 import Requests from "./pages/Requests";
+import CalendarPage from "./pages/Calendar";
 import DesignSystem from "./pages/DesignSystem";
 import WorkflowEditor from "./pages/WorkflowEditor";
 import NotFound from "./pages/NotFound";
@@ -85,6 +86,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Requests />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/calendar"
+              element={
+                <ProtectedRoute>
+                  <CalendarPage />
                 </ProtectedRoute>
               }
             />

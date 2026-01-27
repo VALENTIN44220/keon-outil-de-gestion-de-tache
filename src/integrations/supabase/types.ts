@@ -626,6 +626,54 @@ export type Database = {
           },
         ]
       }
+      outlook_calendar_events: {
+        Row: {
+          attendees: Json | null
+          color: string | null
+          created_at: string
+          end_time: string
+          id: string
+          is_all_day: boolean | null
+          location: string | null
+          organizer_email: string | null
+          outlook_event_id: string
+          start_time: string
+          subject: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          attendees?: Json | null
+          color?: string | null
+          created_at?: string
+          end_time: string
+          id?: string
+          is_all_day?: boolean | null
+          location?: string | null
+          organizer_email?: string | null
+          outlook_event_id: string
+          start_time: string
+          subject: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          attendees?: Json | null
+          color?: string | null
+          created_at?: string
+          end_time?: string
+          id?: string
+          is_all_day?: boolean | null
+          location?: string | null
+          organizer_email?: string | null
+          outlook_event_id?: string
+          start_time?: string
+          subject?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       pending_task_assignments: {
         Row: {
           assigned_at: string | null
@@ -2398,6 +2446,62 @@ export type Database = {
           {
             foreignKeyName: "user_leaves_user_id_fkey"
             columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_microsoft_connections: {
+        Row: {
+          access_token: string | null
+          created_at: string
+          display_name: string | null
+          email: string | null
+          id: string
+          is_calendar_sync_enabled: boolean | null
+          is_email_sync_enabled: boolean | null
+          last_sync_at: string | null
+          profile_id: string | null
+          refresh_token: string | null
+          token_expires_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token?: string | null
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id?: string
+          is_calendar_sync_enabled?: boolean | null
+          is_email_sync_enabled?: boolean | null
+          last_sync_at?: string | null
+          profile_id?: string | null
+          refresh_token?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string | null
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id?: string
+          is_calendar_sync_enabled?: boolean | null
+          is_email_sync_enabled?: boolean | null
+          last_sync_at?: string | null
+          profile_id?: string | null
+          refresh_token?: string | null
+          token_expires_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_microsoft_connections_profile_id_fkey"
+            columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
