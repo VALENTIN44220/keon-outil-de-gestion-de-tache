@@ -142,7 +142,7 @@ export function SubProcessTemplatesList({
 
   return (
     <>
-      <div className={isGridView ? 'space-y-1' : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'}>
+      <div className={isGridView ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3' : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'}>
         {subProcesses.map((sp) => {
           const AssignmentIcon = assignmentTypeLabels[sp.assignment_type]?.icon || Users;
           const VisibilityIcon = visibilityIcons[sp.visibility_level] || Globe;
@@ -150,7 +150,7 @@ export function SubProcessTemplatesList({
           if (isGridView) {
             // Compact/grid view
             return (
-              <Card key={sp.id} className="flex items-center gap-3 p-3 hover:shadow-md transition-shadow">
+              <Card key={sp.id} className="flex flex-col gap-2 p-3 hover:shadow-md transition-shadow">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-sm truncate">{sp.name}</span>
