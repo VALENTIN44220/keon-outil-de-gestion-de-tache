@@ -11,13 +11,14 @@ import { TaskTemplatesList } from '@/components/templates/TaskTemplatesList';
 import { CustomFieldsTab } from '@/components/templates/CustomFieldsTab';
 import { AddIndependentSubProcessDialog } from '@/components/templates/AddIndependentSubProcessDialog';
 import { AddIndependentTaskDialog } from '@/components/templates/AddIndependentTaskDialog';
+import { BulkTaskTemplateImportDialog } from '@/components/templates/BulkTaskTemplateImportDialog';
 import { useProcessTemplates } from '@/hooks/useProcessTemplates';
 import { useAllSubProcessTemplates } from '@/hooks/useAllSubProcessTemplates';
 import { useAllTaskTemplates } from '@/hooks/useAllTaskTemplates';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useTasks } from '@/hooks/useTasks';
 import { useAuth } from '@/contexts/AuthContext';
-import { Loader2, Layers, GitBranch, ListTodo, Plus, FormInput } from 'lucide-react';
+import { Loader2, Layers, GitBranch, ListTodo, Plus, FormInput, Upload } from 'lucide-react';
 import { ProcessTemplate, ProcessWithTasks } from '@/types/template';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -28,6 +29,7 @@ const Templates = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isAddSubProcessDialogOpen, setIsAddSubProcessDialogOpen] = useState(false);
   const [isAddTaskDialogOpen, setIsAddTaskDialogOpen] = useState(false);
+  const [isBulkTaskImportOpen, setIsBulkTaskImportOpen] = useState(false);
   const [editingProcess, setEditingProcess] = useState<ProcessTemplate | null>(null);
   const [viewingProcess, setViewingProcess] = useState<ProcessWithTasks | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -257,6 +259,17 @@ const Templates = () => {
             </TabsContent>
 
             <TabsContent value="tasks">
+              <div className="flex justify-end mb-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsBulkTaskImportOpen(true)}
+                  className="gap-2"
+                >
+                  <Upload className="h-4 w-4" />
+                  Import en masse
+                </Button>
+              </div>
               <TaskTemplatesList
                 tasks={filteredTasks}
                 isLoading={isLoadingTasks}
@@ -288,6 +301,12 @@ const Templates = () => {
       <AddIndependentTaskDialog
         open={isAddTaskDialogOpen}
         onClose={() => setIsAddTaskDialogOpen(false)}
+        onSuccess={refetchTasks}
+      />
+
+      <BulkTaskTemplateImportDialog
+        open={isBulkTaskImportOpen}
+        onClose={() => setIsBulkTaskImportOpen(false)}
         onSuccess={refetchTasks}
       />
 
