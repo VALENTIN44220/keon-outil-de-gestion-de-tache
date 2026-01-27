@@ -19,18 +19,24 @@ export default {
         body: ['Roboto', 'sans-serif'],
       },
       colors: {
-        // KEON Gray palette
+        // KEON Premium palette
         keon: {
           900: "hsl(var(--keon-gray-900))",
           700: "hsl(var(--keon-gray-700))",
           500: "hsl(var(--keon-gray-500))",
+          400: "hsl(var(--keon-gray-400))",
           300: "hsl(var(--keon-gray-300))",
+          200: "hsl(var(--keon-gray-200))",
           100: "hsl(var(--keon-gray-100))",
           50: "hsl(var(--keon-gray-50))",
-          // Accent colors
-          blue: "hsl(var(--keon-blue))",
-          green: "hsl(var(--keon-green))",
-          orange: "hsl(var(--keon-orange))",
+          // Premium accent colors
+          primary: "hsl(var(--keon-primary))",
+          secondary: "hsl(var(--keon-secondary))",
+          accent: "hsl(var(--keon-accent))",
+          // Legacy colors for compatibility
+          blue: "hsl(var(--keon-primary))",
+          green: "hsl(var(--keon-success))",
+          orange: "hsl(var(--keon-warning))",
           terose: "hsl(var(--keon-terose))",
         },
         border: "hsl(var(--border))",
@@ -97,15 +103,24 @@ export default {
         },
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        "2xl": "1rem",
+        xl: "0.75rem",
+        lg: "0.5rem",
+        md: "0.375rem",
+        sm: "0.25rem",
       },
       boxShadow: {
-        'keon-sm': '0 1px 2px 0 rgba(65, 70, 72, 0.05)',
-        'keon': '0 1px 3px 0 rgba(65, 70, 72, 0.08), 0 1px 2px -1px rgba(65, 70, 72, 0.08)',
-        'keon-md': '0 4px 6px -1px rgba(65, 70, 72, 0.08), 0 2px 4px -2px rgba(65, 70, 72, 0.08)',
-        'keon-lg': '0 10px 15px -3px rgba(65, 70, 72, 0.08), 0 4px 6px -4px rgba(65, 70, 72, 0.08)',
+        'premium-sm': '0 1px 2px 0 rgba(15, 23, 42, 0.03)',
+        'premium': '0 1px 3px 0 rgba(15, 23, 42, 0.06), 0 1px 2px -1px rgba(15, 23, 42, 0.06)',
+        'premium-md': '0 4px 6px -1px rgba(15, 23, 42, 0.06), 0 2px 4px -2px rgba(15, 23, 42, 0.06)',
+        'premium-lg': '0 10px 15px -3px rgba(15, 23, 42, 0.06), 0 4px 6px -4px rgba(15, 23, 42, 0.06)',
+        'premium-xl': '0 20px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.08)',
+        'primary-glow': '0 4px 14px -3px rgba(30, 94, 255, 0.35)',
+        // Legacy shadows
+        'keon-sm': '0 1px 2px 0 rgba(15, 23, 42, 0.03)',
+        'keon': '0 1px 3px 0 rgba(15, 23, 42, 0.06), 0 1px 2px -1px rgba(15, 23, 42, 0.06)',
+        'keon-md': '0 4px 6px -1px rgba(15, 23, 42, 0.06), 0 2px 4px -2px rgba(15, 23, 42, 0.06)',
+        'keon-lg': '0 10px 15px -3px rgba(15, 23, 42, 0.06), 0 4px 6px -4px rgba(15, 23, 42, 0.06)',
       },
       keyframes: {
         "accordion-down": {
@@ -128,6 +143,10 @@ export default {
           from: { opacity: "0", transform: "scale(0.95)" },
           to: { opacity: "1", transform: "scale(1)" },
         },
+        "glow": {
+          from: { boxShadow: "0 0 5px rgba(30, 94, 255, 0.2)" },
+          to: { boxShadow: "0 0 20px rgba(30, 94, 255, 0.4)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -135,6 +154,7 @@ export default {
         "fade-in": "fade-in 0.3s ease-out",
         "slide-up": "slide-up 0.3s ease-out",
         "scale-in": "scale-in 0.2s ease-out",
+        "glow": "glow 2s ease-in-out infinite alternate",
       },
     },
   },

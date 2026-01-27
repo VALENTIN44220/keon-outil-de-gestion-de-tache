@@ -4,17 +4,59 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const badgeVariants = cva(
-  "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-all focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+  "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
   {
     variants: {
       variant: {
-        default: "border-transparent bg-gradient-to-r from-keon-blue to-cyan-500 text-white shadow-sm hover:shadow-md",
-        secondary: "border-keon-200 bg-gradient-to-r from-keon-100 to-keon-50 text-keon-700 hover:border-keon-300",
-        destructive: "border-transparent bg-gradient-to-r from-keon-terose to-red-500 text-white shadow-sm hover:shadow-md",
-        outline: "border-keon-300 text-keon-700 bg-white hover:border-keon-blue hover:text-keon-blue",
-        success: "border-transparent bg-gradient-to-r from-keon-green to-emerald-500 text-white shadow-sm hover:shadow-md",
-        warning: "border-transparent bg-gradient-to-r from-keon-orange to-amber-500 text-white shadow-sm hover:shadow-md",
-        info: "border-transparent bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-sm hover:shadow-md",
+        default: [
+          "bg-primary/10 text-primary border border-primary/20",
+          "hover:bg-primary/15",
+        ].join(" "),
+        secondary: [
+          "bg-secondary text-secondary-foreground border border-border",
+          "hover:bg-muted",
+        ].join(" "),
+        destructive: [
+          "bg-destructive/10 text-destructive border border-destructive/20",
+          "hover:bg-destructive/15",
+        ].join(" "),
+        outline: [
+          "border-2 border-border text-muted-foreground bg-white",
+          "hover:border-primary/30 hover:text-primary",
+        ].join(" "),
+        success: [
+          "bg-success/10 text-success border border-success/20",
+          "hover:bg-success/15",
+        ].join(" "),
+        warning: [
+          "bg-warning/10 text-warning border border-warning/20",
+          "hover:bg-warning/15",
+        ].join(" "),
+        info: [
+          "bg-info/10 text-info border border-info/20",
+          "hover:bg-info/15",
+        ].join(" "),
+        accent: [
+          "bg-accent/10 text-accent border border-accent/20",
+          "hover:bg-accent/15",
+        ].join(" "),
+        // Filled variants for more emphasis
+        "default-filled": [
+          "bg-gradient-to-r from-primary to-primary/90 text-primary-foreground",
+          "shadow-sm hover:shadow-md",
+        ].join(" "),
+        "success-filled": [
+          "bg-gradient-to-r from-success to-success/90 text-success-foreground",
+          "shadow-sm hover:shadow-md",
+        ].join(" "),
+        "warning-filled": [
+          "bg-gradient-to-r from-warning to-warning/90 text-warning-foreground",
+          "shadow-sm hover:shadow-md",
+        ].join(" "),
+        "destructive-filled": [
+          "bg-gradient-to-r from-destructive to-destructive/90 text-destructive-foreground",
+          "shadow-sm hover:shadow-md",
+        ].join(" "),
       },
     },
     defaultVariants: {
