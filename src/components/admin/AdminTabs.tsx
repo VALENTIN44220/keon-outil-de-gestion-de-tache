@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building2, Briefcase, Users, Layers, Shield, UserCog, Download, FolderSync, UsersRound, CloudUpload, Grid3X3, UserRoundCog, Workflow } from 'lucide-react';
+import { Building2, Briefcase, Users, Layers, Shield, UserCog, Download, UsersRound, CloudUpload, Grid3X3, UserRoundCog, Workflow } from 'lucide-react';
 import { CompaniesTab } from './CompaniesTab';
 import { DepartmentsTab } from './DepartmentsTab';
 import { JobTitlesTab } from './JobTitlesTab';
@@ -11,7 +11,7 @@ import { UsersTab } from './UsersTab';
 
 
 import { DataExportTab } from './DataExportTab';
-import { GovernanceSyncTab } from './GovernanceSyncTab';
+
 import { CollaboratorGroupsTab } from './CollaboratorGroupsTab';
 import { FabricLakehouseSyncTab } from './FabricLakehouseSyncTab';
 import { DatabaseResetDialog } from './DatabaseResetDialog';
@@ -81,9 +81,6 @@ export function AdminTabs(props: AdminTabsProps) {
           </TabsTrigger>
           <TabsTrigger value="export" className="px-2 py-1.5" title="Export de données">
             <Download className="h-4 w-4" />
-          </TabsTrigger>
-          <TabsTrigger value="sharepoint" className="px-2 py-1.5" title="Synchronisation SharePoint">
-            <FolderSync className="h-4 w-4" />
           </TabsTrigger>
           <TabsTrigger value="fabric" className="px-2 py-1.5" title="Synchronisation Fabric">
             <CloudUpload className="h-4 w-4" />
@@ -188,9 +185,6 @@ export function AdminTabs(props: AdminTabsProps) {
         <DataExportTab />
       </TabsContent>
 
-      <TabsContent value="sharepoint">
-        <GovernanceSyncTab />
-      </TabsContent>
 
       <TabsContent value="fabric">
         <FabricLakehouseSyncTab />

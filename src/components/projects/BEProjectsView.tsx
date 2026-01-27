@@ -2,7 +2,6 @@ import { useState, useMemo } from 'react';
 import { useBEProjects } from '@/hooks/useBEProjects';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { useProjectViewConfig } from '@/hooks/useProjectViewConfig';
-import { useSharePointSync } from '@/hooks/useSharePointSync';
 import { BEProject } from '@/types/beProject';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,10 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Plus, Search, Pencil, Trash2, Building2, FolderOpen, Loader2, RefreshCw, Download, Upload, Eye, FileDown, AlertCircle, CheckCircle2, Stethoscope, Filter } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Building2, FolderOpen, Loader2, FileDown, Filter } from 'lucide-react';
 import { BEProjectDialog } from './BEProjectDialog';
-import { SharePointPreviewDialog } from './SharePointPreviewDialog';
 import { ALL_PROJECT_COLUMNS, ColumnDefinition } from './ProjectColumnSelector';
 import { ProjectViewSelector, ProjectView } from './ProjectViewSelector';
 import { ProjectKanbanView, GroupByField } from './ProjectKanbanView';
@@ -24,7 +21,7 @@ import { fr } from 'date-fns/locale';
 import { toast } from '@/hooks/use-toast';
 
 export function BEProjectsView() {
-  const { projects, isLoading, searchQuery, setSearchQuery, addProject, updateProject, deleteProject, fetchProjects } = useBEProjects();
+  const { projects, isLoading, searchQuery, setSearchQuery, addProject, updateProject, deleteProject } = useBEProjects();
   const { permissionProfile } = useUserPermissions();
   const { 
     activeViewType,
@@ -34,25 +31,10 @@ export function BEProjectsView() {
     switchView,
     getActiveConfig,
   } = useProjectViewConfig();
-  const { 
-    isLoading: isSyncing, 
-    isPreviewLoading,
-    isDiagnosing,
-    previewData,
-    diagnosticResult,
-    getPreview,
-    clearPreview,
-    runDiagnostic,
-    importFromSharePoint, 
-    exportToSharePoint, 
-    fullSync 
-  } = useSharePointSync();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<BEProject | null>(null);
   const [deletingProject, setDeletingProject] = useState<BEProject | null>(null);
-  const [previewAction, setPreviewAction] = useState<'import' | 'export' | 'sync' | null>(null);
-  const [showDiagnosticResult, setShowDiagnosticResult] = useState(false);
   
   // View state
   const [currentView, setCurrentView] = useState<ProjectView>('table');
@@ -76,11 +58,6 @@ export function BEProjectsView() {
   }, [columnOrder, visibleColumns]);
 
   const activeFiltersCount = Object.keys(columnFilters).filter(k => columnFilters[k]?.value).length;
-
-  const handleDiagnose = async () => {
-    setShowDiagnosticResult(true);
-    await runDiagnostic();
-  };
 
   const canCreate = permissionProfile?.can_create_be_projects ?? false;
   const canEdit = permissionProfile?.can_edit_be_projects ?? false;
@@ -111,33 +88,6 @@ export function BEProjectsView() {
       await deleteProject(deletingProject.id);
       setDeletingProject(null);
     }
-  };
-
-  const handlePreviewAction = async (action: 'import' | 'export' | 'sync') => {
-    setPreviewAction(action);
-    await getPreview(action);
-  };
-
-  const handleConfirmSync = async () => {
-    if (!previewAction) return;
-    
-    try {
-      if (previewAction === 'import') {
-        await importFromSharePoint();
-      } else if (previewAction === 'export') {
-        await exportToSharePoint();
-      } else {
-        await fullSync();
-      }
-      fetchProjects();
-    } catch (error) {
-      // Error already handled in hook
-    }
-  };
-
-  const handleClosePreview = () => {
-    setPreviewAction(null);
-    clearPreview();
   };
 
   const handleExportCSV = () => {
@@ -260,37 +210,6 @@ export function BEProjectsView() {
             <FileDown className="h-4 w-4" />
             Export CSV
           </Button>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="gap-2" disabled={isSyncing}>
-                {isSyncing ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-4 w-4" />
-                )}
-                SharePoint
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-background border shadow-lg z-50">
-              <DropdownMenuItem onClick={handleDiagnose} disabled={isDiagnosing}>
-                <Stethoscope className="h-4 w-4 mr-2" />
-                Diagnostic connexion
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handlePreviewAction('sync')}>
-                <Eye className="h-4 w-4 mr-2" />
-                Synchronisation complète
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handlePreviewAction('import')}>
-                <Download className="h-4 w-4 mr-2" />
-                Importer depuis Excel
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handlePreviewAction('export')}>
-                <Upload className="h-4 w-4 mr-2" />
-                Exporter vers Excel
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
 
           {canCreate && (
             <Button onClick={handleAddProject} className="gap-2">
@@ -444,84 +363,6 @@ export function BEProjectsView() {
             <AlertDialogAction onClick={handleConfirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               Supprimer
             </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* SharePoint Preview Dialog */}
-      <SharePointPreviewDialog
-        open={!!previewAction}
-        onClose={handleClosePreview}
-        onConfirm={handleConfirmSync}
-        previewData={previewData}
-        isLoading={isPreviewLoading}
-        action={previewAction || 'import'}
-      />
-
-      {/* Diagnostic Result Dialog */}
-      <AlertDialog open={showDiagnosticResult && !!diagnosticResult} onOpenChange={() => setShowDiagnosticResult(false)}>
-        <AlertDialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              {diagnosticResult?.success ? (
-                <CheckCircle2 className="h-5 w-5 text-green-600" />
-              ) : (
-                <AlertCircle className="h-5 w-5 text-destructive" />
-              )}
-              Diagnostic SharePoint
-            </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-3 text-left">
-                {diagnosticResult && (
-                  <>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <span className="text-muted-foreground">Tenant ID:</span>
-                      <span className="font-mono">{diagnosticResult.tokenDiagnostics?.tenantId || 'N/A'}</span>
-                      
-                      <span className="text-muted-foreground">Client ID:</span>
-                      <span className="font-mono">{diagnosticResult.tokenDiagnostics?.clientId || 'N/A'}</span>
-                      
-                      <span className="text-muted-foreground">Secret configuré:</span>
-                      <span>{diagnosticResult.tokenDiagnostics?.clientSecretSet ? '✓ Oui' : '✗ Non'}</span>
-                      
-                      <span className="text-muted-foreground">Token obtenu:</span>
-                      <span>{diagnosticResult.tokenDiagnostics?.tokenObtained ? '✓ Oui' : '✗ Non'}</span>
-                      
-                      <span className="text-muted-foreground">Accès Graph:</span>
-                      <span>{diagnosticResult.graphAccessOk ? '✓ Oui' : '✗ Non'}</span>
-                      
-                      <span className="text-muted-foreground">Site ID:</span>
-                      <span className="font-mono text-xs">{String(diagnosticResult.siteId || 'N/A')}</span>
-                      
-                      <span className="text-muted-foreground">Drive ID:</span>
-                      <span className="font-mono text-xs">{String(diagnosticResult.driveId || 'N/A')}</span>
-                    </div>
-
-                    {(diagnosticResult as any).fileInfo && (
-                      <div className="border-t pt-2 mt-2">
-                        <p className="font-medium mb-1">Fichier Excel</p>
-                        <div className="grid grid-cols-2 gap-2 text-sm">
-                          <span className="text-muted-foreground">Nom:</span>
-                          <span>{(diagnosticResult as any).fileInfo.name}</span>
-                          <span className="text-muted-foreground">Chemin:</span>
-                          <span className="text-xs">{(diagnosticResult as any).fileInfo.path}</span>
-                        </div>
-                      </div>
-                    )}
-
-                    {diagnosticResult.error && (
-                      <div className="border-t pt-2 mt-2 text-destructive">
-                        <p className="font-medium">Erreur:</p>
-                        <p className="text-sm">{diagnosticResult.error}</p>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Fermer</AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
