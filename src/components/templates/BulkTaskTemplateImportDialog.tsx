@@ -65,8 +65,8 @@ export function BulkTaskTemplateImportDialog({
   const [parseError, setParseError] = useState<string | null>(null);
 
   // Target context
-  const [processId, setProcessId] = useState<string>('');
-  const [subProcessId, setSubProcessId] = useState<string>('');
+  const [processId, setProcessId] = useState<string>('__none__');
+  const [subProcessId, setSubProcessId] = useState<string>('__none__');
 
   // Lists
   const [processes, setProcesses] = useState<{ id: string; name: string }[]>([]);
@@ -92,7 +92,7 @@ export function BulkTaskTemplateImportDialog({
     setSubProcesses(data || []);
   };
 
-  const filteredSubProcesses = processId
+  const filteredSubProcesses = processId && processId !== '__none__'
     ? subProcesses.filter((sp) => sp.process_template_id === processId)
     : subProcesses;
 
@@ -167,7 +167,7 @@ export function BulkTaskTemplateImportDialog({
     setParsedTasks([]);
     setParseError(null);
     setProcessId('');
-    setSubProcessId('');
+    setSubProcessId('__none__');
     onClose();
   };
 
@@ -202,8 +202,8 @@ export function BulkTaskTemplateImportDialog({
           creator_department_id: profile.department_id,
           visibility_level: 'internal_company' as const,
           order_index: i,
-          process_template_id: processId || null,
-          sub_process_template_id: subProcessId || null,
+          process_template_id: processId !== '__none__' ? processId : null,
+          sub_process_template_id: subProcessId !== '__none__' ? subProcessId : null,
         };
 
         const { error } = await supabase.from('task_templates').insert(insertData);
@@ -254,13 +254,13 @@ export function BulkTaskTemplateImportDialog({
               <Label>Processus (optionnel)</Label>
               <Select value={processId} onValueChange={(v) => {
                 setProcessId(v);
-                setSubProcessId('');
+                setSubProcessId('__none__');
               }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Aucun processus" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Aucun processus</SelectItem>
+                  <SelectItem value="__none__">Aucun processus</SelectItem>
                   {processes.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.name}
@@ -272,12 +272,12 @@ export function BulkTaskTemplateImportDialog({
 
             <div className="space-y-2">
               <Label>Sous-processus (optionnel)</Label>
-              <Select value={subProcessId} onValueChange={setSubProcessId} disabled={!processId}>
+              <Select value={subProcessId} onValueChange={setSubProcessId} disabled={processId === '__none__'}>
                 <SelectTrigger>
                   <SelectValue placeholder="Aucun sous-processus" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Aucun sous-processus</SelectItem>
+                  <SelectItem value="__none__">Aucun sous-processus</SelectItem>
                   {filteredSubProcesses.map((sp) => (
                     <SelectItem key={sp.id} value={sp.id}>
                       {sp.name}
