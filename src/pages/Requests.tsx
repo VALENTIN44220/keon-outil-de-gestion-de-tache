@@ -38,17 +38,16 @@ import {
   Building2,
   Inbox,
   User,
-  MessageSquare,
-  Send,
-  Eye,
-  Clock,
-  CheckCircle2,
-  AlertCircle,
   FolderOpen,
   Workflow,
   ChevronRight,
   CheckSquare,
+  Eye,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react';
+import { RequestCard } from '@/components/tasks/RequestCard';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -550,67 +549,19 @@ const Requests = () => {
             />
           </div>
 
-          {/* Request cards */}
-          <div className="grid gap-4">
+          {/* Request cards - Using enriched RequestCard component */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {myOutgoingRequests
               .filter(r => statusFilter === 'all' || r.status === statusFilter)
               .filter(r => priorityFilter === 'all' || r.priority === priorityFilter)
-              .map(request => {
-                const progress = progressMap[request.id];
-                const progressPercent = progress ? (progress.completed / progress.total) * 100 : 0;
-                
-                return (
-                  <Card 
-                    key={request.id} 
-                    className="cursor-pointer hover:shadow-md transition-shadow"
-                    onClick={() => handleViewRequest(request)}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-2">
-                            {getStatusIcon(request.status)}
-                            <h4 className="font-medium truncate">{request.title}</h4>
-                            <Badge variant={request.priority === 'high' ? 'destructive' : request.priority === 'medium' ? 'default' : 'secondary'}>
-                              {request.priority === 'high' ? 'Haute' : request.priority === 'medium' ? 'Moyenne' : 'Basse'}
-                            </Badge>
-                          </div>
-                          
-                          {request.description && (
-                            <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
-                              {request.description}
-                            </p>
-                          )}
-                          
-                          <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                            <span>
-                              Créé le {format(new Date(request.created_at), 'dd MMM yyyy', { locale: fr })}
-                            </span>
-                            {request.due_date && (
-                              <span className="flex items-center gap-1">
-                                <Clock className="h-3 w-3" />
-                                Échéance: {format(new Date(request.due_date), 'dd MMM yyyy', { locale: fr })}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        
-                        <div className="flex flex-col items-end gap-2">
-                          <Badge variant="outline">{getStatusLabel(request.status)}</Badge>
-                          {progress && progress.total > 0 && (
-                            <div className="w-24">
-                              <Progress value={progressPercent} className="h-2" />
-                              <span className="text-xs text-muted-foreground">
-                                {progress.completed}/{progress.total}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+              .map(request => (
+                <RequestCard
+                  key={request.id}
+                  request={request}
+                  onClick={() => handleViewRequest(request)}
+                  progressData={progressMap[request.id]}
+                />
+              ))}
           </div>
         </div>
       )}
