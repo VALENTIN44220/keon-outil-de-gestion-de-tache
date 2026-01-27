@@ -14,23 +14,71 @@ interface ExportTable {
 }
 
 const EXPORTABLE_TABLES: ExportTable[] = [
+  // Organisation
   { name: 'companies', label: 'Sociétés', description: 'Liste des sociétés' },
   { name: 'departments', label: 'Services', description: 'Liste des services' },
   { name: 'job_titles', label: 'Fonctions', description: 'Liste des fonctions' },
   { name: 'hierarchy_levels', label: 'Niveaux hiérarchiques', description: 'Niveaux de la hiérarchie' },
   { name: 'permission_profiles', label: 'Profils de permissions', description: 'Profils de droits utilisateurs' },
   { name: 'profiles', label: 'Utilisateurs', description: 'Profils des utilisateurs' },
+  { name: 'user_roles', label: 'Rôles utilisateurs', description: 'Rôles admin des utilisateurs' },
+  { name: 'collaborator_groups', label: 'Groupes collaborateurs', description: 'Groupes de collaborateurs' },
+  { name: 'collaborator_group_members', label: 'Membres groupes', description: 'Membres des groupes' },
+  { name: 'holidays', label: 'Jours fériés', description: 'Jours fériés par société' },
+  { name: 'user_leaves', label: 'Congés', description: 'Congés des utilisateurs' },
+  
+  // Catégories et règles
   { name: 'categories', label: 'Catégories', description: 'Catégories de tâches' },
   { name: 'subcategories', label: 'Sous-catégories', description: 'Sous-catégories de tâches' },
+  { name: 'assignment_rules', label: 'Règles d\'affectation', description: 'Règles d\'assignation automatique' },
+  
+  // Templates processus
   { name: 'process_templates', label: 'Processus', description: 'Modèles de processus' },
   { name: 'sub_process_templates', label: 'Sous-processus', description: 'Modèles de sous-processus' },
   { name: 'task_templates', label: 'Modèles de tâches', description: 'Modèles de tâches' },
   { name: 'task_template_checklists', label: 'Checklists modèles', description: 'Sous-actions des modèles' },
+  { name: 'template_custom_fields', label: 'Champs personnalisés', description: 'Champs personnalisés des processus' },
+  { name: 'template_validation_levels', label: 'Niveaux validation modèles', description: 'Niveaux de validation des modèles' },
+  
+  // Visibilité templates
+  { name: 'process_template_visible_companies', label: 'Visibilité processus/sociétés', description: 'Visibilité par société' },
+  { name: 'process_template_visible_departments', label: 'Visibilité processus/services', description: 'Visibilité par service' },
+  { name: 'sub_process_template_visible_companies', label: 'Visibilité sous-processus/sociétés', description: 'Visibilité par société' },
+  { name: 'sub_process_template_visible_departments', label: 'Visibilité sous-processus/services', description: 'Visibilité par service' },
+  { name: 'task_template_visible_companies', label: 'Visibilité tâches/sociétés', description: 'Visibilité par société' },
+  { name: 'task_template_visible_departments', label: 'Visibilité tâches/services', description: 'Visibilité par service' },
+  { name: 'permission_profile_process_templates', label: 'Permissions/processus', description: 'Liaison profils-processus' },
+  
+  // Projets BE
   { name: 'be_projects', label: 'Projets', description: 'Projets Bureau d\'Études' },
   { name: 'be_task_labels', label: 'Labels BE', description: 'Labels des tâches BE' },
-  { name: 'assignment_rules', label: 'Règles d\'affectation', description: 'Règles d\'assignation automatique' },
-  { name: 'tasks', label: 'Tâches', description: 'Toutes les tâches' },
+  { name: 'be_request_details', label: 'Détails demandes BE', description: 'Détails des demandes BE' },
+  { name: 'be_request_sub_processes', label: 'Sous-processus demandes BE', description: 'Sous-processus des demandes BE' },
+  
+  // Tâches et demandes
+  { name: 'tasks', label: 'Tâches', description: 'Toutes les tâches et demandes' },
   { name: 'task_checklists', label: 'Checklists tâches', description: 'Sous-actions des tâches' },
+  { name: 'task_attachments', label: 'Pièces jointes', description: 'Pièces jointes des tâches' },
+  { name: 'task_comments', label: 'Commentaires', description: 'Commentaires des tâches' },
+  { name: 'task_validation_levels', label: 'Niveaux validation tâches', description: 'Niveaux de validation' },
+  { name: 'request_field_values', label: 'Valeurs champs', description: 'Valeurs des champs personnalisés' },
+  { name: 'pending_task_assignments', label: 'Affectations en attente', description: 'Tâches à affecter' },
+  
+  // Workflows
+  { name: 'workflow_templates', label: 'Templates workflows', description: 'Modèles de workflows' },
+  { name: 'workflow_template_versions', label: 'Versions workflows', description: 'Versions des workflows' },
+  { name: 'workflow_nodes', label: 'Nœuds workflows', description: 'Nœuds des workflows' },
+  { name: 'workflow_edges', label: 'Connexions workflows', description: 'Connexions entre nœuds' },
+  { name: 'workflow_runs', label: 'Exécutions workflows', description: 'Exécutions en cours' },
+  { name: 'workflow_branch_instances', label: 'Branches workflows', description: 'Instances de branches' },
+  { name: 'workflow_validation_instances', label: 'Validations workflows', description: 'Instances de validations' },
+  { name: 'workflow_notifications', label: 'Notifications workflows', description: 'Notifications générées' },
+  
+  // Configuration
+  { name: 'project_view_configs', label: 'Config vues projets', description: 'Configuration des vues projets' },
+  { name: 'workload_slots', label: 'Créneaux charge', description: 'Créneaux de charge de travail' },
+  { name: 'user_permission_overrides', label: 'Surcharges permissions', description: 'Surcharges de permissions utilisateur' },
+  { name: 'user_process_template_overrides', label: 'Surcharges processus', description: 'Surcharges accès processus' },
 ];
 
 function convertToCSV(data: any[], tableName: string): string {
