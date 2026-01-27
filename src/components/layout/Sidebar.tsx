@@ -173,20 +173,34 @@ export function Sidebar({
     // Sidebar stays in its current state (collapsed or expanded)
   };
 
+  // Color assignments for menu items
+  const menuColors: Record<string, { active: string; hover: string; icon: string }> = {
+    dashboard: { active: 'bg-keon-blue', hover: 'hover:border-keon-blue hover:text-keon-blue', icon: 'text-keon-blue' },
+    requests: { active: 'bg-keon-orange', hover: 'hover:border-keon-orange hover:text-keon-orange', icon: 'text-keon-orange' },
+    templates: { active: 'bg-keon-green', hover: 'hover:border-keon-green hover:text-keon-green', icon: 'text-keon-green' },
+    workload: { active: 'bg-purple-500', hover: 'hover:border-purple-500 hover:text-purple-500', icon: 'text-purple-500' },
+    projects: { active: 'bg-keon-terose', hover: 'hover:border-keon-terose hover:text-keon-terose', icon: 'text-keon-terose' },
+    analytics: { active: 'bg-cyan-500', hover: 'hover:border-cyan-500 hover:text-cyan-500', icon: 'text-cyan-500' },
+    team: { active: 'bg-indigo-500', hover: 'hover:border-indigo-500 hover:text-indigo-500', icon: 'text-indigo-500' },
+    settings: { active: 'bg-keon-700', hover: 'hover:border-keon-700 hover:text-keon-700', icon: 'text-keon-700' },
+    admin: { active: 'bg-red-500', hover: 'hover:border-red-500 hover:text-red-500', icon: 'text-red-500' },
+  };
+
   return (
     <aside 
       data-sidebar-position={isRightSide ? 'right' : 'left'} 
       className={cn(
         "top-0 h-screen flex flex-col transition-all duration-300 ease-in-out",
         collapsed 
-          ? "relative w-16 flex-shrink-0 bg-keon-50" 
-          : "fixed w-64 z-40 bg-white shadow-keon-lg",
-        isRightSide ? "right-0 border-l border-keon-300" : "left-0 border-r border-keon-300",
+          ? "relative w-16 flex-shrink-0 bg-gradient-to-b from-keon-50 to-white" 
+          : "fixed w-64 z-40 bg-gradient-to-b from-white to-keon-50 shadow-keon-lg",
+        isRightSide ? "right-0 border-l border-keon-200" : "left-0 border-r border-keon-200",
         !collapsed && isRightSide && "order-last"
       )}
     >
-      {/* Logo KEON */}
-      <div className="p-4 flex items-center justify-between border-b border-keon-300">
+      {/* Logo KEON with colored accent */}
+      <div className="p-4 flex items-center justify-between border-b border-keon-200 relative">
+        <div className="absolute bottom-0 left-0 right-0 h-0.5 line-keon-spectre opacity-60" />
         {!collapsed && (
           <div className="flex items-center gap-2">
             <img src={keonLogo} alt="KEON Group" className="h-8 w-auto" />
@@ -200,7 +214,7 @@ export function Sidebar({
             {!collapsed && (
               <button 
                 onClick={toggleSidebarPosition} 
-                className="p-2 rounded-sm text-keon-700 hover:text-keon-900 hover:bg-keon-100 transition-colors"
+                className="p-2 rounded-sm text-keon-500 hover:text-keon-blue hover:bg-keon-blue/10 transition-colors"
                 title={isRightSide ? "Déplacer à gauche" : "Déplacer à droite"}
               >
                 <ArrowLeftRight className="w-4 h-4" />
@@ -208,7 +222,7 @@ export function Sidebar({
             )}
             <button 
               onClick={() => setManualCollapsed(!manualCollapsed)} 
-              className="p-2 rounded-sm text-keon-700 hover:text-keon-900 hover:bg-keon-100 transition-colors"
+              className="p-2 rounded-sm text-keon-500 hover:text-keon-blue hover:bg-keon-blue/10 transition-colors"
               title={collapsed ? "Étendre" : "Replier"}
             >
               {collapsed 
@@ -225,61 +239,72 @@ export function Sidebar({
         )}
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+      {/* Navigation with colorful icons */}
+      <nav className="flex-1 p-3 space-y-1.5 overflow-y-auto">
         {menuItems.map(item => {
           const Icon = item.icon;
           const isActive = activeView === item.id;
+          const colors = menuColors[item.id] || menuColors.settings;
           
           return (
             <button 
               key={item.id} 
               onClick={() => handleMenuClick(item.id, item.path)} 
               className={cn(
-                "w-full flex items-center gap-3 transition-all duration-200 font-body",
-                collapsed ? "justify-center p-0" : "px-3 py-2.5 rounded-sm"
+                "w-full flex items-center gap-3 transition-all duration-200 font-body group",
+                collapsed ? "justify-center p-0" : "px-3 py-2.5 rounded-lg",
+                !collapsed && isActive && "bg-gradient-to-r from-keon-100/80 to-transparent"
               )}
               title={collapsed ? item.label : undefined}
             >
-              {/* Icon with KEON styling */}
+              {/* Icon with colored styling */}
               <div className={cn(
-                "flex items-center justify-center p-2.5 rounded-sm transition-all duration-200",
+                "flex items-center justify-center p-2.5 rounded-lg transition-all duration-200 relative overflow-hidden",
                 isActive 
-                  ? "bg-keon-900 text-white shadow-keon" 
-                  : "bg-white border border-keon-300 text-keon-700 hover:border-keon-500 hover:text-keon-900 shadow-keon-sm"
+                  ? cn(colors.active, "text-white shadow-md") 
+                  : cn("bg-white border-2 border-keon-200 text-keon-500 shadow-sm", colors.hover),
+                "group-hover:scale-105"
               )}>
-                <Icon className="w-5 h-5" />
+                <Icon className="w-5 h-5 relative z-10" />
+                {isActive && (
+                  <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent" />
+                )}
               </div>
               
               {!collapsed && (
                 <span className={cn(
-                  "font-medium text-sm",
-                  isActive ? "text-keon-900" : "text-keon-700"
+                  "font-medium text-sm transition-colors",
+                  isActive ? "text-keon-900 font-semibold" : "text-keon-600 group-hover:text-keon-900"
                 )}>
                   {item.label}
                 </span>
+              )}
+
+              {/* Active indicator */}
+              {!collapsed && isActive && (
+                <div className={cn("ml-auto w-1.5 h-1.5 rounded-full", colors.active)} />
               )}
             </button>
           );
         })}
       </nav>
 
-      {/* User section */}
-      <div className="p-3 border-t border-keon-300">
+      {/* User section with gradient */}
+      <div className="p-3 border-t border-keon-200 bg-gradient-to-t from-keon-100/50 to-transparent">
         <UserProfilePopover>
           <button className={cn(
-            "w-full flex items-center gap-3 rounded-sm transition-colors cursor-pointer",
-            collapsed ? "justify-center p-2" : "px-3 py-2 hover:bg-keon-100"
+            "w-full flex items-center gap-3 rounded-lg transition-all cursor-pointer group",
+            collapsed ? "justify-center p-2" : "px-3 py-2.5 hover:bg-white/80"
           )}>
-            <Avatar className="h-9 w-9 flex-shrink-0 ring-2 ring-keon-100">
+            <Avatar className="h-10 w-10 flex-shrink-0 ring-2 ring-keon-blue/30 group-hover:ring-keon-blue/50 transition-all">
               <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || 'Utilisateur'} />
-              <AvatarFallback className="bg-keon-900 text-white text-sm font-medium">
+              <AvatarFallback className="bg-gradient-to-br from-keon-blue to-keon-green text-white text-sm font-semibold">
                 {getInitials(profile?.display_name)}
               </AvatarFallback>
             </Avatar>
             {!collapsed && (
               <div className="flex-1 min-w-0 text-left">
-                <p className="text-sm font-medium text-keon-900 truncate">
+                <p className="text-sm font-semibold text-keon-900 truncate group-hover:text-keon-blue transition-colors">
                   {profile?.display_name || 'Utilisateur'}
                 </p>
                 <p className="text-xs text-keon-500 truncate">

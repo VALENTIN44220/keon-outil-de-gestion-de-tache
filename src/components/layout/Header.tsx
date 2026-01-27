@@ -54,10 +54,13 @@ export function Header({
     .slice(0, 2);
 
   return (
-    <header className="bg-white border-b border-keon-300 px-6 py-4 sticky top-0 z-30">
+    <header className="bg-gradient-to-r from-white via-white to-keon-50 border-b border-keon-200 px-6 py-4 sticky top-0 z-30 relative">
+      {/* Subtle spectre accent line */}
+      <div className="absolute bottom-0 left-0 right-0 h-0.5 line-keon-spectre opacity-40" />
+      
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl">{title}</h1>
+          <h1 className="text-2xl bg-gradient-to-r from-keon-900 via-keon-700 to-keon-blue bg-clip-text text-transparent">{title}</h1>
           <p className="text-sm text-keon-500 mt-0.5 font-body normal-case">
             {new Date().toLocaleDateString('fr-FR', { 
               weekday: 'long', 
@@ -102,10 +105,10 @@ export function Header({
           {/* User Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-9 w-9 rounded-full p-0">
-                <Avatar className="h-9 w-9">
+              <Button variant="ghost" className="relative h-10 w-10 rounded-full p-0 ring-2 ring-keon-200 hover:ring-keon-blue transition-all">
+                <Avatar className="h-10 w-10">
                   <AvatarImage src={profile?.avatar_url || undefined} alt={displayName} />
-                  <AvatarFallback className="bg-keon-900 text-white">
+                  <AvatarFallback className="bg-gradient-to-br from-keon-blue to-keon-green text-white font-semibold">
                     {initials}
                   </AvatarFallback>
                 </Avatar>

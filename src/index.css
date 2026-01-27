@@ -174,12 +174,29 @@
   h5 { @apply text-base md:text-lg; }
   h6 { @apply text-sm md:text-base; }
 
-  /* Liens - style KEON sobre */
+  /* Liens - style KEON avec accent coloré */
   a {
     @apply text-foreground transition-colors;
   }
   a:hover {
     color: hsl(var(--keon-blue));
+  }
+
+  /* Scrollbar colorée */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--keon-gray-100));
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, hsl(var(--keon-blue)), hsl(var(--keon-green)));
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, hsl(var(--keon-blue)), hsl(var(--keon-orange)));
   }
 }
 
