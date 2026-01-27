@@ -46,7 +46,13 @@ export function MicrosoftSyncSettings() {
     try {
       const authUrl = await getAuthUrl();
       if (authUrl) {
-        window.location.href = authUrl;
+        // Open in new window to avoid iframe restrictions from Microsoft
+        const authWindow = window.open(authUrl, '_blank', 'width=600,height=700,scrollbars=yes');
+        
+        // If popup was blocked, fall back to redirect
+        if (!authWindow) {
+          window.location.href = authUrl;
+        }
       }
     } finally {
       setIsConnecting(false);
