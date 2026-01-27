@@ -60,12 +60,6 @@ const allMenuItems = [{
   icon: Users,
   path: '/',
   permissionKey: 'can_access_team' as ScreenPermissionKey
-}, {
-  id: 'settings',
-  label: 'Paramètres',
-  icon: Settings,
-  path: '/',
-  permissionKey: 'can_access_settings' as ScreenPermissionKey
 }];
 
 const adminMenuItem = {
@@ -182,7 +176,7 @@ export function Sidebar({
     projects: { active: 'bg-keon-terose', hover: 'hover:border-keon-terose hover:text-keon-terose', icon: 'text-keon-terose' },
     analytics: { active: 'bg-cyan-500', hover: 'hover:border-cyan-500 hover:text-cyan-500', icon: 'text-cyan-500' },
     team: { active: 'bg-indigo-500', hover: 'hover:border-indigo-500 hover:text-indigo-500', icon: 'text-indigo-500' },
-    settings: { active: 'bg-keon-700', hover: 'hover:border-keon-700 hover:text-keon-700', icon: 'text-keon-700' },
+    
     admin: { active: 'bg-red-500', hover: 'hover:border-red-500 hover:text-red-500', icon: 'text-red-500' },
   };
 
