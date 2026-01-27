@@ -679,17 +679,17 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
         if (!nextOpen) onClose();
       }}
     >
-      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-[800px] max-h-[90vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Building2 className="h-5 w-5 text-primary" />
             {linkedProcessName ? `Demande: ${linkedProcessName}` : 'Nouvelle demande à un service'}
           </DialogTitle>
         </DialogHeader>
         
-        <form onSubmit={handleSubmit} className="flex-1 overflow-hidden flex flex-col">
-          <Tabs defaultValue="general" className="flex-1 overflow-hidden flex flex-col">
-            <TabsList className={`grid w-full ${showSubProcessTab && showCustomFieldsTab ? 'grid-cols-4' : showSubProcessTab || showCustomFieldsTab ? 'grid-cols-3' : 'grid-cols-2'}`}>
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          <Tabs defaultValue="general" className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            <TabsList className={`grid w-full flex-shrink-0 ${showSubProcessTab && showCustomFieldsTab ? 'grid-cols-4' : showSubProcessTab || showCustomFieldsTab ? 'grid-cols-3' : 'grid-cols-2'}`}>
               <TabsTrigger value="general" className="flex items-center gap-2">
                 <FileText className="h-4 w-4" />
                 Général
@@ -712,8 +712,9 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
               </TabsTrigger>
             </TabsList>
 
-            <ScrollArea className="flex-1 mt-4 pr-4 h-[calc(90vh-220px)]">
-              <TabsContent value="general" className="space-y-4">
+            <ScrollArea className="flex-1 mt-4 min-h-0" style={{ maxHeight: 'calc(90vh - 200px)' }}>
+              <div className="pr-4 pb-4">
+              <TabsContent value="general" className="space-y-4 mt-0">
                 <div className="space-y-2">
                   <Label htmlFor="title">Titre *</Label>
                   <Input
@@ -736,25 +737,19 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                   />
                 </div>
 
-                {processImposedValues && linkedProcessId && (
-                  <div className="rounded-lg border border-amber-500/50 bg-amber-50 dark:bg-amber-950/20 p-3">
-                    <p className="text-sm text-amber-700 dark:text-amber-300 flex items-center gap-2">
-                      <Info className="h-4 w-4 shrink-0" />
-                      Les champs catégorie, sous-catégorie et service cible sont définis par le processus sélectionné.
-                    </p>
-                  </div>
+                {/* Only show category/service selection when NOT using a process template */}
+                {!linkedProcessId && (
+                  <CategorySelect
+                    categories={categories}
+                    selectedCategoryId={categoryId}
+                    selectedSubcategoryId={subcategoryId}
+                    onCategoryChange={setCategoryId}
+                    onSubcategoryChange={setSubcategoryId}
+                    onAddCategory={handleAddCategory}
+                    onAddSubcategory={handleAddSubcategory}
+                    disabled={processImposedValues}
+                  />
                 )}
-
-                <CategorySelect
-                  categories={categories}
-                  selectedCategoryId={categoryId}
-                  selectedSubcategoryId={subcategoryId}
-                  onCategoryChange={setCategoryId}
-                  onSubcategoryChange={setSubcategoryId}
-                  onAddCategory={handleAddCategory}
-                  onAddSubcategory={handleAddSubcategory}
-                  disabled={processImposedValues}
-                />
 
                 {/* BE Project Selection */}
                 <BEProjectSelect
@@ -812,15 +807,26 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-4">
+                {/* Only show service selector when NOT using a process template */}
+                {linkedProcessId ? (
                   <div className="space-y-2">
-                    <Label>Service cible *</Label>
-                    {processImposedValues && targetDepartmentId ? (
-                      <div className="flex items-center h-10 px-3 py-2 rounded-md border border-input bg-muted text-sm">
-                        <Building2 className="h-4 w-4 mr-2 text-muted-foreground" />
-                        {departments.find(d => d.id === targetDepartmentId)?.name || 'Service défini par le processus'}
-                      </div>
-                    ) : (
+                    <Label>Priorité</Label>
+                    <Select value={priority} onValueChange={(v) => setPriority(v as TaskPriority)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white z-50">
+                        <SelectItem value="low">Basse</SelectItem>
+                        <SelectItem value="medium">Moyenne</SelectItem>
+                        <SelectItem value="high">Haute</SelectItem>
+                        <SelectItem value="urgent">Urgente</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Service cible *</Label>
                       <Select 
                         value={targetDepartmentId || ''} 
                         onValueChange={(v) => setTargetDepartmentId(v || null)}
@@ -829,7 +835,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                         <SelectTrigger>
                           <SelectValue placeholder="Sélectionner un service" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="bg-white z-50">
                           {departments.map(dept => (
                             <SelectItem key={dept.id} value={dept.id}>
                               {dept.name}
@@ -837,24 +843,24 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                           ))}
                         </SelectContent>
                       </Select>
-                    )}
-                  </div>
+                    </div>
 
-                  <div className="space-y-2">
-                    <Label>Priorité</Label>
-                    <Select value={priority} onValueChange={(v) => setPriority(v as TaskPriority)}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="low">Basse</SelectItem>
-                        <SelectItem value="medium">Moyenne</SelectItem>
-                        <SelectItem value="high">Haute</SelectItem>
-                        <SelectItem value="urgent">Urgente</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="space-y-2">
+                      <Label>Priorité</Label>
+                      <Select value={priority} onValueChange={(v) => setPriority(v as TaskPriority)}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white z-50">
+                          <SelectItem value="low">Basse</SelectItem>
+                          <SelectItem value="medium">Moyenne</SelectItem>
+                          <SelectItem value="high">Haute</SelectItem>
+                          <SelectItem value="urgent">Urgente</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="dueDate">Date souhaitée</Label>
@@ -995,6 +1001,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                   </div>
                 </div>
               </TabsContent>
+              </div>
             </ScrollArea>
           </Tabs>
 
