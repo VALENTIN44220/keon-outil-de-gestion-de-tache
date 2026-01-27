@@ -26,43 +26,71 @@ import { useFabricLakehouseSync, TablePreview, SyncResult } from '@/hooks/useFab
 const TABLE_PREFIX = 'LOVABLE_APPTASK_';
 
 const ALL_TABLES = [
-  { name: 'assignment_rules', label: 'Règles d\'affectation' },
-  { name: 'be_projects', label: 'Projets BE' },
-  { name: 'be_request_details', label: 'Détails demandes BE' },
-  { name: 'be_request_sub_processes', label: 'Sous-processus demandes BE' },
-  { name: 'be_task_labels', label: 'Labels tâches BE' },
-  { name: 'categories', label: 'Catégories' },
-  { name: 'collaborator_group_members', label: 'Membres groupes' },
-  { name: 'collaborator_groups', label: 'Groupes collaborateurs' },
+  // Organisation
   { name: 'companies', label: 'Sociétés' },
   { name: 'departments', label: 'Services' },
-  { name: 'hierarchy_levels', label: 'Niveaux hiérarchiques' },
-  { name: 'holidays', label: 'Jours fériés' },
   { name: 'job_titles', label: 'Postes' },
-  { name: 'pending_task_assignments', label: 'Affectations en attente' },
+  { name: 'hierarchy_levels', label: 'Niveaux hiérarchiques' },
   { name: 'permission_profiles', label: 'Profils permissions' },
-  { name: 'process_template_visible_companies', label: 'Visibilité process/sociétés' },
-  { name: 'process_template_visible_departments', label: 'Visibilité process/services' },
-  { name: 'process_templates', label: 'Templates processus' },
   { name: 'profiles', label: 'Profils utilisateurs' },
-  { name: 'request_field_values', label: 'Valeurs champs' },
-  { name: 'sub_process_template_visible_companies', label: 'Visibilité sous-process/sociétés' },
-  { name: 'sub_process_template_visible_departments', label: 'Visibilité sous-process/services' },
-  { name: 'sub_process_templates', label: 'Templates sous-processus' },
+  { name: 'user_roles', label: 'Rôles utilisateurs' },
+  { name: 'collaborator_groups', label: 'Groupes collaborateurs' },
+  { name: 'collaborator_group_members', label: 'Membres groupes' },
+  { name: 'holidays', label: 'Jours fériés' },
+  { name: 'user_leaves', label: 'Congés' },
+  
+  // Catégories et règles
+  { name: 'categories', label: 'Catégories' },
   { name: 'subcategories', label: 'Sous-catégories' },
-  { name: 'task_attachments', label: 'Pièces jointes' },
-  { name: 'task_checklists', label: 'Checklists tâches' },
-  { name: 'task_template_checklists', label: 'Checklists templates' },
-  { name: 'task_template_visible_companies', label: 'Visibilité tâches/sociétés' },
-  { name: 'task_template_visible_departments', label: 'Visibilité tâches/services' },
+  { name: 'assignment_rules', label: 'Règles d\'affectation' },
+  
+  // Templates processus
+  { name: 'process_templates', label: 'Templates processus' },
+  { name: 'sub_process_templates', label: 'Templates sous-processus' },
   { name: 'task_templates', label: 'Templates tâches' },
-  { name: 'task_validation_levels', label: 'Niveaux validation' },
-  { name: 'tasks', label: 'Tâches' },
+  { name: 'task_template_checklists', label: 'Checklists templates' },
   { name: 'template_custom_fields', label: 'Champs personnalisés' },
   { name: 'template_validation_levels', label: 'Niveaux validation templates' },
-  { name: 'user_leaves', label: 'Congés' },
-  { name: 'user_roles', label: 'Rôles utilisateurs' },
+  
+  // Visibilité templates
+  { name: 'process_template_visible_companies', label: 'Visibilité process/sociétés' },
+  { name: 'process_template_visible_departments', label: 'Visibilité process/services' },
+  { name: 'sub_process_template_visible_companies', label: 'Visibilité sous-process/sociétés' },
+  { name: 'sub_process_template_visible_departments', label: 'Visibilité sous-process/services' },
+  { name: 'task_template_visible_companies', label: 'Visibilité tâches/sociétés' },
+  { name: 'task_template_visible_departments', label: 'Visibilité tâches/services' },
+  { name: 'permission_profile_process_templates', label: 'Permissions/processus' },
+  
+  // Projets BE
+  { name: 'be_projects', label: 'Projets BE' },
+  { name: 'be_task_labels', label: 'Labels tâches BE' },
+  { name: 'be_request_details', label: 'Détails demandes BE' },
+  { name: 'be_request_sub_processes', label: 'Sous-processus demandes BE' },
+  
+  // Tâches et demandes
+  { name: 'tasks', label: 'Tâches' },
+  { name: 'task_checklists', label: 'Checklists tâches' },
+  { name: 'task_attachments', label: 'Pièces jointes' },
+  { name: 'task_comments', label: 'Commentaires tâches' },
+  { name: 'task_validation_levels', label: 'Niveaux validation tâches' },
+  { name: 'request_field_values', label: 'Valeurs champs' },
+  { name: 'pending_task_assignments', label: 'Affectations en attente' },
+  
+  // Workflows
+  { name: 'workflow_templates', label: 'Templates workflows' },
+  { name: 'workflow_template_versions', label: 'Versions workflows' },
+  { name: 'workflow_nodes', label: 'Nœuds workflows' },
+  { name: 'workflow_edges', label: 'Connexions workflows' },
+  { name: 'workflow_runs', label: 'Exécutions workflows' },
+  { name: 'workflow_branch_instances', label: 'Branches workflows' },
+  { name: 'workflow_validation_instances', label: 'Validations workflows' },
+  { name: 'workflow_notifications', label: 'Notifications workflows' },
+  
+  // Configuration
+  { name: 'project_view_configs', label: 'Config vues projets' },
   { name: 'workload_slots', label: 'Créneaux charge' },
+  { name: 'user_permission_overrides', label: 'Surcharges permissions' },
+  { name: 'user_process_template_overrides', label: 'Surcharges processus' },
 ];
 
 // Get Fabric table name with prefix
