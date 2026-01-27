@@ -169,8 +169,6 @@ const Index = () => {
         return 'Tableau de bord';
       case 'to-assign':
         return 'Tâches à affecter';
-      case 'analytics':
-        return 'Analytiques';
       case 'team':
         return 'Équipe';
       default:
@@ -333,12 +331,6 @@ const Index = () => {
         return renderDashboardContent();
       case 'to-assign':
         return <PendingAssignmentsView />;
-      case 'analytics':
-        return (
-          <div className="flex items-center justify-center h-64 bg-card rounded-xl shadow-card">
-            <p className="text-muted-foreground">Module analytiques à venir...</p>
-          </div>
-        );
       case 'team':
         return <TeamModule />;
       default:

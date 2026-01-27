@@ -50,12 +50,6 @@ const allMenuItems = [{
   path: '/projects',
   permissionKey: 'can_access_projects' as ScreenPermissionKey
 }, {
-  id: 'analytics',
-  label: 'Analytiques',
-  icon: BarChart3,
-  path: '/',
-  permissionKey: 'can_access_analytics' as ScreenPermissionKey
-}, {
   id: 'team',
   label: 'Équipe',
   icon: Users,
@@ -97,12 +91,6 @@ const menuColors: Record<string, { bg: string; text: string; border: string; ico
     iconBg: 'bg-gradient-to-br from-accent to-accent/80'
   },
   projects: { 
-    bg: 'bg-info/10', 
-    text: 'text-info', 
-    border: 'border-info',
-    iconBg: 'bg-gradient-to-br from-info to-info/80'
-  },
-  analytics: { 
     bg: 'bg-info/10', 
     text: 'text-info', 
     border: 'border-info',
