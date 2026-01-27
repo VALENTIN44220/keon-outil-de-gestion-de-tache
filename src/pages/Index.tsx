@@ -3,6 +3,7 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { DashboardToolbar } from '@/components/dashboard/DashboardToolbar';
 import { DashboardStats } from '@/components/dashboard/DashboardStats';
+import { ConfigurableDashboard } from '@/components/dashboard/ConfigurableDashboard';
 import { TaskList } from '@/components/tasks/TaskList';
 import { AdvancedFilters, AdvancedFiltersState } from '@/components/tasks/AdvancedFilters';
 import { TaskView } from '@/components/tasks/TaskViewSelector';
@@ -33,6 +34,7 @@ const Index = () => {
   const [taskView, setTaskView] = useState<TaskView>('grid');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [showFullStats, setShowFullStats] = useState(false);
+  const [dashboardMode, setDashboardMode] = useState<'tasks' | 'analytics'>('tasks');
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFiltersState>({
     assigneeId: 'all',
     requesterId: 'all',
@@ -221,64 +223,101 @@ const Index = () => {
 
   const renderDashboardContent = () => (
     <>
-      {/* Unified Toolbar */}
-      <DashboardToolbar
-        scope={scope}
-        availableScopes={availableScopes}
-        onScopeChange={handleScopeChange}
-        currentView={taskView}
-        onViewChange={setTaskView}
-        statusFilter={statusFilter}
-        priorityFilter={priorityFilter}
-        onStatusChange={setStatusFilter}
-        onPriorityChange={setPriorityFilter}
-        showAdvancedFilters={showAdvancedFilters}
-        onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
-        hasActiveAdvancedFilters={hasActiveAdvancedFilters}
-      />
+      {/* Mode toggle: Tasks vs Analytics */}
+      <div className="flex items-center gap-2 mb-4">
+        <div className="flex bg-white rounded-lg border-2 border-keon-200 p-1">
+          <Button
+            variant={dashboardMode === 'tasks' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setDashboardMode('tasks')}
+            className="text-xs"
+          >
+            Gestion des tâches
+          </Button>
+          <Button
+            variant={dashboardMode === 'analytics' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setDashboardMode('analytics')}
+            className="text-xs"
+          >
+            Tableau de bord analytique
+          </Button>
+        </div>
+      </div>
 
-      {/* Advanced Filters Panel */}
-      {showAdvancedFilters && (
-        <AdvancedFilters
-          filters={advancedFilters}
-          onFiltersChange={setAdvancedFilters}
-        />
-      )}
-
-      {/* Collapsible Stats */}
-      <div className="mb-4">
-        <button
-          onClick={() => setShowFullStats(!showFullStats)}
-          className="flex items-center gap-2 text-sm text-keon-700 hover:text-keon-900 mb-2"
-        >
-          {showFullStats ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          {showFullStats ? 'Masquer les statistiques' : 'Afficher les statistiques détaillées'}
-        </button>
-        
-        <DashboardStats
+      {dashboardMode === 'analytics' ? (
+        /* Configurable Dashboard with widgets */
+        <ConfigurableDashboard
+          tasks={allTasks}
           stats={stats}
           globalProgress={globalProgress}
-          globalStats={globalStats}
-          unassignedCount={canAssignToTeam ? (unassignedCount + pendingCount) : 0}
-          onViewUnassigned={() => setActiveView('to-assign')}
-          collapsed={!showFullStats}
+          onTaskClick={(task) => {
+            setSearchQuery(task.title);
+          }}
         />
-      </div>
+      ) : (
+        /* Task management view */
+        <>
+          {/* Unified Toolbar */}
+          <DashboardToolbar
+            scope={scope}
+            availableScopes={availableScopes}
+            onScopeChange={handleScopeChange}
+            currentView={taskView}
+            onViewChange={setTaskView}
+            statusFilter={statusFilter}
+            priorityFilter={priorityFilter}
+            onStatusChange={setStatusFilter}
+            onPriorityChange={setPriorityFilter}
+            showAdvancedFilters={showAdvancedFilters}
+            onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            hasActiveAdvancedFilters={hasActiveAdvancedFilters}
+          />
 
-      {/* Action button */}
-      <div className="flex justify-end mb-4">
-        <Button 
-          variant="outline" 
-          onClick={() => setIsTemplateDialogOpen(true)}
-          className="gap-2 border-keon-300 text-keon-700 hover:bg-keon-100"
-        >
-          <Workflow className="h-4 w-4" />
-          Depuis un modèle
-        </Button>
-      </div>
+          {/* Advanced Filters Panel */}
+          {showAdvancedFilters && (
+            <AdvancedFilters
+              filters={advancedFilters}
+              onFiltersChange={setAdvancedFilters}
+            />
+          )}
 
-      {/* Task View */}
-      {renderTaskView()}
+          {/* Collapsible Stats */}
+          <div className="mb-4">
+            <button
+              onClick={() => setShowFullStats(!showFullStats)}
+              className="flex items-center gap-2 text-sm text-keon-700 hover:text-keon-900 mb-2"
+            >
+              {showFullStats ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              {showFullStats ? 'Masquer les statistiques' : 'Afficher les statistiques détaillées'}
+            </button>
+            
+            <DashboardStats
+              stats={stats}
+              globalProgress={globalProgress}
+              globalStats={globalStats}
+              unassignedCount={canAssignToTeam ? (unassignedCount + pendingCount) : 0}
+              onViewUnassigned={() => setActiveView('to-assign')}
+              collapsed={!showFullStats}
+            />
+          </div>
+
+          {/* Action button */}
+          <div className="flex justify-end mb-4">
+            <Button 
+              variant="outline" 
+              onClick={() => setIsTemplateDialogOpen(true)}
+              className="gap-2 border-keon-300 text-keon-700 hover:bg-keon-100"
+            >
+              <Workflow className="h-4 w-4" />
+              Depuis un modèle
+            </Button>
+          </div>
+
+          {/* Task View */}
+          {renderTaskView()}
+        </>
+      )}
     </>
   );
 
