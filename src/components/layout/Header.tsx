@@ -14,6 +14,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { TaskNotification } from '@/hooks/useNotifications';
 import { CommentNotification } from '@/hooks/useCommentNotifications';
+import keonLogo from '@/assets/keon-logo.jpg';
 
 interface HeaderProps {
   title: string;
@@ -54,23 +55,17 @@ export function Header({
     .slice(0, 2);
 
   return (
-    <header className="header-premium border-b border-border px-6 py-4 sticky top-0 z-30 relative">
-      {/* Gradient accent line at bottom */}
-      <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-primary via-accent to-success opacity-60" />
-      
+    <header className="bg-muted/50 border-b border-border px-6 py-4 sticky top-0 z-30">
       <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-display font-semibold tracking-wide text-foreground">
+        <div className="flex items-center gap-4">
+          <img 
+            src={keonLogo} 
+            alt="KEON" 
+            className="h-10 w-10 object-cover rounded-lg shadow-sm" 
+          />
+          <h1 className="text-xl font-display font-semibold tracking-wide text-foreground uppercase">
             {title}
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5 font-body normal-case">
-            {new Date().toLocaleDateString('fr-FR', { 
-              weekday: 'long', 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric' 
-            })}
-          </p>
         </div>
 
         <div className="flex items-center gap-3">
