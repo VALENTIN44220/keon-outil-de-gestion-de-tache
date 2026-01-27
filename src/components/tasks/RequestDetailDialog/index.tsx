@@ -41,7 +41,8 @@ import {
   MessageSquare,
   ListTodo,
   Info,
-  LayoutDashboard
+  LayoutDashboard,
+  GitBranch
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -53,6 +54,7 @@ import { useDueDatePermissionWithManager } from '@/hooks/useDueDatePermission';
 import { SubProcessGroup, priorityConfig, statusConfig, RequestDetailDialogProps, Profile } from './types';
 import { SynthesisTab } from './SynthesisTab';
 import { SubProcessTab } from './SubProcessTab';
+import { WorkflowProgressTab } from './WorkflowProgressTab';
 
 export function RequestDetailDialog({ task, open, onClose, onStatusChange }: RequestDetailDialogProps) {
   const [childTasks, setChildTasks] = useState<Task[]>([]);
@@ -543,6 +545,12 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange }: Req
                   <LayoutDashboard className="h-4 w-4" />
                   Synthèse
                 </TabsTrigger>
+                {task.source_process_template_id && (
+                  <TabsTrigger value="workflow" className="gap-2">
+                    <GitBranch className="h-4 w-4" />
+                    Workflow
+                  </TabsTrigger>
+                )}
                 {subProcessGroups.map((group) => (
                   <TabsTrigger key={group.subProcessId} value={group.subProcessId} className="gap-2">
                     {group.subProcessName}
@@ -567,6 +575,12 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange }: Req
                   onSelectSubProcess={handleSelectSubProcess}
                 />
               </TabsContent>
+
+              {task.source_process_template_id && (
+                <TabsContent value="workflow" className="h-full m-0">
+                  <WorkflowProgressTab task={task} />
+                </TabsContent>
+              )}
 
               {subProcessGroups.map((group) => (
                 <TabsContent key={group.subProcessId} value={group.subProcessId} className="h-full m-0">
