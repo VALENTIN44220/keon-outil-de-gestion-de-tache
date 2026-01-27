@@ -22,7 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { Info, Upload, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Info, Upload, CheckCircle2, AlertCircle, ListChecks } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface BulkTaskTemplateImportDialogProps {
@@ -37,6 +37,7 @@ interface ParsedTaskTemplate {
   priority: 'low' | 'medium' | 'high' | 'urgent';
   default_duration_days: number;
   requires_validation: boolean;
+  checklistItems: string[];
   isValid: boolean;
   error?: string;
 }
@@ -96,6 +97,15 @@ export function BulkTaskTemplateImportDialog({
     ? subProcesses.filter((sp) => sp.process_template_id === processId)
     : subProcesses;
 
+  // Parse checklist items separated by pipe (|)
+  const parseChecklistItems = (checklistStr: string): string[] => {
+    if (!checklistStr || !checklistStr.trim()) return [];
+    return checklistStr
+      .split('|')
+      .map(item => item.trim())
+      .filter(item => item.length > 0);
+  };
+
   const parseData = (data: string) => {
     setParseError(null);
     const lines = data.trim().split('\n').filter((l) => l.trim());
@@ -109,9 +119,10 @@ export function BulkTaskTemplateImportDialog({
       const parsed: ParsedTaskTemplate[] = [];
 
       for (const line of lines) {
-        // Expected format: titre, description, priorité, durée (jours), validation (oui/non)
+        // Expected format: titre ; description ; priorité ; durée (jours) ; validation ; checklist
         // Minimum: titre
-        const parts = line.split(/[;|\t]/).map((p) => p.trim());
+        // Use semicolon or tab as main separator, pipe for checklist items
+        const parts = line.split(/[;\t]/).map((p) => p.trim());
 
         if (parts.length === 0 || !parts[0]) {
           continue;
@@ -140,12 +151,16 @@ export function BulkTaskTemplateImportDialog({
           requiresValidation = ['oui', 'yes', 'true', '1', 'o', 'y'].includes(vInput);
         }
 
+        // Parse checklist items from 6th column
+        const checklistItems = parts[5] ? parseChecklistItems(parts[5]) : [];
+
         parsed.push({
           title,
           description,
           priority,
           default_duration_days: duration,
           requires_validation: requiresValidation,
+          checklistItems,
           isValid: true,
         });
       }
@@ -206,13 +221,34 @@ export function BulkTaskTemplateImportDialog({
           sub_process_template_id: subProcessId !== '__none__' ? subProcessId : null,
         };
 
-        const { error } = await supabase.from('task_templates').insert(insertData);
+        const { data: insertedTemplate, error } = await supabase
+          .from('task_templates')
+          .insert(insertData)
+          .select('id')
+          .single();
 
         if (error) {
           console.error('Error inserting task template:', error);
           errors++;
         } else {
           created++;
+          
+          // Insert checklist items if any
+          if (insertedTemplate && task.checklistItems.length > 0) {
+            const checklistInserts = task.checklistItems.map((title, index) => ({
+              task_template_id: insertedTemplate.id,
+              title,
+              order_index: index,
+            }));
+
+            const { error: checklistError } = await supabase
+              .from('task_template_checklists')
+              .insert(checklistInserts);
+
+            if (checklistError) {
+              console.error('Error inserting template checklists:', checklistError);
+            }
+          }
         }
       }
 
@@ -233,6 +269,7 @@ export function BulkTaskTemplateImportDialog({
   };
 
   const validCount = parsedTasks.filter((t) => t.isValid).length;
+  const totalChecklistItems = parsedTasks.reduce((sum, t) => sum + t.checklistItems.length, 0);
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && handleClose()}>
@@ -292,13 +329,15 @@ export function BulkTaskTemplateImportDialog({
           <Alert>
             <Info className="h-4 w-4" />
             <AlertDescription className="text-xs">
-              <strong>Format:</strong> Titre ; Description ; Priorité ; Durée (jours) ; Validation
+              <strong>Format:</strong> Titre ; Description ; Priorité ; Durée (jours) ; Validation ; Checklist
               <br />
               <strong>Priorités:</strong> basse, moyenne, haute, urgente
               <br />
               <strong>Validation:</strong> oui / non
               <br />
-              <strong>Séparateurs:</strong> point-virgule (;), tabulation ou pipe (|)
+              <strong>Checklist:</strong> sous-actions séparées par <code className="bg-muted px-1 rounded">|</code> (ex: Action 1|Action 2|Action 3)
+              <br />
+              <strong>Séparateurs colonnes:</strong> point-virgule (;) ou tabulation
               <br />
               <span className="text-muted-foreground">Seul le titre est obligatoire.</span>
             </AlertDescription>
@@ -310,8 +349,8 @@ export function BulkTaskTemplateImportDialog({
             <Textarea
               value={rawData}
               onChange={(e) => handleDataChange(e.target.value)}
-              placeholder={`Tâche 1 ; Description de la tâche ; haute ; 3 ; oui
-Tâche 2 ; ; moyenne ; 1 ; non
+              placeholder={`Tâche 1 ; Description de la tâche ; haute ; 3 ; oui ; Action 1|Action 2|Action 3
+Tâche 2 ; ; moyenne ; 1 ; non ; Vérifier doc|Envoyer email
 Tâche 3`}
               rows={6}
               className="font-mono text-sm"
@@ -330,10 +369,18 @@ Tâche 3`}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label>Aperçu ({validCount} tâche(s))</Label>
-                <Badge variant="outline" className="gap-1">
-                  <CheckCircle2 className="h-3 w-3 text-success" />
-                  {validCount} valide(s)
-                </Badge>
+                <div className="flex items-center gap-2">
+                  {totalChecklistItems > 0 && (
+                    <Badge variant="outline" className="gap-1 bg-primary/10 text-primary border-primary/30">
+                      <ListChecks className="h-3 w-3" />
+                      {totalChecklistItems} sous-action(s)
+                    </Badge>
+                  )}
+                  <Badge variant="outline" className="gap-1">
+                    <CheckCircle2 className="h-3 w-3 text-success" />
+                    {validCount} valide(s)
+                  </Badge>
+                </div>
               </div>
               <ScrollArea className="h-40 border rounded-md">
                 <div className="p-2 space-y-1">
@@ -354,6 +401,12 @@ Tâche 3`}
                       {task.requires_validation && (
                         <Badge className="text-[10px] bg-warning/20 text-warning shrink-0">
                           Validation
+                        </Badge>
+                      )}
+                      {task.checklistItems.length > 0 && (
+                        <Badge variant="outline" className="text-[10px] shrink-0 gap-1">
+                          <ListChecks className="h-3 w-3" />
+                          {task.checklistItems.length}
                         </Badge>
                       )}
                     </div>
