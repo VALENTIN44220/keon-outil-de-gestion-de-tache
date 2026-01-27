@@ -13,19 +13,19 @@ interface StatsCardProps {
 }
 
 const variantStyles = {
-  default: 'bg-white border border-slate-200/80',
-  primary: 'bg-gradient-to-br from-blue-50 to-blue-100/50 border border-blue-200/50',
-  success: 'bg-gradient-to-br from-emerald-50 to-emerald-100/50 border border-emerald-200/50',
-  warning: 'bg-gradient-to-br from-amber-50 to-amber-100/50 border border-amber-200/50',
-  info: 'bg-gradient-to-br from-cyan-50 to-cyan-100/50 border border-cyan-200/50',
+  default: 'bg-white border-2 border-keon-200 hover:border-keon-300',
+  primary: 'bg-gradient-to-br from-keon-blue/5 via-white to-keon-blue/10 border-2 border-keon-blue/30 hover:border-keon-blue/50',
+  success: 'bg-gradient-to-br from-keon-green/5 via-white to-keon-green/10 border-2 border-keon-green/30 hover:border-keon-green/50',
+  warning: 'bg-gradient-to-br from-keon-orange/5 via-white to-keon-orange/10 border-2 border-keon-orange/30 hover:border-keon-orange/50',
+  info: 'bg-gradient-to-br from-purple-50 via-white to-purple-100/50 border-2 border-purple-200 hover:border-purple-300',
 };
 
 const iconStyles = {
-  default: 'bg-slate-100 text-slate-600',
-  primary: 'bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30',
-  success: 'bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/30',
-  warning: 'bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-lg shadow-amber-500/30',
-  info: 'bg-gradient-to-br from-cyan-500 to-cyan-600 text-white shadow-lg shadow-cyan-500/30',
+  default: 'bg-keon-100 text-keon-700',
+  primary: 'bg-gradient-to-br from-keon-blue to-cyan-500 text-white shadow-lg shadow-keon-blue/30',
+  success: 'bg-gradient-to-br from-keon-green to-emerald-500 text-white shadow-lg shadow-keon-green/30',
+  warning: 'bg-gradient-to-br from-keon-orange to-amber-500 text-white shadow-lg shadow-keon-orange/30',
+  info: 'bg-gradient-to-br from-purple-500 to-indigo-500 text-white shadow-lg shadow-purple-500/30',
 };
 
 export function StatsCard({ title, value, icon: Icon, trend, variant = 'default' }: StatsCardProps) {
