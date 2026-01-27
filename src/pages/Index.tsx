@@ -173,8 +173,6 @@ const Index = () => {
         return 'Analytiques';
       case 'team':
         return 'Équipe';
-      case 'settings':
-        return 'Paramètres';
       default:
         return 'Tableau de bord';
     }
@@ -343,12 +341,6 @@ const Index = () => {
         );
       case 'team':
         return <TeamModule />;
-      case 'settings':
-        return (
-          <div className="flex items-center justify-center h-64 bg-card rounded-xl shadow-card">
-            <p className="text-muted-foreground">Paramètres à venir...</p>
-          </div>
-        );
       default:
         return renderDashboardContent();
     }
