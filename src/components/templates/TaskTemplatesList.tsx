@@ -109,14 +109,14 @@ export function TaskTemplatesList({
   const isGridView = viewMode === 'grid';
 
   return (
-    <div className={isGridView ? 'space-y-1' : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'}>
+    <div className={isGridView ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3' : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'}>
       {tasks.map((task) => {
         const VisibilityIcon = visibilityIcons[task.visibility_level] || Globe;
         const isExpanded = expandedTasks.has(task.id);
 
         if (isGridView) {
           return (
-            <Card key={task.id} className="flex items-center gap-3 p-3">
+            <Card key={task.id} className="flex items-center gap-3 p-3 hover:shadow-md transition-shadow">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="font-medium text-sm truncate">{task.title}</span>
