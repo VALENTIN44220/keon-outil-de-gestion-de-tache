@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building2, Briefcase, Users, Layers, Shield, UserCog, Route, Download, FolderSync, UsersRound, CloudUpload, Grid3X3, UserRoundCog, Workflow } from 'lucide-react';
+import { Building2, Briefcase, Users, Layers, Shield, UserCog, Download, FolderSync, UsersRound, CloudUpload, Grid3X3, UserRoundCog, Workflow } from 'lucide-react';
 import { CompaniesTab } from './CompaniesTab';
 import { DepartmentsTab } from './DepartmentsTab';
 import { JobTitlesTab } from './JobTitlesTab';
@@ -8,7 +8,7 @@ import { HierarchyLevelsTab } from './HierarchyLevelsTab';
 import { PermissionProfilesTab } from './PermissionProfilesTab';
 import { PermissionMatrixTab } from './PermissionMatrixTab';
 import { UsersTab } from './UsersTab';
-import { AssignmentRulesTab } from './AssignmentRulesTab';
+
 
 import { DataExportTab } from './DataExportTab';
 import { GovernanceSyncTab } from './GovernanceSyncTab';
@@ -78,9 +78,6 @@ export function AdminTabs(props: AdminTabsProps) {
           </TabsTrigger>
           <TabsTrigger value="matrix" className="px-2 py-1.5" title="Matrice des permissions">
             <Grid3X3 className="h-4 w-4" />
-          </TabsTrigger>
-          <TabsTrigger value="assignment-rules" className="px-2 py-1.5" title="Règles d'affectation">
-            <Route className="h-4 w-4" />
           </TabsTrigger>
           <TabsTrigger value="export" className="px-2 py-1.5" title="Export de données">
             <Download className="h-4 w-4" />
@@ -185,12 +182,6 @@ export function AdminTabs(props: AdminTabsProps) {
         />
       </TabsContent>
 
-      <TabsContent value="assignment-rules">
-        <AssignmentRulesTab 
-          departments={props.departments}
-          users={props.users}
-        />
-      </TabsContent>
 
 
       <TabsContent value="export">
