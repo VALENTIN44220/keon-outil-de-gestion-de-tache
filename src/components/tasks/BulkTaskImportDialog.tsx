@@ -5,7 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Upload, CheckCircle2, XCircle, Loader2, AlertCircle } from 'lucide-react';
+import { Upload, CheckCircle2, XCircle, Loader2, AlertCircle, ListChecks } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -28,6 +28,7 @@ interface ParsedTask {
   assigneeId: string | null;
   categoryName: string;
   categoryId: string | null;
+  checklistItems: string[];
   isValid: boolean;
   error?: string;
 }
@@ -36,6 +37,7 @@ interface ImportResult {
   title: string;
   success: boolean;
   error?: string;
+  checklistCount?: number;
 }
 
 const PRIORITY_MAP: Record<string, TaskPriority> = {
@@ -84,10 +86,10 @@ export function BulkTaskImportDialog({
   }, [open]);
 
   const exampleFormat = `Exemple de format (copier/coller depuis Excel):
-Titre;Description;Priorité;Date échéance;Responsable;Catégorie
-Tâche 1;Description tâche 1;haute;2025-02-15;Jean Dupont;IT
-Tâche 2;Autre description;moyenne;;Marie Martin;RH
-Tâche 3;Sans responsable;basse;;;`;
+Titre;Description;Priorité;Date échéance;Responsable;Catégorie;Checklist
+Tâche 1;Description tâche 1;haute;2025-02-15;Jean Dupont;IT;Action 1|Action 2|Action 3
+Tâche 2;Autre description;moyenne;;Marie Martin;RH;Vérifier doc|Envoyer email
+Tâche 3;Sans responsable;basse;;;;`;
 
   const parseDate = (dateStr: string): string | null => {
     if (!dateStr || !dateStr.trim()) return null;
@@ -104,6 +106,15 @@ Tâche 3;Sans responsable;basse;;;`;
     }
     
     return null;
+  };
+
+  const parseChecklistItems = (checklistStr: string): string[] => {
+    if (!checklistStr || !checklistStr.trim()) return [];
+    // Split by pipe (|) and filter empty items
+    return checklistStr
+      .split('|')
+      .map(item => item.trim())
+      .filter(item => item.length > 0);
   };
 
   const findProfileByName = (name: string): { id: string; display_name: string | null } | undefined => {
@@ -134,7 +145,8 @@ Tâche 3;Sans responsable;basse;;;`;
     // Check if first line is a header
     const firstLineLower = firstLine.toLowerCase();
     const hasHeader = firstLineLower.includes('titre') || firstLineLower.includes('title') || 
-                      firstLineLower.includes('description') || firstLineLower.includes('priorité');
+                      firstLineLower.includes('description') || firstLineLower.includes('priorité') ||
+                      firstLineLower.includes('checklist');
     const dataLines = hasHeader ? lines.slice(1) : lines;
 
     const parsed: ParsedTask[] = dataLines.map(line => {
@@ -145,6 +157,7 @@ Tâche 3;Sans responsable;basse;;;`;
       const dueDateStr = parts[3] || '';
       const assigneeName = parts[4] || '';
       const categoryName = parts[5] || '';
+      const checklistStr = parts[6] || '';
 
       let isValid = true;
       let error: string | undefined;
@@ -163,6 +176,9 @@ Tâche 3;Sans responsable;basse;;;`;
       if (dueDateStr && !dueDate) {
         error = (error ? error + '; ' : '') + 'Format de date invalide';
       }
+
+      // Parse checklist items
+      const checklistItems = parseChecklistItems(checklistStr);
 
       // Resolve assignee
       let assigneeId: string | null = defaultAssigneeId || null;
@@ -194,6 +210,7 @@ Tâche 3;Sans responsable;basse;;;`;
         assigneeId,
         categoryName,
         categoryId,
+        checklistItems,
         isValid,
         error,
       };
@@ -215,7 +232,8 @@ Tâche 3;Sans responsable;basse;;;`;
 
     for (const task of validTasks) {
       try {
-        const { error } = await supabase
+        // Insert the task
+        const { data: insertedTask, error: taskError } = await supabase
           .from('tasks')
           .insert({
             user_id: user.id,
@@ -229,10 +247,39 @@ Tâche 3;Sans responsable;basse;;;`;
             category_id: task.categoryId,
             parent_request_id: parentRequestId || null,
             requester_id: user.id,
-          });
+          })
+          .select('id')
+          .single();
 
-        if (error) throw error;
-        importResults.push({ title: task.title, success: true });
+        if (taskError) throw taskError;
+
+        // Insert checklist items if any
+        let checklistCount = 0;
+        if (insertedTask && task.checklistItems.length > 0) {
+          const checklistInserts = task.checklistItems.map((title, index) => ({
+            task_id: insertedTask.id,
+            title,
+            order_index: index,
+            is_completed: false,
+          }));
+
+          const { error: checklistError } = await supabase
+            .from('task_checklists')
+            .insert(checklistInserts);
+
+          if (checklistError) {
+            console.error('Error inserting checklists:', checklistError);
+            // Don't fail the task import, just log the error
+          } else {
+            checklistCount = task.checklistItems.length;
+          }
+        }
+
+        importResults.push({ 
+          title: task.title, 
+          success: true,
+          checklistCount,
+        });
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
         importResults.push({ title: task.title, success: false, error: errorMessage });
@@ -243,8 +290,11 @@ Tâche 3;Sans responsable;basse;;;`;
     setStep('results');
 
     const successCount = importResults.filter(r => r.success).length;
+    const totalChecklists = importResults.reduce((sum, r) => sum + (r.checklistCount || 0), 0);
+    
     if (successCount > 0) {
-      toast.success(`${successCount} tâche(s) importée(s) avec succès`);
+      const checklistMsg = totalChecklists > 0 ? ` avec ${totalChecklists} sous-action(s)` : '';
+      toast.success(`${successCount} tâche(s) importée(s)${checklistMsg}`);
       onImportComplete();
     }
   };
@@ -259,30 +309,36 @@ Tâche 3;Sans responsable;basse;;;`;
   const validCount = parsedTasks.filter(t => t.isValid).length;
   const invalidCount = parsedTasks.filter(t => !t.isValid).length;
   const warningCount = parsedTasks.filter(t => t.isValid && t.error).length;
+  const totalChecklistItems = parsedTasks.reduce((sum, t) => sum + t.checklistItems.length, 0);
   const successCount = results.filter(r => r.success).length;
   const failCount = results.filter(r => !r.success).length;
+  const importedChecklists = results.reduce((sum, r) => sum + (r.checklistCount || 0), 0);
 
   return (
     <Dialog open={open} onOpenChange={(open) => { if (!open) resetDialog(); onOpenChange(open); }}>
-      <DialogContent className="max-w-5xl max-h-[90vh]">
+      <DialogContent className="max-w-6xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Upload className="h-5 w-5" />
+            <Upload className="h-5 w-5 text-primary" />
             Import en masse des tâches
           </DialogTitle>
           <DialogDescription>
-            Importez plusieurs tâches à la fois en copiant/collant depuis Excel ou un fichier CSV
+            Importez plusieurs tâches avec leurs sous-actions en copiant/collant depuis Excel ou un fichier CSV
           </DialogDescription>
         </DialogHeader>
 
         {step === 'input' && (
           <div className="space-y-4">
-            <div className="text-sm text-muted-foreground whitespace-pre-line bg-muted p-3 rounded-md">
+            <div className="text-sm text-muted-foreground whitespace-pre-line bg-muted p-3 rounded-md border">
               {exampleFormat}
             </div>
             <div className="flex gap-2 flex-wrap text-xs">
               <Badge variant="outline">Priorités: basse, moyenne, haute, urgente</Badge>
               <Badge variant="outline">Dates: AAAA-MM-JJ ou JJ/MM/AAAA</Badge>
+              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
+                <ListChecks className="h-3 w-3 mr-1" />
+                Checklist: Action 1|Action 2|Action 3
+              </Badge>
             </div>
             <Textarea
               placeholder="Collez ici vos données (une tâche par ligne)..."
@@ -300,11 +356,17 @@ Tâche 3;Sans responsable;basse;;;`;
               {validCount > 0 && <Badge variant="default" className="bg-green-600">{validCount} valide(s)</Badge>}
               {warningCount > 0 && <Badge variant="secondary" className="bg-amber-500 text-white">{warningCount} avec avertissement</Badge>}
               {invalidCount > 0 && <Badge variant="destructive">{invalidCount} invalide(s)</Badge>}
+              {totalChecklistItems > 0 && (
+                <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
+                  <ListChecks className="h-3 w-3 mr-1" />
+                  {totalChecklistItems} sous-action(s)
+                </Badge>
+              )}
             </div>
             <ScrollArea className="h-[400px] border rounded-md">
               <Table>
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="bg-muted/50">
                     <TableHead className="w-[50px]">État</TableHead>
                     <TableHead>Titre</TableHead>
                     <TableHead>Description</TableHead>
@@ -312,6 +374,12 @@ Tâche 3;Sans responsable;basse;;;`;
                     <TableHead>Échéance</TableHead>
                     <TableHead>Responsable</TableHead>
                     <TableHead>Catégorie</TableHead>
+                    <TableHead className="min-w-[150px]">
+                      <div className="flex items-center gap-1">
+                        <ListChecks className="h-4 w-4 text-primary" />
+                        Checklist
+                      </div>
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -369,6 +437,25 @@ Tâche 3;Sans responsable;basse;;;`;
                       <TableCell className="text-muted-foreground">
                         {task.categoryName || '-'}
                       </TableCell>
+                      <TableCell>
+                        {task.checklistItems.length > 0 ? (
+                          <div className="space-y-0.5">
+                            <Badge variant="outline" className="text-xs bg-primary/10 text-primary">
+                              {task.checklistItems.length} item(s)
+                            </Badge>
+                            <ul className="text-xs text-muted-foreground pl-2 mt-1 space-y-0.5">
+                              {task.checklistItems.slice(0, 3).map((item, i) => (
+                                <li key={i} className="truncate max-w-[120px]">• {item}</li>
+                              ))}
+                              {task.checklistItems.length > 3 && (
+                                <li className="text-primary">+{task.checklistItems.length - 3} autres...</li>
+                              )}
+                            </ul>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">-</span>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -389,13 +476,20 @@ Tâche 3;Sans responsable;basse;;;`;
             <div className="flex gap-2 flex-wrap">
               {successCount > 0 && <Badge variant="default" className="bg-green-600">{successCount} importée(s)</Badge>}
               {failCount > 0 && <Badge variant="destructive">{failCount} échouée(s)</Badge>}
+              {importedChecklists > 0 && (
+                <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
+                  <ListChecks className="h-3 w-3 mr-1" />
+                  {importedChecklists} sous-action(s) créées
+                </Badge>
+              )}
             </div>
             <ScrollArea className="h-[300px] border rounded-md">
               <Table>
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="bg-muted/50">
                     <TableHead className="w-[50px]">État</TableHead>
                     <TableHead>Titre</TableHead>
+                    <TableHead>Checklist</TableHead>
                     <TableHead>Détails</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -410,6 +504,16 @@ Tâche 3;Sans responsable;basse;;;`;
                         )}
                       </TableCell>
                       <TableCell className="font-medium">{result.title}</TableCell>
+                      <TableCell>
+                        {result.checklistCount && result.checklistCount > 0 ? (
+                          <Badge variant="outline" className="text-xs bg-primary/10 text-primary">
+                            <ListChecks className="h-3 w-3 mr-1" />
+                            {result.checklistCount}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">-</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-muted-foreground">
                         {result.success ? 'Créée avec succès' : result.error}
                       </TableCell>
@@ -439,6 +543,7 @@ Tâche 3;Sans responsable;basse;;;`;
               </Button>
               <Button onClick={handleImport} disabled={validCount === 0}>
                 Importer {validCount} tâche(s)
+                {totalChecklistItems > 0 && ` + ${totalChecklistItems} sous-action(s)`}
               </Button>
             </>
           )}
