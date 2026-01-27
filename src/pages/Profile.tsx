@@ -8,9 +8,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Switch } from '@/components/ui/switch';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ArrowLeft, Save, User, Building2, Users, Briefcase, Shield, Camera, Loader2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ArrowLeft, Save, User, Building2, Users, Briefcase, Shield, Camera, Loader2, Link2 } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
+import { MicrosoftSyncSettings } from '@/components/profile/MicrosoftSyncSettings';
 
 interface ProfileData {
   display_name: string;
@@ -30,6 +32,8 @@ interface ManagerOption {
 export default function Profile() {
   const { user, profile, updateProfile } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'profile';
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [managers, setManagers] = useState<ManagerOption[]>([]);
@@ -169,176 +173,195 @@ export default function Profile() {
           Retour
         </Button>
 
-        <Card className="animate-fade-in">
-          <CardHeader className="text-center pb-6">
-            <div className="flex justify-center mb-4">
-              <div className="relative">
-                <Avatar className="h-24 w-24">
-                  <AvatarImage src={formData.avatar_url} />
-                  <AvatarFallback className="bg-gradient-keon text-white text-2xl font-display">
-                    {getInitials(formData.display_name || user?.email || 'U')}
-                  </AvatarFallback>
-                </Avatar>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploading}
-                  className="absolute bottom-0 right-0 p-2 bg-primary text-primary-foreground rounded-full shadow-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
-                >
-                  {isUploading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Camera className="h-4 w-4" />
-                  )}
-                </button>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAvatarUpload}
-                  className="hidden"
-                />
-              </div>
-            </div>
-            <CardTitle className="text-2xl font-display">Mon Profil</CardTitle>
-            <CardDescription className="font-body">
-              Gérez vos informations professionnelles
-            </CardDescription>
-          </CardHeader>
+        <Tabs defaultValue={activeTab} className="animate-fade-in">
+          <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsTrigger value="profile" className="gap-2">
+              <User className="h-4 w-4" />
+              Profil
+            </TabsTrigger>
+            <TabsTrigger value="sync" className="gap-2">
+              <Link2 className="h-4 w-4" />
+              Synchronisation
+            </TabsTrigger>
+          </TabsList>
 
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Nom d'affichage */}
-              <div className="space-y-2">
-                <Label htmlFor="display_name" className="flex items-center gap-2">
-                  <User className="h-4 w-4 text-muted-foreground" />
-                  Nom d'affichage
-                </Label>
-                <Input
-                  id="display_name"
-                  value={formData.display_name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, display_name: e.target.value })
-                  }
-                  placeholder="Votre nom"
-                />
-              </div>
-
-              {/* Poste */}
-              <div className="space-y-2">
-                <Label htmlFor="job_title" className="flex items-center gap-2">
-                  <Briefcase className="h-4 w-4 text-muted-foreground" />
-                  Poste
-                </Label>
-                <Input
-                  id="job_title"
-                  value={formData.job_title}
-                  onChange={(e) =>
-                    setFormData({ ...formData, job_title: e.target.value })
-                  }
-                  placeholder="Ex: Chef de projet, Développeur..."
-                />
-              </div>
-
-              {/* Service */}
-              <div className="space-y-2">
-                <Label htmlFor="department" className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                  Service
-                </Label>
-                <Input
-                  id="department"
-                  value={formData.department}
-                  onChange={(e) =>
-                    setFormData({ ...formData, department: e.target.value })
-                  }
-                  placeholder="Ex: Marketing, Développement, RH..."
-                />
-              </div>
-
-              {/* Société */}
-              <div className="space-y-2">
-                <Label htmlFor="company" className="flex items-center gap-2">
-                  <Building2 className="h-4 w-4 text-muted-foreground" />
-                  Société
-                </Label>
-                <Input
-                  id="company"
-                  value={formData.company}
-                  onChange={(e) =>
-                    setFormData({ ...formData, company: e.target.value })
-                  }
-                  placeholder="Nom de votre entreprise"
-                />
-              </div>
-
-              {/* Manager */}
-              <div className="space-y-2">
-                <Label htmlFor="manager" className="flex items-center gap-2">
-                  <User className="h-4 w-4 text-muted-foreground" />
-                  Manager
-                </Label>
-                <SearchableSelect
-                  value={formData.manager_id || 'none'}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, manager_id: value === 'none' ? '' : value })
-                  }
-                  placeholder="Sélectionnez votre manager"
-                  searchPlaceholder="Rechercher un manager..."
-                  options={[
-                    { value: 'none', label: 'Aucun manager' },
-                    ...managers.map((manager) => ({
-                      value: manager.id,
-                      label: manager.display_name || 'Utilisateur sans nom',
-                    })),
-                  ]}
-                />
-              </div>
-
-              {/* Profil privé */}
-              <div className="flex items-center justify-between rounded-lg border p-4">
-                <div className="space-y-0.5">
-                  <Label htmlFor="is_private" className="flex items-center gap-2">
-                    <Shield className="h-4 w-4 text-muted-foreground" />
-                    Profil privé
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    Masquer votre profil aux autres utilisateurs
-                  </p>
+          <TabsContent value="profile">
+            <Card>
+              <CardHeader className="text-center pb-6">
+                <div className="flex justify-center mb-4">
+                  <div className="relative">
+                    <Avatar className="h-24 w-24">
+                      <AvatarImage src={formData.avatar_url} />
+                      <AvatarFallback className="bg-gradient-keon text-white text-2xl font-display">
+                        {getInitials(formData.display_name || user?.email || 'U')}
+                      </AvatarFallback>
+                    </Avatar>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                      className="absolute bottom-0 right-0 p-2 bg-primary text-primary-foreground rounded-full shadow-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
+                    >
+                      {isUploading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Camera className="h-4 w-4" />
+                      )}
+                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleAvatarUpload}
+                      className="hidden"
+                    />
+                  </div>
                 </div>
-                <Switch
-                  id="is_private"
-                  checked={formData.is_private}
-                  onCheckedChange={(checked) =>
-                    setFormData({ ...formData, is_private: checked })
-                  }
-                />
-              </div>
+                <CardTitle className="text-2xl font-display">Mon Profil</CardTitle>
+                <CardDescription className="font-body">
+                  Gérez vos informations professionnelles
+                </CardDescription>
+              </CardHeader>
 
-              {/* Email (lecture seule) */}
-              <div className="space-y-2">
-                <Label className="text-muted-foreground">Email</Label>
-                <Input
-                  value={user?.email || ''}
-                  disabled
-                  className="bg-muted"
-                />
-                <p className="text-xs text-muted-foreground">
-                  L'email ne peut pas être modifié
-                </p>
-              </div>
+              <CardContent>
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  {/* Nom d'affichage */}
+                  <div className="space-y-2">
+                    <Label htmlFor="display_name" className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      Nom d'affichage
+                    </Label>
+                    <Input
+                      id="display_name"
+                      value={formData.display_name}
+                      onChange={(e) =>
+                        setFormData({ ...formData, display_name: e.target.value })
+                      }
+                      placeholder="Votre nom"
+                    />
+                  </div>
 
-              <Button
-                type="submit"
-                className="w-full gap-2"
-                disabled={isLoading}
-              >
-                <Save className="h-4 w-4" />
-                {isLoading ? 'Enregistrement...' : 'Enregistrer les modifications'}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+                  {/* Poste */}
+                  <div className="space-y-2">
+                    <Label htmlFor="job_title" className="flex items-center gap-2">
+                      <Briefcase className="h-4 w-4 text-muted-foreground" />
+                      Poste
+                    </Label>
+                    <Input
+                      id="job_title"
+                      value={formData.job_title}
+                      onChange={(e) =>
+                        setFormData({ ...formData, job_title: e.target.value })
+                      }
+                      placeholder="Ex: Chef de projet, Développeur..."
+                    />
+                  </div>
+
+                  {/* Service */}
+                  <div className="space-y-2">
+                    <Label htmlFor="department" className="flex items-center gap-2">
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      Service
+                    </Label>
+                    <Input
+                      id="department"
+                      value={formData.department}
+                      onChange={(e) =>
+                        setFormData({ ...formData, department: e.target.value })
+                      }
+                      placeholder="Ex: Marketing, Développement, RH..."
+                    />
+                  </div>
+
+                  {/* Société */}
+                  <div className="space-y-2">
+                    <Label htmlFor="company" className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4 text-muted-foreground" />
+                      Société
+                    </Label>
+                    <Input
+                      id="company"
+                      value={formData.company}
+                      onChange={(e) =>
+                        setFormData({ ...formData, company: e.target.value })
+                      }
+                      placeholder="Nom de votre entreprise"
+                    />
+                  </div>
+
+                  {/* Manager */}
+                  <div className="space-y-2">
+                    <Label htmlFor="manager" className="flex items-center gap-2">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      Manager
+                    </Label>
+                    <SearchableSelect
+                      value={formData.manager_id || 'none'}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, manager_id: value === 'none' ? '' : value })
+                      }
+                      placeholder="Sélectionnez votre manager"
+                      searchPlaceholder="Rechercher un manager..."
+                      options={[
+                        { value: 'none', label: 'Aucun manager' },
+                        ...managers.map((manager) => ({
+                          value: manager.id,
+                          label: manager.display_name || 'Utilisateur sans nom',
+                        })),
+                      ]}
+                    />
+                  </div>
+
+                  {/* Profil privé */}
+                  <div className="flex items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="is_private" className="flex items-center gap-2">
+                        <Shield className="h-4 w-4 text-muted-foreground" />
+                        Profil privé
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Masquer votre profil aux autres utilisateurs
+                      </p>
+                    </div>
+                    <Switch
+                      id="is_private"
+                      checked={formData.is_private}
+                      onCheckedChange={(checked) =>
+                        setFormData({ ...formData, is_private: checked })
+                      }
+                    />
+                  </div>
+
+                  {/* Email (lecture seule) */}
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground">Email</Label>
+                    <Input
+                      value={user?.email || ''}
+                      disabled
+                      className="bg-muted"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      L'email ne peut pas être modifié
+                    </p>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full gap-2"
+                    disabled={isLoading}
+                  >
+                    <Save className="h-4 w-4" />
+                    {isLoading ? 'Enregistrement...' : 'Enregistrer les modifications'}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="sync">
+            <MicrosoftSyncSettings />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
