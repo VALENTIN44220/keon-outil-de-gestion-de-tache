@@ -475,7 +475,62 @@ SubProcessNode.displayName = 'SubProcessNode';
 export const ForkNode = memo(({ data, selected }: CustomNodeProps) => {
   const colors = nodeColors.fork;
   const config = data.config as ForkNodeConfig;
-  const branchCount = config.branches?.length || 2;
+  
+  // Get branch count from various sources in config
+  const branchLabels = config.branch_labels || [];
+  const branches = config.branches || [];
+  const branchCount = branchLabels.length || branches.length || 2;
+  
+  // Generate dynamic handles based on branch count
+  const renderOutputHandles = () => {
+    if (branchLabels.length > 0) {
+      // Use branch_labels for auto-generated workflows
+      return branchLabels.map((label, index) => (
+        <Handle
+          key={`fork-out-${index}`}
+          type="source"
+          position={Position.Right}
+          id={`fork-out-${index}`}
+          style={{ top: `${((index + 1) / (branchCount + 1)) * 100}%` }}
+          className="!w-3 !h-3 !bg-teal-500 !border-2 !border-white"
+          title={label}
+        />
+      ));
+    }
+    
+    if (branches.length > 0) {
+      return branches.map((branch, index) => (
+        <Handle
+          key={branch.id}
+          type="source"
+          position={Position.Right}
+          id={branch.id}
+          style={{ top: `${((index + 1) / (branchCount + 1)) * 100}%` }}
+          className="!w-3 !h-3 !bg-teal-500 !border-2 !border-white"
+        />
+      ));
+    }
+    
+    // Default: 2 branches
+    return (
+      <>
+        <Handle
+          type="source"
+          position={Position.Right}
+          id="fork-out-0"
+          style={{ top: '33%' }}
+          className="!w-3 !h-3 !bg-teal-500 !border-2 !border-white"
+        />
+        <Handle
+          type="source"
+          position={Position.Right}
+          id="fork-out-1"
+          style={{ top: '66%' }}
+          className="!w-3 !h-3 !bg-teal-500 !border-2 !border-white"
+        />
+      </>
+    );
+  };
   
   return (
     <div className={`
@@ -506,36 +561,16 @@ export const ForkNode = memo(({ data, selected }: CustomNodeProps) => {
             </Badge>
           )}
         </div>
+        {/* Branch labels preview */}
+        {branchLabels.length > 0 && branchLabels.length <= 4 && (
+          <div className="text-[10px] text-muted-foreground space-y-0.5 mt-1 text-right pr-1 max-h-[60px] overflow-hidden">
+            {branchLabels.map((label, i) => (
+              <div key={i} className="truncate" title={label}>→ {label}</div>
+            ))}
+          </div>
+        )}
       </div>
-      {/* Multiple output handles for parallel branches */}
-      {config.branches?.map((branch, index) => (
-        <Handle
-          key={branch.id}
-          type="source"
-          position={Position.Right}
-          id={branch.id}
-          style={{ top: `${((index + 1) / (branchCount + 1)) * 100}%` }}
-          className="!w-3 !h-3 !bg-teal-500 !border-2 !border-white"
-        />
-      ))}
-      {(!config.branches || config.branches.length === 0) && (
-        <>
-          <Handle
-            type="source"
-            position={Position.Right}
-            id="branch_1"
-            style={{ top: '33%' }}
-            className="!w-3 !h-3 !bg-teal-500 !border-2 !border-white"
-          />
-          <Handle
-            type="source"
-            position={Position.Right}
-            id="branch_2"
-            style={{ top: '66%' }}
-            className="!w-3 !h-3 !bg-teal-500 !border-2 !border-white"
-          />
-        </>
-      )}
+      {renderOutputHandles()}
     </div>
   );
 });
@@ -546,13 +581,36 @@ export const JoinNode = memo(({ data, selected }: CustomNodeProps) => {
   const colors = nodeColors.join;
   const config = data.config as JoinNodeConfig;
   
+  // Get branch count from required_count or default
+  const branchCount = config.required_count || config.input_count || 2;
+  
   const getJoinTypeLabel = () => {
     switch (config.join_type) {
-      case 'and': return 'Toutes les branches';
+      case 'and': 
+      case 'all': 
+        return `Toutes (${branchCount})`;
       case 'or': return 'Au moins une';
       case 'n_of_m': return `${config.required_count || 1} branche(s)`;
-      default: return 'Synchronisation';
+      default: return `Sync (${branchCount})`;
     }
+  };
+
+  // Generate dynamic input handles based on branch count
+  const renderInputHandles = () => {
+    const handles = [];
+    for (let i = 0; i < branchCount; i++) {
+      handles.push(
+        <Handle
+          key={`join-in-${i}`}
+          type="target"
+          position={Position.Left}
+          id={`join-in-${i}`}
+          style={{ top: `${((i + 1) / (branchCount + 1)) * 100}%` }}
+          className="!w-3 !h-3 !bg-orange-500 !border-2 !border-white"
+        />
+      );
+    }
+    return handles;
   };
 
   return (
@@ -562,21 +620,8 @@ export const JoinNode = memo(({ data, selected }: CustomNodeProps) => {
       ${selected ? 'ring-2 ring-primary ring-offset-2' : ''}
       transition-all duration-200
     `}>
-      {/* Multiple input handles for parallel branches */}
-      <Handle
-        type="target"
-        position={Position.Left}
-        id="branch_1"
-        style={{ top: '33%' }}
-        className="!w-3 !h-3 !bg-orange-500 !border-2 !border-white"
-      />
-      <Handle
-        type="target"
-        position={Position.Left}
-        id="branch_2"
-        style={{ top: '66%' }}
-        className="!w-3 !h-3 !bg-orange-500 !border-2 !border-white"
-      />
+      {/* Dynamic input handles for parallel branches */}
+      {renderInputHandles()}
       <div className="space-y-2">
         <div className="flex items-center gap-2">
           <div className={`p-1.5 rounded-lg ${colors.bg}`}>

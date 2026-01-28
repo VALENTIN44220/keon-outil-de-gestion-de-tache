@@ -261,7 +261,7 @@ export async function createProcessWorkflow(
     xPosition += xSpacing;
 
     if (useForkJoin) {
-      // FORK node
+      // FORK node - with branch_labels for dynamic handle generation
       nodes.push({
         workflow_id: workflow.id,
         node_type: 'fork',
@@ -269,8 +269,9 @@ export async function createProcessWorkflow(
         position_x: xPosition,
         position_y: baseY,
         config: { 
-          fork_type: 'static',
+          branch_mode: 'static',
           branch_labels: subProcesses.map(sp => sp.name),
+          from_sub_processes: true,
         } as Json,
       });
       xPosition += xSpacing;
@@ -297,7 +298,7 @@ export async function createProcessWorkflow(
       }
       xPosition += xSpacing;
 
-      // JOIN node
+      // JOIN node - with input_count for dynamic handle generation
       nodes.push({
         workflow_id: workflow.id,
         node_type: 'join',
@@ -307,6 +308,7 @@ export async function createProcessWorkflow(
         config: { 
           join_type: 'all',
           required_count: subProcesses.length,
+          input_count: subProcesses.length,
         } as Json,
       });
       xPosition += xSpacing;
