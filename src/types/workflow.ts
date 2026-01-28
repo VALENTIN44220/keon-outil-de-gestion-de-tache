@@ -88,20 +88,23 @@ export interface SubProcessNodeConfig {
 
 // Fork node - starts parallel branches
 export interface ForkNodeConfig {
-  branch_mode: 'static' | 'dynamic';  // static = fixed branches, dynamic = based on sub-processes
+  branch_mode?: 'static' | 'dynamic';  // static = fixed branches, dynamic = based on sub-processes
   branches?: Array<{
     id: string;
     name: string;
     condition?: string;  // Optional condition for this branch
   }>;
+  // Branch labels for auto-generated workflows (from sub-process names)
+  branch_labels?: string[];
   // For dynamic mode - create branches from selected sub-processes
   from_sub_processes?: boolean;
 }
 
 // Join node - synchronizes parallel branches  
 export interface JoinNodeConfig {
-  join_type: 'and' | 'or' | 'n_of_m';  // and = all branches, or = any branch, n_of_m = specific count
-  required_count?: number;  // For n_of_m mode
+  join_type: 'and' | 'or' | 'n_of_m' | 'all';  // and/all = all branches, or = any branch, n_of_m = specific count
+  required_count?: number;  // For n_of_m mode, or expected number of branches
+  input_count?: number;     // Number of input branches (for dynamic handle generation)
   timeout_hours?: number;   // Optional timeout for waiting
   on_timeout_action?: 'continue' | 'fail' | 'notify';
   required_branch_ids?: string[];  // Specific branches required (for and/n_of_m)
