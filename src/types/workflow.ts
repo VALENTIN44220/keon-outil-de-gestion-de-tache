@@ -11,7 +11,9 @@ export type WorkflowNodeType =
   | 'fork'   // Parallel split - starts multiple branches
   | 'join'   // Synchronization - waits for branches
   | 'status_change'   // Change task status based on workflow events
-  | 'assignment';     // Task assignment to specific user/group/department
+  | 'assignment'     // Task assignment to specific user/group/department
+  | 'set_variable'   // Define/update workflow variables
+  | 'datalake_sync'; // Synchronization with datalake
 
 // All possible task statuses
 export type TaskStatusType = 'to_assign' | 'todo' | 'in-progress' | 'done' | 'pending-validation' | 'validated' | 'refused' | 'review';
@@ -156,6 +158,50 @@ export interface ConditionNodeConfig {
   };
 }
 
+// Set Variable node - defines/updates workflow variables
+export type WorkflowVariableType = 'text' | 'boolean' | 'integer' | 'decimal' | 'datetime' | 'autonumber';
+export type WorkflowVariableMode = 'fixed' | 'expression' | 'system';
+export type AutonumberReset = 'never' | 'daily' | 'monthly' | 'yearly';
+
+export interface SetVariableNodeConfig {
+  variable_name: string;
+  variable_type: WorkflowVariableType;
+  mode: WorkflowVariableMode;
+  // For fixed mode
+  fixed_value?: string | number | boolean;
+  // For expression mode
+  expression?: string;
+  // For autonumber
+  autonumber_prefix?: string;
+  autonumber_padding?: number;
+  autonumber_reset?: AutonumberReset;
+  // For datetime
+  datetime_mode?: 'execution' | 'fixed';
+  datetime_value?: string;
+  // Scope
+  accessible_to_subprocesses?: boolean;
+}
+
+// Datalake sync node
+export type DatalakeSyncDirection = 'app_to_datalake' | 'datalake_to_app';
+export type DatalakeSyncMode = 'full' | 'incremental';
+export type DatalakeUpsertStrategy = 'insert_only' | 'upsert' | 'overwrite';
+
+export interface DatalakeTableConfig {
+  table_name: string;
+  upsert_strategy: DatalakeUpsertStrategy;
+  primary_key?: string;
+}
+
+export interface DatalakeSyncNodeConfig {
+  direction: DatalakeSyncDirection;
+  mode: DatalakeSyncMode;
+  tables: DatalakeTableConfig[];
+  stop_on_error?: boolean;
+  retry_count?: number;
+  retry_backoff_seconds?: number;
+}
+
 export type WorkflowNodeConfig = 
   | StartNodeConfig 
   | EndNodeConfig 
@@ -167,7 +213,9 @@ export type WorkflowNodeConfig =
   | ForkNodeConfig
   | JoinNodeConfig
   | StatusChangeNodeConfig
-  | AssignmentNodeConfig;
+  | AssignmentNodeConfig
+  | SetVariableNodeConfig
+  | DatalakeSyncNodeConfig;
 
 // Database entities
 export interface WorkflowTemplate {

@@ -533,6 +533,42 @@ export type Database = {
         }
         Relationships: []
       }
+      datalake_table_catalog: {
+        Row: {
+          created_at: string
+          description: string | null
+          display_name: string
+          id: string
+          last_sync_at: string | null
+          primary_key_column: string
+          sync_enabled: boolean
+          table_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          display_name: string
+          id?: string
+          last_sync_at?: string | null
+          primary_key_column?: string
+          sync_enabled?: boolean
+          table_name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          display_name?: string
+          id?: string
+          last_sync_at?: string | null
+          primary_key_column?: string
+          sync_enabled?: boolean
+          table_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       departments: {
         Row: {
           company_id: string | null
@@ -2711,6 +2747,41 @@ export type Database = {
         }
         Relationships: []
       }
+      workflow_autonumber_sequences: {
+        Row: {
+          created_at: string
+          current_value: number
+          id: string
+          last_reset_at: string
+          updated_at: string
+          variable_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_value?: number
+          id?: string
+          last_reset_at?: string
+          updated_at?: string
+          variable_id: string
+        }
+        Update: {
+          created_at?: string
+          current_value?: number
+          id?: string
+          last_reset_at?: string
+          updated_at?: string
+          variable_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_autonumber_sequences_variable_id_fkey"
+            columns: ["variable_id"]
+            isOneToOne: true
+            referencedRelation: "workflow_variables"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workflow_branch_instances: {
         Row: {
           branch_id: string
@@ -2768,6 +2839,72 @@ export type Database = {
           },
           {
             foreignKeyName: "workflow_branch_instances_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_datalake_sync_logs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          direction: Database["public"]["Enums"]["datalake_sync_direction"]
+          duration_ms: number | null
+          error_message: string | null
+          id: string
+          mode: Database["public"]["Enums"]["datalake_sync_mode"]
+          node_id: string | null
+          rows_read: number | null
+          rows_written: number | null
+          run_id: string | null
+          started_at: string | null
+          status: string
+          tables_synced: string[]
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          direction: Database["public"]["Enums"]["datalake_sync_direction"]
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          mode?: Database["public"]["Enums"]["datalake_sync_mode"]
+          node_id?: string | null
+          rows_read?: number | null
+          rows_written?: number | null
+          run_id?: string | null
+          started_at?: string | null
+          status?: string
+          tables_synced?: string[]
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          direction?: Database["public"]["Enums"]["datalake_sync_direction"]
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          mode?: Database["public"]["Enums"]["datalake_sync_mode"]
+          node_id?: string | null
+          rows_read?: number | null
+          rows_written?: number | null
+          run_id?: string | null
+          started_at?: string | null
+          status?: string
+          tables_synced?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_datalake_sync_logs_node_id_fkey"
+            columns: ["node_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_nodes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_datalake_sync_logs_run_id_fkey"
             columns: ["run_id"]
             isOneToOne: false
             referencedRelation: "workflow_runs"
@@ -3253,6 +3390,104 @@ export type Database = {
           },
         ]
       }
+      workflow_variable_instances: {
+        Row: {
+          computed_at: string
+          created_at: string
+          current_value: Json | null
+          id: string
+          run_id: string
+          variable_id: string
+        }
+        Insert: {
+          computed_at?: string
+          created_at?: string
+          current_value?: Json | null
+          id?: string
+          run_id: string
+          variable_id: string
+        }
+        Update: {
+          computed_at?: string
+          created_at?: string
+          current_value?: Json | null
+          id?: string
+          run_id?: string
+          variable_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_variable_instances_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workflow_variable_instances_variable_id_fkey"
+            columns: ["variable_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_variables"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_variables: {
+        Row: {
+          autonumber_padding: number | null
+          autonumber_prefix: string | null
+          autonumber_reset: string | null
+          created_at: string
+          datetime_mode: string | null
+          default_value: Json | null
+          expression: string | null
+          id: string
+          name: string
+          scope: string
+          updated_at: string
+          variable_type: Database["public"]["Enums"]["workflow_variable_type"]
+          workflow_id: string
+        }
+        Insert: {
+          autonumber_padding?: number | null
+          autonumber_prefix?: string | null
+          autonumber_reset?: string | null
+          created_at?: string
+          datetime_mode?: string | null
+          default_value?: Json | null
+          expression?: string | null
+          id?: string
+          name: string
+          scope?: string
+          updated_at?: string
+          variable_type?: Database["public"]["Enums"]["workflow_variable_type"]
+          workflow_id: string
+        }
+        Update: {
+          autonumber_padding?: number | null
+          autonumber_prefix?: string | null
+          autonumber_reset?: string | null
+          created_at?: string
+          datetime_mode?: string | null
+          default_value?: Json | null
+          expression?: string | null
+          id?: string
+          name?: string
+          scope?: string
+          updated_at?: string
+          variable_type?: Database["public"]["Enums"]["workflow_variable_type"]
+          workflow_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_variables_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workload_slots: {
         Row: {
           created_at: string
@@ -3358,6 +3593,10 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_next_autonumber: {
+        Args: { p_reset_mode?: string; p_variable_id: string }
+        Returns: number
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -3384,6 +3623,9 @@ export type Database = {
         | "department_search"
         | "file"
         | "table_lookup"
+      datalake_sync_direction: "app_to_datalake" | "datalake_to_app"
+      datalake_sync_mode: "full" | "incremental"
+      datalake_upsert_strategy: "insert_only" | "upsert" | "overwrite"
       notification_channel: "in_app" | "email" | "teams"
       template_visibility:
         | "private"
@@ -3409,6 +3651,8 @@ export type Database = {
         | "join"
         | "status_change"
         | "assignment"
+        | "set_variable"
+        | "datalake_sync"
       workflow_run_status:
         | "running"
         | "completed"
@@ -3416,6 +3660,13 @@ export type Database = {
         | "cancelled"
         | "paused"
       workflow_status: "draft" | "active" | "inactive" | "archived"
+      workflow_variable_type:
+        | "text"
+        | "boolean"
+        | "integer"
+        | "decimal"
+        | "datetime"
+        | "autonumber"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3561,6 +3812,9 @@ export const Constants = {
         "file",
         "table_lookup",
       ],
+      datalake_sync_direction: ["app_to_datalake", "datalake_to_app"],
+      datalake_sync_mode: ["full", "incremental"],
+      datalake_upsert_strategy: ["insert_only", "upsert", "overwrite"],
       notification_channel: ["in_app", "email", "teams"],
       template_visibility: [
         "private",
@@ -3588,6 +3842,8 @@ export const Constants = {
         "join",
         "status_change",
         "assignment",
+        "set_variable",
+        "datalake_sync",
       ],
       workflow_run_status: [
         "running",
@@ -3597,6 +3853,14 @@ export const Constants = {
         "paused",
       ],
       workflow_status: ["draft", "active", "inactive", "archived"],
+      workflow_variable_type: [
+        "text",
+        "boolean",
+        "integer",
+        "decimal",
+        "datetime",
+        "autonumber",
+      ],
     },
   },
 } as const

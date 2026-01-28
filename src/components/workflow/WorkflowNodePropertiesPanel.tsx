@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Save, X, Plus, Info, ExternalLink, AlertCircle, Variable } from 'lucide-react';
+import { Trash2, X, Plus, Info, ExternalLink, AlertCircle, Variable, Check, Loader2 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { SearchableSelect, SearchableSelectOption } from '@/components/ui/searchable-select';
@@ -27,10 +27,18 @@ import type {
   JoinNodeConfig,
   StatusChangeNodeConfig,
   AssignmentNodeConfig,
+  SetVariableNodeConfig,
+  DatalakeSyncNodeConfig,
   ApproverType,
   NotificationChannel,
   ValidationTriggerMode,
-  TaskStatusType
+  TaskStatusType,
+  WorkflowVariableType,
+  WorkflowVariableMode,
+  AutonumberReset,
+  DatalakeSyncDirection,
+  DatalakeSyncMode,
+  DatalakeUpsertStrategy
 } from '@/types/workflow';
 import type { TaskTemplate } from '@/types/template';
 import type { TemplateCustomField } from '@/types/customField';
@@ -55,6 +63,11 @@ interface DepartmentOption {
   name: string;
 }
 
+interface DatalakeTableOption {
+  table_name: string;
+  display_name: string;
+}
+
 interface WorkflowNodePropertiesPanelProps {
   node: WorkflowNode | null;
   onUpdate: (nodeId: string, updates: Partial<WorkflowNode>) => Promise<boolean>;
@@ -67,7 +80,11 @@ interface WorkflowNodePropertiesPanelProps {
   users?: UserOption[];
   groups?: GroupOption[];
   departments?: DepartmentOption[];
+  datalakeTables?: DatalakeTableOption[];
 }
+
+// Debounce delay for auto-save
+const AUTOSAVE_DELAY = 500;
 
 export function WorkflowNodePropertiesPanel({
   node,
@@ -81,18 +98,65 @@ export function WorkflowNodePropertiesPanel({
   users = [],
   groups = [],
   departments = [],
+  datalakeTables = [],
 }: WorkflowNodePropertiesPanelProps) {
   const navigate = useNavigate();
   const [label, setLabel] = useState('');
   const [config, setConfig] = useState<WorkflowNodeConfig>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const previousNodeIdRef = useRef<string | null>(null);
 
+  // Auto-save function with debounce
+  const performAutoSave = useCallback(async (nodeId: string, newLabel: string, newConfig: WorkflowNodeConfig) => {
+    if (disabled) return;
+    setSaveStatus('saving');
+    setIsSaving(true);
+    try {
+      await onUpdate(nodeId, { label: newLabel, config: newConfig });
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [disabled, onUpdate]);
+
+  // Schedule auto-save when label or config changes
+  useEffect(() => {
+    if (!node || disabled) return;
+    
+    // Skip if this is initial load (node just changed)
+    if (previousNodeIdRef.current !== node.id) {
+      previousNodeIdRef.current = node.id;
+      return;
+    }
+
+    // Clear previous timeout
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    // Schedule new save
+    saveTimeoutRef.current = setTimeout(() => {
+      performAutoSave(node.id, label, config);
+    }, AUTOSAVE_DELAY);
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [label, config, node, disabled, performAutoSave]);
+
+  // Sync state when node changes
   useEffect(() => {
     if (node) {
       setLabel(node.label);
       setConfig(node.config);
+      setSaveStatus('idle');
     }
-  }, [node]);
+  }, [node?.id]); // Only re-sync when node ID changes
 
   // Build options for SearchableSelect - must be at component level, not inside render function
   const userOptions: SearchableSelectOption[] = useMemo(() => 
@@ -125,11 +189,6 @@ export function WorkflowNodePropertiesPanel({
     );
   }
 
-  const handleSave = async () => {
-    setIsSaving(true);
-    await onUpdate(node.id, { label, config });
-    setIsSaving(false);
-  };
 
   const handleDelete = async () => {
     if (node.node_type === 'start' || node.node_type === 'end') {
@@ -1283,6 +1342,30 @@ export function WorkflowNodePropertiesPanel({
         return renderStatusChangeConfig();
       case 'assignment':
         return renderAssignmentConfig();
+      case 'set_variable':
+        return (
+          <div className="space-y-4">
+            <Alert><Info className="h-4 w-4" /><AlertDescription className="text-xs">Définit une variable réutilisable dans le workflow et ses sous-processus.</AlertDescription></Alert>
+            <div><Label>Nom de la variable</Label><Input value={(config as SetVariableNodeConfig).variable_name || ''} onChange={(e) => updateConfig({ variable_name: e.target.value })} placeholder="ex: montant_ttc" disabled={disabled} /></div>
+            <div><Label>Type</Label><Select value={(config as SetVariableNodeConfig).variable_type || 'text'} onValueChange={(v) => updateConfig({ variable_type: v as WorkflowVariableType })} disabled={disabled}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="text">Texte</SelectItem><SelectItem value="boolean">Booléen</SelectItem><SelectItem value="integer">Entier</SelectItem><SelectItem value="decimal">Décimal</SelectItem><SelectItem value="datetime">Date/Heure</SelectItem><SelectItem value="autonumber">Numéro auto</SelectItem></SelectContent></Select></div>
+            <div><Label>Mode</Label><Select value={(config as SetVariableNodeConfig).mode || 'fixed'} onValueChange={(v) => updateConfig({ mode: v as WorkflowVariableMode })} disabled={disabled}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="fixed">Valeur fixe</SelectItem><SelectItem value="expression">Expression/Calcul</SelectItem><SelectItem value="system">Valeur système</SelectItem></SelectContent></Select></div>
+            {(config as SetVariableNodeConfig).mode === 'fixed' && <div><Label>Valeur</Label><Input value={String((config as SetVariableNodeConfig).fixed_value || '')} onChange={(e) => updateConfig({ fixed_value: e.target.value })} disabled={disabled} /></div>}
+            {(config as SetVariableNodeConfig).mode === 'expression' && <div><Label>Expression</Label><Textarea value={(config as SetVariableNodeConfig).expression || ''} onChange={(e) => updateConfig({ expression: e.target.value })} placeholder="{{montant}} * 1.2" rows={2} disabled={disabled} /><p className="text-xs text-muted-foreground mt-1">Fonctions: round(x,n), min(a,b), max(a,b)</p></div>}
+            {(config as SetVariableNodeConfig).variable_type === 'autonumber' && <><div><Label>Préfixe</Label><Input value={(config as SetVariableNodeConfig).autonumber_prefix || ''} onChange={(e) => updateConfig({ autonumber_prefix: e.target.value })} placeholder="BE-" disabled={disabled} /></div><div><Label>Padding</Label><Input type="number" min={1} max={10} value={(config as SetVariableNodeConfig).autonumber_padding || 5} onChange={(e) => updateConfig({ autonumber_padding: parseInt(e.target.value) })} disabled={disabled} /></div><div><Label>Reset</Label><Select value={(config as SetVariableNodeConfig).autonumber_reset || 'never'} onValueChange={(v) => updateConfig({ autonumber_reset: v as AutonumberReset })} disabled={disabled}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="never">Jamais</SelectItem><SelectItem value="daily">Quotidien</SelectItem><SelectItem value="monthly">Mensuel</SelectItem><SelectItem value="yearly">Annuel</SelectItem></SelectContent></Select></div></>}
+            <div className="flex items-center justify-between pt-2 border-t"><div><Label>Accessible aux sous-processus</Label><p className="text-xs text-muted-foreground">Rend cette variable visible dans les workflows enfants</p></div><Switch checked={(config as SetVariableNodeConfig).accessible_to_subprocesses !== false} onCheckedChange={(v) => updateConfig({ accessible_to_subprocesses: v })} disabled={disabled} /></div>
+          </div>
+        );
+      case 'datalake_sync':
+        return (
+          <div className="space-y-4">
+            <Alert><Info className="h-4 w-4" /><AlertDescription className="text-xs">Synchronise des données entre l'application et le Datalake. Deux sorties: Succès et Erreur.</AlertDescription></Alert>
+            <div><Label>Direction</Label><Select value={(config as DatalakeSyncNodeConfig).direction || 'app_to_datalake'} onValueChange={(v) => updateConfig({ direction: v as DatalakeSyncDirection })} disabled={disabled}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="app_to_datalake">Application → Datalake</SelectItem><SelectItem value="datalake_to_app">Datalake → Application</SelectItem></SelectContent></Select></div>
+            <div><Label>Mode</Label><Select value={(config as DatalakeSyncNodeConfig).mode || 'full'} onValueChange={(v) => updateConfig({ mode: v as DatalakeSyncMode })} disabled={disabled}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="full">Complet</SelectItem><SelectItem value="incremental">Incrémental</SelectItem></SelectContent></Select></div>
+            <div><Label>Tables à synchroniser</Label><p className="text-xs text-muted-foreground mb-2">Configurez les tables dans l'onglet Admin → Fabric Lakehouse</p><Badge variant="secondary">{(config as DatalakeSyncNodeConfig).tables?.length || 0} table(s)</Badge></div>
+            <div className="flex items-center justify-between"><div><Label>Arrêter sur erreur</Label></div><Switch checked={(config as DatalakeSyncNodeConfig).stop_on_error !== false} onCheckedChange={(v) => updateConfig({ stop_on_error: v })} disabled={disabled} /></div>
+            <div><Label>Tentatives</Label><Input type="number" min={1} max={10} value={(config as DatalakeSyncNodeConfig).retry_count || 3} onChange={(e) => updateConfig({ retry_count: parseInt(e.target.value) })} disabled={disabled} /></div>
+          </div>
+        );
       case 'start':
       case 'end':
         return (
@@ -1298,7 +1381,18 @@ export function WorkflowNodePropertiesPanel({
   return (
     <Card className="w-80 shrink-0 overflow-hidden">
       <CardHeader className="py-3 px-4 flex flex-row items-center justify-between">
-        <CardTitle className="text-sm font-medium">Propriétés</CardTitle>
+        <div className="flex items-center gap-2">
+          <CardTitle className="text-sm font-medium">Propriétés</CardTitle>
+          {saveStatus === 'saving' && (
+            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+          )}
+          {saveStatus === 'saved' && (
+            <Badge variant="outline" className="text-xs text-green-600 border-green-300">
+              <Check className="h-3 w-3 mr-1" />
+              Enregistré
+            </Badge>
+          )}
+        </div>
         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose}>
           <X className="h-4 w-4" />
         </Button>
@@ -1318,17 +1412,12 @@ export function WorkflowNodePropertiesPanel({
           {renderConfigPanel()}
         </div>
 
-        {!disabled && (
-          <div className="flex gap-2 pt-4 border-t">
-            <Button onClick={handleSave} disabled={isSaving} className="flex-1">
-              <Save className="h-4 w-4 mr-2" />
-              Enregistrer
+        {!disabled && node && node.node_type !== 'start' && node.node_type !== 'end' && (
+          <div className="pt-4 border-t">
+            <Button variant="destructive" size="sm" onClick={handleDelete} className="w-full">
+              <Trash2 className="h-4 w-4 mr-2" />
+              Supprimer ce bloc
             </Button>
-            {node.node_type !== 'start' && node.node_type !== 'end' && (
-              <Button variant="destructive" size="icon" onClick={handleDelete}>
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            )}
           </div>
         )}
       </CardContent>
