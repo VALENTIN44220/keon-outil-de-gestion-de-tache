@@ -555,7 +555,12 @@ export const ForkNode = memo(({ data, selected }: CustomNodeProps) => {
           <Badge variant="secondary" className="text-xs">
             {branchCount} branches
           </Badge>
-          {config.from_sub_processes && (
+          {config.branch_mode === 'dynamic' && (
+            <Badge variant="outline" className="text-xs text-amber-600 border-amber-400">
+              🔀 Dynamique
+            </Badge>
+          )}
+          {config.from_sub_processes && config.branch_mode !== 'dynamic' && (
             <Badge variant="outline" className="text-xs">
               Sous-processus
             </Badge>
@@ -591,6 +596,7 @@ export const JoinNode = memo(({ data, selected }: CustomNodeProps) => {
         return `Toutes (${branchCount})`;
       case 'or': return 'Au moins une';
       case 'n_of_m': return `${config.required_count || 1} branche(s)`;
+      case 'dynamic': return `Dynamique`;
       default: return `Sync (${branchCount})`;
     }
   };
@@ -629,9 +635,16 @@ export const JoinNode = memo(({ data, selected }: CustomNodeProps) => {
           </div>
           <span className="font-medium text-sm truncate">{data.label}</span>
         </div>
-        <Badge variant="secondary" className="text-xs">
-          {getJoinTypeLabel()}
-        </Badge>
+        <div className="flex flex-wrap gap-1">
+          <Badge variant="secondary" className="text-xs">
+            {getJoinTypeLabel()}
+          </Badge>
+          {config.join_type === 'dynamic' && (
+            <Badge variant="outline" className="text-xs text-amber-600 border-amber-400">
+              🔀 Sélection
+            </Badge>
+          )}
+        </div>
         {config.timeout_hours && (
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <Clock className="h-3 w-3" />
