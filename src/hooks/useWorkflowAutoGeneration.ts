@@ -14,12 +14,20 @@ interface MigrationResult {
   errors: number;
 }
 
+interface SelectionOptions {
+  processIds?: string[];
+  subProcessIds?: string[];
+}
+
 export function useWorkflowAutoGeneration() {
   const { user } = useAuth();
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
 
-  const generateAllMissingWorkflows = async (forceRegenerate = false): Promise<{
+  const generateAllMissingWorkflows = async (
+    forceRegenerate = false,
+    selection?: SelectionOptions
+  ): Promise<{
     subProcesses: MigrationResult;
     processes: MigrationResult;
   }> => {
@@ -36,8 +44,8 @@ export function useWorkflowAutoGeneration() {
     const processResult: MigrationResult = { total: 0, created: 0, existing: 0, errors: 0 };
 
     try {
-      // Fetch all sub-processes with their tasks
-      const { data: subProcesses } = await supabase
+      // Build queries with optional filtering
+      let subProcessQuery = supabase
         .from('sub_process_templates')
         .select(`
           id, 
@@ -51,8 +59,7 @@ export function useWorkflowAutoGeneration() {
           )
         `);
 
-      // Fetch all processes with their sub-processes
-      const { data: processes } = await supabase
+      let processQuery = supabase
         .from('process_templates')
         .select(`
           id, 
@@ -62,6 +69,17 @@ export function useWorkflowAutoGeneration() {
             name
           )
         `);
+
+      // Apply selection filters if provided
+      if (selection?.subProcessIds && selection.subProcessIds.length > 0) {
+        subProcessQuery = subProcessQuery.in('id', selection.subProcessIds);
+      }
+      if (selection?.processIds && selection.processIds.length > 0) {
+        processQuery = processQuery.in('id', selection.processIds);
+      }
+
+      const { data: subProcesses } = await subProcessQuery;
+      const { data: processes } = await processQuery;
 
       // Check existing workflows
       const { data: existingWorkflows } = await supabase

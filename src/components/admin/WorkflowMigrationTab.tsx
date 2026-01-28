@@ -1,12 +1,19 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
-import { Loader2, Play, CheckCircle2, XCircle, AlertCircle, Workflow, Layers, RefreshCw } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { 
+  Loader2, Play, CheckCircle2, XCircle, AlertCircle, 
+  Workflow, Layers, RefreshCw, GitFork, Search 
+} from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { useWorkflowMigration } from '@/hooks/useWorkflowMigration';
 import { useWorkflowAutoGeneration } from '@/hooks/useWorkflowAutoGeneration';
+import { supabase } from '@/integrations/supabase/client';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,40 +26,404 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 
+interface ProcessItem {
+  id: string;
+  name: string;
+  subProcessCount: number;
+}
+
+interface SubProcessItem {
+  id: string;
+  name: string;
+  processName: string;
+}
+
 export function WorkflowMigrationTab() {
   const { isMigrating, migrationResults, migrateAllProcesses } = useWorkflowMigration();
   const { generateAllMissingWorkflows, isGenerating, progress } = useWorkflowAutoGeneration();
   const [showConfirm, setShowConfirm] = useState(false);
-  const [showAutoGenConfirm, setShowAutoGenConfirm] = useState(false);
-  const [showForceRegenConfirm, setShowForceRegenConfirm] = useState(false);
+  const [showSelectiveRegenConfirm, setShowSelectiveRegenConfirm] = useState(false);
   const [autoGenResults, setAutoGenResults] = useState<{
     subProcesses: { total: number; created: number; existing: number; errors: number };
     processes: { total: number; created: number; existing: number; errors: number };
   } | null>(null);
+
+  // Selection state
+  const [processes, setProcesses] = useState<ProcessItem[]>([]);
+  const [subProcesses, setSubProcesses] = useState<SubProcessItem[]>([]);
+  const [selectedProcessIds, setSelectedProcessIds] = useState<string[]>([]);
+  const [selectedSubProcessIds, setSelectedSubProcessIds] = useState<string[]>([]);
+  const [processSearch, setProcessSearch] = useState('');
+  const [subProcessSearch, setSubProcessSearch] = useState('');
+  const [isLoadingData, setIsLoadingData] = useState(true);
+
+  // Fetch processes and sub-processes for selection
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoadingData(true);
+      try {
+        const [{ data: processData }, { data: subProcessData }] = await Promise.all([
+          supabase
+            .from('process_templates')
+            .select('id, name, sub_process_templates(id)')
+            .order('name'),
+          supabase
+            .from('sub_process_templates')
+            .select('id, name, process_templates(name)')
+            .order('name'),
+        ]);
+
+        setProcesses(
+          (processData || []).map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            subProcessCount: p.sub_process_templates?.length || 0,
+          }))
+        );
+
+        setSubProcesses(
+          (subProcessData || []).map((sp: any) => ({
+            id: sp.id,
+            name: sp.name,
+            processName: sp.process_templates?.name || 'N/A',
+          }))
+        );
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   const handleMigrate = async () => {
     setShowConfirm(false);
     await migrateAllProcesses();
   };
 
-  const handleAutoGenerate = async (forceRegenerate = false) => {
-    setShowAutoGenConfirm(false);
-    setShowForceRegenConfirm(false);
-    const results = await generateAllMissingWorkflows(forceRegenerate);
+  const handleSelectiveRegenerate = async () => {
+    setShowSelectiveRegenConfirm(false);
+    const results = await generateAllMissingWorkflows(true, {
+      processIds: selectedProcessIds.length > 0 ? selectedProcessIds : undefined,
+      subProcessIds: selectedSubProcessIds.length > 0 ? selectedSubProcessIds : undefined,
+    });
+    setAutoGenResults(results);
+    // Clear selection after regeneration
+    setSelectedProcessIds([]);
+    setSelectedSubProcessIds([]);
+  };
+
+  const handleGenerateMissing = async () => {
+    const results = await generateAllMissingWorkflows(false);
     setAutoGenResults(results);
   };
+
+  const toggleProcessSelection = (id: string) => {
+    setSelectedProcessIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSubProcessSelection = (id: string) => {
+    setSelectedSubProcessIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const selectAllProcesses = () => {
+    const filtered = filteredProcesses.map(p => p.id);
+    const allSelected = filtered.every(id => selectedProcessIds.includes(id));
+    if (allSelected) {
+      setSelectedProcessIds(prev => prev.filter(id => !filtered.includes(id)));
+    } else {
+      setSelectedProcessIds(prev => [...new Set([...prev, ...filtered])]);
+    }
+  };
+
+  const selectAllSubProcesses = () => {
+    const filtered = filteredSubProcesses.map(sp => sp.id);
+    const allSelected = filtered.every(id => selectedSubProcessIds.includes(id));
+    if (allSelected) {
+      setSelectedSubProcessIds(prev => prev.filter(id => !filtered.includes(id)));
+    } else {
+      setSelectedSubProcessIds(prev => [...new Set([...prev, ...filtered])]);
+    }
+  };
+
+  const filteredProcesses = processes.filter(p =>
+    p.name.toLowerCase().includes(processSearch.toLowerCase())
+  );
+
+  const filteredSubProcesses = subProcesses.filter(sp =>
+    sp.name.toLowerCase().includes(subProcessSearch.toLowerCase()) ||
+    sp.processName.toLowerCase().includes(subProcessSearch.toLowerCase())
+  );
 
   const successCount = migrationResults.filter(r => r.workflowCreated).length;
   const skipCount = migrationResults.filter(r => r.error === 'Workflow déjà existant').length;
   const errorCount = migrationResults.filter(r => r.error && r.error !== 'Workflow déjà existant').length;
 
+  const totalSelected = selectedProcessIds.length + selectedSubProcessIds.length;
+
   return (
     <div className="space-y-6">
+      {/* Selective Regeneration Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <GitFork className="h-5 w-5" />
+            Régénération sélective des workflows
+          </CardTitle>
+          <CardDescription>
+            Sélectionnez les processus et/ou sous-processus dont vous souhaitez régénérer les workflows.
+            Les processus avec plusieurs sous-processus utilisent un pattern Fork/Join pour l'exécution parallèle.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Tabs defaultValue="processes" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="processes" className="flex items-center gap-2">
+                <Workflow className="h-4 w-4" />
+                Processus ({selectedProcessIds.length}/{processes.length})
+              </TabsTrigger>
+              <TabsTrigger value="subprocesses" className="flex items-center gap-2">
+                <Layers className="h-4 w-4" />
+                Sous-processus ({selectedSubProcessIds.length}/{subProcesses.length})
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="processes" className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Rechercher un processus..."
+                    value={processSearch}
+                    onChange={(e) => setProcessSearch(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <Button variant="outline" size="sm" onClick={selectAllProcesses}>
+                  {filteredProcesses.every(p => selectedProcessIds.includes(p.id))
+                    ? 'Désélectionner tout'
+                    : 'Sélectionner tout'}
+                </Button>
+              </div>
+
+              <ScrollArea className="h-[250px] rounded-md border">
+                {isLoadingData ? (
+                  <div className="flex items-center justify-center h-full">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                  <div className="p-3 space-y-1">
+                    {filteredProcesses.map((process) => (
+                      <div
+                        key={process.id}
+                        className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
+                          selectedProcessIds.includes(process.id)
+                            ? 'bg-primary/10 border border-primary/30'
+                            : 'bg-muted/30 hover:bg-muted/50'
+                        }`}
+                        onClick={() => toggleProcessSelection(process.id)}
+                      >
+                        <Checkbox
+                          checked={selectedProcessIds.includes(process.id)}
+                          onCheckedChange={() => toggleProcessSelection(process.id)}
+                        />
+                        <div className="flex-1">
+                          <p className="font-medium">{process.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {process.subProcessCount} sous-processus
+                          </p>
+                        </div>
+                        {process.subProcessCount > 1 && (
+                          <Badge variant="outline" className="text-xs">
+                            <GitFork className="h-3 w-3 mr-1" />
+                            Fork/Join
+                          </Badge>
+                        )}
+                      </div>
+                    ))}
+                    {filteredProcesses.length === 0 && (
+                      <p className="text-center text-muted-foreground py-8">
+                        Aucun processus trouvé
+                      </p>
+                    )}
+                  </div>
+                )}
+              </ScrollArea>
+            </TabsContent>
+
+            <TabsContent value="subprocesses" className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Rechercher un sous-processus..."
+                    value={subProcessSearch}
+                    onChange={(e) => setSubProcessSearch(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <Button variant="outline" size="sm" onClick={selectAllSubProcesses}>
+                  {filteredSubProcesses.every(sp => selectedSubProcessIds.includes(sp.id))
+                    ? 'Désélectionner tout'
+                    : 'Sélectionner tout'}
+                </Button>
+              </div>
+
+              <ScrollArea className="h-[250px] rounded-md border">
+                {isLoadingData ? (
+                  <div className="flex items-center justify-center h-full">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                  <div className="p-3 space-y-1">
+                    {filteredSubProcesses.map((sp) => (
+                      <div
+                        key={sp.id}
+                        className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
+                          selectedSubProcessIds.includes(sp.id)
+                            ? 'bg-primary/10 border border-primary/30'
+                            : 'bg-muted/30 hover:bg-muted/50'
+                        }`}
+                        onClick={() => toggleSubProcessSelection(sp.id)}
+                      >
+                        <Checkbox
+                          checked={selectedSubProcessIds.includes(sp.id)}
+                          onCheckedChange={() => toggleSubProcessSelection(sp.id)}
+                        />
+                        <div className="flex-1">
+                          <p className="font-medium">{sp.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {sp.processName}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                    {filteredSubProcesses.length === 0 && (
+                      <p className="text-center text-muted-foreground py-8">
+                        Aucun sous-processus trouvé
+                      </p>
+                    )}
+                  </div>
+                )}
+              </ScrollArea>
+            </TabsContent>
+          </Tabs>
+
+          <div className="flex items-center gap-4 pt-2 border-t">
+            <AlertDialog open={showSelectiveRegenConfirm} onOpenChange={setShowSelectiveRegenConfirm}>
+              <AlertDialogTrigger asChild>
+                <Button 
+                  disabled={isGenerating || totalSelected === 0}
+                  variant="default"
+                >
+                  {isGenerating ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Génération...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Régénérer la sélection ({totalSelected})
+                    </>
+                  )}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="text-destructive">
+                    ⚠️ Régénérer les workflows sélectionnés
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Cette action va <strong>supprimer et recréer</strong> les workflows pour :
+                    <ul className="list-disc list-inside mt-2 space-y-1">
+                      {selectedProcessIds.length > 0 && (
+                        <li>{selectedProcessIds.length} processus</li>
+                      )}
+                      {selectedSubProcessIds.length > 0 && (
+                        <li>{selectedSubProcessIds.length} sous-processus</li>
+                      )}
+                    </ul>
+                    <br />
+                    <span className="text-destructive font-medium">
+                      Les personnalisations manuelles seront perdues !
+                    </span>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Annuler</AlertDialogCancel>
+                  <AlertDialogAction 
+                    onClick={handleSelectiveRegenerate}
+                    className="bg-destructive hover:bg-destructive/90"
+                  >
+                    Régénérer
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
+            <Button 
+              variant="outline" 
+              disabled={isGenerating}
+              onClick={handleGenerateMissing}
+            >
+              <Play className="h-4 w-4 mr-2" />
+              Générer les manquants uniquement
+            </Button>
+          </div>
+
+          {isGenerating && progress.total > 0 && (
+            <div className="space-y-2">
+              <Progress value={(progress.current / progress.total) * 100} />
+              <p className="text-sm text-muted-foreground">
+                {progress.current} / {progress.total} éléments traités
+              </p>
+            </div>
+          )}
+
+          {autoGenResults && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="p-4 rounded-lg bg-muted/50">
+                <div className="flex items-center gap-2 mb-3">
+                  <Layers className="h-4 w-4 text-primary" />
+                  <span className="font-medium">Sous-processus</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>Total : {autoGenResults.subProcesses.total}</div>
+                  <div className="text-green-600">Créés : {autoGenResults.subProcesses.created}</div>
+                  <div className="text-blue-600">Existants : {autoGenResults.subProcesses.existing}</div>
+                  <div className="text-red-600">Erreurs : {autoGenResults.subProcesses.errors}</div>
+                </div>
+              </div>
+              <div className="p-4 rounded-lg bg-muted/50">
+                <div className="flex items-center gap-2 mb-3">
+                  <Workflow className="h-4 w-4 text-primary" />
+                  <span className="font-medium">Processus</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>Total : {autoGenResults.processes.total}</div>
+                  <div className="text-green-600">Créés : {autoGenResults.processes.created}</div>
+                  <div className="text-blue-600">Existants : {autoGenResults.processes.existing}</div>
+                  <div className="text-red-600">Erreurs : {autoGenResults.processes.errors}</div>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Legacy Migration Card */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Workflow className="h-5 w-5" />
-            Migration des Workflows
+            Migration des Workflows (Legacy)
           </CardTitle>
           <CardDescription>
             Générer automatiquement des workflows pour tous les processus existants. 
@@ -64,7 +435,7 @@ export function WorkflowMigrationTab() {
           <div className="flex items-center gap-4">
             <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
               <AlertDialogTrigger asChild>
-                <Button disabled={isMigrating}>
+                <Button variant="outline" disabled={isMigrating}>
                   {isMigrating ? (
                     <>
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -123,7 +494,7 @@ export function WorkflowMigrationTab() {
           </div>
 
           {migrationResults.length > 0 && (
-            <ScrollArea className="h-[300px] rounded-md border">
+            <ScrollArea className="h-[200px] rounded-md border">
               <div className="p-4 space-y-2">
                 {migrationResults.map((result, index) => (
                   <div 
@@ -158,138 +529,10 @@ export function WorkflowMigrationTab() {
         </CardContent>
       </Card>
 
-      {/* Auto-generation section */}
+      {/* Info Card */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Layers className="h-5 w-5" />
-            Génération automatique des workflows
-          </CardTitle>
-          <CardDescription>
-            Crée automatiquement un workflow complet pour chaque processus et sous-processus, 
-            incluant: Déclencheur → Tâches → Validation Manager → Notification → Fin.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-wrap items-center gap-4">
-            <AlertDialog open={showAutoGenConfirm} onOpenChange={setShowAutoGenConfirm}>
-              <AlertDialogTrigger asChild>
-                <Button variant="outline" disabled={isGenerating}>
-                  {isGenerating ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Génération...
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                      Générer les workflows manquants
-                    </>
-                  )}
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Générer les workflows manquants</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Cette action va créer un workflow complet pour chaque processus et 
-                    sous-processus qui n'en possède pas encore.
-                    <br /><br />
-                    <strong>Contenu généré :</strong>
-                    <ul className="list-disc list-inside mt-2 space-y-1">
-                      <li>🚀 Nœud Déclencheur (démarrage automatique)</li>
-                      <li>📋 Nœuds Tâche pour chaque tâche existante</li>
-                      <li>✅ Nœud Validation Manager</li>
-                      <li>🔔 Nœud Notification de clôture</li>
-                      <li>🏁 Nœud Fin</li>
-                    </ul>
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Annuler</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => handleAutoGenerate(false)}>
-                    Générer
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-
-            <AlertDialog open={showForceRegenConfirm} onOpenChange={setShowForceRegenConfirm}>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" disabled={isGenerating}>
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Régénérer TOUS les workflows
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle className="text-destructive">⚠️ Attention - Régénération complète</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Cette action va <strong>supprimer et recréer</strong> TOUS les workflows existants.
-                    <br /><br />
-                    <span className="text-destructive font-medium">
-                      Toutes les personnalisations manuelles seront perdues !
-                    </span>
-                    <br /><br />
-                    Utilisez cette option uniquement si vous souhaitez repartir d'une base propre.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Annuler</AlertDialogCancel>
-                  <AlertDialogAction 
-                    onClick={() => handleAutoGenerate(true)}
-                    className="bg-destructive hover:bg-destructive/90"
-                  >
-                    Régénérer tout
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
-
-          {isGenerating && progress.total > 0 && (
-            <div className="space-y-2">
-              <Progress value={(progress.current / progress.total) * 100} />
-              <p className="text-sm text-muted-foreground">
-                {progress.current} / {progress.total} éléments traités
-              </p>
-            </div>
-          )}
-
-          {autoGenResults && (
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="p-4 rounded-lg bg-muted/50">
-                <div className="flex items-center gap-2 mb-3">
-                  <Layers className="h-4 w-4 text-primary" />
-                  <span className="font-medium">Sous-processus</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>Total : {autoGenResults.subProcesses.total}</div>
-                  <div className="text-green-600">Créés : {autoGenResults.subProcesses.created}</div>
-                  <div className="text-blue-600">Existants : {autoGenResults.subProcesses.existing}</div>
-                  <div className="text-red-600">Erreurs : {autoGenResults.subProcesses.errors}</div>
-                </div>
-              </div>
-              <div className="p-4 rounded-lg bg-muted/50">
-                <div className="flex items-center gap-2 mb-3">
-                  <Workflow className="h-4 w-4 text-primary" />
-                  <span className="font-medium">Processus</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>Total : {autoGenResults.processes.total}</div>
-                  <div className="text-green-600">Créés : {autoGenResults.processes.created}</div>
-                  <div className="text-blue-600">Existants : {autoGenResults.processes.existing}</div>
-                  <div className="text-red-600">Erreurs : {autoGenResults.processes.errors}</div>
-                </div>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Fonctionnement de la migration</CardTitle>
+          <CardTitle>Fonctionnement de la génération</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-3">
@@ -298,10 +541,10 @@ export function WorkflowMigrationTab() {
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm">
                   1
                 </span>
-                Analyse
+                Sous-processus unique
               </div>
               <p className="text-sm text-muted-foreground">
-                Le système analyse chaque processus, ses sous-processus et tâches associées.
+                Début → Tâches → Validation → Notification → Fin
               </p>
             </div>
 
@@ -310,10 +553,10 @@ export function WorkflowMigrationTab() {
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm">
                   2
                 </span>
-                Génération
+                Multi sous-processus
               </div>
               <p className="text-sm text-muted-foreground">
-                Un workflow est créé avec les nœuds correspondants : Début, Tâches, Validations, Fin.
+                Début → <strong>Fork</strong> → [SP parallèles] → <strong>Join</strong> → Fin
               </p>
             </div>
 
@@ -322,10 +565,10 @@ export function WorkflowMigrationTab() {
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-sm">
                   3
                 </span>
-                Vérification
+                Fork/Join
               </div>
               <p className="text-sm text-muted-foreground">
-                Les workflows sont créés en brouillon. Vérifiez et publiez-les manuellement.
+                Exécution parallèle des sous-processus avec synchronisation finale.
               </p>
             </div>
           </div>
@@ -336,8 +579,8 @@ export function WorkflowMigrationTab() {
               <div>
                 <p className="font-medium text-amber-800">Important</p>
                 <p className="text-sm text-amber-700 mt-1">
-                  Les paramètres d'affectation et de validation dans les sous-processus sont désormais 
-                  en lecture seule. Toute la configuration se fait via l'éditeur de workflow.
+                  Les workflows générés sont en brouillon. Vérifiez et publiez-les via l'éditeur de workflow.
+                  La régénération supprime les personnalisations existantes.
                 </p>
               </div>
             </div>
