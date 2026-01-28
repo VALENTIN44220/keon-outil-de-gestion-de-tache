@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building2, Briefcase, Users, Layers, Shield, UserCog, Download, UsersRound, CloudUpload, Grid3X3, UserRoundCog, Workflow } from 'lucide-react';
+import { Building2, Briefcase, Users, Layers, Shield, UserCog, Download, UsersRound, CloudUpload, Grid3X3, UserRoundCog, Workflow, Database } from 'lucide-react';
 import { CompaniesTab } from './CompaniesTab';
 import { DepartmentsTab } from './DepartmentsTab';
 import { JobTitlesTab } from './JobTitlesTab';
@@ -17,6 +17,7 @@ import { FabricLakehouseSyncTab } from './FabricLakehouseSyncTab';
 import { DatabaseResetDialog } from './DatabaseResetDialog';
 import { UserSimulationSelector } from './UserSimulationSelector';
 import { WorkflowMigrationTab } from './WorkflowMigrationTab';
+import { TableLookupConfigTab } from './TableLookupConfigTab';
 import type { Company, Department, JobTitle, HierarchyLevel, PermissionProfile, UserProfile } from '@/types/admin';
 
 interface AdminTabsProps {
@@ -90,6 +91,9 @@ export function AdminTabs(props: AdminTabsProps) {
           </TabsTrigger>
           <TabsTrigger value="workflow-migration" className="px-2 py-1.5" title="Migration Workflows">
             <Workflow className="h-4 w-4" />
+          </TabsTrigger>
+          <TabsTrigger value="table-lookup" className="px-2 py-1.5" title="Champs table">
+            <Database className="h-4 w-4" />
           </TabsTrigger>
         </TabsList>
 
@@ -198,6 +202,10 @@ export function AdminTabs(props: AdminTabsProps) {
 
       <TabsContent value="workflow-migration">
         <WorkflowMigrationTab />
+      </TabsContent>
+
+      <TabsContent value="table-lookup">
+        <TableLookupConfigTab />
       </TabsContent>
     </Tabs>
     </div>
