@@ -200,6 +200,7 @@ export async function createSubProcessWorkflow(
 
 /**
  * Creates a default workflow for a process template with its sub-processes
+ * Uses Fork/Join pattern when there are multiple sub-processes
  */
 export async function createProcessWorkflow(
   processId: string,
@@ -240,9 +241,13 @@ export async function createProcessWorkflow(
       config: Json;
     }> = [];
 
-    let xPosition = 100;
-    const yPosition = 200;
     const xSpacing = 250;
+    const ySpacing = 120;
+    const baseY = 300;
+    let xPosition = 100;
+
+    // If more than 1 sub-process, use Fork/Join pattern
+    const useForkJoin = subProcesses.length > 1;
 
     // Start node
     nodes.push({
@@ -250,26 +255,78 @@ export async function createProcessWorkflow(
       node_type: 'start',
       label: 'Début',
       position_x: xPosition,
-      position_y: yPosition,
+      position_y: baseY,
       config: { trigger: 'on_create' } as Json,
     });
     xPosition += xSpacing;
 
-    // Sub-process nodes
-    for (const sp of subProcesses) {
+    if (useForkJoin) {
+      // FORK node
       nodes.push({
         workflow_id: workflow.id,
-        node_type: 'sub_process',
-        label: sp.name,
+        node_type: 'fork',
+        label: 'FORK',
         position_x: xPosition,
-        position_y: yPosition,
-        config: {
-          sub_process_template_id: sp.id,
-          sub_process_name: sp.name,
-          execute_all_tasks: true,
+        position_y: baseY,
+        config: { 
+          fork_type: 'static',
+          branch_labels: subProcesses.map(sp => sp.name),
         } as Json,
       });
       xPosition += xSpacing;
+
+      // Calculate vertical positions for sub-processes (centered around baseY)
+      const totalHeight = (subProcesses.length - 1) * ySpacing;
+      const startY = baseY - totalHeight / 2;
+
+      // Sub-process nodes (parallel branches)
+      for (let i = 0; i < subProcesses.length; i++) {
+        const sp = subProcesses[i];
+        nodes.push({
+          workflow_id: workflow.id,
+          node_type: 'sub_process',
+          label: sp.name,
+          position_x: xPosition,
+          position_y: startY + i * ySpacing,
+          config: {
+            sub_process_template_id: sp.id,
+            sub_process_name: sp.name,
+            execute_all_tasks: true,
+          } as Json,
+        });
+      }
+      xPosition += xSpacing;
+
+      // JOIN node
+      nodes.push({
+        workflow_id: workflow.id,
+        node_type: 'join',
+        label: 'JOIN',
+        position_x: xPosition,
+        position_y: baseY,
+        config: { 
+          join_type: 'all',
+          required_count: subProcesses.length,
+        } as Json,
+      });
+      xPosition += xSpacing;
+    } else {
+      // Single or no sub-process - linear flow
+      for (const sp of subProcesses) {
+        nodes.push({
+          workflow_id: workflow.id,
+          node_type: 'sub_process',
+          label: sp.name,
+          position_x: xPosition,
+          position_y: baseY,
+          config: {
+            sub_process_template_id: sp.id,
+            sub_process_name: sp.name,
+            execute_all_tasks: true,
+          } as Json,
+        });
+        xPosition += xSpacing;
+      }
     }
 
     // End node
@@ -278,7 +335,7 @@ export async function createProcessWorkflow(
       node_type: 'end',
       label: 'Fin',
       position_x: xPosition,
-      position_y: yPosition,
+      position_y: baseY,
       config: { final_status: 'completed' } as Json,
     });
 
@@ -293,21 +350,74 @@ export async function createProcessWorkflow(
       return workflow.id;
     }
 
-    // Create edges to connect nodes sequentially
+    // Create edges based on the pattern used
     const edges: Array<{
       workflow_id: string;
       source_node_id: string;
       target_node_id: string;
       animated: boolean;
+      source_handle?: string;
+      target_handle?: string;
     }> = [];
 
-    for (let i = 0; i < insertedNodes.length - 1; i++) {
-      edges.push({
-        workflow_id: workflow.id,
-        source_node_id: insertedNodes[i].id,
-        target_node_id: insertedNodes[i + 1].id,
-        animated: true,
+    if (useForkJoin) {
+      // Find nodes by type
+      const startNode = insertedNodes.find(n => n.node_type === 'start');
+      const forkNode = insertedNodes.find(n => n.node_type === 'fork');
+      const joinNode = insertedNodes.find(n => n.node_type === 'join');
+      const endNode = insertedNodes.find(n => n.node_type === 'end');
+      const subProcessNodes = insertedNodes.filter(n => n.node_type === 'sub_process');
+
+      if (startNode && forkNode) {
+        edges.push({
+          workflow_id: workflow.id,
+          source_node_id: startNode.id,
+          target_node_id: forkNode.id,
+          animated: true,
+        });
+      }
+
+      // Connect fork to each sub-process
+      subProcessNodes.forEach((spNode, index) => {
+        if (forkNode) {
+          edges.push({
+            workflow_id: workflow.id,
+            source_node_id: forkNode.id,
+            target_node_id: spNode.id,
+            animated: true,
+            source_handle: `fork-out-${index}`,
+          });
+        }
+        // Connect each sub-process to join
+        if (joinNode) {
+          edges.push({
+            workflow_id: workflow.id,
+            source_node_id: spNode.id,
+            target_node_id: joinNode.id,
+            animated: true,
+            target_handle: `join-in-${index}`,
+          });
+        }
       });
+
+      if (joinNode && endNode) {
+        edges.push({
+          workflow_id: workflow.id,
+          source_node_id: joinNode.id,
+          target_node_id: endNode.id,
+          animated: true,
+        });
+      }
+    } else {
+      // Linear flow - connect nodes sequentially
+      for (let i = 0; i < insertedNodes.length - 1; i++) {
+        edges.push({
+          workflow_id: workflow.id,
+          source_node_id: insertedNodes[i].id,
+          target_node_id: insertedNodes[i + 1].id,
+          animated: true,
+        });
+      }
     }
 
     if (edges.length > 0) {
