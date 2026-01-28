@@ -26,8 +26,8 @@ import {
   FIELD_TYPE_LABELS,
   FieldOption,
   FieldScope,
-  LOOKUP_TABLES,
 } from '@/types/customField';
+import { useTableLookupConfigs } from '@/hooks/useTableLookupConfigs';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Trash2 } from 'lucide-react';
 
@@ -47,6 +47,7 @@ export function AddCustomFieldDialog({
   defaultSubProcessId,
 }: AddCustomFieldDialogProps) {
   const { user } = useAuth();
+  const { activeConfigs } = useTableLookupConfigs();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form state
@@ -59,10 +60,8 @@ export function AddCustomFieldDialog({
   const [defaultValue, setDefaultValue] = useState('');
   const [options, setOptions] = useState<FieldOption[]>([]);
   
-  // Table lookup configuration
-  const [lookupTable, setLookupTable] = useState<string | null>(null);
-  const [lookupValueColumn, setLookupValueColumn] = useState<string>('id');
-  const [lookupLabelColumn, setLookupLabelColumn] = useState<string>('name');
+  // Table lookup configuration - now uses config ID
+  const [lookupConfigId, setLookupConfigId] = useState<string | null>(null);
 
   // Scope
   const [scope, setScope] = useState<FieldScope>(
@@ -117,9 +116,7 @@ export function AddCustomFieldDialog({
     setScope(defaultSubProcessId ? 'sub_process' : defaultProcessId ? 'process' : 'common');
     setProcessId(defaultProcessId || null);
     setSubProcessId(defaultSubProcessId || null);
-    setLookupTable(null);
-    setLookupValueColumn('id');
-    setLookupLabelColumn('name');
+    setLookupConfigId(null);
   };
 
   const handleClose = () => {
@@ -171,10 +168,10 @@ export function AddCustomFieldDialog({
         sub_process_template_id: scope === 'sub_process' ? subProcessId : null,
         created_by: profile?.id || null,
         order_index: 0,
-        // Table lookup configuration
-        lookup_table: fieldType === 'table_lookup' ? lookupTable : null,
-        lookup_value_column: fieldType === 'table_lookup' ? lookupValueColumn : null,
-        lookup_label_column: fieldType === 'table_lookup' ? lookupLabelColumn : null,
+        // Table lookup configuration - get from selected config
+        lookup_table: fieldType === 'table_lookup' && lookupConfigId ? activeConfigs.find(c => c.id === lookupConfigId)?.table_name : null,
+        lookup_value_column: fieldType === 'table_lookup' && lookupConfigId ? activeConfigs.find(c => c.id === lookupConfigId)?.value_column : null,
+        lookup_label_column: fieldType === 'table_lookup' && lookupConfigId ? activeConfigs.find(c => c.id === lookupConfigId)?.display_column : null,
       };
 
       const { error } = await supabase.from('template_custom_fields').insert(insertData);
@@ -308,58 +305,44 @@ export function AddCustomFieldDialog({
               <Label className="text-base font-medium">Configuration de la table source</Label>
               
               <div className="space-y-2">
-                <Label>Table *</Label>
-                <Select value={lookupTable || ''} onValueChange={setLookupTable}>
+                <Label>Source de données *</Label>
+                <Select value={lookupConfigId || '__none__'} onValueChange={(v) => setLookupConfigId(v === '__none__' ? null : v)}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner une table" />
+                    <SelectValue placeholder="Sélectionner une source" />
                   </SelectTrigger>
-                  <SelectContent>
-                    {LOOKUP_TABLES.map((table) => (
-                      <SelectItem key={table.value} value={table.value}>
-                        {table.label}
+                  <SelectContent className="bg-popover">
+                    <SelectItem value="__none__">Sélectionner une source</SelectItem>
+                    {activeConfigs.map((config) => (
+                      <SelectItem key={config.id} value={config.id}>
+                        {config.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {activeConfigs.length === 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Aucune configuration disponible. Configurez les sources dans Administration &gt; Champs table.
+                  </p>
+                )}
               </div>
 
-              {lookupTable && (
-                <>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Colonne valeur (ID)</Label>
-                      <Select value={lookupValueColumn} onValueChange={setLookupValueColumn}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {LOOKUP_TABLES.find(t => t.value === lookupTable)?.columns.map((col) => (
-                            <SelectItem key={col} value={col}>
-                              {col}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-muted-foreground">Valeur stockée (généralement "id")</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Colonne affichée</Label>
-                      <Select value={lookupLabelColumn} onValueChange={setLookupLabelColumn}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {LOOKUP_TABLES.find(t => t.value === lookupTable)?.columns.map((col) => (
-                            <SelectItem key={col} value={col}>
-                              {col}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-muted-foreground">Texte affiché à l'utilisateur</p>
-                    </div>
-                  </div>
-                </>
+              {lookupConfigId && (
+                <div className="text-sm text-muted-foreground p-3 bg-background rounded border">
+                  {(() => {
+                    const config = activeConfigs.find(c => c.id === lookupConfigId);
+                    if (!config) return null;
+                    return (
+                      <>
+                        <p><strong>Table :</strong> {config.table_name}</p>
+                        <p><strong>Affichage :</strong> {config.display_column}</p>
+                        <p><strong>Valeur :</strong> {config.value_column}</p>
+                        {config.filter_column && (
+                          <p><strong>Filtre :</strong> {config.filter_column} = {config.filter_value}</p>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
               )}
             </div>
           )}

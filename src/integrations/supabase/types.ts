@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_table_lookup_configs: {
+        Row: {
+          created_at: string
+          description: string | null
+          display_column: string
+          filter_column: string | null
+          filter_value: string | null
+          id: string
+          is_active: boolean
+          label: string
+          order_index: number
+          table_name: string
+          updated_at: string
+          value_column: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          display_column: string
+          filter_column?: string | null
+          filter_value?: string | null
+          id?: string
+          is_active?: boolean
+          label: string
+          order_index?: number
+          table_name: string
+          updated_at?: string
+          value_column: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          display_column?: string
+          filter_column?: string | null
+          filter_value?: string | null
+          id?: string
+          is_active?: boolean
+          label?: string
+          order_index?: number
+          table_name?: string
+          updated_at?: string
+          value_column?: string
+        }
+        Relationships: []
+      }
       assignment_rules: {
         Row: {
           auto_assign: boolean | null
