@@ -253,10 +253,53 @@ export function useAllCustomFields() {
     }
   };
 
+  const deleteMultipleFields = async (ids: string[]) => {
+    try {
+      const { error } = await supabase
+        .from('template_custom_fields')
+        .delete()
+        .in('id', ids);
+      if (error) throw error;
+      setFields((prev) => prev.filter((f) => !ids.includes(f.id)));
+      toast.success(`${ids.length} champ(s) supprimé(s)`);
+    } catch (error) {
+      console.error('Error deleting fields:', error);
+      toast.error('Erreur lors de la suppression');
+    }
+  };
+
+  const updateMultipleFieldsScope = async (
+    ids: string[],
+    scope: {
+      is_common: boolean;
+      process_template_id: string | null;
+      sub_process_template_id: string | null;
+    }
+  ) => {
+    try {
+      const { error } = await supabase
+        .from('template_custom_fields')
+        .update({
+          is_common: scope.is_common,
+          process_template_id: scope.process_template_id,
+          sub_process_template_id: scope.sub_process_template_id,
+        })
+        .in('id', ids);
+      if (error) throw error;
+      toast.success(`Portée mise à jour pour ${ids.length} champ(s)`);
+      await fetchAllFields();
+    } catch (error) {
+      console.error('Error updating fields scope:', error);
+      toast.error('Erreur lors de la mise à jour');
+    }
+  };
+
   return {
     fields,
     isLoading,
     deleteField,
+    deleteMultipleFields,
+    updateMultipleFieldsScope,
     refetch: fetchAllFields,
   };
 }
