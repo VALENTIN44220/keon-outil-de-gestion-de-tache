@@ -261,7 +261,7 @@ export async function createProcessWorkflow(
     xPosition += xSpacing;
 
     if (useForkJoin) {
-      // FORK node - with branch_labels for dynamic handle generation
+      // FORK node - dynamic branching based on selected sub-processes
       nodes.push({
         workflow_id: workflow.id,
         node_type: 'fork',
@@ -269,9 +269,11 @@ export async function createProcessWorkflow(
         position_x: xPosition,
         position_y: baseY,
         config: { 
-          branch_mode: 'static',
+          branch_mode: 'dynamic',
           branch_labels: subProcesses.map(sp => sp.name),
           from_sub_processes: true,
+          // Store sub-process IDs for runtime filtering
+          sub_process_ids: subProcesses.map(sp => sp.id),
         } as Json,
       });
       xPosition += xSpacing;
@@ -280,7 +282,7 @@ export async function createProcessWorkflow(
       const totalHeight = (subProcesses.length - 1) * ySpacing;
       const startY = baseY - totalHeight / 2;
 
-      // Sub-process nodes (parallel branches)
+      // Sub-process nodes (parallel branches) - each with branch_index for runtime filtering
       for (let i = 0; i < subProcesses.length; i++) {
         const sp = subProcesses[i];
         nodes.push({
@@ -293,12 +295,13 @@ export async function createProcessWorkflow(
             sub_process_template_id: sp.id,
             sub_process_name: sp.name,
             execute_all_tasks: true,
+            branch_index: i,  // For dynamic filtering
           } as Json,
         });
       }
       xPosition += xSpacing;
 
-      // JOIN node - with input_count for dynamic handle generation
+      // JOIN node - dynamic: waits only for active branches
       nodes.push({
         workflow_id: workflow.id,
         node_type: 'join',
@@ -306,9 +309,11 @@ export async function createProcessWorkflow(
         position_x: xPosition,
         position_y: baseY,
         config: { 
-          join_type: 'all',
-          required_count: subProcesses.length,
+          join_type: 'dynamic',  // Dynamic: wait for branches that were actually started
+          required_count: subProcesses.length,  // Max possible branches
           input_count: subProcesses.length,
+          from_sub_processes: true,
+          sub_process_ids: subProcesses.map(sp => sp.id),
         } as Json,
       });
       xPosition += xSpacing;

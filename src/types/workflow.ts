@@ -84,11 +84,12 @@ export interface SubProcessNodeConfig {
   sub_process_name?: string;
   execute_all_tasks?: boolean;
   branch_on_selection?: boolean; // If true, creates branches based on request sub-process selection
+  branch_index?: number;  // Index in the parent Fork for dynamic execution
 }
 
 // Fork node - starts parallel branches
 export interface ForkNodeConfig {
-  branch_mode?: 'static' | 'dynamic';  // static = fixed branches, dynamic = based on sub-processes
+  branch_mode?: 'static' | 'dynamic';  // static = fixed branches, dynamic = based on selected sub-processes
   branches?: Array<{
     id: string;
     name: string;
@@ -96,18 +97,23 @@ export interface ForkNodeConfig {
   }>;
   // Branch labels for auto-generated workflows (from sub-process names)
   branch_labels?: string[];
+  // Sub-process IDs for dynamic runtime filtering (only execute selected ones)
+  sub_process_ids?: string[];
   // For dynamic mode - create branches from selected sub-processes
   from_sub_processes?: boolean;
 }
 
 // Join node - synchronizes parallel branches  
 export interface JoinNodeConfig {
-  join_type: 'and' | 'or' | 'n_of_m' | 'all';  // and/all = all branches, or = any branch, n_of_m = specific count
+  join_type: 'and' | 'or' | 'n_of_m' | 'all' | 'dynamic';  // dynamic = wait for actually started branches
   required_count?: number;  // For n_of_m mode, or expected number of branches
   input_count?: number;     // Number of input branches (for dynamic handle generation)
   timeout_hours?: number;   // Optional timeout for waiting
   on_timeout_action?: 'continue' | 'fail' | 'notify';
   required_branch_ids?: string[];  // Specific branches required (for and/n_of_m)
+  // For dynamic mode - track which sub-processes to wait for
+  from_sub_processes?: boolean;
+  sub_process_ids?: string[];
 }
 
 // Validation prerequisites
