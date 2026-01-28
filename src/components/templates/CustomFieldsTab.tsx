@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { useAllCustomFields } from '@/hooks/useCustomFields';
+import { useProcessTemplates } from '@/hooks/useProcessTemplates';
+import { useAllSubProcessTemplates } from '@/hooks/useAllSubProcessTemplates';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Table,
   TableBody,
@@ -30,6 +33,22 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import {
   Plus,
   Search,
   MoreHorizontal,
@@ -54,6 +73,7 @@ import {
   Building2,
   Paperclip,
   Database,
+  Settings2,
 } from 'lucide-react';
 import { FIELD_TYPE_LABELS, TemplateCustomField, CustomFieldType } from '@/types/customField';
 import { AddCustomFieldDialog } from './AddCustomFieldDialog';
@@ -79,12 +99,23 @@ const FIELD_TYPE_ICON_MAP: Record<CustomFieldType, React.ElementType> = {
 };
 
 export function CustomFieldsTab() {
-  const { fields, isLoading, deleteField, refetch } = useAllCustomFields();
+  const { fields, isLoading, deleteField, deleteMultipleFields, updateMultipleFieldsScope, refetch } = useAllCustomFields();
+  const { processes } = useProcessTemplates();
+  const { subProcesses } = useAllSubProcessTemplates();
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
   const [editingField, setEditingField] = useState<TemplateCustomField | null>(null);
   const [deletingFieldId, setDeletingFieldId] = useState<string | null>(null);
+  
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkScopeOpen, setBulkScopeOpen] = useState(false);
+  const [bulkScopeType, setBulkScopeType] = useState<'common' | 'process' | 'subprocess'>('common');
+  const [bulkProcessId, setBulkProcessId] = useState<string>('__none__');
+  const [bulkSubProcessId, setBulkSubProcessId] = useState<string>('__none__');
 
   const filteredFields = fields.filter(
     (field) =>
@@ -97,6 +128,57 @@ export function CustomFieldsTab() {
       await deleteField(deletingFieldId);
       setDeletingFieldId(null);
     }
+  };
+
+  const handleBulkDelete = async () => {
+    await deleteMultipleFields(Array.from(selectedIds));
+    setSelectedIds(new Set());
+    setBulkDeleteOpen(false);
+  };
+
+  const handleBulkScopeChange = async () => {
+    let scope: { is_common: boolean; process_template_id: string | null; sub_process_template_id: string | null };
+    
+    if (bulkScopeType === 'common') {
+      scope = { is_common: true, process_template_id: null, sub_process_template_id: null };
+    } else if (bulkScopeType === 'process') {
+      scope = {
+        is_common: false,
+        process_template_id: bulkProcessId === '__none__' ? null : bulkProcessId,
+        sub_process_template_id: null,
+      };
+    } else {
+      scope = {
+        is_common: false,
+        process_template_id: null,
+        sub_process_template_id: bulkSubProcessId === '__none__' ? null : bulkSubProcessId,
+      };
+    }
+    
+    await updateMultipleFieldsScope(Array.from(selectedIds), scope);
+    setSelectedIds(new Set());
+    setBulkScopeOpen(false);
+    setBulkScopeType('common');
+    setBulkProcessId('__none__');
+    setBulkSubProcessId('__none__');
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredFields.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredFields.map((f) => f.id)));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    const newSet = new Set(selectedIds);
+    if (newSet.has(id)) {
+      newSet.delete(id);
+    } else {
+      newSet.add(id);
+    }
+    setSelectedIds(newSet);
   };
 
   const getScopeInfo = (field: TemplateCustomField & { process_template?: { name: string }; sub_process_template?: { name: string } }) => {
@@ -143,6 +225,24 @@ export function CustomFieldsTab() {
           />
         </div>
         <div className="flex gap-2">
+          {selectedIds.size > 0 && (
+            <>
+              <Button
+                variant="outline"
+                onClick={() => setBulkScopeOpen(true)}
+              >
+                <Settings2 className="h-4 w-4 mr-2" />
+                Modifier portée ({selectedIds.size})
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => setBulkDeleteOpen(true)}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Supprimer ({selectedIds.size})
+              </Button>
+            </>
+          )}
           <Button variant="outline" onClick={() => setBulkImportOpen(true)}>
             <Upload className="h-4 w-4 mr-2" />
             Import en masse
@@ -200,6 +300,12 @@ export function CustomFieldsTab() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[50px]">
+                  <Checkbox
+                    checked={filteredFields.length > 0 && selectedIds.size === filteredFields.length}
+                    onCheckedChange={toggleSelectAll}
+                  />
+                </TableHead>
                 <TableHead>Nom</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Portée</TableHead>
@@ -210,7 +316,7 @@ export function CustomFieldsTab() {
             <TableBody>
               {filteredFields.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                     {searchQuery ? 'Aucun champ trouvé' : 'Aucun champ personnalisé défini'}
                   </TableCell>
                 </TableRow>
@@ -222,6 +328,12 @@ export function CustomFieldsTab() {
 
                   return (
                     <TableRow key={field.id}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedIds.has(field.id)}
+                          onCheckedChange={() => toggleSelect(field.id)}
+                        />
+                      </TableCell>
                       <TableCell>
                         <div>
                           <div className="font-medium">{field.label}</div>
@@ -254,7 +366,7 @@ export function CustomFieldsTab() {
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
+                          <DropdownMenuContent align="end" className="bg-popover">
                             <DropdownMenuItem onClick={() => setEditingField(field)}>
                               <Pencil className="h-4 w-4 mr-2" />
                               Modifier
@@ -307,6 +419,7 @@ export function CustomFieldsTab() {
         }}
       />
 
+      {/* Single Delete Dialog */}
       <AlertDialog open={!!deletingFieldId} onOpenChange={() => setDeletingFieldId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -324,6 +437,113 @@ export function CustomFieldsTab() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Bulk Delete Dialog */}
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer {selectedIds.size} champ(s) ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. Toutes les valeurs associées dans les demandes
+              existantes seront également supprimées.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBulkDelete} className="bg-destructive text-destructive-foreground">
+              Supprimer {selectedIds.size} champ(s)
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Scope Change Dialog */}
+      <Dialog open={bulkScopeOpen} onOpenChange={setBulkScopeOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Modifier la portée de {selectedIds.size} champ(s)</DialogTitle>
+            <DialogDescription>
+              Sélectionnez la nouvelle portée à appliquer aux champs sélectionnés.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Type de portée</Label>
+              <Select value={bulkScopeType} onValueChange={(v) => setBulkScopeType(v as any)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-popover">
+                  <SelectItem value="common">
+                    <div className="flex items-center gap-2">
+                      <Globe className="h-4 w-4" />
+                      Commun (tous les processus)
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="process">
+                    <div className="flex items-center gap-2">
+                      <Workflow className="h-4 w-4" />
+                      Processus spécifique
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="subprocess">
+                    <div className="flex items-center gap-2">
+                      <GitBranch className="h-4 w-4" />
+                      Sous-processus spécifique
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {bulkScopeType === 'process' && (
+              <div className="space-y-2">
+                <Label>Processus cible</Label>
+                <Select value={bulkProcessId} onValueChange={setBulkProcessId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner un processus" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover">
+                    <SelectItem value="__none__">Aucun</SelectItem>
+                    {processes.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {bulkScopeType === 'subprocess' && (
+              <div className="space-y-2">
+                <Label>Sous-processus cible</Label>
+                <Select value={bulkSubProcessId} onValueChange={setBulkSubProcessId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner un sous-processus" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover">
+                    <SelectItem value="__none__">Aucun</SelectItem>
+                    {subProcesses.map((sp) => (
+                      <SelectItem key={sp.id} value={sp.id}>
+                        {sp.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkScopeOpen(false)}>
+              Annuler
+            </Button>
+            <Button onClick={handleBulkScopeChange}>
+              Appliquer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
