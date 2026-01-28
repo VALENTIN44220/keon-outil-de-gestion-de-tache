@@ -16,7 +16,10 @@ import {
   Merge,
   Hand,
   RefreshCw,
-  UserPlus
+  UserPlus,
+  Variable,
+  Database,
+  ArrowRightLeft
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import type { 
@@ -29,6 +32,8 @@ import type {
   JoinNodeConfig,
   StatusChangeNodeConfig,
   AssignmentNodeConfig,
+  SetVariableNodeConfig,
+  DatalakeSyncNodeConfig,
   TaskStatusType
 } from '@/types/workflow';
 
@@ -98,6 +103,16 @@ const nodeColors = {
     bg: 'bg-emerald-100 dark:bg-emerald-900/30',
     border: 'border-emerald-500',
     icon: 'text-emerald-600',
+  },
+  set_variable: {
+    bg: 'bg-violet-100 dark:bg-violet-900/30',
+    border: 'border-violet-500',
+    icon: 'text-violet-600',
+  },
+  datalake_sync: {
+    bg: 'bg-slate-100 dark:bg-slate-900/30',
+    border: 'border-slate-500',
+    icon: 'text-slate-600',
   },
 };
 
@@ -714,6 +729,151 @@ export const AssignmentNode = memo(({ data, selected }: CustomNodeProps) => {
 });
 AssignmentNode.displayName = 'AssignmentNode';
 
+// Set Variable Node - Creates/updates workflow variables
+export const SetVariableNode = memo(({ data, selected }: CustomNodeProps) => {
+  const colors = nodeColors.set_variable;
+  const config = data.config as SetVariableNodeConfig;
+  
+  const getTypeLabel = (type?: string) => {
+    switch (type) {
+      case 'text': return 'Texte';
+      case 'boolean': return 'Booléen';
+      case 'integer': return 'Entier';
+      case 'decimal': return 'Décimal';
+      case 'datetime': return 'Date/Heure';
+      case 'autonumber': return 'Numéro auto';
+      default: return 'Texte';
+    }
+  };
+
+  const getModeLabel = (mode?: string) => {
+    switch (mode) {
+      case 'fixed': return 'Fixe';
+      case 'expression': return 'Calcul';
+      case 'system': return 'Système';
+      default: return 'Fixe';
+    }
+  };
+
+  return (
+    <div className={`
+      px-4 py-3 rounded-xl border-2 shadow-lg min-w-[180px] max-w-[250px]
+      ${colors.bg} ${colors.border}
+      ${selected ? 'ring-2 ring-primary ring-offset-2' : ''}
+      transition-all duration-200
+    `}>
+      <Handle
+        type="target"
+        position={Position.Left}
+        className="!w-3 !h-3 !bg-violet-500 !border-2 !border-white"
+      />
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <div className={`p-1.5 rounded-lg ${colors.bg}`}>
+            <Variable className={`h-4 w-4 ${colors.icon}`} />
+          </div>
+          <span className="font-medium text-sm truncate">{data.label}</span>
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {config.variable_name && (
+            <Badge variant="secondary" className="text-xs font-mono">
+              {config.variable_name}
+            </Badge>
+          )}
+          <Badge variant="outline" className="text-xs">
+            {getTypeLabel(config.variable_type)}
+          </Badge>
+          {config.mode === 'expression' && (
+            <Badge variant="outline" className="text-xs text-violet-600">
+              ƒ(x)
+            </Badge>
+          )}
+        </div>
+        {config.accessible_to_subprocesses && (
+          <div className="text-[10px] text-muted-foreground">
+            🔗 Accessible aux sous-processus
+          </div>
+        )}
+      </div>
+      <Handle
+        type="source"
+        position={Position.Right}
+        className="!w-3 !h-3 !bg-violet-500 !border-2 !border-white"
+      />
+    </div>
+  );
+});
+SetVariableNode.displayName = 'SetVariableNode';
+
+// Datalake Sync Node - Bidirectional sync with datalake
+export const DatalakeSyncNode = memo(({ data, selected }: CustomNodeProps) => {
+  const colors = nodeColors.datalake_sync;
+  const config = data.config as DatalakeSyncNodeConfig;
+  
+  const getDirectionLabel = (dir?: string) => {
+    switch (dir) {
+      case 'app_to_datalake': return '→ Datalake';
+      case 'datalake_to_app': return '← Datalake';
+      default: return 'Sync';
+    }
+  };
+
+  return (
+    <div className={`
+      px-4 py-3 rounded-xl border-2 shadow-lg min-w-[180px] max-w-[250px]
+      ${colors.bg} ${colors.border}
+      ${selected ? 'ring-2 ring-primary ring-offset-2' : ''}
+      transition-all duration-200
+    `}>
+      <Handle
+        type="target"
+        position={Position.Left}
+        className="!w-3 !h-3 !bg-slate-500 !border-2 !border-white"
+      />
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <div className={`p-1.5 rounded-lg ${colors.bg}`}>
+            <Database className={`h-4 w-4 ${colors.icon}`} />
+          </div>
+          <span className="font-medium text-sm truncate">{data.label}</span>
+        </div>
+        <div className="flex flex-wrap gap-1">
+          <Badge variant="secondary" className="text-xs">
+            <ArrowRightLeft className="h-3 w-3 mr-1" />
+            {getDirectionLabel(config.direction)}
+          </Badge>
+          {config.mode && (
+            <Badge variant="outline" className="text-xs">
+              {config.mode === 'full' ? 'Complet' : 'Incrémental'}
+            </Badge>
+          )}
+        </div>
+        {config.tables && config.tables.length > 0 && (
+          <div className="text-[10px] text-muted-foreground">
+            📊 {config.tables.length} table(s)
+          </div>
+        )}
+      </div>
+      {/* Two output handles: success and error */}
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="success"
+        style={{ top: '35%' }}
+        className="!w-3 !h-3 !bg-green-500 !border-2 !border-white"
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="error"
+        style={{ top: '65%' }}
+        className="!w-3 !h-3 !bg-red-500 !border-2 !border-white"
+      />
+    </div>
+  );
+});
+DatalakeSyncNode.displayName = 'DatalakeSyncNode';
+
 // Export node types map for React Flow
 export const workflowNodeTypes = {
   start: StartNode,
@@ -727,4 +887,6 @@ export const workflowNodeTypes = {
   join: JoinNode,
   status_change: StatusChangeNode,
   assignment: AssignmentNode,
+  set_variable: SetVariableNode,
+  datalake_sync: DatalakeSyncNode,
 };

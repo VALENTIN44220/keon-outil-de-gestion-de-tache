@@ -445,7 +445,7 @@ function getDefaultConfig(type: WorkflowNodeType): WorkflowNodeConfig {
         approver_type: 'requester_manager', 
         is_mandatory: true, 
         approval_mode: 'single',
-        trigger_mode: 'auto'  // Default to auto-trigger for backward compatibility
+        trigger_mode: 'auto'
       };
     case 'notification':
       return { 
@@ -470,7 +470,7 @@ function getDefaultConfig(type: WorkflowNodeType): WorkflowNodeConfig {
       };
     case 'join':
       return {
-        join_type: 'and',  // Wait for all branches by default
+        join_type: 'and',
         on_timeout_action: 'notify'
       };
     case 'status_change':
@@ -482,6 +482,22 @@ function getDefaultConfig(type: WorkflowNodeType): WorkflowNodeConfig {
       return {
         assignment_type: 'user',
         auto_start: true
+      };
+    case 'set_variable':
+      return {
+        variable_name: '',
+        variable_type: 'text',
+        mode: 'fixed',
+        accessible_to_subprocesses: true
+      };
+    case 'datalake_sync':
+      return {
+        direction: 'app_to_datalake',
+        mode: 'full',
+        tables: [],
+        stop_on_error: true,
+        retry_count: 3,
+        retry_backoff_seconds: 5
       };
     default:
       return {};
