@@ -3653,6 +3653,10 @@ export type Database = {
         | "assignment"
         | "set_variable"
         | "datalake_sync"
+        | "sub_process_standard_direct"
+        | "sub_process_standard_manager"
+        | "sub_process_standard_validation1"
+        | "sub_process_standard_validation2"
       workflow_run_status:
         | "running"
         | "completed"
@@ -3844,6 +3848,10 @@ export const Constants = {
         "assignment",
         "set_variable",
         "datalake_sync",
+        "sub_process_standard_direct",
+        "sub_process_standard_manager",
+        "sub_process_standard_validation1",
+        "sub_process_standard_validation2",
       ],
       workflow_run_status: [
         "running",
