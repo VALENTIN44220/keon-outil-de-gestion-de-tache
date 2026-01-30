@@ -10,12 +10,23 @@ interface TaskTemplateForWorkflow {
 interface SubProcessInfo {
   target_manager_id?: string | null;
   target_department_id?: string | null;
+  target_assignee_id?: string | null;
+  assignment_type?: string | null;
   name?: string;
 }
 
+type NodeType = "condition" | "end" | "fork" | "join" | "notification" | "start" | "sub_process" | "task" | "validation" | "status_change" | "assignment";
+
 /**
- * Creates a complete workflow for a sub-process template
- * Includes: Start -> Tasks -> Validation Manager -> Notification -> End
+ * Standard sub-process workflow sequence (S1-S4):
+ * S1: Create tasks with initial status based on assignment mode
+ * S2: Notify requester + manager/assignee at creation
+ * S3: Notify requester on each status change (handled by event listener)
+ * S4: Notify requester at closure
+ * 
+ * This creates a workflow that follows the standard pattern:
+ * Start -> [S1: Create Tasks] -> [S2: Creation Notifications] -> Tasks execution -> 
+ * [Optional: Validation] -> [S4: Closure Notification] -> End
  */
 export async function createSubProcessWorkflow(
   subProcessId: string,
@@ -25,12 +36,20 @@ export async function createSubProcessWorkflow(
   subProcessInfo?: SubProcessInfo
 ): Promise<string | null> {
   try {
+    // Determine assignment mode and initial task status
+    const assignmentType = subProcessInfo?.assignment_type || 'manager';
+    const isDirectAssignment = assignmentType === 'user' || subProcessInfo?.target_assignee_id;
+    const initialTaskStatus = isDirectAssignment ? 'todo' : 'to_assign';
+    const hasManager = subProcessInfo?.target_manager_id;
+
     // Create the workflow template
     const { data: workflow, error: workflowError } = await supabase
       .from('workflow_templates')
       .insert({
-        name: `Workflow - ${subProcessName}`,
-        description: `Workflow automatique pour le sous-processus ${subProcessName}`,
+        name: `Workflow Standard - ${subProcessName}`,
+        description: `Workflow standard (S1-S4) pour le sous-processus ${subProcessName}. ` +
+          `Mode: ${isDirectAssignment ? 'Affectation directe' : 'Affectation manager'}. ` +
+          `Statut initial: ${initialTaskStatus === 'todo' ? 'À faire' : 'À affecter'}.`,
         created_by: userId,
         is_default: true,
         status: 'draft' as const,
@@ -44,8 +63,6 @@ export async function createSubProcessWorkflow(
       console.error('Error creating workflow:', workflowError);
       return null;
     }
-
-    type NodeType = "condition" | "end" | "fork" | "join" | "notification" | "start" | "sub_process" | "task" | "validation";
 
     // Create nodes
     const nodes: Array<{
@@ -62,18 +79,55 @@ export async function createSubProcessWorkflow(
     const yPosition = 200;
     const xSpacing = 250;
 
-    // 1. START NODE - Trigger
+    // ========== S1: START - Trigger on creation ==========
     nodes.push({
       workflow_id: workflow.id,
       node_type: 'start',
-      label: 'Déclencheur',
+      label: 'Déclencheur (S1)',
       position_x: xPosition,
       position_y: yPosition,
       config: { trigger: 'on_create' } as Json,
     });
     xPosition += xSpacing;
 
-    // 2. TASK NODES - One for each task template
+    // ========== S2: NOTIFICATION - Creation notifications ==========
+    // Notify requester
+    nodes.push({
+      workflow_id: workflow.id,
+      node_type: 'notification',
+      label: 'Notif création (S2)',
+      position_x: xPosition,
+      position_y: yPosition - 80,
+      config: {
+        channels: ['in_app', 'email'],
+        recipient_type: 'requester',
+        subject_template: `[${subProcessName}] Demande créée`,
+        body_template: `Votre demande concernant "${subProcessName}" a été créée et est en cours de traitement.`,
+        action_url_template: '/requests',
+      } as Json,
+    });
+
+    // Notify manager or assignee
+    nodes.push({
+      workflow_id: workflow.id,
+      node_type: 'notification',
+      label: isDirectAssignment ? 'Notif assigné (S2)' : 'Notif manager (S2)',
+      position_x: xPosition,
+      position_y: yPosition + 80,
+      config: {
+        channels: ['in_app', 'email'],
+        recipient_type: isDirectAssignment ? 'assignee' : 'approvers',
+        recipient_id: isDirectAssignment ? subProcessInfo?.target_assignee_id : subProcessInfo?.target_manager_id,
+        subject_template: `[${subProcessName}] Nouvelle ${isDirectAssignment ? 'tâche assignée' : 'demande à affecter'}`,
+        body_template: isDirectAssignment 
+          ? `Une nouvelle tâche vous a été assignée dans le sous-processus "${subProcessName}".`
+          : `Une nouvelle demande est en attente d'affectation dans "${subProcessName}".`,
+        action_url_template: '/requests',
+      } as Json,
+    });
+    xPosition += xSpacing;
+
+    // ========== TASK NODES - Create tasks with correct initial status ==========
     if (tasks.length > 0) {
       for (const task of tasks) {
         nodes.push({
@@ -87,7 +141,12 @@ export async function createSubProcessWorkflow(
             task_template_ids: [task.id],
             task_title: task.title,
             duration_days: task.default_duration_days || 5,
-            responsible_type: 'assignee',
+            responsible_type: isDirectAssignment ? 'assignee' : 'department',
+            responsible_id: isDirectAssignment 
+              ? subProcessInfo?.target_assignee_id 
+              : subProcessInfo?.target_department_id,
+            // Initial status is set when task is created based on assignment mode
+            initial_status: initialTaskStatus,
           } as Json,
           task_template_id: task.id,
         });
@@ -104,51 +163,55 @@ export async function createSubProcessWorkflow(
         config: {
           task_title: 'Tâche principale',
           duration_days: 5,
-          responsible_type: 'assignee',
+          responsible_type: isDirectAssignment ? 'assignee' : 'department',
+          initial_status: initialTaskStatus,
         } as Json,
       });
       xPosition += xSpacing;
     }
 
-    // 3. VALIDATION NODE - Manager validation
-    nodes.push({
-      workflow_id: workflow.id,
-      node_type: 'validation',
-      label: 'Validation Manager',
-      position_x: xPosition,
-      position_y: yPosition,
-      config: {
-        approver_type: subProcessInfo?.target_manager_id ? 'user' : 'requester_manager',
-        approver_id: subProcessInfo?.target_manager_id || null,
-        is_mandatory: true,
-        approval_mode: 'single',
-        sla_hours: 48,
-        reminder_hours: 24,
-        allow_delegation: true,
-        on_timeout_action: 'notify',
-        trigger_mode: 'auto',
-      } as Json,
-    });
-    xPosition += xSpacing;
+    // ========== VALIDATION NODE - Manager validation (optional) ==========
+    // Only add validation if we have a manager target
+    if (hasManager) {
+      nodes.push({
+        workflow_id: workflow.id,
+        node_type: 'validation',
+        label: 'Validation Manager',
+        position_x: xPosition,
+        position_y: yPosition,
+        config: {
+          approver_type: subProcessInfo?.target_manager_id ? 'user' : 'requester_manager',
+          approver_id: subProcessInfo?.target_manager_id || null,
+          is_mandatory: true,
+          approval_mode: 'single',
+          sla_hours: 48,
+          reminder_hours: 24,
+          allow_delegation: true,
+          on_timeout_action: 'notify',
+          trigger_mode: 'auto',
+        } as Json,
+      });
+      xPosition += xSpacing;
+    }
 
-    // 4. NOTIFICATION NODE - Notify requester
+    // ========== S4: NOTIFICATION - Closure notification ==========
     nodes.push({
       workflow_id: workflow.id,
       node_type: 'notification',
-      label: 'Notification de clôture',
+      label: 'Notification clôture (S4)',
       position_x: xPosition,
       position_y: yPosition,
       config: {
         channels: ['in_app', 'email'],
         recipient_type: 'requester',
-        subject_template: `[${subProcessName}] Demande traitée`,
-        body_template: `Votre demande concernant "${subProcessName}" a été traitée et validée.\n\nMerci de votre confiance.`,
+        subject_template: `[${subProcessName}] Sous-processus clôturé`,
+        body_template: `Votre demande concernant "${subProcessName}" a été traitée et clôturée avec succès.\n\nMerci de votre confiance.`,
         action_url_template: '/requests',
       } as Json,
     });
     xPosition += xSpacing;
 
-    // 5. END NODE
+    // ========== END NODE ==========
     nodes.push({
       workflow_id: workflow.id,
       node_type: 'end',
@@ -169,7 +232,8 @@ export async function createSubProcessWorkflow(
       return workflow.id;
     }
 
-    // Create edges to connect nodes sequentially
+    // Create edges to connect nodes
+    // We need to handle the parallel S2 notifications properly
     const edges: Array<{
       workflow_id: string;
       source_node_id: string;
@@ -178,11 +242,88 @@ export async function createSubProcessWorkflow(
       label?: string;
     }> = [];
 
-    for (let i = 0; i < insertedNodes.length - 1; i++) {
+    const startNode = insertedNodes.find(n => n.node_type === 'start');
+    const s2NotificationNodes = insertedNodes.filter(n => 
+      n.node_type === 'notification' && n.label.includes('(S2)')
+    );
+    const taskNodes = insertedNodes.filter(n => n.node_type === 'task');
+    const validationNode = insertedNodes.find(n => n.node_type === 'validation');
+    const s4NotificationNode = insertedNodes.find(n => 
+      n.node_type === 'notification' && n.label.includes('(S4)')
+    );
+    const endNode = insertedNodes.find(n => n.node_type === 'end');
+
+    // Start -> S2 notifications (parallel)
+    if (startNode) {
+      for (const s2Node of s2NotificationNodes) {
+        edges.push({
+          workflow_id: workflow.id,
+          source_node_id: startNode.id,
+          target_node_id: s2Node.id,
+          animated: true,
+        });
+      }
+    }
+
+    // S2 notifications -> First task
+    const firstTask = taskNodes[0];
+    if (firstTask) {
+      for (const s2Node of s2NotificationNodes) {
+        edges.push({
+          workflow_id: workflow.id,
+          source_node_id: s2Node.id,
+          target_node_id: firstTask.id,
+          animated: true,
+        });
+      }
+    }
+
+    // Connect tasks sequentially
+    for (let i = 0; i < taskNodes.length - 1; i++) {
       edges.push({
         workflow_id: workflow.id,
-        source_node_id: insertedNodes[i].id,
-        target_node_id: insertedNodes[i + 1].id,
+        source_node_id: taskNodes[i].id,
+        target_node_id: taskNodes[i + 1].id,
+        animated: true,
+      });
+    }
+
+    // Last task -> Validation (if exists) or S4 notification
+    const lastTask = taskNodes[taskNodes.length - 1];
+    if (lastTask) {
+      if (validationNode) {
+        edges.push({
+          workflow_id: workflow.id,
+          source_node_id: lastTask.id,
+          target_node_id: validationNode.id,
+          animated: true,
+        });
+      } else if (s4NotificationNode) {
+        edges.push({
+          workflow_id: workflow.id,
+          source_node_id: lastTask.id,
+          target_node_id: s4NotificationNode.id,
+          animated: true,
+        });
+      }
+    }
+
+    // Validation -> S4 notification
+    if (validationNode && s4NotificationNode) {
+      edges.push({
+        workflow_id: workflow.id,
+        source_node_id: validationNode.id,
+        target_node_id: s4NotificationNode.id,
+        animated: true,
+      });
+    }
+
+    // S4 notification -> End
+    if (s4NotificationNode && endNode) {
+      edges.push({
+        workflow_id: workflow.id,
+        source_node_id: s4NotificationNode.id,
+        target_node_id: endNode.id,
         animated: true,
       });
     }
@@ -439,7 +580,7 @@ export async function createProcessWorkflow(
 }
 
 /**
- * Ensures a sub-process has a workflow, creating one if it doesn't exist
+ * Ensures a sub-process has a workflow with standard S1-S4 sequence, creating one if it doesn't exist
  */
 export async function ensureSubProcessWorkflow(
   subProcessId: string,
@@ -458,10 +599,10 @@ export async function ensureSubProcessWorkflow(
     return existingWorkflow.id;
   }
 
-  // Fetch sub-process info for manager configuration
+  // Fetch sub-process info for manager/assignment configuration
   const { data: subProcessInfo } = await supabase
     .from('sub_process_templates')
-    .select('target_manager_id, target_department_id')
+    .select('target_manager_id, target_department_id, target_assignee_id, assignment_type, name')
     .eq('id', subProcessId)
     .maybeSingle();
 

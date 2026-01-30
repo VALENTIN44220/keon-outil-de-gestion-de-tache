@@ -15,6 +15,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { SearchableSelect, SearchableSelectOption } from '@/components/ui/searchable-select';
 import { VariableInsertButton } from './VariableInsertButton';
+import { StandardSubProcessConfigPanel } from './StandardSubProcessConfigPanel';
 import type { 
   WorkflowNode, 
   WorkflowNodeConfig,
@@ -23,6 +24,7 @@ import type {
   NotificationNodeConfig,
   ConditionNodeConfig,
   SubProcessNodeConfig,
+  StandardSubProcessNodeConfig,
   ForkNodeConfig,
   JoinNodeConfig,
   StatusChangeNodeConfig,
@@ -1322,6 +1324,21 @@ export function WorkflowNodePropertiesPanel({
     );
   };
 
+  const renderStandardSubProcessConfig = () => {
+    return (
+      <StandardSubProcessConfigPanel
+        nodeType={node.node_type}
+        config={config as StandardSubProcessNodeConfig}
+        onUpdateConfig={(updates) => setConfig(prev => ({ ...prev, ...updates }))}
+        disabled={disabled}
+        subProcesses={subProcesses}
+        users={users}
+        groups={groups}
+        departments={departments}
+      />
+    );
+  };
+
   const renderConfigPanel = () => {
     switch (node.node_type) {
       case 'task':
@@ -1342,6 +1359,12 @@ export function WorkflowNodePropertiesPanel({
         return renderStatusChangeConfig();
       case 'assignment':
         return renderAssignmentConfig();
+      // Standard sub-process blocks
+      case 'sub_process_standard_direct':
+      case 'sub_process_standard_manager':
+      case 'sub_process_standard_validation1':
+      case 'sub_process_standard_validation2':
+        return renderStandardSubProcessConfig();
       case 'set_variable':
         return (
           <div className="space-y-4">

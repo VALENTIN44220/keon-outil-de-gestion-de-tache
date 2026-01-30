@@ -114,6 +114,27 @@ const nodeColors = {
     border: 'border-slate-500',
     icon: 'text-slate-600',
   },
+  // Standard sub-process nodes
+  sub_process_standard_direct: {
+    bg: 'bg-emerald-100 dark:bg-emerald-900/30',
+    border: 'border-emerald-500',
+    icon: 'text-emerald-600',
+  },
+  sub_process_standard_manager: {
+    bg: 'bg-amber-100 dark:bg-amber-900/30',
+    border: 'border-amber-500',
+    icon: 'text-amber-600',
+  },
+  sub_process_standard_validation1: {
+    bg: 'bg-cyan-100 dark:bg-cyan-900/30',
+    border: 'border-cyan-500',
+    icon: 'text-cyan-600',
+  },
+  sub_process_standard_validation2: {
+    bg: 'bg-violet-100 dark:bg-violet-900/30',
+    border: 'border-violet-500',
+    icon: 'text-violet-600',
+  },
 };
 
 // Start Node
@@ -932,6 +953,9 @@ export const DatalakeSyncNode = memo(({ data, selected }: CustomNodeProps) => {
 });
 DatalakeSyncNode.displayName = 'DatalakeSyncNode';
 
+// Import standard sub-process nodes
+import { standardSubProcessNodeTypes } from './StandardSubProcessNodes';
+
 // Export node types map for React Flow
 export const workflowNodeTypes = {
   start: StartNode,
@@ -947,4 +971,6 @@ export const workflowNodeTypes = {
   assignment: AssignmentNode,
   set_variable: SetVariableNode,
   datalake_sync: DatalakeSyncNode,
+  // Standard sub-process node types
+  ...standardSubProcessNodeTypes,
 };

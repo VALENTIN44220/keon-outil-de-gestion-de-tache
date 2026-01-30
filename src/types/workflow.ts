@@ -13,7 +13,12 @@ export type WorkflowNodeType =
   | 'status_change'   // Change task status based on workflow events
   | 'assignment'     // Task assignment to specific user/group/department
   | 'set_variable'   // Define/update workflow variables
-  | 'datalake_sync'; // Synchronization with datalake
+  | 'datalake_sync'  // Synchronization with datalake
+  // Standard sub-process blocks with built-in workflows
+  | 'sub_process_standard_direct'      // Direct assignment - tasks start as "À faire"
+  | 'sub_process_standard_manager'     // Manager assignment - tasks start as "À affecter"
+  | 'sub_process_standard_validation1' // 1-level validation (manager)
+  | 'sub_process_standard_validation2'; // 2-level validation (requester then manager)
 
 // All possible task statuses
 export type TaskStatusType = 'to_assign' | 'todo' | 'in-progress' | 'done' | 'pending-validation' | 'validated' | 'refused' | 'review';
@@ -85,6 +90,44 @@ export interface SubProcessNodeConfig {
   execute_all_tasks?: boolean;
   branch_on_selection?: boolean; // If true, creates branches based on request sub-process selection
   branch_index?: number;  // Index in the parent Fork for dynamic execution
+}
+
+// Assignment mode for standard sub-process blocks
+export type StandardSubProcessAssignmentMode = 'direct' | 'manager';
+
+// Standard sub-process block configuration
+export interface StandardSubProcessNodeConfig {
+  sub_process_template_id?: string;
+  sub_process_name?: string;
+  
+  // Assignment configuration
+  assignment_mode: StandardSubProcessAssignmentMode;
+  assignee_id?: string;        // For direct assignment - specific user
+  assignee_type?: 'user' | 'group' | 'department' | 'rule'; // Type of direct assignment
+  group_id?: string;           // For group assignment
+  department_id?: string;      // For department assignment
+  manager_type?: 'requester_manager' | 'target_manager' | 'specific_user'; // For manager assignment
+  manager_id?: string;         // Specific manager ID if manager_type is 'specific_user'
+  
+  // Initial task status based on assignment mode
+  initial_task_status: 'todo' | 'to_assign';
+  
+  // Validation levels (for validation blocks)
+  validation_levels?: number;  // 0, 1, or 2
+  validation_1_approver_type?: 'requester' | 'manager' | 'specific_user';
+  validation_1_approver_id?: string;
+  validation_2_approver_type?: 'requester' | 'manager' | 'specific_user';
+  validation_2_approver_id?: string;
+  
+  // Notification settings
+  notify_on_create?: boolean;          // S2: Notification at creation
+  notify_on_status_change?: boolean;   // S3: Notification on each status change
+  notify_on_close?: boolean;           // S4: Notification at closure
+  notify_requester?: boolean;          // Always notify requester
+  notify_assignee?: boolean;           // Notify assigned person/manager
+  
+  // Branch index for parallel execution
+  branch_index?: number;
 }
 
 // Fork node - starts parallel branches
@@ -219,6 +262,7 @@ export type WorkflowNodeConfig =
   | NotificationNodeConfig 
   | ConditionNodeConfig
   | SubProcessNodeConfig
+  | StandardSubProcessNodeConfig
   | ForkNodeConfig
   | JoinNodeConfig
   | StatusChangeNodeConfig
