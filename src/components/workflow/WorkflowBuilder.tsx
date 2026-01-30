@@ -17,6 +17,7 @@ import { useWorkflowTemplates } from '@/hooks/useWorkflowTemplates';
 import { useSubProcessTemplates } from '@/hooks/useSubProcessTemplates';
 import { useCustomFields } from '@/hooks/useCustomFields';
 import { supabase } from '@/integrations/supabase/client';
+import type { TaskTemplate } from '@/types/template';
 
 interface WorkflowBuilderProps {
   processTemplateId?: string | null;
@@ -48,7 +49,7 @@ export function WorkflowBuilder({
     saveCanvasSettings,
   } = useWorkflowTemplates({ processTemplateId, subProcessTemplateId });
 
-  // Fetch sub-processes for this process
+  // Fetch sub-processes for this process (only for process-level workflows)
   const { subProcesses, fetchSubProcesses } = useSubProcessTemplates(processTemplateId || null);
   
   // Fetch custom fields for notification templates
@@ -58,6 +59,9 @@ export function WorkflowBuilder({
   const [users, setUsers] = useState<{ id: string; display_name: string | null }[]>([]);
   const [groups, setGroups] = useState<{ id: string; name: string }[]>([]);
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
+  
+  // State for sub-process specific task templates
+  const [subProcessTaskTemplates, setSubProcessTaskTemplates] = useState<TaskTemplate[]>([]);
 
   // Fetch reference data for task assignment
   useEffect(() => {
@@ -76,15 +80,44 @@ export function WorkflowBuilder({
     fetchReferenceData();
   }, []);
 
-  // Fetch sub-processes on mount
+  // Fetch sub-processes on mount (for process-level workflows)
   useEffect(() => {
     if (processTemplateId) {
       fetchSubProcesses();
     }
   }, [processTemplateId, fetchSubProcesses]);
 
-  // Flatten all task templates from all sub-processes
-  const allTaskTemplates = subProcesses.flatMap(sp => sp.task_templates || []);
+  // Fetch task templates for the current sub-process (for sub-process-level workflows)
+  useEffect(() => {
+    const fetchSubProcessTasks = async () => {
+      if (!subProcessTemplateId) {
+        setSubProcessTaskTemplates([]);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('task_templates')
+          .select('*')
+          .eq('sub_process_template_id', subProcessTemplateId)
+          .order('order_index', { ascending: true });
+
+        if (error) throw error;
+        setSubProcessTaskTemplates((data || []) as TaskTemplate[]);
+      } catch (error) {
+        console.error('Error fetching sub-process task templates:', error);
+      }
+    };
+
+    fetchSubProcessTasks();
+  }, [subProcessTemplateId]);
+
+  // Determine which task templates to show based on context
+  // For sub-process workflows: show only tasks from that sub-process
+  // For process workflows: show tasks from all sub-processes
+  const allTaskTemplates = subProcessTemplateId
+    ? subProcessTaskTemplates
+    : subProcesses.flatMap(sp => sp.task_templates || []);
 
   const handleCreateWorkflow = async () => {
     if (!newName.trim()) return;
