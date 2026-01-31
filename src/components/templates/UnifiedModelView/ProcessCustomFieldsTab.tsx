@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { FormBuilderContainer } from '@/components/formBuilder/FormBuilderContainer';
+import { EnhancedFormBuilderContainer } from '@/components/formBuilder/EnhancedFormBuilderContainer';
 import { ProcessCustomFieldsEditor } from '../ProcessCustomFieldsEditor';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { LayoutGrid, List } from 'lucide-react';
+import { LayoutGrid, List, Wand2 } from 'lucide-react';
 
 interface ProcessCustomFieldsTabProps {
   processId: string;
@@ -16,9 +16,12 @@ export function ProcessCustomFieldsTab({ processId, canManage }: ProcessCustomFi
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-base font-semibold">Champs personnalisés</h3>
+          <h3 className="text-base font-semibold flex items-center gap-2">
+            <Wand2 className="h-4 w-4 text-primary" />
+            Form Builder
+          </h3>
           <p className="text-sm text-muted-foreground">
-            Configurez les champs du formulaire de demande
+            Configurez visuellement les champs du formulaire de demande
           </p>
         </div>
 
@@ -37,7 +40,7 @@ export function ProcessCustomFieldsTab({ processId, canManage }: ProcessCustomFi
       </div>
 
       {viewMode === 'builder' ? (
-        <FormBuilderContainer
+        <EnhancedFormBuilderContainer
           processTemplateId={processId}
           canManage={canManage}
         />
