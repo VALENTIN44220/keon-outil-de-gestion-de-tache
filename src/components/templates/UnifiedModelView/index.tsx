@@ -16,14 +16,23 @@ import {
   Clock,
   Building2,
   Timer,
+  Eye,
+  Target,
+  Users,
+  Variable,
+  Zap,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { ProcessWithTasks } from '@/types/template';
 import { ProcessSettingsTab } from './ProcessSettingsTab';
+import { ProcessAccessTab } from './ProcessAccessTab';
 import { ProcessSubProcessesTab } from './ProcessSubProcessesTab';
-import { ProcessWorkflowTab } from './ProcessWorkflowTab';
+import { ProcessTargetsTab } from './ProcessTargetsTab';
+import { ProcessAssignmentTab } from './ProcessAssignmentTab';
 import { ProcessCustomFieldsTab } from './ProcessCustomFieldsTab';
+import { ProcessVariablesTab } from './ProcessVariablesTab';
 import { ProcessNotificationsTab } from './ProcessNotificationsTab';
+import { ProcessGeneratedWorkflowTab } from './ProcessGeneratedWorkflowTab';
 import { ProcessSLATab } from './ProcessSLATab';
 
 interface UnifiedModelViewProps {
@@ -37,7 +46,7 @@ interface UnifiedModelViewProps {
 interface WorkflowInfo {
   id: string;
   name: string;
-  status: 'draft' | 'published' | 'archived';
+  status: 'draft' | 'active' | 'archived';
   version: number;
   updatedAt: string;
 }
@@ -71,7 +80,7 @@ export function UnifiedModelView({
         setWorkflowInfo({
           id: data.id,
           name: data.name,
-          status: data.status as 'draft' | 'published' | 'archived',
+          status: data.status as 'draft' | 'active' | 'archived',
           version: data.version,
           updatedAt: data.updated_at,
         });
@@ -113,7 +122,7 @@ export function UnifiedModelView({
     }
 
     switch (workflowInfo.status) {
-      case 'published':
+      case 'active':
         return (
           <Badge className="bg-green-100 text-green-700 border-green-300">
             <CheckCircle className="h-3 w-3 mr-1" />
@@ -139,9 +148,22 @@ export function UnifiedModelView({
     }
   };
 
+  // Tab configuration - 8 tabs as per spec
+  const tabs = [
+    { id: 'settings', label: 'Paramètres', icon: Settings },
+    { id: 'access', label: 'Accès', icon: Eye },
+    { id: 'subprocesses', label: 'Sous-proc.', icon: GitBranch },
+    { id: 'fields', label: 'Champs', icon: FormInput },
+    { id: 'targets', label: 'Cibles', icon: Target },
+    { id: 'assignment', label: 'Affectation', icon: Users },
+    { id: 'notifications', label: 'Notifs', icon: Bell },
+    { id: 'variables', label: 'Variables', icon: Variable },
+    { id: 'workflow', label: 'Workflow', icon: Zap },
+  ];
+
   return (
     <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <SheetContent className="w-full sm:max-w-3xl p-0 flex flex-col h-full">
+      <SheetContent className="w-full sm:max-w-4xl p-0 flex flex-col h-full">
         <SheetHeader className="p-6 pb-4 border-b shrink-0">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
@@ -178,32 +200,21 @@ export function UnifiedModelView({
           onValueChange={setActiveTab}
           className="flex-1 flex flex-col min-h-0"
         >
-          <div className="px-6 pt-4 shrink-0">
-            <TabsList className="w-full grid grid-cols-6">
-              <TabsTrigger value="settings" className="gap-1 text-xs">
-                <Settings className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Paramètres</span>
-              </TabsTrigger>
-              <TabsTrigger value="subprocesses" className="gap-1 text-xs">
-                <GitBranch className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Sous-proc.</span>
-              </TabsTrigger>
-              <TabsTrigger value="workflow" className="gap-1 text-xs">
-                <Workflow className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Workflow</span>
-              </TabsTrigger>
-              <TabsTrigger value="fields" className="gap-1 text-xs">
-                <FormInput className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Champs</span>
-              </TabsTrigger>
-              <TabsTrigger value="sla" className="gap-1 text-xs">
-                <Timer className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">SLA</span>
-              </TabsTrigger>
-              <TabsTrigger value="notifications" className="gap-1 text-xs">
-                <Bell className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Notifs</span>
-              </TabsTrigger>
+          <div className="px-4 pt-4 shrink-0 overflow-x-auto">
+            <TabsList className="inline-flex w-auto min-w-full">
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                return (
+                  <TabsTrigger
+                    key={tab.id}
+                    value={tab.id}
+                    className="gap-1 text-xs whitespace-nowrap"
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    <span className="hidden lg:inline">{tab.label}</span>
+                  </TabsTrigger>
+                );
+              })}
             </TabsList>
           </div>
 
@@ -211,6 +222,14 @@ export function UnifiedModelView({
             <div className="p-6">
               <TabsContent value="settings" className="mt-0">
                 <ProcessSettingsTab
+                  process={process}
+                  onUpdate={onUpdate}
+                  canManage={canManage}
+                />
+              </TabsContent>
+
+              <TabsContent value="access" className="mt-0">
+                <ProcessAccessTab
                   process={process}
                   onUpdate={onUpdate}
                   canManage={canManage}
@@ -225,16 +244,6 @@ export function UnifiedModelView({
                 />
               </TabsContent>
 
-              <TabsContent value="workflow" className="mt-0">
-                <ProcessWorkflowTab
-                  processId={process.id}
-                  processName={process.name}
-                  workflowInfo={workflowInfo}
-                  canManage={canManage}
-                  onNavigateToEditor={() => navigate(`/templates/workflow/process/${process.id}`)}
-                />
-              </TabsContent>
-
               <TabsContent value="fields" className="mt-0">
                 <ProcessCustomFieldsTab
                   processId={process.id}
@@ -242,9 +251,18 @@ export function UnifiedModelView({
                 />
               </TabsContent>
 
-              <TabsContent value="sla" className="mt-0">
-                <ProcessSLATab
-                  processId={process.id}
+              <TabsContent value="targets" className="mt-0">
+                <ProcessTargetsTab
+                  process={process}
+                  onUpdate={onUpdate}
+                  canManage={canManage}
+                />
+              </TabsContent>
+
+              <TabsContent value="assignment" className="mt-0">
+                <ProcessAssignmentTab
+                  process={process}
+                  onUpdate={onUpdate}
                   canManage={canManage}
                 />
               </TabsContent>
@@ -253,6 +271,22 @@ export function UnifiedModelView({
                 <ProcessNotificationsTab
                   processId={process.id}
                   canManage={canManage}
+                />
+              </TabsContent>
+
+              <TabsContent value="variables" className="mt-0">
+                <ProcessVariablesTab
+                  processId={process.id}
+                  canManage={canManage}
+                />
+              </TabsContent>
+
+              <TabsContent value="workflow" className="mt-0">
+                <ProcessGeneratedWorkflowTab
+                  processId={process.id}
+                  processName={process.name}
+                  canManage={canManage}
+                  onUpdate={onUpdate}
                 />
               </TabsContent>
             </div>

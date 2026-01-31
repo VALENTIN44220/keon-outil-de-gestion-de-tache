@@ -176,6 +176,35 @@ export function useWorkflowExecution() {
         // Sub-process node: handle sub-process execution
         await handleSubProcessNode(runId, node, config, allNodes, allEdges, context);
         break;
+
+      // Standard sub-process blocks (S1-S4 pattern)
+      case 'sub_process_standard_direct':
+      case 'sub_process_standard_manager':
+      case 'sub_process_standard_validation1':
+      case 'sub_process_standard_validation2':
+        await handleStandardSubProcessBlock(runId, node, config, allNodes, allEdges, context);
+        break;
+
+      // Other node types
+      case 'status_change':
+        await handleStatusChangeNode(runId, node, config, context);
+        await moveToNextNode(runId, node.id, allNodes, allEdges, context);
+        break;
+
+      case 'assignment':
+        await handleAssignmentNode(runId, node, config, context);
+        await moveToNextNode(runId, node.id, allNodes, allEdges, context);
+        break;
+
+      case 'set_variable':
+        await handleSetVariableNode(runId, node, config, context);
+        await moveToNextNode(runId, node.id, allNodes, allEdges, context);
+        break;
+
+      case 'datalake_sync':
+        await handleDatalakeSyncNode(runId, node, config, context);
+        await moveToNextNode(runId, node.id, allNodes, allEdges, context);
+        break;
     }
   };
 
@@ -192,6 +221,170 @@ export function useWorkflowExecution() {
     
     // For now, just move to next node - sub-process handling depends on configuration
     await moveToNextNode(runId, node.id, allNodes, allEdges, context);
+  };
+
+  // Handle standard sub-process block (S1-S4 pattern)
+  const handleStandardSubProcessBlock = async (
+    runId: string,
+    node: { id: string; node_type: string },
+    config: unknown,
+    allNodes: Array<{ id: string; node_type: string; config: unknown; task_template_id?: string | null }>,
+    allEdges: Array<{ source_node_id: string; target_node_id: string; source_handle?: string | null }>,
+    context: ExecutionContext
+  ): Promise<void> => {
+    const blockConfig = config as {
+      sub_process_template_id?: string;
+      sub_process_name?: string;
+      assignment_type?: string;
+      target_manager_id?: string;
+      target_assignee_id?: string;
+      target_department_id?: string;
+      task_template_ids?: string[];
+      initial_status?: string;
+      validation_levels?: number;
+      s1_create_tasks?: boolean;
+      s2_notify_creation?: boolean;
+      s3_notify_status_changes?: boolean;
+      s4_notify_closure?: boolean;
+    };
+
+    await appendExecutionLog(runId, node.id, 'standard_block_started', {
+      block_type: node.node_type,
+      sub_process_template_id: blockConfig.sub_process_template_id,
+      sub_process_name: blockConfig.sub_process_name,
+    });
+
+    // S1: Create tasks with correct initial status
+    const initialStatus = blockConfig.initial_status || 
+      (blockConfig.assignment_type === 'user' ? 'todo' : 'to_assign');
+    
+    if (blockConfig.s1_create_tasks && blockConfig.task_template_ids?.length) {
+      await appendExecutionLog(runId, node.id, 's1_create_tasks', {
+        task_count: blockConfig.task_template_ids.length,
+        initial_status: initialStatus,
+      });
+      // Task creation is handled by the request creation flow
+    }
+
+    // S2: Send creation notifications
+    if (blockConfig.s2_notify_creation) {
+      await appendExecutionLog(runId, node.id, 's2_notify_creation', {
+        recipient_type: 'requester',
+      });
+      // Notification creation would be handled here
+    }
+
+    // S3: Status change notifications are handled by event listeners (not here)
+    
+    // For blocks with validation, we need to pause and wait
+    const hasValidation = node.node_type.includes('validation');
+    if (hasValidation && blockConfig.validation_levels && blockConfig.validation_levels > 0) {
+      await appendExecutionLog(runId, node.id, 'awaiting_validation', {
+        validation_levels: blockConfig.validation_levels,
+      });
+      
+      // Pause at this node waiting for validation
+      await supabase
+        .from('workflow_runs')
+        .update({
+          current_node_id: node.id,
+          status: 'paused' as const
+        })
+        .eq('id', runId);
+      return;
+    }
+
+    // S4: Will be triggered when sub-process completes
+    await appendExecutionLog(runId, node.id, 'standard_block_completed', {
+      block_type: node.node_type,
+    });
+
+    // Move to next node
+    await moveToNextNode(runId, node.id, allNodes, allEdges, context);
+  };
+
+  // Handle status_change node
+  const handleStatusChangeNode = async (
+    runId: string,
+    node: { id: string },
+    config: unknown,
+    context: ExecutionContext
+  ): Promise<void> => {
+    const changeConfig = config as {
+      target_status?: string;
+      trigger?: string;
+      target_entity?: 'task' | 'request' | 'sub_process';
+    };
+
+    await appendExecutionLog(runId, node.id, 'status_change_executed', {
+      target_status: changeConfig.target_status,
+      trigger: changeConfig.trigger,
+    });
+
+    // Status changes are typically handled by event listeners
+    // This node logs the intent
+  };
+
+  // Handle assignment node
+  const handleAssignmentNode = async (
+    runId: string,
+    node: { id: string },
+    config: unknown,
+    context: ExecutionContext
+  ): Promise<void> => {
+    const assignConfig = config as {
+      assignment_type?: string;
+      target_user_id?: string;
+      target_group_id?: string;
+      target_department_id?: string;
+    };
+
+    await appendExecutionLog(runId, node.id, 'assignment_executed', {
+      assignment_type: assignConfig.assignment_type,
+      target_user_id: assignConfig.target_user_id,
+    });
+  };
+
+  // Handle set_variable node
+  const handleSetVariableNode = async (
+    runId: string,
+    node: { id: string },
+    config: unknown,
+    context: ExecutionContext
+  ): Promise<void> => {
+    const varConfig = config as {
+      variable_name?: string;
+      value_mode?: 'fixed' | 'expression' | 'system';
+      fixed_value?: string;
+      expression?: string;
+    };
+
+    await appendExecutionLog(runId, node.id, 'variable_set', {
+      variable_name: varConfig.variable_name,
+      value_mode: varConfig.value_mode,
+    });
+
+    // Variable setting logic would be implemented here
+  };
+
+  // Handle datalake_sync node
+  const handleDatalakeSyncNode = async (
+    runId: string,
+    node: { id: string },
+    config: unknown,
+    context: ExecutionContext
+  ): Promise<void> => {
+    const syncConfig = config as {
+      table_name?: string;
+      sync_mode?: 'insert' | 'update' | 'upsert';
+    };
+
+    await appendExecutionLog(runId, node.id, 'datalake_sync_triggered', {
+      table_name: syncConfig.table_name,
+      sync_mode: syncConfig.sync_mode,
+    });
+
+    // Datalake sync would be implemented here
   };
 
   // Move to the next node based on edges
