@@ -15,6 +15,7 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Scissors, Trash2, CheckCircle2, Search, GripVertical, Calendar, Clock, Plus, AlertTriangle } from 'lucide-react';
 import { GanttTimeline, TodayLine, WeekendOverlay, WeekSeparators, TodayColumnHighlight } from './gantt/GanttTimeline';
 import { GanttKPIs } from './gantt/GanttKPIs';
+import { GanttLegend } from './gantt/GanttLegend';
 import { VirtualizedGanttRows } from './gantt/VirtualizedGanttRows';
 import { GanttHeatmapOverlay } from './GanttHeatmapOverlay';
 import { UnifiedTaskDrawer, DrawerItem } from './UnifiedTaskDrawer';
@@ -608,6 +609,9 @@ export function GanttViewInteractive({
             </div>
           </Card>
         </div>
+        
+        {/* Legend */}
+        <GanttLegend className="mt-4" />
       </div>
 
       {/* Unified Task Drawer */}
