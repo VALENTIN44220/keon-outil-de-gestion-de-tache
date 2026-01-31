@@ -1,26 +1,21 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 import {
   Settings,
   GitBranch,
   Workflow,
   FormInput,
   Bell,
-  ExternalLink,
   Layers,
   History,
-  Play,
   CheckCircle,
   Clock,
   Building2,
-  Users,
+  Timer,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { ProcessWithTasks } from '@/types/template';
@@ -29,6 +24,7 @@ import { ProcessSubProcessesTab } from './ProcessSubProcessesTab';
 import { ProcessWorkflowTab } from './ProcessWorkflowTab';
 import { ProcessCustomFieldsTab } from './ProcessCustomFieldsTab';
 import { ProcessNotificationsTab } from './ProcessNotificationsTab';
+import { ProcessSLATab } from './ProcessSLATab';
 
 interface UnifiedModelViewProps {
   process: ProcessWithTasks | null;
@@ -183,7 +179,7 @@ export function UnifiedModelView({
           className="flex-1 flex flex-col min-h-0"
         >
           <div className="px-6 pt-4 shrink-0">
-            <TabsList className="w-full grid grid-cols-5">
+            <TabsList className="w-full grid grid-cols-6">
               <TabsTrigger value="settings" className="gap-1 text-xs">
                 <Settings className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Paramètres</span>
@@ -199,6 +195,10 @@ export function UnifiedModelView({
               <TabsTrigger value="fields" className="gap-1 text-xs">
                 <FormInput className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Champs</span>
+              </TabsTrigger>
+              <TabsTrigger value="sla" className="gap-1 text-xs">
+                <Timer className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">SLA</span>
               </TabsTrigger>
               <TabsTrigger value="notifications" className="gap-1 text-xs">
                 <Bell className="h-3.5 w-3.5" />
@@ -237,6 +237,13 @@ export function UnifiedModelView({
 
               <TabsContent value="fields" className="mt-0">
                 <ProcessCustomFieldsTab
+                  processId={process.id}
+                  canManage={canManage}
+                />
+              </TabsContent>
+
+              <TabsContent value="sla" className="mt-0">
+                <ProcessSLATab
                   processId={process.id}
                   canManage={canManage}
                 />

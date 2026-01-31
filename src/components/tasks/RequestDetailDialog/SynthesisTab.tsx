@@ -2,21 +2,23 @@ import { Task } from '@/types/task';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
 import { 
   Building2, 
   Calendar, 
   User, 
-  Flag, 
   Workflow,
   CheckCircle2,
   Clock,
   AlertCircle,
-  Layers
+  Layers,
+  History
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { SubProcessGroup, priorityConfig, statusConfig } from './types';
+import { AuditTimeline } from '@/components/execution/AuditTimeline';
 
 interface SynthesisTabProps {
   task: Task;
@@ -162,6 +164,10 @@ export function SynthesisTab({
             <span>Exécutant: {profiles.get(task.assignee_id) || 'N/A'}</span>
           </div>
         )}
+
+        {/* Audit Timeline */}
+        <Separator />
+        <AuditTimeline requestId={task.id} maxHeight="250px" />
       </div>
     </ScrollArea>
   );
