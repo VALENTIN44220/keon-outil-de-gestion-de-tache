@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useWorkloadPlanning } from '@/hooks/useWorkloadPlanning';
+import { useWorkloadPreferences } from '@/hooks/useWorkloadPreferences';
 import { WorkloadFilters } from '@/components/workload/WorkloadFilters';
 import { GanttViewInteractive } from '@/components/workload/GanttViewInteractive';
 import { WorkloadCalendarView } from '@/components/workload/WorkloadCalendarView';
@@ -9,11 +10,13 @@ import { WorkloadSummaryView } from '@/components/workload/WorkloadSummaryView';
 import { LeaveManagement } from '@/components/workload/LeaveManagement';
 import { HolidayManagement } from '@/components/workload/HolidayManagement';
 import { TeamWorkloadView } from '@/components/team/TeamWorkloadView';
+import { GanttConfigPanel } from '@/components/workload/GanttConfigPanel';
+import { exportToCSV, exportToJSON, exportSummaryReport, ExportData } from '@/components/workload/WorkloadExport';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { Loader2, GanttChart, CalendarDays, BarChart3, Palmtree, CalendarCheck, Download, RefreshCw, Users } from 'lucide-react';
+import { Loader2, GanttChart, CalendarDays, BarChart3, Palmtree, CalendarCheck, Download, RefreshCw, Users, FileSpreadsheet, FileJson, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSimulation } from '@/contexts/SimulationContext';
@@ -22,7 +25,6 @@ import { WorkloadSlot } from '@/types/workload';
 import { toast } from 'sonner';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
-
 export default function Workload() {
   const { profile: authProfile } = useAuth();
   const { getActiveProfile } = useSimulation();
@@ -38,6 +40,17 @@ export default function Workload() {
   const [selectedCalendarUserId, setSelectedCalendarUserId] = useState<string | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
 
+  // Workload preferences (persisted in localStorage)
+  const {
+    preferences,
+    updatePreference,
+    updateColumn,
+    resetToDefaults,
+    toggleHeatmap,
+    setGroupBy,
+    setZoomLevel,
+    toggleCompactMode,
+  } = useWorkloadPreferences();
   const {
     workloadData,
     slots,
@@ -175,7 +188,16 @@ export default function Workload() {
     return Array.from(uniqueTaskIds);
   }, [slots]);
 
-  // Export to ICS format
+  // Export data for all export functions
+  const exportData: ExportData = useMemo(() => ({
+    workloadData,
+    tasks,
+    slots,
+    startDate,
+    endDate,
+  }), [workloadData, tasks, slots, startDate, endDate]);
+
+  // Export handlers
   const handleExportICS = () => {
     try {
       let icsContent = [
@@ -221,9 +243,12 @@ export default function Workload() {
     }
   };
 
+  const handleExportCSV = () => exportToCSV(exportData);
+  const handleExportJSON = () => exportToJSON(exportData);
+  const handleExportReport = () => exportSummaryReport(exportData);
+
   // Open Outlook web calendar sync
   const handleOutlookSync = () => {
-    // Microsoft Graph would require OAuth, for now show info
     toast.info('Synchronisation Outlook : Importez le fichier ICS exporté dans votre calendrier Outlook');
     handleExportICS();
   };
@@ -272,6 +297,20 @@ export default function Workload() {
                 </TabsTrigger>
               </TabsList>
 
+              {/* Config Panel for Gantt */}
+              {activeTab === 'gantt' && (
+                <GanttConfigPanel
+                  preferences={preferences}
+                  onGroupByChange={setGroupBy}
+                  onZoomChange={setZoomLevel}
+                  onToggleHeatmap={toggleHeatmap}
+                  onToggleCompact={toggleCompactMode}
+                  onColumnChange={updateColumn}
+                  onWidthChange={(width) => updatePreference('memberColumnWidth', width)}
+                  onReset={resetToDefaults}
+                />
+              )}
+
               {/* Export / Sync buttons */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -280,10 +319,23 @@ export default function Workload() {
                     <span className="hidden sm:inline">Exporter</span>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={handleExportCSV}>
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                    Export CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportJSON}>
+                    <FileJson className="h-4 w-4 mr-2" />
+                    Export JSON
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportReport}>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Rapport de synthèse
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleExportICS}>
                     <CalendarDays className="h-4 w-4 mr-2" />
-                    Exporter en ICS
+                    Export ICS (Calendrier)
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleOutlookSync}>
@@ -339,6 +391,7 @@ export default function Workload() {
                     getTaskDuration={getTaskDuration}
                     getTaskProgress={getTaskProgress}
                     plannedTaskIds={plannedTaskIds}
+                    preferences={preferences}
                   />
                 </TabsContent>
 
