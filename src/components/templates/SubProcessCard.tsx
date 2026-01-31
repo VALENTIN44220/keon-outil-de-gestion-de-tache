@@ -1,31 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { SubProcessWithTasks, TaskTemplate } from '@/types/template';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { SubProcessWithTasks, TaskTemplate, VISIBILITY_LABELS, TemplateVisibility } from '@/types/template';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger,
-  DropdownMenuSeparator
-} from '@/components/ui/dropdown-menu';
-import { 
-  MoreVertical, Plus, Trash2, ChevronDown, ChevronRight,
-  Users, User, UserCog, FormInput, Lock, Link2, Edit2, Workflow, Eye
+  Trash2, Users, User, UserCog, Workflow, ListTodo, 
+  Lock, Building2, Globe, Eye, CheckCircle, Layers
 } from 'lucide-react';
-import { AddTaskTemplateDialog } from './AddTaskTemplateDialog';
-import { EditTaskTemplateDialog } from './EditTaskTemplateDialog';
-import { LinkExistingTaskDialog } from './LinkExistingTaskDialog';
-import { SubProcessCustomFieldsEditor } from './SubProcessCustomFieldsEditor';
-import { ViewSubProcessDialog } from './ViewSubProcessDialog';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SubProcessConfigView } from './SubProcessConfigView';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 
 interface SubProcessCardProps {
   subProcess: SubProcessWithTasks;
@@ -39,19 +23,25 @@ interface SubProcessCardProps {
   onMandatoryChange?: (id: string, isMandatory: boolean) => void;
 }
 
-const priorityColors: Record<string, string> = {
-  low: 'bg-green-500/10 text-green-600 border-green-500/20',
-  medium: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20',
-  high: 'bg-orange-500/10 text-orange-600 border-orange-500/20',
-  urgent: 'bg-red-500/10 text-red-600 border-red-500/20',
-};
-
 const assignmentTypeLabels: Record<string, { label: string; icon: any }> = {
   manager: { label: 'Par manager', icon: Users },
   role: { label: 'Par poste', icon: UserCog },
   user: { label: 'Utilisateur', icon: User },
   group: { label: 'Groupe', icon: Users },
 };
+
+const visibilityIcons: Record<string, any> = {
+  private: Lock,
+  internal_department: Users,
+  internal_company: Building2,
+  public: Globe,
+};
+
+interface WorkflowStatus {
+  status: 'active' | 'draft' | 'none';
+  nodeCount: number;
+  hasValidation: boolean;
+}
 
 export function SubProcessCard({ 
   subProcess, 
@@ -65,260 +55,135 @@ export function SubProcessCard({
   onMandatoryChange
 }: SubProcessCardProps) {
   const navigate = useNavigate();
-  const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
-  const [isLinkTaskOpen, setIsLinkTaskOpen] = useState(false);
-  const [editingTask, setEditingTask] = useState<TaskTemplate | null>(null);
-  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [isMandatory, setIsMandatory] = useState(subProcess.is_mandatory ?? false);
-  const [isViewOpen, setIsViewOpen] = useState(false);
+  const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [workflowStatus, setWorkflowStatus] = useState<WorkflowStatus>({ status: 'none', nodeCount: 0, hasValidation: false });
 
-  const toggleTaskExpanded = (taskId: string) => {
-    setExpandedTasks(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(taskId)) {
-        newSet.delete(taskId);
-      } else {
-        newSet.add(taskId);
+  useEffect(() => {
+    const fetchWorkflowStatus = async () => {
+      const { data: workflowData } = await supabase
+        .from('workflow_templates')
+        .select('id, status, workflow_nodes(id, type)')
+        .eq('sub_process_template_id', subProcess.id)
+        .maybeSingle();
+
+      if (workflowData) {
+        const nodes = (workflowData as any).workflow_nodes || [];
+        const hasValidation = nodes.some((n: any) => n.type === 'validation');
+        const status = workflowData.status;
+        const isActive = status !== 'draft' && status !== 'archived' && status !== 'inactive';
+        setWorkflowStatus({
+          status: isActive ? 'active' : (status === 'draft' ? 'draft' : 'none'),
+          nodeCount: nodes.length,
+          hasValidation
+        });
       }
-      return newSet;
-    });
-  };
-
-  const handleMandatoryToggle = async (checked: boolean) => {
-    try {
-      const { error } = await supabase
-        .from('sub_process_templates')
-        .update({ is_mandatory: checked })
-        .eq('id', subProcess.id);
-      
-      if (error) throw error;
-      
-      setIsMandatory(checked);
-      onMandatoryChange?.(subProcess.id, checked);
-      toast.success(checked ? 'Sous-processus marqué comme obligatoire' : 'Sous-processus marqué comme optionnel');
-    } catch (error) {
-      console.error('Error updating mandatory status:', error);
-      toast.error('Erreur lors de la mise à jour');
-    }
-  };
+    };
+    fetchWorkflowStatus();
+  }, [subProcess.id]);
 
   const AssignmentIcon = assignmentTypeLabels[subProcess.assignment_type]?.icon || Users;
+  const VisibilityIcon = visibilityIcons[subProcess.visibility_level] || Globe;
+
+  // Get workflow status badge
+  const getWorkflowBadge = () => {
+    if (workflowStatus.status === 'active') {
+      return <Badge className="bg-success/20 text-success border-success/30 text-[10px] px-1.5 py-0">Actif</Badge>;
+    } else if (workflowStatus.status === 'draft') {
+      return <Badge className="bg-warning/20 text-warning border-warning/30 text-[10px] px-1.5 py-0">Brouillon</Badge>;
+    }
+    return null;
+  };
+
+  const handleOpenConfig = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsConfigOpen(true);
+  };
 
   return (
     <>
-      <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
-        <Card className="border-l-4 border-l-primary/50">
-          <CardHeader className="pb-2">
-            <div className="flex items-start justify-between">
-              <CollapsibleTrigger asChild>
-                <button className="flex items-center gap-2 flex-1 text-left hover:bg-muted/50 rounded p-1 -m-1 transition-colors">
-                  {isExpanded ? (
-                    <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <CardTitle className="text-base truncate">{subProcess.name}</CardTitle>
-                    {subProcess.description && (
-                      <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                        {subProcess.description}
-                      </p>
-                    )}
-                  </div>
-                </button>
-              </CollapsibleTrigger>
-              {canManage && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => setIsViewOpen(true)}>
-                      <Eye className="h-4 w-4 mr-2" />
-                      Voir les paramètres
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => navigate(`/templates/workflow/subprocess/${subProcess.id}`)}>
-                      <Workflow className="h-4 w-4 mr-2" />
-                      Éditer le workflow
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem 
-                      onClick={onDelete}
-                      className="text-destructive focus:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Supprimer
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-            </div>
-
-            <div className="flex flex-wrap gap-1.5 mt-2">
-              <Badge variant="outline" className="text-xs">
-                <AssignmentIcon className="h-3 w-3 mr-1" />
-                {assignmentTypeLabels[subProcess.assignment_type]?.label}
-              </Badge>
-              <Badge variant="secondary" className="text-xs">
-                {subProcess.task_templates.length} tâche(s)
-              </Badge>
-              {isMandatory && (
-                <Badge variant="default" className="text-xs bg-primary/80">
-                  <Lock className="h-3 w-3 mr-1" />
-                  Obligatoire
-                </Badge>
-              )}
-            </div>
-
-            {canManage && (
-              <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border/50">
-                <Switch
-                  id={`mandatory-${subProcess.id}`}
-                  checked={isMandatory}
-                  onCheckedChange={handleMandatoryToggle}
-                />
-                <label 
-                  htmlFor={`mandatory-${subProcess.id}`}
-                  className="text-xs text-muted-foreground cursor-pointer"
-                >
-                  Sous-processus obligatoire
-                </label>
+      <Card 
+        className="flex flex-col cursor-pointer hover:shadow-md transition-all hover:border-primary/30 bg-card"
+        onClick={handleOpenConfig}
+      >
+        <CardContent className="p-3 space-y-2">
+          {/* Header: Name + Workflow Badge */}
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-semibold text-sm truncate">{subProcess.name}</h3>
+                {getWorkflowBadge()}
+                {subProcess.is_mandatory && (
+                  <Badge variant="default" className="bg-primary/80 text-[10px] px-1.5 py-0">
+                    <Lock className="h-3 w-3 mr-0.5" />
+                    Obligatoire
+                  </Badge>
+                )}
               </div>
+            </div>
+          </div>
+
+          {/* Meta info row */}
+          <div className="flex items-center gap-2 text-[11px] text-muted-foreground flex-wrap">
+            <span className="flex items-center gap-1">
+              <AssignmentIcon className="h-3 w-3" />
+              {assignmentTypeLabels[subProcess.assignment_type]?.label}
+            </span>
+            <span className="flex items-center gap-1">
+              <ListTodo className="h-3 w-3" />
+              {subProcess.task_templates.length} tâche(s)
+            </span>
+            <span className="flex items-center gap-1">
+              <VisibilityIcon className="h-3 w-3" />
+              {subProcess.visibility_level === 'public' ? 'Public' : 'Privé'}
+            </span>
+            {workflowStatus.hasValidation && (
+              <span className="flex items-center gap-1 text-success">
+                <CheckCircle className="h-3 w-3" />
+                Validation
+              </span>
             )}
-          </CardHeader>
+          </div>
 
-          <CollapsibleContent>
-            <CardContent className="pt-2">
-              <Tabs defaultValue="tasks" className="w-full">
-                <TabsList className="w-full h-8">
-                  <TabsTrigger value="tasks" className="text-xs flex-1">
-                    Tâches ({subProcess.task_templates.length})
-                  </TabsTrigger>
-                  <TabsTrigger value="fields" className="text-xs flex-1">
-                    <FormInput className="h-3 w-3 mr-1" />
-                    Champs
-                  </TabsTrigger>
-                </TabsList>
+          {/* Action buttons - MAX 3 buttons like ProcessCard */}
+          <div className="flex items-center gap-1.5 pt-1">
+            <Button 
+              variant="default" 
+              size="sm" 
+              className="h-7 px-2.5 text-xs"
+              onClick={handleOpenConfig}
+            >
+              <Eye className="h-3 w-3 mr-1" />
+              {canManage ? 'Gérer' : 'Voir'}
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="h-7 px-2.5 text-xs bg-success/10 border-success/30 text-success hover:bg-success/20"
+              onClick={(e) => { e.stopPropagation(); navigate(`/templates/workflow/subprocess/${subProcess.id}`); }}
+            >
+              <Workflow className="h-3 w-3 mr-1" />
+              Workflow
+            </Button>
+            {canManage && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-7 px-2.5 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
-                <TabsContent value="tasks" className="mt-3">
-                  {subProcess.task_templates.length === 0 ? (
-                    <p className="text-xs text-muted-foreground text-center py-2">
-                      Aucune tâche dans ce sous-processus
-                    </p>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-2">
-                      {subProcess.task_templates.map((task, index) => (
-                        <div 
-                          key={task.id}
-                          className="rounded-lg bg-muted/50 p-2 flex items-center justify-between gap-1"
-                        >
-                          <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                            <span className="text-xs text-muted-foreground shrink-0">
-                              {index + 1}.
-                            </span>
-                            <span className="text-sm truncate">{task.title}</span>
-                          </div>
-                          <div className="flex items-center gap-1 shrink-0">
-                            <Badge 
-                              variant="outline" 
-                              className={`text-xs ${priorityColors[task.priority]}`}
-                            >
-                              {task.priority}
-                            </Badge>
-                            {canManage && (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6"
-                                  onClick={() => setEditingTask(task)}
-                                >
-                                  <Edit2 className="h-3 w-3 text-muted-foreground hover:text-primary" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6"
-                                  onClick={() => onDeleteTask(task.id)}
-                                >
-                                  <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
-                                </Button>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {canManage && (
-                    <div className="flex gap-2 mt-3">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="flex-1"
-                        onClick={() => setIsAddTaskOpen(true)}
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Nouvelle tâche
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="flex-1"
-                        onClick={() => setIsLinkTaskOpen(true)}
-                      >
-                        <Link2 className="h-4 w-4 mr-2" />
-                        Existante
-                      </Button>
-                    </div>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="fields" className="mt-3">
-                  <ScrollArea className="h-[200px]">
-                    <SubProcessCustomFieldsEditor 
-                      subProcessTemplateId={subProcess.id}
-                      canManage={canManage}
-                    />
-                  </ScrollArea>
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </CollapsibleContent>
-        </Card>
-      </Collapsible>
-
-      <AddTaskTemplateDialog
-        open={isAddTaskOpen}
-        onClose={() => setIsAddTaskOpen(false)}
-        onAdd={onAddTask}
-        orderIndex={subProcess.task_templates.length}
-      />
-
-      <LinkExistingTaskDialog
-        open={isLinkTaskOpen}
-        onClose={() => setIsLinkTaskOpen(false)}
+      <SubProcessConfigView
         subProcessId={subProcess.id}
-        processId={processId}
-        existingTaskIds={subProcess.task_templates.map(t => t.id)}
-        onTasksLinked={() => onRefresh?.()}
-      />
-
-      <EditTaskTemplateDialog
-        task={editingTask}
-        open={!!editingTask}
-        onClose={() => setEditingTask(null)}
-        onSave={() => { setEditingTask(null); onRefresh?.(); }}
-      />
-
-      <ViewSubProcessDialog
-        subProcess={subProcess}
-        open={isViewOpen}
-        onClose={() => setIsViewOpen(false)}
+        open={isConfigOpen}
+        onClose={() => setIsConfigOpen(false)}
+        onUpdate={() => { onRefresh?.(); }}
+        canManage={canManage}
       />
     </>
   );

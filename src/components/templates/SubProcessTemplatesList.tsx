@@ -1,18 +1,10 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SubProcessWithTasks } from '@/types/template';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  MoreVertical,
   Trash2,
   Users,
   User,
@@ -25,12 +17,9 @@ import {
   Globe,
   Loader2,
   Eye,
-  CheckCircle2,
-  AlertCircle,
-  Circle,
-  ShieldCheck,
+  CheckCircle,
 } from 'lucide-react';
-import { ViewSubProcessDialog } from './ViewSubProcessDialog';
+import { SubProcessConfigView } from './SubProcessConfigView';
 import { VISIBILITY_LABELS } from '@/types/template';
 import { useSubProcessWorkflowStatuses } from '@/hooks/useWorkflowStatus';
 
@@ -56,14 +45,6 @@ const visibilityIcons: Record<string, any> = {
   public: Globe,
 };
 
-const workflowStatusConfig = {
-  active: { label: 'Actif', color: 'bg-green-500/15 text-green-700 border-green-500/30', icon: CheckCircle2 },
-  draft: { label: 'Brouillon', color: 'bg-amber-500/15 text-amber-700 border-amber-500/30', icon: Circle },
-  inactive: { label: 'Inactif', color: 'bg-muted text-muted-foreground', icon: Circle },
-  archived: { label: 'Archivé', color: 'bg-muted text-muted-foreground', icon: Circle },
-  none: { label: 'Non configuré', color: 'bg-red-500/15 text-red-700 border-red-500/30', icon: AlertCircle },
-};
-
 export function SubProcessTemplatesList({
   subProcesses,
   isLoading,
@@ -72,7 +53,7 @@ export function SubProcessTemplatesList({
   viewMode = 'list',
 }: SubProcessTemplatesListProps) {
   const navigate = useNavigate();
-  const [viewingSubProcess, setViewingSubProcess] = useState<SubProcessWithTasks | null>(null);
+  const [configSubProcessId, setConfigSubProcessId] = useState<string | null>(null);
 
   // Get all sub-process IDs for workflow status lookup
   const subProcessIds = useMemo(() => subProcesses.map(sp => sp.id), [subProcesses]);
@@ -98,226 +79,107 @@ export function SubProcessTemplatesList({
     );
   }
 
-  const isGridView = viewMode === 'grid';
-
-  const getWorkflowStatusBadge = (subProcessId: string) => {
+  const getWorkflowBadge = (subProcessId: string) => {
     const status = workflowStatuses?.[subProcessId];
     if (!status?.hasWorkflow) {
-      const config = workflowStatusConfig.none;
-      return (
-        <Badge variant="outline" className={`text-xs ${config.color}`}>
-          <config.icon className="h-3 w-3 mr-1" />
-          {config.label}
-        </Badge>
-      );
+      return null;
     }
-    const config = workflowStatusConfig[status.status || 'draft'];
-    return (
-      <Badge variant="outline" className={`text-xs ${config.color}`}>
-        <config.icon className="h-3 w-3 mr-1" />
-        {config.label}
-      </Badge>
-    );
-  };
-
-  const getWorkflowDetailsBadges = (subProcessId: string) => {
-    const status = workflowStatuses?.[subProcessId];
-    if (!status?.hasWorkflow) return null;
-    
-    return (
-      <>
-        <Badge variant="secondary" className="text-xs">
-          <Workflow className="h-3 w-3 mr-1" />
-          {status.nodeCount} nœuds
-        </Badge>
-        {status.hasValidation && (
-          <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-700 border-blue-500/30">
-            <ShieldCheck className="h-3 w-3 mr-1" />
-            Validation
-          </Badge>
-        )}
-      </>
-    );
+    if (status.status === 'active' || (status.status !== 'draft' && status.status !== 'archived' && status.status !== 'inactive')) {
+      return <Badge className="bg-success/20 text-success border-success/30 text-[10px] px-1.5 py-0">Actif</Badge>;
+    }
+    if (status.status === 'draft') {
+      return <Badge className="bg-warning/20 text-warning border-warning/30 text-[10px] px-1.5 py-0">Brouillon</Badge>;
+    }
+    return null;
   };
 
   return (
     <>
-      <div className={isGridView ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3' : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'}>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {subProcesses.map((sp) => {
           const AssignmentIcon = assignmentTypeLabels[sp.assignment_type]?.icon || Users;
           const VisibilityIcon = visibilityIcons[sp.visibility_level] || Globe;
+          const hasValidation = workflowStatuses?.[sp.id]?.hasValidation;
 
-          if (isGridView) {
-            // Compact/grid view
-            return (
-              <Card key={sp.id} className="flex flex-col gap-2 p-3 hover:shadow-md transition-shadow">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm truncate">{sp.name}</span>
-                    {getWorkflowStatusBadge(sp.id)}
-                    {sp.process_name && (
-                      <Badge variant="outline" className="text-xs shrink-0">
-                        <Layers className="h-3 w-3 mr-1" />
-                        {sp.process_name}
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground mt-1">
-                    <span className="flex items-center gap-1">
-                      <AssignmentIcon className="h-3 w-3" />
-                      {assignmentTypeLabels[sp.assignment_type]?.label}
-                    </span>
-                    <span>{sp.task_templates.length} tâche(s)</span>
-                    <span className="flex items-center gap-1">
-                      <VisibilityIcon className="h-3 w-3" />
-                      {VISIBILITY_LABELS[sp.visibility_level]}
-                    </span>
-                    {workflowStatuses?.[sp.id]?.hasValidation && (
-                      <span className="flex items-center gap-1 text-blue-600">
-                        <ShieldCheck className="h-3 w-3" />
-                        Validation
-                      </span>
-                    )}
-                  </div>
-                </div>
-                {sp.can_manage && (
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-7 px-2"
-                      onClick={() => setViewingSubProcess(sp)}
-                    >
-                      <Eye className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="default"
-                      size="sm"
-                      className="h-7 px-2"
-                      onClick={() => navigate(`/templates/workflow/subprocess/${sp.id}`)}
-                    >
-                      <Workflow className="h-3.5 w-3.5" />
-                    </Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => onDelete(sp.id)}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Supprimer
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                )}
-              </Card>
-            );
-          }
-
-          // Card view (like ProcessCard)
           return (
-            <Card key={sp.id} className="flex flex-col hover:shadow-md transition-shadow">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
+            <Card 
+              key={sp.id} 
+              className="flex flex-col cursor-pointer hover:shadow-md transition-all hover:border-primary/30 bg-card"
+              onClick={() => setConfigSubProcessId(sp.id)}
+            >
+              <CardContent className="p-3 space-y-2">
+                {/* Header: Name + Workflow Badge + Process Name */}
+                <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
-                    <CardTitle className="text-lg line-clamp-1">{sp.name}</CardTitle>
-                    {sp.description && (
-                      <CardDescription className="mt-1 line-clamp-2">
-                        {sp.description}
-                      </CardDescription>
-                    )}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-semibold text-sm truncate">{sp.name}</h3>
+                      {getWorkflowBadge(sp.id)}
+                      {sp.process_name && (
+                        <Badge variant="secondary" className="bg-info/20 text-info border-info/30 text-[10px] px-1.5 py-0 shrink-0">
+                          <Layers className="h-3 w-3 mr-0.5" />
+                          {sp.process_name}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
-                  {sp.can_manage && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setViewingSubProcess(sp)}>
-                          <Eye className="h-4 w-4 mr-2" />
-                          Voir les paramètres
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => navigate(`/templates/workflow/subprocess/${sp.id}`)}>
-                          <Workflow className="h-4 w-4 mr-2" />
-                          Éditer le workflow
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => onDelete(sp.id)}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Supprimer
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
                 </div>
 
-                {/* Workflow Status Section */}
-                <div className="flex items-center gap-2 mb-3 p-2 rounded-md bg-muted/50">
-                  <Workflow className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium text-muted-foreground">Workflow:</span>
-                  {getWorkflowStatusBadge(sp.id)}
-                  {getWorkflowDetailsBadges(sp.id)}
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {sp.process_name && (
-                    <Badge variant="outline" className="text-xs">
-                      <Layers className="h-3 w-3 mr-1" />
-                      {sp.process_name}
-                    </Badge>
-                  )}
-                  <Badge variant="outline" className="text-xs">
-                    <AssignmentIcon className="h-3 w-3 mr-1" />
+                {/* Meta info row */}
+                <div className="flex items-center gap-2 text-[11px] text-muted-foreground flex-wrap">
+                  <span className="flex items-center gap-1">
+                    <AssignmentIcon className="h-3 w-3" />
                     {assignmentTypeLabels[sp.assignment_type]?.label}
-                  </Badge>
-                  <Badge variant="secondary" className="text-xs">
-                    <ListTodo className="h-3 w-3 mr-1" />
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <ListTodo className="h-3 w-3" />
                     {sp.task_templates.length} tâche(s)
-                  </Badge>
-                  <Badge variant="outline" className="text-xs">
-                    <VisibilityIcon className="h-3 w-3 mr-1" />
-                    {VISIBILITY_LABELS[sp.visibility_level]}
-                  </Badge>
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <VisibilityIcon className="h-3 w-3" />
+                    {sp.visibility_level === 'public' ? 'Public' : 'Privé'}
+                  </span>
                   {sp.is_mandatory && (
-                    <Badge variant="default" className="text-xs bg-primary/80">
-                      <Lock className="h-3 w-3 mr-1" />
+                    <span className="flex items-center gap-1">
+                      <Lock className="h-3 w-3" />
                       Obligatoire
-                    </Badge>
+                    </span>
+                  )}
+                  {hasValidation && (
+                    <span className="flex items-center gap-1 text-success">
+                      <CheckCircle className="h-3 w-3" />
+                      Validation
+                    </span>
                   )}
                 </div>
-              </CardHeader>
 
-              <CardContent className="flex-1">
-                <div className="flex gap-2 mt-2">
+                {/* Action buttons - MAX 3 buttons like ProcessCard */}
+                <div className="flex items-center gap-1.5 pt-1">
+                  <Button 
+                    variant="default" 
+                    size="sm" 
+                    className="h-7 px-2.5 text-xs"
+                    onClick={(e) => { e.stopPropagation(); setConfigSubProcessId(sp.id); }}
+                  >
+                    <Eye className="h-3 w-3 mr-1" />
+                    {sp.can_manage ? 'Gérer' : 'Voir'}
+                  </Button>
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    className="flex-1"
-                    onClick={() => setViewingSubProcess(sp)}
+                    className="h-7 px-2.5 text-xs bg-success/10 border-success/30 text-success hover:bg-success/20"
+                    onClick={(e) => { e.stopPropagation(); navigate(`/templates/workflow/subprocess/${sp.id}`); }}
                   >
-                    <Eye className="h-4 w-4 mr-2" />
-                    Paramètres
+                    <Workflow className="h-3 w-3 mr-1" />
+                    Workflow
                   </Button>
                   {sp.can_manage && (
                     <Button 
-                      variant="default" 
+                      variant="ghost" 
                       size="sm" 
-                      className="flex-1"
-                      onClick={() => navigate(`/templates/workflow/subprocess/${sp.id}`)}
+                      className="h-7 px-2.5 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={(e) => { e.stopPropagation(); onDelete(sp.id); }}
                     >
-                      <Workflow className="h-4 w-4 mr-2" />
-                      Workflow
+                      <Trash2 className="h-3 w-3" />
                     </Button>
                   )}
                 </div>
@@ -327,11 +189,15 @@ export function SubProcessTemplatesList({
         })}
       </div>
 
-      <ViewSubProcessDialog
-        subProcess={viewingSubProcess}
-        open={!!viewingSubProcess}
-        onClose={() => setViewingSubProcess(null)}
-      />
+      {configSubProcessId && (
+        <SubProcessConfigView
+          subProcessId={configSubProcessId}
+          open={!!configSubProcessId}
+          onClose={() => setConfigSubProcessId(null)}
+          onUpdate={onRefresh}
+          canManage={subProcesses.find(sp => sp.id === configSubProcessId)?.can_manage ?? false}
+        />
+      )}
     </>
   );
 }
