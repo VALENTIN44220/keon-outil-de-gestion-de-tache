@@ -14,6 +14,7 @@ import {
   ExternalLink,
   Trash2,
   MoreVertical,
+  Settings,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -24,6 +25,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { SubProcessConfigView } from '../SubProcessConfigView';
 
 interface SubProcess {
   id: string;
@@ -49,6 +51,7 @@ export function ProcessSubProcessesTab({
   const navigate = useNavigate();
   const [subProcesses, setSubProcesses] = useState<SubProcess[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedSubProcessId, setSelectedSubProcessId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchSubProcesses();
@@ -213,6 +216,14 @@ export function ProcessSubProcessesTab({
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setSelectedSubProcessId(sp.id)}
+                    >
+                      <Settings className="h-4 w-4 mr-1" />
+                      Configurer
+                    </Button>
+                    <Button
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8"
@@ -241,6 +252,20 @@ export function ProcessSubProcessesTab({
             </Card>
           ))}
         </div>
+      )}
+
+      {/* Sub-process Configuration Panel */}
+      {selectedSubProcessId && (
+        <SubProcessConfigView
+          subProcessId={selectedSubProcessId}
+          open={!!selectedSubProcessId}
+          onClose={() => setSelectedSubProcessId(null)}
+          onUpdate={() => {
+            fetchSubProcesses();
+            onUpdate();
+          }}
+          canManage={canManage}
+        />
       )}
     </div>
   );
