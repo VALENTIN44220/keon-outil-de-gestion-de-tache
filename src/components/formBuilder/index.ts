@@ -9,3 +9,7 @@ export { CommonFieldsLibrary } from './CommonFieldsLibrary';
 export { EnhancedFormBuilderCanvas } from './EnhancedFormBuilderCanvas';
 export { EnhancedPropertiesPanel } from './EnhancedPropertiesPanel';
 export { EnhancedFormBuilderContainer } from './EnhancedFormBuilderContainer';
+export { ConditionsEditorPanel } from './ConditionsEditorPanel';
+
+// Dynamic rendering
+export { DynamicFieldsRenderer } from '../tasks/DynamicFieldsRenderer';
