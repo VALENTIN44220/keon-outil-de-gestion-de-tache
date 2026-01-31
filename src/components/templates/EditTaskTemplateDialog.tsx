@@ -43,10 +43,12 @@ export function EditTaskTemplateDialog({ task, open, onClose, onSave }: EditTask
 
   const { categories, addCategory, addSubcategory } = useCategories();
   
-  // Get custom fields - use process template id if available
+  // Get custom fields - include common + parent process + sub-process fields
   const { fields: customFields } = useCustomFields({ 
     processTemplateId: task?.process_template_id || undefined,
-    includeCommon: true 
+    subProcessTemplateId: task?.sub_process_template_id || undefined,
+    includeCommon: true,
+    includeParentProcessFields: true,
   });
 
   useEffect(() => {
