@@ -1138,6 +1138,7 @@ export type Database = {
           id: string
           is_shared: boolean
           name: string
+          settings: Json | null
           subcategory_id: string | null
           target_company_id: string | null
           target_department_id: string | null
@@ -1156,6 +1157,7 @@ export type Database = {
           id?: string
           is_shared?: boolean
           name: string
+          settings?: Json | null
           subcategory_id?: string | null
           target_company_id?: string | null
           target_department_id?: string | null
@@ -1174,6 +1176,7 @@ export type Database = {
           id?: string
           is_shared?: boolean
           name?: string
+          settings?: Json | null
           subcategory_id?: string | null
           target_company_id?: string | null
           target_department_id?: string | null

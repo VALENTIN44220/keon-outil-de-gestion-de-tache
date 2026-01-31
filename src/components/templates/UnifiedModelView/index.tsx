@@ -271,6 +271,7 @@ export function UnifiedModelView({
                 <ProcessNotificationsTab
                   processId={process.id}
                   canManage={canManage}
+                  onUpdate={onUpdate}
                 />
               </TabsContent>
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +11,7 @@ import {
   Settings,
   Save,
 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 interface NotificationEvent {
@@ -66,11 +67,51 @@ const DEFAULT_EVENTS: NotificationEvent[] = [
 interface ProcessNotificationsTabProps {
   processId: string;
   canManage: boolean;
+  onUpdate?: () => void;
 }
 
-export function ProcessNotificationsTab({ processId, canManage }: ProcessNotificationsTabProps) {
+export function ProcessNotificationsTab({ processId, canManage, onUpdate }: ProcessNotificationsTabProps) {
   const [events, setEvents] = useState<NotificationEvent[]>(DEFAULT_EVENTS);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+
+  useEffect(() => {
+    loadNotificationConfig();
+  }, [processId]);
+
+  const loadNotificationConfig = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('process_templates')
+        .select('settings')
+        .eq('id', processId)
+        .single();
+
+      if (error) throw error;
+
+      const settings = (data?.settings as Record<string, any>) || {};
+      const notificationConfig = settings.notification_config as NotificationEvent[] | undefined;
+
+      if (notificationConfig && Array.isArray(notificationConfig)) {
+        // Merge saved config with defaults to handle new events
+        const mergedEvents = DEFAULT_EVENTS.map(defaultEvent => {
+          const saved = notificationConfig.find(e => e.id === defaultEvent.id);
+          return saved || defaultEvent;
+        });
+        setEvents(mergedEvents);
+      } else {
+        setEvents(DEFAULT_EVENTS);
+      }
+      setIsDirty(false);
+    } catch (error) {
+      console.error('Error loading notification config:', error);
+      toast.error('Erreur lors du chargement de la configuration');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const toggleChannel = (eventId: string, channel: 'email' | 'inApp' | 'teams') => {
     setEvents((prev) =>
@@ -86,18 +127,40 @@ export function ProcessNotificationsTab({ processId, canManage }: ProcessNotific
           : event
       )
     );
+    setIsDirty(true);
   };
 
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // In a real implementation, save to process_notification_config table
-      // For now, we just show success
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // First get current settings to merge
+      const { data: currentData, error: fetchError } = await supabase
+        .from('process_templates')
+        .select('settings')
+        .eq('id', processId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      const currentSettings = (currentData?.settings as Record<string, unknown>) || {};
+      const updatedSettings = {
+        ...currentSettings,
+        notification_config: events as unknown,
+      };
+
+      const { error } = await supabase
+        .from('process_templates')
+        .update({ settings: updatedSettings as any })
+        .eq('id', processId);
+
+      if (error) throw error;
+
       toast.success('Configuration des notifications enregistrée');
-    } catch (error) {
+      setIsDirty(false);
+      onUpdate?.();
+    } catch (error: any) {
       console.error('Error saving notifications:', error);
-      toast.error('Erreur lors de la sauvegarde');
+      toast.error(`Erreur: ${error.message || 'Impossible de sauvegarder'}`);
     } finally {
       setIsSaving(false);
     }
@@ -113,6 +176,14 @@ export function ProcessNotificationsTab({ processId, canManage }: ProcessNotific
     { name: '{{status}}', description: 'Statut actuel' },
   ];
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -122,6 +193,11 @@ export function ProcessNotificationsTab({ processId, canManage }: ProcessNotific
             Configurez les notifications par événement
           </p>
         </div>
+        {isDirty && (
+          <Badge variant="outline" className="text-warning border-warning">
+            Modifications non enregistrées
+          </Badge>
+        )}
       </div>
 
       {/* Event notifications */}
@@ -219,7 +295,7 @@ export function ProcessNotificationsTab({ processId, canManage }: ProcessNotific
       {/* Save Button */}
       {canManage && (
         <div className="flex justify-end">
-          <Button onClick={handleSave} disabled={isSaving}>
+          <Button onClick={handleSave} disabled={isSaving || !isDirty}>
             {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             <Save className="h-4 w-4 mr-2" />
             Enregistrer les notifications
