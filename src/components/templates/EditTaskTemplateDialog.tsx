@@ -3,12 +3,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TaskTemplate, TemplateVisibility, ValidationLevelType, VALIDATION_TYPE_LABELS } from '@/types/template';
 import { CategorySelect } from './CategorySelect';
 import { VisibilitySelect } from './VisibilitySelect';
+import { VariableInputField } from './VariableInputField';
 import { useCategories } from '@/hooks/useCategories';
+import { useCustomFields } from '@/hooks/useCustomFields';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -41,6 +42,12 @@ export function EditTaskTemplateDialog({ task, open, onClose, onSave }: EditTask
   const [isSaving, setIsSaving] = useState(false);
 
   const { categories, addCategory, addSubcategory } = useCategories();
+  
+  // Get custom fields - use process template id if available
+  const { fields: customFields } = useCustomFields({ 
+    processTemplateId: task?.process_template_id || undefined,
+    includeCommon: true 
+  });
 
   useEffect(() => {
     if (open && task) {
@@ -131,29 +138,29 @@ export function EditTaskTemplateDialog({ task, open, onClose, onSave }: EditTask
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="title">Titre de la tâche *</Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Ex: Préparer le poste de travail"
-              required
-              maxLength={200}
-            />
-          </div>
+          <VariableInputField
+            id="title"
+            label="Titre de la tâche"
+            value={title}
+            onChange={setTitle}
+            customFields={customFields}
+            type="input"
+            placeholder="Ex: Préparer le poste - {demandeur}"
+            required
+            maxLength={200}
+          />
 
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Instructions détaillées..."
-              rows={3}
-              maxLength={1000}
-            />
-          </div>
+          <VariableInputField
+            id="description"
+            label="Description / Instructions"
+            value={description}
+            onChange={setDescription}
+            customFields={customFields}
+            type="textarea"
+            placeholder="Instructions détaillées... Vous pouvez insérer des variables comme {champ:code_projet}"
+            rows={4}
+            maxLength={2000}
+          />
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
