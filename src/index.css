@@ -729,6 +729,32 @@
     border-color: hsl(var(--keon-gray-200));
     box-shadow: 0 10px 25px -5px hsl(var(--keon-gray-900) / 0.15);
   }
+  
+  /* Shimmer animation for task bars */
+  @keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+  .animate-shimmer {
+    animation: shimmer 1.5s ease-in-out infinite;
+  }
+  
+  /* Leave bar styling */
+  .workload-leave-bar {
+    @apply rounded-lg shadow-sm;
+    background: linear-gradient(135deg, hsl(187 70% 45%), hsl(187 70% 55%));
+  }
+  
+  /* Holiday column styling */
+  .workload-holiday-column {
+    background: repeating-linear-gradient(
+      -45deg,
+      hsl(38 92% 50% / 0.1),
+      hsl(38 92% 50% / 0.1) 4px,
+      hsl(38 92% 50% / 0.05) 4px,
+      hsl(38 92% 50% / 0.05) 8px
+    );
+  }
 }
 
 @keyframes fadeIn {
