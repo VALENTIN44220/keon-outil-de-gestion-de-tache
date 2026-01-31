@@ -4,7 +4,6 @@ import { Header } from '@/components/layout/Header';
 import { ProcessCard } from '@/components/templates/ProcessCard';
 import { TemplateAdvancedFilters, TemplateFiltersState, defaultFilters } from '@/components/templates/TemplateAdvancedFilters';
 import { AddProcessDialog } from '@/components/templates/AddProcessDialog';
-import { EditProcessDialog } from '@/components/templates/EditProcessDialog';
 import { UnifiedModelView } from '@/components/templates/UnifiedModelView';
 import { SubProcessTemplatesList } from '@/components/templates/SubProcessTemplatesList';
 import { TaskTemplatesList } from '@/components/templates/TaskTemplatesList';
@@ -19,7 +18,7 @@ import { useNotifications } from '@/hooks/useNotifications';
 import { useTasks } from '@/hooks/useTasks';
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2, Layers, GitBranch, ListTodo, Plus, FormInput, Upload } from 'lucide-react';
-import { ProcessTemplate, ProcessWithTasks } from '@/types/template';
+import { ProcessWithTasks } from '@/types/template';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 
@@ -30,7 +29,6 @@ const Templates = () => {
   const [isAddSubProcessDialogOpen, setIsAddSubProcessDialogOpen] = useState(false);
   const [isAddTaskDialogOpen, setIsAddTaskDialogOpen] = useState(false);
   const [isBulkTaskImportOpen, setIsBulkTaskImportOpen] = useState(false);
-  const [editingProcess, setEditingProcess] = useState<ProcessTemplate | null>(null);
   const [viewingProcess, setViewingProcess] = useState<ProcessWithTasks | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState<TemplateFiltersState>(defaultFilters);
@@ -44,6 +42,7 @@ const Templates = () => {
     deleteProcess,
     addTaskTemplate,
     deleteTaskTemplate,
+    refetch: refetchProcesses,
   } = useProcessTemplates();
 
   const {
@@ -108,13 +107,6 @@ const Templates = () => {
     return true;
   });
 
-  const handleEditProcess = (id: string) => {
-    const process = processes.find((p) => p.id === id);
-    if (process) {
-      setEditingProcess(process);
-    }
-  };
-
   const handleViewDetails = (id: string) => {
     const process = processes.find((p) => p.id === id);
     if (process) {
@@ -122,12 +114,8 @@ const Templates = () => {
     }
   };
 
-  const handleUpdateProcess = async (updates: Partial<ProcessTemplate>) => {
-    if (editingProcess) {
-      await updateProcess(editingProcess.id, updates);
-      setEditingProcess(null);
-    }
-  };
+  // handleEditProcess now redirects to the unified view (same as viewDetails)
+  const handleEditProcess = handleViewDetails;
 
   const getAddButtonAction = () => {
     switch (activeTab) {
@@ -310,18 +298,19 @@ const Templates = () => {
         onSuccess={refetchTasks}
       />
 
-      <EditProcessDialog
-        process={editingProcess}
-        open={!!editingProcess}
-        onClose={() => setEditingProcess(null)}
-        onSave={handleUpdateProcess}
-      />
-
       <UnifiedModelView
         process={viewingProcess}
         open={!!viewingProcess}
         onClose={() => setViewingProcess(null)}
-        onUpdate={() => {}}
+        onUpdate={async () => {
+          // Refresh the processes list from the database
+          await refetchProcesses();
+          // Update the viewing process with the refreshed data
+          if (viewingProcess) {
+            const updated = processes.find(p => p.id === viewingProcess.id);
+            if (updated) setViewingProcess(updated);
+          }
+        }}
         canManage={Boolean(viewingProcess?.can_manage)}
       />
     </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -24,6 +24,14 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
     description: process.description || '',
   });
 
+  // Sync formData when process prop changes
+  useEffect(() => {
+    setFormData({
+      name: process.name,
+      description: process.description || '',
+    });
+  }, [process.id, process.name, process.description]);
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
@@ -39,7 +47,7 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
 
       toast.success('Paramètres enregistrés');
       setIsEditing(false);
-      onUpdate();
+      onUpdate(); // Notify parent to refresh data
     } catch (error) {
       console.error('Error updating process:', error);
       toast.error('Erreur lors de la sauvegarde');
@@ -68,7 +76,7 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               />
             ) : (
-              <p className="text-sm font-medium">{process.name}</p>
+              <p className="text-sm font-medium">{formData.name}</p>
             )}
           </div>
 
@@ -82,7 +90,7 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
               />
             ) : (
               <p className="text-sm text-muted-foreground">
-                {process.description || 'Aucune description'}
+                {formData.description || 'Aucune description'}
               </p>
             )}
           </div>
@@ -94,7 +102,14 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
                 <Save className="h-4 w-4 mr-2" />
                 Enregistrer
               </Button>
-              <Button variant="outline" onClick={() => setIsEditing(false)}>
+              <Button variant="outline" onClick={() => {
+                setIsEditing(false);
+                // Reset to current process values
+                setFormData({
+                  name: process.name,
+                  description: process.description || '',
+                });
+              }}>
                 Annuler
               </Button>
             </div>
