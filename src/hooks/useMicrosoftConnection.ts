@@ -46,7 +46,8 @@ export function useMicrosoftConnection() {
 
   const getAuthUrl = async (): Promise<string | null> => {
     try {
-      const redirectUri = `${window.location.origin}/profile?tab=sync`;
+      // Use dedicated callback route for OAuth
+      const redirectUri = `${window.location.origin}/auth/callback`;
       
       const { data, error } = await supabase.functions.invoke('microsoft-graph', {
         body: { action: 'get-auth-url', redirectUri },
@@ -63,7 +64,8 @@ export function useMicrosoftConnection() {
 
   const exchangeCode = async (code: string): Promise<boolean> => {
     try {
-      const redirectUri = `${window.location.origin}/profile?tab=sync`;
+      // Use dedicated callback route for OAuth
+      const redirectUri = `${window.location.origin}/auth/callback`;
       
       const { data, error } = await supabase.functions.invoke('microsoft-graph', {
         body: { action: 'exchange-code', code, redirectUri },
