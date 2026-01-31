@@ -267,83 +267,106 @@ export default function Workload() {
           onSearchChange={() => {}}
         />
         
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-keon-50">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
-              <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-grid">
-                <TabsTrigger value="gantt" className="gap-2">
+            {/* Premium header row */}
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+              {/* Tabs with premium underline style */}
+              <TabsList className="h-auto p-1 bg-card border border-keon-200 rounded-xl shadow-premium">
+                <TabsTrigger 
+                  value="gantt" 
+                  className="gap-2 px-4 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-white rounded-lg transition-all"
+                >
                   <GanttChart className="h-4 w-4" />
-                  <span className="hidden sm:inline">Gantt</span>
+                  <span className="hidden sm:inline font-medium">Gantt</span>
                 </TabsTrigger>
-                <TabsTrigger value="calendar" className="gap-2">
+                <TabsTrigger 
+                  value="calendar" 
+                  className="gap-2 px-4 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-white rounded-lg transition-all"
+                >
                   <CalendarDays className="h-4 w-4" />
-                  <span className="hidden sm:inline">Calendrier</span>
+                  <span className="hidden sm:inline font-medium">Calendrier</span>
                 </TabsTrigger>
-                <TabsTrigger value="summary" className="gap-2">
+                <TabsTrigger 
+                  value="summary" 
+                  className="gap-2 px-4 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-white rounded-lg transition-all"
+                >
                   <BarChart3 className="h-4 w-4" />
-                  <span className="hidden sm:inline">Bilan</span>
+                  <span className="hidden sm:inline font-medium">Bilan</span>
                 </TabsTrigger>
-                <TabsTrigger value="team" className="gap-2">
+                <TabsTrigger 
+                  value="team" 
+                  className="gap-2 px-4 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-white rounded-lg transition-all"
+                >
                   <Users className="h-4 w-4" />
-                  <span className="hidden sm:inline">Équipe</span>
+                  <span className="hidden sm:inline font-medium">Équipe</span>
                 </TabsTrigger>
-                <TabsTrigger value="leaves" className="gap-2">
+                <TabsTrigger 
+                  value="leaves" 
+                  className="gap-2 px-4 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-white rounded-lg transition-all"
+                >
                   <Palmtree className="h-4 w-4" />
-                  <span className="hidden sm:inline">Congés</span>
+                  <span className="hidden sm:inline font-medium">Congés</span>
                 </TabsTrigger>
-                <TabsTrigger value="holidays" className="gap-2">
+                <TabsTrigger 
+                  value="holidays" 
+                  className="gap-2 px-4 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-white rounded-lg transition-all"
+                >
                   <CalendarCheck className="h-4 w-4" />
-                  <span className="hidden sm:inline">Fériés</span>
+                  <span className="hidden sm:inline font-medium">Fériés</span>
                 </TabsTrigger>
               </TabsList>
 
-              {/* Config Panel for Gantt */}
-              {activeTab === 'gantt' && (
-                <GanttConfigPanel
-                  preferences={preferences}
-                  onGroupByChange={setGroupBy}
-                  onZoomChange={setZoomLevel}
-                  onToggleHeatmap={toggleHeatmap}
-                  onToggleCompact={toggleCompactMode}
-                  onColumnChange={updateColumn}
-                  onWidthChange={(width) => updatePreference('memberColumnWidth', width)}
-                  onReset={resetToDefaults}
-                />
-              )}
+              {/* Action buttons row */}
+              <div className="flex items-center gap-2">
+                {/* Config Panel for Gantt */}
+                {activeTab === 'gantt' && (
+                  <GanttConfigPanel
+                    preferences={preferences}
+                    onGroupByChange={setGroupBy}
+                    onZoomChange={setZoomLevel}
+                    onToggleHeatmap={toggleHeatmap}
+                    onToggleCompact={toggleCompactMode}
+                    onColumnChange={updateColumn}
+                    onWidthChange={(width) => updatePreference('memberColumnWidth', width)}
+                    onReset={resetToDefaults}
+                  />
+                )}
 
-              {/* Export / Sync buttons */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <Download className="h-4 w-4" />
-                    <span className="hidden sm:inline">Exporter</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuItem onClick={handleExportCSV}>
-                    <FileSpreadsheet className="h-4 w-4 mr-2" />
-                    Export CSV
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleExportJSON}>
-                    <FileJson className="h-4 w-4 mr-2" />
-                    Export JSON
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleExportReport}>
-                    <FileText className="h-4 w-4 mr-2" />
-                    Rapport de synthèse
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleExportICS}>
-                    <CalendarDays className="h-4 w-4 mr-2" />
-                    Export ICS (Calendrier)
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleOutlookSync}>
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Synchroniser Outlook
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                {/* Export / Sync buttons */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-2 h-9 border-keon-200 hover:bg-keon-50">
+                      <Download className="h-4 w-4" />
+                      <span className="hidden sm:inline font-medium">Exporter</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem onClick={handleExportCSV}>
+                      <FileSpreadsheet className="h-4 w-4 mr-2" />
+                      Export CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleExportJSON}>
+                      <FileJson className="h-4 w-4 mr-2" />
+                      Export JSON
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleExportReport}>
+                      <FileText className="h-4 w-4 mr-2" />
+                      Rapport de synthèse
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleExportICS}>
+                      <CalendarDays className="h-4 w-4 mr-2" />
+                      Export ICS (Calendrier)
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleOutlookSync}>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Synchroniser Outlook
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
 
             {/* Filters for planning views */}
