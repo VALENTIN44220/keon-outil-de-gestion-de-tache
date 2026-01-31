@@ -17,13 +17,15 @@ import {
   MessageSquare,
   ListTodo,
   UserCheck,
-  Loader2
+  Loader2,
+  History
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { SubProcessGroup, statusConfig } from './types';
 import { TaskCommentsSection } from '../TaskCommentsSection';
+import { AuditTimeline } from '@/components/execution/AuditTimeline';
 
 interface SubProcessTabProps {
   group: SubProcessGroup;
@@ -40,7 +42,7 @@ export function SubProcessTab({
   onOpenTask,
   requestId,
 }: SubProcessTabProps) {
-  const [activeView, setActiveView] = useState<'tasks' | 'chat'>('tasks');
+  const [activeView, setActiveView] = useState<'tasks' | 'chat' | 'audit'>('tasks');
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -109,8 +111,8 @@ export function SubProcessTab({
         </div>
       </div>
 
-      {/* Tabs for tasks and chat */}
-      <Tabs value={activeView} onValueChange={(v) => setActiveView(v as 'tasks' | 'chat')}>
+      {/* Tabs for tasks, chat, and audit */}
+      <Tabs value={activeView} onValueChange={(v) => setActiveView(v as 'tasks' | 'chat' | 'audit')}>
         <TabsList className="w-full">
           <TabsTrigger value="tasks" className="flex-1 gap-2">
             <ListTodo className="h-4 w-4" />
@@ -119,6 +121,10 @@ export function SubProcessTab({
           <TabsTrigger value="chat" className="flex-1 gap-2">
             <MessageSquare className="h-4 w-4" />
             Échanges
+          </TabsTrigger>
+          <TabsTrigger value="audit" className="flex-1 gap-2">
+            <History className="h-4 w-4" />
+            Historique
           </TabsTrigger>
         </TabsList>
 
@@ -209,6 +215,14 @@ export function SubProcessTab({
           <TaskCommentsSection 
             taskId={group.tasks.length > 0 ? group.tasks[0].id : requestId} 
             className="min-h-[280px]" 
+          />
+        </TabsContent>
+
+        <TabsContent value="audit" className="mt-4">
+          {/* Audit timeline for this sub-process tasks */}
+          <AuditTimeline 
+            requestId={requestId}
+            maxHeight="280px"
           />
         </TabsContent>
       </Tabs>
