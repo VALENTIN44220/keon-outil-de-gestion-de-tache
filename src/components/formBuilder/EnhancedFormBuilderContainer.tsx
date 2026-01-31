@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -9,13 +9,14 @@ import {
   RotateCcw,
   Save,
   Loader2,
-  Undo2,
-  Redo2,
 } from 'lucide-react';
 import { useFormBuilder } from '@/hooks/useFormBuilder';
+import { useFormSchema } from '@/hooks/useFormSchema';
+import { useCustomFields } from '@/hooks/useCustomFields';
 import { CommonFieldsLibrary } from './CommonFieldsLibrary';
 import { EnhancedFormBuilderCanvas } from './EnhancedFormBuilderCanvas';
 import { EnhancedPropertiesPanel } from './EnhancedPropertiesPanel';
+import { FormPreviewDrawer } from './FormPreviewDrawer';
 import type { FieldTypeConfig, FormField } from '@/types/formBuilder';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -55,6 +56,26 @@ export function EnhancedFormBuilderContainer({
     subProcessTemplateId,
   });
 
+  // Form schema for JSONB storage
+  const {
+    schema,
+    isLoading: isSchemaLoading,
+    isSaving: isSchemaSaving,
+    hasChanges: hasSchemaChanges,
+    saveSchema,
+    toggleCommonField: toggleSchemaCommonField,
+  } = useFormSchema({
+    processTemplateId,
+    subProcessTemplateId,
+  });
+
+  // Custom fields for preview
+  const { fields: templateFields } = useCustomFields({
+    processTemplateId,
+    subProcessTemplateId,
+    includeCommon: true,
+  });
+
   const [isCreatingField, setIsCreatingField] = useState(false);
   const [gridColumns, setGridColumns] = useState<1 | 2 | 3 | 4>(2);
   const [activeCommonFields, setActiveCommonFields] = useState<string[]>([
@@ -62,6 +83,16 @@ export function EnhancedFormBuilderContainer({
     'company',
     'department',
   ]);
+
+  // Sync active common fields with schema
+  useEffect(() => {
+    if (schema.common_fields) {
+      const enabled = Object.entries(schema.common_fields)
+        .filter(([_, v]) => v)
+        .map(([k]) => k);
+      setActiveCommonFields(enabled);
+    }
+  }, [schema.common_fields]);
 
   // Handle adding a new field from the palette
   const handleAddField = useCallback(
@@ -204,13 +235,14 @@ export function EnhancedFormBuilderContainer({
     [fields, loadData, selectField]
   );
 
-  // Toggle common field
+  // Toggle common field - persist to schema
   const handleToggleCommonField = useCallback((fieldId: string, active: boolean) => {
     setActiveCommonFields((prev) =>
       active ? [...prev, fieldId] : prev.filter((id) => id !== fieldId)
     );
-    // TODO: Persist to database if needed
-  }, []);
+    // Persist to schema
+    toggleSchemaCommonField(fieldId, active);
+  }, [toggleSchemaCommonField]);
 
   // Handle selecting an existing field
   const handleSelectExistingField = useCallback(
@@ -275,24 +307,33 @@ export function EnhancedFormBuilderContainer({
             </Button>
           </div>
 
-          {/* Preview toggle */}
-          <Button
-            variant={previewMode ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => togglePreview()}
-          >
-            {previewMode ? (
-              <>
-                <EyeOff className="h-4 w-4 mr-2" />
-                Édition
-              </>
-            ) : (
-              <>
+          {/* Preview drawer */}
+          <FormPreviewDrawer
+            schema={schema}
+            fields={templateFields}
+            trigger={
+              <Button variant="outline" size="sm">
                 <Eye className="h-4 w-4 mr-2" />
                 Aperçu
-              </>
-            )}
-          </Button>
+              </Button>
+            }
+          />
+
+          {/* Save schema button */}
+          {canManage && hasSchemaChanges && (
+            <Button
+              size="sm"
+              onClick={saveSchema}
+              disabled={isSchemaSaving}
+            >
+              {isSchemaSaving ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              Sauver schéma
+            </Button>
+          )}
 
           {/* Refresh */}
           <Button variant="outline" size="sm" onClick={loadData}>

@@ -1228,6 +1228,7 @@ export type Database = {
           creator_department_id: string | null
           department: string | null
           description: string | null
+          form_schema: Json | null
           id: string
           is_shared: boolean
           name: string
@@ -1247,6 +1248,7 @@ export type Database = {
           creator_department_id?: string | null
           department?: string | null
           description?: string | null
+          form_schema?: Json | null
           id?: string
           is_shared?: boolean
           name: string
@@ -1266,6 +1268,7 @@ export type Database = {
           creator_department_id?: string | null
           department?: string | null
           description?: string | null
+          form_schema?: Json | null
           id?: string
           is_shared?: boolean
           name?: string
@@ -1687,6 +1690,7 @@ export type Database = {
           creator_company_id: string | null
           creator_department_id: string | null
           description: string | null
+          form_schema: Json | null
           id: string
           is_mandatory: boolean
           is_shared: boolean
@@ -1708,6 +1712,7 @@ export type Database = {
           creator_company_id?: string | null
           creator_department_id?: string | null
           description?: string | null
+          form_schema?: Json | null
           id?: string
           is_mandatory?: boolean
           is_shared?: boolean
@@ -1729,6 +1734,7 @@ export type Database = {
           creator_company_id?: string | null
           creator_department_id?: string | null
           description?: string | null
+          form_schema?: Json | null
           id?: string
           is_mandatory?: boolean
           is_shared?: boolean
@@ -4143,6 +4149,10 @@ export type Database = {
           p_run_id?: string
         }
         Returns: string
+      }
+      generate_default_form_schema: {
+        Args: { p_process_id: string }
+        Returns: Json
       }
       get_active_workflow: {
         Args: {
