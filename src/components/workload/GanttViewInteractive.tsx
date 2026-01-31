@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, useRef } from 'react';
-import { format, parseISO, isWeekend, isToday, eachDayOfInterval, differenceInDays } from 'date-fns';
+import { format, parseISO, isWeekend, isToday, eachDayOfInterval, differenceInDays, addDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { TeamMemberWorkload, WorkloadSlot, UserLeave } from '@/types/workload';
 import { Task } from '@/types/task';
@@ -25,6 +25,8 @@ import { UnifiedTaskDrawer, DrawerItem } from './UnifiedTaskDrawer';
 import { useGanttDragDrop } from '@/hooks/useGanttDragDrop';
 import { WorkloadPreferences } from '@/hooks/useWorkloadPreferences';
 import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface GanttViewInteractiveProps {
   workloadData: TeamMemberWorkload[];
@@ -40,6 +42,7 @@ interface GanttViewInteractiveProps {
   onReassignTask?: (taskId: string, fromUserId: string, toUserId: string, newStartDate: string) => Promise<void>;
   onResizeTask?: (taskId: string, userId: string, newStartDate: string, newEndDate: string) => Promise<void>;
   onQuickAddTask?: (userId: string, startDate: string, endDate: string) => void;
+  onTaskCreated?: (task: Task) => void;
   isHalfDayAvailable?: (userId: string, date: string, halfDay: 'morning' | 'afternoon') => boolean;
   checkSlotLeaveConflict?: (userId: string, date: string, halfDay: 'morning' | 'afternoon') => { hasConflict: boolean; leaveType?: string };
   getTaskSlotsCount?: (taskId: string, userId: string) => number;
@@ -93,6 +96,7 @@ export function GanttViewInteractive({
   onReassignTask,
   onResizeTask,
   onQuickAddTask,
+  onTaskCreated,
   isHalfDayAvailable = () => true,
   checkSlotLeaveConflict,
   getTaskSlotsCount,
@@ -105,6 +109,7 @@ export function GanttViewInteractive({
   selectedPriorities = [],
   showOnlyOverloaded = false,
 }: GanttViewInteractiveProps) {
+  const { user } = useAuth();
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
   const [dropTarget, setDropTarget] = useState<{ userId: string; date: string; halfDay: 'morning' | 'afternoon' } | null>(null);
   const [localSearchQuery, setLocalSearchQuery] = useState('');
@@ -445,6 +450,61 @@ export function GanttViewInteractive({
       setIsSaving(false);
     }
   }, [quickAddPopover, onMultiSlotAdd, availableTasks]);
+
+  // Handle creating a new task from quick add popover
+  const handleQuickCreateNewTask = useCallback(async (title: string, priority: string, slots: number) => {
+    if (!quickAddPopover || !user) return;
+    
+    setIsSaving(true);
+    try {
+      // Calculate due date based on end date of selection
+      const dueDate = quickAddPopover.endDate;
+      
+      // Create the task
+      const { data: newTask, error: taskError } = await supabase
+        .from('tasks')
+        .insert({
+          title,
+          priority: priority as 'low' | 'medium' | 'high' | 'urgent',
+          status: 'todo',
+          type: 'task',
+          user_id: user.id,
+          assignee_id: quickAddPopover.userId,
+          due_date: dueDate,
+          created_by: user.id,
+        })
+        .select()
+        .single();
+
+      if (taskError) throw taskError;
+
+      // Plan the task with slots
+      if (onMultiSlotAdd && newTask) {
+        await onMultiSlotAdd(newTask.id, quickAddPopover.userId, quickAddPopover.startDate, 'morning', slots);
+      }
+
+      toast({
+        title: "Tâche créée et planifiée",
+        description: `"${title}" planifiée du ${format(parseISO(quickAddPopover.startDate), 'd MMM', { locale: fr })} au ${format(parseISO(quickAddPopover.endDate), 'd MMM', { locale: fr })}`,
+      });
+
+      // Notify parent to refresh tasks list
+      if (onTaskCreated && newTask) {
+        onTaskCreated(newTask as Task);
+      }
+
+      setQuickAddPopover(null);
+    } catch (error: any) {
+      console.error('Error creating task:', error);
+      toast({
+        title: "Erreur",
+        description: error.message || "Impossible de créer la tâche",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  }, [quickAddPopover, user, onMultiSlotAdd, onTaskCreated]);
 
   const handleConfirmQuickAdd = () => {
     if (quickAddContext && onQuickAddTask) {
@@ -849,6 +909,7 @@ export function GanttViewInteractive({
           endDate={quickAddPopover.endDate}
           availableTasks={availableTasks}
           onAddExistingTask={handleQuickAddExistingTask}
+          onCreateNewTask={handleQuickCreateNewTask}
         />
       )}
       
