@@ -4,6 +4,18 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { 
   Clock, 
   CheckCircle2, 
@@ -14,12 +26,14 @@ import {
   Workflow,
   ArrowRight,
   Calendar,
-  Building2
+  Building2,
+  XCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface SubProcessProgress {
   id: string;
@@ -42,9 +56,10 @@ interface RequestCardProps {
   request: Task;
   onClick: () => void;
   progressData?: { completed: number; total: number };
+  onRequestUpdated?: () => void;
 }
 
-export function RequestCard({ request, onClick, progressData }: RequestCardProps) {
+export function RequestCard({ request, onClick, progressData, onRequestUpdated }: RequestCardProps) {
   const [subProcesses, setSubProcesses] = useState<SubProcessProgress[]>([]);
   const [workflowInfo, setWorkflowInfo] = useState<WorkflowInfo | null>(null);
   const [assigneeInfo, setAssigneeInfo] = useState<{ name: string; avatar?: string } | null>(null);
@@ -255,6 +270,55 @@ export function RequestCard({ request, onClick, progressData }: RequestCardProps
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
+  // Check if cancellation is allowed
+  const canCancel = !['done', 'validated', 'cancelled'].includes(request.status);
+
+  const handleCancelRequest = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    try {
+      // 1. Cancel the main request
+      const updateMainRequest = supabase
+        .from('tasks')
+        .update({ status: 'cancelled' })
+        .eq('id', request.id);
+      await updateMainRequest;
+
+      // 2. Cancel all child tasks
+      const updateChildTasks = supabase
+        .from('tasks')
+        .update({ status: 'cancelled' })
+        .eq('parent_request_id', request.id);
+      await updateChildTasks;
+
+      // 3. Cancel request_sub_processes
+      const updateSubProcesses = supabase
+        .from('request_sub_processes')
+        .update({ status: 'cancelled' })
+        .eq('request_id', request.id);
+      await updateSubProcesses;
+
+      // 4. Cancel active workflow runs - fetch all then filter in JS
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const wfTable = supabase.from('workflow_runs') as any;
+      const workflowResult = await wfTable.select('id, status').eq('request_id', request.id);
+      
+      if (workflowResult.data) {
+        for (const run of workflowResult.data as Array<{ id: string; status: string }>) {
+          if (run.status === 'running' || run.status === 'paused') {
+            await wfTable.update({ status: 'cancelled' }).eq('id', run.id);
+          }
+        }
+      }
+
+      toast.success('Demande annulée avec succès');
+      onRequestUpdated?.();
+    } catch (error) {
+      console.error('Error cancelling request:', error);
+      toast.error("Erreur lors de l'annulation de la demande");
+    }
+  };
+
   return (
     <Card 
       className="cursor-pointer hover:shadow-md transition-all hover:border-primary/30 bg-card"
@@ -344,7 +408,7 @@ export function RequestCard({ request, onClick, progressData }: RequestCardProps
           </div>
         )}
 
-        {/* Footer: Assignment + Workflow + Dates */}
+        {/* Footer: Assignment + Workflow + Dates + Cancel */}
         <div className="flex items-center justify-between gap-2 pt-2 border-t text-xs">
           <div className="flex items-center gap-3">
             {/* Assignment */}
@@ -379,13 +443,50 @@ export function RequestCard({ request, onClick, progressData }: RequestCardProps
             )}
           </div>
 
-          {/* Dates */}
-          <div className="flex items-center gap-2 text-muted-foreground shrink-0">
+          {/* Dates + Cancel button */}
+          <div className="flex items-center gap-2 shrink-0">
             {request.due_date && (
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 text-muted-foreground">
                 <Calendar className="h-3 w-3" />
                 <span>{format(new Date(request.due_date), 'dd MMM', { locale: fr })}</span>
               </div>
+            )}
+            
+            {/* Cancel button */}
+            {canCancel && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <XCircle className="h-3 w-3 mr-1" />
+                    Annuler
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Annuler la demande ?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Cette action annulera la demande ainsi que tous les sous-processus et tâches associés. 
+                      Cette action est irréversible.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel onClick={(e) => e.stopPropagation()}>
+                      Non, garder
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleCancelRequest}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Oui, annuler la demande
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             )}
           </div>
         </div>
