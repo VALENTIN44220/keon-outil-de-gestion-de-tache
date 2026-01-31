@@ -3,6 +3,7 @@ import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, format } from 'date-f
 import { fr } from 'date-fns/locale';
 import { useWorkloadPlanning } from '@/hooks/useWorkloadPlanning';
 import { useWorkloadPreferences } from '@/hooks/useWorkloadPreferences';
+import { useWorkloadFilters } from '@/hooks/useWorkloadFilters';
 import { WorkloadFilters } from '@/components/workload/WorkloadFilters';
 import { GanttViewInteractive } from '@/components/workload/GanttViewInteractive';
 import { WorkloadCalendarView } from '@/components/workload/WorkloadCalendarView';
@@ -21,7 +22,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSimulation } from '@/contexts/SimulationContext';
 import { Task } from '@/types/task';
-import { WorkloadSlot } from '@/types/workload';
+import { WorkloadSlot, TeamMemberWorkload } from '@/types/workload';
 import { toast } from 'sonner';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
@@ -34,11 +35,27 @@ export default function Workload() {
   const [viewMode, setViewMode] = useState<'week' | 'month' | 'quarter'>('month');
   const [startDate, setStartDate] = useState(() => startOfMonth(new Date()));
   const [endDate, setEndDate] = useState(() => endOfMonth(new Date()));
-  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
-  const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
-  const [selectedCompanyId, setSelectedCompanyId] = useState<string | null>(null);
   const [selectedCalendarUserId, setSelectedCalendarUserId] = useState<string | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [useAdvancedFilters, setUseAdvancedFilters] = useState(false);
+
+  // Workload filters (persisted in localStorage)
+  const {
+    filters,
+    setSearchQuery,
+    setSelectedUserIds,
+    setSelectedProcessId,
+    setSelectedCompanyId,
+    setSelectedDepartmentId,
+    setSelectedStatuses,
+    setSelectedPriorities,
+    setItemType,
+    setShowOnlyOverloaded,
+    setShowOnlyWithConflicts,
+    clearFilters,
+    hasActiveFilters,
+    activeFiltersCount,
+  } = useWorkloadFilters();
 
   // Workload preferences (persisted in localStorage)
   const {
@@ -72,9 +89,9 @@ export default function Workload() {
   } = useWorkloadPlanning({
     startDate,
     endDate,
-    userIds: selectedUserIds.length > 0 ? selectedUserIds : undefined,
-    processTemplateId: selectedProcessId || undefined,
-    companyId: selectedCompanyId || undefined,
+    userIds: filters.selectedUserIds.length > 0 ? filters.selectedUserIds : undefined,
+    processTemplateId: filters.selectedProcessId || undefined,
+    companyId: filters.selectedCompanyId || undefined,
   });
 
   // Fetch tasks for assignment
@@ -371,19 +388,28 @@ export default function Workload() {
 
             {/* Filters for planning views */}
             {(activeTab === 'gantt' || activeTab === 'calendar' || activeTab === 'summary') && (
-              <WorkloadFilters
-                startDate={startDate}
-                endDate={endDate}
-                onDateRangeChange={handleDateRangeChange}
-                selectedUserIds={selectedUserIds}
-                onUserIdsChange={setSelectedUserIds}
-                selectedProcessId={selectedProcessId}
-                onProcessIdChange={setSelectedProcessId}
-                selectedCompanyId={selectedCompanyId}
-                onCompanyIdChange={setSelectedCompanyId}
-                teamMembers={teamMembers}
-                viewMode={viewMode}
-              />
+              <>
+                {/* Date range navigation */}
+                <WorkloadFilters
+                  startDate={startDate}
+                  endDate={endDate}
+                  onDateRangeChange={handleDateRangeChange}
+                  selectedUserIds={filters.selectedUserIds}
+                  onUserIdsChange={setSelectedUserIds}
+                  selectedProcessId={filters.selectedProcessId}
+                  onProcessIdChange={setSelectedProcessId}
+                  selectedCompanyId={filters.selectedCompanyId}
+                  onCompanyIdChange={setSelectedCompanyId}
+                  teamMembers={teamMembers}
+                  viewMode={viewMode}
+                  searchQuery={filters.searchQuery}
+                  onSearchChange={setSearchQuery}
+                  selectedStatuses={filters.selectedStatuses}
+                  onStatusesChange={setSelectedStatuses}
+                  itemTypeFilter={filters.itemType}
+                  onItemTypeChange={setItemType}
+                />
+              </>
             )}
 
             {isLoading && (activeTab === 'gantt' || activeTab === 'calendar' || activeTab === 'summary') ? (
@@ -415,6 +441,10 @@ export default function Workload() {
                     getTaskProgress={getTaskProgress}
                     plannedTaskIds={plannedTaskIds}
                     preferences={preferences}
+                    searchQuery={filters.searchQuery}
+                    selectedStatuses={filters.selectedStatuses}
+                    selectedPriorities={filters.selectedPriorities}
+                    showOnlyOverloaded={filters.showOnlyOverloaded}
                   />
                 </TabsContent>
 

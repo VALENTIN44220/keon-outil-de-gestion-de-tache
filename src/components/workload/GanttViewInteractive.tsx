@@ -47,6 +47,11 @@ interface GanttViewInteractiveProps {
   getTaskProgress?: (taskId: string) => { completed: number; total: number } | null;
   plannedTaskIds?: string[];
   preferences?: WorkloadPreferences;
+  // Filter props
+  searchQuery?: string;
+  selectedStatuses?: string[];
+  selectedPriorities?: string[];
+  showOnlyOverloaded?: boolean;
 }
 
 interface DropContext {
@@ -95,10 +100,14 @@ export function GanttViewInteractive({
   getTaskProgress,
   plannedTaskIds = [],
   preferences,
+  searchQuery: externalSearchQuery = '',
+  selectedStatuses = [],
+  selectedPriorities = [],
+  showOnlyOverloaded = false,
 }: GanttViewInteractiveProps) {
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
   const [dropTarget, setDropTarget] = useState<{ userId: string; date: string; halfDay: 'morning' | 'afternoon' } | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [localSearchQuery, setLocalSearchQuery] = useState('');
   
   // Drawer state
   const [drawerItem, setDrawerItem] = useState<DrawerItem | null>(null);
@@ -163,6 +172,9 @@ export function GanttViewInteractive({
   const rowHeight = isCompact ? 56 : 80;
   const showHeatmap = preferences?.showHeatmap || false;
 
+  // Effective search query (prefer external, fallback to local)
+  const effectiveSearchQuery = externalSearchQuery || localSearchQuery;
+  
   // Available tasks (not yet planned)
   const availableTasks = useMemo(() => {
     return tasks.filter(t => 
@@ -171,10 +183,10 @@ export function GanttViewInteractive({
       t.assignee_id &&
       !plannedTaskIds.includes(t.id)
     ).filter(t => 
-      searchQuery === '' || 
-      t.title.toLowerCase().includes(searchQuery.toLowerCase())
+      effectiveSearchQuery === '' || 
+      t.title.toLowerCase().includes(effectiveSearchQuery.toLowerCase())
     );
-  }, [tasks, plannedTaskIds, searchQuery]);
+  }, [tasks, plannedTaskIds, effectiveSearchQuery]);
 
   // All slots grouped by user
   const slotsByUser = useMemo(() => {
@@ -189,6 +201,17 @@ export function GanttViewInteractive({
     });
     return map;
   }, [workloadData]);
+
+  // Filter workload data based on overload filter
+  const filteredWorkloadData = useMemo(() => {
+    if (!showOnlyOverloaded) return workloadData;
+    
+    return workloadData.filter(member => {
+      const available = member.totalSlots - member.leaveSlots - member.holidaySlots;
+      const percentage = available > 0 ? Math.round((member.usedSlots / available) * 100) : 0;
+      return percentage > 100;
+    });
+  }, [workloadData, showOnlyOverloaded]);
 
   // Unique tasks per user with their slots
   const tasksByUser = useMemo(() => {
@@ -534,8 +557,8 @@ export function GanttViewInteractive({
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Rechercher..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  value={localSearchQuery}
+                  onChange={(e) => setLocalSearchQuery(e.target.value)}
                   className="pl-9 h-9 text-sm bg-background/50"
                 />
               </div>
