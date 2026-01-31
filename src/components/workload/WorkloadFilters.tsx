@@ -18,8 +18,11 @@ import {
   CheckCircle2,
   Palmtree,
   ListFilter,
-  X
+  X,
+  Flag,
+  AlertTriangle
 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addMonths, addWeeks, subWeeks, subMonths, startOfQuarter, endOfQuarter, addDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -40,13 +43,18 @@ interface WorkloadFiltersProps {
   onCompanyIdChange: (id: string | null) => void;
   teamMembers: any[];
   viewMode?: 'week' | 'month' | 'quarter';
-  // New filters
+  // Search and filter props
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
   selectedStatuses?: string[];
   onStatusesChange?: (statuses: string[]) => void;
+  selectedPriorities?: string[];
+  onPrioritiesChange?: (priorities: string[]) => void;
   itemTypeFilter?: ItemTypeFilter;
   onItemTypeChange?: (type: ItemTypeFilter) => void;
+  // Quick filters
+  showOnlyOverloaded?: boolean;
+  onShowOnlyOverloadedChange?: (show: boolean) => void;
 }
 
 const STATUS_OPTIONS = [
@@ -55,6 +63,13 @@ const STATUS_OPTIONS = [
   { value: 'to_assign', label: 'À affecter', color: 'bg-amber-500' },
   { value: 'pending_validation_1', label: 'En validation', color: 'bg-purple-500' },
   { value: 'done', label: 'Terminé', color: 'bg-emerald-500' },
+];
+
+const PRIORITY_OPTIONS = [
+  { value: 'urgent', label: 'Urgente', color: 'bg-red-500' },
+  { value: 'high', label: 'Haute', color: 'bg-orange-500' },
+  { value: 'medium', label: 'Moyenne', color: 'bg-blue-500' },
+  { value: 'low', label: 'Basse', color: 'bg-emerald-500' },
 ];
 
 export function WorkloadFilters({
@@ -73,8 +88,12 @@ export function WorkloadFilters({
   onSearchChange,
   selectedStatuses = [],
   onStatusesChange,
+  selectedPriorities = [],
+  onPrioritiesChange,
   itemTypeFilter = 'all',
   onItemTypeChange,
+  showOnlyOverloaded = false,
+  onShowOnlyOverloadedChange,
 }: WorkloadFiltersProps) {
   const [processes, setProcesses] = useState<any[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
@@ -169,22 +188,35 @@ export function WorkloadFilters({
     }
   };
 
+  const handlePriorityToggle = (priority: string) => {
+    if (!onPrioritiesChange) return;
+    if (selectedPriorities.includes(priority)) {
+      onPrioritiesChange(selectedPriorities.filter(p => p !== priority));
+    } else {
+      onPrioritiesChange([...selectedPriorities, priority]);
+    }
+  };
+
   const clearFilters = () => {
     onUserIdsChange([]);
     onProcessIdChange(null);
     onCompanyIdChange(null);
     onStatusesChange?.([]);
+    onPrioritiesChange?.([]);
     onItemTypeChange?.('all');
+    onShowOnlyOverloadedChange?.(false);
     setLocalSearch('');
   };
 
-  const hasActiveFilters = selectedUserIds.length > 0 || selectedProcessId || selectedCompanyId || selectedStatuses.length > 0 || itemTypeFilter !== 'all' || localSearch;
+  const hasActiveFilters = selectedUserIds.length > 0 || selectedProcessId || selectedCompanyId || selectedStatuses.length > 0 || selectedPriorities.length > 0 || itemTypeFilter !== 'all' || localSearch || showOnlyOverloaded;
   const activeFiltersCount = [
     selectedUserIds.length > 0,
     !!selectedProcessId,
     !!selectedCompanyId,
     selectedStatuses.length > 0,
+    selectedPriorities.length > 0,
     itemTypeFilter !== 'all',
+    showOnlyOverloaded,
   ].filter(Boolean).length;
 
   const getInitials = (name: string) => {
@@ -521,6 +553,30 @@ export function WorkloadFilters({
               Congés
             </Button>
           </div>
+        )}
+
+        {/* Quick filter: Overloaded */}
+        {onShowOnlyOverloadedChange && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={showOnlyOverloaded ? "default" : "outline"}
+                  size="sm"
+                  className={cn(
+                    "h-8 w-8 p-0",
+                    showOnlyOverloaded && "bg-red-600 hover:bg-red-700"
+                  )}
+                  onClick={() => onShowOnlyOverloadedChange(!showOnlyOverloaded)}
+                >
+                  <AlertTriangle className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Afficher uniquement les surchargés</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
 
         {/* Clear all filters */}
