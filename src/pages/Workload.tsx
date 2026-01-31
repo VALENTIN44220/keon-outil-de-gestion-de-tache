@@ -3,7 +3,7 @@ import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, format } from 'date-f
 import { fr } from 'date-fns/locale';
 import { useWorkloadPlanning } from '@/hooks/useWorkloadPlanning';
 import { WorkloadFilters } from '@/components/workload/WorkloadFilters';
-import { GanttView } from '@/components/workload/GanttView';
+import { GanttViewInteractive } from '@/components/workload/GanttViewInteractive';
 import { WorkloadCalendarView } from '@/components/workload/WorkloadCalendarView';
 import { WorkloadSummaryView } from '@/components/workload/WorkloadSummaryView';
 import { LeaveManagement } from '@/components/workload/LeaveManagement';
@@ -52,6 +52,9 @@ export default function Workload() {
     segmentTaskSlots,
     isHalfDayAvailable,
     getTaskSlotsCount,
+    checkSlotLeaveConflict,
+    reassignTaskSlots,
+    resizeTaskSlots,
     refetch,
   } = useWorkloadPlanning({
     startDate,
@@ -317,18 +320,21 @@ export default function Workload() {
             ) : (
               <>
                 <TabsContent value="gantt" className="mt-4">
-                  <GanttView
+                  <GanttViewInteractive
                     workloadData={workloadData}
                     startDate={startDate}
                     endDate={endDate}
                     tasks={tasks}
+                    leaves={leaves}
                     viewMode={viewMode}
                     onSlotAdd={handleAddSlot}
                     onSlotRemove={handleRemoveSlot}
                     onSlotMove={handleMoveSlot}
                     onMultiSlotAdd={handleAddMultipleSlots}
-                    onSegmentSlot={handleSegmentSlot}
+                    onReassignTask={reassignTaskSlots}
+                    onResizeTask={resizeTaskSlots}
                     isHalfDayAvailable={isHalfDayAvailable}
+                    checkSlotLeaveConflict={checkSlotLeaveConflict}
                     getTaskSlotsCount={getTaskSlotsCount}
                     getTaskDuration={getTaskDuration}
                     getTaskProgress={getTaskProgress}

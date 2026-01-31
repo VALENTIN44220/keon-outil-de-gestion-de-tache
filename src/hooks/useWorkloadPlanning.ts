@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSimulation } from '@/contexts/SimulationContext';
 import { Holiday, UserLeave, WorkloadSlot, WorkloadDay, TeamMemberWorkload } from '@/types/workload';
-import { format, addDays, isWeekend, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, parseISO } from 'date-fns';
+import { format, addDays, isWeekend, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, parseISO, differenceInDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 interface UseWorkloadPlanningProps {
@@ -486,6 +486,137 @@ export function useWorkloadPlanning({
     await fetchData();
   };
 
+  // Move multiple slots by offset (for drag & drop)
+  const moveSlotsWithOffset = async (
+    slotIds: string[], 
+    dayOffset: number,
+    newUserId?: string
+  ) => {
+    const slotsToMove = slots.filter(s => slotIds.includes(s.id));
+    
+    for (const slot of slotsToMove) {
+      const currentDate = parseISO(slot.date);
+      const newDate = format(addDays(currentDate, dayOffset), 'yyyy-MM-dd');
+      
+      const update: Record<string, any> = { date: newDate };
+      if (newUserId && newUserId !== slot.user_id) {
+        update.user_id = newUserId;
+      }
+      
+      const { error } = await supabase
+        .from('workload_slots')
+        .update(update)
+        .eq('id', slot.id);
+      
+      if (error) throw error;
+    }
+    
+    await fetchData();
+  };
+
+  // Reassign all slots for a task to a new user
+  const reassignTaskSlots = async (
+    taskId: string,
+    fromUserId: string,
+    toUserId: string,
+    newStartDate: string
+  ) => {
+    // Get all slots for this task/user
+    const taskSlots = slots.filter(s => s.task_id === taskId && s.user_id === fromUserId);
+    if (taskSlots.length === 0) return;
+
+    // Sort slots
+    const sortedSlots = [...taskSlots].sort((a, b) => {
+      const dateCompare = a.date.localeCompare(b.date);
+      if (dateCompare !== 0) return dateCompare;
+      return a.half_day === 'morning' ? -1 : 1;
+    });
+
+    const firstSlotDate = sortedSlots[0].date;
+    const firstSlotHalfDay = sortedSlots[0].half_day as 'morning' | 'afternoon';
+
+    // Calculate day offset
+    const dayOffset = differenceInDays(parseISO(newStartDate), parseISO(firstSlotDate));
+
+    // Find available slots for new user starting from new date
+    const newSlots = findNextAvailableSlots(
+      toUserId,
+      parseISO(newStartDate),
+      firstSlotHalfDay,
+      taskSlots.length
+    );
+
+    if (newSlots.length < taskSlots.length) {
+      throw new Error('Pas assez de créneaux disponibles pour ce collaborateur');
+    }
+
+    // Delete old slots
+    await removeTaskSlots(taskId, fromUserId);
+
+    // Create new slots
+    const inserts = newSlots.map(slot => ({
+      task_id: taskId,
+      user_id: toUserId,
+      date: slot.date,
+      half_day: slot.halfDay,
+    }));
+
+    const { error } = await supabase
+      .from('workload_slots')
+      .insert(inserts);
+
+    if (error) throw error;
+
+    // Update task assignment
+    await assignTaskToUserFromPlanning(taskId, toUserId);
+
+    await fetchData();
+  };
+
+  // Resize task (change duration)
+  const resizeTaskSlots = async (
+    taskId: string,
+    userId: string,
+    newStartDate: string,
+    newEndDate: string
+  ) => {
+    // Calculate new slot count
+    const start = parseISO(newStartDate);
+    const end = parseISO(newEndDate);
+    const newDayCount = differenceInDays(end, start) + 1;
+    const newSlotCount = newDayCount * 2; // Half-days
+    
+    // Remove existing slots
+    await removeTaskSlots(taskId, userId);
+    
+    // Add new slots
+    await addMultipleSlots(taskId, userId, newStartDate, 'morning', newSlotCount);
+  };
+
+  // Check if a slot overlaps with a leave
+  const checkSlotLeaveConflict = useCallback((
+    userId: string,
+    slotDate: string,
+    slotHalfDay: 'morning' | 'afternoon'
+  ): { hasConflict: boolean; leaveType?: string } => {
+    const userLeaves = leaves.filter(l => l.user_id === userId);
+    const date = parseISO(slotDate);
+    
+    for (const leave of userLeaves) {
+      const start = parseISO(leave.start_date);
+      const end = parseISO(leave.end_date);
+      
+      if (date >= start && date <= end) {
+        // Check specific half-day
+        if (slotDate === leave.start_date && leave.start_half_day === 'afternoon' && slotHalfDay === 'morning') continue;
+        if (slotDate === leave.end_date && leave.end_half_day === 'morning' && slotHalfDay === 'afternoon') continue;
+        return { hasConflict: true, leaveType: leave.leave_type };
+      }
+    }
+    
+    return { hasConflict: false };
+  }, [leaves]);
+
   return {
     workloadData,
     slots,
@@ -499,9 +630,13 @@ export function useWorkloadPlanning({
     removeTaskSlots,
     segmentTaskSlots,
     moveSlot,
+    moveSlotsWithOffset,
+    reassignTaskSlots,
+    resizeTaskSlots,
     isHalfDayAvailable,
     findNextAvailableSlots,
     getTaskSlotsCount,
+    checkSlotLeaveConflict,
     refetch: fetchData,
   };
 }
