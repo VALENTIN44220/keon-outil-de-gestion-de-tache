@@ -8,9 +8,6 @@ import { Button } from '@/components/ui/button';
 
 type CallbackStatus = 'processing' | 'success' | 'error';
 
-// Storage key for PKCE (must match useMicrosoftConnection.ts)
-const PKCE_VERIFIER_KEY = 'microsoft_oauth_code_verifier';
-
 const AuthCallback = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -41,31 +38,18 @@ const AuthCallback = () => {
       }
 
       try {
-        // Retrieve the code verifier from session storage (set during auth URL generation)
-        const codeVerifier = sessionStorage.getItem(PKCE_VERIFIER_KEY);
-        
-        if (!codeVerifier) {
-          console.error('PKCE code_verifier not found in sessionStorage');
-          setStatus('error');
-          setErrorMessage('Session expirée. Veuillez réessayer la connexion.');
-          return;
-        }
-
         // Determine the provider from state or default to Microsoft
         const provider = state?.includes('microsoft') ? 'microsoft' : 'microsoft';
 
         if (provider === 'microsoft') {
-          // Exchange the code for tokens via edge function
+          // Exchange the code for tokens via edge function (server-side flow, no PKCE)
           const redirectUri = `${window.location.origin}/auth/callback`;
           
           const { data, error: exchangeError } = await supabase.functions.invoke('microsoft-graph', {
-            body: { action: 'exchange-code', code, redirectUri, codeVerifier },
+            body: { action: 'exchange-code', code, redirectUri },
           });
 
           if (exchangeError) throw exchangeError;
-
-          // Clean up the stored verifier on success
-          sessionStorage.removeItem(PKCE_VERIFIER_KEY);
 
           setStatus('success');
           toast.success(`Connecté à Microsoft: ${data.email}`);
