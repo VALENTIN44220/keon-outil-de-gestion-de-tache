@@ -17,33 +17,49 @@ interface TokenResponse {
 // Get Azure AD credentials
 function getAzureCredentials() {
   const clientId = Deno.env.get('AZURE_CLIENT_ID');
-  const clientSecret = Deno.env.get('AZURE_CLIENT_SECRET');
   const tenantId = Deno.env.get('AZURE_TENANT_ID');
+  // Client secret is optional for SPA apps using PKCE
+  const clientSecret = Deno.env.get('AZURE_CLIENT_SECRET');
 
-  if (!clientId || !clientSecret || !tenantId) {
-    throw new Error('Azure AD credentials not configured');
+  if (!clientId || !tenantId) {
+    throw new Error('Azure AD credentials not configured (AZURE_CLIENT_ID and AZURE_TENANT_ID required)');
   }
 
   return { clientId, clientSecret, tenantId };
 }
 
-// Exchange authorization code for tokens
+// Exchange authorization code for tokens (with PKCE support)
 async function exchangeCodeForTokens(
   code: string,
-  redirectUri: string
+  redirectUri: string,
+  codeVerifier?: string
 ): Promise<TokenResponse> {
   const { clientId, clientSecret, tenantId } = getAzureCredentials();
   
   const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
   
-  const body = new URLSearchParams({
+  const bodyParams: Record<string, string> = {
     client_id: clientId,
-    client_secret: clientSecret,
     code,
     redirect_uri: redirectUri,
     grant_type: 'authorization_code',
     scope: 'openid profile email offline_access User.Read Calendars.Read Calendars.ReadWrite Mail.Send',
-  });
+  };
+
+  // Add PKCE code verifier if provided (for SPA flow)
+  if (codeVerifier) {
+    bodyParams.code_verifier = codeVerifier;
+  }
+  
+  // Add client secret if available (for confidential client flow)
+  if (clientSecret && !codeVerifier) {
+    bodyParams.client_secret = clientSecret;
+  }
+
+  const body = new URLSearchParams(bodyParams);
+
+  console.log('Token exchange request to:', tokenUrl);
+  console.log('Using PKCE:', !!codeVerifier);
 
   const response = await fetch(tokenUrl, {
     method: 'POST',
@@ -54,7 +70,7 @@ async function exchangeCodeForTokens(
   if (!response.ok) {
     const errorText = await response.text();
     console.error('Token exchange error:', errorText);
-    throw new Error(`Failed to exchange code: ${response.status}`);
+    throw new Error(`Failed to exchange code: ${response.status} - ${errorText}`);
   }
 
   return await response.json();
@@ -66,13 +82,19 @@ async function refreshAccessToken(refreshToken: string): Promise<TokenResponse> 
   
   const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
   
-  const body = new URLSearchParams({
+  const bodyParams: Record<string, string> = {
     client_id: clientId,
-    client_secret: clientSecret,
     refresh_token: refreshToken,
     grant_type: 'refresh_token',
     scope: 'openid profile email offline_access User.Read Calendars.Read Calendars.ReadWrite Mail.Send',
-  });
+  };
+
+  // Add client secret if available
+  if (clientSecret) {
+    bodyParams.client_secret = clientSecret;
+  }
+
+  const body = new URLSearchParams(bodyParams);
 
   const response = await fetch(tokenUrl, {
     method: 'POST',
@@ -241,12 +263,12 @@ Deno.serve(async (req) => {
       userId = data?.user?.id || null;
     }
 
-    // Action: Get OAuth URL
+    // Action: Get OAuth URL (with PKCE support)
     if (action === 'get-auth-url') {
       const { clientId, tenantId } = getAzureCredentials();
-      const { redirectUri } = params;
+      const { redirectUri, codeChallenge, codeChallengeMethod } = params;
       
-      const authUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize?` +
+      let authUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize?` +
         `client_id=${clientId}` +
         `&response_type=code` +
         `&redirect_uri=${encodeURIComponent(redirectUri)}` +
@@ -254,19 +276,25 @@ Deno.serve(async (req) => {
         `&scope=${encodeURIComponent('openid profile email offline_access User.Read Calendars.Read Calendars.ReadWrite Mail.Send')}` +
         `&state=${userId || 'anonymous'}`;
 
+      // Add PKCE parameters if provided
+      if (codeChallenge && codeChallengeMethod) {
+        authUrl += `&code_challenge=${encodeURIComponent(codeChallenge)}`;
+        authUrl += `&code_challenge_method=${codeChallengeMethod}`;
+      }
+
       return new Response(JSON.stringify({ authUrl }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Action: Exchange code for tokens
+    // Action: Exchange code for tokens (with PKCE support)
     if (action === 'exchange-code') {
       if (!userId) {
         throw new Error('User not authenticated');
       }
 
-      const { code, redirectUri } = params;
-      const tokens = await exchangeCodeForTokens(code, redirectUri);
+      const { code, redirectUri, codeVerifier } = params;
+      const tokens = await exchangeCodeForTokens(code, redirectUri, codeVerifier);
       
       // Get user profile from Microsoft
       const profile = await getUserProfile(tokens.access_token);
