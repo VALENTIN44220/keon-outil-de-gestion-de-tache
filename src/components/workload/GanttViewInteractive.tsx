@@ -16,8 +16,10 @@ import { Scissors, Trash2, CheckCircle2, Search, GripVertical, Calendar, Clock, 
 import { GanttTimeline, TodayLine, WeekendOverlay } from './gantt/GanttTimeline';
 import { GanttKPIs } from './gantt/GanttKPIs';
 import { VirtualizedGanttRows } from './gantt/VirtualizedGanttRows';
+import { GanttHeatmapOverlay } from './GanttHeatmapOverlay';
 import { UnifiedTaskDrawer, DrawerItem } from './UnifiedTaskDrawer';
 import { useGanttDragDrop } from '@/hooks/useGanttDragDrop';
+import { WorkloadPreferences } from '@/hooks/useWorkloadPreferences';
 
 interface GanttViewInteractiveProps {
   workloadData: TeamMemberWorkload[];
@@ -39,6 +41,7 @@ interface GanttViewInteractiveProps {
   getTaskDuration?: (taskId: string) => number | null;
   getTaskProgress?: (taskId: string) => { completed: number; total: number } | null;
   plannedTaskIds?: string[];
+  preferences?: WorkloadPreferences;
 }
 
 interface DropContext {
@@ -86,6 +89,7 @@ export function GanttViewInteractive({
   getTaskDuration,
   getTaskProgress,
   plannedTaskIds = [],
+  preferences,
 }: GanttViewInteractiveProps) {
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
   const [dropTarget, setDropTarget] = useState<{ userId: string; date: string; halfDay: 'morning' | 'afternoon' } | null>(null);
@@ -119,19 +123,21 @@ export function GanttViewInteractive({
   // Calculate days array
   const days = useMemo(() => eachDayOfInterval({ start: startDate, end: endDate }), [startDate, endDate]);
   
-  // Day width based on view mode
+  // Day width based on view mode and preferences
   const dayWidth = useMemo(() => {
-    switch (viewMode) {
-      case 'week': return 120;
-      case 'quarter': return 40;
-      case 'month':
+    const zoomLevel = preferences?.zoomLevel || 'week';
+    switch (zoomLevel) {
+      case 'day': return 160;
+      case 'month': return 40;
+      case 'week':
       default: return 80;
     }
-  }, [viewMode]);
+  }, [preferences?.zoomLevel]);
   
-  const isCompact = viewMode === 'quarter';
-  const memberColumnWidth = isCompact ? 200 : 260;
+  const isCompact = preferences?.compactMode || viewMode === 'quarter';
+  const memberColumnWidth = preferences?.memberColumnWidth || (isCompact ? 200 : 260);
   const rowHeight = isCompact ? 56 : 80;
+  const showHeatmap = preferences?.showHeatmap || false;
 
   // Available tasks (not yet planned)
   const availableTasks = useMemo(() => {
@@ -531,6 +537,16 @@ export function GanttViewInteractive({
                     days={days} 
                     dayWidth={dayWidth} 
                     headerOffset={memberColumnWidth}
+                  />
+                  
+                  {/* Heatmap Overlay */}
+                  <GanttHeatmapOverlay
+                    workloadData={workloadData}
+                    startDate={startDate}
+                    endDate={endDate}
+                    dayWidth={dayWidth}
+                    memberColumnWidth={memberColumnWidth}
+                    visible={showHeatmap}
                   />
                   
                   {/* Virtualized Member Rows */}
