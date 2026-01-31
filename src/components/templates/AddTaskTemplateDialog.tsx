@@ -23,9 +23,20 @@ interface AddTaskTemplateDialogProps {
   onClose: () => void;
   onAdd: (task: Omit<TaskTemplate, 'id' | 'user_id' | 'process_template_id' | 'created_at' | 'updated_at'>) => void;
   orderIndex: number;
+  /** Process template ID for fetching process-level custom fields */
+  processTemplateId?: string | null;
+  /** Sub-process template ID for fetching sub-process-level custom fields */
+  subProcessTemplateId?: string | null;
 }
 
-export function AddTaskTemplateDialog({ open, onClose, onAdd, orderIndex }: AddTaskTemplateDialogProps) {
+export function AddTaskTemplateDialog({ 
+  open, 
+  onClose, 
+  onAdd, 
+  orderIndex,
+  processTemplateId,
+  subProcessTemplateId,
+}: AddTaskTemplateDialogProps) {
   const { profile } = useAuth();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -43,7 +54,13 @@ export function AddTaskTemplateDialog({ open, onClose, onAdd, orderIndex }: AddT
   const [profiles, setProfiles] = useState<Profile[]>([]);
 
   const { categories, addCategory, addSubcategory } = useCategories();
-  const { fields: customFields } = useCustomFields({ includeCommon: true });
+  // Get custom fields including common, process-level, and sub-process-level
+  const { fields: customFields } = useCustomFields({ 
+    processTemplateId: processTemplateId || undefined,
+    subProcessTemplateId: subProcessTemplateId || undefined,
+    includeCommon: true,
+    includeParentProcessFields: true,
+  });
 
   useEffect(() => {
     if (open) {

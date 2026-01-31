@@ -797,6 +797,8 @@ export function SubProcessConfigView({
         onClose={() => setIsAddTaskOpen(false)}
         onAdd={handleAddTask}
         orderIndex={tasks.length}
+        processTemplateId={subProcess?.process_template_id}
+        subProcessTemplateId={subProcessId}
       />
 
       <EditTaskTemplateDialog

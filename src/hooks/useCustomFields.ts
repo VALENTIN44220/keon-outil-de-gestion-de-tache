@@ -7,40 +7,83 @@ interface UseCustomFieldsOptions {
   processTemplateId?: string | null;
   subProcessTemplateId?: string | null;
   includeCommon?: boolean;
+  /**
+   * When true and subProcessTemplateId is provided, also fetches fields
+   * from the parent process template
+   */
+  includeParentProcessFields?: boolean;
 }
 
 export function useCustomFields(options: UseCustomFieldsOptions = {}) {
-  const { processTemplateId, subProcessTemplateId, includeCommon = true } = options;
+  const { 
+    processTemplateId, 
+    subProcessTemplateId, 
+    includeCommon = true,
+    includeParentProcessFields = false 
+  } = options;
   
   const [fields, setFields] = useState<TemplateCustomField[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [parentProcessId, setParentProcessId] = useState<string | null>(null);
+
+  // Fetch parent process ID if we have a sub-process and need parent fields
+  useEffect(() => {
+    async function fetchParentProcessId() {
+      if (subProcessTemplateId && includeParentProcessFields) {
+        const { data } = await supabase
+          .from('sub_process_templates')
+          .select('process_template_id')
+          .eq('id', subProcessTemplateId)
+          .single();
+        
+        if (data?.process_template_id) {
+          setParentProcessId(data.process_template_id);
+        }
+      } else {
+        setParentProcessId(null);
+      }
+    }
+    fetchParentProcessId();
+  }, [subProcessTemplateId, includeParentProcessFields]);
 
   const fetchFields = useCallback(async () => {
     setIsLoading(true);
     try {
+      // Build OR conditions for the query
+      const orConditions: string[] = [];
+
+      // Always include common fields if requested
+      if (includeCommon) {
+        orConditions.push('is_common.eq.true');
+      }
+
+      // Include process-level fields
+      if (processTemplateId && !subProcessTemplateId) {
+        orConditions.push(`process_template_id.eq.${processTemplateId}`);
+      }
+
+      // Include sub-process fields
+      if (subProcessTemplateId) {
+        orConditions.push(`sub_process_template_id.eq.${subProcessTemplateId}`);
+        
+        // Also include parent process fields if requested
+        if (includeParentProcessFields && parentProcessId) {
+          orConditions.push(`process_template_id.eq.${parentProcessId}`);
+        }
+      }
+
       let query = supabase
         .from('template_custom_fields')
         .select('*')
         .order('order_index', { ascending: true });
 
-      // Build filter conditions
-      if (processTemplateId && !subProcessTemplateId) {
-        // Fetch fields for this process + common fields
-        if (includeCommon) {
-          query = query.or(`process_template_id.eq.${processTemplateId},is_common.eq.true`);
-        } else {
-          query = query.eq('process_template_id', processTemplateId);
-        }
-      } else if (subProcessTemplateId) {
-        // Fetch fields for this sub-process + common fields
-        if (includeCommon) {
-          query = query.or(`sub_process_template_id.eq.${subProcessTemplateId},is_common.eq.true`);
-        } else {
-          query = query.eq('sub_process_template_id', subProcessTemplateId);
-        }
-      } else if (includeCommon) {
-        // Fetch only common fields
-        query = query.eq('is_common', true);
+      if (orConditions.length > 0) {
+        query = query.or(orConditions.join(','));
+      } else if (!includeCommon) {
+        // No conditions and no common - return empty
+        setFields([]);
+        setIsLoading(false);
+        return;
       }
 
       const { data, error } = await query;
@@ -62,7 +105,7 @@ export function useCustomFields(options: UseCustomFieldsOptions = {}) {
     } finally {
       setIsLoading(false);
     }
-  }, [processTemplateId, subProcessTemplateId, includeCommon]);
+  }, [processTemplateId, subProcessTemplateId, includeCommon, includeParentProcessFields, parentProcessId]);
 
   useEffect(() => {
     fetchFields();
