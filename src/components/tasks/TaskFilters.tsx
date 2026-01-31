@@ -15,6 +15,7 @@ const statusOptions: { value: TaskStatus | 'all'; label: string }[] = [
   { value: 'todo', label: 'À faire' },
   { value: 'in-progress', label: 'En cours' },
   { value: 'done', label: 'Terminé' },
+  { value: 'cancelled', label: 'Annulé' },
 ];
 
 const priorityOptions: { value: TaskPriority | 'all'; label: string }[] = [
