@@ -12,37 +12,6 @@ interface MicrosoftConnection {
   last_sync_at?: string;
 }
 
-// PKCE Helper functions
-function generateRandomString(length: number): string {
-  const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
-  const values = crypto.getRandomValues(new Uint8Array(length));
-  return Array.from(values)
-    .map((x) => possible[x % possible.length])
-    .join('');
-}
-
-async function sha256(plain: string): Promise<ArrayBuffer> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(plain);
-  return crypto.subtle.digest('SHA-256', data);
-}
-
-function base64urlencode(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  let str = '';
-  bytes.forEach((b) => (str += String.fromCharCode(b)));
-  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-async function generatePKCE(): Promise<{ codeVerifier: string; codeChallenge: string }> {
-  const codeVerifier = generateRandomString(64);
-  const hashed = await sha256(codeVerifier);
-  const codeChallenge = base64urlencode(hashed);
-  return { codeVerifier, codeChallenge };
-}
-
-// Storage keys for PKCE
-const PKCE_VERIFIER_KEY = 'microsoft_oauth_code_verifier';
 
 export function useMicrosoftConnection() {
   const { user } = useAuth();
@@ -78,22 +47,11 @@ export function useMicrosoftConnection() {
 
   const getAuthUrl = async (): Promise<string | null> => {
     try {
-      // Generate PKCE values
-      const { codeVerifier, codeChallenge } = await generatePKCE();
-      
-      // Store code verifier for later use during token exchange
-      sessionStorage.setItem(PKCE_VERIFIER_KEY, codeVerifier);
-      
       // Use dedicated callback route for OAuth
       const redirectUri = `${window.location.origin}/auth/callback`;
       
       const { data, error } = await supabase.functions.invoke('microsoft-graph', {
-        body: { 
-          action: 'get-auth-url', 
-          redirectUri,
-          codeChallenge,
-          codeChallengeMethod: 'S256',
-        },
+        body: { action: 'get-auth-url', redirectUri },
       });
 
       if (error) throw error;
@@ -107,29 +65,14 @@ export function useMicrosoftConnection() {
 
   const exchangeCode = async (code: string): Promise<boolean> => {
     try {
-      // Retrieve the code verifier from session storage
-      const codeVerifier = sessionStorage.getItem(PKCE_VERIFIER_KEY);
-      
-      if (!codeVerifier) {
-        throw new Error('Code verifier not found. Please restart the authentication flow.');
-      }
-      
       // Use dedicated callback route for OAuth
       const redirectUri = `${window.location.origin}/auth/callback`;
       
       const { data, error } = await supabase.functions.invoke('microsoft-graph', {
-        body: { 
-          action: 'exchange-code', 
-          code, 
-          redirectUri,
-          codeVerifier,
-        },
+        body: { action: 'exchange-code', code, redirectUri },
       });
 
       if (error) throw error;
-      
-      // Clean up the stored verifier
-      sessionStorage.removeItem(PKCE_VERIFIER_KEY);
       
       toast.success(`Connecté à Microsoft: ${data.email}`);
       await checkConnection();

@@ -18,21 +18,19 @@ interface TokenResponse {
 function getAzureCredentials() {
   const clientId = Deno.env.get('AZURE_CLIENT_ID');
   const tenantId = Deno.env.get('AZURE_TENANT_ID');
-  // Client secret is optional for SPA apps using PKCE
   const clientSecret = Deno.env.get('AZURE_CLIENT_SECRET');
 
-  if (!clientId || !tenantId) {
-    throw new Error('Azure AD credentials not configured (AZURE_CLIENT_ID and AZURE_TENANT_ID required)');
+  if (!clientId || !tenantId || !clientSecret) {
+    throw new Error('Azure AD credentials not configured (AZURE_CLIENT_ID, AZURE_TENANT_ID, and AZURE_CLIENT_SECRET required)');
   }
 
   return { clientId, clientSecret, tenantId };
 }
 
-// Exchange authorization code for tokens (with PKCE support)
+// Exchange authorization code for tokens (server-side confidential client flow)
 async function exchangeCodeForTokens(
   code: string,
-  redirectUri: string,
-  codeVerifier?: string
+  redirectUri: string
 ): Promise<TokenResponse> {
   const { clientId, clientSecret, tenantId } = getAzureCredentials();
   
@@ -40,26 +38,16 @@ async function exchangeCodeForTokens(
   
   const bodyParams: Record<string, string> = {
     client_id: clientId,
+    client_secret: clientSecret,
     code,
     redirect_uri: redirectUri,
     grant_type: 'authorization_code',
     scope: 'openid profile email offline_access User.Read Calendars.Read Calendars.ReadWrite Mail.Send',
   };
 
-  // Add PKCE code verifier if provided (for SPA flow)
-  if (codeVerifier) {
-    bodyParams.code_verifier = codeVerifier;
-  }
-  
-  // Add client secret if available (for confidential client flow)
-  if (clientSecret && !codeVerifier) {
-    bodyParams.client_secret = clientSecret;
-  }
-
   const body = new URLSearchParams(bodyParams);
 
   console.log('Token exchange request to:', tokenUrl);
-  console.log('Using PKCE:', !!codeVerifier);
 
   const response = await fetch(tokenUrl, {
     method: 'POST',
@@ -263,38 +251,32 @@ Deno.serve(async (req) => {
       userId = data?.user?.id || null;
     }
 
-    // Action: Get OAuth URL (with PKCE support)
+    // Action: Get OAuth URL (server-side flow, no PKCE)
     if (action === 'get-auth-url') {
       const { clientId, tenantId } = getAzureCredentials();
-      const { redirectUri, codeChallenge, codeChallengeMethod } = params;
+      const { redirectUri } = params;
       
-      let authUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize?` +
+      const authUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize?` +
         `client_id=${clientId}` +
         `&response_type=code` +
         `&redirect_uri=${encodeURIComponent(redirectUri)}` +
         `&response_mode=query` +
         `&scope=${encodeURIComponent('openid profile email offline_access User.Read Calendars.Read Calendars.ReadWrite Mail.Send')}` +
-        `&state=${userId || 'anonymous'}`;
-
-      // Add PKCE parameters if provided
-      if (codeChallenge && codeChallengeMethod) {
-        authUrl += `&code_challenge=${encodeURIComponent(codeChallenge)}`;
-        authUrl += `&code_challenge_method=${codeChallengeMethod}`;
-      }
+        `&state=microsoft-${userId || 'anonymous'}`;
 
       return new Response(JSON.stringify({ authUrl }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Action: Exchange code for tokens (with PKCE support)
+    // Action: Exchange code for tokens (server-side flow)
     if (action === 'exchange-code') {
       if (!userId) {
         throw new Error('User not authenticated');
       }
 
-      const { code, redirectUri, codeVerifier } = params;
-      const tokens = await exchangeCodeForTokens(code, redirectUri, codeVerifier);
+      const { code, redirectUri } = params;
+      const tokens = await exchangeCodeForTokens(code, redirectUri);
       
       // Get user profile from Microsoft
       const profile = await getUserProfile(tokens.access_token);
