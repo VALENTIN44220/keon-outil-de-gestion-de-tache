@@ -1,5 +1,5 @@
 import { TemplateCustomField } from '@/types/customField';
-import { CustomFieldsRenderer } from './CustomFieldsRenderer';
+import { ValidatedCustomFieldsRenderer } from './ValidatedCustomFieldsRenderer';
 import { Badge } from '@/components/ui/badge';
 import { Workflow, FormInput } from 'lucide-react';
 
@@ -51,12 +51,12 @@ export function GroupedCustomFieldsRenderer({
             </Badge>
           </div>
           <div className="pl-6 border-l-2 border-primary/20">
-            <CustomFieldsRenderer
+            <ValidatedCustomFieldsRenderer
               fields={commonFields}
               values={values}
               onChange={onChange}
-              errors={errors}
               disabled={disabled}
+              validateOnChange={true}
             />
           </div>
         </div>
@@ -70,12 +70,12 @@ export function GroupedCustomFieldsRenderer({
             <span className="text-sm font-medium text-foreground">Champs du processus</span>
           </div>
           <div className="pl-6 border-l-2 border-muted">
-            <CustomFieldsRenderer
+            <ValidatedCustomFieldsRenderer
               fields={processFields}
               values={values}
               onChange={onChange}
-              errors={errors}
               disabled={disabled}
+              validateOnChange={true}
             />
           </div>
         </div>
@@ -92,12 +92,12 @@ export function GroupedCustomFieldsRenderer({
             </Badge>
           </div>
           <div className="pl-6 border-l-2 border-accent/30">
-            <CustomFieldsRenderer
+            <ValidatedCustomFieldsRenderer
               fields={group.fields}
               values={values}
               onChange={onChange}
-              errors={errors}
               disabled={disabled}
+              validateOnChange={true}
             />
           </div>
         </div>

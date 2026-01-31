@@ -29,6 +29,7 @@ import type { FormSection, FormField, ValidationType } from '@/types/formBuilder
 import { VALIDATION_TYPE_LABELS, CONDITION_OPERATOR_LABELS, ConditionOperator } from '@/types/formBuilder';
 import { FIELD_TYPE_LABELS } from '@/types/customField';
 import { cn } from '@/lib/utils';
+import { ValidationPropertiesPanel } from './ValidationPropertiesPanel';
 
 interface FormBuilderPropertiesPanelProps {
   selectedSection: FormSection | null;
@@ -541,97 +542,15 @@ function FieldProperties({
             </div>
           </TabsContent>
 
-          <TabsContent value="validation" className="p-4 space-y-4 mt-0">
-            <div className="space-y-2">
-              <Label>Type de validation</Label>
-              <Select
-                value={localField.validation_type || '__none__'}
-                onValueChange={(v) => {
-                  const validationType = v === '__none__' ? null : v;
-                  handleChange('validation_type', validationType);
-                  onUpdate(field.id, {
-                    ...localField,
-                    validation_type: validationType as ValidationType | null,
-                  });
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Aucune validation spécifique" />
-                </SelectTrigger>
-                <SelectContent className="bg-popover">
-                  <SelectItem value="__none__">Aucune</SelectItem>
-                  {Object.entries(VALIDATION_TYPE_LABELS).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {localField.validation_type === 'regex' && (
-              <div className="space-y-2">
-                <Label htmlFor="validation-regex">Expression régulière</Label>
-                <Input
-                  id="validation-regex"
-                  value={localField.validation_regex || ''}
-                  onChange={(e) =>
-                    handleChange('validation_regex', e.target.value)
-                  }
-                  onBlur={handleBlur}
-                  placeholder="^[A-Z]{2}[0-9]{4}$"
-                />
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label htmlFor="validation-message">Message d'erreur</Label>
-              <Textarea
-                id="validation-message"
-                value={localField.validation_message || ''}
-                onChange={(e) =>
-                  handleChange('validation_message', e.target.value)
-                }
-                onBlur={handleBlur}
-                placeholder="Format invalide"
-                rows={2}
-              />
-            </div>
-
-            {localField.field_type === 'number' && (
-              <div className="grid grid-cols-2 gap-2">
-                <div className="space-y-2">
-                  <Label htmlFor="min-value">Valeur min</Label>
-                  <Input
-                    id="min-value"
-                    type="number"
-                    value={localField.min_value ?? ''}
-                    onChange={(e) =>
-                      handleChange(
-                        'min_value',
-                        e.target.value ? parseFloat(e.target.value) : null
-                      )
-                    }
-                    onBlur={handleBlur}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="max-value">Valeur max</Label>
-                  <Input
-                    id="max-value"
-                    type="number"
-                    value={localField.max_value ?? ''}
-                    onChange={(e) =>
-                      handleChange(
-                        'max_value',
-                        e.target.value ? parseFloat(e.target.value) : null
-                      )
-                    }
-                    onBlur={handleBlur}
-                  />
-                </div>
-              </div>
-            )}
+          <TabsContent value="validation" className="p-4 mt-0">
+            <ValidationPropertiesPanel
+              field={localField}
+              onUpdate={(updates) => {
+                const newField = { ...localField, ...updates };
+                setLocalField(newField);
+                onUpdate(field.id, updates);
+              }}
+            />
           </TabsContent>
 
           <TabsContent value="conditions" className="p-4 space-y-4 mt-0">
