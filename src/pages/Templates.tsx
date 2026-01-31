@@ -95,11 +95,23 @@ const Templates = () => {
     return true;
   });
 
+  // Get sub-processes belonging to the selected process (for transitive filtering)
+  const subProcessIdsForProcess = filters.processId
+    ? subProcesses.filter((sp) => sp.process_template_id === filters.processId).map((sp) => sp.id)
+    : [];
+
   // Apply filters to task templates
   const filteredTasks = taskTemplates.filter((t) => {
     if (searchQuery && !t.title.toLowerCase().includes(searchQuery.toLowerCase()) && 
         !t.description?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    if (filters.processId && t.process_template_id !== filters.processId) return false;
+    
+    // Process filter: include tasks directly on the process OR tasks on sub-processes of that process
+    if (filters.processId) {
+      const directMatch = t.process_template_id === filters.processId;
+      const viaSubProcess = t.sub_process_template_id && subProcessIdsForProcess.includes(t.sub_process_template_id);
+      if (!directMatch && !viaSubProcess) return false;
+    }
+    
     if (filters.subProcessId && t.sub_process_template_id !== filters.subProcessId) return false;
     if (filters.companyId && t.creator_company_id !== filters.companyId) return false;
     if (filters.departmentId && t.creator_department_id !== filters.departmentId) return false;
