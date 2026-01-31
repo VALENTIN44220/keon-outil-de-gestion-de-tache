@@ -4,15 +4,8 @@ import { ProcessWithTasks, TaskTemplate, VISIBILITY_LABELS, TemplateVisibility }
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuTrigger 
-} from '@/components/ui/dropdown-menu';
-import { MoreVertical, Trash2, Building2, Briefcase, ListTodo, Edit, Layers, Eye, Lock, Users, Globe, Workflow, CheckCircle } from 'lucide-react';
+import { Trash2, Building2, Briefcase, ListTodo, Eye, Lock, Users, Globe, Workflow, CheckCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { cn } from '@/lib/utils';
 
 interface ProcessCardProps {
   process: ProcessWithTasks;
@@ -38,7 +31,7 @@ interface WorkflowStatus {
   hasValidation: boolean;
 }
 
-export function ProcessCard({ process, onDelete, onEdit, onViewDetails, onAddTask, onDeleteTask, canManage = false, compact = false }: ProcessCardProps) {
+export function ProcessCard({ process, onDelete, onViewDetails, canManage = false, compact = false }: ProcessCardProps) {
   const navigate = useNavigate();
   const [subProcessCount, setSubProcessCount] = useState(0);
   const [targetDepartments, setTargetDepartments] = useState<string[]>([]);
@@ -101,7 +94,7 @@ export function ProcessCard({ process, onDelete, onEdit, onViewDetails, onAddTas
     return null;
   };
 
-  // Compact list view (horizontal)
+  // Compact list view (horizontal) - Simplified to 3 buttons max
   if (compact) {
     return (
       <Card 
@@ -123,33 +116,40 @@ export function ProcessCard({ process, onDelete, onEdit, onViewDetails, onAddTas
             <span>{directTaskCount} tâche(s)</span>
           </div>
         </div>
-        {canManage && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-              <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
-                <Edit className="h-4 w-4 mr-2" />
-                Modifier
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={(e) => { e.stopPropagation(); onDelete(); }}
-                className="text-destructive focus:text-destructive"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Supprimer
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+        <div className="flex items-center gap-1">
+          <Button 
+            variant="default" 
+            size="sm" 
+            className="h-7 px-2 text-xs"
+            onClick={(e) => { e.stopPropagation(); onViewDetails(); }}
+          >
+            <Eye className="h-3 w-3 mr-1" />
+            Gérer
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="h-7 px-2 text-xs bg-success/10 border-success/30 text-success hover:bg-success/20"
+            onClick={(e) => { e.stopPropagation(); navigate(`/templates/workflow/process/${process.id}`); }}
+          >
+            <Workflow className="h-3 w-3" />
+          </Button>
+          {canManage && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
       </Card>
     );
   }
 
-  // Grid card view (default) - Condensed style like screenshot
+  // Grid card view (default) - Simplified to 3 action buttons max
   return (
     <Card 
       className="flex flex-col cursor-pointer hover:shadow-md transition-all hover:border-primary/30 bg-card"
@@ -169,39 +169,6 @@ export function ProcessCard({ process, onDelete, onEdit, onViewDetails, onAddTas
               )}
             </div>
           </div>
-          
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-              <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0">
-                <MoreVertical className="h-3.5 w-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onViewDetails(); }}>
-                <Eye className="h-4 w-4 mr-2" />
-                Voir les détails
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/templates/workflow/process/${process.id}`); }}>
-                <Workflow className="h-4 w-4 mr-2" />
-                Éditer le workflow
-              </DropdownMenuItem>
-              {canManage && (
-                <>
-                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
-                    <Edit className="h-4 w-4 mr-2" />
-                    Modifier
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={(e) => { e.stopPropagation(); onDelete(); }}
-                    className="text-destructive focus:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Supprimer
-                  </DropdownMenuItem>
-                </>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
 
         {/* Meta info row */}
@@ -228,7 +195,7 @@ export function ProcessCard({ process, onDelete, onEdit, onViewDetails, onAddTas
           )}
         </div>
 
-        {/* Action buttons */}
+        {/* Action buttons - MAX 3 buttons */}
         <div className="flex items-center gap-1.5 pt-1">
           <Button 
             variant="default" 
@@ -246,27 +213,18 @@ export function ProcessCard({ process, onDelete, onEdit, onViewDetails, onAddTas
             onClick={(e) => { e.stopPropagation(); navigate(`/templates/workflow/process/${process.id}`); }}
           >
             <Workflow className="h-3 w-3 mr-1" />
+            Workflow
           </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-              <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-                <MoreVertical className="h-3.5 w-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
-                <Edit className="h-4 w-4 mr-2" />
-                Modifier
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={(e) => { e.stopPropagation(); onDelete(); }}
-                className="text-destructive focus:text-destructive"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Supprimer
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {canManage && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-7 px-2.5 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>
