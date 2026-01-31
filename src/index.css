@@ -755,7 +755,70 @@
       hsl(38 92% 50% / 0.05) 8px
     );
   }
-}
+  }
+  
+  /* ================================
+     ACCESSIBILITY ENHANCEMENTS
+     ================================ */
+  
+  /* Focus visible styling for keyboard navigation */
+  .workload-focus-visible:focus-visible,
+  [data-gantt-grid] *:focus-visible {
+    @apply outline-none ring-2 ring-offset-2;
+    ring-color: hsl(var(--keon-primary));
+    ring-offset-color: hsl(var(--card));
+  }
+  
+  /* Skip link for screen readers */
+  .workload-skip-link {
+    @apply sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4;
+    @apply z-50 px-4 py-2 rounded-lg font-medium text-sm;
+    background: hsl(var(--keon-primary));
+    color: hsl(var(--primary-foreground));
+  }
+  
+  /* High contrast mode support */
+  @media (prefers-contrast: high) {
+    .workload-task-bar {
+      border-width: 2px;
+    }
+    .workload-day-header-today {
+      border: 2px solid hsl(var(--keon-primary));
+    }
+    .workload-today-line {
+      width: 3px;
+    }
+  }
+  
+  /* Reduced motion support */
+  @media (prefers-reduced-motion: reduce) {
+    .workload-task-bar,
+    .workload-task-bar:hover,
+    .animate-shimmer,
+    .animate-pulse {
+      animation: none !important;
+      transition: none !important;
+    }
+    .workload-today-line::before {
+      animation: none !important;
+    }
+  }
+  
+  /* Print styles for Gantt export */
+  @media print {
+    .workload-filter-bar,
+    .workload-kpi-card,
+    [data-quick-action] {
+      display: none !important;
+    }
+    .workload-task-bar {
+      box-shadow: none !important;
+      border: 1px solid #000 !important;
+    }
+    .workload-grid-bg {
+      background: white !important;
+    }
+  }
 
 @keyframes fadeIn {
   from { opacity: 0; }
