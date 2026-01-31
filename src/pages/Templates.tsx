@@ -4,6 +4,7 @@ import { Header } from '@/components/layout/Header';
 import { ProcessCard } from '@/components/templates/ProcessCard';
 import { TemplateAdvancedFilters, TemplateFiltersState, defaultFilters } from '@/components/templates/TemplateAdvancedFilters';
 import { AddProcessDialog } from '@/components/templates/AddProcessDialog';
+import { DeleteProcessDialog } from '@/components/templates/DeleteProcessDialog';
 import { UnifiedModelView } from '@/components/templates/UnifiedModelView';
 import { SubProcessTemplatesList } from '@/components/templates/SubProcessTemplatesList';
 import { TaskTemplatesList } from '@/components/templates/TaskTemplatesList';
@@ -21,6 +22,7 @@ import { Loader2, Layers, GitBranch, ListTodo, Plus, FormInput, Upload } from 'l
 import { ProcessWithTasks } from '@/types/template';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 const Templates = () => {
   const [activeView, setActiveView] = useState('templates');
@@ -30,6 +32,7 @@ const Templates = () => {
   const [isAddTaskDialogOpen, setIsAddTaskDialogOpen] = useState(false);
   const [isBulkTaskImportOpen, setIsBulkTaskImportOpen] = useState(false);
   const [viewingProcess, setViewingProcess] = useState<ProcessWithTasks | null>(null);
+  const [deletingProcess, setDeletingProcess] = useState<ProcessWithTasks | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState<TemplateFiltersState>(defaultFilters);
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
@@ -116,6 +119,29 @@ const Templates = () => {
 
   // handleEditProcess now redirects to the unified view (same as viewDetails)
   const handleEditProcess = handleViewDetails;
+
+  const handleDeleteProcess = (id: string) => {
+    const process = processes.find((p) => p.id === id);
+    if (process) {
+      setDeletingProcess(process);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (deletingProcess) {
+      await deleteProcess(deletingProcess.id);
+      setDeletingProcess(null);
+    }
+  };
+
+  const handleArchiveProcess = async () => {
+    if (deletingProcess) {
+      // Archive by updating visibility to private and marking as archived
+      await updateProcess(deletingProcess.id, { visibility_level: 'private' });
+      toast.success('Processus archivé');
+      setDeletingProcess(null);
+    }
+  };
 
   const getAddButtonAction = () => {
     switch (activeTab) {
@@ -208,7 +234,7 @@ const Templates = () => {
                     <ProcessCard
                       key={process.id}
                       process={process}
-                      onDelete={() => deleteProcess(process.id)}
+                      onDelete={() => handleDeleteProcess(process.id)}
                       onEdit={() => handleEditProcess(process.id)}
                       onViewDetails={() => handleViewDetails(process.id)}
                       onAddTask={(task) => addTaskTemplate(process.id, task)}
@@ -224,7 +250,7 @@ const Templates = () => {
                     <ProcessCard
                       key={process.id}
                       process={process}
-                      onDelete={() => deleteProcess(process.id)}
+                      onDelete={() => handleDeleteProcess(process.id)}
                       onEdit={() => handleEditProcess(process.id)}
                       onViewDetails={() => handleViewDetails(process.id)}
                       onAddTask={(task) => addTaskTemplate(process.id, task)}
@@ -312,6 +338,15 @@ const Templates = () => {
           }
         }}
         canManage={Boolean(viewingProcess?.can_manage)}
+      />
+
+      <DeleteProcessDialog
+        processId={deletingProcess?.id || null}
+        processName={deletingProcess?.name || ''}
+        open={!!deletingProcess}
+        onClose={() => setDeletingProcess(null)}
+        onConfirmDelete={handleConfirmDelete}
+        onConfirmArchive={handleArchiveProcess}
       />
     </div>
   );
