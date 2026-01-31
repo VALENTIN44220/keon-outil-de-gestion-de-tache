@@ -193,8 +193,8 @@ export function WorkloadFilters({
 
   return (
     <div className="space-y-3">
-      {/* Main filter bar */}
-      <div className="flex flex-wrap items-center gap-2 p-3 bg-card rounded-xl border shadow-sm">
+      {/* Main filter bar - premium design */}
+      <div className="workload-filter-bar">
         {/* Search */}
         <div className="relative flex-1 min-w-[200px] max-w-[300px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -202,22 +202,22 @@ export function WorkloadFilters({
             placeholder="Rechercher une tâche..."
             value={localSearch}
             onChange={(e) => setLocalSearch(e.target.value)}
-            className="pl-9 h-9 bg-muted/50 border-0 focus-visible:ring-1"
+            className="pl-9 h-9 bg-keon-50 border-keon-200 focus-visible:ring-1 focus-visible:ring-primary"
           />
           {localSearch && (
             <button
               onClick={() => setLocalSearch('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
             >
               <X className="h-4 w-4" />
             </button>
           )}
         </div>
 
-        <Separator orientation="vertical" className="h-6" />
+        <Separator orientation="vertical" className="h-6 bg-keon-200" />
 
-        {/* Period presets */}
-        <div className="flex items-center rounded-lg bg-muted p-0.5">
+        {/* Period presets - segmented control */}
+        <div className="workload-segmented-control">
           {(['week', 'month', 'quarter'] as const).map((preset) => (
             <Button 
               key={preset}
@@ -225,10 +225,8 @@ export function WorkloadFilters({
               size="sm" 
               onClick={() => handlePresetPeriod(preset)}
               className={cn(
-                "h-8 px-3 text-xs font-medium transition-all",
-                viewMode === preset 
-                  ? "bg-background text-foreground shadow-sm" 
-                  : "text-muted-foreground hover:text-foreground hover:bg-transparent"
+                "workload-segmented-btn h-8 px-4",
+                viewMode === preset && "workload-segmented-btn-active"
               )}
             >
               {preset === 'week' ? 'Semaine' : preset === 'month' ? 'Mois' : 'Trimestre'}
@@ -236,12 +234,12 @@ export function WorkloadFilters({
           ))}
         </div>
 
-        {/* Navigation */}
-        <div className="flex items-center gap-1">
+        {/* Navigation - more compact */}
+        <div className="flex items-center gap-0.5 bg-keon-100 rounded-lg p-0.5">
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 hover:bg-muted"
+            className="h-8 w-8 hover:bg-card rounded-md"
             onClick={() => navigatePeriod('prev')}
           >
             <ChevronLeft className="h-4 w-4" />
@@ -250,27 +248,27 @@ export function WorkloadFilters({
             variant="ghost"
             size="sm"
             onClick={goToToday}
-            className="h-8 px-3 text-xs font-medium"
+            className="h-8 px-3 text-xs font-semibold hover:bg-card rounded-md"
           >
             Aujourd'hui
           </Button>
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 hover:bg-muted"
+            className="h-8 w-8 hover:bg-card rounded-md"
             onClick={() => navigatePeriod('next')}
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
 
-        {/* Date range display */}
+        {/* Date range display - premium button */}
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8 gap-2 font-medium">
-              <CalendarIcon className="h-3.5 w-3.5" />
+            <Button variant="outline" size="sm" className="h-8 gap-2 font-semibold border-keon-200 hover:bg-keon-50">
+              <CalendarIcon className="h-3.5 w-3.5 text-primary" />
               <span className="text-xs">
-                {format(startDate, 'd MMM', { locale: fr })} - {format(endDate, 'd MMM yyyy', { locale: fr })}
+                {format(startDate, 'd MMM', { locale: fr })} – {format(endDate, 'd MMM yyyy', { locale: fr })}
               </span>
             </Button>
           </PopoverTrigger>
@@ -290,7 +288,7 @@ export function WorkloadFilters({
           </PopoverContent>
         </Popover>
 
-        <Separator orientation="vertical" className="h-6" />
+        <Separator orientation="vertical" className="h-6 bg-keon-200" />
 
         {/* Collaborators filter */}
         <Popover>

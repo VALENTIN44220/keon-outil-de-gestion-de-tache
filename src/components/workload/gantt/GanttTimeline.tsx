@@ -71,11 +71,11 @@ export function GanttTimeline({
   }, [days]);
   
   return (
-    <div className="sticky top-0 z-20 bg-card shadow-sm">
+    <div className="workload-timeline-header">
       {/* Month header row */}
-      <div className="flex border-b border-border/50">
+      <div className="flex">
         <div 
-          className="shrink-0 border-r border-border/50 bg-muted/30"
+          className="shrink-0 bg-card"
           style={{ width: memberColumnWidth }}
         />
         
@@ -87,15 +87,12 @@ export function GanttTimeline({
             <div
               key={`month-${idx}`}
               className={cn(
-                "flex items-center justify-center border-r border-border/50 h-8",
-                isCurrentMonth ? "bg-primary/5" : "bg-muted/20"
+                "flex items-center justify-center h-9 border-r",
+                isCurrentMonth ? "workload-month-label-current" : "workload-month-label"
               )}
-              style={{ width }}
+              style={{ width, borderColor: 'hsl(var(--keon-gray-200))' }}
             >
-              <span className={cn(
-                "text-xs font-semibold capitalize",
-                isCurrentMonth ? "text-primary" : "text-muted-foreground"
-              )}>
+              <span className="text-xs font-semibold capitalize tracking-wide">
                 {group.label}
               </span>
             </div>
@@ -104,9 +101,9 @@ export function GanttTimeline({
       </div>
 
       {/* Week row */}
-      <div className="flex border-b border-border/40">
+      <div className="flex border-t" style={{ borderColor: 'hsl(var(--keon-gray-100))' }}>
         <div 
-          className="shrink-0 border-r border-border/50 bg-muted/30"
+          className="shrink-0 bg-card"
           style={{ width: memberColumnWidth }}
         />
         
@@ -117,17 +114,13 @@ export function GanttTimeline({
           return (
             <div
               key={`week-${group.year}-${group.weekNum}-${idx}`}
-              className={cn(
-                "flex items-center justify-center border-r border-border/30 h-6",
-                isCurrentWeek ? "bg-primary/10" : ""
-              )}
-              style={{ width }}
+              className="flex items-center justify-center h-7 border-r"
+              style={{ width, borderColor: 'hsl(var(--keon-gray-100))' }}
             >
               <span className={cn(
-                "text-[10px] font-medium px-1.5 py-0.5 rounded",
                 isCurrentWeek 
-                  ? "bg-primary/20 text-primary font-semibold" 
-                  : "text-muted-foreground"
+                  ? "workload-week-label-current" 
+                  : "workload-week-label"
               )}>
                 S{group.weekNum}
               </span>
@@ -137,44 +130,54 @@ export function GanttTimeline({
       </div>
       
       {/* Days row */}
-      <div className="flex border-b-2 border-border/50">
+      <div className="flex border-t" style={{ borderColor: 'hsl(var(--keon-gray-200))' }}>
         <div 
-          className="shrink-0 border-r border-border/50 bg-muted/30 flex items-center px-4"
-          style={{ width: memberColumnWidth, height: isCompact ? 32 : 40 }}
+          className="shrink-0 bg-card flex items-center px-4 border-r"
+          style={{ 
+            width: memberColumnWidth, 
+            height: isCompact ? 36 : 44,
+            borderColor: 'hsl(var(--keon-gray-200))'
+          }}
         >
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">
             Collaborateur
           </span>
         </div>
         
-        {days.map(day => {
+        {days.map((day, idx) => {
           const isTodayDay = isToday(day);
           const isWeekendDay = isWeekend(day);
+          // Check if this is the first day of a week (Monday)
+          const isWeekStart = day.getDay() === 1 && idx > 0;
           
           return (
             <div
               key={day.toISOString()}
               className={cn(
-                "shrink-0 flex flex-col items-center justify-center border-r border-border/20",
-                isCompact ? "h-8" : "h-10",
-                isWeekendDay && "bg-muted/60",
-                isTodayDay && "bg-primary/10"
+                "workload-day-header shrink-0 border-r",
+                isCompact ? "h-9" : "h-11",
+                isWeekendDay && "workload-day-header-weekend",
+                isTodayDay && "workload-day-header-today",
+                isWeekStart && "workload-week-separator"
               )}
-              style={{ width: dayWidth }}
+              style={{ 
+                width: dayWidth,
+                borderColor: 'hsl(var(--keon-gray-100))'
+              }}
             >
               <span className={cn(
                 "text-[9px] font-medium uppercase leading-none",
-                isWeekendDay ? "text-muted-foreground/50" :
-                isTodayDay ? "text-primary font-bold" : "text-muted-foreground"
+                isWeekendDay && "opacity-50",
+                isTodayDay && "font-bold"
               )}>
                 {viewMode === 'quarter' 
                   ? format(day, 'EEEEE', { locale: fr }) 
                   : format(day, 'EEE', { locale: fr })}
               </span>
               <span className={cn(
-                "text-xs tabular-nums font-medium leading-none mt-0.5",
-                isWeekendDay ? "text-muted-foreground/50" :
-                isTodayDay ? "text-primary font-bold" : "text-foreground"
+                "text-xs tabular-nums font-semibold leading-none mt-0.5",
+                isWeekendDay && "opacity-50",
+                isTodayDay && "font-bold"
               )}>
                 {format(day, 'd', { locale: fr })}
               </span>
@@ -186,7 +189,7 @@ export function GanttTimeline({
   );
 }
 
-// Today line indicator component - more prominent
+// Today line indicator component - premium design
 export function TodayLine({ 
   days, 
   dayWidth, 
@@ -205,19 +208,13 @@ export function TodayLine({
   
   return (
     <div 
-      className="absolute top-0 w-0.5 bg-red-500 z-30 pointer-events-none shadow-[0_0_8px_rgba(239,68,68,0.5)]"
+      className="workload-today-line"
       style={{ left, height }}
-    >
-      {/* Top indicator dot */}
-      <div className="absolute -top-0 left-1/2 -translate-x-1/2 flex flex-col items-center">
-        <div className="w-2.5 h-2.5 bg-red-500 rounded-full shadow-lg ring-2 ring-red-200" />
-        <div className="w-2.5 h-2.5 bg-red-500 rounded-full absolute animate-ping opacity-40" />
-      </div>
-    </div>
+    />
   );
 }
 
-// Weekend overlay for the grid
+// Weekend overlay for the grid - premium striped pattern
 export function WeekendOverlay({
   days,
   dayWidth,
@@ -238,11 +235,72 @@ export function WeekendOverlay({
         return (
           <div
             key={day.toISOString()}
-            className="absolute top-0 bg-muted/40 pointer-events-none"
+            className="absolute top-0 workload-weekend-bg pointer-events-none opacity-60"
             style={{ left, width: dayWidth, height }}
           />
         );
       })}
     </>
+  );
+}
+
+// Week separator lines
+export function WeekSeparators({
+  days,
+  dayWidth,
+  headerOffset,
+  height = '100%'
+}: {
+  days: Date[];
+  dayWidth: number;
+  headerOffset: number;
+  height?: string | number;
+}) {
+  return (
+    <>
+      {days.map((day, idx) => {
+        // Show separator at the start of each week (Monday)
+        if (day.getDay() !== 1 || idx === 0) return null;
+        const left = headerOffset + (idx * dayWidth);
+        
+        return (
+          <div
+            key={`week-sep-${day.toISOString()}`}
+            className="absolute top-0 pointer-events-none"
+            style={{ 
+              left, 
+              height,
+              width: 2,
+              background: 'repeating-linear-gradient(to bottom, hsl(var(--keon-gray-300)) 0, hsl(var(--keon-gray-300)) 4px, transparent 4px, transparent 8px)'
+            }}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+// Today column highlight
+export function TodayColumnHighlight({
+  days,
+  dayWidth,
+  headerOffset,
+  height = '100%'
+}: {
+  days: Date[];
+  dayWidth: number;
+  headerOffset: number;
+  height?: string | number;
+}) {
+  const todayIndex = days.findIndex(d => isToday(d));
+  if (todayIndex === -1) return null;
+  
+  const left = headerOffset + (todayIndex * dayWidth);
+  
+  return (
+    <div 
+      className="absolute top-0 workload-today-column pointer-events-none"
+      style={{ left, width: dayWidth, height }}
+    />
   );
 }

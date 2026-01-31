@@ -88,24 +88,25 @@ export function GanttKPIs({ workloadData, tasks, plannedTaskIds }: GanttKPIsProp
   ];
   
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-3">
       {kpis.map((kpi, idx) => {
         const Icon = kpi.icon;
         return (
           <div
             key={idx}
-            className={cn(
-              "flex items-center gap-2 px-3 py-1.5 rounded-lg border",
-              kpi.bgColor,
-              kpi.borderColor
-            )}
+            className="workload-kpi-card"
           >
-            <Icon className={cn("h-4 w-4", kpi.color)} />
-            <div className="flex items-baseline gap-1.5">
-              <span className={cn("text-sm font-bold tabular-nums", kpi.color)}>
+            <div className={cn(
+              "w-9 h-9 rounded-xl flex items-center justify-center",
+              kpi.bgColor
+            )}>
+              <Icon className={cn("h-4.5 w-4.5", kpi.color)} />
+            </div>
+            <div className="flex flex-col">
+              <span className="workload-kpi-value text-lg">
                 {kpi.value}
               </span>
-              <span className="text-[10px] text-muted-foreground hidden xl:inline">
+              <span className="workload-kpi-label text-[10px]">
                 {kpi.label}
               </span>
             </div>

@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Scissors, Trash2, CheckCircle2, Search, GripVertical, Calendar, Clock, Plus, AlertTriangle } from 'lucide-react';
-import { GanttTimeline, TodayLine, WeekendOverlay } from './gantt/GanttTimeline';
+import { GanttTimeline, TodayLine, WeekendOverlay, WeekSeparators, TodayColumnHighlight } from './gantt/GanttTimeline';
 import { GanttKPIs } from './gantt/GanttKPIs';
 import { VirtualizedGanttRows } from './gantt/VirtualizedGanttRows';
 import { GanttHeatmapOverlay } from './GanttHeatmapOverlay';
@@ -519,7 +519,7 @@ export function GanttViewInteractive({
           </Card>
 
           {/* Gantt Chart */}
-          <Card className="flex-1 shadow-lg border-0 overflow-hidden">
+          <Card className="flex-1 shadow-premium-lg border-0 overflow-hidden workload-grid-bg">
             <div className="relative">
               <ScrollArea className="w-full" style={{ height: '600px' }}>
                 <div className="min-w-max relative">
@@ -530,6 +530,30 @@ export function GanttViewInteractive({
                     viewMode={viewMode} 
                     isCompact={isCompact}
                     memberColumnWidth={memberColumnWidth}
+                  />
+                  
+                  {/* Weekend Overlay */}
+                  <WeekendOverlay 
+                    days={days} 
+                    dayWidth={dayWidth} 
+                    headerOffset={memberColumnWidth}
+                    height="100%"
+                  />
+                  
+                  {/* Week Separators */}
+                  <WeekSeparators 
+                    days={days} 
+                    dayWidth={dayWidth} 
+                    headerOffset={memberColumnWidth}
+                    height="100%"
+                  />
+                  
+                  {/* Today Column Highlight */}
+                  <TodayColumnHighlight 
+                    days={days} 
+                    dayWidth={dayWidth} 
+                    headerOffset={memberColumnWidth}
+                    height="100%"
                   />
                   
                   {/* Today Line */}
