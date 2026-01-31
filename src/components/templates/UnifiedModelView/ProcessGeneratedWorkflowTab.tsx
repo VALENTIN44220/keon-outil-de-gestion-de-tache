@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,6 +31,9 @@ import {
   Bell,
   ArrowRight,
   Zap,
+  Save,
+  Wand2,
+  Settings2,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -50,7 +55,6 @@ interface WorkflowInfo {
   status: 'draft' | 'published' | 'archived';
   version: number;
   updatedAt: string;
-  isCustomized: boolean;
   nodeCount: number;
 }
 
@@ -60,6 +64,8 @@ interface WorkflowVersion {
   status: string;
   created_at: string;
 }
+
+type WorkflowMode = 'standard' | 'custom';
 
 export function ProcessGeneratedWorkflowTab({
   processId,
@@ -75,11 +81,43 @@ export function ProcessGeneratedWorkflowTab({
   const [isGenerating, setIsGenerating] = useState(false);
   const [showRegenerateDialog, setShowRegenerateDialog] = useState(false);
   const [subProcessCount, setSubProcessCount] = useState(0);
+  
+  // New state for workflow mode
+  const [workflowMode, setWorkflowMode] = useState<WorkflowMode>('standard');
+  const [isSavingMode, setIsSavingMode] = useState(false);
+  const [isModeDirty, setIsModeDirty] = useState(false);
 
   useEffect(() => {
-    fetchWorkflowInfo();
-    fetchSubProcessCount();
+    Promise.all([
+      fetchWorkflowInfo(),
+      fetchSubProcessCount(),
+      loadWorkflowMode(),
+    ]);
   }, [processId]);
+
+  const loadWorkflowMode = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('process_templates')
+        .select('settings')
+        .eq('id', processId)
+        .single();
+
+      if (error) throw error;
+
+      const settings = (data?.settings as Record<string, unknown>) || {};
+      const savedMode = settings.workflow_mode as WorkflowMode | undefined;
+      
+      if (savedMode) {
+        setWorkflowMode(savedMode);
+      } else {
+        setWorkflowMode('standard');
+      }
+      setIsModeDirty(false);
+    } catch (error) {
+      console.error('Error loading workflow mode:', error);
+    }
+  };
 
   const fetchWorkflowInfo = async () => {
     setIsLoading(true);
@@ -99,17 +137,12 @@ export function ProcessGeneratedWorkflowTab({
           .select('id', { count: 'exact', head: true })
           .eq('workflow_id', workflow.id);
 
-        // Check if customized (has manual edits - simplified check)
-        const isCustomized = workflow.name.includes('(personnalisé)') || 
-                            workflow.name.includes('(custom)');
-
         setWorkflowInfo({
           id: workflow.id,
           name: workflow.name,
           status: workflow.status as 'draft' | 'published' | 'archived',
           version: workflow.version,
           updatedAt: workflow.updated_at,
-          isCustomized,
           nodeCount: count || 0,
         });
 
@@ -142,15 +175,83 @@ export function ProcessGeneratedWorkflowTab({
     setSubProcessCount(count || 0);
   };
 
+  const handleModeChange = (mode: WorkflowMode) => {
+    setWorkflowMode(mode);
+    setIsModeDirty(true);
+  };
+
+  const handleSaveMode = async () => {
+    if (!canManage) return;
+    setIsSavingMode(true);
+
+    try {
+      const { data: currentData, error: fetchError } = await supabase
+        .from('process_templates')
+        .select('settings')
+        .eq('id', processId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      const currentSettings = (currentData?.settings as Record<string, unknown>) || {};
+      const updatedSettings = {
+        ...currentSettings,
+        workflow_mode: workflowMode,
+      };
+
+      const { error } = await supabase
+        .from('process_templates')
+        .update({ settings: updatedSettings as any })
+        .eq('id', processId);
+
+      if (error) throw error;
+
+      toast.success('Mode de workflow enregistré');
+      setIsModeDirty(false);
+      onUpdate();
+    } catch (error: any) {
+      console.error('Error saving workflow mode:', error);
+      toast.error(`Erreur: ${error.message || 'Impossible de sauvegarder'}`);
+    } finally {
+      setIsSavingMode(false);
+    }
+  };
+
   const handleGenerate = async (forceRegenerate = false) => {
     if (!user) return;
+    
+    // In custom mode with existing workflow, show warning
+    if (workflowMode === 'custom' && workflowInfo && !forceRegenerate) {
+      setShowRegenerateDialog(true);
+      return;
+    }
     
     setIsGenerating(true);
     setShowRegenerateDialog(false);
 
     try {
       // Delete existing workflow if regenerating
-      if (forceRegenerate && workflowInfo) {
+      if (workflowInfo) {
+        // First delete edges
+        const { data: nodes } = await supabase
+          .from('workflow_nodes')
+          .select('id')
+          .eq('workflow_id', workflowInfo.id);
+        
+        if (nodes && nodes.length > 0) {
+          await supabase
+            .from('workflow_edges')
+            .delete()
+            .in('source_node_id', nodes.map(n => n.id));
+        }
+        
+        // Then delete nodes
+        await supabase
+          .from('workflow_nodes')
+          .delete()
+          .eq('workflow_id', workflowInfo.id);
+        
+        // Finally delete the workflow
         await supabase
           .from('workflow_templates')
           .delete()
@@ -165,7 +266,7 @@ export function ProcessGeneratedWorkflowTab({
         fetchWorkflowInfo();
         onUpdate();
       } else {
-        toast.error('Erreur lors de la génération');
+        toast.error('Aucun sous-processus trouvé pour générer le workflow');
       }
     } catch (error) {
       console.error('Error generating workflow:', error);
@@ -230,6 +331,88 @@ export function ProcessGeneratedWorkflowTab({
 
   return (
     <div className="space-y-6">
+      {/* Workflow Mode Selection */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-base">Mode de workflow</CardTitle>
+              <CardDescription>
+                Choisissez comment le workflow est géré
+              </CardDescription>
+            </div>
+            {isModeDirty && (
+              <Badge variant="outline" className="text-warning border-warning">
+                Non enregistré
+              </Badge>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <RadioGroup
+            value={workflowMode}
+            onValueChange={(v) => handleModeChange(v as WorkflowMode)}
+            disabled={!canManage}
+            className="space-y-3"
+          >
+            <div 
+              className={`flex items-start space-x-3 p-3 rounded-lg border transition-all cursor-pointer ${
+                workflowMode === 'standard' 
+                  ? 'border-primary bg-primary/5' 
+                  : 'hover:bg-muted/50'
+              }`}
+              onClick={() => canManage && handleModeChange('standard')}
+            >
+              <RadioGroupItem value="standard" id="mode-standard" className="mt-1" />
+              <Wand2 className={`h-5 w-5 mt-0.5 shrink-0 ${workflowMode === 'standard' ? 'text-primary' : 'text-muted-foreground'}`} />
+              <div className="flex-1 min-w-0">
+                <Label htmlFor="mode-standard" className="font-medium cursor-pointer">
+                  Workflow standard (généré)
+                </Label>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Généré automatiquement depuis les paramètres. Régénérez après chaque modification.
+                </p>
+              </div>
+            </div>
+
+            <div 
+              className={`flex items-start space-x-3 p-3 rounded-lg border transition-all cursor-pointer ${
+                workflowMode === 'custom' 
+                  ? 'border-primary bg-primary/5' 
+                  : 'hover:bg-muted/50'
+              }`}
+              onClick={() => canManage && handleModeChange('custom')}
+            >
+              <RadioGroupItem value="custom" id="mode-custom" className="mt-1" />
+              <Settings2 className={`h-5 w-5 mt-0.5 shrink-0 ${workflowMode === 'custom' ? 'text-primary' : 'text-muted-foreground'}`} />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="mode-custom" className="font-medium cursor-pointer">
+                    Workflow spécifique (custom)
+                  </Label>
+                  {workflowMode === 'custom' && (
+                    <Badge variant="secondary" className="text-xs">Custom</Badge>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Géré manuellement dans l'éditeur. Les paramètres ne régénèrent pas le canvas.
+                </p>
+              </div>
+            </div>
+          </RadioGroup>
+
+          {canManage && (
+            <div className="flex justify-end">
+              <Button onClick={handleSaveMode} disabled={isSavingMode || !isModeDirty} size="sm">
+                {isSavingMode && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                <Save className="h-4 w-4 mr-2" />
+                Enregistrer le mode
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Workflow Status */}
       <Card>
         <CardHeader>
@@ -239,7 +422,12 @@ export function ProcessGeneratedWorkflowTab({
                 <Workflow className={`h-5 w-5 ${workflowInfo ? 'text-primary' : 'text-muted-foreground'}`} />
               </div>
               <div>
-                <CardTitle className="text-base">Workflow généré</CardTitle>
+                <CardTitle className="text-base flex items-center gap-2">
+                  Workflow 
+                  {workflowMode === 'custom' && workflowInfo && (
+                    <Badge variant="secondary" className="text-xs">Custom</Badge>
+                  )}
+                </CardTitle>
                 <CardDescription>
                   {workflowInfo 
                     ? `Version ${workflowInfo.version} • ${workflowInfo.nodeCount} nœuds`
@@ -254,15 +442,15 @@ export function ProcessGeneratedWorkflowTab({
         <CardContent className="space-y-4">
           {workflowInfo ? (
             <>
-              {workflowInfo.isCustomized && (
+              {workflowMode === 'custom' && (
                 <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg">
-                  <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5" />
+                  <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
                   <div className="text-sm">
                     <p className="font-medium text-amber-700 dark:text-amber-300">
-                      Workflow personnalisé
+                      Mode personnalisé actif
                     </p>
                     <p className="text-amber-600 dark:text-amber-400 text-xs">
-                      Ce workflow a été modifié manuellement. La régénération écrasera ces modifications.
+                      La régénération écrasera les modifications manuelles. Utilisez l'éditeur pour modifier.
                     </p>
                   </div>
                 </div>
@@ -290,7 +478,7 @@ export function ProcessGeneratedWorkflowTab({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setShowRegenerateDialog(true)}
+                      onClick={() => workflowMode === 'custom' ? setShowRegenerateDialog(true) : handleGenerate(true)}
                       disabled={isGenerating}
                     >
                       {isGenerating ? (
@@ -314,17 +502,32 @@ export function ProcessGeneratedWorkflowTab({
             <div className="text-center py-6">
               <Zap className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
               <p className="text-muted-foreground mb-4">
-                Générez un workflow automatiquement à partir des paramètres du processus
+                {workflowMode === 'standard' 
+                  ? "Générez un workflow automatiquement à partir des paramètres du processus"
+                  : "Créez un workflow personnalisé dans l'éditeur"
+                }
               </p>
               {canManage && (
-                <Button onClick={() => handleGenerate(false)} disabled={isGenerating}>
-                  {isGenerating ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Zap className="h-4 w-4 mr-2" />
-                  )}
-                  Générer le workflow
-                </Button>
+                workflowMode === 'standard' ? (
+                  <Button onClick={() => handleGenerate(false)} disabled={isGenerating || subProcessCount === 0}>
+                    {isGenerating ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Zap className="h-4 w-4 mr-2" />
+                    )}
+                    Générer le workflow
+                  </Button>
+                ) : (
+                  <Button onClick={() => navigate(`/templates/workflow/process/${processId}`)}>
+                    <Workflow className="h-4 w-4 mr-2" />
+                    Créer dans l'éditeur
+                  </Button>
+                )
+              )}
+              {subProcessCount === 0 && workflowMode === 'standard' && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  Ajoutez d'abord des sous-processus pour générer un workflow
+                </p>
               )}
             </div>
           )}
@@ -332,7 +535,7 @@ export function ProcessGeneratedWorkflowTab({
       </Card>
 
       {/* Generated Structure Preview */}
-      {subProcessCount > 0 && (
+      {subProcessCount > 0 && workflowMode === 'standard' && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Structure générée (aperçu)</CardTitle>
@@ -422,12 +625,18 @@ export function ProcessGeneratedWorkflowTab({
       <AlertDialog open={showRegenerateDialog} onOpenChange={setShowRegenerateDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Régénérer le workflow ?</AlertDialogTitle>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-warning" />
+              Régénérer le workflow ?
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              {workflowInfo?.isCustomized ? (
+              {workflowMode === 'custom' ? (
                 <>
-                  <span className="font-medium text-amber-600">Attention :</span> Ce workflow a été 
-                  personnalisé manuellement. La régénération écrasera toutes les modifications.
+                  <span className="font-medium text-amber-600">Attention :</span> Vous êtes en mode 
+                  "Workflow spécifique". La régénération <strong>écrasera</strong> toutes les modifications 
+                  manuelles effectuées dans l'éditeur.
+                  <br /><br />
+                  Cette action est irréversible.
                 </>
               ) : (
                 <>
@@ -438,7 +647,15 @@ export function ProcessGeneratedWorkflowTab({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction onClick={() => handleGenerate(true)}>
+            <AlertDialogAction 
+              onClick={() => handleGenerate(true)}
+              className={workflowMode === 'custom' ? 'bg-warning text-warning-foreground hover:bg-warning/90' : ''}
+            >
+              {isGenerating ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2" />
+              )}
               Régénérer
             </AlertDialogAction>
           </AlertDialogFooter>
