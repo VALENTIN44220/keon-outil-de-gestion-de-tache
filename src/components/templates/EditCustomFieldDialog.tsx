@@ -27,7 +27,9 @@ import {
   FieldOption,
 } from '@/types/customField';
 import { useTableLookupConfigs } from '@/hooks/useTableLookupConfigs';
-import { Plus, Trash2 } from 'lucide-react';
+import { useProcessTemplates } from '@/hooks/useProcessTemplates';
+import { useAllSubProcessTemplates } from '@/hooks/useAllSubProcessTemplates';
+import { Plus, Trash2, Globe, Workflow, GitBranch } from 'lucide-react';
 
 interface EditCustomFieldDialogProps {
   field: TemplateCustomField | null;
@@ -43,6 +45,8 @@ export function EditCustomFieldDialog({
   onSuccess,
 }: EditCustomFieldDialogProps) {
   const { activeConfigs, configs } = useTableLookupConfigs();
+  const { processes } = useProcessTemplates();
+  const { subProcesses } = useAllSubProcessTemplates();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form state
@@ -55,6 +59,11 @@ export function EditCustomFieldDialog({
   const [defaultValue, setDefaultValue] = useState('');
   const [options, setOptions] = useState<FieldOption[]>([]);
   const [lookupConfigId, setLookupConfigId] = useState<string | null>(null);
+  
+  // Scope state
+  const [scopeType, setScopeType] = useState<'common' | 'process' | 'subprocess'>('common');
+  const [processId, setProcessId] = useState<string>('__none__');
+  const [subProcessId, setSubProcessId] = useState<string>('__none__');
 
   useEffect(() => {
     if (field) {
@@ -66,6 +75,7 @@ export function EditCustomFieldDialog({
       setPlaceholder(field.placeholder || '');
       setDefaultValue(field.default_value || '');
       setOptions(field.options || []);
+      
       // Find matching config by table/columns
       const matchingConfig = configs.find(
         c => c.table_name === field.lookup_table && 
@@ -73,6 +83,25 @@ export function EditCustomFieldDialog({
              c.value_column === field.lookup_value_column
       );
       setLookupConfigId(matchingConfig?.id || null);
+      
+      // Set scope
+      if (field.is_common) {
+        setScopeType('common');
+        setProcessId('__none__');
+        setSubProcessId('__none__');
+      } else if (field.sub_process_template_id) {
+        setScopeType('subprocess');
+        setSubProcessId(field.sub_process_template_id);
+        setProcessId('__none__');
+      } else if (field.process_template_id) {
+        setScopeType('process');
+        setProcessId(field.process_template_id);
+        setSubProcessId('__none__');
+      } else {
+        setScopeType('common');
+        setProcessId('__none__');
+        setSubProcessId('__none__');
+      }
     }
   }, [field, configs]);
 
@@ -101,6 +130,19 @@ export function EditCustomFieldDialog({
       return;
     }
 
+    // Build scope values
+    let is_common = false;
+    let process_template_id: string | null = null;
+    let sub_process_template_id: string | null = null;
+    
+    if (scopeType === 'common') {
+      is_common = true;
+    } else if (scopeType === 'process' && processId !== '__none__') {
+      process_template_id = processId;
+    } else if (scopeType === 'subprocess' && subProcessId !== '__none__') {
+      sub_process_template_id = subProcessId;
+    }
+
     setIsSubmitting(true);
     try {
       const { error } = await supabase
@@ -119,6 +161,9 @@ export function EditCustomFieldDialog({
           lookup_table: fieldType === 'table_lookup' && lookupConfigId ? activeConfigs.find(c => c.id === lookupConfigId)?.table_name : null,
           lookup_value_column: fieldType === 'table_lookup' && lookupConfigId ? activeConfigs.find(c => c.id === lookupConfigId)?.value_column : null,
           lookup_label_column: fieldType === 'table_lookup' && lookupConfigId ? activeConfigs.find(c => c.id === lookupConfigId)?.display_column : null,
+          is_common,
+          process_template_id,
+          sub_process_template_id,
         })
         .eq('id', field.id);
 
@@ -311,19 +356,76 @@ export function EditCustomFieldDialog({
             </div>
           </div>
 
-          {/* Scope info (read-only) */}
-          <div className="p-3 bg-muted rounded-lg text-sm">
-            <span className="font-medium">Portée : </span>
-            {field.is_common
-              ? 'Commun à tous les processus'
-              : field.sub_process_template_id
-              ? 'Lié à un sous-processus'
-              : field.process_template_id
-              ? 'Lié à un processus'
-              : 'Non défini'}
-            <p className="text-muted-foreground mt-1">
-              La portée ne peut pas être modifiée. Supprimez et recréez le champ si nécessaire.
-            </p>
+          {/* Scope Selection */}
+          <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+            <Label className="text-base font-medium">Portée du champ</Label>
+            
+            <div className="space-y-2">
+              <Label>Type de portée</Label>
+              <Select value={scopeType} onValueChange={(v) => setScopeType(v as any)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-popover">
+                  <SelectItem value="common">
+                    <div className="flex items-center gap-2">
+                      <Globe className="h-4 w-4" />
+                      Commun (tous les processus)
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="process">
+                    <div className="flex items-center gap-2">
+                      <Workflow className="h-4 w-4" />
+                      Processus spécifique
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="subprocess">
+                    <div className="flex items-center gap-2">
+                      <GitBranch className="h-4 w-4" />
+                      Sous-processus spécifique
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {scopeType === 'process' && (
+              <div className="space-y-2">
+                <Label>Processus cible</Label>
+                <Select value={processId} onValueChange={setProcessId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner un processus" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover">
+                    <SelectItem value="__none__">Aucun (non lié)</SelectItem>
+                    {processes.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {scopeType === 'subprocess' && (
+              <div className="space-y-2">
+                <Label>Sous-processus cible</Label>
+                <Select value={subProcessId} onValueChange={setSubProcessId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner un sous-processus" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover">
+                    <SelectItem value="__none__">Aucun (non lié)</SelectItem>
+                    {subProcesses.map((sp) => (
+                      <SelectItem key={sp.id} value={sp.id}>
+                        {sp.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
           <DialogFooter>
