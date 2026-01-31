@@ -320,6 +320,13 @@ export type Database = {
             foreignKeyName: "be_request_details_task_id_fkey"
             columns: ["task_id"]
             isOneToOne: true
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "be_request_details_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: true
             referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
@@ -349,8 +356,22 @@ export type Database = {
             foreignKeyName: "be_request_sub_processes_sub_process_template_id_fkey"
             columns: ["sub_process_template_id"]
             isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["sub_process_template_id"]
+          },
+          {
+            foreignKeyName: "be_request_sub_processes_sub_process_template_id_fkey"
+            columns: ["sub_process_template_id"]
+            isOneToOne: false
             referencedRelation: "sub_process_templates"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "be_request_sub_processes_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["request_id"]
           },
           {
             foreignKeyName: "be_request_sub_processes_task_id_fkey"
@@ -707,6 +728,39 @@ export type Database = {
           },
         ]
       }
+      notification_preferences: {
+        Row: {
+          channel: string
+          created_at: string
+          enabled: boolean
+          event_type: string
+          frequency: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          channel: string
+          created_at?: string
+          enabled?: boolean
+          event_type: string
+          frequency?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          enabled?: boolean
+          event_type?: string
+          frequency?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       outlook_calendar_events: {
         Row: {
           attendees: Json | null
@@ -817,6 +871,13 @@ export type Database = {
             foreignKeyName: "pending_task_assignments_created_task_id_fkey"
             columns: ["created_task_id"]
             isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "pending_task_assignments_created_task_id_fkey"
+            columns: ["created_task_id"]
+            isOneToOne: false
             referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
@@ -831,8 +892,22 @@ export type Database = {
             foreignKeyName: "pending_task_assignments_request_id_fkey"
             columns: ["request_id"]
             isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "pending_task_assignments_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
             referencedRelation: "tasks"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_task_assignments_sub_process_template_id_fkey"
+            columns: ["sub_process_template_id"]
+            isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["sub_process_template_id"]
           },
           {
             foreignKeyName: "pending_task_assignments_sub_process_template_id_fkey"
@@ -1336,7 +1411,89 @@ export type Database = {
             foreignKeyName: "request_field_values_task_id_fkey"
             columns: ["task_id"]
             isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "request_field_values_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
             referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      request_sub_processes: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          id: string
+          order_index: number
+          request_id: string
+          started_at: string | null
+          status: string
+          sub_process_template_id: string
+          updated_at: string
+          workflow_run_id: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          order_index?: number
+          request_id: string
+          started_at?: string | null
+          status?: string
+          sub_process_template_id: string
+          updated_at?: string
+          workflow_run_id?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          order_index?: number
+          request_id?: string
+          started_at?: string | null
+          status?: string
+          sub_process_template_id?: string
+          updated_at?: string
+          workflow_run_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "request_sub_processes_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "request_sub_processes_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "request_sub_processes_sub_process_template_id_fkey"
+            columns: ["sub_process_template_id"]
+            isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["sub_process_template_id"]
+          },
+          {
+            foreignKeyName: "request_sub_processes_sub_process_template_id_fkey"
+            columns: ["sub_process_template_id"]
+            isOneToOne: false
+            referencedRelation: "sub_process_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "request_sub_processes_workflow_run_id_fkey"
+            columns: ["workflow_run_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_runs"
             referencedColumns: ["id"]
           },
         ]
@@ -1361,6 +1518,13 @@ export type Database = {
           sub_process_template_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "sub_process_template_visible_compa_sub_process_template_id_fkey"
+            columns: ["sub_process_template_id"]
+            isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["sub_process_template_id"]
+          },
           {
             foreignKeyName: "sub_process_template_visible_compa_sub_process_template_id_fkey"
             columns: ["sub_process_template_id"]
@@ -1397,6 +1561,13 @@ export type Database = {
           sub_process_template_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "sub_process_template_visible_depar_sub_process_template_id_fkey"
+            columns: ["sub_process_template_id"]
+            isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["sub_process_template_id"]
+          },
           {
             foreignKeyName: "sub_process_template_visible_depar_sub_process_template_id_fkey"
             columns: ["sub_process_template_id"]
@@ -1614,6 +1785,13 @@ export type Database = {
             foreignKeyName: "task_attachments_task_id_fkey"
             columns: ["task_id"]
             isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "task_attachments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
             referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
@@ -1672,6 +1850,13 @@ export type Database = {
             foreignKeyName: "task_checklists_task_id_fkey"
             columns: ["task_id"]
             isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "task_checklists_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
             referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
@@ -1712,6 +1897,61 @@ export type Database = {
           },
           {
             foreignKeyName: "task_comments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "task_comments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_status_transitions: {
+        Row: {
+          changed_by: string | null
+          created_at: string
+          from_status: string
+          id: string
+          metadata: Json | null
+          reason: string | null
+          task_id: string
+          to_status: string
+        }
+        Insert: {
+          changed_by?: string | null
+          created_at?: string
+          from_status: string
+          id?: string
+          metadata?: Json | null
+          reason?: string | null
+          task_id: string
+          to_status: string
+        }
+        Update: {
+          changed_by?: string | null
+          created_at?: string
+          from_status?: string
+          id?: string
+          metadata?: Json | null
+          reason?: string | null
+          task_id?: string
+          to_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_status_transitions_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "task_status_transitions_task_id_fkey"
             columns: ["task_id"]
             isOneToOne: false
             referencedRelation: "tasks"
@@ -1938,6 +2178,13 @@ export type Database = {
             foreignKeyName: "task_templates_sub_process_template_id_fkey"
             columns: ["sub_process_template_id"]
             isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["sub_process_template_id"]
+          },
+          {
+            foreignKeyName: "task_templates_sub_process_template_id_fkey"
+            columns: ["sub_process_template_id"]
+            isOneToOne: false
             referencedRelation: "sub_process_templates"
             referencedColumns: ["id"]
           },
@@ -2010,6 +2257,13 @@ export type Database = {
             foreignKeyName: "task_validation_levels_task_id_fkey"
             columns: ["task_id"]
             isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "task_validation_levels_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
             referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
@@ -2046,7 +2300,9 @@ export type Database = {
           is_locked_for_validation: boolean | null
           original_assignee_id: string | null
           parent_request_id: string | null
+          parent_sub_process_run_id: string | null
           priority: string
+          process_template_id: string | null
           rbe_validated_at: string | null
           rbe_validation_comment: string | null
           rbe_validation_status: string | null
@@ -2082,6 +2338,7 @@ export type Database = {
           validator_id: string | null
           validator_level_1_id: string | null
           validator_level_2_id: string | null
+          workflow_run_id: string | null
         }
         Insert: {
           assignee_id?: string | null
@@ -2099,7 +2356,9 @@ export type Database = {
           is_locked_for_validation?: boolean | null
           original_assignee_id?: string | null
           parent_request_id?: string | null
+          parent_sub_process_run_id?: string | null
           priority?: string
+          process_template_id?: string | null
           rbe_validated_at?: string | null
           rbe_validation_comment?: string | null
           rbe_validation_status?: string | null
@@ -2135,6 +2394,7 @@ export type Database = {
           validator_id?: string | null
           validator_level_1_id?: string | null
           validator_level_2_id?: string | null
+          workflow_run_id?: string | null
         }
         Update: {
           assignee_id?: string | null
@@ -2152,7 +2412,9 @@ export type Database = {
           is_locked_for_validation?: boolean | null
           original_assignee_id?: string | null
           parent_request_id?: string | null
+          parent_sub_process_run_id?: string | null
           priority?: string
+          process_template_id?: string | null
           rbe_validated_at?: string | null
           rbe_validation_comment?: string | null
           rbe_validation_status?: string | null
@@ -2188,6 +2450,7 @@ export type Database = {
           validator_id?: string | null
           validator_level_1_id?: string | null
           validator_level_2_id?: string | null
+          workflow_run_id?: string | null
         }
         Relationships: [
           {
@@ -2229,7 +2492,35 @@ export type Database = {
             foreignKeyName: "tasks_parent_request_id_fkey"
             columns: ["parent_request_id"]
             isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "tasks_parent_request_id_fkey"
+            columns: ["parent_request_id"]
+            isOneToOne: false
             referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_parent_sub_process_run_id_fkey"
+            columns: ["parent_sub_process_run_id"]
+            isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["sub_process_run_id"]
+          },
+          {
+            foreignKeyName: "tasks_parent_sub_process_run_id_fkey"
+            columns: ["parent_sub_process_run_id"]
+            isOneToOne: false
+            referencedRelation: "request_sub_processes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_process_template_id_fkey"
+            columns: ["process_template_id"]
+            isOneToOne: false
+            referencedRelation: "process_templates"
             referencedColumns: ["id"]
           },
           {
@@ -2259,6 +2550,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "process_templates"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_source_sub_process_template_id_fkey"
+            columns: ["source_sub_process_template_id"]
+            isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["sub_process_template_id"]
           },
           {
             foreignKeyName: "tasks_source_sub_process_template_id_fkey"
@@ -2314,6 +2612,13 @@ export type Database = {
             columns: ["validator_level_2_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_workflow_run_id_fkey"
+            columns: ["workflow_run_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_runs"
             referencedColumns: ["id"]
           },
         ]
@@ -2421,6 +2726,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "process_templates"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "template_custom_fields_sub_process_template_id_fkey"
+            columns: ["sub_process_template_id"]
+            isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["sub_process_template_id"]
           },
           {
             foreignKeyName: "template_custom_fields_sub_process_template_id_fkey"
@@ -2979,6 +3291,97 @@ export type Database = {
           },
         ]
       }
+      workflow_events: {
+        Row: {
+          created_at: string
+          entity_id: string
+          entity_type: string
+          error_message: string | null
+          event_type: string
+          id: string
+          payload: Json
+          processed: boolean
+          processed_at: string | null
+          run_id: string | null
+          triggered_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          error_message?: string | null
+          event_type: string
+          id?: string
+          payload?: Json
+          processed?: boolean
+          processed_at?: string | null
+          run_id?: string | null
+          triggered_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          error_message?: string | null
+          event_type?: string
+          id?: string
+          payload?: Json
+          processed?: boolean
+          processed_at?: string | null
+          run_id?: string | null
+          triggered_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_events_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workflow_execution_logs: {
+        Row: {
+          action: string
+          actor_id: string | null
+          created_at: string
+          details: Json | null
+          duration_ms: number | null
+          id: string
+          node_id: string | null
+          run_id: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          created_at?: string
+          details?: Json | null
+          duration_ms?: number | null
+          id?: string
+          node_id?: string | null
+          run_id: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          created_at?: string
+          details?: Json | null
+          duration_ms?: number | null
+          id?: string
+          node_id?: string | null
+          run_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workflow_execution_logs_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workflow_nodes: {
         Row: {
           config: Json
@@ -3291,6 +3694,13 @@ export type Database = {
             foreignKeyName: "workflow_templates_sub_process_template_id_fkey"
             columns: ["sub_process_template_id"]
             isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["sub_process_template_id"]
+          },
+          {
+            foreignKeyName: "workflow_templates_sub_process_template_id_fkey"
+            columns: ["sub_process_template_id"]
+            isOneToOne: false
             referencedRelation: "sub_process_templates"
             referencedColumns: ["id"]
           },
@@ -3524,6 +3934,13 @@ export type Database = {
             foreignKeyName: "workload_slots_task_id_fkey"
             columns: ["task_id"]
             isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "workload_slots_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
             referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
@@ -3538,7 +3955,23 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      request_progress_view: {
+        Row: {
+          completed_task_count: number | null
+          progress_percent: number | null
+          request_created_at: string | null
+          request_id: string | null
+          request_status: string | null
+          request_title: string | null
+          sub_process_name: string | null
+          sub_process_order: number | null
+          sub_process_run_id: string | null
+          sub_process_status: string | null
+          sub_process_template_id: string | null
+          task_count: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       can_access_task: { Args: { _task_id: string }; Returns: boolean }
@@ -3568,6 +4001,16 @@ export type Database = {
       current_company_id: { Args: never; Returns: string }
       current_department_id: { Args: never; Returns: string }
       current_profile_id: { Args: never; Returns: string }
+      emit_workflow_event: {
+        Args: {
+          p_entity_id: string
+          p_entity_type: string
+          p_event_type: string
+          p_payload?: Json
+          p_run_id?: string
+        }
+        Returns: string
+      }
       get_active_workflow: {
         Args: {
           _process_template_id?: string
