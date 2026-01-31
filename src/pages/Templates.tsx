@@ -5,7 +5,6 @@ import { ProcessCard } from '@/components/templates/ProcessCard';
 import { TemplateAdvancedFilters, TemplateFiltersState, defaultFilters } from '@/components/templates/TemplateAdvancedFilters';
 import { AddProcessDialog } from '@/components/templates/AddProcessDialog';
 import { EditProcessDialog } from '@/components/templates/EditProcessDialog';
-import { ProcessDetailView } from '@/components/templates/ProcessDetailView';
 import { UnifiedModelView } from '@/components/templates/UnifiedModelView';
 import { SubProcessTemplatesList } from '@/components/templates/SubProcessTemplatesList';
 import { TaskTemplatesList } from '@/components/templates/TaskTemplatesList';
@@ -33,7 +32,6 @@ const Templates = () => {
   const [isBulkTaskImportOpen, setIsBulkTaskImportOpen] = useState(false);
   const [editingProcess, setEditingProcess] = useState<ProcessTemplate | null>(null);
   const [viewingProcess, setViewingProcess] = useState<ProcessWithTasks | null>(null);
-  const [viewingModelProcess, setViewingModelProcess] = useState<ProcessWithTasks | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState<TemplateFiltersState>(defaultFilters);
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
@@ -319,21 +317,12 @@ const Templates = () => {
         onSave={handleUpdateProcess}
       />
 
-      <ProcessDetailView
+      <UnifiedModelView
         process={viewingProcess}
         open={!!viewingProcess}
         onClose={() => setViewingProcess(null)}
-        onAddTask={(task) => viewingProcess && addTaskTemplate(viewingProcess.id, task)}
-        onDeleteTask={(taskId) => viewingProcess && deleteTaskTemplate(viewingProcess.id, taskId)}
-        canManage={Boolean(viewingProcess?.can_manage)}
-      />
-
-      <UnifiedModelView
-        process={viewingModelProcess}
-        open={!!viewingModelProcess}
-        onClose={() => setViewingModelProcess(null)}
         onUpdate={() => {}}
-        canManage={Boolean(viewingModelProcess?.can_manage)}
+        canManage={Boolean(viewingProcess?.can_manage)}
       />
     </div>
   );
