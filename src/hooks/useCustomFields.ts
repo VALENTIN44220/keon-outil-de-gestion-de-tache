@@ -96,6 +96,9 @@ export function useCustomFields(options: UseCustomFieldsOptions = {}) {
         field_type: field.field_type as CustomFieldType,
         options: field.options as FieldOption[] | null,
         condition_operator: field.condition_operator as TemplateCustomField['condition_operator'],
+        conditions_logic: (field.conditions_logic || 'AND') as 'AND' | 'OR',
+        validation_params: field.validation_params as Record<string, any> | null,
+        additional_conditions: field.additional_conditions as Array<{ field_id: string; operator: string; value: string }> | null,
       }));
 
       setFields(typedFields);
@@ -146,6 +149,9 @@ export function useCustomFields(options: UseCustomFieldsOptions = {}) {
         field_type: data.field_type as CustomFieldType,
         options: data.options as unknown as FieldOption[] | null,
         condition_operator: data.condition_operator as TemplateCustomField['condition_operator'],
+        conditions_logic: (data.conditions_logic || 'AND') as 'AND' | 'OR',
+        validation_params: data.validation_params as Record<string, any> | null,
+        additional_conditions: data.additional_conditions as Array<{ field_id: string; operator: string; value: string }> | null,
       };
 
       setFields((prev) => [...prev, typedField].sort((a, b) => a.order_index - b.order_index));

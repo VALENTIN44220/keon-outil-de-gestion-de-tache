@@ -95,6 +95,19 @@ export interface TemplateCustomField {
   lookup_table: string | null;
   lookup_value_column: string | null;
   lookup_label_column: string | null;
+  // Layout fields (Form Builder)
+  section_id: string | null;
+  column_span: number;
+  row_index: number | null;
+  column_index: number;
+  width_ratio: number | null;
+  // Enhanced validation
+  validation_type: string | null;
+  validation_message: string | null;
+  validation_params: Record<string, any> | null;
+  // Advanced conditions
+  conditions_logic: 'AND' | 'OR';
+  additional_conditions: Array<{ field_id: string; operator: string; value: string }> | null;
 }
 
 export interface RequestFieldValue {

@@ -628,6 +628,99 @@ export type Database = {
           },
         ]
       }
+      form_sections: {
+        Row: {
+          condition_field_id: string | null
+          condition_operator: string | null
+          condition_value: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_collapsed_by_default: boolean
+          is_collapsible: boolean
+          is_common: boolean
+          label: string
+          name: string
+          order_index: number
+          process_template_id: string | null
+          sub_process_template_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          condition_field_id?: string | null
+          condition_operator?: string | null
+          condition_value?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_collapsed_by_default?: boolean
+          is_collapsible?: boolean
+          is_common?: boolean
+          label: string
+          name: string
+          order_index?: number
+          process_template_id?: string | null
+          sub_process_template_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          condition_field_id?: string | null
+          condition_operator?: string | null
+          condition_value?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_collapsed_by_default?: boolean
+          is_collapsible?: boolean
+          is_common?: boolean
+          label?: string
+          name?: string
+          order_index?: number
+          process_template_id?: string | null
+          sub_process_template_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_sections_condition_field_id_fkey"
+            columns: ["condition_field_id"]
+            isOneToOne: false
+            referencedRelation: "template_custom_fields"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_sections_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_sections_process_template_id_fkey"
+            columns: ["process_template_id"]
+            isOneToOne: false
+            referencedRelation: "process_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_sections_sub_process_template_id_fkey"
+            columns: ["sub_process_template_id"]
+            isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["sub_process_template_id"]
+          },
+          {
+            foreignKeyName: "form_sections_sub_process_template_id_fkey"
+            columns: ["sub_process_template_id"]
+            isOneToOne: false
+            referencedRelation: "sub_process_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hierarchy_levels: {
         Row: {
           created_at: string
@@ -2628,9 +2721,13 @@ export type Database = {
       }
       template_custom_fields: {
         Row: {
+          additional_conditions: Json | null
+          column_index: number
+          column_span: number
           condition_field_id: string | null
           condition_operator: string | null
           condition_value: string | null
+          conditions_logic: string | null
           created_at: string
           created_by: string | null
           default_value: string | null
@@ -2650,14 +2747,24 @@ export type Database = {
           order_index: number
           placeholder: string | null
           process_template_id: string | null
+          row_index: number | null
+          section_id: string | null
           sub_process_template_id: string | null
           updated_at: string
+          validation_message: string | null
+          validation_params: Json | null
           validation_regex: string | null
+          validation_type: string | null
+          width_ratio: number | null
         }
         Insert: {
+          additional_conditions?: Json | null
+          column_index?: number
+          column_span?: number
           condition_field_id?: string | null
           condition_operator?: string | null
           condition_value?: string | null
+          conditions_logic?: string | null
           created_at?: string
           created_by?: string | null
           default_value?: string | null
@@ -2677,14 +2784,24 @@ export type Database = {
           order_index?: number
           placeholder?: string | null
           process_template_id?: string | null
+          row_index?: number | null
+          section_id?: string | null
           sub_process_template_id?: string | null
           updated_at?: string
+          validation_message?: string | null
+          validation_params?: Json | null
           validation_regex?: string | null
+          validation_type?: string | null
+          width_ratio?: number | null
         }
         Update: {
+          additional_conditions?: Json | null
+          column_index?: number
+          column_span?: number
           condition_field_id?: string | null
           condition_operator?: string | null
           condition_value?: string | null
+          conditions_logic?: string | null
           created_at?: string
           created_by?: string | null
           default_value?: string | null
@@ -2704,9 +2821,15 @@ export type Database = {
           order_index?: number
           placeholder?: string | null
           process_template_id?: string | null
+          row_index?: number | null
+          section_id?: string | null
           sub_process_template_id?: string | null
           updated_at?: string
+          validation_message?: string | null
+          validation_params?: Json | null
           validation_regex?: string | null
+          validation_type?: string | null
+          width_ratio?: number | null
         }
         Relationships: [
           {
@@ -2728,6 +2851,13 @@ export type Database = {
             columns: ["process_template_id"]
             isOneToOne: false
             referencedRelation: "process_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "template_custom_fields_section_id_fkey"
+            columns: ["section_id"]
+            isOneToOne: false
+            referencedRelation: "form_sections"
             referencedColumns: ["id"]
           },
           {
