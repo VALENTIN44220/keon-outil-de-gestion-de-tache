@@ -36,20 +36,34 @@ type AssignmentScope = 'global' | 'per_subprocess';
 type AssignmentRule = 'manager' | 'user' | 'group';
 type ManagerSource = 'requester_manager' | 'target_department_manager' | 'specific_user';
 
+interface AssignmentConfig {
+  scope: AssignmentScope;
+  rule: AssignmentRule;
+  manager_source: ManagerSource;
+  specific_user_id: string | null;
+  specific_group_id: string | null;
+}
+
+const DEFAULT_CONFIG: AssignmentConfig = {
+  scope: 'per_subprocess',
+  rule: 'manager',
+  manager_source: 'target_department_manager',
+  specific_user_id: null,
+  specific_group_id: null,
+};
+
 export function ProcessAssignmentTab({ process, onUpdate, canManage }: ProcessAssignmentTabProps) {
+  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [assignmentScope, setAssignmentScope] = useState<AssignmentScope>('per_subprocess');
-  const [assignmentRule, setAssignmentRule] = useState<AssignmentRule>('manager');
-  const [managerSource, setManagerSource] = useState<ManagerSource>('target_department_manager');
-  const [specificUserId, setSpecificUserId] = useState<string | null>(null);
-  const [specificGroupId, setSpecificGroupId] = useState<string | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
+  const [config, setConfig] = useState<AssignmentConfig>(DEFAULT_CONFIG);
   
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [groups, setGroups] = useState<CollaboratorGroup[]>([]);
 
   useEffect(() => {
-    fetchReferenceData();
-  }, []);
+    Promise.all([fetchReferenceData(), loadAssignmentConfig()]);
+  }, [process.id]);
 
   const fetchReferenceData = async () => {
     const [profileRes, groupRes] = await Promise.all([
@@ -61,18 +75,71 @@ export function ProcessAssignmentTab({ process, onUpdate, canManage }: ProcessAs
     if (groupRes.data) setGroups(groupRes.data);
   };
 
+  const loadAssignmentConfig = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('process_templates')
+        .select('settings')
+        .eq('id', process.id)
+        .single();
+
+      if (error) throw error;
+
+      const settings = (data?.settings as Record<string, any>) || {};
+      const assignmentConfig = settings.assignment_config as AssignmentConfig | undefined;
+
+      if (assignmentConfig) {
+        setConfig(assignmentConfig);
+      } else {
+        setConfig(DEFAULT_CONFIG);
+      }
+      setIsDirty(false);
+    } catch (error) {
+      console.error('Error loading assignment config:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const updateConfig = (updates: Partial<AssignmentConfig>) => {
+    setConfig(prev => ({ ...prev, ...updates }));
+    setIsDirty(true);
+  };
+
   const handleSave = async () => {
     if (!canManage) return;
     setIsSaving(true);
 
     try {
-      // In a real implementation, we would save this to a process_assignment_config table
-      // For now, we just show a success message
+      // First get current settings to merge
+      const { data: currentData, error: fetchError } = await supabase
+        .from('process_templates')
+        .select('settings')
+        .eq('id', process.id)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      const currentSettings = (currentData?.settings as Record<string, unknown>) || {};
+      const updatedSettings = {
+        ...currentSettings,
+        assignment_config: config as unknown,
+      };
+
+      const { error } = await supabase
+        .from('process_templates')
+        .update({ settings: updatedSettings as any })
+        .eq('id', process.id);
+
+      if (error) throw error;
+
       toast.success('Configuration d\'affectation enregistrée');
+      setIsDirty(false);
       onUpdate();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving assignment config:', error);
-      toast.error('Erreur lors de la sauvegarde');
+      toast.error(`Erreur: ${error.message || 'Impossible de sauvegarder'}`);
     } finally {
       setIsSaving(false);
     }
@@ -105,8 +172,30 @@ export function ProcessAssignmentTab({ process, onUpdate, canManage }: ProcessAs
     { value: 'specific_user', label: 'Utilisateur spécifique' },
   ];
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-base font-semibold">Affectation des tâches</h3>
+          <p className="text-sm text-muted-foreground">
+            Définissez les règles d'affectation par défaut
+          </p>
+        </div>
+        {isDirty && (
+          <Badge variant="outline" className="text-warning border-warning">
+            Modifications non enregistrées
+          </Badge>
+        )}
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Périmètre d'affectation</CardTitle>
@@ -116,8 +205,8 @@ export function ProcessAssignmentTab({ process, onUpdate, canManage }: ProcessAs
         </CardHeader>
         <CardContent>
           <RadioGroup
-            value={assignmentScope}
-            onValueChange={(v) => setAssignmentScope(v as AssignmentScope)}
+            value={config.scope}
+            onValueChange={(v) => updateConfig({ scope: v as AssignmentScope })}
             disabled={!canManage}
             className="space-y-3"
           >
@@ -147,7 +236,7 @@ export function ProcessAssignmentTab({ process, onUpdate, canManage }: ProcessAs
         </CardContent>
       </Card>
 
-      {assignmentScope === 'global' && (
+      {config.scope === 'global' && (
         <>
           <Card>
             <CardHeader>
@@ -155,14 +244,14 @@ export function ProcessAssignmentTab({ process, onUpdate, canManage }: ProcessAs
             </CardHeader>
             <CardContent className="space-y-4">
               <RadioGroup
-                value={assignmentRule}
-                onValueChange={(v) => setAssignmentRule(v as AssignmentRule)}
+                value={config.rule}
+                onValueChange={(v) => updateConfig({ rule: v as AssignmentRule })}
                 disabled={!canManage}
                 className="grid grid-cols-1 gap-3"
               >
                 {assignmentRules.map((rule) => {
                   const Icon = rule.icon;
-                  const isSelected = assignmentRule === rule.value;
+                  const isSelected = config.rule === rule.value;
                   return (
                     <div
                       key={rule.value}
@@ -185,15 +274,15 @@ export function ProcessAssignmentTab({ process, onUpdate, canManage }: ProcessAs
             </CardContent>
           </Card>
 
-          {assignmentRule === 'manager' && (
+          {config.rule === 'manager' && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Source du manager</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Select
-                  value={managerSource}
-                  onValueChange={(v) => setManagerSource(v as ManagerSource)}
+                  value={config.manager_source}
+                  onValueChange={(v) => updateConfig({ manager_source: v as ManagerSource })}
                   disabled={!canManage}
                 >
                   <SelectTrigger>
@@ -208,12 +297,12 @@ export function ProcessAssignmentTab({ process, onUpdate, canManage }: ProcessAs
                   </SelectContent>
                 </Select>
 
-                {managerSource === 'specific_user' && (
+                {config.manager_source === 'specific_user' && (
                   <div className="space-y-2">
                     <Label>Utilisateur manager</Label>
                     <Select
-                      value={specificUserId || '__none__'}
-                      onValueChange={(v) => setSpecificUserId(v === '__none__' ? null : v)}
+                      value={config.specific_user_id || '__none__'}
+                      onValueChange={(v) => updateConfig({ specific_user_id: v === '__none__' ? null : v })}
                       disabled={!canManage}
                     >
                       <SelectTrigger>
@@ -234,15 +323,15 @@ export function ProcessAssignmentTab({ process, onUpdate, canManage }: ProcessAs
             </Card>
           )}
 
-          {assignmentRule === 'user' && (
+          {config.rule === 'user' && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Utilisateur cible</CardTitle>
               </CardHeader>
               <CardContent>
                 <Select
-                  value={specificUserId || '__none__'}
-                  onValueChange={(v) => setSpecificUserId(v === '__none__' ? null : v)}
+                  value={config.specific_user_id || '__none__'}
+                  onValueChange={(v) => updateConfig({ specific_user_id: v === '__none__' ? null : v })}
                   disabled={!canManage}
                 >
                   <SelectTrigger>
@@ -261,15 +350,15 @@ export function ProcessAssignmentTab({ process, onUpdate, canManage }: ProcessAs
             </Card>
           )}
 
-          {assignmentRule === 'group' && (
+          {config.rule === 'group' && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Groupe cible</CardTitle>
               </CardHeader>
               <CardContent>
                 <Select
-                  value={specificGroupId || '__none__'}
-                  onValueChange={(v) => setSpecificGroupId(v === '__none__' ? null : v)}
+                  value={config.specific_group_id || '__none__'}
+                  onValueChange={(v) => updateConfig({ specific_group_id: v === '__none__' ? null : v })}
                   disabled={!canManage}
                 >
                   <SelectTrigger>
@@ -290,7 +379,7 @@ export function ProcessAssignmentTab({ process, onUpdate, canManage }: ProcessAs
         </>
       )}
 
-      {assignmentScope === 'per_subprocess' && (
+      {config.scope === 'per_subprocess' && (
         <Card>
           <CardContent className="py-8">
             <div className="flex flex-col items-center text-center">
@@ -305,9 +394,9 @@ export function ProcessAssignmentTab({ process, onUpdate, canManage }: ProcessAs
         </Card>
       )}
 
-      {canManage && assignmentScope === 'global' && (
+      {canManage && (
         <div className="flex justify-end">
-          <Button onClick={handleSave} disabled={isSaving}>
+          <Button onClick={handleSave} disabled={isSaving || !isDirty}>
             {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             <Save className="h-4 w-4 mr-2" />
             Enregistrer
