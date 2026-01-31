@@ -23,6 +23,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Building2, 
@@ -42,7 +52,8 @@ import {
   ListTodo,
   Info,
   LayoutDashboard,
-  GitBranch
+  GitBranch,
+  Ban
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -67,6 +78,10 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange }: Req
   
   // Active tab management
   const [activeTab, setActiveTab] = useState<string>('synthesis');
+  
+  // Cancel request dialog state
+  const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
   
   // Child task editing state
   const [selectedChildTask, setSelectedChildTask] = useState<Task | null>(null);
@@ -293,10 +308,102 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange }: Req
     setActiveTab(subProcessId);
   };
 
+  // Cancel request and all related entities
+  const handleCancelRequest = async () => {
+    if (!task) return;
+    
+    setIsCancelling(true);
+    try {
+      // 1. Cancel all child tasks
+      if (childTasks.length > 0) {
+        const childTaskIds = childTasks.map(t => t.id);
+        const { error: childError } = await supabase
+          .from('tasks')
+          .update({ 
+            status: 'cancelled' as TaskStatus, 
+            updated_at: new Date().toISOString() 
+          })
+          .in('id', childTaskIds);
+        
+        if (childError) throw childError;
+      }
+
+      // 2. Cancel related request_sub_processes
+      const { error: subProcessError } = await supabase
+        .from('request_sub_processes')
+        .update({ 
+          status: 'cancelled',
+          updated_at: new Date().toISOString() 
+        })
+        .eq('request_id', task.id);
+      
+      if (subProcessError) {
+        console.error('Error cancelling sub-processes:', subProcessError);
+      }
+
+      // 3. Cancel any active workflow runs
+      const { error: workflowError } = await supabase
+        .from('workflow_runs')
+        .update({ 
+          status: 'cancelled' as const,
+          completed_at: new Date().toISOString() 
+        })
+        .eq('trigger_entity_id', task.id)
+        .neq('status', 'completed')
+        .neq('status', 'failed')
+        .neq('status', 'cancelled');
+      
+      if (workflowError) {
+        console.error('Error cancelling workflow runs:', workflowError);
+      }
+
+      // 4. Cancel the main request
+      const { error: requestError } = await supabase
+        .from('tasks')
+        .update({ 
+          status: 'cancelled' as TaskStatus, 
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', task.id);
+      
+      if (requestError) throw requestError;
+
+      // 5. Emit workflow event
+      await supabase.from('workflow_events').insert({
+        event_type: 'task_status_changed',
+        entity_type: 'request',
+        entity_id: task.id,
+        payload: {
+          from_status: task.status,
+          to_status: 'cancelled',
+          task_title: task.title,
+          cancelled_tasks_count: childTasks.length,
+        },
+      });
+
+      onStatusChange(task.id, 'cancelled');
+      toast.success('Demande annulée avec succès');
+      setIsCancelDialogOpen(false);
+      onClose();
+    } catch (error) {
+      console.error('Error cancelling request:', error);
+      toast.error('Erreur lors de l\'annulation de la demande');
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
   if (!task) return null;
+
+  // Check if request is linked to a process
+  const isProcessRequest = !!task.source_process_template_id;
+  
+  // Check if request can be cancelled (not already done, validated, or cancelled)
+  const canCancel = !['done', 'validated', 'cancelled'].includes(task.status);
 
   const StatusIcon = statusConfig[task.status] ? 
     (task.status === 'done' || task.status === 'validated' ? CheckCircle2 : 
+     task.status === 'cancelled' ? Ban :
      task.status === 'in-progress' ? Clock : AlertCircle) 
     : AlertCircle;
 
@@ -656,13 +763,59 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange }: Req
           <Button variant="outline" onClick={onClose}>
             Fermer
           </Button>
-          {task.status !== 'done' && task.status !== 'validated' && (
+          {/* Cancel button - available for all non-terminal statuses */}
+          {canCancel && (
+            <Button 
+              variant="destructive" 
+              onClick={() => setIsCancelDialogOpen(true)}
+            >
+              <Ban className="h-4 w-4 mr-2" />
+              Annuler la demande
+            </Button>
+          )}
+          {/* Complete button - only for non-process requests */}
+          {!isProcessRequest && task.status !== 'done' && task.status !== 'validated' && task.status !== 'cancelled' && (
             <Button onClick={() => { onStatusChange(task.id, 'done'); onClose(); }}>
               <CheckCircle2 className="h-4 w-4 mr-2" />
               Marquer terminé
             </Button>
           )}
         </div>
+
+        {/* Cancel Confirmation Dialog */}
+        <AlertDialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Annuler cette demande ?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Cette action annulera la demande et tous les éléments liés :
+                <ul className="list-disc pl-5 mt-2 space-y-1">
+                  <li>{childTasks.length} tâche(s) seront annulée(s)</li>
+                  <li>Les sous-processus en cours seront arrêtés</li>
+                  <li>Les workflows actifs seront stoppés</li>
+                </ul>
+                <p className="mt-2 font-medium text-destructive">
+                  Cette action est irréversible.
+                </p>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isCancelling}>Retour</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={handleCancelRequest} 
+                disabled={isCancelling}
+                className="bg-destructive hover:bg-destructive/90"
+              >
+                {isCancelling ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <Ban className="h-4 w-4 mr-2" />
+                )}
+                Confirmer l'annulation
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DialogContent>
     </Dialog>
   );

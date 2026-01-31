@@ -45,4 +45,5 @@ export const statusConfig: Record<string, { label: string; color: string }> = {
   'pending-validation': { label: 'En validation', color: 'text-warning' },
   validated: { label: 'Validé', color: 'text-success' },
   refused: { label: 'Refusé', color: 'text-destructive' },
+  cancelled: { label: 'Annulé', color: 'text-muted-foreground' },
 };

@@ -41,6 +41,7 @@ interface ContextualActionButtonsProps {
   onStatusChange: (taskId: string, newStatus: TaskStatus) => void;
   onRefresh?: () => void;
   isRequest?: boolean;
+  isProcessRequest?: boolean; // New: whether this request is linked to a process
   hasValidation?: boolean;
   validationLevel?: number;
   className?: string;
@@ -51,6 +52,7 @@ export function ContextualActionButtons({
   onStatusChange,
   onRefresh,
   isRequest = false,
+  isProcessRequest = false,
   hasValidation = false,
   validationLevel = 0,
   className,
@@ -246,6 +248,36 @@ export function ContextualActionButtons({
 
     // In progress state
     if (status === 'in-progress') {
+      // For process requests, don't show complete button - completion is automatic
+      if (isProcessRequest) {
+        return (
+          <div className="flex gap-2">
+            {hasValidation && (
+              <Button
+                size="sm"
+                onClick={() => confirmAction('request_validation', 'pending_validation_1')}
+              >
+                <Send className="h-4 w-4 mr-2" />
+                Soumettre validation
+              </Button>
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => confirmAction('pause', 'todo')}>
+                  <Pause className="h-4 w-4 mr-2" />
+                  Mettre en pause
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        );
+      }
+      
       return (
         <div className="flex gap-2">
           {hasValidation ? (
@@ -320,6 +352,11 @@ export function ContextualActionButtons({
           </Button>
         </div>
       );
+    }
+
+    // Cancelled state - no actions available
+    if (status === 'cancelled') {
+      return null;
     }
 
     // Done or validated - no actions needed

@@ -146,15 +146,16 @@ export interface StandardWorkflowConfig {
 
 // Matrice de transition de statuts
 export const STATUS_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
-  'to_assign': ['todo', 'in-progress'],
-  'todo': ['in-progress', 'to_assign'],
-  'in-progress': ['done', 'todo', 'pending_validation_1', 'review'],
-  'pending_validation_1': ['pending_validation_2', 'validated', 'refused', 'review'],
-  'pending_validation_2': ['validated', 'refused', 'review'],
-  'validated': ['done'],
-  'refused': ['todo', 'review'],
-  'review': ['todo', 'in-progress'],
+  'to_assign': ['todo', 'in-progress', 'cancelled'],
+  'todo': ['in-progress', 'to_assign', 'cancelled'],
+  'in-progress': ['done', 'todo', 'pending_validation_1', 'review', 'cancelled'],
+  'pending_validation_1': ['pending_validation_2', 'validated', 'refused', 'review', 'cancelled'],
+  'pending_validation_2': ['validated', 'refused', 'review', 'cancelled'],
+  'validated': ['done', 'cancelled'],
+  'refused': ['todo', 'review', 'cancelled'],
+  'review': ['todo', 'in-progress', 'cancelled'],
   'done': [],
+  'cancelled': [],
 };
 
 // Labels FR des statuts
@@ -168,6 +169,7 @@ export const STATUS_LABELS: Record<TaskStatus, string> = {
   'validated': 'Validé',
   'refused': 'Refusé',
   'review': 'À corriger',
+  'cancelled': 'Annulé',
 };
 
 // Couleurs des statuts
@@ -181,4 +183,5 @@ export const STATUS_COLORS: Record<TaskStatus, string> = {
   'validated': 'bg-emerald-100 text-emerald-800 border-emerald-200',
   'refused': 'bg-red-100 text-red-800 border-red-200',
   'review': 'bg-purple-100 text-purple-800 border-purple-200',
+  'cancelled': 'bg-gray-100 text-gray-800 border-gray-200',
 };
