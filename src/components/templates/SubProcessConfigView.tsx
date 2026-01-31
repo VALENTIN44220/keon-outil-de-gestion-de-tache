@@ -45,6 +45,10 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { SubProcessTemplate, TaskTemplate, ASSIGNMENT_TYPE_LABELS } from '@/types/template';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
+import { AddTaskTemplateDialog } from './AddTaskTemplateDialog';
+import { EditTaskTemplateDialog } from './EditTaskTemplateDialog';
+import { addTaskToWorkflow, removeTaskFromWorkflow } from '@/hooks/useAutoWorkflowGeneration';
 
 interface SubProcessConfigViewProps {
   subProcessId: string;
@@ -88,6 +92,7 @@ export function SubProcessConfigView({
   canManage = false,
 }: SubProcessConfigViewProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('general');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -101,6 +106,10 @@ export function SubProcessConfigView({
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [groups, setGroups] = useState<CollaboratorGroup[]>([]);
+
+  // Task dialogs
+  const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<TaskTemplateWithChecklist | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -256,6 +265,59 @@ export function SubProcessConfigView({
     setValidationLevels(validationLevels.filter(v => v.level !== level));
   };
 
+  const handleAddTask = async (
+    task: Omit<TaskTemplate, 'id' | 'user_id' | 'process_template_id' | 'sub_process_template_id' | 'created_at' | 'updated_at'>
+  ) => {
+    if (!user || !subProcess) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('task_templates')
+        .insert({
+          ...task,
+          user_id: user.id,
+          sub_process_template_id: subProcessId,
+          process_template_id: subProcess.process_template_id,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Add task node to the workflow
+      await addTaskToWorkflow(subProcessId, data.id, data.title, data.default_duration_days || 5);
+
+      setTasks(prev => [...prev, { ...data, checklist_count: 0 } as TaskTemplateWithChecklist]);
+      toast.success('Tâche ajoutée au workflow');
+      setIsAddTaskOpen(false);
+      onUpdate();
+    } catch (error) {
+      console.error('Error adding task:', error);
+      toast.error("Erreur lors de l'ajout de la tâche");
+    }
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    try {
+      // Remove task node from workflow first
+      await removeTaskFromWorkflow(subProcessId, taskId);
+
+      const { error } = await supabase
+        .from('task_templates')
+        .delete()
+        .eq('id', taskId);
+
+      if (error) throw error;
+
+      setTasks(prev => prev.filter(t => t.id !== taskId));
+      toast.success('Tâche supprimée du workflow');
+      onUpdate();
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      toast.error('Erreur lors de la suppression');
+    }
+  };
+
   if (isLoading) {
     return (
       <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -279,6 +341,7 @@ export function SubProcessConfigView({
   ];
 
   return (
+    <>
     <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <SheetContent className="w-full sm:max-w-3xl p-0 flex flex-col h-full">
         <SheetHeader className="p-6 pb-4 border-b shrink-0">
@@ -386,7 +449,7 @@ export function SubProcessConfigView({
                       </CardDescription>
                     </div>
                     {canManage && (
-                      <Button size="sm">
+                      <Button size="sm" onClick={() => setIsAddTaskOpen(true)}>
                         <Plus className="h-4 w-4 mr-2" />
                         Ajouter
                       </Button>
@@ -428,10 +491,20 @@ export function SubProcessConfigView({
                             </div>
                             {canManage && (
                               <div className="flex gap-1 opacity-0 group-hover:opacity-100">
-                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-8 w-8"
+                                  onClick={() => setEditingTask(task)}
+                                >
                                   <Edit2 className="h-4 w-4" />
                                 </Button>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-8 w-8 text-destructive"
+                                  onClick={() => handleDeleteTask(task.id)}
+                                >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
                               </div>
@@ -718,5 +791,24 @@ export function SubProcessConfigView({
         </Tabs>
       </SheetContent>
     </Sheet>
+
+      <AddTaskTemplateDialog
+        open={isAddTaskOpen}
+        onClose={() => setIsAddTaskOpen(false)}
+        onAdd={handleAddTask}
+        orderIndex={tasks.length}
+      />
+
+      <EditTaskTemplateDialog
+        task={editingTask}
+        open={!!editingTask}
+        onClose={() => setEditingTask(null)}
+        onSave={() => { 
+          setEditingTask(null); 
+          fetchData(); 
+          onUpdate(); 
+        }}
+      />
+    </>
   );
 }
