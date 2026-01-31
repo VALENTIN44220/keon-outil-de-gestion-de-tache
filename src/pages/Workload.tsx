@@ -434,6 +434,7 @@ export default function Workload() {
                     onMultiSlotAdd={handleAddMultipleSlots}
                     onReassignTask={reassignTaskSlots}
                     onResizeTask={resizeTaskSlots}
+                    onTaskCreated={(newTask) => setTasks(prev => [newTask, ...prev])}
                     isHalfDayAvailable={isHalfDayAvailable}
                     checkSlotLeaveConflict={checkSlotLeaveConflict}
                     getTaskSlotsCount={getTaskSlotsCount}
