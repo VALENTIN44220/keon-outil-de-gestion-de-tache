@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { format, parseISO, isWeekend, isToday, eachDayOfInterval, differenceInDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { TeamMemberWorkload, WorkloadSlot, UserLeave } from '@/types/workload';
@@ -9,15 +9,18 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { Scissors, Trash2, CheckCircle2, Search, GripVertical, Calendar, Clock, Plus, AlertTriangle } from 'lucide-react';
-import { GanttTimeline, TodayLine, WeekendOverlay } from './gantt/GanttTimeline';
+import { CheckCircle2, Search, GripVertical, Calendar, Clock, Plus, Keyboard } from 'lucide-react';
+import { GanttTimeline, TodayLine } from './gantt/GanttTimeline';
 import { GanttKPIs } from './gantt/GanttKPIs';
 import { VirtualizedGanttRows } from './gantt/VirtualizedGanttRows';
 import { UnifiedTaskDrawer, DrawerItem } from './UnifiedTaskDrawer';
-import { useGanttDragDrop } from '@/hooks/useGanttDragDrop';
+import { GanttSettingsPanel } from './GanttSettingsPanel';
+import { GanttExportPanel } from './GanttExportPanel';
+import { GanttHeatmapOverlay, HeatmapLegend } from './GanttHeatmapOverlay';
+import { GanttEmptyState, GanttLoadingSkeleton } from './GanttEmptyState';
+import { useGanttViewPreferences, GroupByOption } from '@/hooks/useGanttViewPreferences';
 
 interface GanttViewInteractiveProps {
   workloadData: TeamMemberWorkload[];
@@ -39,6 +42,44 @@ interface GanttViewInteractiveProps {
   getTaskDuration?: (taskId: string) => number | null;
   getTaskProgress?: (taskId: string) => { completed: number; total: number } | null;
   plannedTaskIds?: string[];
+  isLoading?: boolean;
+}
+
+// Group members by department, company, or team
+function groupMembers(
+  members: TeamMemberWorkload[], 
+  groupBy: GroupByOption
+): Map<string, TeamMemberWorkload[]> {
+  const groups = new Map<string, TeamMemberWorkload[]>();
+  
+  if (groupBy === 'none') {
+    groups.set('all', members);
+    return groups;
+  }
+  
+  members.forEach(member => {
+    let key = 'Autre';
+    
+    switch (groupBy) {
+      case 'department':
+        key = member.department || 'Sans service';
+        break;
+      case 'company':
+        key = member.companyId || 'Sans société';
+        break;
+      case 'team':
+        // Would need manager info - fallback to department
+        key = member.department || 'Sans équipe';
+        break;
+    }
+    
+    if (!groups.has(key)) {
+      groups.set(key, []);
+    }
+    groups.get(key)!.push(member);
+  });
+  
+  return groups;
 }
 
 interface DropContext {
@@ -86,10 +127,20 @@ export function GanttViewInteractive({
   getTaskDuration,
   getTaskProgress,
   plannedTaskIds = [],
+  isLoading = false,
 }: GanttViewInteractiveProps) {
+  // Preferences
+  const { 
+    preferences, 
+    savePreferences, 
+    resetToDefaults 
+  } = useGanttViewPreferences();
+  
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
   const [dropTarget, setDropTarget] = useState<{ userId: string; date: string; halfDay: 'morning' | 'afternoon' } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [focusedTaskIndex, setFocusedTaskIndex] = useState(-1);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   
   // Drawer state
   const [drawerItem, setDrawerItem] = useState<DrawerItem | null>(null);
@@ -98,7 +149,6 @@ export function GanttViewInteractive({
   // Multi-slot dialog state
   const [showMultiSlotDialog, setShowMultiSlotDialog] = useState(false);
   const [multiSlotContext, setMultiSlotContext] = useState<DropContext | null>(null);
-  const [halfDayCount, setHalfDayCount] = useState(1);
   const [isAdding, setIsAdding] = useState(false);
   
   // Quick add dialog state
@@ -113,25 +163,91 @@ export function GanttViewInteractive({
   } | null>(null);
   const [isQuickAdding, setIsQuickAdding] = useState(false);
   
-  // Container ref for scroll
+  // Refs
   const containerRef = useRef<HTMLDivElement>(null);
+  const taskListRef = useRef<HTMLDivElement>(null);
 
   // Calculate days array
   const days = useMemo(() => eachDayOfInterval({ start: startDate, end: endDate }), [startDate, endDate]);
   
-  // Day width based on view mode
+  // Day width based on preferences zoom level and view mode
   const dayWidth = useMemo(() => {
+    const zoomMultiplier = preferences.zoomLevel === 'day' ? 1.5 : 
+                          preferences.zoomLevel === 'month' ? 0.5 : 1;
     switch (viewMode) {
-      case 'week': return 120;
-      case 'quarter': return 40;
+      case 'week': return 120 * zoomMultiplier;
+      case 'quarter': return 40 * zoomMultiplier;
       case 'month':
-      default: return 80;
+      default: return 80 * zoomMultiplier;
     }
-  }, [viewMode]);
+  }, [viewMode, preferences.zoomLevel]);
   
-  const isCompact = viewMode === 'quarter';
-  const memberColumnWidth = isCompact ? 200 : 260;
-  const rowHeight = isCompact ? 56 : 80;
+  const isCompact = preferences.compactMode || viewMode === 'quarter';
+  const memberColumnWidth = preferences.memberColumnWidth;
+  const rowHeight = preferences.rowHeight;
+  
+  // Group members based on preferences
+  const groupedMembers = useMemo(() => 
+    groupMembers(workloadData, preferences.groupBy),
+    [workloadData, preferences.groupBy]
+  );
+  
+  // Initialize expanded groups
+  useEffect(() => {
+    if (preferences.groupBy !== 'none' && expandedGroups.size === 0) {
+      setExpandedGroups(new Set(groupedMembers.keys()));
+    }
+  }, [preferences.groupBy, groupedMembers]);
+  
+  // Flatten for display
+  const displayMembers = useMemo(() => {
+    if (preferences.groupBy === 'none') {
+      return workloadData;
+    }
+    
+    const result: TeamMemberWorkload[] = [];
+    groupedMembers.forEach((members, group) => {
+      if (expandedGroups.has(group)) {
+        result.push(...members);
+      }
+    });
+    return result;
+  }, [workloadData, preferences.groupBy, groupedMembers, expandedGroups]);
+  
+  // Keyboard navigation for task list
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!taskListRef.current?.contains(document.activeElement)) return;
+      
+      const availableCount = availableTasks.length;
+      if (availableCount === 0) return;
+      
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault();
+          setFocusedTaskIndex(prev => Math.min(prev + 1, availableCount - 1));
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          setFocusedTaskIndex(prev => Math.max(prev - 1, 0));
+          break;
+        case 'Enter':
+          if (focusedTaskIndex >= 0 && focusedTaskIndex < availableCount) {
+            // Open task drawer
+            const task = availableTasks[focusedTaskIndex];
+            setDrawerItem({ type: 'task', task, slots: [] });
+            setIsDrawerOpen(true);
+          }
+          break;
+        case 'Escape':
+          setFocusedTaskIndex(-1);
+          break;
+      }
+    };
+    
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [focusedTaskIndex, tasks, plannedTaskIds, searchQuery]);
 
   // Available tasks (not yet planned)
   const availableTasks = useMemo(() => {
@@ -242,7 +358,6 @@ export function GanttViewInteractive({
           halfDay,
           taskDuration: duration,
         });
-        setHalfDayCount(duration);
         setShowMultiSlotDialog(true);
         setDraggedTask(null);
       }
@@ -389,16 +504,43 @@ export function GanttViewInteractive({
   // Drag offset placeholder (would be managed by useGanttDragDrop in full implementation)
   const getDragOffset = useCallback((taskId: string) => null, []);
 
+  // Loading state
+  if (isLoading) {
+    return <GanttLoadingSkeleton />;
+  }
+  
+  // Empty states
+  if (workloadData.length === 0) {
+    return <GanttEmptyState type="no-members" />;
+  }
+
   return (
     <TooltipProvider>
       <div className="space-y-4" ref={containerRef}>
-        {/* KPIs Header */}
-        <div className="flex items-center justify-between">
+        {/* Toolbar */}
+        <div className="flex items-center justify-between gap-4 flex-wrap">
           <GanttKPIs 
             workloadData={workloadData} 
             tasks={tasks} 
             plannedTaskIds={plannedTaskIds} 
           />
+          
+          <div className="flex items-center gap-2">
+            {preferences.showHeatmap && <HeatmapLegend />}
+            
+            <GanttExportPanel
+              workloadData={workloadData}
+              tasks={tasks}
+              startDate={startDate}
+              endDate={endDate}
+            />
+            
+            <GanttSettingsPanel
+              preferences={preferences}
+              onPreferencesChange={savePreferences}
+              onReset={resetToDefaults}
+            />
+          </div>
         </div>
         
         <div className="flex gap-4">
@@ -427,28 +569,52 @@ export function GanttViewInteractive({
             
             <CardContent className="pt-0">
               <ScrollArea className="h-[500px] pr-3">
-                <div className="space-y-2">
-                  {availableTasks.map(task => {
+                <div 
+                  className="space-y-2" 
+                  ref={taskListRef}
+                  tabIndex={0}
+                  role="listbox"
+                  aria-label="Tâches à planifier"
+                >
+                  {availableTasks.map((task, index) => {
                     const duration = getTaskDuration ? getTaskDuration(task.id) : null;
                     const progress = getTaskProgress ? getTaskProgress(task.id) : null;
                     const progressPercent = progress && progress.total > 0 
                       ? Math.round((progress.completed / progress.total) * 100) 
                       : 0;
+                    const isFocused = focusedTaskIndex === index;
                     
                     return (
                       <div
                         key={task.id}
+                        role="option"
+                        aria-selected={isFocused}
                         draggable
                         onDragStart={(e) => handleTaskDragStart(e, task)}
+                        onClick={() => {
+                          setFocusedTaskIndex(index);
+                          setDrawerItem({ type: 'task', task, slots: [] });
+                          setIsDrawerOpen(true);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setDrawerItem({ type: 'task', task, slots: [] });
+                            setIsDrawerOpen(true);
+                          }
+                        }}
+                        tabIndex={isFocused ? 0 : -1}
                         className={cn(
                           "group p-3 rounded-xl border-2 cursor-grab active:cursor-grabbing",
                           "bg-card hover:bg-accent/50 hover:shadow-md",
                           "transition-all duration-200 hover:scale-[1.02]",
+                          "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
                           task.priority === 'urgent' && "border-red-200 hover:border-red-300",
                           task.priority === 'high' && "border-orange-200 hover:border-orange-300",
                           task.priority === 'medium' && "border-blue-200 hover:border-blue-300",
                           task.priority === 'low' && "border-emerald-200 hover:border-emerald-300",
-                          !['urgent', 'high', 'medium', 'low'].includes(task.priority) && "border-border"
+                          !['urgent', 'high', 'medium', 'low'].includes(task.priority) && "border-border",
+                          isFocused && "ring-2 ring-primary ring-offset-2"
                         )}
                       >
                         <div className="flex items-start gap-2">
@@ -507,6 +673,12 @@ export function GanttViewInteractive({
                       </p>
                     </div>
                   )}
+                </div>
+                
+                {/* Keyboard hint */}
+                <div className="mt-4 p-2 bg-muted/50 rounded-lg text-xs text-muted-foreground flex items-center gap-2">
+                  <Keyboard className="h-3 w-3" />
+                  <span>↑↓ naviguer • Entrée ouvrir</span>
                 </div>
               </ScrollArea>
             </CardContent>
