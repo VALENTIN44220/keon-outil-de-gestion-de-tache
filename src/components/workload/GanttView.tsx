@@ -13,11 +13,11 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Scissors, Trash2, CheckCircle2, Search, GripVertical, Calendar, Clock } from 'lucide-react';
-import { GanttTaskBar } from './gantt/GanttTaskBar';
+import { GanttTaskBar, GanttLeaveBar } from './gantt/GanttTaskBar';
 import { GanttMemberRow } from './gantt/GanttMemberRow';
-import { GanttTimeline, TodayLine } from './gantt/GanttTimeline';
+import { GanttTimeline, TodayLine, WeekendOverlay } from './gantt/GanttTimeline';
 import { GanttKPIs } from './gantt/GanttKPIs';
-import { TaskDrawer } from './calendar/TaskDrawer';
+import { UnifiedTaskDrawer, DrawerItem } from './UnifiedTaskDrawer';
 
 interface GanttViewProps {
   workloadData: TeamMemberWorkload[];
@@ -84,8 +84,8 @@ export function GanttView({
   const [dropTarget, setDropTarget] = useState<{ userId: string; date: string; halfDay: 'morning' | 'afternoon' } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Drawer state
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  // Drawer state - now using unified drawer
+  const [drawerItem, setDrawerItem] = useState<DrawerItem | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   
   // Multi-slot dialog state
@@ -113,8 +113,8 @@ export function GanttView({
   }, [viewMode]);
   
   const isCompact = viewMode === 'quarter';
-  const memberColumnWidth = isCompact ? 192 : 240; // 48rem / 60rem in pixels
-  const rowHeight = isCompact ? 48 : 72;
+  const memberColumnWidth = isCompact ? 200 : 260;
+  const rowHeight = isCompact ? 56 : 80;
 
   // Available tasks (not yet planned)
   const availableTasks = useMemo(() => {
@@ -312,8 +312,8 @@ export function GanttView({
     await onSlotRemove(slot.id);
   };
 
-  const handleTaskClick = (task: Task) => {
-    setSelectedTask(task);
+  const handleTaskClick = (task: Task, slots: WorkloadSlot[]) => {
+    setDrawerItem({ type: 'task', task, slots });
     setIsDrawerOpen(true);
   };
 
@@ -569,7 +569,7 @@ export function GanttView({
                                 endDate={endDate}
                                 dayWidth={dayWidth}
                                 progress={progressPercent}
-                                onClick={() => handleTaskClick(task)}
+                                onClick={() => handleTaskClick(task, slots)}
                                 onDragStart={(e) => {
                                   if (slots.length > 0) {
                                     handleDragStart(e, slots[0]);
@@ -591,15 +591,12 @@ export function GanttView({
         </div>
       </div>
 
-      {/* Task Details Drawer */}
-      <TaskDrawer
-        task={selectedTask}
-        slots={allSlots}
+      {/* Unified Task Drawer */}
+      <UnifiedTaskDrawer
+        item={drawerItem}
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
-        onMarkDone={handleMarkDone}
-        onDelete={(slotId) => onSlotRemove(slotId)}
-        onSegment={(slot) => selectedTask && handleSegmentRequest(slot, selectedTask.assignee_id || '')}
+        onSlotDelete={(slotId) => onSlotRemove(slotId)}
       />
 
       {/* Multi-slot Dialog */}
