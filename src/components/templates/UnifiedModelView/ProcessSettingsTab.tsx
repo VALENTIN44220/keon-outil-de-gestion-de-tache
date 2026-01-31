@@ -4,17 +4,8 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
-import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Eye, EyeOff, Building2, Briefcase, Save, Loader2 } from 'lucide-react';
+import { Building2, Save, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { ProcessWithTasks } from '@/types/template';
 import { toast } from 'sonner';
@@ -31,8 +22,6 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
   const [formData, setFormData] = useState({
     name: process.name,
     description: process.description || '',
-    visibility_level: process.visibility_level,
-    is_shared: process.is_shared,
   });
 
   const handleSave = async () => {
@@ -43,8 +32,6 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
         .update({
           name: formData.name,
           description: formData.description || null,
-          visibility_level: formData.visibility_level,
-          is_shared: formData.is_shared,
         })
         .eq('id', process.id);
 
@@ -60,13 +47,6 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
       setIsSaving(false);
     }
   };
-
-  const visibilityOptions = [
-    { value: 'private', label: 'Privé', icon: EyeOff },
-    { value: 'department', label: 'Département', icon: Briefcase },
-    { value: 'company', label: 'Entreprise', icon: Building2 },
-    { value: 'global', label: 'Global', icon: Eye },
-  ];
 
   return (
     <div className="space-y-6">
@@ -122,63 +102,6 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Visibilité et accès</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Niveau de visibilité</Label>
-            {isEditing ? (
-              <Select
-                value={formData.visibility_level}
-                onValueChange={(v) =>
-                  setFormData({ ...formData, visibility_level: v as any })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {visibilityOptions.map((opt) => {
-                    const Icon = opt.icon;
-                    return (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        <div className="flex items-center gap-2">
-                          <Icon className="h-4 w-4" />
-                          {opt.label}
-                        </div>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            ) : (
-              <Badge variant="secondary">
-                {visibilityOptions.find((o) => o.value === process.visibility_level)?.label ||
-                  'Privé'}
-              </Badge>
-            )}
-          </div>
-
-          {isEditing && (
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>Partager ce processus</Label>
-                <p className="text-xs text-muted-foreground">
-                  Permet aux autres utilisateurs de réutiliser ce modèle
-                </p>
-              </div>
-              <Switch
-                checked={formData.is_shared}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, is_shared: checked })
-                }
-              />
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
       <Card>
         <CardHeader>
