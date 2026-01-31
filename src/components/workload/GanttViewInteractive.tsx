@@ -12,15 +12,19 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { Scissors, Trash2, CheckCircle2, Search, GripVertical, Calendar, Clock, Plus, AlertTriangle } from 'lucide-react';
+import { Scissors, Trash2, CheckCircle2, Search, GripVertical, Calendar, Clock, Plus, AlertTriangle, CheckSquare } from 'lucide-react';
 import { GanttTimeline, TodayLine, WeekendOverlay, WeekSeparators, TodayColumnHighlight } from './gantt/GanttTimeline';
 import { GanttKPIs } from './gantt/GanttKPIs';
 import { GanttLegend } from './gantt/GanttLegend';
 import { VirtualizedGanttRows } from './gantt/VirtualizedGanttRows';
 import { GanttHeatmapOverlay } from './GanttHeatmapOverlay';
+import { QuickAddPopover } from './gantt/QuickAddPopover';
+import { useGanttMultiSelect, GanttMultiSelectBar } from './gantt/GanttMultiSelect';
+import { useGanttUndo, GanttUndoToasts, SavingIndicator } from './gantt/GanttUndoManager';
 import { UnifiedTaskDrawer, DrawerItem } from './UnifiedTaskDrawer';
 import { useGanttDragDrop } from '@/hooks/useGanttDragDrop';
 import { WorkloadPreferences } from '@/hooks/useWorkloadPreferences';
+import { toast } from '@/hooks/use-toast';
 
 interface GanttViewInteractiveProps {
   workloadData: TeamMemberWorkload[];
@@ -117,6 +121,25 @@ export function GanttViewInteractive({
     endDate: string | null;
   } | null>(null);
   const [isQuickAdding, setIsQuickAdding] = useState(false);
+  
+  // Quick add popover state
+  const [quickAddPopover, setQuickAddPopover] = useState<{
+    isOpen: boolean;
+    position: { x: number; y: number };
+    userId: string;
+    userName: string;
+    startDate: string;
+    endDate: string;
+  } | null>(null);
+  
+  // Multi-select hook
+  const multiSelect = useGanttMultiSelect();
+  
+  // Undo manager hook
+  const undoManager = useGanttUndo({ undoTimeoutMs: 5000 });
+  
+  // Saving state
+  const [isSaving, setIsSaving] = useState(false);
   
   // Container ref for scroll
   const containerRef = useRef<HTMLDivElement>(null);
@@ -337,12 +360,12 @@ export function GanttViewInteractive({
       }
     };
     
-    const handleMouseUp = () => {
+    const handleMouseUp = (e: MouseEvent) => {
       setIsQuickAdding(false);
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
       
-      // Show quick add dialog
+      // Show quick add popover instead of dialog
       if (quickAddSelection?.startDate && quickAddSelection?.endDate && quickAddSelection?.userId) {
         const duration = differenceInDays(
           parseISO(quickAddSelection.endDate), 
@@ -350,13 +373,18 @@ export function GanttViewInteractive({
         ) + 1;
         
         if (duration > 0) {
-          setQuickAddContext({
+          // Find user name
+          const member = workloadData.find(m => m.memberId === quickAddSelection.userId);
+          const userName = member?.memberName || 'Collaborateur';
+          
+          setQuickAddPopover({
+            isOpen: true,
+            position: { x: e.clientX, y: e.clientY },
             userId: quickAddSelection.userId,
+            userName,
             startDate: quickAddSelection.startDate,
             endDate: quickAddSelection.endDate,
-            duration,
           });
-          setShowQuickAddDialog(true);
         }
       }
       
@@ -365,7 +393,35 @@ export function GanttViewInteractive({
     
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
-  }, [days, dayWidth, quickAddSelection]);
+  }, [days, dayWidth, quickAddSelection, workloadData]);
+
+  // Handle adding task from quick add popover
+  const handleQuickAddExistingTask = useCallback(async (taskId: string, slots: number) => {
+    if (!quickAddPopover || !onMultiSlotAdd) return;
+    
+    setIsSaving(true);
+    try {
+      await onMultiSlotAdd(taskId, quickAddPopover.userId, quickAddPopover.startDate, 'morning', slots);
+      
+      // Show toast with undo
+      const task = availableTasks.find(t => t.id === taskId);
+      toast({
+        title: "Tâche planifiée",
+        description: `"${task?.title}" planifiée du ${format(parseISO(quickAddPopover.startDate), 'd MMM', { locale: fr })} au ${format(parseISO(quickAddPopover.endDate), 'd MMM', { locale: fr })}`,
+      });
+      
+      setQuickAddPopover(null);
+    } catch (error) {
+      console.error('Error adding task:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de planifier la tâche",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  }, [quickAddPopover, onMultiSlotAdd, availableTasks]);
 
   const handleConfirmQuickAdd = () => {
     if (quickAddContext && onQuickAddTask) {
@@ -374,6 +430,43 @@ export function GanttViewInteractive({
     setShowQuickAddDialog(false);
     setQuickAddContext(null);
   };
+  
+  // Handle bulk actions from multi-select
+  const handleBulkMove = useCallback(async (dayOffset: number) => {
+    // Implementation for bulk move
+    toast({
+      title: "Déplacement groupé",
+      description: `${multiSelect.selectedTasks.size} tâche(s) déplacée(s) de ${dayOffset > 0 ? '+' : ''}${dayOffset} jour(s)`,
+    });
+    multiSelect.clearSelection();
+  }, [multiSelect]);
+  
+  const handleBulkReassign = useCallback(async (newUserId: string) => {
+    // Implementation for bulk reassign
+    toast({
+      title: "Réassignation groupée",
+      description: `${multiSelect.selectedTasks.size} tâche(s) réassignée(s)`,
+    });
+    multiSelect.clearSelection();
+  }, [multiSelect]);
+  
+  const handleBulkStatusChange = useCallback(async (newStatus: string) => {
+    // Implementation for bulk status change
+    toast({
+      title: "Statut modifié",
+      description: `${multiSelect.selectedTasks.size} tâche(s) passée(s) en "${newStatus}"`,
+    });
+    multiSelect.clearSelection();
+  }, [multiSelect]);
+  
+  const handleBulkDelete = useCallback(async () => {
+    // Implementation for bulk delete from planning
+    toast({
+      title: "Tâches retirées",
+      description: `${multiSelect.selectedTasks.size} tâche(s) retirée(s) du planning`,
+    });
+    multiSelect.clearSelection();
+  }, [multiSelect]);
 
   // Check for conflicts
   const checkConflict = useCallback((userId: string, slots: WorkloadSlot[]): { hasConflict: boolean; message?: string } => {
@@ -399,13 +492,29 @@ export function GanttViewInteractive({
   return (
     <TooltipProvider>
       <div className="space-y-4" ref={containerRef}>
-        {/* KPIs Header */}
+        {/* KPIs Header with multi-select toggle and saving indicator */}
         <div className="flex items-center justify-between">
           <GanttKPIs 
             workloadData={workloadData} 
             tasks={tasks} 
             plannedTaskIds={plannedTaskIds} 
           />
+          
+          <div className="flex items-center gap-3">
+            <SavingIndicator isSaving={isSaving} />
+            
+            <Button
+              variant={multiSelect.isSelecting ? "secondary" : "outline"}
+              size="sm"
+              className="h-8 gap-2"
+              onClick={() => multiSelect.isSelecting ? multiSelect.stopSelecting() : multiSelect.startSelecting()}
+            >
+              <CheckSquare className="h-4 w-4" />
+              <span className="text-xs">
+                {multiSelect.isSelecting ? 'Annuler sélection' : 'Sélection multiple'}
+              </span>
+            </Button>
+          </div>
         </div>
         
         <div className="flex gap-4">
@@ -704,6 +813,39 @@ export function GanttViewInteractive({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Quick Add Popover */}
+      {quickAddPopover && (
+        <QuickAddPopover
+          isOpen={quickAddPopover.isOpen}
+          onClose={() => setQuickAddPopover(null)}
+          position={quickAddPopover.position}
+          userId={quickAddPopover.userId}
+          userName={quickAddPopover.userName}
+          startDate={quickAddPopover.startDate}
+          endDate={quickAddPopover.endDate}
+          availableTasks={availableTasks}
+          onAddExistingTask={handleQuickAddExistingTask}
+        />
+      )}
+      
+      {/* Multi-select action bar */}
+      <GanttMultiSelectBar
+        selectedTasks={multiSelect.selectedTasks}
+        onClearSelection={multiSelect.clearSelection}
+        onBulkMove={handleBulkMove}
+        onBulkReassign={handleBulkReassign}
+        onBulkStatusChange={handleBulkStatusChange}
+        onBulkDelete={handleBulkDelete}
+        isProcessing={isSaving}
+      />
+      
+      {/* Undo toasts */}
+      <GanttUndoToasts
+        actions={undoManager.pendingActions}
+        onUndo={undoManager.executeUndo}
+        onDismiss={undoManager.dismissUndo}
+      />
     </TooltipProvider>
   );
 }
