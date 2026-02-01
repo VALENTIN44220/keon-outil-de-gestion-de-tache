@@ -99,7 +99,7 @@ export function ProcessCard({ process, onDelete, onViewDetails, canManage = fals
     return (
       <Card 
         className="flex items-center gap-3 p-3 cursor-pointer hover:shadow-md transition-shadow"
-        onClick={onViewDetails}
+        onClick={() => navigate(`/templates/process/${process.id}`)}
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
@@ -121,7 +121,7 @@ export function ProcessCard({ process, onDelete, onViewDetails, canManage = fals
             variant="default" 
             size="sm" 
             className="h-7 px-2 text-xs"
-            onClick={(e) => { e.stopPropagation(); onViewDetails(); }}
+            onClick={(e) => { e.stopPropagation(); navigate(`/templates/process/${process.id}`); }}
           >
             <Eye className="h-3 w-3 mr-1" />
             Gérer
@@ -153,7 +153,7 @@ export function ProcessCard({ process, onDelete, onViewDetails, canManage = fals
   return (
     <Card 
       className="flex flex-col cursor-pointer hover:shadow-md transition-all hover:border-primary/30 bg-card"
-      onClick={onViewDetails}
+      onClick={() => navigate(`/templates/process/${process.id}`)}
     >
       <CardContent className="p-3 space-y-2">
         {/* Header: Name + Workflow Badge + Target Dept */}
@@ -201,7 +201,7 @@ export function ProcessCard({ process, onDelete, onViewDetails, canManage = fals
             variant="default" 
             size="sm" 
             className="h-7 px-2.5 text-xs"
-            onClick={(e) => { e.stopPropagation(); onViewDetails(); }}
+            onClick={(e) => { e.stopPropagation(); navigate(`/templates/process/${process.id}`); }}
           >
             <Eye className="h-3 w-3 mr-1" />
             {canManage ? 'Gérer' : 'Voir'}

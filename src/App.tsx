@@ -12,6 +12,8 @@ import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
 import Profile from "./pages/Profile";
 import Templates from "./pages/Templates";
+import ProcessSettings from "./pages/ProcessSettings";
+import SubProcessSettings from "./pages/SubProcessSettings";
 import Projects from "./pages/Projects";
 import Admin from "./pages/Admin";
 import Workload from "./pages/Workload";
@@ -56,6 +58,22 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Templates />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/templates/process/:processId"
+              element={
+                <ProtectedRoute>
+                  <ProcessSettings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/templates/subprocess/:subProcessId"
+              element={
+                <ProtectedRoute>
+                  <SubProcessSettings />
                 </ProtectedRoute>
               }
             />
