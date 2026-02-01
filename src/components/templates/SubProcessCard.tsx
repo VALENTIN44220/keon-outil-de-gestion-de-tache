@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SubProcessWithTasks, TaskTemplate, VISIBILITY_LABELS, TemplateVisibility } from '@/types/template';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
   Trash2, Users, User, UserCog, Workflow, ListTodo, 
-  Lock, Building2, Globe, Eye, CheckCircle, Layers
+  Lock, Building2, Globe, Eye, CheckCircle, ArrowRight
 } from 'lucide-react';
 import { SubProcessConfigView } from './SubProcessConfigView';
 import { supabase } from '@/integrations/supabase/client';
+import { cn } from '@/lib/utils';
 
 interface SubProcessCardProps {
   subProcess: SubProcessWithTasks;
@@ -23,11 +24,11 @@ interface SubProcessCardProps {
   onMandatoryChange?: (id: string, isMandatory: boolean) => void;
 }
 
-const assignmentTypeLabels: Record<string, { label: string; icon: any }> = {
-  manager: { label: 'Par manager', icon: Users },
-  role: { label: 'Par poste', icon: UserCog },
-  user: { label: 'Utilisateur', icon: User },
-  group: { label: 'Groupe', icon: Users },
+const assignmentTypeLabels: Record<string, { label: string; icon: any; color: string }> = {
+  manager: { label: 'Manager', icon: Users, color: 'text-info' },
+  role: { label: 'Par poste', icon: UserCog, color: 'text-warning' },
+  user: { label: 'Utilisateur', icon: User, color: 'text-success' },
+  group: { label: 'Groupe', icon: Users, color: 'text-primary' },
 };
 
 const visibilityIcons: Record<string, any> = {
@@ -81,17 +82,33 @@ export function SubProcessCard({
     fetchWorkflowStatus();
   }, [subProcess.id]);
 
-  const AssignmentIcon = assignmentTypeLabels[subProcess.assignment_type]?.icon || Users;
+  const assignmentInfo = assignmentTypeLabels[subProcess.assignment_type] || assignmentTypeLabels.manager;
+  const AssignmentIcon = assignmentInfo.icon;
   const VisibilityIcon = visibilityIcons[subProcess.visibility_level] || Globe;
 
-  // Get workflow status badge
-  const getWorkflowBadge = () => {
+  // Get workflow status indicator
+  const getWorkflowIndicator = () => {
     if (workflowStatus.status === 'active') {
-      return <Badge className="bg-success/20 text-success border-success/30 text-[10px] px-1.5 py-0">Actif</Badge>;
+      return (
+        <div className="flex items-center gap-1.5 text-xs font-medium text-success">
+          <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
+          Actif
+        </div>
+      );
     } else if (workflowStatus.status === 'draft') {
-      return <Badge className="bg-warning/20 text-warning border-warning/30 text-[10px] px-1.5 py-0">Brouillon</Badge>;
+      return (
+        <div className="flex items-center gap-1.5 text-xs font-medium text-warning">
+          <div className="w-2 h-2 rounded-full bg-warning" />
+          Brouillon
+        </div>
+      );
     }
-    return null;
+    return (
+      <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+        <div className="w-2 h-2 rounded-full bg-muted" />
+        Non configuré
+      </div>
+    );
   };
 
   const handleOpenConfig = (e: React.MouseEvent) => {
@@ -102,80 +119,107 @@ export function SubProcessCard({
   return (
     <>
       <Card 
-        className="flex flex-col cursor-pointer hover:shadow-md transition-all hover:border-primary/30 bg-card"
+        className={cn(
+          "group relative flex flex-col cursor-pointer transition-all duration-300",
+          "border-l-4",
+          subProcess.is_mandatory ? "border-l-warning" : "border-l-secondary",
+          "hover:shadow-xl hover:shadow-primary/10 hover:-translate-y-1",
+          "bg-gradient-to-b from-card to-card/95"
+        )}
         onClick={handleOpenConfig}
       >
-        <CardContent className="p-3 space-y-2">
-          {/* Header: Name + Workflow Badge */}
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-semibold text-sm truncate">{subProcess.name}</h3>
-                {getWorkflowBadge()}
-                {subProcess.is_mandatory && (
-                  <Badge variant="default" className="bg-primary/80 text-[10px] px-1.5 py-0">
-                    <Lock className="h-3 w-3 mr-0.5" />
-                    Obligatoire
-                  </Badge>
-                )}
+        {/* Mandatory ribbon */}
+        {subProcess.is_mandatory && (
+          <div className="absolute -top-0 -right-0 overflow-hidden w-16 h-16">
+            <div className="absolute top-3 right-[-20px] bg-warning text-warning-foreground text-[9px] font-bold py-0.5 px-5 rotate-45 shadow-sm">
+              REQUIS
+            </div>
+          </div>
+        )}
+
+        {/* Header section */}
+        <div className="p-4 pb-3">
+          <div className="flex items-start justify-between gap-2 mb-3">
+            <h3 className="font-bold text-base text-foreground group-hover:text-primary transition-colors line-clamp-2 leading-tight pr-4">
+              {subProcess.name}
+            </h3>
+            <div className="shrink-0">
+              {getWorkflowIndicator()}
+            </div>
+          </div>
+
+          {/* Assignment type badge */}
+          <Badge 
+            variant="outline" 
+            className={cn(
+              "text-xs font-medium mb-3",
+              assignmentInfo.color,
+              "border-current/30 bg-current/5"
+            )}
+          >
+            <AssignmentIcon className="h-3 w-3 mr-1" />
+            {assignmentInfo.label}
+          </Badge>
+
+          {/* Stats row */}
+          <div className="grid grid-cols-2 gap-2 bg-muted/30 rounded-lg p-2.5">
+            <div className="text-center">
+              <div className="text-lg font-bold text-foreground">{subProcess.task_templates.length}</div>
+              <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Tâches</div>
+            </div>
+            <div className="text-center border-l border-border/50">
+              <div className="flex justify-center">
+                <VisibilityIcon className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                {subProcess.visibility_level === 'public' ? 'Public' : 'Privé'}
               </div>
             </div>
           </div>
 
-          {/* Meta info row */}
-          <div className="flex items-center gap-2 text-[11px] text-muted-foreground flex-wrap">
-            <span className="flex items-center gap-1">
-              <AssignmentIcon className="h-3 w-3" />
-              {assignmentTypeLabels[subProcess.assignment_type]?.label}
-            </span>
-            <span className="flex items-center gap-1">
-              <ListTodo className="h-3 w-3" />
-              {subProcess.task_templates.length} tâche(s)
-            </span>
-            <span className="flex items-center gap-1">
-              <VisibilityIcon className="h-3 w-3" />
-              {subProcess.visibility_level === 'public' ? 'Public' : 'Privé'}
-            </span>
-            {workflowStatus.hasValidation && (
-              <span className="flex items-center gap-1 text-success">
-                <CheckCircle className="h-3 w-3" />
-                Validation
-              </span>
-            )}
-          </div>
+          {/* Features indicators */}
+          {workflowStatus.hasValidation && (
+            <div className="flex items-center gap-1.5 mt-3 text-xs text-success">
+              <CheckCircle className="h-3.5 w-3.5" />
+              <span>Validation intégrée</span>
+            </div>
+          )}
+        </div>
 
-          {/* Action buttons - MAX 3 buttons like ProcessCard */}
-          <div className="flex items-center gap-1.5 pt-1">
+        {/* Action buttons footer */}
+        <div className="mt-auto border-t border-border/50 p-3 bg-muted/20">
+          <div className="flex items-center gap-2">
             <Button 
               variant="default" 
               size="sm" 
-              className="h-7 px-2.5 text-xs"
+              className="flex-1 h-9 text-xs font-medium shadow-sm"
               onClick={handleOpenConfig}
             >
-              <Eye className="h-3 w-3 mr-1" />
+              <Eye className="h-3.5 w-3.5 mr-1.5" />
               {canManage ? 'Gérer' : 'Voir'}
             </Button>
             <Button 
               variant="outline" 
               size="sm" 
-              className="h-7 px-2.5 text-xs bg-success/10 border-success/30 text-success hover:bg-success/20"
+              className="h-9 w-9 p-0 bg-success/10 border-success/30 text-success hover:bg-success/20 hover:border-success/50"
               onClick={(e) => { e.stopPropagation(); navigate(`/templates/workflow/subprocess/${subProcess.id}`); }}
+              title="Modifier le workflow"
             >
-              <Workflow className="h-3 w-3 mr-1" />
-              Workflow
+              <Workflow className="h-4 w-4" />
             </Button>
             {canManage && (
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="h-7 px-2.5 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                className="h-9 w-9 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                 onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                title="Supprimer"
               >
-                <Trash2 className="h-3 w-3" />
+                <Trash2 className="h-4 w-4" />
               </Button>
             )}
           </div>
-        </CardContent>
+        </div>
       </Card>
 
       <SubProcessConfigView
