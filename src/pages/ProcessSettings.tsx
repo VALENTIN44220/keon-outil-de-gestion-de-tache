@@ -19,7 +19,6 @@ import {
   Eye,
   Target,
   Users,
-  Variable,
   Zap,
   ArrowLeft,
 } from 'lucide-react';
@@ -31,7 +30,7 @@ import { ProcessSubProcessesTab } from '@/components/templates/UnifiedModelView/
 import { ProcessTargetsTab } from '@/components/templates/UnifiedModelView/ProcessTargetsTab';
 import { ProcessAssignmentTab } from '@/components/templates/UnifiedModelView/ProcessAssignmentTab';
 import { ProcessCustomFieldsTab } from '@/components/templates/UnifiedModelView/ProcessCustomFieldsTab';
-import { ProcessVariablesTab } from '@/components/templates/UnifiedModelView/ProcessVariablesTab';
+
 import { ProcessNotificationsTab } from '@/components/templates/UnifiedModelView/ProcessNotificationsTab';
 import { ProcessGeneratedWorkflowTab } from '@/components/templates/UnifiedModelView/ProcessGeneratedWorkflowTab';
 import { useAuth } from '@/contexts/AuthContext';
@@ -166,7 +165,6 @@ export default function ProcessSettings() {
     { id: 'targets', label: 'Cibles', icon: Target },
     { id: 'assignment', label: 'Affectation', icon: Users },
     { id: 'notifications', label: 'Notifs', icon: Bell },
-    { id: 'variables', label: 'Variables', icon: Variable },
     { id: 'workflow', label: 'Workflow', icon: Zap },
   ];
 
@@ -311,13 +309,6 @@ export default function ProcessSettings() {
                     processId={process.id}
                     canManage={canManage}
                     onUpdate={handleUpdate}
-                  />
-                </TabsContent>
-
-                <TabsContent value="variables" className="mt-0">
-                  <ProcessVariablesTab
-                    processId={process.id}
-                    canManage={canManage}
                   />
                 </TabsContent>
 

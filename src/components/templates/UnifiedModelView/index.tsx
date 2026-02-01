@@ -19,7 +19,7 @@ import {
   Eye,
   Target,
   Users,
-  Variable,
+  
   Zap,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -30,7 +30,7 @@ import { ProcessSubProcessesTab } from './ProcessSubProcessesTab';
 import { ProcessTargetsTab } from './ProcessTargetsTab';
 import { ProcessAssignmentTab } from './ProcessAssignmentTab';
 import { ProcessCustomFieldsTab } from './ProcessCustomFieldsTab';
-import { ProcessVariablesTab } from './ProcessVariablesTab';
+
 import { ProcessNotificationsTab } from './ProcessNotificationsTab';
 import { ProcessGeneratedWorkflowTab } from './ProcessGeneratedWorkflowTab';
 import { ProcessSLATab } from './ProcessSLATab';
@@ -157,7 +157,6 @@ export function UnifiedModelView({
     { id: 'targets', label: 'Cibles', icon: Target },
     { id: 'assignment', label: 'Affectation', icon: Users },
     { id: 'notifications', label: 'Notifs', icon: Bell },
-    { id: 'variables', label: 'Variables', icon: Variable },
     { id: 'workflow', label: 'Workflow', icon: Zap },
   ];
 
@@ -275,12 +274,6 @@ export function UnifiedModelView({
                 />
               </TabsContent>
 
-              <TabsContent value="variables" className="mt-0">
-                <ProcessVariablesTab
-                  processId={process.id}
-                  canManage={canManage}
-                />
-              </TabsContent>
 
               <TabsContent value="workflow" className="mt-0">
                 <ProcessGeneratedWorkflowTab

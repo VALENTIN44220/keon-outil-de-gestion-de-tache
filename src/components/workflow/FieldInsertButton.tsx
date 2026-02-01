@@ -1,18 +1,18 @@
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Variable, ChevronDown } from 'lucide-react';
+import { FormInput, ChevronDown } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import type { TemplateCustomField } from '@/types/customField';
 
-interface VariableInsertButtonProps {
-  onInsert: (variable: string) => void;
+interface FieldInsertButtonProps {
+  onInsert: (field: string) => void;
   customFields: TemplateCustomField[];
   disabled?: boolean;
   className?: string;
 }
 
-const SYSTEM_VARIABLES = [
+const SYSTEM_FIELDS = [
   { key: '{processus}', label: 'Nom du processus', description: 'Nom du processus en cours' },
   { key: '{sous_processus}', label: 'Sous-processus', description: 'Nom du sous-processus' },
   { key: '{tache}', label: 'Nom de la tâche', description: 'Titre de la tâche actuelle' },
@@ -26,12 +26,12 @@ const SYSTEM_VARIABLES = [
   { key: '{projet}', label: 'Projet', description: 'Nom du projet associé' },
 ];
 
-export function VariableInsertButton({
+export function FieldInsertButton({
   onInsert,
   customFields,
   disabled = false,
   className = '',
-}: VariableInsertButtonProps) {
+}: FieldInsertButtonProps) {
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -42,7 +42,7 @@ export function VariableInsertButton({
           className={`h-8 gap-1 ${className}`}
           disabled={disabled}
         >
-          <Variable className="h-4 w-4" />
+          <FormInput className="h-4 w-4" />
           Champs
           <ChevronDown className="h-3 w-3" />
         </Button>
@@ -61,7 +61,7 @@ export function VariableInsertButton({
               Champs système
             </Label>
             <div className="grid grid-cols-2 gap-1 mb-3">
-              {SYSTEM_VARIABLES.map((v) => (
+              {SYSTEM_FIELDS.map((v) => (
                 <Button
                   key={v.key}
                   type="button"
