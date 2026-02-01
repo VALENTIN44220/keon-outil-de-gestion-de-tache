@@ -381,6 +381,12 @@ export function useFormBuilder(options: UseFormBuilderOptions = {}) {
       targetIndex: number
     ) => {
       try {
+        // Optimistically update local state first
+        dispatch({
+          type: 'MOVE_FIELD',
+          payload: { fieldId, targetSectionId, targetIndex },
+        });
+
         const { error } = await supabase
           .from('template_custom_fields')
           .update({
@@ -392,19 +398,17 @@ export function useFormBuilder(options: UseFormBuilderOptions = {}) {
 
         if (error) throw error;
 
-        dispatch({
-          type: 'MOVE_FIELD',
-          payload: { fieldId, targetSectionId, targetIndex },
-        });
-
+        toast.success('Champ déplacé');
         return true;
       } catch (error: any) {
         console.error('Error moving field:', error);
         toast.error(error.message || 'Erreur lors du déplacement');
+        // Reload data to revert optimistic update
+        await loadData();
         return false;
       }
     },
-    []
+    [loadData]
   );
 
   const reorderSections = useCallback(async (orderedIds: string[]) => {

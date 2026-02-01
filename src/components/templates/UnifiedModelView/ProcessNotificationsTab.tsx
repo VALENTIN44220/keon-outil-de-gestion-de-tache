@@ -166,7 +166,8 @@ export function ProcessNotificationsTab({ processId, canManage, onUpdate }: Proc
     }
   };
 
-  const availableVariables = [
+  // Available template tokens for notifications
+  const availableTokens = [
     { name: '{{requester_name}}', description: 'Nom du demandeur' },
     { name: '{{request_title}}', description: 'Titre de la demande' },
     { name: '{{process_name}}', description: 'Nom du processus' },
@@ -249,27 +250,27 @@ export function ProcessNotificationsTab({ processId, canManage, onUpdate }: Proc
 
       <Separator />
 
-      {/* Available Variables */}
+      {/* Available Tokens */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm flex items-center gap-2">
             <Settings className="h-4 w-4" />
-            Variables disponibles
+            Tokens disponibles
           </CardTitle>
         </CardHeader>
         <CardContent>
           <p className="text-xs text-muted-foreground mb-3">
-            Ces variables peuvent être utilisées dans les modèles de notification
+            Ces tokens peuvent être utilisés dans les modèles de notification
           </p>
           <div className="flex flex-wrap gap-2">
-            {availableVariables.map((variable) => (
+            {availableTokens.map((token) => (
               <Badge
-                key={variable.name}
+                key={token.name}
                 variant="outline"
                 className="font-mono text-xs"
-                title={variable.description}
+                title={token.description}
               >
-                {variable.name}
+                {token.name}
               </Badge>
             ))}
           </div>

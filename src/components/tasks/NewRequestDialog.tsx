@@ -25,15 +25,13 @@ import { useAssignmentRules } from '@/hooks/useAssignmentRules';
 import { useRequestWorkflow } from '@/hooks/useRequestWorkflow';
 import { useCustomFields } from '@/hooks/useCustomFields';
 import { supabase } from '@/integrations/supabase/client';
-import { InlineChecklistEditor } from './InlineChecklistEditor';
-import { TaskLinksEditor } from './TaskLinksEditor';
 import { CustomFieldsRenderer, validateCustomFields } from './CustomFieldsRenderer';
-import { GroupedCustomFieldsRenderer } from './GroupedCustomFieldsRenderer';
+import { SectionedCustomFieldsRenderer } from './SectionedCustomFieldsRenderer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
-import { Info, ArrowRight, Building2, Workflow, FormInput, CheckSquare, FileText, Paperclip } from 'lucide-react';
+import { Info, ArrowRight, Building2, Workflow, FormInput, CheckSquare, FileText } from 'lucide-react';
 import { BEProjectSelect } from '@/components/be/BEProjectSelect';
 import { toast } from 'sonner';
 import { TemplateCustomField } from '@/types/customField';
@@ -725,7 +723,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
         
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 overflow-hidden">
           <Tabs defaultValue="general" className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <TabsList className={`grid w-full flex-shrink-0 ${showSubProcessTab && showCustomFieldsTab ? 'grid-cols-4' : showSubProcessTab || showCustomFieldsTab ? 'grid-cols-3' : 'grid-cols-2'}`}>
+            <TabsList className={`grid w-full flex-shrink-0 ${showSubProcessTab && showCustomFieldsTab ? 'grid-cols-3' : showSubProcessTab || showCustomFieldsTab ? 'grid-cols-2' : 'grid-cols-1'}`}>
               <TabsTrigger value="general" className="flex items-center gap-2">
                 <FileText className="h-4 w-4" />
                 Général
@@ -742,10 +740,6 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                   Champs ({customFieldsCount})
                 </TabsTrigger>
               )}
-              <TabsTrigger value="extras" className="flex items-center gap-2">
-                <Paperclip className="h-4 w-4" />
-                Compléments
-              </TabsTrigger>
             </TabsList>
 
             <ScrollArea className="flex-1 mt-4 min-h-0" style={{ maxHeight: 'calc(90vh - 200px)' }}>
@@ -1004,10 +998,10 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                       Chargement des champs...
                     </div>
                   ) : (
-                    <GroupedCustomFieldsRenderer
-                      commonFields={visibleCustomFields.commonFields}
-                      processFields={visibleCustomFields.processFields}
-                      subProcessFieldGroups={visibleCustomFields.subProcessFieldGroups}
+                    <SectionedCustomFieldsRenderer
+                      processTemplateId={linkedProcessId}
+                      subProcessTemplateId={linkedSubProcessId}
+                      fields={allFieldsFlat}
                       values={customFieldValues}
                       onChange={handleCustomFieldChange}
                       errors={fieldErrors}
@@ -1016,27 +1010,6 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                   )}
                 </TabsContent>
               )}
-
-              {/* Extras Tab */}
-              <TabsContent value="extras" className="space-y-4">
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="text-sm font-medium mb-2">Liens & Pièces jointes</h4>
-                    <TaskLinksEditor 
-                      items={links} 
-                      onChange={setLinks} 
-                    />
-                  </div>
-                  
-                  <div className="pt-4 border-t">
-                    <h4 className="text-sm font-medium mb-2">Sous-actions</h4>
-                    <InlineChecklistEditor 
-                      items={checklistItems} 
-                      onChange={setChecklistItems} 
-                    />
-                  </div>
-                </div>
-              </TabsContent>
               </div>
             </ScrollArea>
           </Tabs>

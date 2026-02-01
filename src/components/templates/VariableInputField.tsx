@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Variable, ChevronDown, Globe, Layers, GitBranch } from 'lucide-react';
 import type { TemplateCustomField } from '@/types/customField';
 
-const SYSTEM_VARIABLES = [
+const SYSTEM_TOKENS = [
   { key: '{processus}', label: 'Nom du processus', description: 'Nom du processus en cours' },
   { key: '{sous_processus}', label: 'Sous-processus', description: 'Nom du sous-processus' },
   { key: '{demandeur}', label: 'Demandeur', description: 'Nom du demandeur' },
@@ -67,23 +67,23 @@ export function VariableInputField({
     return { common, process, subProcess };
   }, [customFields]);
 
-  const handleInsertVariable = (variable: string) => {
+  const handleInsertToken = (token: string) => {
     const input = inputRef.current;
     if (!input) {
       // Just append if no input ref
-      onChange(value + variable);
+      onChange(value + token);
       setIsOpen(false);
       return;
     }
 
     const start = input.selectionStart || 0;
     const end = input.selectionEnd || 0;
-    const newValue = value.substring(0, start) + variable + value.substring(end);
+    const newValue = value.substring(0, start) + token + value.substring(end);
     onChange(newValue);
 
-    // Set cursor position after the inserted variable
+    // Set cursor position after the inserted token
     setTimeout(() => {
-      const newPosition = start + variable.length;
+      const newPosition = start + token.length;
       input.setSelectionRange(newPosition, newPosition);
       input.focus();
     }, 0);
@@ -112,35 +112,35 @@ export function VariableInputField({
               className="h-6 px-2 text-xs"
             >
               <Variable className="h-3 w-3 mr-1" />
-              Insérer variable
+              Insérer un champ
               <ChevronDown className="h-3 w-3 ml-1" />
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-96 p-0" align="end">
             <div className="p-3 border-b bg-muted/30">
-              <h4 className="font-medium text-sm">Insérer une variable</h4>
+              <h4 className="font-medium text-sm">Insérer un champ</h4>
               <p className="text-xs text-muted-foreground mt-1">
-                La variable sera remplacée par sa valeur lors de la création de tâches
+                Le champ sera remplacé par sa valeur lors de la création de tâches
               </p>
             </div>
             
             <ScrollArea className="h-80">
               <div className="p-3 space-y-4">
-                {/* System variables */}
+                {/* System tokens */}
                 <div>
                   <div className="flex items-center gap-1.5 mb-2">
                     <Globe className="h-3.5 w-3.5 text-primary" />
-                    <Label className="text-xs font-medium">Variables système</Label>
+                    <Label className="text-xs font-medium">Tokens système</Label>
                   </div>
                   <div className="grid grid-cols-2 gap-1">
-                    {SYSTEM_VARIABLES.map((v) => (
+                    {SYSTEM_TOKENS.map((v) => (
                       <Button
                         key={v.key}
                         type="button"
                         variant="ghost"
                         size="sm"
                         className="h-auto py-1.5 px-2 justify-start text-left hover:bg-primary/10"
-                        onClick={() => handleInsertVariable(v.key)}
+                        onClick={() => handleInsertToken(v.key)}
                       >
                         <div className="flex flex-col items-start">
                           <span className="text-xs font-mono text-primary">{v.key}</span>
@@ -169,7 +169,7 @@ export function VariableInputField({
                           variant="ghost"
                           size="sm"
                           className="h-auto py-1.5 px-2 justify-start text-left hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-                          onClick={() => handleInsertVariable(`{champ:${field.name}}`)}
+                          onClick={() => handleInsertToken(`{champ:${field.name}}`)}
                         >
                           <div className="flex flex-col items-start">
                             <span className="text-xs font-mono text-emerald-600 dark:text-emerald-400">{`{${field.name}}`}</span>
@@ -199,7 +199,7 @@ export function VariableInputField({
                           variant="ghost"
                           size="sm"
                           className="h-auto py-1.5 px-2 justify-start text-left hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                          onClick={() => handleInsertVariable(`{champ:${field.name}}`)}
+                          onClick={() => handleInsertToken(`{champ:${field.name}}`)}
                         >
                           <div className="flex flex-col items-start">
                             <span className="text-xs font-mono text-blue-600 dark:text-blue-400">{`{${field.name}}`}</span>
@@ -229,7 +229,7 @@ export function VariableInputField({
                           variant="ghost"
                           size="sm"
                           className="h-auto py-1.5 px-2 justify-start text-left hover:bg-violet-50 dark:hover:bg-violet-900/20"
-                          onClick={() => handleInsertVariable(`{champ:${field.name}}`)}
+                          onClick={() => handleInsertToken(`{champ:${field.name}}`)}
                         >
                           <div className="flex flex-col items-start">
                             <span className="text-xs font-mono text-violet-600 dark:text-violet-400">{`{${field.name}}`}</span>
@@ -275,10 +275,10 @@ export function VariableInputField({
         />
       )}
 
-      {/* Preview of detected variables */}
+      {/* Preview of detected tokens */}
       {value && (value.includes('{') && value.includes('}')) && (
         <p className="text-xs text-muted-foreground">
-          Variables détectées : les valeurs seront remplacées lors de la création
+          Tokens détectés : les valeurs seront remplacées lors de la création
         </p>
       )}
     </div>
