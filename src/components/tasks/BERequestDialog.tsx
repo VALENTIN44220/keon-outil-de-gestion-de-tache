@@ -127,32 +127,58 @@ export function BERequestDialog({
     includeCommon: true,
   });
 
-  // Fetch custom fields for each selected sub-process
+  // Fetch custom fields for all available sub-processes in a single query
   useEffect(() => {
     const fetchSubProcessFields = async () => {
-      const fieldsMap: Record<string, TemplateCustomField[]> = {};
+      // Get all sub-process IDs to fetch fields for
+      const allSubProcessIds = availableSubProcesses.map(sp => sp.id);
       
-      for (const subProcess of availableSubProcesses) {
-        const { data } = await supabase
-          .from('template_custom_fields')
-          .select('*')
-          .eq('sub_process_template_id', subProcess.id)
-          .order('order_index');
-        
-        if (data && data.length > 0) {
-          fieldsMap[subProcess.id] = data.map((field: any) => ({
+      if (allSubProcessIds.length === 0) {
+        setSubProcessCustomFields({});
+        return;
+      }
+      
+      // Fetch all fields in a single query
+      const { data, error } = await supabase
+        .from('template_custom_fields')
+        .select('*')
+        .in('sub_process_template_id', allSubProcessIds)
+        .order('order_index');
+      
+      if (error) {
+        console.error('Error fetching sub-process fields:', error);
+        return;
+      }
+      
+      // Group by sub_process_template_id
+      const fieldsMap: Record<string, TemplateCustomField[]> = {};
+      for (const field of data || []) {
+        const spId = field.sub_process_template_id;
+        if (spId) {
+          if (!fieldsMap[spId]) {
+            fieldsMap[spId] = [];
+          }
+          fieldsMap[spId].push({
             ...field,
-            options: field.options || null,
-          }));
+            field_type: field.field_type,
+            options: (field.options || null) as unknown as TemplateCustomField['options'],
+            condition_operator: field.condition_operator as TemplateCustomField['condition_operator'],
+            conditions_logic: (field.conditions_logic || 'AND') as 'AND' | 'OR',
+            validation_params: field.validation_params as Record<string, any> | null,
+            additional_conditions: field.additional_conditions as Array<{ field_id: string; operator: string; value: string }> | null,
+          } as TemplateCustomField);
         }
       }
+      
+      console.log('[BERequestDialog] Sub-process custom fields loaded:', { 
+        subProcessCount: allSubProcessIds.length,
+        fieldsCount: Object.keys(fieldsMap).length 
+      });
       
       setSubProcessCustomFields(fieldsMap);
     };
 
-    if (availableSubProcesses.length > 0) {
-      fetchSubProcessFields();
-    }
+    fetchSubProcessFields();
   }, [availableSubProcesses]);
 
   const handleCustomFieldChange = (fieldId: string, value: any) => {

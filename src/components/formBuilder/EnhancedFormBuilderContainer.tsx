@@ -69,11 +69,12 @@ export function EnhancedFormBuilderContainer({
     subProcessTemplateId,
   });
 
-  // Custom fields for preview
+  // Custom fields for preview - include parent process fields when in sub-process context
   const { fields: templateFields } = useCustomFields({
     processTemplateId,
     subProcessTemplateId,
     includeCommon: true,
+    includeParentProcessFields: true,
   });
 
   const [isCreatingField, setIsCreatingField] = useState(false);

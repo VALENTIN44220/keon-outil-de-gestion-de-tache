@@ -130,33 +130,69 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
   );
   const requiresValidation = matchingRule?.requires_validation || false;
 
-  // Fetch custom fields for each available sub-process
+  // Fetch custom fields for relevant sub-processes
+  // Fix: use actual relevant IDs, not just availableSubProcesses (which can be empty in single sub-process mode)
   useEffect(() => {
     const fetchSubProcessFields = async () => {
-      const fieldsMap: Record<string, TemplateCustomField[]> = {};
+      // Calculate relevant sub-process IDs based on context
+      const relevantSubProcessIds = hasMultipleSubProcesses 
+        ? selectedSubProcessIds 
+        : (linkedSubProcessId ? [linkedSubProcessId] : []);
       
-      for (const subProcess of availableSubProcesses) {
-        const { data } = await supabase
-          .from('template_custom_fields')
-          .select('*')
-          .eq('sub_process_template_id', subProcess.id)
-          .order('order_index');
-        
-        if (data && data.length > 0) {
-          fieldsMap[subProcess.id] = data.map((field: any) => ({
+      // Also include availableSubProcesses IDs if they exist (for preloading)
+      const allRelevantIds = [...new Set([
+        ...relevantSubProcessIds,
+        ...availableSubProcesses.map(sp => sp.id)
+      ])];
+      
+      if (allRelevantIds.length === 0) {
+        setSubProcessCustomFields({});
+        return;
+      }
+      
+      // Fetch all fields in a single query
+      const { data, error } = await supabase
+        .from('template_custom_fields')
+        .select('*')
+        .in('sub_process_template_id', allRelevantIds)
+        .order('order_index');
+      
+      if (error) {
+        console.error('Error fetching sub-process fields:', error);
+        return;
+      }
+      
+      // Group by sub_process_template_id
+      const fieldsMap: Record<string, TemplateCustomField[]> = {};
+      for (const field of data || []) {
+        const spId = field.sub_process_template_id;
+        if (spId) {
+          if (!fieldsMap[spId]) {
+            fieldsMap[spId] = [];
+          }
+          fieldsMap[spId].push({
             ...field,
-            options: field.options || null,
-          }));
+            field_type: field.field_type,
+            options: (field.options || null) as unknown as TemplateCustomField['options'],
+            condition_operator: field.condition_operator as TemplateCustomField['condition_operator'],
+            conditions_logic: (field.conditions_logic || 'AND') as 'AND' | 'OR',
+            validation_params: field.validation_params as Record<string, any> | null,
+            additional_conditions: field.additional_conditions as Array<{ field_id: string; operator: string; value: string }> | null,
+          } as TemplateCustomField);
         }
       }
+      
+      console.log('[NewRequestDialog] Sub-process custom fields loaded:', { 
+        relevantSubProcessIds, 
+        linkedSubProcessId,
+        fieldsCount: Object.keys(fieldsMap).length 
+      });
       
       setSubProcessCustomFields(fieldsMap);
     };
 
-    if (availableSubProcesses.length > 0) {
-      fetchSubProcessFields();
-    }
-  }, [availableSubProcesses]);
+    fetchSubProcessFields();
+  }, [hasMultipleSubProcesses, selectedSubProcessIds, linkedSubProcessId, availableSubProcesses]);
 
   const handleCustomFieldChange = (fieldId: string, value: any) => {
     setCustomFieldValues((prev) => ({ ...prev, [fieldId]: value }));
