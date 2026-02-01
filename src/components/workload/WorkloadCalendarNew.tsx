@@ -116,9 +116,9 @@ export function WorkloadCalendarNew({
     setViewMode('month');
   }, []);
 
-  // Build legend for visible assignees
+  // Build legend for all team members with any events (tasks or leaves)
   const visibleAssignees = useMemo(() => {
-    const assigneeIds = new Set(events.filter(e => e.type === 'task' && e.assigneeId).map(e => e.assigneeId!));
+    const assigneeIds = new Set(events.filter(e => e.assigneeId).map(e => e.assigneeId!));
     return workloadData.filter(m => assigneeIds.has(m.memberId));
   }, [events, workloadData]);
 
