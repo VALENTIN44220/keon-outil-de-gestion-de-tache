@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   format,
   startOfMonth,
@@ -6,10 +6,14 @@ import {
   startOfWeek,
   endOfWeek,
   addDays,
+  addWeeks,
+  subWeeks,
   isSameMonth,
   isSameDay,
+  isSameWeek,
   addMonths,
   subMonths,
+  isWithinInterval,
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, RefreshCw, Users } from 'lucide-react';
@@ -21,10 +25,9 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useOutlookCalendar, OutlookEvent } from '@/hooks/useOutlookCalendar';
+import { useOutlookCalendar } from '@/hooks/useOutlookCalendar';
 import { useMicrosoftConnection } from '@/hooks/useMicrosoftConnection';
 import { useTasks } from '@/hooks/useTasks';
-import { Task } from '@/types/task';
 
 interface CalendarEvent {
   id: string;
@@ -38,14 +41,29 @@ interface CalendarEvent {
   source?: string;
 }
 
+type ViewMode = 'week' | 'month';
+
 export function UnifiedCalendarView() {
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
-  const [viewMode, setViewMode] = useState<'today' | 'week' | 'month'>('month');
+  const [currentDate, setCurrentDate] = useState(() => new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(() => new Date());
+  const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [includeSubordinates, setIncludeSubordinates] = useState(false);
 
-  const startDate = startOfMonth(subMonths(currentMonth, 1));
-  const endDate = endOfMonth(addMonths(currentMonth, 1));
+  // Compute date range based on view mode - memoized
+  const { startDate, endDate } = useMemo(() => {
+    if (viewMode === 'week') {
+      const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
+      const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
+      return {
+        startDate: subWeeks(weekStart, 1),
+        endDate: addWeeks(weekEnd, 1),
+      };
+    }
+    return {
+      startDate: startOfMonth(subMonths(currentDate, 1)),
+      endDate: endOfMonth(addMonths(currentDate, 1)),
+    };
+  }, [currentDate, viewMode]);
 
   const { events: outlookEvents, isLoading: isLoadingOutlook, refetch: refetchOutlook } = useOutlookCalendar(
     startDate,
@@ -56,21 +74,19 @@ export function UnifiedCalendarView() {
   const { connection, isSyncing, syncCalendar } = useMicrosoftConnection();
   const { allTasks, isLoading: isLoadingTasks } = useTasks();
 
-  // Convert to unified format
-  const calendarEvents: CalendarEvent[] = [
-    // Outlook events
+  // Memoize calendar events to prevent flickering
+  const calendarEvents = useMemo<CalendarEvent[]>(() => [
     ...outlookEvents.map(event => ({
       id: `outlook-${event.id}`,
       title: event.subject,
       start: new Date(event.start_time),
       end: new Date(event.end_time),
       type: 'outlook' as const,
-      color: 'bg-[#0078D4]', // Microsoft blue
+      color: 'bg-[#0078D4]',
       location: event.location,
       isAllDay: event.is_all_day,
       source: 'Outlook',
     })),
-    // App tasks with due dates
     ...allTasks
       .filter(task => task.due_date && task.type === 'task')
       .map(task => ({
@@ -83,20 +99,104 @@ export function UnifiedCalendarView() {
                task.priority === 'medium' ? 'bg-warning' : 'bg-primary',
         source: 'Tâche',
       })),
-  ];
+  ], [outlookEvents, allTasks]);
 
-  const getEventsForDate = (date: Date): CalendarEvent[] => {
+  const getEventsForDate = useCallback((date: Date): CalendarEvent[] => {
     return calendarEvents.filter(event => isSameDay(event.start, date));
-  };
+  }, [calendarEvents]);
 
-  const handleSync = async () => {
+  const handleSync = useCallback(async () => {
     await syncCalendar(startDate.toISOString(), endDate.toISOString());
     refetchOutlook();
-  };
+  }, [syncCalendar, startDate, endDate, refetchOutlook]);
 
-  // Calendar grid
-  const renderCalendarGrid = () => {
-    const monthStart = startOfMonth(currentMonth);
+  const handleNavigate = useCallback((direction: 'prev' | 'next') => {
+    if (viewMode === 'week') {
+      setCurrentDate(prev => direction === 'prev' ? subWeeks(prev, 1) : addWeeks(prev, 1));
+    } else {
+      setCurrentDate(prev => direction === 'prev' ? subMonths(prev, 1) : addMonths(prev, 1));
+    }
+  }, [viewMode]);
+
+  const handleToday = useCallback(() => {
+    setCurrentDate(new Date());
+    setSelectedDate(new Date());
+  }, []);
+
+  // Memoize the title
+  const periodTitle = useMemo(() => {
+    if (viewMode === 'week') {
+      const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
+      const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
+      return `${format(weekStart, 'd MMM', { locale: fr })} - ${format(weekEnd, 'd MMM yyyy', { locale: fr })}`;
+    }
+    return format(currentDate, 'MMMM yyyy', { locale: fr });
+  }, [currentDate, viewMode]);
+
+  // Render week view
+  const renderWeekView = useMemo(() => {
+    const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
+    const days: JSX.Element[] = [];
+
+    for (let i = 0; i < 7; i++) {
+      const day = addDays(weekStart, i);
+      const dayEvents = getEventsForDate(day);
+      const isToday = isSameDay(day, new Date());
+      const isSelected = selectedDate && isSameDay(day, selectedDate);
+
+      days.push(
+        <div
+          key={day.toISOString()}
+          className={cn(
+            'min-h-[300px] p-2 border-r cursor-pointer transition-colors flex-1',
+            isSelected && 'bg-primary/5',
+            'hover:bg-muted/50'
+          )}
+          onClick={() => setSelectedDate(day)}
+        >
+          <div className="text-center mb-2">
+            <div className="text-xs text-muted-foreground uppercase">
+              {format(day, 'EEE', { locale: fr })}
+            </div>
+            <div className={cn(
+              'w-8 h-8 mx-auto flex items-center justify-center rounded-full text-sm font-medium mt-1',
+              isToday && 'bg-primary text-primary-foreground',
+              isSelected && !isToday && 'bg-primary/20'
+            )}>
+              {format(day, 'd')}
+            </div>
+          </div>
+          <div className="space-y-1">
+            {dayEvents.map(event => (
+              <div
+                key={event.id}
+                className={cn(
+                  'text-xs px-2 py-1.5 rounded text-white',
+                  event.color
+                )}
+                title={event.title}
+              >
+                <div className="font-medium truncate">{event.title}</div>
+                {!event.isAllDay && (
+                  <div className="text-[10px] opacity-80">{format(event.start, 'HH:mm')}</div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex border-l border-t border-b">
+        {days}
+      </div>
+    );
+  }, [currentDate, selectedDate, getEventsForDate]);
+
+  // Render month view - memoized
+  const renderMonthView = useMemo(() => {
+    const monthStart = startOfMonth(currentDate);
     const monthEnd = endOfMonth(monthStart);
     const weekStart = startOfWeek(monthStart, { weekStartsOn: 1 });
     const weekEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
@@ -108,7 +208,7 @@ export function UnifiedCalendarView() {
       const currentDay = day;
       const dayEvents = getEventsForDate(currentDay);
       const isToday = isSameDay(currentDay, new Date());
-      const isCurrentMonth = isSameMonth(currentDay, currentMonth);
+      const isCurrentMonth = isSameMonth(currentDay, currentDate);
       const isSelected = selectedDate && isSameDay(currentDay, selectedDate);
 
       days.push(
@@ -155,9 +255,14 @@ export function UnifiedCalendarView() {
     }
 
     return days;
-  };
+  }, [currentDate, selectedDate, getEventsForDate]);
 
-  const selectedDateEvents = selectedDate ? getEventsForDate(selectedDate) : [];
+  // Memoize selected date events
+  const selectedDateEvents = useMemo(() => {
+    return selectedDate ? getEventsForDate(selectedDate) : [];
+  }, [selectedDate, getEventsForDate]);
+
+  const isLoading = isLoadingOutlook || isLoadingTasks;
 
   return (
     <div className="flex gap-4 h-full">
@@ -166,18 +271,41 @@ export function UnifiedCalendarView() {
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
+              <Button variant="ghost" size="icon" onClick={() => handleNavigate('prev')}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <CardTitle className="text-lg capitalize">
-                {format(currentMonth, 'MMMM yyyy', { locale: fr })}
-              </CardTitle>
-              <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
+              <Button variant="outline" size="sm" onClick={handleToday} className="text-xs">
+                Aujourd'hui
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => handleNavigate('next')}>
                 <ChevronRight className="h-4 w-4" />
               </Button>
+              <CardTitle className="text-lg capitalize ml-2">
+                {periodTitle}
+              </CardTitle>
             </div>
             
             <div className="flex items-center gap-4">
+              {/* View mode selector */}
+              <div className="flex bg-muted rounded-lg p-0.5">
+                <Button
+                  variant={viewMode === 'week' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="text-xs h-7 px-3"
+                  onClick={() => setViewMode('week')}
+                >
+                  Semaine
+                </Button>
+                <Button
+                  variant={viewMode === 'month' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="text-xs h-7 px-3"
+                  onClick={() => setViewMode('month')}
+                >
+                  Mois
+                </Button>
+              </div>
+
               <div className="flex items-center gap-2">
                 <Switch
                   id="subordinates"
@@ -206,16 +334,21 @@ export function UnifiedCalendarView() {
           </div>
         </CardHeader>
         <CardContent className="p-2">
-          {/* Week days header */}
-          <div className="grid grid-cols-7 border-l border-t">
-            {['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map(day => (
-              <div key={day} className="text-center text-xs font-medium py-2 border-b border-r bg-muted/50">
-                {day}
+          {viewMode === 'week' ? (
+            renderWeekView
+          ) : (
+            <>
+              {/* Week days header */}
+              <div className="grid grid-cols-7 border-l border-t">
+                {['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map(day => (
+                  <div key={day} className="text-center text-xs font-medium py-2 border-b border-r bg-muted/50">
+                    {day}
+                  </div>
+                ))}
+                {renderMonthView}
               </div>
-            ))}
-            {/* Calendar days */}
-            {renderCalendarGrid()}
-          </div>
+            </>
+          )}
 
           {/* Legend */}
           <div className="flex items-center gap-4 mt-3 text-xs">
@@ -252,23 +385,10 @@ export function UnifiedCalendarView() {
               <span>Événements</span>
             )}
           </CardTitle>
-          <div className="flex gap-1 mt-2">
-            {['today', 'week', 'month'].map(mode => (
-              <Button
-                key={mode}
-                variant={viewMode === mode ? 'secondary' : 'ghost'}
-                size="sm"
-                className="text-xs px-2 h-7"
-                onClick={() => setViewMode(mode as any)}
-              >
-                {mode === 'today' ? "Aujourd'hui" : mode === 'week' ? 'Semaine' : 'Mois'}
-              </Button>
-            ))}
-          </div>
         </CardHeader>
         <CardContent className="p-0">
           <ScrollArea className="h-[400px]">
-            {(isLoadingOutlook || isLoadingTasks) ? (
+            {isLoading ? (
               <div className="flex items-center justify-center p-8">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
               </div>
