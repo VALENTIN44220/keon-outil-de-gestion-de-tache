@@ -6,7 +6,7 @@ import { useWorkloadPreferences } from '@/hooks/useWorkloadPreferences';
 import { useWorkloadFilters } from '@/hooks/useWorkloadFilters';
 import { WorkloadFilters } from '@/components/workload/WorkloadFilters';
 import { GanttViewInteractive } from '@/components/workload/GanttViewInteractive';
-import { WorkloadCalendarView } from '@/components/workload/WorkloadCalendarView';
+import { WorkloadCalendarNew } from '@/components/workload/WorkloadCalendarNew';
 import { WorkloadSummaryView } from '@/components/workload/WorkloadSummaryView';
 import { LeaveManagement } from '@/components/workload/LeaveManagement';
 import { HolidayManagement } from '@/components/workload/HolidayManagement';
@@ -450,26 +450,12 @@ export default function Workload() {
                 </TabsContent>
 
                 <TabsContent value="calendar" className="mt-4">
-                  <WorkloadCalendarView
+                  <WorkloadCalendarNew
                     workloadData={workloadData}
                     holidays={holidays}
                     leaves={leaves}
-                    selectedUserId={selectedCalendarUserId}
-                    onUserSelect={setSelectedCalendarUserId}
-                    viewMode={viewMode}
-                    startDate={startDate}
-                    endDate={endDate}
                     tasks={tasks}
-                    onSlotAdd={handleAddSlot}
-                    onSlotRemove={handleRemoveSlot}
-                    onSlotMove={handleMoveSlot}
-                    onMultiSlotAdd={handleAddMultipleSlots}
-                    onSegmentSlot={handleSegmentSlot}
-                    isHalfDayAvailable={isHalfDayAvailable}
-                    getTaskSlotsCount={getTaskSlotsCount}
-                    getTaskDuration={getTaskDuration}
-                    getTaskProgress={getTaskProgress}
-                    plannedTaskIds={plannedTaskIds}
+                    onTaskUpdate={refetch}
                   />
                 </TabsContent>
 
