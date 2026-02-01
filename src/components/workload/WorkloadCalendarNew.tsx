@@ -125,41 +125,43 @@ export function WorkloadCalendarNew({
   return (
     <div className="space-y-4">
       {/* View mode selector */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-card rounded-xl border p-4 shadow-sm">
-        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as CalendarViewMode)}>
-          <TabsList>
-            <TabsTrigger value="month" className="gap-2">
-              <CalendarDays className="h-4 w-4" />
-              Mois
-            </TabsTrigger>
-            <TabsTrigger value="semester" className="gap-2">
-              <CalendarRange className="h-4 w-4" />
-              Semestre
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+      <div className="flex flex-col gap-4 bg-card rounded-xl border p-4 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as CalendarViewMode)}>
+            <TabsList>
+              <TabsTrigger value="month" className="gap-2">
+                <CalendarDays className="h-4 w-4" />
+                Mois
+              </TabsTrigger>
+              <TabsTrigger value="semester" className="gap-2">
+                <CalendarRange className="h-4 w-4" />
+                Semestre
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
 
-        {/* Legend */}
+        {/* Legend - Collaborators */}
         {visibleAssignees.length > 0 && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <Users className="h-4 w-4 text-muted-foreground" />
-            {visibleAssignees.slice(0, 6).map(member => {
-              const color = getUserColor(member.memberId);
-              return (
-                <Badge
-                  key={member.memberId}
-                  variant="secondary"
-                  className={`text-[10px] ${color.bg} ${color.text}`}
-                >
-                  {member.memberName.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                </Badge>
-              );
-            })}
-            {visibleAssignees.length > 6 && (
-              <Badge variant="outline" className="text-[10px]">
-                +{visibleAssignees.length - 6}
-              </Badge>
-            )}
+          <div className="border-t pt-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Users className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium text-muted-foreground">Collaborateurs</span>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              {visibleAssignees.map(member => {
+                const color = getUserColor(member.memberId);
+                return (
+                  <div
+                    key={member.memberId}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/50"
+                  >
+                    <div className={`w-3 h-3 rounded-sm ${color.bg}`} />
+                    <span className="text-xs font-medium">{member.memberName}</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>
