@@ -156,19 +156,21 @@ export function SubProcessConfigView({
       }
 
       // Fetch tasks with checklist count
-      const { data: taskData } = await supabase
+      const { data: taskData, error: taskError } = await supabase
         .from('task_templates')
         .select(`
           *,
-          template_checklist_items (id)
+          task_template_checklists (id)
         `)
         .eq('sub_process_template_id', subProcessId)
         .order('order_index');
 
+      console.log('SubProcessConfigView - Tasks query:', { subProcessId, taskData, taskError, tasksCount: taskData?.length || 0 });
+
       if (taskData) {
         setTasks(taskData.map(t => ({
           ...t,
-          checklist_count: t.template_checklist_items?.length || 0,
+          checklist_count: t.task_template_checklists?.length || 0,
         })) as TaskTemplateWithChecklist[]);
       }
 
