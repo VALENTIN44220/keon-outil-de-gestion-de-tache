@@ -39,17 +39,17 @@ export function VariableInsertButton({
           type="button"
           variant="outline"
           size="sm"
-          className={`h-8 ${className}`}
+          className={`h-8 gap-1 ${className}`}
           disabled={disabled}
         >
-          <Variable className="h-4 w-4 mr-1" />
-          Variables
-          <ChevronDown className="h-3 w-3 ml-1" />
+          <Variable className="h-4 w-4" />
+          Champs
+          <ChevronDown className="h-3 w-3" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-80 p-0" align="start">
         <div className="p-3 border-b">
-          <h4 className="font-medium text-sm">Insérer une variable</h4>
+          <h4 className="font-medium text-sm">Insérer un champ personnalisé</h4>
           <p className="text-xs text-muted-foreground mt-1">
             Cliquez pour insérer dans le champ
           </p>
@@ -58,7 +58,7 @@ export function VariableInsertButton({
         <ScrollArea className="h-64">
           <div className="p-2">
             <Label className="text-xs font-medium text-muted-foreground mb-2 block">
-              Variables système
+              Champs système
             </Label>
             <div className="grid grid-cols-2 gap-1 mb-3">
               {SYSTEM_VARIABLES.map((v) => (

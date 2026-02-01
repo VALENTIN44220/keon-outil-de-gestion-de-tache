@@ -52,8 +52,12 @@ export function WorkflowBuilder({
   // Fetch sub-processes for this process (only for process-level workflows)
   const { subProcesses, fetchSubProcesses } = useSubProcessTemplates(processTemplateId || null);
   
-  // Fetch custom fields for notification templates
-  const { fields: customFields } = useCustomFields({ processTemplateId });
+  // Fetch custom fields for notification templates (including sub-process and parent fields)
+  const { fields: customFields } = useCustomFields({ 
+    processTemplateId, 
+    subProcessTemplateId,
+    includeParentProcessFields: true 
+  });
 
   // State for reference data (users, groups, departments)
   const [users, setUsers] = useState<{ id: string; display_name: string | null }[]>([]);

@@ -33,7 +33,7 @@ import {
   ListTodo,
   Users,
   CheckSquare,
-  Variable,
+  FileText,
   Plus,
   Trash2,
   Edit2,
@@ -51,6 +51,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { AddTaskTemplateDialog } from '@/components/templates/AddTaskTemplateDialog';
 import { EditTaskTemplateDialog } from '@/components/templates/EditTaskTemplateDialog';
 import { addTaskToWorkflow, removeTaskFromWorkflow } from '@/hooks/useAutoWorkflowGeneration';
+import { SubProcessCustomFieldsEditor } from '@/components/templates/SubProcessCustomFieldsEditor';
 
 interface TaskTemplateWithChecklist extends TaskTemplate {
   checklist_count: number;
@@ -264,20 +265,6 @@ export default function SubProcessSettings() {
     }
   };
 
-  const handleSaveVariables = async () => {
-    if (!subProcess) return;
-    setIsSaving(true);
-
-    try {
-      // For now, just show success - actual implementation would save variables
-      toast.success('Variables enregistrées');
-    } catch (error) {
-      console.error('Error saving variables:', error);
-      toast.error('Erreur lors de la sauvegarde');
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
   const addValidationLevel = () => {
     if (validationLevels.length >= 5) {
@@ -355,7 +342,7 @@ export default function SubProcessSettings() {
     { id: 'tasks', label: 'Tâches', icon: ListTodo },
     { id: 'assignment', label: 'Affectation', icon: Users },
     { id: 'validations', label: 'Validations', icon: CheckSquare },
-    { id: 'variables', label: 'Variables', icon: Variable },
+    { id: 'custom-fields', label: 'Champs personnalisés', icon: FileText },
   ];
 
   if (isLoading) {
@@ -840,29 +827,20 @@ export default function SubProcessSettings() {
                   </Card>
                 </TabsContent>
 
-                {/* Variables Tab */}
-                <TabsContent value="variables" className="mt-0 space-y-4">
+                {/* Custom Fields Tab */}
+                <TabsContent value="custom-fields" className="mt-0 space-y-4">
                   <Card>
                     <CardHeader>
-                      <CardTitle className="text-base">Variables du sous-processus</CardTitle>
+                      <CardTitle className="text-base">Champs personnalisés du sous-processus</CardTitle>
                       <CardDescription>
-                        Variables locales et remontées vers le processus parent
+                        Champs spécifiques à ce sous-processus, utilisables dans les tâches et formulaires
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-center py-8 text-muted-foreground">
-                        <Variable className="h-10 w-10 mx-auto mb-3 opacity-50" />
-                        <p>Fonctionnalité en cours de développement</p>
-                      </div>
-                      {canManage && (
-                        <div className="pt-4 mt-4 border-t">
-                          <Button onClick={handleSaveVariables} disabled={isSaving}>
-                            {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                            <Save className="h-4 w-4 mr-2" />
-                            Enregistrer les variables
-                          </Button>
-                        </div>
-                      )}
+                      <SubProcessCustomFieldsEditor
+                        subProcessTemplateId={subProcessId!}
+                        canManage={canManage}
+                      />
                     </CardContent>
                   </Card>
                 </TabsContent>
