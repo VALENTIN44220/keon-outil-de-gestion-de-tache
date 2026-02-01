@@ -125,10 +125,9 @@ export function MonthlyCalendarGrid({
 
   // Render event bar/chip
   const renderEventChip = (event: CalendarEvent, day: Date, isStart: boolean, isEnd: boolean) => {
+    // Holidays use a fixed amber color, but tasks and leaves use assignee-based colors
     const color = event.type === 'holiday' 
       ? { bg: 'bg-amber-400', text: 'text-amber-900', light: 'bg-amber-100' }
-      : event.type === 'leave'
-      ? { bg: 'bg-purple-400', text: 'text-purple-900', light: 'bg-purple-100' }
       : getUserColor(event.assigneeId);
     
     return (
