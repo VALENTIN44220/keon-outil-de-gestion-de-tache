@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SubProcessWithTasks } from '@/types/template';
 import { Card, CardContent } from '@/components/ui/card';
@@ -19,7 +19,7 @@ import {
   Eye,
   CheckCircle,
 } from 'lucide-react';
-import { SubProcessConfigView } from './SubProcessConfigView';
+
 import { VISIBILITY_LABELS } from '@/types/template';
 import { useSubProcessWorkflowStatuses } from '@/hooks/useWorkflowStatus';
 
@@ -53,7 +53,6 @@ export function SubProcessTemplatesList({
   viewMode = 'list',
 }: SubProcessTemplatesListProps) {
   const navigate = useNavigate();
-  const [configSubProcessId, setConfigSubProcessId] = useState<string | null>(null);
 
   // Get all sub-process IDs for workflow status lookup
   const subProcessIds = useMemo(() => subProcesses.map(sp => sp.id), [subProcesses]);
@@ -105,7 +104,7 @@ export function SubProcessTemplatesList({
             <Card 
               key={sp.id} 
               className="flex flex-col cursor-pointer hover:shadow-md transition-all hover:border-primary/30 bg-card"
-              onClick={() => setConfigSubProcessId(sp.id)}
+              onClick={() => navigate(`/templates/subprocess/${sp.id}`)}
             >
               <CardContent className="p-3 space-y-2">
                 {/* Header: Name + Workflow Badge + Process Name */}
@@ -158,7 +157,7 @@ export function SubProcessTemplatesList({
                     variant="default" 
                     size="sm" 
                     className="h-7 px-2.5 text-xs"
-                    onClick={(e) => { e.stopPropagation(); setConfigSubProcessId(sp.id); }}
+                    onClick={(e) => { e.stopPropagation(); navigate(`/templates/subprocess/${sp.id}`); }}
                   >
                     <Eye className="h-3 w-3 mr-1" />
                     {sp.can_manage ? 'Gérer' : 'Voir'}
@@ -188,16 +187,6 @@ export function SubProcessTemplatesList({
           );
         })}
       </div>
-
-      {configSubProcessId && (
-        <SubProcessConfigView
-          subProcessId={configSubProcessId}
-          open={!!configSubProcessId}
-          onClose={() => setConfigSubProcessId(null)}
-          onUpdate={onRefresh}
-          canManage={subProcesses.find(sp => sp.id === configSubProcessId)?.can_manage ?? false}
-        />
-      )}
     </>
   );
 }

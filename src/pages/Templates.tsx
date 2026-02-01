@@ -1,11 +1,11 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { ProcessCard } from '@/components/templates/ProcessCard';
 import { TemplateAdvancedFilters, TemplateFiltersState, defaultFilters } from '@/components/templates/TemplateAdvancedFilters';
 import { AddProcessDialog } from '@/components/templates/AddProcessDialog';
 import { DeleteProcessDialog } from '@/components/templates/DeleteProcessDialog';
-import { UnifiedModelView } from '@/components/templates/UnifiedModelView';
 import { SubProcessTemplatesList } from '@/components/templates/SubProcessTemplatesList';
 import { TaskTemplatesList } from '@/components/templates/TaskTemplatesList';
 import { CustomFieldsTab } from '@/components/templates/CustomFieldsTab';
@@ -25,13 +25,13 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
 const Templates = () => {
+  const navigate = useNavigate();
   const [activeView, setActiveView] = useState('templates');
   const [activeTab, setActiveTab] = useState<'processes' | 'subprocesses' | 'tasks' | 'fields'>('processes');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isAddSubProcessDialogOpen, setIsAddSubProcessDialogOpen] = useState(false);
   const [isAddTaskDialogOpen, setIsAddTaskDialogOpen] = useState(false);
   const [isBulkTaskImportOpen, setIsBulkTaskImportOpen] = useState(false);
-  const [viewingProcess, setViewingProcess] = useState<ProcessWithTasks | null>(null);
   const [deletingProcess, setDeletingProcess] = useState<ProcessWithTasks | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState<TemplateFiltersState>(defaultFilters);
@@ -123,13 +123,10 @@ const Templates = () => {
   });
 
   const handleViewDetails = (id: string) => {
-    const process = processes.find((p) => p.id === id);
-    if (process) {
-      setViewingProcess(process);
-    }
+    navigate(`/templates/process/${id}`);
   };
 
-  // handleEditProcess now redirects to the unified view (same as viewDetails)
+  // handleEditProcess now redirects to the full page view
   const handleEditProcess = handleViewDetails;
 
   const handleDeleteProcess = (id: string) => {
@@ -334,22 +331,6 @@ const Templates = () => {
         open={isBulkTaskImportOpen}
         onClose={() => setIsBulkTaskImportOpen(false)}
         onSuccess={refetchTasks}
-      />
-
-      <UnifiedModelView
-        process={viewingProcess}
-        open={!!viewingProcess}
-        onClose={() => setViewingProcess(null)}
-        onUpdate={async () => {
-          // Refresh the processes list from the database
-          await refetchProcesses();
-          // Update the viewing process with the refreshed data
-          if (viewingProcess) {
-            const updated = processes.find(p => p.id === viewingProcess.id);
-            if (updated) setViewingProcess(updated);
-          }
-        }}
-        canManage={Boolean(viewingProcess?.can_manage)}
       />
 
       <DeleteProcessDialog

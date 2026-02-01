@@ -3,7 +3,7 @@ import keonLogo from '@/assets/keon-logo.jpg';
 import { cn } from '@/lib/utils';
 
 interface PageHeaderProps {
-  title: string;
+  title: ReactNode;
   children?: ReactNode;
   className?: string;
 }
