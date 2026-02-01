@@ -12,6 +12,12 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
   Search,
   ChevronDown,
   ChevronRight,
@@ -30,6 +36,9 @@ import { cn } from '@/lib/utils';
 import type { FormField, FieldTypeConfig } from '@/types/formBuilder';
 import { FIELD_TYPE_CONFIGS } from '@/types/formBuilder';
 
+// Mandatory system fields that cannot be disabled
+const MANDATORY_SYSTEM_FIELD_IDS = ['requester', 'company', 'department', 'priority', 'due_date'];
+
 // Common system fields that can be activated/deactivated
 const COMMON_SYSTEM_FIELDS = [
   {
@@ -39,6 +48,8 @@ const COMMON_SYSTEM_FIELDS = [
     icon: User,
     description: 'Utilisateur faisant la demande',
     isSystem: true,
+    isMandatory: true,
+    autoFillInfo: 'Auto-rempli, non modifiable',
   },
   {
     id: 'company',
@@ -47,6 +58,8 @@ const COMMON_SYSTEM_FIELDS = [
     icon: Building2,
     description: 'Société du demandeur',
     isSystem: true,
+    isMandatory: true,
+    autoFillInfo: 'Auto-rempli depuis le profil',
   },
   {
     id: 'department',
@@ -55,6 +68,8 @@ const COMMON_SYSTEM_FIELDS = [
     icon: Building2,
     description: 'Service du demandeur',
     isSystem: true,
+    isMandatory: true,
+    autoFillInfo: 'Auto-rempli depuis le profil',
   },
   {
     id: 'priority',
@@ -63,6 +78,8 @@ const COMMON_SYSTEM_FIELDS = [
     icon: Flag,
     description: 'Niveau de priorité',
     isSystem: true,
+    isMandatory: true,
+    autoFillInfo: 'Obligatoire, modifiable',
   },
   {
     id: 'due_date',
@@ -71,8 +88,12 @@ const COMMON_SYSTEM_FIELDS = [
     icon: Calendar,
     description: 'Date limite',
     isSystem: true,
+    isMandatory: true,
+    autoFillInfo: 'Obligatoire, modifiable',
   },
 ];
+
+export { MANDATORY_SYSTEM_FIELD_IDS };
 
 interface CommonFieldsLibraryProps {
   existingFields: FormField[];
@@ -225,35 +246,73 @@ export const CommonFieldsLibrary = memo(function CommonFieldsLibrary({
               )}
             </CollapsibleTrigger>
             <CollapsibleContent className="mt-2 space-y-1">
-              {COMMON_SYSTEM_FIELDS.map((field) => {
-                const isActive = activeCommonFields.includes(field.id);
-                const Icon = field.icon;
-                return (
-                  <div
-                    key={field.id}
-                    className={cn(
-                      'flex items-center gap-2 p-2 rounded-md border transition-all',
-                      isActive ? 'bg-primary/5 border-primary/30' : 'border-transparent hover:bg-muted/50'
-                    )}
-                  >
-                    <div className="shrink-0 w-7 h-7 rounded bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                      <Icon className="h-4 w-4 text-amber-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm truncate">{field.label}</div>
-                      <div className="text-[10px] text-muted-foreground truncate">
-                        {field.description}
+              <TooltipProvider delayDuration={200}>
+                {COMMON_SYSTEM_FIELDS.map((field) => {
+                  const isActive = activeCommonFields.includes(field.id);
+                  const isMandatory = field.isMandatory === true;
+                  const Icon = field.icon;
+                  
+                  return (
+                    <div
+                      key={field.id}
+                      className={cn(
+                        'flex items-center gap-2 p-2 rounded-md border transition-all',
+                        isActive ? 'bg-primary/5 border-primary/30' : 'border-transparent hover:bg-muted/50',
+                        isMandatory && 'bg-amber-50/50 dark:bg-amber-950/20 border-amber-200/50'
+                      )}
+                    >
+                      <div className="shrink-0 w-7 h-7 rounded bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                        <Icon className="h-4 w-4 text-amber-600" />
                       </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1">
+                          <span className="font-medium text-sm truncate">{field.label}</span>
+                          {isMandatory && (
+                            <span className="text-destructive text-xs">*</span>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground truncate">
+                          {field.autoFillInfo || field.description}
+                        </div>
+                      </div>
+                      
+                      {isMandatory ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50">
+                              <Lock className="h-3 w-3 text-amber-600" />
+                              <Switch
+                                checked={true}
+                                disabled={true}
+                                className="scale-75 opacity-50 cursor-not-allowed"
+                              />
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="left">
+                            <p className="text-xs">Champ système obligatoire</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div>
+                              <Switch
+                                checked={isActive}
+                                onCheckedChange={(checked) => onToggleCommonField(field.id, checked)}
+                                disabled={!canManage}
+                                className="scale-75"
+                              />
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="left">
+                            <p className="text-xs">Afficher dans le formulaire</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
                     </div>
-                    <Switch
-                      checked={isActive}
-                      onCheckedChange={(checked) => onToggleCommonField(field.id, checked)}
-                      disabled={!canManage}
-                      className="scale-75"
-                    />
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </TooltipProvider>
             </CollapsibleContent>
           </Collapsible>
 

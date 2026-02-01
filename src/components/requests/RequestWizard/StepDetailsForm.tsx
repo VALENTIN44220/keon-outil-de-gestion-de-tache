@@ -88,13 +88,18 @@ export function StepDetailsForm({ data, requestType, onDataChange }: StepDetails
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="dueDate">Date souhaitée</Label>
+              <Label htmlFor="dueDate">Échéance *</Label>
               <Input
                 id="dueDate"
                 type="date"
                 value={data.dueDate || ''}
                 onChange={(e) => onDataChange({ dueDate: e.target.value || null })}
+                required
+                className={!data.dueDate ? 'border-destructive/50' : ''}
               />
+              {!data.dueDate && (
+                <p className="text-xs text-destructive">L'échéance est obligatoire</p>
+              )}
             </div>
           </div>
 

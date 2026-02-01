@@ -31,10 +31,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
-import { Info, ArrowRight, Building2, Workflow, FormInput, CheckSquare, FileText } from 'lucide-react';
+import { Info, ArrowRight, Building2, Workflow, FormInput, CheckSquare, FileText, User, Lock } from 'lucide-react';
 import { BEProjectSelect } from '@/components/be/BEProjectSelect';
 import { toast } from 'sonner';
 import { TemplateCustomField } from '@/types/customField';
+import { Card, CardContent } from '@/components/ui/card';
 
 interface Department {
   id: string;
@@ -486,6 +487,18 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
       return;
     }
 
+    // Validate priority (should always have a value but just in case)
+    if (!priority) {
+      toast.error('La priorité est obligatoire');
+      return;
+    }
+
+    // Validate due date (mandatory system field)
+    if (!dueDate) {
+      toast.error("L'échéance est obligatoire");
+      return;
+    }
+
     // If multi-select mode and no sub-process selected
     if (hasMultipleSubProcesses && selectedSubProcessIds.length === 0) {
       toast.error('Veuillez sélectionner au moins un sous-processus');
@@ -745,6 +758,47 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
             <ScrollArea className="flex-1 mt-4 min-h-0" style={{ maxHeight: 'calc(90vh - 200px)' }}>
               <div className="pr-4 pb-4">
               <TabsContent value="general" className="space-y-4 mt-0">
+                {/* System fields section - Read-only auto-filled */}
+                <Card className="bg-muted/30 border-muted">
+                  <CardContent className="pt-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Lock className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        Champs système
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                          <User className="h-3 w-3" />
+                          Demandeur
+                        </Label>
+                        <div className="text-sm font-medium bg-background/50 rounded px-2 py-1.5 border">
+                          {currentUser?.display_name || 'Utilisateur connecté'}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Building2 className="h-3 w-3" />
+                          Société
+                        </Label>
+                        <div className="text-sm font-medium bg-background/50 rounded px-2 py-1.5 border">
+                          {currentUser?.company || 'Non renseignée'}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Building2 className="h-3 w-3" />
+                          Service
+                        </Label>
+                        <div className="text-sm font-medium bg-background/50 rounded px-2 py-1.5 border">
+                          {currentUser?.department || 'Non renseigné'}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
                 <div className="space-y-2">
                   <Label htmlFor="title">Titre *</Label>
                   <Input
@@ -893,13 +947,18 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                 )}
 
                 <div className="space-y-2">
-                  <Label htmlFor="dueDate">Date souhaitée</Label>
+                  <Label htmlFor="dueDate">Échéance *</Label>
                   <Input
                     id="dueDate"
                     type="date"
                     value={dueDate}
                     onChange={(e) => setDueDate(e.target.value)}
+                    required
+                    className={!dueDate ? 'border-destructive/50' : ''}
                   />
+                  {!dueDate && (
+                    <p className="text-xs text-destructive">L'échéance est obligatoire</p>
+                  )}
                 </div>
               </TabsContent>
 
@@ -1023,6 +1082,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
               disabled={
                 !title.trim() || 
                 !targetDepartmentId || 
+                !dueDate ||
                 isSubmitting ||
                 (hasMultipleSubProcesses && selectedSubProcessIds.length === 0)
               }

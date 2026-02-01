@@ -12,6 +12,25 @@ import {
   mergeWithDefaults,
 } from '@/types/formSchema';
 
+// Mandatory system fields that must always be enabled
+const MANDATORY_COMMON_FIELDS = ['requester', 'company', 'department', 'priority', 'due_date'];
+
+/**
+ * Ensures all mandatory common fields are enabled in the schema
+ */
+function enforceMandatoryFields(schema: FormSchema): FormSchema {
+  const enforcedCommonFields = { ...schema.common_fields };
+  
+  for (const fieldId of MANDATORY_COMMON_FIELDS) {
+    enforcedCommonFields[fieldId] = true;
+  }
+  
+  return {
+    ...schema,
+    common_fields: enforcedCommonFields,
+  };
+}
+
 interface UseFormSchemaProps {
   processTemplateId?: string | null;
   subProcessTemplateId?: string | null;
@@ -78,13 +97,14 @@ export function useFormSchema({
       }
 
       if (data && validateFormSchema(data)) {
-        const loadedSchema = mergeWithDefaults(data);
+        const loadedSchema = enforceMandatoryFields(mergeWithDefaults(data));
         setSchema(loadedSchema);
         setOriginalSchema(loadedSchema);
       } else {
-        // Use default schema
-        setSchema(DEFAULT_FORM_SCHEMA);
-        setOriginalSchema(DEFAULT_FORM_SCHEMA);
+        // Use default schema with enforced mandatory fields
+        const defaultWithMandatory = enforceMandatoryFields(DEFAULT_FORM_SCHEMA);
+        setSchema(defaultWithMandatory);
+        setOriginalSchema(defaultWithMandatory);
       }
     } catch (error: any) {
       console.error('Error loading form schema:', error);
@@ -94,29 +114,33 @@ export function useFormSchema({
     }
   }, [processTemplateId, subProcessTemplateId]);
 
-  // Save schema to database
+  // Save schema to database (with mandatory fields enforcement)
   const saveSchema = useCallback(async (): Promise<boolean> => {
     if (!processTemplateId && !subProcessTemplateId) return false;
+
+    // Enforce mandatory fields before saving
+    const schemaToSave = enforceMandatoryFields(schema);
 
     setIsSaving(true);
     try {
       if (processTemplateId) {
         const { error } = await supabase
           .from('process_templates')
-          .update({ form_schema: schema as any })
+          .update({ form_schema: schemaToSave as any })
           .eq('id', processTemplateId);
 
         if (error) throw error;
       } else if (subProcessTemplateId) {
         const { error } = await supabase
           .from('sub_process_templates')
-          .update({ form_schema: schema as any })
+          .update({ form_schema: schemaToSave as any })
           .eq('id', subProcessTemplateId);
 
         if (error) throw error;
       }
 
-      setOriginalSchema(schema);
+      setSchema(schemaToSave);
+      setOriginalSchema(schemaToSave);
       toast.success('Schéma enregistré');
       return true;
     } catch (error: any) {
@@ -244,8 +268,14 @@ export function useFormSchema({
     []
   );
 
-  // Toggle common field
+  // Toggle common field (guards mandatory fields from being disabled)
   const toggleCommonField = useCallback((fieldKey: string, enabled: boolean) => {
+    // Prevent disabling mandatory fields
+    if (!enabled && MANDATORY_COMMON_FIELDS.includes(fieldKey)) {
+      toast.error('Ce champ système est obligatoire et ne peut pas être désactivé');
+      return;
+    }
+    
     setSchema((prev) => ({
       ...prev,
       common_fields: {
@@ -255,9 +285,9 @@ export function useFormSchema({
     }));
   }, []);
 
-  // Reset to default
+  // Reset to default (with mandatory fields enforced)
   const resetToDefault = useCallback(() => {
-    setSchema(DEFAULT_FORM_SCHEMA);
+    setSchema(enforceMandatoryFields(DEFAULT_FORM_SCHEMA));
   }, []);
 
   // Load on mount
