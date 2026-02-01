@@ -31,7 +31,7 @@ import {
   ListTodo,
   Users,
   CheckSquare,
-  Variable,
+  
   Plus,
   Trash2,
   Edit2,
@@ -339,7 +339,6 @@ export function SubProcessConfigView({
     { id: 'tasks', label: 'Tâches', icon: ListTodo },
     { id: 'assignment', label: 'Affectation', icon: Users },
     { id: 'validations', label: 'Validations', icon: CheckSquare },
-    { id: 'variables', label: 'Variables', icon: Variable },
   ];
 
   return (
@@ -377,7 +376,7 @@ export function SubProcessConfigView({
           className="flex-1 flex flex-col min-h-0"
         >
           <div className="px-6 pt-4 shrink-0">
-            <TabsList className="w-full grid grid-cols-5">
+            <TabsList className="w-full grid grid-cols-4">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 return (
@@ -773,21 +772,6 @@ export function SubProcessConfigView({
                 </Card>
               </TabsContent>
 
-              {/* Variables Tab */}
-              <TabsContent value="variables" className="mt-0 space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Variables du sous-processus</CardTitle>
-                    <CardDescription>
-                      Variables locales et remontées vers le processus parent
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="text-center py-8 text-muted-foreground">
-                    <Variable className="h-10 w-10 mx-auto mb-3 opacity-50" />
-                    <p>Fonctionnalité en cours de développement</p>
-                  </CardContent>
-                </Card>
-              </TabsContent>
             </div>
           </ScrollArea>
         </Tabs>

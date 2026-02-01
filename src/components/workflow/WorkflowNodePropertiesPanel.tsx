@@ -14,7 +14,7 @@ import { Trash2, X, Plus, Info, ExternalLink, AlertCircle, Variable, Check, Load
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { SearchableSelect, SearchableSelectOption } from '@/components/ui/searchable-select';
-import { VariableInsertButton } from './VariableInsertButton';
+import { FieldInsertButton } from './FieldInsertButton';
 import { StandardSubProcessConfigPanel } from './StandardSubProcessConfigPanel';
 import type { 
   WorkflowNode, 
@@ -283,10 +283,10 @@ export function WorkflowNodePropertiesPanel({
         <div>
           <Label className="flex items-center justify-between">
             <span>Titre de la tâche (optionnel)</span>
-            <VariableInsertButton
-              onInsert={(variable) => {
+            <FieldInsertButton
+              onInsert={(field) => {
                 const current = taskConfig.task_title || '';
-                updateConfig({ task_title: current + variable });
+                updateConfig({ task_title: current + field });
               }}
               customFields={customFields}
               disabled={disabled}
@@ -1009,10 +1009,10 @@ export function WorkflowNodePropertiesPanel({
         <div>
           <Label className="flex items-center justify-between">
             <span>Sujet</span>
-            <VariableInsertButton
-              onInsert={(variable) => {
+            <FieldInsertButton
+              onInsert={(field) => {
                 const current = notifConfig.subject_template || '';
-                updateConfig({ subject_template: current + variable });
+                updateConfig({ subject_template: current + field });
               }}
               customFields={customFields}
               disabled={disabled}
@@ -1030,10 +1030,10 @@ export function WorkflowNodePropertiesPanel({
         <div>
           <Label className="flex items-center justify-between">
             <span>Message</span>
-            <VariableInsertButton
-              onInsert={(variable) => {
+            <FieldInsertButton
+              onInsert={(field) => {
                 const current = notifConfig.body_template || '';
-                updateConfig({ body_template: current + variable });
+                updateConfig({ body_template: current + field });
               }}
               customFields={customFields}
               disabled={disabled}
