@@ -21,19 +21,20 @@ import {
   CheckCircle2, 
   AlertCircle, 
   Users, 
-  User,
   GitBranch,
   Workflow,
-  ArrowRight,
   Calendar,
   Building2,
-  XCircle
+  XCircle,
+  ChevronRight,
+  Zap
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { SubProcessProgressCard } from './request-dialog/SubProcessProgressCard';
 
 interface SubProcessProgress {
   id: string;
@@ -319,136 +320,195 @@ export function RequestCard({ request, onClick, progressData, onRequestUpdated }
     }
   };
 
+  // Priority color mapping
+  const getPriorityStyle = (priority: string) => {
+    switch (priority) {
+      case 'urgent':
+        return { bg: 'bg-red-500', text: 'text-white', label: 'Urgente', icon: Zap };
+      case 'high':
+        return { bg: 'bg-orange-500', text: 'text-white', label: 'Haute', icon: null };
+      case 'medium':
+        return { bg: 'bg-blue-500', text: 'text-white', label: 'Moyenne', icon: null };
+      default:
+        return { bg: 'bg-slate-400', text: 'text-white', label: 'Basse', icon: null };
+    }
+  };
+
+  const priorityStyle = getPriorityStyle(request.priority);
+
   return (
     <Card 
-      className="cursor-pointer hover:shadow-md transition-all hover:border-primary/30 bg-card"
+      className={cn(
+        "group cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 bg-card overflow-hidden border-2",
+        workflowInfo?.status === 'completed' && "border-success/40",
+        workflowInfo?.status === 'running' && "border-primary/40",
+        !workflowInfo && "border-border hover:border-primary/40"
+      )}
       onClick={onClick}
     >
-      <CardContent className="p-4 space-y-3">
+      {/* Top accent bar with gradient based on status */}
+      <div className={cn(
+        "h-1.5 w-full",
+        workflowInfo?.status === 'completed' && "bg-gradient-to-r from-success via-success/80 to-emerald-400",
+        workflowInfo?.status === 'running' && "bg-gradient-to-r from-primary via-primary/80 to-blue-400",
+        workflowInfo?.status === 'failed' && "bg-gradient-to-r from-destructive via-destructive/80 to-red-400",
+        !workflowInfo && "bg-gradient-to-r from-muted-foreground/30 via-muted-foreground/20 to-muted-foreground/10"
+      )} />
+
+      <CardContent className="p-4 space-y-4">
         {/* Header: Title + Status + Priority */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              {getStatusIcon(request.status)}
-              <h4 className="font-semibold text-sm truncate">{request.title}</h4>
+            <div className="flex items-center gap-2 mb-1.5">
+              <div className={cn(
+                "p-1.5 rounded-lg",
+                workflowInfo?.status === 'completed' && "bg-success/10",
+                workflowInfo?.status === 'running' && "bg-primary/10",
+                !workflowInfo && "bg-muted"
+              )}>
+                {getStatusIcon(request.status)}
+              </div>
+              <h4 className="font-semibold text-sm truncate group-hover:text-primary transition-colors">
+                {request.title}
+              </h4>
             </div>
             {request.description && (
-              <p className="text-xs text-muted-foreground line-clamp-1">
+              <p className="text-xs text-muted-foreground line-clamp-2 pl-9">
                 {request.description}
               </p>
             )}
           </div>
           
-          <div className="flex items-center gap-2 shrink-0">
-            <Badge className={cn("text-[10px] px-1.5 py-0", getStatusBadgeVariant(request.status))}>
+          <div className="flex flex-col items-end gap-1.5 shrink-0">
+            <Badge className={cn("text-[10px] px-2 py-0.5 gap-1", getStatusBadgeVariant(request.status))}>
               {getStatusLabel(request.status)}
             </Badge>
-            <Badge 
-              variant={request.priority === 'high' ? 'destructive' : 'secondary'}
-              className="text-[10px] px-1.5 py-0"
-            >
-              {request.priority === 'high' ? 'Haute' : request.priority === 'medium' ? 'Moy.' : 'Basse'}
+            <Badge className={cn("text-[10px] px-2 py-0.5 gap-1", priorityStyle.bg, priorityStyle.text)}>
+              {priorityStyle.icon && <Zap className="h-3 w-3" />}
+              {priorityStyle.label}
             </Badge>
           </div>
         </div>
 
         {/* Global Progress Bar */}
-        <div className="space-y-1">
+        <div className="space-y-2 px-1">
           <div className="flex items-center justify-between text-xs">
-            <span className="text-muted-foreground">Avancement global</span>
-            <span className="font-medium">{Math.round(globalProgress)}%</span>
+            <span className="text-muted-foreground font-medium">Avancement global</span>
+            <span className={cn(
+              "font-bold tabular-nums",
+              globalProgress === 100 ? "text-success" : 
+              globalProgress > 50 ? "text-primary" : 
+              "text-muted-foreground"
+            )}>
+              {Math.round(globalProgress)}%
+            </span>
           </div>
-          <Progress value={globalProgress} className="h-2" />
+          <div className="relative h-2.5 rounded-full bg-muted overflow-hidden">
+            <div 
+              className={cn(
+                "absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out",
+                globalProgress === 100 
+                  ? "bg-gradient-to-r from-success to-emerald-400" 
+                  : "bg-gradient-to-r from-primary to-blue-400"
+              )}
+              style={{ width: `${globalProgress}%` }}
+            />
+          </div>
         </div>
 
-        {/* Sub-processes Progress */}
+        {/* Sub-processes Progress with new card design */}
         {subProcesses.length > 0 && (
-          <div className="space-y-2 pt-2 border-t">
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <GitBranch className="h-3 w-3" />
-              <span>Sous-processus ({subProcesses.length})</span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {subProcesses.slice(0, 4).map(sp => (
-                <div 
-                  key={sp.id} 
-                  className="flex items-center gap-2 p-2 rounded-lg bg-muted/50"
-                >
-                  <div className={cn(
-                    "w-2 h-2 rounded-full shrink-0",
-                    sp.status === 'done' ? 'bg-success' : 
-                    sp.status === 'in_progress' ? 'bg-primary animate-pulse' : 
-                    'bg-muted-foreground'
-                  )} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium truncate">{sp.name}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <Progress value={sp.progress} className="h-1 flex-1" />
-                      <span className="text-[10px] text-muted-foreground shrink-0">
-                        {sp.completedTasks}/{sp.taskCount}
-                      </span>
-                    </div>
-                  </div>
-                  {sp.assigneeName && (
-                    <Avatar className="h-5 w-5 shrink-0">
-                      <AvatarImage src={sp.assigneeAvatar} />
-                      <AvatarFallback className="text-[8px] bg-primary/20">
-                        {getInitials(sp.assigneeName)}
-                      </AvatarFallback>
-                    </Avatar>
-                  )}
+          <div className="space-y-3 pt-3 border-t border-dashed">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-1 rounded-md bg-violet-500/10">
+                  <GitBranch className="h-3.5 w-3.5 text-violet-600" />
                 </div>
+                <span className="text-xs font-semibold text-foreground">
+                  Sous-processus
+                </span>
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-violet-500/10 text-violet-700 border-violet-500/20">
+                  {subProcesses.length}
+                </Badge>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {subProcesses.slice(0, 4).map((sp, index) => (
+                <SubProcessProgressCard
+                  key={sp.id}
+                  name={sp.name}
+                  status={sp.status}
+                  progress={sp.progress}
+                  completedTasks={sp.completedTasks}
+                  taskCount={sp.taskCount}
+                  assigneeName={sp.assigneeName}
+                  assigneeAvatar={sp.assigneeAvatar}
+                  colorIndex={index}
+                />
               ))}
             </div>
+            
             {subProcesses.length > 4 && (
-              <p className="text-[10px] text-muted-foreground text-center">
-                +{subProcesses.length - 4} autres sous-processus
-              </p>
+              <div className="flex items-center justify-center">
+                <Badge variant="outline" className="text-[10px] gap-1 hover:bg-muted transition-colors">
+                  <span>+{subProcesses.length - 4} autres</span>
+                  <ChevronRight className="h-3 w-3" />
+                </Badge>
+              </div>
             )}
           </div>
         )}
 
         {/* Footer: Assignment + Workflow + Dates + Cancel */}
-        <div className="flex items-center justify-between gap-2 pt-2 border-t text-xs">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between gap-3 pt-3 border-t">
+          <div className="flex items-center gap-4">
             {/* Assignment */}
             {assigneeInfo ? (
-              <div className="flex items-center gap-1.5">
-                <Avatar className="h-5 w-5">
+              <div className="flex items-center gap-2 px-2 py-1 rounded-full bg-muted/50">
+                <Avatar className="h-5 w-5 ring-2 ring-background">
                   <AvatarImage src={assigneeInfo.avatar} />
-                  <AvatarFallback className="text-[8px] bg-primary/20">
+                  <AvatarFallback className="text-[8px] bg-primary/20 text-primary">
                     {getInitials(assigneeInfo.name)}
                   </AvatarFallback>
                 </Avatar>
-                <span className="text-muted-foreground truncate max-w-24">{assigneeInfo.name}</span>
+                <span className="text-xs font-medium text-muted-foreground truncate max-w-20">
+                  {assigneeInfo.name}
+                </span>
               </div>
             ) : targetDepartment ? (
-              <div className="flex items-center gap-1 text-muted-foreground">
-                <Building2 className="h-3 w-3" />
-                <span className="truncate max-w-24">{targetDepartment}</span>
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-muted/50">
+                <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground truncate max-w-20">{targetDepartment}</span>
               </div>
             ) : (
-              <div className="flex items-center gap-1 text-warning">
-                <Users className="h-3 w-3" />
-                <span>Non affecté</span>
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-warning/10 border border-warning/20">
+                <Users className="h-3.5 w-3.5 text-warning" />
+                <span className="text-xs font-medium text-warning">Non affecté</span>
               </div>
             )}
 
             {/* Workflow status */}
             {workflowInfo && (
-              <div className="flex items-center gap-1">
-                <Workflow className="h-3 w-3 text-muted-foreground" />
+              <div className="flex items-center gap-1.5">
+                <Workflow className="h-3.5 w-3.5 text-muted-foreground" />
                 {getWorkflowStatusBadge()}
               </div>
             )}
           </div>
 
           {/* Dates + Cancel button */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-3 shrink-0">
             {request.due_date && (
-              <div className="flex items-center gap-1 text-muted-foreground">
+              <div className={cn(
+                "flex items-center gap-1.5 px-2 py-1 rounded-full text-xs",
+                new Date(request.due_date) < new Date() 
+                  ? "bg-destructive/10 text-destructive border border-destructive/20" 
+                  : "bg-muted/50 text-muted-foreground"
+              )}>
                 <Calendar className="h-3 w-3" />
-                <span>{format(new Date(request.due_date), 'dd MMM', { locale: fr })}</span>
+                <span className="font-medium">{format(new Date(request.due_date), 'dd MMM', { locale: fr })}</span>
               </div>
             )}
             
@@ -459,10 +519,10 @@ export function RequestCard({ request, onClick, progressData, onRequestUpdated }
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-6 px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                    className="h-7 px-2.5 text-destructive hover:text-destructive hover:bg-destructive/10 rounded-full"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <XCircle className="h-3 w-3 mr-1" />
+                    <XCircle className="h-3.5 w-3.5 mr-1" />
                     Annuler
                   </Button>
                 </AlertDialogTrigger>
