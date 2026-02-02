@@ -108,10 +108,10 @@ export function SectionedCustomFieldsRenderer({
 
   // Always ensure first section is selected when sections change
   useEffect(() => {
-    if (fieldSections.length > 0) {
+    if (fieldSections.length > 0 && !activeTab) {
       setActiveTab(fieldSections[0].id);
     }
-  }, [fieldSections.length > 0 ? fieldSections[0].id : null]);
+  }, [fieldSections]);
 
   if (fields.length === 0) {
     return (
