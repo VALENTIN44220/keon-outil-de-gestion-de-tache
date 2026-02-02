@@ -208,106 +208,144 @@ export function CustomFieldsTab() {
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        <Skeleton className="h-10 w-full" />
-        <Skeleton className="h-64 w-full" />
+      <div className="space-y-6 p-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Skeleton className="h-28 rounded-xl" />
+          <Skeleton className="h-28 rounded-xl" />
+          <Skeleton className="h-28 rounded-xl" />
+        </div>
+        <Skeleton className="h-64 rounded-xl" />
       </div>
     );
   }
 
+  const commonCount = fields.filter((f) => f.is_common).length;
+  const processCount = fields.filter((f) => f.process_template_id && !f.sub_process_template_id).length;
+  const subProcessCount = fields.filter((f) => f.sub_process_template_id).length;
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* Stats Cards - Modern colorful design */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Common Fields Card */}
+        <div className="relative overflow-hidden rounded-xl border bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 p-5 transition-all hover:shadow-lg hover:scale-[1.02]">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full -translate-y-8 translate-x-8" />
+          <div className="relative">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+                <Globe className="h-5 w-5" />
+              </div>
+              <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Champs communs</span>
+            </div>
+            <div className="text-4xl font-bold text-emerald-700 dark:text-emerald-300">
+              {commonCount}
+            </div>
+            <p className="text-xs text-emerald-600/70 dark:text-emerald-400/70 mt-1">Partagés entre tous les processus</p>
+          </div>
+        </div>
+
+        {/* Process Fields Card */}
+        <div className="relative overflow-hidden rounded-xl border bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 p-5 transition-all hover:shadow-lg hover:scale-[1.02]">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 rounded-full -translate-y-8 translate-x-8" />
+          <div className="relative">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-500/20 text-blue-600 dark:text-blue-400">
+                <Workflow className="h-5 w-5" />
+              </div>
+              <span className="text-sm font-medium text-blue-700 dark:text-blue-300">Liés à un processus</span>
+            </div>
+            <div className="text-4xl font-bold text-blue-700 dark:text-blue-300">
+              {processCount}
+            </div>
+            <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">Spécifiques à un processus</p>
+          </div>
+        </div>
+
+        {/* Sub-process Fields Card */}
+        <div className="relative overflow-hidden rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 dark:from-violet-950/30 dark:to-purple-950/30 p-5 transition-all hover:shadow-lg hover:scale-[1.02]">
+          <div className="absolute top-0 right-0 w-24 h-24 bg-violet-500/10 rounded-full -translate-y-8 translate-x-8" />
+          <div className="relative">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-violet-500/20 text-violet-600 dark:text-violet-400">
+                <GitBranch className="h-5 w-5" />
+              </div>
+              <span className="text-sm font-medium text-violet-700 dark:text-violet-300">Liés à un sous-processus</span>
+            </div>
+            <div className="text-4xl font-bold text-violet-700 dark:text-violet-300">
+              {subProcessCount}
+            </div>
+            <p className="text-xs text-violet-600/70 dark:text-violet-400/70 mt-1">Spécifiques à un sous-processus</p>
+          </div>
+        </div>
+      </div>
+
       {/* Header Actions */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between">
+      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Rechercher un champ..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
+            className="pl-9 h-11 rounded-lg border-muted-foreground/20 focus:border-primary"
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {selectedIds.size > 0 && (
             <>
               <Button
                 variant="outline"
                 onClick={() => setBulkScopeOpen(true)}
+                className="gap-2 border-amber-500/50 text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/30"
               >
-                <Settings2 className="h-4 w-4 mr-2" />
-                Modifier portée ({selectedIds.size})
+                <Settings2 className="h-4 w-4" />
+                Modifier portée
+                <Badge variant="secondary" className="ml-1 bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">
+                  {selectedIds.size}
+                </Badge>
               </Button>
               <Button
-                variant="destructive"
+                variant="outline"
                 onClick={() => setBulkDeleteOpen(true)}
+                className="gap-2 border-red-500/50 text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30"
               >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Supprimer ({selectedIds.size})
+                <Trash2 className="h-4 w-4" />
+                Supprimer
+                <Badge variant="secondary" className="ml-1 bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300">
+                  {selectedIds.size}
+                </Badge>
               </Button>
             </>
           )}
-          <Button variant="outline" onClick={() => setBulkImportOpen(true)}>
-            <Upload className="h-4 w-4 mr-2" />
+          <Button 
+            variant="outline" 
+            onClick={() => setBulkImportOpen(true)}
+            className="gap-2 hover:bg-muted/50"
+          >
+            <Upload className="h-4 w-4" />
             Import en masse
           </Button>
-          <Button onClick={() => setAddDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
+          <Button 
+            onClick={() => setAddDialogOpen(true)}
+            className="gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-md hover:shadow-lg transition-all"
+          >
+            <Plus className="h-4 w-4" />
             Nouveau champ
           </Button>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Champs communs
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {fields.filter((f) => f.is_common).length}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Liés à un processus
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {fields.filter((f) => f.process_template_id && !f.sub_process_template_id).length}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Liés à un sous-processus
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {fields.filter((f) => f.sub_process_template_id).length}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       {/* Fields Table */}
-      <Card>
+      <Card className="overflow-hidden rounded-xl border shadow-sm">
         <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow>
+              <TableRow className="bg-muted/30 hover:bg-muted/30">
                 <TableHead className="w-[50px]">
                   <Checkbox
                     checked={sortedFields.length > 0 && selectedIds.size === sortedFields.length}
                     onCheckedChange={toggleSelectAll}
+                    className="border-muted-foreground/30"
                   />
                 </TableHead>
                 <SortableTableHead
@@ -315,6 +353,7 @@ export function CustomFieldsTab() {
                   currentSortKey={sortConfig.key as string}
                   currentDirection={sortConfig.direction}
                   onSort={handleSort}
+                  className="font-semibold"
                 >
                   Nom
                 </SortableTableHead>
@@ -323,6 +362,7 @@ export function CustomFieldsTab() {
                   currentSortKey={sortConfig.key as string}
                   currentDirection={sortConfig.direction}
                   onSort={handleSort}
+                  className="font-semibold"
                 >
                   Type
                 </SortableTableHead>
@@ -331,6 +371,7 @@ export function CustomFieldsTab() {
                   currentSortKey={sortConfig.key as string}
                   currentDirection={sortConfig.direction}
                   onSort={handleSort}
+                  className="font-semibold"
                 >
                   Portée
                 </SortableTableHead>
@@ -339,75 +380,142 @@ export function CustomFieldsTab() {
                   currentSortKey={sortConfig.key as string}
                   currentDirection={sortConfig.direction}
                   onSort={handleSort}
+                  className="font-semibold"
                 >
                   Requis
                 </SortableTableHead>
-                <TableHead className="w-[100px]">Actions</TableHead>
+                <TableHead className="w-[100px] font-semibold">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {sortedFields.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                    {searchQuery ? 'Aucun champ trouvé' : 'Aucun champ personnalisé défini'}
+                  <TableCell colSpan={6} className="text-center py-16">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="flex items-center justify-center w-16 h-16 rounded-full bg-muted/50">
+                        <Database className="h-8 w-8 text-muted-foreground/50" />
+                      </div>
+                      <div className="text-muted-foreground">
+                        {searchQuery ? 'Aucun champ trouvé' : 'Aucun champ personnalisé défini'}
+                      </div>
+                      {!searchQuery && (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => setAddDialogOpen(true)}
+                          className="mt-2"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Créer votre premier champ
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ) : (
-                sortedFields.map((field) => {
+                sortedFields.map((field, index) => {
                   const FieldIcon = FIELD_TYPE_ICON_MAP[field.field_type];
                   const scopeInfo = getScopeInfo(field as any);
                   const ScopeIcon = scopeInfo.icon;
+                  const isSelected = selectedIds.has(field.id);
+
+                  // Colored icon backgrounds based on field type
+                  const getTypeColor = (type: CustomFieldType) => {
+                    const colors: Partial<Record<CustomFieldType, string>> = {
+                      text: 'bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400',
+                      textarea: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400',
+                      number: 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400',
+                      date: 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400',
+                      datetime: 'bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400',
+                      email: 'bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400',
+                      phone: 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400',
+                      url: 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
+                      checkbox: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400',
+                      select: 'bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400',
+                      multiselect: 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400',
+                      user_search: 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400',
+                      department_search: 'bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400',
+                      file: 'bg-slate-100 text-slate-600 dark:bg-slate-900/30 dark:text-slate-400',
+                      table_lookup: 'bg-fuchsia-100 text-fuchsia-600 dark:bg-fuchsia-900/30 dark:text-fuchsia-400',
+                    };
+                    return colors[type] || 'bg-gray-100 text-gray-600 dark:bg-gray-900/30 dark:text-gray-400';
+                  };
+
+                  const getScopeBadgeStyle = () => {
+                    if (field.is_common) {
+                      return 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800';
+                    }
+                    if (field.sub_process_template_id) {
+                      return 'bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-300 dark:border-violet-800';
+                    }
+                    if (field.process_template_id) {
+                      return 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800';
+                    }
+                    return 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-900/30 dark:text-gray-300 dark:border-gray-800';
+                  };
 
                   return (
-                    <TableRow key={field.id}>
+                    <TableRow 
+                      key={field.id}
+                      className={`transition-colors ${isSelected ? 'bg-primary/5' : index % 2 === 0 ? 'bg-background' : 'bg-muted/20'} hover:bg-muted/40`}
+                    >
                       <TableCell>
                         <Checkbox
-                          checked={selectedIds.has(field.id)}
+                          checked={isSelected}
                           onCheckedChange={() => toggleSelect(field.id)}
+                          className="border-muted-foreground/30"
                         />
                       </TableCell>
                       <TableCell>
-                        <div>
-                          <div className="font-medium">{field.label}</div>
-                          <div className="text-sm text-muted-foreground">{field.name}</div>
+                        <div className="flex flex-col">
+                          <span className="font-medium text-foreground">{field.label}</span>
+                          <code className="text-xs text-muted-foreground font-mono bg-muted/50 px-1.5 py-0.5 rounded w-fit mt-0.5">
+                            {field.name}
+                          </code>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          <FieldIcon className="h-4 w-4 text-muted-foreground" />
-                          <span>{FIELD_TYPE_LABELS[field.field_type]}</span>
+                        <div className="flex items-center gap-2.5">
+                          <div className={`flex items-center justify-center w-8 h-8 rounded-lg ${getTypeColor(field.field_type)}`}>
+                            <FieldIcon className="h-4 w-4" />
+                          </div>
+                          <span className="text-sm">{FIELD_TYPE_LABELS[field.field_type]}</span>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={scopeInfo.variant} className="gap-1">
+                        <Badge variant="outline" className={`gap-1.5 font-medium ${getScopeBadgeStyle()}`}>
                           <ScopeIcon className="h-3 w-3" />
-                          {scopeInfo.label}
+                          <span className="max-w-[120px] truncate">{scopeInfo.label}</span>
                         </Badge>
                       </TableCell>
                       <TableCell>
                         {field.is_required ? (
-                          <Badge variant="destructive">Oui</Badge>
+                          <Badge className="bg-red-100 text-red-700 border border-red-200 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800">
+                            Oui
+                          </Badge>
                         ) : (
-                          <Badge variant="secondary">Non</Badge>
+                          <Badge variant="outline" className="text-muted-foreground border-muted-foreground/30">
+                            Non
+                          </Badge>
                         )}
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted">
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="bg-popover">
-                            <DropdownMenuItem onClick={() => setEditingField(field)}>
-                              <Pencil className="h-4 w-4 mr-2" />
+                          <DropdownMenuContent align="end" className="bg-popover w-44">
+                            <DropdownMenuItem onClick={() => setEditingField(field)} className="gap-2">
+                              <Pencil className="h-4 w-4" />
                               Modifier
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => setDeletingFieldId(field.id)}
-                              className="text-destructive"
+                              className="text-destructive gap-2 focus:text-destructive"
                             >
-                              <Trash2 className="h-4 w-4 mr-2" />
+                              <Trash2 className="h-4 w-4" />
                               Supprimer
                             </DropdownMenuItem>
                           </DropdownMenuContent>
@@ -420,6 +528,15 @@ export function CustomFieldsTab() {
             </TableBody>
           </Table>
         </CardContent>
+        {sortedFields.length > 0 && (
+          <div className="border-t bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+            {selectedIds.size > 0 ? (
+              <span className="font-medium text-primary">{selectedIds.size} champ(s) sélectionné(s)</span>
+            ) : (
+              <span>{sortedFields.length} champ(s) au total</span>
+            )}
+          </div>
+        )}
       </Card>
 
       {/* Dialogs */}
