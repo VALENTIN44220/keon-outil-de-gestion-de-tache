@@ -48,6 +48,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { RequestCard } from '@/components/tasks/RequestCard';
+import { ServiceProcessCard } from '@/components/tasks/ServiceProcessCard';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -463,56 +464,29 @@ const Requests = () => {
 
       {/* Service requests by process */}
       {processes.length > 0 && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold flex items-center gap-2">
-            <Building2 className="h-5 w-5" />
-            Demandes aux services
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {processes.map(process => (
-              <Card key={process.id} className="overflow-hidden">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center gap-2">
-                    <FolderOpen className="h-4 w-4 text-primary" />
-                    <CardTitle className="text-sm font-medium">{process.name}</CardTitle>
-                  </div>
-                  {process.department && (
-                    <CardDescription className="text-xs">Service: {process.department}</CardDescription>
-                  )}
-                </CardHeader>
-                <CardContent className="pt-0">
-                  {process.sub_processes.length > 0 ? (
-                    <div className="space-y-2">
-                      {/* Main button to open dialog with all sub-processes and checkboxes */}
-                      <Button
-                        variant="default"
-                        size="sm"
-                        className="w-full justify-center"
-                        onClick={() => handleOpenRequest(null as any, undefined, process.id)}
-                      >
-                        <CheckSquare className="h-4 w-4 mr-2" />
-                        Sélectionner les tâches ({process.sub_processes.length})
-                      </Button>
-                      
-                      {/* Preview of available sub-processes */}
-                      <div className="text-xs text-muted-foreground pt-1 border-t">
-                        {process.sub_processes.slice(0, 3).map(sp => sp.name).join(', ')}
-                        {process.sub_processes.length > 3 && ` +${process.sub_processes.length - 3} autres`}
-                      </div>
-                    </div>
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="w-full justify-start"
-                      onClick={() => handleOpenRequest(null as any, undefined, process.id)}
-                    >
-                      <ChevronRight className="h-3 w-3 mr-2" />
-                      <span className="text-xs">Créer une demande</span>
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
+        <div className="space-y-5">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-primary/10">
+              <Building2 className="h-5 w-5 text-primary" />
+            </div>
+            <h3 className="text-lg font-bold tracking-tight">
+              Demandes aux services
+            </h3>
+            <Badge variant="secondary" className="ml-auto">
+              {processes.length} processus
+            </Badge>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {processes.map((process, index) => (
+              <ServiceProcessCard
+                key={process.id}
+                id={process.id}
+                name={process.name}
+                department={process.department}
+                subProcesses={process.sub_processes}
+                onCreateRequest={(processId) => handleOpenRequest(null as any, undefined, processId)}
+                colorIndex={index}
+              />
             ))}
           </div>
         </div>
