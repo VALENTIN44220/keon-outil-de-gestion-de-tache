@@ -1,5 +1,7 @@
 import { Task } from '@/types/task';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { useTableSort } from '@/hooks/useTableSort';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -24,17 +26,50 @@ const priorityLabels: Record<string, { label: string; color: string }> = {
 };
 
 export function DataTableWidget({ tasks, onTaskClick }: DataTableWidgetProps) {
-  const displayTasks = tasks.slice(0, 50);
+  const { sortedData, sortConfig, handleSort } = useTableSort(tasks, 'due_date', 'asc');
+  const displayTasks = sortedData.slice(0, 50);
 
   return (
     <div className="overflow-auto h-full">
       <Table>
         <TableHeader>
           <TableRow className="bg-keon-50">
-            <TableHead className="font-semibold text-keon-900">Titre</TableHead>
-            <TableHead className="font-semibold text-keon-900">Statut</TableHead>
-            <TableHead className="font-semibold text-keon-900">Priorité</TableHead>
-            <TableHead className="font-semibold text-keon-900">Échéance</TableHead>
+            <SortableTableHead
+              sortKey="title"
+              currentSortKey={sortConfig.key as string}
+              currentDirection={sortConfig.direction}
+              onSort={handleSort}
+              className="font-semibold text-keon-900"
+            >
+              Titre
+            </SortableTableHead>
+            <SortableTableHead
+              sortKey="status"
+              currentSortKey={sortConfig.key as string}
+              currentDirection={sortConfig.direction}
+              onSort={handleSort}
+              className="font-semibold text-keon-900"
+            >
+              Statut
+            </SortableTableHead>
+            <SortableTableHead
+              sortKey="priority"
+              currentSortKey={sortConfig.key as string}
+              currentDirection={sortConfig.direction}
+              onSort={handleSort}
+              className="font-semibold text-keon-900"
+            >
+              Priorité
+            </SortableTableHead>
+            <SortableTableHead
+              sortKey="due_date"
+              currentSortKey={sortConfig.key as string}
+              currentDirection={sortConfig.direction}
+              onSort={handleSort}
+              className="font-semibold text-keon-900"
+            >
+              Échéance
+            </SortableTableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

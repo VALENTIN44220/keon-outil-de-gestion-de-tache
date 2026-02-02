@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useHolidays } from '@/hooks/useHolidays';
+import { useTableSort } from '@/hooks/useTableSort';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Trash2, Loader2, Wand2 } from 'lucide-react';
 
@@ -15,6 +17,7 @@ export function HolidayManagement() {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const { holidays, isLoading, addHoliday, deleteHoliday, generateFrenchHolidays } = useHolidays(selectedYear);
+  const { sortedData: sortedHolidays, sortConfig, handleSort } = useTableSort(holidays, 'date', 'asc');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
     date: '',
@@ -137,14 +140,35 @@ export function HolidayManagement() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Nom</TableHead>
-                  <TableHead>Type</TableHead>
+                  <SortableTableHead
+                    sortKey="date"
+                    currentSortKey={sortConfig.key as string}
+                    currentDirection={sortConfig.direction}
+                    onSort={handleSort}
+                  >
+                    Date
+                  </SortableTableHead>
+                  <SortableTableHead
+                    sortKey="name"
+                    currentSortKey={sortConfig.key as string}
+                    currentDirection={sortConfig.direction}
+                    onSort={handleSort}
+                  >
+                    Nom
+                  </SortableTableHead>
+                  <SortableTableHead
+                    sortKey="is_national"
+                    currentSortKey={sortConfig.key as string}
+                    currentDirection={sortConfig.direction}
+                    onSort={handleSort}
+                  >
+                    Type
+                  </SortableTableHead>
                   <TableHead className="w-[100px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {holidays.map(holiday => (
+                {sortedHolidays.map(holiday => (
                   <TableRow key={holiday.id}>
                     <TableCell className="font-medium">
                       {format(parseISO(holiday.date), 'EEEE dd MMMM yyyy', { locale: fr })}

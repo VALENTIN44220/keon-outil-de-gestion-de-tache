@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { useTableSort } from '@/hooks/useTableSort';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Plus, Trash2, Layers, Pencil } from 'lucide-react';
@@ -29,6 +31,8 @@ export function HierarchyLevelsTab({ hierarchyLevels, onAdd, onUpdate, onDelete,
   const [editLevel, setEditLevel] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
+
+  const { sortedData: sortedLevels, sortConfig, handleSort } = useTableSort(hierarchyLevels, 'level', 'asc');
 
   const handleAdd = async () => {
     if (!name.trim()) {
@@ -149,14 +153,36 @@ export function HierarchyLevelsTab({ hierarchyLevels, onAdd, onUpdate, onDelete,
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[80px]">Niveau</TableHead>
-                  <TableHead>Nom</TableHead>
-                  <TableHead>Description</TableHead>
+                  <SortableTableHead
+                    sortKey="level"
+                    currentSortKey={sortConfig.key as string}
+                    currentDirection={sortConfig.direction}
+                    onSort={handleSort}
+                    className="w-[80px]"
+                  >
+                    Niveau
+                  </SortableTableHead>
+                  <SortableTableHead
+                    sortKey="name"
+                    currentSortKey={sortConfig.key as string}
+                    currentDirection={sortConfig.direction}
+                    onSort={handleSort}
+                  >
+                    Nom
+                  </SortableTableHead>
+                  <SortableTableHead
+                    sortKey="description"
+                    currentSortKey={sortConfig.key as string}
+                    currentDirection={sortConfig.direction}
+                    onSort={handleSort}
+                  >
+                    Description
+                  </SortableTableHead>
                   <TableHead className="w-[120px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {hierarchyLevels.map((hl) => (
+                {sortedLevels.map((hl) => (
                   <TableRow key={hl.id}>
                     <TableCell className="font-mono">{hl.level}</TableCell>
                     <TableCell className="font-medium">{hl.name}</TableCell>

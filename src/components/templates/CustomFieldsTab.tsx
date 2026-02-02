@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAllCustomFields } from '@/hooks/useCustomFields';
 import { useProcessTemplates } from '@/hooks/useProcessTemplates';
 import { useAllSubProcessTemplates } from '@/hooks/useAllSubProcessTemplates';
+import { useTableSort } from '@/hooks/useTableSort';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -122,6 +124,8 @@ export function CustomFieldsTab() {
       field.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       field.label.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const { sortedData: sortedFields, sortConfig, handleSort } = useTableSort(filteredFields, 'label', 'asc');
 
   const handleDelete = async () => {
     if (deletingFieldId) {
@@ -302,26 +306,54 @@ export function CustomFieldsTab() {
               <TableRow>
                 <TableHead className="w-[50px]">
                   <Checkbox
-                    checked={filteredFields.length > 0 && selectedIds.size === filteredFields.length}
+                    checked={sortedFields.length > 0 && selectedIds.size === sortedFields.length}
                     onCheckedChange={toggleSelectAll}
                   />
                 </TableHead>
-                <TableHead>Nom</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Portée</TableHead>
-                <TableHead>Requis</TableHead>
+                <SortableTableHead
+                  sortKey="label"
+                  currentSortKey={sortConfig.key as string}
+                  currentDirection={sortConfig.direction}
+                  onSort={handleSort}
+                >
+                  Nom
+                </SortableTableHead>
+                <SortableTableHead
+                  sortKey="field_type"
+                  currentSortKey={sortConfig.key as string}
+                  currentDirection={sortConfig.direction}
+                  onSort={handleSort}
+                >
+                  Type
+                </SortableTableHead>
+                <SortableTableHead
+                  sortKey="is_common"
+                  currentSortKey={sortConfig.key as string}
+                  currentDirection={sortConfig.direction}
+                  onSort={handleSort}
+                >
+                  Portée
+                </SortableTableHead>
+                <SortableTableHead
+                  sortKey="is_required"
+                  currentSortKey={sortConfig.key as string}
+                  currentDirection={sortConfig.direction}
+                  onSort={handleSort}
+                >
+                  Requis
+                </SortableTableHead>
                 <TableHead className="w-[100px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredFields.length === 0 ? (
+              {sortedFields.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                     {searchQuery ? 'Aucun champ trouvé' : 'Aucun champ personnalisé défini'}
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredFields.map((field) => {
+                sortedFields.map((field) => {
                   const FieldIcon = FIELD_TYPE_ICON_MAP[field.field_type];
                   const scopeInfo = getScopeInfo(field as any);
                   const ScopeIcon = scopeInfo.icon;
