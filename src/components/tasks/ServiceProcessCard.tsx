@@ -4,7 +4,6 @@ import { Badge } from '@/components/ui/badge';
 import { 
   FolderOpen, 
   ChevronRight, 
-  CheckSquare,
   Building2,
   Layers,
   Sparkles
@@ -135,63 +134,53 @@ export function ServiceProcessCard({
           </div>
         </div>
 
-        {/* Sub-processes section */}
-        {hasSubProcesses ? (
-          <div className="space-y-3">
-            {/* Action button */}
-            <Button
-              className={cn(
-                "w-full h-10 font-medium shadow-md transition-all",
-                "hover:shadow-lg hover:scale-[1.02]",
-                colors.button
+        {/* Sub-processes preview */}
+        {hasSubProcesses && (
+          <div className="mb-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Layers className={cn("h-3.5 w-3.5", colors.icon)} />
+              <span className="text-xs font-medium text-muted-foreground">
+                {subProcesses.length} sous-processus
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {subProcesses.slice(0, 3).map((sp) => (
+                <Badge 
+                  key={sp.id} 
+                  variant="secondary"
+                  className={cn(
+                    "text-[10px] px-2 py-0.5 font-medium",
+                    colors.badge
+                  )}
+                >
+                  {sp.name}
+                </Badge>
+              ))}
+              {subProcesses.length > 3 && (
+                <Badge 
+                  variant="outline" 
+                  className="text-[10px] px-2 py-0.5 text-muted-foreground"
+                >
+                  +{subProcesses.length - 3} autres
+                </Badge>
               )}
-              onClick={() => onCreateRequest(id)}
-            >
-              <CheckSquare className="h-4 w-4 mr-2" />
-              Sélectionner les tâches ({subProcesses.length})
-            </Button>
-            
-            {/* Sub-processes preview */}
-            <div className="pt-3 border-t border-border/50">
-              <div className="flex flex-wrap gap-1.5">
-                {subProcesses.slice(0, 3).map((sp, idx) => (
-                  <Badge 
-                    key={sp.id} 
-                    variant="secondary"
-                    className={cn(
-                      "text-[10px] px-2 py-0.5 font-medium",
-                      colors.badge
-                    )}
-                  >
-                    {sp.name}
-                  </Badge>
-                ))}
-                {subProcesses.length > 3 && (
-                  <Badge 
-                    variant="outline" 
-                    className="text-[10px] px-2 py-0.5 text-muted-foreground"
-                  >
-                    +{subProcesses.length - 3} autres
-                  </Badge>
-                )}
-              </div>
             </div>
           </div>
-        ) : (
-          <Button
-            variant="ghost"
-            className={cn(
-              "w-full justify-between h-10 px-3",
-              "hover:bg-muted/50 group/btn"
-            )}
-            onClick={() => onCreateRequest(id)}
-          >
-            <span className="text-sm text-muted-foreground group-hover/btn:text-foreground transition-colors">
-              Créer une demande
-            </span>
-            <ChevronRight className="h-4 w-4 text-muted-foreground group-hover/btn:text-primary group-hover/btn:translate-x-1 transition-all" />
-          </Button>
         )}
+
+        {/* Unified action button */}
+        <Button
+          className={cn(
+            "w-full h-10 font-medium shadow-md transition-all",
+            "hover:shadow-lg hover:scale-[1.02]",
+            colors.button
+          )}
+          onClick={() => onCreateRequest(id)}
+        >
+          <Sparkles className="h-4 w-4 mr-2" />
+          Créer une demande
+          <ChevronRight className="h-4 w-4 ml-auto" />
+        </Button>
       </CardContent>
 
       {/* Decorative corner element */}
