@@ -9,7 +9,7 @@ import { WeeklyCalendarGrid } from './WeeklyCalendarGrid';
 import { UnifiedTaskDrawer } from './UnifiedTaskDrawer';
 import { Users } from 'lucide-react';
 
-type CalendarViewMode = 'week' | 'month' | 'semester';
+type CalendarViewMode = 'week' | 'month' | 'quarter';
 
 interface WorkloadCalendarNewProps {
   workloadData: TeamMemberWorkload[];
@@ -103,8 +103,8 @@ export function WorkloadCalendarNew({
     }
     
     const offset = direction === 'prev' ? -1 : 1;
-    if (viewMode === 'semester') {
-      setInternalDate(prev => addMonths(prev, 6 * offset));
+    if (viewMode === 'quarter') {
+      setInternalDate(prev => addMonths(prev, 3 * offset));
     } else if (viewMode === 'week') {
       setInternalDate(prev => addWeeks(prev, offset));
     } else {
@@ -192,6 +192,7 @@ export function WorkloadCalendarNew({
           onToday={handleToday}
           onEventClick={handleEventClick}
           onMonthClick={handleMonthClick}
+          monthCount={3}
         />
       )}
 
