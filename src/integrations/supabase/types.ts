@@ -4137,6 +4137,7 @@ export type Database = {
             }
             Returns: boolean
           }
+      cancel_request: { Args: { p_request_id: string }; Returns: undefined }
       current_company_id: { Args: never; Returns: string }
       current_department_id: { Args: never; Returns: string }
       current_profile_id: { Args: never; Returns: string }
