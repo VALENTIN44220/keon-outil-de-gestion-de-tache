@@ -1002,11 +1002,6 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                 {/* Custom Fields Tab */}
                 {showCustomFieldsTab && (
                   <TabsContent value="customfields" className="mt-0 space-y-4">
-                    <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
-                      <p className="text-sm text-muted-foreground">
-                        Remplissez les champs ci-dessous. Les champs marqués d'un <span className="text-destructive font-medium">*</span> sont obligatoires.
-                      </p>
-                    </div>
 
                     {loadingProcessFields ? (
                       <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
