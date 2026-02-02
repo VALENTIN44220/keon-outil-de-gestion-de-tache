@@ -672,7 +672,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
         if (!nextOpen) onClose();
       }}
     >
-      <DialogContent className="sm:max-w-[900px] max-h-[90vh] p-0 flex flex-col overflow-hidden rounded-2xl border-border shadow-premium-xl">
+      <DialogContent className="sm:max-w-[920px] max-h-[92vh] p-0 flex flex-col overflow-hidden rounded-3xl border-2 border-primary/10 shadow-2xl shadow-primary/5 bg-gradient-to-b from-white to-muted/20">
         {/* Custom Header */}
         <RequestDialogHeader 
           processName={linkedProcessName} 
@@ -682,23 +682,29 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {/* Tabs */}
           <Tabs defaultValue="general" className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div className="px-6 pt-4 flex-shrink-0">
-              <TabsList className="w-full bg-muted/30 p-1 rounded-xl h-auto flex-wrap">
+            <div className="px-6 pt-5 pb-2 flex-shrink-0 bg-gradient-to-b from-white to-transparent">
+              <TabsList className="w-full bg-muted/40 p-1.5 rounded-2xl h-auto flex-wrap gap-1 border border-border/50">
                 <TabsTrigger 
                   value="general" 
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 data-[state=active]:shadow-md"
+                  className="flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl font-semibold transition-all duration-200 data-[state=active]:shadow-lg data-[state=active]:bg-white data-[state=active]:text-primary data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-white/50"
                 >
                   <FileText className="h-4 w-4" />
-                  <span className="font-medium">Général</span>
+                  <span>Général</span>
                 </TabsTrigger>
                 {showSubProcessTab && (
                   <TabsTrigger 
                     value="subprocesses" 
-                    className="flex-1 flex items-center justify-center gap-2 py-2.5 data-[state=active]:shadow-md"
+                    className="flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl font-semibold transition-all duration-200 data-[state=active]:shadow-lg data-[state=active]:bg-white data-[state=active]:text-primary data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-white/50"
                   >
                     <CheckSquare className="h-4 w-4" />
-                    <span className="font-medium">Tâches</span>
-                    <Badge variant={selectedSubProcessIds.length > 0 ? "default" : "secondary"} className="ml-1 text-[10px] px-1.5 py-0">
+                    <span>Tâches</span>
+                    <Badge 
+                      variant={selectedSubProcessIds.length > 0 ? "default" : "secondary"} 
+                      className={cn(
+                        "ml-1.5 text-[10px] px-2 py-0.5 rounded-full font-bold",
+                        selectedSubProcessIds.length > 0 && "bg-primary shadow-sm"
+                      )}
+                    >
                       {selectedSubProcessIds.length}
                     </Badge>
                   </TabsTrigger>
@@ -706,11 +712,11 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                 {showCustomFieldsTab && (
                   <TabsTrigger 
                     value="customfields" 
-                    className="flex-1 flex items-center justify-center gap-2 py-2.5 data-[state=active]:shadow-md"
+                    className="flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl font-semibold transition-all duration-200 data-[state=active]:shadow-lg data-[state=active]:bg-white data-[state=active]:text-primary data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-white/50"
                   >
                     <FormInput className="h-4 w-4" />
-                    <span className="font-medium">Détails de la demande</span>
-                    <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">
+                    <span>Détails de la demande</span>
+                    <Badge variant="secondary" className="ml-1.5 text-[10px] px-2 py-0.5 rounded-full font-bold">
                       {customFieldsCount}
                     </Badge>
                   </TabsTrigger>
@@ -720,9 +726,9 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
 
             {/* Scrollable Content */}
             <ScrollArea className="flex-1 min-h-0">
-              <div className="px-6 py-4">
+              <div className="px-6 py-5">
                 {/* General Tab */}
-                <TabsContent value="general" className="mt-0 space-y-5">
+                <TabsContent value="general" className="mt-0 space-y-6">
                   {/* System Fields Card */}
                   <SystemFieldsCard
                     userName={currentUser?.display_name}
@@ -731,27 +737,27 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                   />
 
                   {/* Title Field */}
-                  <div className="space-y-2">
-                    <Label htmlFor="title" className="text-sm font-medium flex items-center gap-1">
+                  <div className="space-y-2.5">
+                    <Label htmlFor="title" className="text-sm font-semibold flex items-center gap-1.5 text-foreground">
                       Titre de la demande
-                      <span className="text-destructive">*</span>
+                      <span className="text-destructive text-lg leading-none">*</span>
                     </Label>
                     <Input
                       id="title"
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
                       placeholder="Décrivez brièvement votre demande..."
-                      className="h-11"
+                      className="h-12 text-base rounded-xl border-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all"
                       required
                     />
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground pl-1">
                       Un titre clair aide à identifier rapidement votre demande
                     </p>
                   </div>
 
                   {/* Description Field */}
-                  <div className="space-y-2">
-                    <Label htmlFor="description" className="text-sm font-medium">
+                  <div className="space-y-2.5">
+                    <Label htmlFor="description" className="text-sm font-semibold text-foreground">
                       Description
                     </Label>
                     <Textarea
@@ -760,7 +766,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                       onChange={(e) => setDescription(e.target.value)}
                       placeholder="Donnez plus de détails sur votre demande..."
                       rows={3}
-                      className="resize-none"
+                      className="resize-none rounded-xl border-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all"
                     />
                   </div>
 
@@ -779,9 +785,11 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                   )}
 
                   {/* BE Project Selection */}
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium flex items-center gap-2">
-                      <Folder className="h-4 w-4 text-muted-foreground" />
+                  <div className="space-y-2.5">
+                    <Label className="text-sm font-semibold flex items-center gap-2 text-foreground">
+                      <div className="p-1.5 rounded-lg bg-accent/10">
+                        <Folder className="h-4 w-4 text-accent" />
+                      </div>
                       Projet associé
                     </Label>
                     <BEProjectSelect
@@ -792,19 +800,20 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
 
                   {/* Process Info Banner */}
                   {(linkedProcessId || linkedSubProcessId) && !hasMultipleSubProcesses && (
-                    <div className="rounded-xl border-2 border-primary/30 bg-gradient-to-r from-primary/5 to-primary/10 p-4">
-                      <div className="flex items-start gap-3">
-                        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
-                          <Workflow className="h-5 w-5 text-primary" />
+                    <div className="rounded-2xl border-2 border-primary/30 bg-gradient-to-r from-primary/10 via-primary/5 to-accent/5 p-5 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+                      <div className="flex items-start gap-4 relative">
+                        <div className="flex-shrink-0 w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg shadow-primary/25">
+                          <Workflow className="h-6 w-6 text-white" />
                         </div>
                         <div className="flex-1">
-                          <p className="text-sm font-semibold text-primary">
+                          <p className="text-base font-bold text-primary font-display tracking-wide">
                             {linkedSubProcessName 
                               ? `${linkedProcessName} → ${linkedSubProcessName}`
-                              : `Processus: ${linkedProcessName}`
+                              : linkedProcessName
                             }
                           </p>
-                          <p className="text-sm text-muted-foreground mt-1">
+                          <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
                             Cette demande déclenchera automatiquement la création des tâches du {linkedSubProcessId ? 'sous-processus' : 'processus'}.
                           </p>
                         </div>
@@ -814,17 +823,19 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
 
                   {/* Assignment Rule Info */}
                   {matchingRule && (
-                    <div className="rounded-xl border border-border bg-muted/30 p-4">
+                    <div className="rounded-2xl border-2 border-info/30 bg-gradient-to-r from-info/5 to-transparent p-4">
                       <div className="flex items-start gap-3">
-                        <Info className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+                        <div className="p-2 rounded-xl bg-info/10">
+                          <Info className="h-5 w-5 text-info" />
+                        </div>
                         <div className="flex-1">
-                          <p className="text-sm font-medium">Règle d'affectation: {matchingRule.name}</p>
+                          <p className="text-sm font-semibold text-foreground">Règle d'affectation: {matchingRule.name}</p>
                           <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground flex-wrap">
                             {matchingRule.auto_assign ? (
                               <>
                                 <span>Affectation automatique</span>
                                 <ArrowRight className="h-3 w-3" />
-                                <Badge variant="outline">
+                                <Badge variant="outline" className="rounded-lg border-primary/30 text-primary bg-primary/5">
                                   {matchingRule.target_department_id 
                                     ? `Service: ${getDepartmentName(matchingRule.target_department_id)}`
                                     : 'Personne assignée'
@@ -835,7 +846,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                               <span>Veuillez sélectionner le service cible ci-dessous</span>
                             )}
                             {matchingRule.requires_validation && (
-                              <Badge variant="secondary" className="ml-2">Validation requise</Badge>
+                              <Badge variant="secondary" className="ml-2 rounded-lg">Validation requise</Badge>
                             )}
                           </div>
                         </div>
@@ -844,24 +855,24 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                   )}
 
                   {/* Priority and Service */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                     {!linkedProcessId && (
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium flex items-center gap-1">
+                      <div className="space-y-2.5">
+                        <Label className="text-sm font-semibold flex items-center gap-1.5 text-foreground">
                           Service cible
-                          <span className="text-destructive">*</span>
+                          <span className="text-destructive text-lg leading-none">*</span>
                         </Label>
                         <Select 
                           value={targetDepartmentId || ''} 
                           onValueChange={(v) => setTargetDepartmentId(v || null)}
                           disabled={matchingRule?.auto_assign && matchingRule?.target_department_id ? true : false}
                         >
-                          <SelectTrigger className="h-11">
+                          <SelectTrigger className="h-12 rounded-xl border-2 focus:ring-primary/20 focus:border-primary transition-all">
                             <SelectValue placeholder="Sélectionner un service" />
                           </SelectTrigger>
-                          <SelectContent className="bg-white z-50">
+                          <SelectContent className="bg-white z-50 rounded-xl border-2">
                             {departments.map(dept => (
-                              <SelectItem key={dept.id} value={dept.id}>
+                              <SelectItem key={dept.id} value={dept.id} className="rounded-lg">
                                 {dept.name}
                               </SelectItem>
                             ))}
@@ -870,34 +881,34 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                       </div>
                     )}
 
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium flex items-center gap-1">
+                    <div className="space-y-2.5">
+                      <Label className="text-sm font-semibold flex items-center gap-1.5 text-foreground">
                         Priorité
-                        <span className="text-destructive">*</span>
+                        <span className="text-destructive text-lg leading-none">*</span>
                       </Label>
                       <Select value={priority} onValueChange={(v) => setPriority(v as TaskPriority)}>
-                        <SelectTrigger className="h-11">
+                        <SelectTrigger className="h-12 rounded-xl border-2 focus:ring-primary/20 focus:border-primary transition-all">
                           <div className="flex items-center gap-2">
                             <PriorityBadge priority={priority} size="sm" />
                           </div>
                         </SelectTrigger>
-                        <SelectContent className="bg-white z-50">
-                          <SelectItem value="low">
+                        <SelectContent className="bg-white z-50 rounded-xl border-2">
+                          <SelectItem value="low" className="rounded-lg">
                             <div className="flex items-center gap-2">
                               <PriorityBadge priority="low" size="sm" />
                             </div>
                           </SelectItem>
-                          <SelectItem value="medium">
+                          <SelectItem value="medium" className="rounded-lg">
                             <div className="flex items-center gap-2">
                               <PriorityBadge priority="medium" size="sm" />
                             </div>
                           </SelectItem>
-                          <SelectItem value="high">
+                          <SelectItem value="high" className="rounded-lg">
                             <div className="flex items-center gap-2">
                               <PriorityBadge priority="high" size="sm" />
                             </div>
                           </SelectItem>
-                          <SelectItem value="urgent">
+                          <SelectItem value="urgent" className="rounded-lg">
                             <div className="flex items-center gap-2">
                               <PriorityBadge priority="urgent" size="sm" />
                             </div>
@@ -908,11 +919,13 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                   </div>
 
                   {/* Due Date */}
-                  <div className="space-y-2">
-                    <Label htmlFor="dueDate" className="text-sm font-medium flex items-center gap-1">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <div className="space-y-2.5">
+                    <Label htmlFor="dueDate" className="text-sm font-semibold flex items-center gap-2 text-foreground">
+                      <div className="p-1.5 rounded-lg bg-warning/10">
+                        <Calendar className="h-4 w-4 text-warning" />
+                      </div>
                       Échéance
-                      <span className="text-destructive">*</span>
+                      <span className="text-destructive text-lg leading-none">*</span>
                     </Label>
                     <div className="relative">
                       <Input
@@ -922,37 +935,45 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                         onChange={(e) => setDueDate(e.target.value)}
                         required
                         className={cn(
-                          "h-11",
-                          !dueDate && "border-destructive/50 focus-visible:ring-destructive/20"
+                          "h-12 rounded-xl border-2 transition-all",
+                          !dueDate 
+                            ? "border-warning/50 bg-warning/5 focus-visible:ring-warning/20 focus-visible:border-warning" 
+                            : "focus-visible:ring-primary/20 focus-visible:border-primary"
                         )}
                       />
                     </div>
                     {!dueDate && (
-                      <div className="flex items-center gap-1.5 text-destructive">
-                        <AlertCircle className="h-3.5 w-3.5" />
-                        <p className="text-xs">L'échéance est obligatoire</p>
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-warning/10 border border-warning/20">
+                        <AlertCircle className="h-4 w-4 text-warning flex-shrink-0" />
+                        <p className="text-xs font-medium text-warning">L'échéance est obligatoire pour soumettre la demande</p>
                       </div>
                     )}
-                    <p className="text-xs text-muted-foreground">
-                      Date limite pour la réalisation de cette demande
+                    <p className="text-xs text-muted-foreground pl-1">
+                      Format : JJ/MM/AAAA • Date limite pour la réalisation
                     </p>
                   </div>
                 </TabsContent>
 
                 {/* Sub-processes/Tasks Tab */}
                 {showSubProcessTab && (
-                  <TabsContent value="subprocesses" className="mt-0 space-y-4">
-                    <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
-                      <p className="text-sm text-muted-foreground">
-                        Sélectionnez les tâches à réaliser pour cette demande. Chaque tâche cochée déclenchera la création des actions correspondantes.
-                      </p>
+                  <TabsContent value="subprocesses" className="mt-0 space-y-5">
+                    {/* Info banner */}
+                    <div className="rounded-2xl border-2 border-info/30 bg-gradient-to-r from-info/10 via-info/5 to-transparent p-5">
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 rounded-xl bg-info/20">
+                          <Info className="h-5 w-5 text-info" />
+                        </div>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                          Sélectionnez les tâches à réaliser pour cette demande. Chaque tâche cochée déclenchera la création des actions correspondantes.
+                        </p>
+                      </div>
                     </div>
 
                     {availableSubProcesses.length === 0 ? (
                       <TasksEmptyState />
                     ) : (
                       <>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           {availableSubProcesses.map((subProcess) => {
                             const isSelected = selectedSubProcessIds.includes(subProcess.id);
                             const hasCustomFields = subProcessCustomFields[subProcess.id]?.length > 0;
@@ -972,8 +993,9 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                         </div>
 
                         {selectedSubProcessIds.length > 0 && (
-                          <div className="pt-4 border-t">
-                            <p className="text-sm font-medium text-foreground mb-3">
+                          <div className="pt-5 border-t-2 border-dashed border-primary/20">
+                            <p className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
+                              <CheckSquare className="h-4 w-4 text-primary" />
                               Tâches sélectionnées ({selectedSubProcessIds.length})
                             </p>
                             <div className="flex flex-wrap gap-2">
@@ -983,11 +1005,11 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                                   <Badge 
                                     key={spId} 
                                     variant="default"
-                                    className="cursor-pointer hover:bg-primary/80 transition-colors"
+                                    className="cursor-pointer hover:bg-primary/80 transition-all rounded-lg px-3 py-1.5 gap-1.5 font-medium shadow-sm"
                                     onClick={() => toggleSubProcess(spId)}
                                   >
                                     {sp.name}
-                                    <span className="ml-1.5 opacity-70">×</span>
+                                    <span className="ml-1 opacity-70 hover:opacity-100">×</span>
                                   </Badge>
                                 ) : null;
                               })}
@@ -1001,15 +1023,14 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
 
                 {/* Custom Fields Tab */}
                 {showCustomFieldsTab && (
-                  <TabsContent value="customfields" className="mt-0 space-y-4">
-
+                  <TabsContent value="customfields" className="mt-0 space-y-5">
                     {loadingProcessFields ? (
-                      <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                        <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin mb-4" />
-                        <p className="text-sm">Chargement des champs...</p>
+                      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                        <div className="w-12 h-12 border-3 border-primary/30 border-t-primary rounded-full animate-spin mb-4" />
+                        <p className="text-sm font-medium">Chargement des champs...</p>
                       </div>
                     ) : (
-                      <div className="bg-white rounded-xl border border-border p-4">
+                      <div className="bg-white rounded-2xl border-2 border-border/50 p-5 shadow-sm">
                         <SectionedCustomFieldsRenderer
                           processTemplateId={linkedProcessId}
                           subProcessTemplateId={linkedSubProcessId}
