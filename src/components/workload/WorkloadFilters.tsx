@@ -23,7 +23,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addMonths, addWeeks, subWeeks, subMonths, startOfQuarter, endOfQuarter, addDays } from 'date-fns';
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addMonths, addWeeks, subWeeks, subMonths, startOfQuarter, endOfQuarter, addDays, startOfYear, endOfYear, addYears } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -34,7 +34,7 @@ export type ItemTypeFilter = 'all' | 'tasks' | 'leaves';
 interface WorkloadFiltersProps {
   startDate: Date;
   endDate: Date;
-  onDateRangeChange: (start: Date, end: Date, viewMode?: 'week' | 'month' | 'quarter') => void;
+  onDateRangeChange: (start: Date, end: Date, viewMode?: 'week' | 'month' | 'quarter' | 'year') => void;
   selectedUserIds: string[];
   onUserIdsChange: (ids: string[]) => void;
   selectedProcessId: string | null;
@@ -42,7 +42,7 @@ interface WorkloadFiltersProps {
   selectedCompanyId: string | null;
   onCompanyIdChange: (id: string | null) => void;
   teamMembers: any[];
-  viewMode?: 'week' | 'month' | 'quarter';
+  viewMode?: 'week' | 'month' | 'quarter' | 'year';
   // Search and filter props
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
@@ -120,7 +120,7 @@ export function WorkloadFilters({
     return () => clearTimeout(timer);
   }, [localSearch, onSearchChange]);
 
-  const handlePresetPeriod = (preset: 'week' | 'month' | 'quarter') => {
+  const handlePresetPeriod = (preset: 'week' | 'month' | 'quarter' | 'year') => {
     const now = new Date();
     let start: Date, end: Date;
     
@@ -136,6 +136,10 @@ export function WorkloadFilters({
       case 'quarter':
         start = startOfQuarter(now);
         end = endOfQuarter(now);
+        break;
+      case 'year':
+        start = startOfYear(now);
+        end = endOfYear(now);
         break;
     }
     
@@ -155,6 +159,10 @@ export function WorkloadFilters({
       case 'quarter':
         newStart = addMonths(startDate, 3 * offset);
         newEnd = endOfQuarter(newStart);
+        break;
+      case 'year':
+        newStart = addYears(startDate, offset);
+        newEnd = endOfYear(newStart);
         break;
       case 'month':
       default:
@@ -250,18 +258,18 @@ export function WorkloadFilters({
 
         {/* Period presets - segmented control */}
         <div className="workload-segmented-control">
-          {(['week', 'month', 'quarter'] as const).map((preset) => (
+          {(['week', 'month', 'quarter', 'year'] as const).map((preset) => (
             <Button 
               key={preset}
               variant="ghost"
               size="sm" 
               onClick={() => handlePresetPeriod(preset)}
               className={cn(
-                "workload-segmented-btn h-8 px-4",
+                "workload-segmented-btn h-8 px-3",
                 viewMode === preset && "workload-segmented-btn-active"
               )}
             >
-              {preset === 'week' ? 'Semaine' : preset === 'month' ? 'Mois' : 'Trimestre'}
+              {preset === 'week' ? 'Semaine' : preset === 'month' ? 'Mois' : preset === 'quarter' ? 'Trimestre' : 'Année'}
             </Button>
           ))}
         </div>

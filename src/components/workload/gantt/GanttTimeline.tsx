@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 interface GanttTimelineProps {
   days: Date[];
   dayWidth: number;
-  viewMode: 'week' | 'month' | 'quarter';
+  viewMode: 'week' | 'month' | 'quarter' | 'year';
   isCompact?: boolean;
   memberColumnWidth?: number;
 }

@@ -1,15 +1,16 @@
 import { useState, useMemo, useCallback } from 'react';
-import { format, addMonths, addWeeks, parseISO } from 'date-fns';
+import { format, addMonths, addWeeks, addYears, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Task } from '@/types/task';
 import { TeamMemberWorkload, Holiday, UserLeave } from '@/types/workload';
 import { MonthlyCalendarGrid, CalendarEvent, getUserColor } from './MonthlyCalendarGrid';
 import { SemesterCalendarGrid } from './SemesterCalendarGrid';
 import { WeeklyCalendarGrid } from './WeeklyCalendarGrid';
+import { YearlyCalendarGrid } from './YearlyCalendarGrid';
 import { UnifiedTaskDrawer } from './UnifiedTaskDrawer';
 import { Users } from 'lucide-react';
 
-type CalendarViewMode = 'week' | 'month' | 'quarter';
+type CalendarViewMode = 'week' | 'month' | 'quarter' | 'year';
 
 interface WorkloadCalendarNewProps {
   workloadData: TeamMemberWorkload[];
@@ -107,6 +108,8 @@ export function WorkloadCalendarNew({
       setInternalDate(prev => addMonths(prev, 3 * offset));
     } else if (viewMode === 'week') {
       setInternalDate(prev => addWeeks(prev, offset));
+    } else if (viewMode === 'year') {
+      setInternalDate(prev => addYears(prev, offset));
     } else {
       setInternalDate(prev => addMonths(prev, offset));
     }
@@ -183,6 +186,17 @@ export function WorkloadCalendarNew({
           onEventClick={handleEventClick}
           showHeader
           showNavigation
+        />
+      ) : viewMode === 'year' ? (
+        <YearlyCalendarGrid
+          currentDate={currentDate}
+          events={events}
+          onNavigate={handleNavigate}
+          onToday={handleToday}
+          onEventClick={handleEventClick}
+          onWeekClick={(weekStart) => {
+            // Could switch to week view on click
+          }}
         />
       ) : (
         <SemesterCalendarGrid

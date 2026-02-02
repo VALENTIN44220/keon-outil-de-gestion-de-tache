@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, format, addWeeks, addMonths } from 'date-fns';
+import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, format, addWeeks, addMonths, startOfYear, endOfYear, addYears } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useWorkloadPlanning } from '@/hooks/useWorkloadPlanning';
 import { useWorkloadPreferences } from '@/hooks/useWorkloadPreferences';
@@ -32,7 +32,7 @@ export default function Workload() {
   const profile = getActiveProfile() || authProfile;
   const [activeView, setActiveView] = useState('workload');
   const [activeTab, setActiveTab] = useState('gantt');
-  const [viewMode, setViewMode] = useState<'week' | 'month' | 'quarter'>('month');
+  const [viewMode, setViewMode] = useState<'week' | 'month' | 'quarter' | 'year'>('month');
   const [startDate, setStartDate] = useState(() => startOfMonth(new Date()));
   const [endDate, setEndDate] = useState(() => endOfMonth(new Date()));
   const [selectedCalendarUserId, setSelectedCalendarUserId] = useState<string | null>(null);
@@ -467,6 +467,9 @@ export default function Workload() {
                       } else if (viewMode === 'quarter') {
                         newStart = addMonths(startDate, 3 * offset);
                         newEnd = endOfMonth(addMonths(newStart, 2));
+                      } else if (viewMode === 'year') {
+                        newStart = addYears(startDate, offset);
+                        newEnd = endOfYear(newStart);
                       } else {
                         newStart = addMonths(startDate, offset);
                         newEnd = endOfMonth(newStart);
@@ -481,6 +484,9 @@ export default function Workload() {
                       } else if (viewMode === 'quarter') {
                         setStartDate(startOfMonth(new Date()));
                         setEndDate(endOfMonth(addMonths(new Date(), 2)));
+                      } else if (viewMode === 'year') {
+                        setStartDate(startOfYear(new Date()));
+                        setEndDate(endOfYear(new Date()));
                       } else {
                         setStartDate(startOfMonth(new Date()));
                         setEndDate(endOfMonth(new Date()));
