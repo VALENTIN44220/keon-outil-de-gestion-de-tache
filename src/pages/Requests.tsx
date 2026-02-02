@@ -245,6 +245,11 @@ const Requests = () => {
       filtered = filtered.filter(r => r.assignee_id === profile?.id || r.target_department_id === profile?.department_id);
     }
 
+    // By default, hide cancelled requests when status filter is set to "all"
+    if (statusFilter === 'all') {
+      filtered = filtered.filter(r => r.status !== 'cancelled');
+    }
+
     // Apply status filter
     if (statusFilter !== 'all') {
       filtered = filtered.filter(r => r.status === statusFilter);
@@ -526,7 +531,7 @@ const Requests = () => {
           {/* Request cards - Using enriched RequestCard component */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {myOutgoingRequests
-              .filter(r => statusFilter === 'all' || r.status === statusFilter)
+              .filter(r => (statusFilter === 'all' ? r.status !== 'cancelled' : r.status === statusFilter))
               .filter(r => priorityFilter === 'all' || r.priority === priorityFilter)
               .map(request => (
                 <RequestCard
@@ -534,6 +539,7 @@ const Requests = () => {
                   request={request}
                   onClick={() => handleViewRequest(request)}
                   progressData={progressMap[request.id]}
+                  onRequestUpdated={handleRefresh}
                 />
               ))}
           </div>

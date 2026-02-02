@@ -302,7 +302,10 @@ export function RequestCard({ request, onClick, progressData, onRequestUpdated }
       // 4. Cancel active workflow runs - fetch all then filter in JS
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const wfTable = supabase.from('workflow_runs') as any;
-      const workflowResult = await wfTable.select('id, status').eq('request_id', request.id);
+      // Note: workflow_runs does not have request_id; it links via trigger_entity_id
+      const workflowResult = await wfTable
+        .select('id, status')
+        .eq('trigger_entity_id', request.id);
       
       if (workflowResult.data) {
         for (const run of workflowResult.data as Array<{ id: string; status: string }>) {
