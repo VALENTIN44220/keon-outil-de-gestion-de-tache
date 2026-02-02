@@ -72,10 +72,25 @@ export function RequestCard({ request, onClick, progressData, onRequestUpdated }
       setIsLoading(true);
       try {
         // Fetch sub-processes linked to this request
-        const { data: subProcessLinks } = await supabase
-          .from('be_request_sub_processes')
+        // Preferred table: request_sub_processes (new model)
+        const { data: subProcessLinksNew, error: subProcessLinksNewError } = await supabase
+          .from('request_sub_processes')
           .select('id, sub_process_template_id')
-          .eq('task_id', request.id);
+          .eq('request_id', request.id);
+
+        if (subProcessLinksNewError) throw subProcessLinksNewError;
+
+        // Backward compatibility: older requests may still be linked via be_request_sub_processes
+        // (no status column there)
+        let subProcessLinks = (subProcessLinksNew || []) as Array<{ id: string; sub_process_template_id: string }>;
+        if (subProcessLinks.length === 0) {
+          const { data: legacyLinks, error: legacyError } = await supabase
+            .from('be_request_sub_processes')
+            .select('id, sub_process_template_id')
+            .eq('task_id', request.id);
+          if (legacyError) throw legacyError;
+          subProcessLinks = (legacyLinks || []) as Array<{ id: string; sub_process_template_id: string }>;
+        }
 
         // Fetch sub-process template names
         const subProcessTemplateIds = subProcessLinks?.map(l => l.sub_process_template_id) || [];
@@ -224,6 +239,7 @@ export function RequestCard({ request, onClick, progressData, onRequestUpdated }
       done: 'Terminé',
       validated: 'Validé',
       refused: 'Refusé',
+      cancelled: 'Annulé',
     };
     return labels[status] || status;
   };
@@ -278,26 +294,34 @@ export function RequestCard({ request, onClick, progressData, onRequestUpdated }
     e.stopPropagation();
     
     try {
+      const assertOk = (error: unknown) => {
+        if (error) throw error;
+      };
+
       // 1. Cancel the main request
-      const updateMainRequest = supabase
+      const { error: mainError } = await supabase
         .from('tasks')
         .update({ status: 'cancelled' })
-        .eq('id', request.id);
-      await updateMainRequest;
+        .eq('id', request.id)
+        .select('id');
+      assertOk(mainError);
 
       // 2. Cancel all child tasks
-      const updateChildTasks = supabase
+      const { error: childError } = await supabase
         .from('tasks')
         .update({ status: 'cancelled' })
-        .eq('parent_request_id', request.id);
-      await updateChildTasks;
+        .eq('parent_request_id', request.id)
+        .select('id');
+      assertOk(childError);
 
       // 3. Cancel request_sub_processes
-      const updateSubProcesses = supabase
+      // (Older requests might not have rows here; that's OK)
+      const { error: spError } = await supabase
         .from('request_sub_processes')
         .update({ status: 'cancelled' })
-        .eq('request_id', request.id);
-      await updateSubProcesses;
+        .eq('request_id', request.id)
+        .select('id');
+      assertOk(spError);
 
       // 4. Cancel active workflow runs - fetch all then filter in JS
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -310,7 +334,8 @@ export function RequestCard({ request, onClick, progressData, onRequestUpdated }
       if (workflowResult.data) {
         for (const run of workflowResult.data as Array<{ id: string; status: string }>) {
           if (run.status === 'running' || run.status === 'paused') {
-            await wfTable.update({ status: 'cancelled' }).eq('id', run.id);
+            const { error: wfCancelError } = await wfTable.update({ status: 'cancelled' }).eq('id', run.id);
+            assertOk(wfCancelError);
           }
         }
       }
