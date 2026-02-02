@@ -13,6 +13,7 @@ interface SemesterCalendarGridProps {
   onToday?: () => void;
   onEventClick?: (event: CalendarEvent) => void;
   onMonthClick?: (month: Date) => void;
+  monthCount?: 3 | 6; // 3 for quarter, 6 for semester
 }
 
 export function SemesterCalendarGrid({
@@ -22,18 +23,19 @@ export function SemesterCalendarGrid({
   onToday,
   onEventClick,
   onMonthClick,
+  monthCount = 6,
 }: SemesterCalendarGridProps) {
-  // Generate 6 months starting from currentDate
+  // Generate months starting from currentDate
   const months = useMemo(() => {
     const result: Date[] = [];
     const startMonth = startOfMonth(currentDate);
     
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < monthCount; i++) {
       result.push(addMonths(startMonth, i));
     }
     
     return result;
-  }, [currentDate]);
+  }, [currentDate, monthCount]);
 
   // Filter events for each month
   const getEventsForMonth = (month: Date) => {
@@ -46,10 +48,10 @@ export function SemesterCalendarGrid({
     });
   };
 
-  // Get semester label
-  const getSemesterLabel = () => {
+  // Get period label
+  const getPeriodLabel = () => {
     const firstMonth = months[0];
-    const lastMonth = months[5];
+    const lastMonth = months[months.length - 1];
     const startYear = format(firstMonth, 'yyyy');
     const endYear = format(lastMonth, 'yyyy');
     
@@ -64,7 +66,7 @@ export function SemesterCalendarGrid({
       {/* Header with navigation */}
       <div className="flex items-center justify-between bg-card rounded-xl border p-4 shadow-sm">
         <h2 className="text-lg font-semibold capitalize">
-          {getSemesterLabel()}
+          {getPeriodLabel()}
         </h2>
         
         <div className="flex items-center gap-2">

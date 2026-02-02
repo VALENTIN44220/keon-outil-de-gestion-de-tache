@@ -456,7 +456,7 @@ export default function Workload() {
                     leaves={leaves}
                     tasks={tasks}
                     onTaskUpdate={refetch}
-                    viewMode={viewMode === 'quarter' ? 'semester' : viewMode}
+                    viewMode={viewMode}
                     currentDate={startDate}
                     onNavigate={(direction) => {
                       const offset = direction === 'prev' ? -1 : 1;
@@ -465,8 +465,8 @@ export default function Workload() {
                         newStart = addWeeks(startDate, offset);
                         newEnd = endOfWeek(newStart, { locale: fr });
                       } else if (viewMode === 'quarter') {
-                        newStart = addMonths(startDate, 6 * offset);
-                        newEnd = endOfMonth(addMonths(newStart, 5));
+                        newStart = addMonths(startDate, 3 * offset);
+                        newEnd = endOfMonth(addMonths(newStart, 2));
                       } else {
                         newStart = addMonths(startDate, offset);
                         newEnd = endOfMonth(newStart);
@@ -480,7 +480,7 @@ export default function Workload() {
                         setEndDate(endOfWeek(new Date(), { locale: fr }));
                       } else if (viewMode === 'quarter') {
                         setStartDate(startOfMonth(new Date()));
-                        setEndDate(endOfMonth(addMonths(new Date(), 5)));
+                        setEndDate(endOfMonth(addMonths(new Date(), 2)));
                       } else {
                         setStartDate(startOfMonth(new Date()));
                         setEndDate(endOfMonth(new Date()));
