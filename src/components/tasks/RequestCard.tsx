@@ -294,57 +294,22 @@ export function RequestCard({ request, onClick, progressData, onRequestUpdated }
     e.stopPropagation();
     
     try {
-      const assertOk = (error: unknown) => {
-        if (error) throw error;
-      };
+      // Do the cascade cancellation server-side to avoid partial failures due to RLS
+      const { error } = await supabase.rpc('cancel_request', {
+        p_request_id: request.id,
+      });
 
-      // 1. Cancel the main request
-      const { error: mainError } = await supabase
-        .from('tasks')
-        .update({ status: 'cancelled' })
-        .eq('id', request.id)
-        .select('id');
-      assertOk(mainError);
-
-      // 2. Cancel all child tasks
-      const { error: childError } = await supabase
-        .from('tasks')
-        .update({ status: 'cancelled' })
-        .eq('parent_request_id', request.id)
-        .select('id');
-      assertOk(childError);
-
-      // 3. Cancel request_sub_processes
-      // (Older requests might not have rows here; that's OK)
-      const { error: spError } = await supabase
-        .from('request_sub_processes')
-        .update({ status: 'cancelled' })
-        .eq('request_id', request.id)
-        .select('id');
-      assertOk(spError);
-
-      // 4. Cancel active workflow runs - fetch all then filter in JS
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const wfTable = supabase.from('workflow_runs') as any;
-      // Note: workflow_runs does not have request_id; it links via trigger_entity_id
-      const workflowResult = await wfTable
-        .select('id, status')
-        .eq('trigger_entity_id', request.id);
-      
-      if (workflowResult.data) {
-        for (const run of workflowResult.data as Array<{ id: string; status: string }>) {
-          if (run.status === 'running' || run.status === 'paused') {
-            const { error: wfCancelError } = await wfTable.update({ status: 'cancelled' }).eq('id', run.id);
-            assertOk(wfCancelError);
-          }
-        }
-      }
+      if (error) throw error;
 
       toast.success('Demande annulée avec succès');
       onRequestUpdated?.();
     } catch (error) {
       console.error('Error cancelling request:', error);
-      toast.error("Erreur lors de l'annulation de la demande");
+      const message =
+        typeof error === 'object' && error && 'message' in error
+          ? String((error as { message?: unknown }).message)
+          : "Erreur lors de l'annulation de la demande";
+      toast.error(message);
     }
   };
 
