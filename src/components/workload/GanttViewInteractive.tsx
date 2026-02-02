@@ -34,7 +34,7 @@ interface GanttViewInteractiveProps {
   endDate: Date;
   tasks: Task[];
   leaves: UserLeave[];
-  viewMode?: 'week' | 'month' | 'quarter';
+  viewMode?: 'week' | 'month' | 'quarter' | 'year';
   onSlotAdd: (taskId: string, userId: string, date: string, halfDay: 'morning' | 'afternoon') => Promise<void>;
   onSlotRemove: (slotId: string) => Promise<void>;
   onSlotMove: (slotId: string, newDate: string, newHalfDay: 'morning' | 'afternoon') => Promise<void>;
