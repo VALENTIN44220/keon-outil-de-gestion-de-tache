@@ -361,6 +361,7 @@ const Requests = () => {
       'in-progress': 'En cours',
       review: 'En révision',
       done: 'Terminé',
+      cancelled: 'Annulé',
     };
     return labels[status] || status;
   };
