@@ -6,6 +6,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { useTableSort } from '@/hooks/useTableSort';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Plus, Trash2, Shield, Check, X, User, Users, Crown, Pencil, FolderOpen } from 'lucide-react';
@@ -50,6 +52,8 @@ export function PermissionProfilesTab({ permissionProfiles, onAdd, onUpdate, onD
   const [editDescription, setEditDescription] = useState('');
   const [editPermissions, setEditPermissions] = useState(defaultPermissions);
   const [isUpdating, setIsUpdating] = useState(false);
+
+  const { sortedData: sortedProfiles, sortConfig, handleSort } = useTableSort(permissionProfiles, 'name', 'asc');
 
   const handleAdd = async () => {
     if (!name.trim()) {
@@ -369,8 +373,22 @@ export function PermissionProfilesTab({ permissionProfiles, onAdd, onUpdate, onD
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Nom</TableHead>
-                    <TableHead>Description</TableHead>
+                    <SortableTableHead
+                      sortKey="name"
+                      currentSortKey={sortConfig.key as string}
+                      currentDirection={sortConfig.direction}
+                      onSort={handleSort}
+                    >
+                      Nom
+                    </SortableTableHead>
+                    <SortableTableHead
+                      sortKey="description"
+                      currentSortKey={sortConfig.key as string}
+                      currentDirection={sortConfig.direction}
+                      onSort={handleSort}
+                    >
+                      Description
+                    </SortableTableHead>
                     <TableHead className="text-center" title="Gérer les utilisateurs">
                       <User className="h-4 w-4 mx-auto" />
                     </TableHead>
@@ -397,7 +415,7 @@ export function PermissionProfilesTab({ permissionProfiles, onAdd, onUpdate, onD
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {permissionProfiles.map((profile) => (
+                  {sortedProfiles.map((profile) => (
                     <TableRow key={profile.id}>
                       <TableCell className="font-medium">{profile.name}</TableCell>
                       <TableCell className="text-muted-foreground max-w-[150px] truncate">

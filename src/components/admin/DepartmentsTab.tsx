@@ -5,6 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { useTableSort } from '@/hooks/useTableSort';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -36,6 +38,8 @@ export function DepartmentsTab({ departments, companies, onAdd, onUpdate, onDele
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const { sortedData: sortedDepartments, sortConfig, handleSort } = useTableSort(departments, 'name', 'asc');
 
   const toggleSelection = (id: string) => {
     setSelectedIds(prev => 
@@ -205,18 +209,39 @@ export function DepartmentsTab({ departments, companies, onAdd, onUpdate, onDele
                 <TableRow>
                   <TableHead className="w-[50px]">
                     <Checkbox
-                      checked={selectedIds.length === departments.length && departments.length > 0}
+                      checked={selectedIds.length === sortedDepartments.length && sortedDepartments.length > 0}
                       onCheckedChange={toggleAll}
                     />
                   </TableHead>
-                  <TableHead>Nom</TableHead>
-                  <TableHead>Société</TableHead>
-                  <TableHead>Description</TableHead>
+                  <SortableTableHead
+                    sortKey="name"
+                    currentSortKey={sortConfig.key as string}
+                    currentDirection={sortConfig.direction}
+                    onSort={handleSort}
+                  >
+                    Nom
+                  </SortableTableHead>
+                  <SortableTableHead
+                    sortKey="company.name"
+                    currentSortKey={sortConfig.key as string}
+                    currentDirection={sortConfig.direction}
+                    onSort={handleSort}
+                  >
+                    Société
+                  </SortableTableHead>
+                  <SortableTableHead
+                    sortKey="description"
+                    currentSortKey={sortConfig.key as string}
+                    currentDirection={sortConfig.direction}
+                    onSort={handleSort}
+                  >
+                    Description
+                  </SortableTableHead>
                   <TableHead className="w-[120px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {departments.map((dept) => (
+                {sortedDepartments.map((dept) => (
                   <TableRow key={dept.id} className={selectedIds.includes(dept.id) ? 'bg-muted/50' : ''}>
                     <TableCell>
                       <Checkbox
