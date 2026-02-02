@@ -3,6 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ValidatedCustomFieldsRenderer } from './ValidatedCustomFieldsRenderer';
 import { Badge } from '@/components/ui/badge';
 import { Layers, FormInput } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { TemplateCustomField } from '@/types/customField';
 import type { FormSection } from '@/types/formBuilder';
 import { supabase } from '@/integrations/supabase/client';
@@ -156,13 +157,15 @@ export function SectionedCustomFieldsRenderer({
 
       {fieldSections.map((section) => (
         <TabsContent key={section.id} value={section.id} className="mt-4">
-          <ValidatedCustomFieldsRenderer
-            fields={section.fields}
-            values={values}
-            onChange={onChange}
-            disabled={disabled}
-            validateOnChange={true}
-          />
+          <ScrollArea className="h-[300px] pr-4">
+            <ValidatedCustomFieldsRenderer
+              fields={section.fields}
+              values={values}
+              onChange={onChange}
+              disabled={disabled}
+              validateOnChange={true}
+            />
+          </ScrollArea>
         </TabsContent>
       ))}
     </Tabs>
