@@ -14,7 +14,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { TaskNotification } from '@/hooks/useNotifications';
 import { CommentNotification } from '@/hooks/useCommentNotifications';
-import keonLogo from '@/assets/keon-logo.jpg';
+import keonTaskLogo from '@/assets/keon-task-logo.png';
 
 interface HeaderProps {
   title: string;
@@ -57,15 +57,16 @@ export function Header({
   return (
     <header className="bg-muted/50 border-b border-border px-6 py-4 sticky top-0 z-30">
       <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <img 
-            src={keonLogo} 
-            alt="KEON" 
-            className="h-10 w-10 object-cover rounded-lg shadow-sm" 
+            src={keonTaskLogo} 
+            alt="KEON Task Manager" 
+            className="h-10 w-10 object-contain" 
           />
-          <h1 className="text-xl font-display font-semibold tracking-wide text-foreground uppercase">
-            {title}
-          </h1>
+          <div className="flex flex-col leading-tight">
+            <span className="text-base font-body font-bold tracking-wide text-foreground">KEON</span>
+            <span className="text-xs font-display font-semibold tracking-wider text-muted-foreground uppercase">Task Manager</span>
+          </div>
         </div>
 
         <div className="flex items-center gap-3">
