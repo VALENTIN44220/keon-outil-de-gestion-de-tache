@@ -9,10 +9,11 @@ import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Switch } from '@/components/ui/switch';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Save, User, Building2, Users, Briefcase, Shield, Camera, Loader2, Link2 } from 'lucide-react';
+import { ArrowLeft, Save, User, Building2, Users, Briefcase, Shield, Camera, Loader2, Link2, KeyRound } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { MicrosoftSyncSettings } from '@/components/profile/MicrosoftSyncSettings';
+import { ChangePasswordDialog } from '@/components/auth/ChangePasswordDialog';
 
 interface ProfileData {
   display_name: string;
@@ -37,6 +38,7 @@ export default function Profile() {
   const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [managers, setManagers] = useState<ManagerOption[]>([]);
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [formData, setFormData] = useState<ProfileData>({
     display_name: '',
@@ -332,6 +334,26 @@ export default function Profile() {
                     />
                   </div>
 
+                  {/* Changer le mot de passe */}
+                  <div className="flex items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <Label className="flex items-center gap-2">
+                        <KeyRound className="h-4 w-4 text-muted-foreground" />
+                        Mot de passe
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Modifiez votre mot de passe de connexion
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowPasswordDialog(true)}
+                    >
+                      Changer
+                    </Button>
+                  </div>
+
                   {/* Email (lecture seule) */}
                   <div className="space-y-2">
                     <Label className="text-muted-foreground">Email</Label>
@@ -362,6 +384,12 @@ export default function Profile() {
             <MicrosoftSyncSettings />
           </TabsContent>
         </Tabs>
+
+        {/* Password Change Dialog */}
+        <ChangePasswordDialog
+          open={showPasswordDialog}
+          onOpenChange={setShowPasswordDialog}
+        />
       </div>
     </div>
   );

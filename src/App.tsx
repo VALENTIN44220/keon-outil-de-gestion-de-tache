@@ -7,6 +7,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { SimulationProvider } from "@/contexts/SimulationContext";
 import { SimulationBanner } from "@/components/layout/SimulationBanner";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { ForcePasswordChange } from "@/components/auth/ForcePasswordChange";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
@@ -30,10 +31,11 @@ const App = () => (
     <AuthProvider>
       <SimulationProvider>
         <TooltipProvider>
-          <SimulationBanner />
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
+          <ForcePasswordChange>
+            <SimulationBanner />
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
             <Routes>
               <Route path="/auth" element={<Auth />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
@@ -138,6 +140,7 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
+          </ForcePasswordChange>
         </TooltipProvider>
       </SimulationProvider>
     </AuthProvider>
