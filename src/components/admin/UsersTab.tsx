@@ -9,7 +9,11 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Plus, UserPlus, Users, Building2, Briefcase, Layers, Shield, ChevronUp, ChevronDown, AlertCircle, RefreshCw, Upload, Trash2, Search, UserX, UserCheck, Pause, Key, Copy } from 'lucide-react';
+import { Plus, UserPlus, Users, Building2, Briefcase, Layers, Shield, ChevronUp, ChevronDown, AlertCircle, RefreshCw, Upload, Trash2, Search, UserX, UserCheck, Pause, Key, Copy, LayoutGrid, Table2 } from 'lucide-react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { useTableSort } from '@/hooks/useTableSort';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { RefreshButton } from './RefreshButton';
@@ -62,6 +66,7 @@ export function UsersTab({
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<UserStatus | 'all'>('all');
   const [isResettingPassword, setIsResettingPassword] = useState<string | null>(null);
   const [lovableEmail, setLovableEmail] = useState('');
+  const [viewMode, setViewMode] = useState<'cards' | 'grid'>('cards');
 
   // Create a stable color map for companies
   const companyColorMap = useMemo(() => {
@@ -99,6 +104,9 @@ export function UsersTab({
     
     return result;
   }, [users, searchQuery, selectedCompanyFilter, selectedStatusFilter]);
+
+  // Sort hook for grid view
+  const { sortedData, sortConfig, handleSort } = useTableSort(filteredUsers, 'display_name', 'asc');
 
   // Filter possible managers to exclude suspended/deleted users
   const activeUsers = useMemo(() => {
@@ -738,6 +746,16 @@ export function UsersTab({
                 Tout sélectionner ({filteredUsers.length})
               </Label>
             </div>
+            
+            {/* View Mode Toggle */}
+            <ToggleGroup type="single" value={viewMode} onValueChange={(v) => v && setViewMode(v as 'cards' | 'grid')}>
+              <ToggleGroupItem value="cards" aria-label="Vue cartes" className="h-8 w-8 p-0">
+                <LayoutGrid className="h-4 w-4" />
+              </ToggleGroupItem>
+              <ToggleGroupItem value="grid" aria-label="Vue grille" className="h-8 w-8 p-0">
+                <Table2 className="h-4 w-4" />
+              </ToggleGroupItem>
+            </ToggleGroup>
           </div>
 
           {/* Company Color Legend - Clickable Filters */}
@@ -772,12 +790,188 @@ export function UsersTab({
             })}
           </div>
 
-          {/* User Cards Grid */}
+          {/* User Display */}
           {filteredUsers.length === 0 ? (
             <p className="text-muted-foreground text-center py-8">
               {searchQuery ? 'Aucun utilisateur trouvé' : 'Aucun utilisateur'}
             </p>
+          ) : viewMode === 'grid' ? (
+            /* Table/Grid View */
+            <div className="rounded-lg border overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={selectedIds.length === filteredUsers.length}
+                        onCheckedChange={() => {
+                          if (selectedIds.length === filteredUsers.length) {
+                            setSelectedIds([]);
+                          } else {
+                            setSelectedIds(filteredUsers.map(u => u.id));
+                          }
+                        }}
+                      />
+                    </TableHead>
+                    <SortableTableHead
+                      sortKey="display_name"
+                      currentSortKey={sortConfig.key as string}
+                      currentDirection={sortConfig.direction}
+                      onSort={handleSort}
+                    >
+                      Nom
+                    </SortableTableHead>
+                    <SortableTableHead
+                      sortKey="lovable_email"
+                      currentSortKey={sortConfig.key as string}
+                      currentDirection={sortConfig.direction}
+                      onSort={handleSort}
+                    >
+                      Email Lovable
+                    </SortableTableHead>
+                    <SortableTableHead
+                      sortKey="company.name"
+                      currentSortKey={sortConfig.key as string}
+                      currentDirection={sortConfig.direction}
+                      onSort={handleSort}
+                    >
+                      Société
+                    </SortableTableHead>
+                    <SortableTableHead
+                      sortKey="department.name"
+                      currentSortKey={sortConfig.key as string}
+                      currentDirection={sortConfig.direction}
+                      onSort={handleSort}
+                    >
+                      Service
+                    </SortableTableHead>
+                    <SortableTableHead
+                      sortKey="job_title.name"
+                      currentSortKey={sortConfig.key as string}
+                      currentDirection={sortConfig.direction}
+                      onSort={handleSort}
+                    >
+                      Poste
+                    </SortableTableHead>
+                    <SortableTableHead
+                      sortKey="manager.display_name"
+                      currentSortKey={sortConfig.key as string}
+                      currentDirection={sortConfig.direction}
+                      onSort={handleSort}
+                    >
+                      Manager
+                    </SortableTableHead>
+                    <SortableTableHead
+                      sortKey="permission_profile.name"
+                      currentSortKey={sortConfig.key as string}
+                      currentDirection={sortConfig.direction}
+                      onSort={handleSort}
+                    >
+                      Droits
+                    </SortableTableHead>
+                    <TableHead>Statut</TableHead>
+                    <TableHead className="w-24">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sortedData.map((user) => {
+                    const isSelected = selectedIds.includes(user.id);
+                    const colors = user.company_id ? companyColorMap.get(user.company_id) : null;
+                    
+                    return (
+                      <TableRow 
+                        key={user.id} 
+                        className={`${isSelected ? 'bg-primary/5' : ''} ${colors?.bg || ''}`}
+                      >
+                        <TableCell>
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleSelection(user.id)}
+                          />
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            {user.display_name || 'Sans nom'}
+                            {user.must_change_password && (
+                              <Badge variant="outline" className="text-[10px] h-4 px-1 text-amber-600 border-amber-300 bg-amber-50">
+                                <AlertCircle className="h-2.5 w-2.5 mr-0.5" />
+                                MDP
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {user.lovable_email || '-'}
+                        </TableCell>
+                        <TableCell>
+                          {user.company?.name ? (
+                            <Badge variant="outline" className={`text-xs ${colors?.text} ${colors?.border}`}>
+                              {user.company.name}
+                            </Badge>
+                          ) : '-'}
+                        </TableCell>
+                        <TableCell className="text-sm">{user.department?.name || '-'}</TableCell>
+                        <TableCell className="text-sm">{user.job_title?.name || '-'}</TableCell>
+                        <TableCell className="text-sm">{user.manager?.display_name || '-'}</TableCell>
+                        <TableCell>
+                          {user.permission_profile ? (
+                            <Badge variant="secondary" className="text-xs">
+                              {user.permission_profile.name}
+                            </Badge>
+                          ) : '-'}
+                        </TableCell>
+                        <TableCell>
+                          {user.status && user.status !== 'active' ? (
+                            <Badge 
+                              variant="outline" 
+                              className={`text-xs ${USER_STATUS_LABELS[user.status]?.color}`}
+                            >
+                              {user.status === 'suspended' && <Pause className="h-3 w-3 mr-1" />}
+                              {user.status === 'deleted' && <UserX className="h-3 w-3 mr-1" />}
+                              {USER_STATUS_LABELS[user.status]?.label}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs text-green-600 border-green-300 bg-green-50">
+                              <UserCheck className="h-3 w-3 mr-1" />
+                              Actif
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0"
+                              onClick={() => openEditDialog(user)}
+                            >
+                              <Briefcase className="h-3.5 w-3.5" />
+                            </Button>
+                            {user.status !== 'deleted' && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0"
+                                disabled={isResettingPassword === user.id}
+                                onClick={() => handleResetPassword(user)}
+                              >
+                                {isResettingPassword === user.id ? (
+                                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <Key className="h-3.5 w-3.5" />
+                                )}
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           ) : (
+            /* Cards View */
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {filteredUsers.map((user) => {
                 const isExpanded = expandedUserId === user.id;
