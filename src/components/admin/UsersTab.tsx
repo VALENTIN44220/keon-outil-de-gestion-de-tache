@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Plus, UserPlus, Users, Building2, Briefcase, Layers, Shield, ChevronUp, ChevronDown, AlertCircle, RefreshCw, Upload, Trash2, Search, UserX, UserCheck, Pause, Key, Copy, LayoutGrid, Table2 } from 'lucide-react';
+import { Plus, UserPlus, Users, Building2, Briefcase, Layers, Shield, ChevronUp, ChevronDown, AlertCircle, RefreshCw, Upload, Trash2, Search, UserX, UserCheck, Pause, Key, Copy, LayoutGrid, Table2, Mail, CheckCircle2, XCircle, Send } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { useTableSort } from '@/hooks/useTableSort';
@@ -18,8 +18,13 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { RefreshButton } from './RefreshButton';
 import { BulkUserImportDialog } from './BulkUserImportDialog';
-import type { Company, Department, JobTitle, HierarchyLevel, PermissionProfile, UserProfile, UserStatus } from '@/types/admin';
+import type { Company, Department, JobTitle, HierarchyLevel, PermissionProfile, UserProfile, UserStatus, LovableStatus } from '@/types/admin';
 import { USER_STATUS_LABELS } from '@/types/admin';
+
+const LOVABLE_STATUS_LABELS: Record<LovableStatus, { label: string; color: string; icon: 'check' | 'x' }> = {
+  OK: { label: 'Inscrit sur Lovable', color: 'bg-green-100 text-green-800 border-green-300', icon: 'check' },
+  NOK: { label: 'Non inscrit', color: 'bg-red-100 text-red-800 border-red-300', icon: 'x' },
+};
 
 // KEON spectrum colors for companies
 const COMPANY_COLORS = [
@@ -65,7 +70,11 @@ export function UsersTab({
   const [selectedCompanyFilter, setSelectedCompanyFilter] = useState<string | null>(null);
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<UserStatus | 'all'>('all');
   const [isResettingPassword, setIsResettingPassword] = useState<string | null>(null);
+  const [isInviting, setIsInviting] = useState<string | null>(null);
+  const [isBulkInviting, setIsBulkInviting] = useState(false);
   const [lovableEmail, setLovableEmail] = useState('');
+  const [secondaryEmail, setSecondaryEmail] = useState('');
+  const [lovableStatus, setLovableStatus] = useState<LovableStatus>('NOK');
   const [viewMode, setViewMode] = useState<'cards' | 'grid'>('cards');
 
   // Create a stable color map for companies
@@ -177,6 +186,8 @@ export function UsersTab({
     setManagerId('');
     setUserStatus('active');
     setLovableEmail('');
+    setSecondaryEmail('');
+    setLovableStatus('NOK');
     setEditingUser(null);
   };
 
@@ -263,6 +274,8 @@ export function UsersTab({
           manager_id: managerId || null,
           status: userStatus,
           lovable_email: lovableEmail.trim() || null,
+          secondary_email: secondaryEmail.trim() || null,
+          lovable_status: lovableStatus,
         })
         .eq('id', userId);
 
@@ -288,7 +301,122 @@ export function UsersTab({
     setManagerId(user.manager_id || '');
     setUserStatus(user.status || 'active');
     setLovableEmail(user.lovable_email || '');
+    setSecondaryEmail(user.secondary_email || '');
+    setLovableStatus(user.lovable_status || 'NOK');
     setIsDialogOpen(true);
+  };
+
+  // Invite user to app via email
+  const handleInviteToApp = async (user: UserProfile) => {
+    if (user.lovable_status !== 'OK') {
+      toast.error('L\'utilisateur doit d\'abord être inscrit sur Lovable (statut OK)');
+      return;
+    }
+
+    if (!user.lovable_email && !user.secondary_email) {
+      toast.error('Aucun email disponible pour l\'invitation. Définissez lovable_email ou secondary_email.');
+      return;
+    }
+
+    setIsInviting(user.id);
+    try {
+      const response = await supabase.functions.invoke('invite-user', {
+        body: {
+          profile_id: user.id,
+          redirect_url: window.location.origin,
+        },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Erreur lors de l\'invitation');
+      }
+
+      if (response.data?.already_exists) {
+        toast.info('Cet utilisateur a déjà un compte dans l\'application');
+      } else {
+        toast.success(`Invitation envoyée à ${user.lovable_email || user.secondary_email}`);
+      }
+
+      onUserUpdated();
+    } catch (error: any) {
+      console.error('Error inviting user:', error);
+      toast.error(error.message || 'Erreur lors de l\'invitation');
+    } finally {
+      setIsInviting(null);
+    }
+  };
+
+  // Bulk invite all users with lovable_status OK but no account
+  const handleBulkInviteToApp = async () => {
+    const eligibleUsers = users.filter(u => 
+      u.lovable_status === 'OK' && 
+      !u.user_id &&
+      (u.lovable_email || u.secondary_email)
+    );
+
+    if (eligibleUsers.length === 0) {
+      toast.info('Aucun utilisateur éligible pour l\'invitation en masse');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Voulez-vous envoyer une invitation à ${eligibleUsers.length} utilisateur(s) ?`
+    );
+
+    if (!confirmed) return;
+
+    setIsBulkInviting(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const user of eligibleUsers) {
+      try {
+        const response = await supabase.functions.invoke('invite-user', {
+          body: {
+            profile_id: user.id,
+            redirect_url: window.location.origin,
+          },
+        });
+
+        if (response.error) {
+          errorCount++;
+        } else {
+          successCount++;
+        }
+      } catch {
+        errorCount++;
+      }
+    }
+
+    setIsBulkInviting(false);
+    
+    if (successCount > 0) {
+      toast.success(`${successCount} invitation(s) envoyée(s)`);
+    }
+    if (errorCount > 0) {
+      toast.error(`${errorCount} erreur(s) lors de l'envoi`);
+    }
+
+    onUserUpdated();
+  };
+
+  // Toggle Lovable status for a user
+  const handleToggleLovableStatus = async (user: UserProfile) => {
+    const newStatus: LovableStatus = user.lovable_status === 'OK' ? 'NOK' : 'OK';
+    
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ lovable_status: newStatus })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      toast.success(`Statut Lovable mis à jour: ${LOVABLE_STATUS_LABELS[newStatus].label}`);
+      onUserUpdated();
+    } catch (error: any) {
+      toast.error(error.message || 'Erreur lors de la mise à jour du statut');
+    }
   };
 
   // Filter departments by selected company
@@ -388,6 +516,18 @@ export function UsersTab({
                   Supprimer ({selectedIds.length})
                 </Button>
               )}
+              <Button 
+                variant="outline" 
+                onClick={handleBulkInviteToApp}
+                disabled={isBulkInviting}
+              >
+                {isBulkInviting ? (
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="mr-2 h-4 w-4" />
+                )}
+                Inviter en masse
+              </Button>
               <RefreshButton onRefresh={onRefresh} />
               <Button variant="outline" onClick={() => setIsBulkImportOpen(true)}>
                 <Upload className="mr-2 h-4 w-4" />
@@ -478,6 +618,50 @@ export function UsersTab({
                           </p>
                         )}
                       </div>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="secondaryEmail">Email secondaire (ex: Gmail)</Label>
+                        <Input
+                          id="secondaryEmail"
+                          type="email"
+                          placeholder="utilisateur@gmail.com"
+                          value={secondaryEmail}
+                          onChange={(e) => setSecondaryEmail(e.target.value)}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Adresse alternative pour le compte Lovable
+                        </p>
+                      </div>
+                      {editingUser && (
+                        <div className="space-y-2">
+                          <Label>Statut Lovable</Label>
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              variant={lovableStatus === 'OK' ? 'default' : 'outline'}
+                              size="sm"
+                              className={lovableStatus === 'OK' ? 'bg-green-600 hover:bg-green-700' : ''}
+                              onClick={() => setLovableStatus('OK')}
+                            >
+                              <CheckCircle2 className="h-4 w-4 mr-1" />
+                              OK
+                            </Button>
+                            <Button
+                              type="button"
+                              variant={lovableStatus === 'NOK' ? 'destructive' : 'outline'}
+                              size="sm"
+                              onClick={() => setLovableStatus('NOK')}
+                            >
+                              <XCircle className="h-4 w-4 mr-1" />
+                              NOK
+                            </Button>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Définissez manuellement si l'utilisateur est inscrit sur le workspace Lovable
+                          </p>
+                        </div>
+                      )}
                     </div>
                     {editingUser?.must_change_password && (
                       <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50">
@@ -1038,13 +1222,42 @@ export function UsersTab({
                       {/* Expanded Content */}
                       <CollapsibleContent>
                         <div className="px-3 pb-3 pt-0 space-y-3 animate-fade-in border-t border-current/10">
+                          {/* Lovable Status Badge */}
+                          <div className="flex items-center justify-between">
+                            <Badge 
+                              variant="outline" 
+                              className={`text-xs cursor-pointer ${LOVABLE_STATUS_LABELS[user.lovable_status || 'NOK'].color}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleLovableStatus(user);
+                              }}
+                            >
+                              {user.lovable_status === 'OK' ? (
+                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                              ) : (
+                                <XCircle className="h-3 w-3 mr-1" />
+                              )}
+                              {LOVABLE_STATUS_LABELS[user.lovable_status || 'NOK'].label}
+                            </Badge>
+                            {user.user_id && (
+                              <Badge variant="secondary" className="text-xs">
+                                <UserCheck className="h-3 w-3 mr-1" />
+                                Compte créé
+                              </Badge>
+                            )}
+                          </div>
+
                           {/* Email Lovable */}
-                          {user.lovable_email && (
-                            <div className="text-xs">
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div>
                               <span className="text-muted-foreground">Email Lovable</span>
-                              <p className="font-medium truncate">{user.lovable_email}</p>
+                              <p className="font-medium truncate">{user.lovable_email || '-'}</p>
                             </div>
-                          )}
+                            <div>
+                              <span className="text-muted-foreground">Email secondaire</span>
+                              <p className="font-medium truncate">{user.secondary_email || '-'}</p>
+                            </div>
+                          </div>
                           
                           {/* Organization Info */}
                           <div className="grid grid-cols-2 gap-2 text-xs">
@@ -1109,7 +1322,7 @@ export function UsersTab({
                           )}
 
                           {/* Actions */}
-                          <div className="flex gap-2">
+                          <div className="flex flex-wrap gap-2">
                             <Button
                               size="sm"
                               className="flex-1"
@@ -1120,7 +1333,29 @@ export function UsersTab({
                             >
                               Modifier
                             </Button>
-                            {user.status !== 'deleted' && (
+                            {/* Invite to App button - only for OK status without account */}
+                            {user.lovable_status === 'OK' && !user.user_id && (user.lovable_email || user.secondary_email) && (
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                className="flex-shrink-0"
+                                disabled={isInviting === user.id}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleInviteToApp(user);
+                                }}
+                              >
+                                {isInviting === user.id ? (
+                                  <RefreshCw className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <>
+                                    <Mail className="h-4 w-4 mr-1" />
+                                    Inviter
+                                  </>
+                                )}
+                              </Button>
+                            )}
+                            {user.status !== 'deleted' && user.user_id && (
                               <Button
                                 size="sm"
                                 variant="outline"
