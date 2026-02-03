@@ -4120,6 +4120,56 @@ export type Database = {
         }
         Relationships: []
       }
+      user_microsoft_connections_public: {
+        Row: {
+          created_at: string | null
+          display_name: string | null
+          email: string | null
+          id: string | null
+          is_calendar_sync_enabled: boolean | null
+          is_email_sync_enabled: boolean | null
+          last_sync_at: string | null
+          profile_id: string | null
+          token_expires_at: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          display_name?: string | null
+          email?: string | null
+          id?: string | null
+          is_calendar_sync_enabled?: boolean | null
+          is_email_sync_enabled?: boolean | null
+          last_sync_at?: string | null
+          profile_id?: string | null
+          token_expires_at?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          display_name?: string | null
+          email?: string | null
+          id?: string | null
+          is_calendar_sync_enabled?: boolean | null
+          is_email_sync_enabled?: boolean | null
+          last_sync_at?: string | null
+          profile_id?: string | null
+          token_expires_at?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_microsoft_connections_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       can_access_task: { Args: { _task_id: string }; Returns: boolean }
