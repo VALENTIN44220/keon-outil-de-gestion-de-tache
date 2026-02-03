@@ -72,6 +72,8 @@ export interface UserRole {
   created_at: string;
 }
 
+export type LovableStatus = 'OK' | 'NOK';
+
 export interface UserProfile {
   id: string;
   user_id: string;
@@ -87,6 +89,8 @@ export interface UserProfile {
   is_private: boolean;
   status: UserStatus;
   lovable_email: string | null;
+  secondary_email: string | null;
+  lovable_status: LovableStatus;
   created_at: string;
   updated_at: string;
   // Joined data

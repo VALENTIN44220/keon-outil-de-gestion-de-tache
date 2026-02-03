@@ -1341,9 +1341,11 @@ export type Database = {
           job_title: string | null
           job_title_id: string | null
           lovable_email: string | null
+          lovable_status: string | null
           manager_id: string | null
           must_change_password: boolean
           permission_profile_id: string | null
+          secondary_email: string | null
           status: string
           updated_at: string
           user_id: string
@@ -1363,9 +1365,11 @@ export type Database = {
           job_title?: string | null
           job_title_id?: string | null
           lovable_email?: string | null
+          lovable_status?: string | null
           manager_id?: string | null
           must_change_password?: boolean
           permission_profile_id?: string | null
+          secondary_email?: string | null
           status?: string
           updated_at?: string
           user_id: string
@@ -1385,9 +1389,11 @@ export type Database = {
           job_title?: string | null
           job_title_id?: string | null
           lovable_email?: string | null
+          lovable_status?: string | null
           manager_id?: string | null
           must_change_password?: boolean
           permission_profile_id?: string | null
+          secondary_email?: string | null
           status?: string
           updated_at?: string
           user_id?: string
