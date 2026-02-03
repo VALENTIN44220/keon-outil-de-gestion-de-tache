@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { profile_id, redirect_url } = await req.json();
+    const { profile_id } = await req.json();
 
     if (!profile_id) {
       return new Response(
@@ -90,42 +90,56 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Determine which email to use for invitation
-    const inviteEmail = profile.lovable_email || profile.secondary_email;
+    // Determine which email to use
+    const userEmail = profile.lovable_email || profile.secondary_email;
     
-    if (!inviteEmail) {
+    if (!userEmail) {
       return new Response(
-        JSON.stringify({ error: 'No email address available for invitation. Set lovable_email or secondary_email first.' }),
+        JSON.stringify({ error: 'No email address available. Set lovable_email or secondary_email first.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Send magic link invitation
-    const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
-      inviteEmail,
-      {
-        redirectTo: redirect_url || `${supabaseUrl.replace('.supabase.co', '')}/auth/callback`,
-        data: {
-          display_name: profile.display_name || inviteEmail,
-          profile_id: profile.id,
-        },
-      }
-    );
+    // Generate password: [NomUser]TASKMANAGER2027!
+    // Extract name, clean it up (uppercase, letters only)
+    const displayName = profile.display_name || userEmail.split('@')[0];
+    const userName = displayName
+      .toUpperCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove accents
+      .replace(/[^A-Z]/g, '') // Keep only letters
+      .substring(0, 20); // Limit length
+    
+    const generatedPassword = `${userName}TASKMANAGER2027!`;
 
-    if (inviteError) {
-      console.error('Invite error:', inviteError);
+    console.log(`Creating user ${userEmail} with generated password pattern for: ${userName}`);
+
+    // Create the user with generated password
+    const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
+      email: userEmail,
+      password: generatedPassword,
+      email_confirm: true, // Auto-confirm email so they can login immediately
+      user_metadata: {
+        display_name: displayName,
+        profile_id: profile.id,
+      },
+    });
+
+    if (createError) {
+      console.error('User creation error:', createError);
       return new Response(
-        JSON.stringify({ error: inviteError.message }),
+        JSON.stringify({ error: createError.message }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Update the profile to link to the new user and mark as invited
+    // Update the profile to link to the new user
     const { error: updateError } = await supabaseAdmin
       .from('profiles')
       .update({
-        user_id: inviteData.user.id,
-        lovable_email: inviteEmail,
+        user_id: userData.user.id,
+        lovable_email: userEmail,
+        must_change_password: true,
       })
       .eq('id', profile_id);
 
@@ -133,11 +147,15 @@ Deno.serve(async (req) => {
       console.error('Profile update error:', updateError);
     }
 
+    console.log(`User ${userEmail} created successfully with ID ${userData.user.id}`);
+
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: `Invitation sent to ${inviteEmail}`,
-        user_id: inviteData.user.id,
+        message: `Compte créé pour ${userEmail}`,
+        user_id: userData.user.id,
+        email: userEmail,
+        generated_password: generatedPassword, // Return password so admin can communicate it
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
