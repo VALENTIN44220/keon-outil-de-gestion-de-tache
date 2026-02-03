@@ -86,6 +86,7 @@ export interface UserProfile {
   must_change_password: boolean;
   is_private: boolean;
   status: UserStatus;
+  lovable_email: string | null;
   created_at: string;
   updated_at: string;
   // Joined data
