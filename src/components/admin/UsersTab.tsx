@@ -306,7 +306,24 @@ export function UsersTab({
     setIsDialogOpen(true);
   };
 
-  // Invite user to app via email
+  // Copy password to clipboard helper
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success('Mot de passe copié dans le presse-papier');
+    } catch {
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      toast.success('Mot de passe copié dans le presse-papier');
+    }
+  };
+
+  // Invite user to app - creates account with generated password
   const handleInviteToApp = async (user: UserProfile) => {
     if (user.lovable_status !== 'OK') {
       toast.error('L\'utilisateur doit d\'abord être inscrit sur Lovable (statut OK)');
@@ -323,24 +340,43 @@ export function UsersTab({
       const response = await supabase.functions.invoke('invite-user', {
         body: {
           profile_id: user.id,
-          redirect_url: window.location.origin,
         },
       });
 
       if (response.error) {
-        throw new Error(response.error.message || 'Erreur lors de l\'invitation');
+        throw new Error(response.error.message || 'Erreur lors de la création du compte');
       }
 
       if (response.data?.already_exists) {
         toast.info('Cet utilisateur a déjà un compte dans l\'application');
+      } else if (response.data?.generated_password) {
+        // Show success with password and copy button
+        toast.success(
+          <div className="space-y-2">
+            <p>Compte créé pour {response.data.email}</p>
+            <div className="flex items-center gap-2 bg-muted p-2 rounded text-sm font-mono">
+              <span className="flex-1 break-all">{response.data.generated_password}</span>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 px-2"
+                onClick={() => copyToClipboard(response.data.generated_password)}
+              >
+                <Copy className="h-3 w-3" />
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">Communiquez ce mot de passe à l'utilisateur</p>
+          </div>,
+          { duration: 15000 }
+        );
       } else {
-        toast.success(`Invitation envoyée à ${user.lovable_email || user.secondary_email}`);
+        toast.success(`Compte créé pour ${user.lovable_email || user.secondary_email}`);
       }
 
       onUserUpdated();
     } catch (error: any) {
-      console.error('Error inviting user:', error);
-      toast.error(error.message || 'Erreur lors de l\'invitation');
+      console.error('Error creating user account:', error);
+      toast.error(error.message || 'Erreur lors de la création du compte');
     } finally {
       setIsInviting(null);
     }
@@ -360,7 +396,7 @@ export function UsersTab({
     }
 
     const confirmed = window.confirm(
-      `Voulez-vous envoyer une invitation à ${eligibleUsers.length} utilisateur(s) ?`
+      `Voulez-vous créer un compte pour ${eligibleUsers.length} utilisateur(s) ? Les mots de passe générés seront affichés.`
     );
 
     if (!confirmed) return;
@@ -368,13 +404,13 @@ export function UsersTab({
     setIsBulkInviting(true);
     let successCount = 0;
     let errorCount = 0;
+    const createdUsers: Array<{ email: string; password: string }> = [];
 
     for (const user of eligibleUsers) {
       try {
         const response = await supabase.functions.invoke('invite-user', {
           body: {
             profile_id: user.id,
-            redirect_url: window.location.origin,
           },
         });
 
@@ -382,6 +418,12 @@ export function UsersTab({
           errorCount++;
         } else {
           successCount++;
+          if (response.data?.generated_password) {
+            createdUsers.push({
+              email: response.data.email,
+              password: response.data.generated_password,
+            });
+          }
         }
       } catch {
         errorCount++;
@@ -390,11 +432,32 @@ export function UsersTab({
 
     setIsBulkInviting(false);
     
-    if (successCount > 0) {
-      toast.success(`${successCount} invitation(s) envoyée(s)`);
+    if (createdUsers.length > 0) {
+      // Format all passwords for display and copy
+      const passwordList = createdUsers.map(u => `${u.email}: ${u.password}`).join('\n');
+      
+      toast.success(
+        <div className="space-y-2">
+          <p>{successCount} compte(s) créé(s)</p>
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full"
+            onClick={() => copyToClipboard(passwordList)}
+          >
+            <Copy className="h-3 w-3 mr-2" />
+            Copier tous les mots de passe
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Format: email: mot de passe (un par ligne)
+          </p>
+        </div>,
+        { duration: 30000 }
+      );
     }
+    
     if (errorCount > 0) {
-      toast.error(`${errorCount} erreur(s) lors de l'envoi`);
+      toast.error(`${errorCount} erreur(s) lors de la création`);
     }
 
     onUserUpdated();
