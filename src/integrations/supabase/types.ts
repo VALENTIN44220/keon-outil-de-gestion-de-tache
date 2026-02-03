@@ -1340,6 +1340,7 @@ export type Database = {
           is_private: boolean
           job_title: string | null
           job_title_id: string | null
+          lovable_email: string | null
           manager_id: string | null
           must_change_password: boolean
           permission_profile_id: string | null
@@ -1361,6 +1362,7 @@ export type Database = {
           is_private?: boolean
           job_title?: string | null
           job_title_id?: string | null
+          lovable_email?: string | null
           manager_id?: string | null
           must_change_password?: boolean
           permission_profile_id?: string | null
@@ -1382,6 +1384,7 @@ export type Database = {
           is_private?: boolean
           job_title?: string | null
           job_title_id?: string | null
+          lovable_email?: string | null
           manager_id?: string | null
           must_change_password?: boolean
           permission_profile_id?: string | null

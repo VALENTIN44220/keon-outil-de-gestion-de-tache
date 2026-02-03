@@ -220,7 +220,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Update the profile with additional info
+    // Update the profile with additional info (including lovable_email)
     const { data: profileData, error: profileError } = await supabaseAdmin
       .from('profiles')
       .update({
@@ -232,6 +232,7 @@ Deno.serve(async (req) => {
         permission_profile_id,
         manager_id,
         must_change_password: true,
+        lovable_email: email,
       })
       .eq('user_id', userData.user.id)
       .select('id')

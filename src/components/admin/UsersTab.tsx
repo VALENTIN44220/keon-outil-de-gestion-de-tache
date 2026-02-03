@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Plus, UserPlus, Users, Building2, Briefcase, Layers, Shield, ChevronUp, ChevronDown, AlertCircle, RefreshCw, Upload, Trash2, Search, UserX, UserCheck, Pause } from 'lucide-react';
+import { Plus, UserPlus, Users, Building2, Briefcase, Layers, Shield, ChevronUp, ChevronDown, AlertCircle, RefreshCw, Upload, Trash2, Search, UserX, UserCheck, Pause, Key, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { RefreshButton } from './RefreshButton';
@@ -60,6 +60,7 @@ export function UsersTab({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCompanyFilter, setSelectedCompanyFilter] = useState<string | null>(null);
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<UserStatus | 'all'>('all');
+  const [isResettingPassword, setIsResettingPassword] = useState<string | null>(null);
 
   // Create a stable color map for companies
   const companyColorMap = useMemo(() => {
@@ -299,6 +300,59 @@ export function UsersTab({
   // Get subordinates for a user
   const getSubordinates = (userId: string) => {
     return users.filter(u => u.manager_id === userId);
+  };
+
+  // Handle password reset
+  const handleResetPassword = async (user: UserProfile) => {
+    if (user.status === 'deleted') {
+      toast.error('Impossible de réinitialiser le mot de passe d\'un utilisateur "Parti"');
+      return;
+    }
+
+    setIsResettingPassword(user.id);
+    try {
+      const response = await supabase.functions.invoke('reset-user-password', {
+        body: { user_id: user.user_id },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Erreur lors de la réinitialisation');
+      }
+
+      const { temporary_password } = response.data;
+
+      // Copy to clipboard
+      try {
+        await navigator.clipboard.writeText(temporary_password);
+        toast.success(
+          <div className="space-y-2">
+            <p className="font-medium">Mot de passe réinitialisé</p>
+            <p className="text-sm">Mot de passe temporaire copié dans le presse-papier :</p>
+            <code className="bg-muted px-2 py-1 rounded text-sm font-mono">{temporary_password}</code>
+            <p className="text-xs text-muted-foreground">L'utilisateur devra le changer à sa prochaine connexion.</p>
+          </div>,
+          { duration: 15000 }
+        );
+      } catch {
+        // Fallback if clipboard fails
+        toast.success(
+          <div className="space-y-2">
+            <p className="font-medium">Mot de passe réinitialisé</p>
+            <p className="text-sm">Nouveau mot de passe temporaire :</p>
+            <code className="bg-muted px-2 py-1 rounded text-sm font-mono select-all">{temporary_password}</code>
+            <p className="text-xs text-muted-foreground">Copiez-le et transmettez-le à l'utilisateur. Il devra le changer.</p>
+          </div>,
+          { duration: 15000 }
+        );
+      }
+
+      onUserUpdated();
+    } catch (error: any) {
+      console.error('Error resetting password:', error);
+      toast.error(error.message || 'Erreur lors de la réinitialisation du mot de passe');
+    } finally {
+      setIsResettingPassword(null);
+    }
   };
 
   return (
@@ -825,16 +879,36 @@ export function UsersTab({
                           )}
 
                           {/* Actions */}
-                          <Button
-                            size="sm"
-                            className="w-full"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openEditDialog(user);
-                            }}
-                          >
-                            Modifier
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              className="flex-1"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEditDialog(user);
+                              }}
+                            >
+                              Modifier
+                            </Button>
+                            {user.status !== 'deleted' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-shrink-0"
+                                disabled={isResettingPassword === user.id}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleResetPassword(user);
+                                }}
+                              >
+                                {isResettingPassword === user.id ? (
+                                  <RefreshCw className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Key className="h-4 w-4" />
+                                )}
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </CollapsibleContent>
                     </div>
