@@ -61,6 +61,7 @@ export function UsersTab({
   const [selectedCompanyFilter, setSelectedCompanyFilter] = useState<string | null>(null);
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<UserStatus | 'all'>('all');
   const [isResettingPassword, setIsResettingPassword] = useState<string | null>(null);
+  const [lovableEmail, setLovableEmail] = useState('');
 
   // Create a stable color map for companies
   const companyColorMap = useMemo(() => {
@@ -167,6 +168,7 @@ export function UsersTab({
     setPermissionProfileId('');
     setManagerId('');
     setUserStatus('active');
+    setLovableEmail('');
     setEditingUser(null);
   };
 
@@ -252,6 +254,7 @@ export function UsersTab({
           permission_profile_id: permissionProfileId || null,
           manager_id: managerId || null,
           status: userStatus,
+          lovable_email: lovableEmail.trim() || null,
         })
         .eq('id', userId);
 
@@ -276,6 +279,7 @@ export function UsersTab({
     setPermissionProfileId(user.permission_profile_id || '');
     setManagerId(user.manager_id || '');
     setUserStatus(user.status || 'active');
+    setLovableEmail(user.lovable_email || '');
     setIsDialogOpen(true);
   };
 
@@ -440,15 +444,39 @@ export function UsersTab({
                   {/* Basic info */}
                   <div className="space-y-4">
                     <h4 className="font-medium">Informations générales</h4>
-                    <div className="space-y-2">
-                      <Label htmlFor="displayName">Nom d'affichage</Label>
-                      <Input
-                        id="displayName"
-                        placeholder="Prénom Nom"
-                        value={displayName}
-                        onChange={(e) => setDisplayName(e.target.value)}
-                      />
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="displayName">Nom d'affichage</Label>
+                        <Input
+                          id="displayName"
+                          placeholder="Prénom Nom"
+                          value={displayName}
+                          onChange={(e) => setDisplayName(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="lovableEmail">Email Lovable</Label>
+                        <Input
+                          id="lovableEmail"
+                          type="email"
+                          placeholder="utilisateur@lovable.app"
+                          value={lovableEmail}
+                          onChange={(e) => setLovableEmail(e.target.value)}
+                          disabled={!editingUser}
+                        />
+                        {!editingUser && (
+                          <p className="text-xs text-muted-foreground">
+                            Renseigné automatiquement à la création
+                          </p>
+                        )}
+                      </div>
                     </div>
+                    {editingUser?.must_change_password && (
+                      <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50">
+                        <AlertCircle className="h-3 w-3 mr-1" />
+                        Mot de passe à changer à la prochaine connexion
+                      </Badge>
+                    )}
                   </div>
 
                   {/* Organization */}
@@ -816,6 +844,14 @@ export function UsersTab({
                       {/* Expanded Content */}
                       <CollapsibleContent>
                         <div className="px-3 pb-3 pt-0 space-y-3 animate-fade-in border-t border-current/10">
+                          {/* Email Lovable */}
+                          {user.lovable_email && (
+                            <div className="text-xs">
+                              <span className="text-muted-foreground">Email Lovable</span>
+                              <p className="font-medium truncate">{user.lovable_email}</p>
+                            </div>
+                          )}
+                          
                           {/* Organization Info */}
                           <div className="grid grid-cols-2 gap-2 text-xs">
                             <div>
