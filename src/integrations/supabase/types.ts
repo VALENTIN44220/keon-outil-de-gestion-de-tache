@@ -4184,6 +4184,9 @@ export type Database = {
         }[]
       }
       get_my_company_id: { Args: never; Returns: string }
+      get_my_department_id: { Args: never; Returns: string }
+      get_my_manager_profile_id: { Args: never; Returns: string }
+      get_my_profile_id: { Args: never; Returns: string }
       get_next_autonumber: {
         Args: { p_reset_mode?: string; p_variable_id: string }
         Returns: number
