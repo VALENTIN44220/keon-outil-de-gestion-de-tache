@@ -6,6 +6,11 @@ import {
   createProcessWorkflow,
 } from '@/hooks/useAutoWorkflowGeneration';
 import { toast } from 'sonner';
+import {
+  isInterventionBEProcess,
+  applyInterventionBEPresetToSubProcesses,
+  getSubProcessIdsForProcess,
+} from '@/utils/interventionBEPreset';
 
 export interface RegenerationResult {
   id: string;
@@ -108,17 +113,19 @@ export function useWorkflowRegeneration() {
     setIsRunning(true);
     
     try {
-      // Build queries
+      // Build queries - include process_template_id to check INTERVENTION BE
       let subProcessQuery = supabase
         .from('sub_process_templates')
         .select(`
           id,
           name,
+          process_template_id,
           target_manager_id,
           target_department_id,
           target_assignee_id,
           assignment_type,
-          task_templates (id, title, default_duration_days)
+          task_templates (id, title, default_duration_days),
+          process_templates (name)
         `);
 
       let processQuery = supabase
@@ -162,9 +169,14 @@ export function useWorkflowRegeneration() {
       const totalItems = (subProcesses?.length || 0) + (processes?.length || 0);
       setProgress({ current: 0, total: totalItems });
 
+      // Track sub-processes belonging to INTERVENTION BE for preset application
+      const interventionBESubProcessIds: string[] = [];
+
       // Process sub-processes
       for (const sp of (subProcesses || [])) {
         const hasExisting = existingSubProcessWorkflows.has(sp.id);
+        const processName = (sp as any).process_templates?.name;
+        const isInterventionBE = isInterventionBEProcess(processName);
 
         if (hasExisting && !forceRegenerate) {
           results.push({
@@ -176,6 +188,11 @@ export function useWorkflowRegeneration() {
             hasExistingWorkflow: true,
             taskCount: sp.task_templates?.length || 0,
           });
+          
+          // For "generate missing only" mode on INTERVENTION BE: apply preset if config is empty
+          if (isInterventionBE) {
+            interventionBESubProcessIds.push(sp.id);
+          }
         } else {
           if (dryRun) {
             results.push({
@@ -210,6 +227,11 @@ export function useWorkflowRegeneration() {
                 }
               );
 
+              // Track INTERVENTION BE sub-processes for preset application
+              if (isInterventionBE) {
+                interventionBESubProcessIds.push(sp.id);
+              }
+
               results.push({
                 id: sp.id,
                 name: sp.name,
@@ -234,9 +256,20 @@ export function useWorkflowRegeneration() {
         setProgress(prev => ({ ...prev, current: prev.current + 1 }));
       }
 
-      // Process processes
+      // Apply INTERVENTION BE preset to collected sub-processes
+      if (interventionBESubProcessIds.length > 0 && !dryRun) {
+        console.log(`[Workflow Regeneration] Applying INTERVENTION BE preset to ${interventionBESubProcessIds.length} sub-processes`);
+        const presetResult = await applyInterventionBEPresetToSubProcesses(
+          interventionBESubProcessIds,
+          forceRegenerate // forceOverwrite matches forceRegenerate mode
+        );
+        console.log(`[Workflow Regeneration] INTERVENTION BE preset applied:`, presetResult);
+      }
+
+      // Process processes - also apply INTERVENTION BE preset to their sub-processes
       for (const p of (processes || [])) {
         const hasExisting = existingProcessWorkflows.has(p.id);
+        const isInterventionBE = isInterventionBEProcess(p.name);
 
         if (hasExisting && !forceRegenerate) {
           results.push({
@@ -247,6 +280,15 @@ export function useWorkflowRegeneration() {
             message: 'Workflow existant conservé',
             hasExistingWorkflow: true,
           });
+          
+          // Even when skipping process workflow, apply preset to sub-processes if INTERVENTION BE
+          if (isInterventionBE && !dryRun) {
+            const subProcessIds = await getSubProcessIdsForProcess(p.id);
+            if (subProcessIds.length > 0) {
+              console.log(`[Workflow Regeneration] Applying INTERVENTION BE preset (skipped process) to ${subProcessIds.length} sub-processes`);
+              await applyInterventionBEPresetToSubProcesses(subProcessIds, false);
+            }
+          }
         } else {
           if (dryRun) {
             results.push({
@@ -272,6 +314,15 @@ export function useWorkflowRegeneration() {
                 user.id,
                 p.sub_process_templates || []
               );
+
+              // Apply INTERVENTION BE preset to all sub-processes of this process
+              if (isInterventionBE) {
+                const subProcessIds = (p.sub_process_templates || []).map(sp => sp.id);
+                if (subProcessIds.length > 0) {
+                  console.log(`[Workflow Regeneration] Applying INTERVENTION BE preset (regenerated process) to ${subProcessIds.length} sub-processes`);
+                  await applyInterventionBEPresetToSubProcesses(subProcessIds, forceRegenerate);
+                }
+              }
 
               results.push({
                 id: p.id,
