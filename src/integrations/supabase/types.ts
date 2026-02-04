@@ -1713,6 +1713,7 @@ export type Database = {
           target_manager_id: string | null
           updated_at: string
           user_id: string
+          validation_config: Json | null
           visibility_level: Database["public"]["Enums"]["template_visibility"]
         }
         Insert: {
@@ -1735,6 +1736,7 @@ export type Database = {
           target_manager_id?: string | null
           updated_at?: string
           user_id: string
+          validation_config?: Json | null
           visibility_level?: Database["public"]["Enums"]["template_visibility"]
         }
         Update: {
@@ -1757,6 +1759,7 @@ export type Database = {
           target_manager_id?: string | null
           updated_at?: string
           user_id?: string
+          validation_config?: Json | null
           visibility_level?: Database["public"]["Enums"]["template_visibility"]
         }
         Relationships: [

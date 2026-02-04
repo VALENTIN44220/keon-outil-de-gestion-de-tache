@@ -153,6 +153,14 @@ export function SubProcessConfigView({
           target_group_id: spData.target_group_id,
           modifiable_at_request: false,
         });
+        
+        // Load validation levels from validation_config JSONB column
+        const validationConfig = (spData as any).validation_config;
+        if (validationConfig && Array.isArray(validationConfig)) {
+          setValidationLevels(validationConfig as ValidationLevel[]);
+        } else {
+          setValidationLevels([]);
+        }
       }
 
       // Fetch tasks with checklist count
@@ -265,6 +273,37 @@ export function SubProcessConfigView({
 
   const removeValidationLevel = (level: number) => {
     setValidationLevels(validationLevels.filter(v => v.level !== level));
+  };
+
+  const handleSaveValidation = async () => {
+    if (!subProcess) return;
+    setIsSaving(true);
+
+    try {
+      // Renumber levels sequentially
+      const renumberedLevels = validationLevels.map((v, idx) => ({
+        ...v,
+        level: idx + 1,
+      }));
+
+      const { error } = await supabase
+        .from('sub_process_templates')
+        .update({
+          validation_config: renumberedLevels,
+        })
+        .eq('id', subProcessId);
+
+      if (error) throw error;
+
+      setValidationLevels(renumberedLevels);
+      toast.success('Validations enregistrées');
+      onUpdate();
+    } catch (error) {
+      console.error('Error saving validation:', error);
+      toast.error('Erreur lors de la sauvegarde');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleAddTask = async (
@@ -767,6 +806,16 @@ export function SubProcessConfigView({
                           ))}
                         </TableBody>
                       </Table>
+                    )}
+                    
+                    {canManage && (
+                      <div className="flex justify-end pt-4 border-t mt-4">
+                        <Button onClick={handleSaveValidation} disabled={isSaving}>
+                          {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                          <Save className="h-4 w-4 mr-2" />
+                          Enregistrer les validations
+                        </Button>
+                      </div>
                     )}
                   </CardContent>
                 </Card>
