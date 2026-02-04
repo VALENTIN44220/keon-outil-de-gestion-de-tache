@@ -31,7 +31,7 @@ import {
   ListTodo,
   Users,
   CheckSquare,
-  
+  Bell,
   Plus,
   Trash2,
   Edit2,
@@ -48,6 +48,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { AddTaskTemplateDialog } from './AddTaskTemplateDialog';
 import { EditTaskTemplateDialog } from './EditTaskTemplateDialog';
+import { SubProcessNotificationsPanel } from './SubProcessNotificationsPanel';
 import { addTaskToWorkflow, removeTaskFromWorkflow } from '@/hooks/useAutoWorkflowGeneration';
 
 interface SubProcessConfigViewProps {
@@ -378,6 +379,7 @@ export function SubProcessConfigView({
     { id: 'tasks', label: 'Tâches', icon: ListTodo },
     { id: 'assignment', label: 'Affectation', icon: Users },
     { id: 'validations', label: 'Validations', icon: CheckSquare },
+    { id: 'notifications', label: 'Notifications', icon: Bell },
   ];
 
   return (
@@ -415,7 +417,7 @@ export function SubProcessConfigView({
           className="flex-1 flex flex-col min-h-0"
         >
           <div className="px-6 pt-4 shrink-0">
-            <TabsList className="w-full grid grid-cols-4">
+            <TabsList className="w-full grid grid-cols-5">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 return (
@@ -819,6 +821,15 @@ export function SubProcessConfigView({
                     )}
                   </CardContent>
                 </Card>
+              </TabsContent>
+
+              {/* Notifications Tab */}
+              <TabsContent value="notifications" className="mt-0 space-y-4">
+                <SubProcessNotificationsPanel
+                  subProcessId={subProcessId}
+                  canManage={canManage}
+                  onUpdate={onUpdate}
+                />
               </TabsContent>
 
             </div>
