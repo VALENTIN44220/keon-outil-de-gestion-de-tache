@@ -20,13 +20,17 @@ interface GanttTaskBarProps {
   isCompact?: boolean;
 }
 
+// Use centralized status colors
 const STATUS_COLORS = {
   'todo': { bg: 'from-slate-500 to-slate-400', track: 'bg-slate-100', border: 'border-slate-300' },
   'in-progress': { bg: 'from-blue-500 to-blue-400', track: 'bg-blue-100', border: 'border-blue-300' },
-  'done': { bg: 'from-emerald-500 to-emerald-400', track: 'bg-emerald-100', border: 'border-emerald-300' },
-  'validated': { bg: 'from-purple-500 to-purple-400', track: 'bg-purple-100', border: 'border-purple-300' },
+  'done': { bg: 'from-green-500 to-green-400', track: 'bg-green-100', border: 'border-green-300' },
+  'validated': { bg: 'from-emerald-500 to-emerald-400', track: 'bg-emerald-100', border: 'border-emerald-300' },
   'to_assign': { bg: 'from-amber-500 to-amber-400', track: 'bg-amber-100', border: 'border-amber-300' },
   'pending_validation_1': { bg: 'from-violet-500 to-violet-400', track: 'bg-violet-100', border: 'border-violet-300' },
+  'pending_validation_2': { bg: 'from-violet-500 to-violet-400', track: 'bg-violet-100', border: 'border-violet-300' },
+  'review': { bg: 'from-purple-500 to-purple-400', track: 'bg-purple-100', border: 'border-purple-300' },
+  'cancelled': { bg: 'from-gray-400 to-gray-300', track: 'bg-gray-100', border: 'border-gray-300' },
 };
 
 const PRIORITY_INDICATORS = {

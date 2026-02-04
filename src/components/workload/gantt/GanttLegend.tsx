@@ -37,18 +37,18 @@ const TASK_LEGEND: LegendItem[] = [
     description: 'Tâche en cours de réalisation',
   },
   {
-    label: 'Terminée',
-    color: 'text-emerald-600',
-    bgColor: 'bg-gradient-to-r from-emerald-500 to-emerald-400',
-    icon: CheckCircle2,
-    description: 'Tâche terminée ou validée',
-  },
-  {
-    label: 'Validation',
+    label: 'En attente de validation',
     color: 'text-violet-600',
     bgColor: 'bg-gradient-to-r from-violet-500 to-violet-400',
     icon: Clock,
-    description: 'En attente de validation',
+    description: 'En attente de validation (N1 ou N2)',
+  },
+  {
+    label: 'Validé / Terminé',
+    color: 'text-emerald-600',
+    bgColor: 'bg-gradient-to-r from-emerald-500 to-emerald-400',
+    icon: CheckCircle2,
+    description: 'Tâche validée ou terminée',
   },
 ];
 

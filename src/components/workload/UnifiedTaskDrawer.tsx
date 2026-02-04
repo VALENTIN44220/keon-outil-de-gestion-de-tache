@@ -67,12 +67,15 @@ interface UnifiedTaskDrawerProps {
   teamMembers?: { id: string; display_name: string; avatar_url?: string }[];
 }
 
+// Use centralized status configuration
 const STATUS_OPTIONS = [
   { value: 'to_assign', label: 'À affecter', color: 'bg-amber-500', icon: UserCheck },
   { value: 'todo', label: 'À faire', color: 'bg-slate-500', icon: Clock },
   { value: 'in-progress', label: 'En cours', color: 'bg-blue-500', icon: Play },
-  { value: 'pending_validation_1', label: 'En validation', color: 'bg-purple-500', icon: Pause },
-  { value: 'done', label: 'Terminé', color: 'bg-emerald-500', icon: CheckCircle2 },
+  { value: 'pending_validation_1', label: 'En attente de validation', color: 'bg-violet-500', icon: Pause },
+  { value: 'pending_validation_2', label: 'En attente de validation (N2)', color: 'bg-violet-500', icon: Pause },
+  { value: 'validated', label: 'Validé / Terminé', color: 'bg-emerald-500', icon: CheckCircle2 },
+  { value: 'done', label: 'Terminé', color: 'bg-green-500', icon: CheckCircle2 },
 ];
 
 const PRIORITY_CONFIG = {

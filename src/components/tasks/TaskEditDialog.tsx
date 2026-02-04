@@ -29,6 +29,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useTaskAttachments } from '@/hooks/useTaskAttachments';
 import { useDueDatePermissionWithManager } from '@/hooks/useDueDatePermission';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { getStatusSelectOptions } from '@/services/taskStatusService';
 
 interface Department {
   id: string;
@@ -48,16 +49,8 @@ interface TaskEditDialogProps {
   onTaskUpdated: () => void;
 }
 
-const statusOptions: { value: TaskStatus; label: string }[] = [
-  { value: 'to_assign', label: 'À affecter' },
-  { value: 'todo', label: 'À faire' },
-  { value: 'in-progress', label: 'En cours' },
-  { value: 'done', label: 'Terminé' },
-  { value: 'pending_validation_1', label: 'En attente validation N1' },
-  { value: 'pending_validation_2', label: 'En attente validation N2' },
-  { value: 'validated', label: 'Validé' },
-  { value: 'refused', label: 'Refusé' },
-];
+// Use centralized status options from taskStatusService
+const statusOptions = getStatusSelectOptions();
 
 const priorityOptions: { value: TaskPriority; label: string }[] = [
   { value: 'low', label: 'Basse' },
