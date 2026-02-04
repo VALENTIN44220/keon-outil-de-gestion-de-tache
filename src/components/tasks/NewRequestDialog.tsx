@@ -973,24 +973,26 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                       <TasksEmptyState />
                     ) : (
                       <>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {availableSubProcesses.map((subProcess) => {
-                            const isSelected = selectedSubProcessIds.includes(subProcess.id);
-                            const hasCustomFields = subProcessCustomFields[subProcess.id]?.length > 0;
-                            
-                            return (
-                              <TaskSelectionCard
-                                key={subProcess.id}
-                                id={subProcess.id}
-                                name={subProcess.name}
-                                description={subProcess.description}
-                                isSelected={isSelected}
-                                hasCustomFields={hasCustomFields}
-                                onToggle={() => toggleSubProcess(subProcess.id)}
-                              />
-                            );
-                          })}
-                        </div>
+                        <ScrollArea className="max-h-[320px] pr-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {availableSubProcesses.map((subProcess) => {
+                              const isSelected = selectedSubProcessIds.includes(subProcess.id);
+                              const hasCustomFields = subProcessCustomFields[subProcess.id]?.length > 0;
+                              
+                              return (
+                                <TaskSelectionCard
+                                  key={subProcess.id}
+                                  id={subProcess.id}
+                                  name={subProcess.name}
+                                  description={subProcess.description}
+                                  isSelected={isSelected}
+                                  hasCustomFields={hasCustomFields}
+                                  onToggle={() => toggleSubProcess(subProcess.id)}
+                                />
+                              );
+                            })}
+                          </div>
+                        </ScrollArea>
 
                         {selectedSubProcessIds.length > 0 && (
                           <div className="pt-5 border-t-2 border-dashed border-primary/20">
