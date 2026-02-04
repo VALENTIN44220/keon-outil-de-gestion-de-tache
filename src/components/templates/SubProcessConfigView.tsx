@@ -67,7 +67,7 @@ interface ValidationLevel {
   level: number;
   type: 'manager' | 'requester' | 'user';
   userId: string | null;
-  timing: 'before_start' | 'before_close';
+  timing: 'before_close';
 }
 
 interface Profile {
@@ -774,23 +774,9 @@ export function SubProcessConfigView({
                                 )}
                               </TableCell>
                               <TableCell>
-                                <Select
-                                  value={v.timing}
-                                  onValueChange={(val) => {
-                                    setValidationLevels(validationLevels.map(vl => 
-                                      vl.level === v.level ? { ...vl, timing: val as any } : vl
-                                    ));
-                                  }}
-                                  disabled={!canManage}
-                                >
-                                  <SelectTrigger className="w-[140px]">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="before_start">Avant démarrage</SelectItem>
-                                    <SelectItem value="before_close">Avant clôture</SelectItem>
-                                  </SelectContent>
-                                </Select>
+                                <Badge variant="outline" className="text-xs">
+                                  Avant clôture
+                                </Badge>
                               </TableCell>
                               <TableCell>
                                 {canManage && (
