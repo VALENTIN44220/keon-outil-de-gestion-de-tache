@@ -16,13 +16,16 @@ import {
   XCircle, 
   Clock, 
   Lock,
-  User,
-  Users
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { ValidationLevelType } from '@/types/task';
+import { 
+  requestValidation, 
+  validateLevel1, 
+  validateLevel2, 
+  rejectValidationToInProgress 
+} from '@/services/taskStatusService';
 
 interface TaskValidationWorkflowProps {
   taskId: string;
@@ -69,7 +72,6 @@ export function TaskValidationWorkflow({
   const [showValidateDialog, setShowValidateDialog] = useState(false);
   const [showRefuseDialog, setShowRefuseDialog] = useState(false);
   const [comment, setComment] = useState('');
-  const [currentLevel, setCurrentLevel] = useState<1 | 2>(1);
 
   const requiresValidation = validationLevel1 !== 'none' || validationLevel2 !== 'none';
   const isAssignee = profile?.id === assigneeId;
@@ -104,25 +106,22 @@ export function TaskValidationWorkflow({
     return false;
   })();
 
-  // Send for validation (by assignee)
+  // Determine current validation level
+  const currentLevel: 1 | 2 = status === 'pending_validation_2' ? 2 : 1;
+
+  // Send for validation (by assignee when task is in-progress)
   const handleSendForValidation = async () => {
     if (!isAssignee) return;
     
     setIsSubmitting(true);
     try {
-      const { error } = await supabase
-        .from('tasks')
-        .update({
-          status: 'pending_validation_1',
-          original_assignee_id: assigneeId,
-          is_locked_for_validation: true,
-          validation_1_status: 'pending',
-        })
-        .eq('id', taskId);
-
-      if (error) throw error;
+      const result = await requestValidation(taskId, validatorLevel1Id || undefined);
       
-      toast.success('Tâche envoyée pour validation');
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+      
+      toast.success('Demande de validation envoyée');
       onUpdate();
     } catch (error) {
       console.error('Error sending for validation:', error);
@@ -132,43 +131,33 @@ export function TaskValidationWorkflow({
     }
   };
 
-  // Validate a level
+  // Validate current level
   const handleValidate = async () => {
+    if (!profile?.id) return;
+    
     setIsSubmitting(true);
     try {
-      const level = status === 'pending_validation_1' ? 1 : 2;
-      const hasLevel2 = validationLevel2 !== 'none';
+      let result;
       
-      let newStatus: string;
-      if (level === 1 && hasLevel2) {
-        newStatus = 'pending_validation_2';
+      if (currentLevel === 1) {
+        const hasLevel2 = validationLevel2 !== 'none';
+        result = await validateLevel1(taskId, hasLevel2, profile.id, comment);
+        
+        if (result.success) {
+          toast.success(hasLevel2 ? 'Validation niveau 1 effectuée' : 'Tâche validée');
+        }
       } else {
-        newStatus = 'validated';
+        result = await validateLevel2(taskId, profile.id, comment);
+        
+        if (result.success) {
+          toast.success('Tâche validée');
+        }
       }
 
-      const updates: Record<string, any> = {
-        status: newStatus,
-        [`validation_${level}_status`]: 'validated',
-        [`validation_${level}_at`]: new Date().toISOString(),
-        [`validation_${level}_by`]: profile?.id,
-        [`validation_${level}_comment`]: comment || null,
-      };
-
-      // If fully validated, unlock the task
-      if (newStatus === 'validated') {
-        updates.is_locked_for_validation = false;
-        updates.validated_at = new Date().toISOString();
-        updates.validator_id = profile?.id;
+      if (!result?.success) {
+        throw new Error(result?.error || 'Erreur inconnue');
       }
-
-      const { error } = await supabase
-        .from('tasks')
-        .update(updates)
-        .eq('id', taskId);
-
-      if (error) throw error;
       
-      toast.success(newStatus === 'validated' ? 'Tâche validée' : 'Validation niveau 1 effectuée');
       setShowValidateDialog(false);
       setComment('');
       onUpdate();
@@ -180,8 +169,10 @@ export function TaskValidationWorkflow({
     }
   };
 
-  // Refuse validation
+  // Refuse validation - returns task to in-progress
   const handleRefuse = async () => {
+    if (!profile?.id) return;
+    
     if (!comment.trim()) {
       toast.error('Veuillez ajouter un commentaire pour expliquer le refus');
       return;
@@ -189,23 +180,18 @@ export function TaskValidationWorkflow({
 
     setIsSubmitting(true);
     try {
-      const level = status === 'pending_validation_1' ? 1 : 2;
-      
-      const { error } = await supabase
-        .from('tasks')
-        .update({
-          status: 'refused',
-          [`validation_${level}_status`]: 'refused',
-          [`validation_${level}_at`]: new Date().toISOString(),
-          [`validation_${level}_by`]: profile?.id,
-          [`validation_${level}_comment`]: comment,
-          is_locked_for_validation: false,
-        })
-        .eq('id', taskId);
+      const result = await rejectValidationToInProgress(
+        taskId, 
+        currentLevel, 
+        profile.id, 
+        comment
+      );
 
-      if (error) throw error;
+      if (!result.success) {
+        throw new Error(result.error);
+      }
       
-      toast.success('Tâche refusée');
+      toast.success('Tâche renvoyée pour correction');
       setShowRefuseDialog(false);
       setComment('');
       onUpdate();
@@ -223,9 +209,9 @@ export function TaskValidationWorkflow({
   }
 
   // Si aucune validation n'est en cours ou passée, afficher un message de redirection
-  const hasActiveValidation = status.includes('pending_validation') || status === 'validated' || status === 'refused';
+  const hasActiveValidation = status.includes('pending_validation') || status === 'validated' || validation1Status === 'validated' || validation1Status === 'refused';
   
-  if (!hasActiveValidation) {
+  if (!hasActiveValidation && status !== 'in-progress') {
     return (
       <div className="p-3 bg-muted/50 rounded-lg border border-dashed">
         <p className="text-sm text-muted-foreground">
@@ -257,13 +243,13 @@ export function TaskValidationWorkflow({
               </Badge>
             )}
             {validation1Status === 'refused' && (
-              <Badge className="bg-red-500/10 text-red-600">
+              <Badge className="bg-amber-500/10 text-amber-600">
                 <XCircle className="h-3 w-3 mr-1" />
-                Refusé
+                Renvoyé pour correction
               </Badge>
             )}
             {validation1Status === 'pending' && status === 'pending_validation_1' && (
-              <Badge className="bg-yellow-500/10 text-yellow-600">
+              <Badge className="bg-violet-500/10 text-violet-600">
                 <Clock className="h-3 w-3 mr-1" />
                 En attente
               </Badge>
@@ -284,13 +270,13 @@ export function TaskValidationWorkflow({
               </Badge>
             )}
             {validation2Status === 'refused' && (
-              <Badge className="bg-red-500/10 text-red-600">
+              <Badge className="bg-amber-500/10 text-amber-600">
                 <XCircle className="h-3 w-3 mr-1" />
-                Refusé
+                Renvoyé pour correction
               </Badge>
             )}
             {validation2Status === 'pending' && status === 'pending_validation_2' && (
-              <Badge className="bg-yellow-500/10 text-yellow-600">
+              <Badge className="bg-violet-500/10 text-violet-600">
                 <Clock className="h-3 w-3 mr-1" />
                 En attente
               </Badge>
@@ -313,15 +299,15 @@ export function TaskValidationWorkflow({
 
       {/* Action Buttons */}
       <div className="flex gap-2 flex-wrap">
-        {/* Send for validation button (for assignee when task is done) */}
-        {isAssignee && status === 'done' && !isLockedForValidation && (
+        {/* Send for validation button (for assignee when task is in-progress) */}
+        {isAssignee && status === 'in-progress' && !isLockedForValidation && (
           <Button 
             size="sm" 
             onClick={handleSendForValidation}
             disabled={isSubmitting}
           >
             <Send className="h-4 w-4 mr-2" />
-            Envoyer pour validation
+            Demander validation
           </Button>
         )}
 
@@ -348,12 +334,13 @@ export function TaskValidationWorkflow({
             </Button>
             <Button 
               size="sm" 
-              variant="destructive"
+              variant="outline"
+              className="text-amber-600 border-amber-300 hover:bg-amber-50"
               onClick={() => setShowRefuseDialog(true)}
               disabled={isSubmitting}
             >
               <XCircle className="h-4 w-4 mr-2" />
-              Refuser
+              Renvoyer pour correction
             </Button>
           </>
         )}
@@ -403,9 +390,9 @@ export function TaskValidationWorkflow({
       <Dialog open={showRefuseDialog} onOpenChange={setShowRefuseDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Refuser la tâche</DialogTitle>
+            <DialogTitle>Renvoyer pour correction</DialogTitle>
             <DialogDescription>
-              Expliquez la raison du refus
+              La tâche sera renvoyée à l'exécutant pour correction
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -416,7 +403,7 @@ export function TaskValidationWorkflow({
               <Textarea
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
-                placeholder="Raison du refus..."
+                placeholder="Expliquez ce qui doit être corrigé..."
                 rows={3}
                 required
               />
@@ -427,11 +414,12 @@ export function TaskValidationWorkflow({
               Annuler
             </Button>
             <Button 
-              variant="destructive"
+              variant="default"
+              className="bg-amber-600 hover:bg-amber-700"
               onClick={handleRefuse} 
               disabled={isSubmitting || !comment.trim()}
             >
-              Confirmer le refus
+              Confirmer le renvoi
             </Button>
           </DialogFooter>
         </DialogContent>

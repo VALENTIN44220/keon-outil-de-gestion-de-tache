@@ -57,12 +57,14 @@ interface WorkloadFiltersProps {
   onShowOnlyOverloadedChange?: (show: boolean) => void;
 }
 
+// Use centralized status options with colors
 const STATUS_OPTIONS = [
+  { value: 'to_assign', label: 'À affecter', color: 'bg-amber-500' },
   { value: 'todo', label: 'À faire', color: 'bg-slate-500' },
   { value: 'in-progress', label: 'En cours', color: 'bg-blue-500' },
-  { value: 'to_assign', label: 'À affecter', color: 'bg-amber-500' },
-  { value: 'pending_validation_1', label: 'En validation', color: 'bg-purple-500' },
-  { value: 'done', label: 'Terminé', color: 'bg-emerald-500' },
+  { value: 'pending_validation', label: 'En attente de validation', color: 'bg-violet-500' },
+  { value: 'validated', label: 'Validé / Terminé', color: 'bg-emerald-500' },
+  { value: 'done', label: 'Terminé', color: 'bg-green-500' },
 ];
 
 const PRIORITY_OPTIONS = [

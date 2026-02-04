@@ -5,6 +5,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
+import { TASK_STATUS_LABELS, isPendingValidation } from './taskStatusService';
 
 // Types d'événements supportés
 export type WorkflowEventType =
@@ -45,6 +46,7 @@ export interface EventPayload {
   task_id?: string;
   request_id?: string;
   run_id?: string;
+  task_title?: string;
   
   // Status change
   from_status?: string;
@@ -67,7 +69,6 @@ export interface EventPayload {
   // Notification context
   requester_id?: string;
   requester_name?: string;
-  task_title?: string;
   request_title?: string;
   
   // Custom data
@@ -240,13 +241,20 @@ async function handleRequestCreated(requestId: string, payload: EventPayload): P
 
 /**
  * Handler: Changement de statut de tâche
+ * Gère les notifications selon le workflow de validation
  */
 async function handleTaskStatusChanged(taskId: string, payload: EventPayload): Promise<void> {
-  // Récupérer la tâche avec ses infos
+  const fromStatus = payload.from_status;
+  const toStatus = payload.to_status;
+  const taskTitle = payload.task_title;
+
+  // Récupérer la tâche avec ses infos complètes
   const { data: task } = await supabase
     .from('tasks')
     .select(`
-      id, title, type, parent_request_id, assignee_id,
+      id, title, type, parent_request_id, assignee_id, requester_id,
+      validator_level_1_id, validator_level_2_id,
+      validation_1_comment, validation_2_comment,
       parent_request:tasks!parent_request_id(user_id, title)
     `)
     .eq('id', taskId)
@@ -254,25 +262,157 @@ async function handleTaskStatusChanged(taskId: string, payload: EventPayload): P
 
   if (!task) return;
 
-  const requesterId = task.parent_request?.user_id;
-  const fromStatus = payload.from_status;
-  const toStatus = payload.to_status;
+  const requesterId = task.requester_id || task.parent_request?.user_id;
+  const title = task.title || taskTitle || 'Sans titre';
 
-  // Notifier le demandeur des changements d'état (S3 du standard)
+  // Convertir les statuts en libellés pour les messages
+  const fromLabel = fromStatus ? TASK_STATUS_LABELS[fromStatus as keyof typeof TASK_STATUS_LABELS] || fromStatus : '';
+  const toLabel = toStatus ? TASK_STATUS_LABELS[toStatus as keyof typeof TASK_STATUS_LABELS] || toStatus : '';
+
+  // =========================================
+  // CAS 1: Demande de validation (pending_validation_1)
+  // =========================================
+  if (toStatus === 'pending_validation_1') {
+    const validatorId = payload.validator_id || task.validator_level_1_id;
+    
+    if (validatorId) {
+      await createNotification({
+        recipient_id: validatorId,
+        type: 'validation_requested',
+        title: 'Validation requise',
+        body: `La tâche "${title}" nécessite votre validation.`,
+        entity_type: 'task',
+        entity_id: taskId,
+      });
+    }
+    return;
+  }
+
+  // =========================================
+  // CAS 2: Passage au niveau 2 (pending_validation_2)
+  // =========================================
+  if (toStatus === 'pending_validation_2') {
+    const validatorId = payload.validator_id || task.validator_level_2_id;
+    
+    if (validatorId) {
+      await createNotification({
+        recipient_id: validatorId,
+        type: 'validation_requested',
+        title: 'Validation niveau 2 requise',
+        body: `La tâche "${title}" a été validée au niveau 1 et nécessite votre validation.`,
+        entity_type: 'task',
+        entity_id: taskId,
+      });
+    }
+    return;
+  }
+
+  // =========================================
+  // CAS 3: Validation finale (validated)
+  // =========================================
+  if (toStatus === 'validated') {
+    // Notifier l'exécutant (assignee)
+    if (task.assignee_id) {
+      await createNotification({
+        recipient_id: task.assignee_id,
+        type: 'task_status_changed',
+        title: 'Tâche validée',
+        body: `Votre tâche "${title}" a été validée avec succès.`,
+        entity_type: 'task',
+        entity_id: taskId,
+      });
+    }
+
+    // Notifier le manager de l'exécutant
+    if (task.assignee_id) {
+      const { data: assigneeProfile } = await supabase
+        .from('profiles')
+        .select('manager_id')
+        .eq('id', task.assignee_id)
+        .single();
+
+      if (assigneeProfile?.manager_id) {
+        await createNotification({
+          recipient_id: assigneeProfile.manager_id,
+          type: 'task_status_changed',
+          title: 'Tâche validée',
+          body: `La tâche "${title}" a été validée.`,
+          entity_type: 'task',
+          entity_id: taskId,
+        });
+      }
+    }
+
+    // Notifier le demandeur si différent de l'assignee
+    if (requesterId && requesterId !== task.assignee_id) {
+      await createNotification({
+        recipient_id: requesterId,
+        type: 'task_status_changed',
+        title: 'Tâche de votre demande validée',
+        body: `La tâche "${title}" a été validée.`,
+        entity_type: 'task',
+        entity_id: taskId,
+      });
+    }
+    
+    // Vérifier si le sous-processus est complet
+    await checkSubProcessCompletion(task.parent_request_id, taskId);
+    return;
+  }
+
+  // =========================================
+  // CAS 4: Refus de validation (retour à in-progress depuis pending_validation_*)
+  // =========================================
+  if (toStatus === 'in-progress' && isPendingValidation(fromStatus || '')) {
+    const comment = payload.comment || task.validation_1_comment || task.validation_2_comment || '';
+    
+    // Notifier l'exécutant du refus
+    if (task.assignee_id) {
+      await createNotification({
+        recipient_id: task.assignee_id,
+        type: 'validation_decided',
+        title: 'Validation refusée',
+        body: `La tâche "${title}" a été refusée.${comment ? ` Raison : ${comment}` : ''}`,
+        entity_type: 'task',
+        entity_id: taskId,
+      });
+    }
+    return;
+  }
+
+  // =========================================
+  // CAS 5: Tâche terminée (done) - sans validation
+  // =========================================
+  if (toStatus === 'done') {
+    // Notifier le demandeur
+    if (requesterId && task.type !== 'request') {
+      await createNotification({
+        recipient_id: requesterId,
+        type: 'task_status_changed',
+        title: 'Tâche terminée',
+        body: `La tâche "${title}" a été terminée.`,
+        entity_type: 'task',
+        entity_id: taskId,
+      });
+    }
+    
+    // Vérifier si le sous-processus est complet
+    await checkSubProcessCompletion(task.parent_request_id, taskId);
+    return;
+  }
+
+  // =========================================
+  // CAS 6: Autres changements de statut (notification S3)
+  // =========================================
   if (requesterId && task.type !== 'request') {
     await createNotification({
       recipient_id: requesterId,
       type: 'task_status_changed',
       title: 'Avancement de votre demande',
-      body: `La tâche "${task.title}" est passée de "${fromStatus}" à "${toStatus}".`,
+      body: `La tâche "${title}" est passée de "${fromLabel}" à "${toLabel}".`,
       entity_type: 'task',
       entity_id: taskId,
     });
-  }
-
-  // Si tâche terminée, vérifier si sous-processus complet
-  if (toStatus === 'done' || toStatus === 'validated') {
-    await checkSubProcessCompletion(task.parent_request_id, taskId);
   }
 }
 
@@ -300,12 +440,12 @@ async function handleTaskAssigned(taskId: string, payload: EventPayload): Promis
 }
 
 /**
- * Handler: Décision de validation
+ * Handler: Décision de validation (legacy - maintenu pour compatibilité)
  */
 async function handleValidationDecided(entityId: string, payload: EventPayload): Promise<void> {
   const { data: task } = await supabase
     .from('tasks')
-    .select('title, user_id, parent_request_id')
+    .select('title, user_id, assignee_id, parent_request_id')
     .eq('id', entityId)
     .single();
 
@@ -317,7 +457,19 @@ async function handleValidationDecided(entityId: string, payload: EventPayload):
     ? `La tâche "${task.title}" a été validée.`
     : `La tâche "${task.title}" a été refusée. ${payload.comment || ''}`;
 
-  // Notifier le demandeur
+  // Notifier l'exécutant
+  if (task.assignee_id) {
+    await createNotification({
+      recipient_id: task.assignee_id,
+      type: 'validation_decided',
+      title,
+      body,
+      entity_type: 'task',
+      entity_id: entityId,
+    });
+  }
+
+  // Notifier le demandeur si différent
   if (task.parent_request_id) {
     const { data: request } = await supabase
       .from('tasks')
@@ -325,7 +477,7 @@ async function handleValidationDecided(entityId: string, payload: EventPayload):
       .eq('id', task.parent_request_id)
       .single();
 
-    if (request?.user_id) {
+    if (request?.user_id && request.user_id !== task.assignee_id) {
       await createNotification({
         recipient_id: request.user_id,
         type: 'validation_decided',
@@ -418,7 +570,7 @@ async function checkSubProcessCompletion(parentRequestId: string | null, taskId:
 
   if (!tasks) return;
 
-  // Vérifier si toutes sont terminées
+  // Vérifier si toutes sont terminées (done OU validated)
   const allCompleted = tasks.every(t => t.status === 'done' || t.status === 'validated');
 
   if (allCompleted && task.parent_sub_process_run_id) {

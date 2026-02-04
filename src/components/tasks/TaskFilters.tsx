@@ -1,6 +1,7 @@
 import { TaskStatus, TaskPriority } from '@/types/task';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { getStatusFilterOptions } from '@/services/taskStatusService';
 
 interface TaskFiltersProps {
   statusFilter: TaskStatus | 'all';
@@ -9,14 +10,8 @@ interface TaskFiltersProps {
   onPriorityChange: (priority: TaskPriority | 'all') => void;
 }
 
-const statusOptions: { value: TaskStatus | 'all'; label: string }[] = [
-  { value: 'all', label: 'Tous' },
-  { value: 'to_assign', label: 'À affecter' },
-  { value: 'todo', label: 'À faire' },
-  { value: 'in-progress', label: 'En cours' },
-  { value: 'done', label: 'Terminé' },
-  { value: 'cancelled', label: 'Annulé' },
-];
+// Use centralized filter options from taskStatusService
+const statusOptions = getStatusFilterOptions();
 
 const priorityOptions: { value: TaskPriority | 'all'; label: string }[] = [
   { value: 'all', label: 'Toutes' },
@@ -43,10 +38,19 @@ export function TaskFilters({
               key={option.value}
               variant="ghost"
               size="sm"
-              onClick={() => onStatusChange(option.value)}
+              onClick={() => {
+                // Map filter values to TaskStatus | 'all'
+                const filterValue = option.value === 'pending_validation' 
+                  ? 'pending_validation_1' as TaskStatus 
+                  : option.value as TaskStatus | 'all';
+                onStatusChange(filterValue);
+              }}
               className={cn(
                 "text-xs px-3 py-1 h-auto rounded-md transition-all",
-                statusFilter === option.value 
+                // Check if current filter matches this option
+                (statusFilter === option.value || 
+                 (option.value === 'pending_validation' && 
+                  (statusFilter === 'pending_validation_1' || statusFilter === 'pending_validation_2')))
                   ? "bg-card shadow-sm text-foreground" 
                   : "text-muted-foreground hover:text-foreground"
               )}

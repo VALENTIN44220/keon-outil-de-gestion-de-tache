@@ -139,9 +139,13 @@ export function useTasks(externalScope?: TaskScope) {
     const todo = tasks.filter(t => t.status === 'todo').length;
     const inProgress = tasks.filter(t => t.status === 'in-progress').length;
     const done = tasks.filter(t => t.status === 'done').length;
-    const pendingValidation = tasks.filter(t => t.status === 'pending_validation_1' || t.status === 'pending_validation_2').length;
+    // Use helper function logic for pending validation
+    const pendingValidation = tasks.filter(t => 
+      t.status === 'pending_validation_1' || t.status === 'pending_validation_2'
+    ).length;
     const validated = tasks.filter(t => t.status === 'validated').length;
     const refused = tasks.filter(t => t.status === 'refused').length;
+    // Completion = done + validated (both are terminal states)
     const completionRate = total > 0 ? Math.round(((done + validated) / total) * 100) : 0;
 
     return { total, todo, inProgress, done, pendingValidation, validated, refused, completionRate };
