@@ -1,7 +1,6 @@
 import { Building2, X, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { DialogTitle } from '@/components/ui/dialog';
-import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 
 interface RequestDialogHeaderProps {
   processName?: string | null;
@@ -24,9 +23,9 @@ export function RequestDialogHeader({ processName, onClose }: RequestDialogHeade
       
       <div className="relative flex items-center justify-between px-6 py-5">
         {/* Accessibility: Hidden DialogTitle for screen readers */}
-        <VisuallyHidden.Root asChild>
-          <DialogTitle>{processName ? processName : 'Nouvelle demande'}</DialogTitle>
-        </VisuallyHidden.Root>
+        <DialogTitle className="sr-only">
+          {processName ? processName : 'Nouvelle demande'}
+        </DialogTitle>
         
         <div className="flex items-center gap-4">
           <div className="relative">
