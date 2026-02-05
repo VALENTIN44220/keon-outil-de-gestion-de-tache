@@ -728,7 +728,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
             </div>
 
             {/* Scrollable Content */}
-            <ScrollArea className="flex-1 min-h-0" type="always">
+            <ScrollArea className="flex-1 min-h-0 pr-3" type="always">
               <div className="px-6 py-5">
                 {/* General Tab */}
                 <TabsContent value="general" className="mt-0 space-y-6">
