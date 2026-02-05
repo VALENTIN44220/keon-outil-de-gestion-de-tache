@@ -47,6 +47,7 @@
    onTaskUpdated?: () => void;
    searchQuery?: string;
    onSearchChange?: (query: string) => void;
+  onViewModeChange?: (mode: 'week' | 'month' | 'quarter' | 'year', anchorDate?: Date) => void;
  }
  
  export function PlanningCalendarView({
@@ -71,6 +72,7 @@
    onTaskUpdated,
    searchQuery = '',
    onSearchChange,
+  onViewModeChange,
  }: PlanningCalendarViewProps) {
    // UI state
    const [isBacklogCollapsed, setIsBacklogCollapsed] = useState(false);
@@ -299,6 +301,7 @@
                isHalfDayAvailable={isHalfDayAvailable}
                checkSlotLeaveConflict={checkSlotLeaveConflict}
                isCompact={isCompact}
+              onViewModeChange={onViewModeChange}
              />
            </div>
          </div>

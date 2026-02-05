@@ -5,3 +5,4 @@
 export { WeekPlanningGrid } from './WeekPlanningGrid';
 export { MonthPlanningGrid } from './MonthPlanningGrid';
 export { QuarterPlanningGrid } from './QuarterPlanningGrid';
+export { YearPlanningGrid } from './YearPlanningGrid';

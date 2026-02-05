@@ -461,6 +461,24 @@ export default function Workload() {
                      onTaskUpdated={refetch}
                      searchQuery={filters.searchQuery}
                      onSearchChange={setSearchQuery}
+                     onViewModeChange={(mode, anchorDate) => {
+                       setViewMode(mode);
+                       if (anchorDate) {
+                         if (mode === 'week') {
+                           setStartDate(startOfWeek(anchorDate, { locale: fr }));
+                           setEndDate(endOfWeek(anchorDate, { locale: fr }));
+                         } else if (mode === 'month') {
+                           setStartDate(startOfMonth(anchorDate));
+                           setEndDate(endOfMonth(anchorDate));
+                         } else if (mode === 'quarter') {
+                           setStartDate(startOfQuarter(anchorDate));
+                           setEndDate(endOfQuarter(anchorDate));
+                         } else if (mode === 'year') {
+                           setStartDate(startOfYear(anchorDate));
+                           setEndDate(endOfYear(anchorDate));
+                         }
+                       }
+                     }}
                   />
                 </TabsContent>
 
