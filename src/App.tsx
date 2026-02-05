@@ -20,6 +20,7 @@ import Admin from "./pages/Admin";
 import Workload from "./pages/Workload";
 import Requests from "./pages/Requests";
 import CalendarPage from "./pages/Calendar";
+import Chat from "./pages/Chat";
 import DesignSystem from "./pages/DesignSystem";
 import WorkflowEditor from "./pages/WorkflowEditor";
 import NotFound from "./pages/NotFound";
@@ -116,6 +117,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <CalendarPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/chat"
+              element={
+                <ProtectedRoute>
+                  <Chat />
                 </ProtectedRoute>
               }
             />

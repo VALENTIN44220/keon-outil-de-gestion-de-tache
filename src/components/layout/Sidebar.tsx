@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, BarChart3, Users, ChevronLeft, ChevronRight, Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText, ArrowLeftRight, Calendar } from 'lucide-react';
+import { LayoutDashboard, BarChart3, Users, ChevronLeft, ChevronRight, Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText, ArrowLeftRight, Calendar, MessageCircle } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import keonLogo from '@/assets/keon-logo.jpg';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { UserProfilePopover } from './UserProfilePopover';
@@ -31,6 +32,12 @@ const allMenuItems = [{
   icon: FileText,
   path: '/requests',
   permissionKey: 'can_access_requests' as ScreenPermissionKey
+}, {
+  id: 'chat',
+  label: 'Messages',
+  icon: MessageCircle,
+  path: '/chat',
+  permissionKey: 'can_access_dashboard' as ScreenPermissionKey // Chat accessible to all authenticated users
 }, {
   id: 'templates',
   label: 'Modèles',
@@ -83,6 +90,12 @@ const menuColors: Record<string, { bg: string; text: string; border: string; ico
     text: 'text-warning', 
     border: 'border-warning',
     iconBg: 'bg-gradient-to-br from-warning to-warning/80'
+  },
+  chat: { 
+    bg: 'bg-[#7C3AED]/10', 
+    text: 'text-[#7C3AED]', 
+    border: 'border-[#7C3AED]',
+    iconBg: 'bg-gradient-to-br from-[#7C3AED] to-[#7C3AED]/80'
   },
   templates: { 
     bg: 'bg-success/10', 
