@@ -651,7 +651,7 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange }: Req
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : hasSubProcesses ? (
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0 overflow-hidden">
             <ScrollArea className="w-full shrink-0">
               <TabsList className="inline-flex w-max">
                 <TabsTrigger value="synthesis" className="gap-2">
@@ -676,8 +676,9 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange }: Req
               <ScrollBar orientation="horizontal" />
             </ScrollArea>
 
-            <div className="flex-1 overflow-hidden mt-4">
-              <TabsContent value="synthesis" className="h-full m-0">
+            {/* Body scroll: keep header/tabs fixed, make content reliably scrollable */}
+            <div className="flex-1 min-h-0 mt-4 overflow-y-auto pr-2">
+              <TabsContent value="synthesis" className="m-0">
                 <SynthesisTab
                   task={task}
                   processName={processName}
@@ -690,13 +691,13 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange }: Req
               </TabsContent>
 
               {task.source_process_template_id && (
-                <TabsContent value="workflow" className="h-full m-0">
+                <TabsContent value="workflow" className="m-0">
                   <WorkflowProgressTab task={task} />
                 </TabsContent>
               )}
 
               {subProcessGroups.map((group) => (
-                <TabsContent key={group.subProcessId} value={group.subProcessId} className="h-full m-0">
+                <TabsContent key={group.subProcessId} value={group.subProcessId} className="m-0">
                   <SubProcessTab
                     group={group}
                     profiles={profiles}
