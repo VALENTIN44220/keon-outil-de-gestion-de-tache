@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+ import { useState, useEffect, useCallback } from 'react';
 import { Task } from '@/types/task';
 import { WorkloadSlot, UserLeave } from '@/types/workload';
 import { cn } from '@/lib/utils';
@@ -16,17 +16,18 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
+ import {
+   AlertDialog,
+   AlertDialogAction,
+   AlertDialogCancel,
+   AlertDialogContent,
+   AlertDialogDescription,
+   AlertDialogFooter,
+   AlertDialogHeader,
+   AlertDialogTitle,
+   AlertDialogTrigger,
+ } from '@/components/ui/alert-dialog';
+ import { ReassignTaskDialog } from './ReassignTaskDialog';
 import {
   Calendar,
   Clock,
@@ -44,6 +45,7 @@ import {
   UserCheck,
   ChevronRight,
   ExternalLink,
+   UserRoundPlus,
 } from 'lucide-react';
 import { format, parseISO, differenceInDays, isPast, isToday, differenceInBusinessDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -106,10 +108,14 @@ export function UnifiedTaskDrawer({
 }: UnifiedTaskDrawerProps) {
   const [comment, setComment] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
+ const [isReassignOpen, setIsReassignOpen] = useState(false);
 
   // Reset comment when drawer closes
   useEffect(() => {
-    if (!isOpen) setComment('');
+   if (!isOpen) {
+     setComment('');
+     setIsReassignOpen(false);
+   }
   }, [isOpen]);
 
   if (!item) return null;
@@ -286,6 +292,19 @@ export function UnifiedTaskDrawer({
                 </Button>
               )}
             </div>
+ 
+         {/* Reassign button - always available for assigned tasks */}
+         {task.assignee_id && task.status !== 'validated' && task.status !== 'done' && (
+           <Button 
+             variant="outline" 
+             size="sm" 
+             className="w-full gap-2 text-amber-600 border-amber-200 hover:bg-amber-50 hover:text-amber-700"
+             onClick={() => setIsReassignOpen(true)}
+           >
+             <UserRoundPlus className="h-4 w-4" />
+             Réaffecter à quelqu'un d'autre
+           </Button>
+         )}
 
             {/* Status selector */}
             <div className="space-y-2">
@@ -470,6 +489,17 @@ export function UnifiedTaskDrawer({
             </AlertDialog>
           )}
         </div>
+ 
+       {/* Reassign dialog */}
+       <ReassignTaskDialog
+         task={task}
+         isOpen={isReassignOpen}
+         onClose={() => setIsReassignOpen(false)}
+         onReassigned={() => {
+           onClose();
+         }}
+         teamMembers={teamMembers}
+       />
       </>
     );
   };
