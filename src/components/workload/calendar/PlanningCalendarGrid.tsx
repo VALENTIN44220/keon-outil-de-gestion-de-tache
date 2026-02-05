@@ -73,7 +73,14 @@ import { format, parseISO, isWeekend, isToday, eachDayOfInterval, isSameDay, get
  }: PlanningCalendarGridProps) {
    const [hoveredTask, setHoveredTask] = useState<string | null>(null);
  
-   const days = useMemo(() => eachDayOfInterval({ start: startDate, end: endDate }), [startDate, endDate]);
+  const days = useMemo(() => {
+    if (!startDate || !endDate) return [];
+    try {
+      return eachDayOfInterval({ start: startDate, end: endDate });
+    } catch {
+      return [];
+    }
+  }, [startDate, endDate]);
    
    const dayWidth = useMemo(() => {
      switch (viewMode) {
@@ -209,6 +216,7 @@ import { format, parseISO, isWeekend, isToday, eachDayOfInterval, isSameDay, get
    };
  
    const getPeriodLabel = () => {
+    if (!startDate || !endDate) return '';
      switch (viewMode) {
        case 'week':
          return `Semaine ${getWeek(startDate, { locale: fr })} - ${format(startDate, 'MMMM yyyy', { locale: fr })}`;
