@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Building2, Briefcase, Users, Layers, Shield, UserCog, Download, UsersRound, CloudUpload, Grid3X3, UserRoundCog, Workflow, Database } from 'lucide-react';
 import { CompaniesTab } from './CompaniesTab';
@@ -8,7 +8,6 @@ import { HierarchyLevelsTab } from './HierarchyLevelsTab';
 import { PermissionProfilesTab } from './PermissionProfilesTab';
 import { PermissionMatrixTab } from './PermissionMatrixTab';
 import { UsersTab } from './UsersTab';
-
 
 import { DataExportTab } from './DataExportTab';
 
@@ -48,13 +47,17 @@ interface AdminTabsProps {
 export function AdminTabs(props: AdminTabsProps) {
   const [activeTab, setActiveTab] = useState('users');
 
+  const handleTabChange = useCallback((next: string) => {
+    setActiveTab((prev) => (prev === next ? prev : next));
+  }, []);
+
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
         <DatabaseResetDialog onReset={props.refetch} />
       </div>
-      
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
         <TabsList className="h-auto p-1 flex flex-wrap justify-start">
           <TabsTrigger value="users" className="px-2 py-1.5" title="Utilisateurs">
             <UserCog className="h-4 w-4" />
@@ -97,117 +100,114 @@ export function AdminTabs(props: AdminTabsProps) {
           </TabsTrigger>
         </TabsList>
 
-      <TabsContent value="users">
-        <UsersTab
-          users={props.users}
-          companies={props.companies}
-          departments={props.departments}
-          jobTitles={props.jobTitles}
-          hierarchyLevels={props.hierarchyLevels}
-          permissionProfiles={props.permissionProfiles}
-          onUserCreated={props.refetch}
-          onUserUpdated={props.refetch}
-          onRefresh={props.refetch}
-        />
-      </TabsContent>
+        <TabsContent value="users">
+          <UsersTab
+            users={props.users}
+            companies={props.companies}
+            departments={props.departments}
+            jobTitles={props.jobTitles}
+            hierarchyLevels={props.hierarchyLevels}
+            permissionProfiles={props.permissionProfiles}
+            onUserCreated={props.refetch}
+            onUserUpdated={props.refetch}
+            onRefresh={props.refetch}
+          />
+        </TabsContent>
 
-      <TabsContent value="groups">
-        <CollaboratorGroupsTab
-          companies={props.companies}
-          departments={props.departments}
-          users={props.users}
-          onRefresh={props.refetch}
-        />
-      </TabsContent>
+        <TabsContent value="groups">
+          <CollaboratorGroupsTab
+            companies={props.companies}
+            departments={props.departments}
+            users={props.users}
+            onRefresh={props.refetch}
+          />
+        </TabsContent>
 
-      <TabsContent value="companies">
-        <CompaniesTab 
-          companies={props.companies} 
-          onAdd={props.addCompany}
-          onUpdate={props.updateCompany}
-          onDelete={props.deleteCompany}
-          onRefresh={props.refetch}
-        />
-      </TabsContent>
+        <TabsContent value="companies">
+          <CompaniesTab
+            companies={props.companies}
+            onAdd={props.addCompany}
+            onUpdate={props.updateCompany}
+            onDelete={props.deleteCompany}
+            onRefresh={props.refetch}
+          />
+        </TabsContent>
 
-      <TabsContent value="departments">
-        <DepartmentsTab 
-          departments={props.departments}
-          companies={props.companies}
-          onAdd={props.addDepartment}
-          onUpdate={props.updateDepartment}
-          onDelete={props.deleteDepartment}
-          onRefresh={props.refetch}
-        />
-      </TabsContent>
+        <TabsContent value="departments">
+          <DepartmentsTab
+            departments={props.departments}
+            companies={props.companies}
+            onAdd={props.addDepartment}
+            onUpdate={props.updateDepartment}
+            onDelete={props.deleteDepartment}
+            onRefresh={props.refetch}
+          />
+        </TabsContent>
 
-      <TabsContent value="job-titles">
-        <JobTitlesTab 
-          jobTitles={props.jobTitles}
-          departments={props.departments}
-          companies={props.companies}
-          onAdd={props.addJobTitle}
-          onUpdate={props.updateJobTitle}
-          onDelete={props.deleteJobTitle}
-          onRefresh={props.refetch}
-        />
-      </TabsContent>
+        <TabsContent value="job-titles">
+          <JobTitlesTab
+            jobTitles={props.jobTitles}
+            departments={props.departments}
+            companies={props.companies}
+            onAdd={props.addJobTitle}
+            onUpdate={props.updateJobTitle}
+            onDelete={props.deleteJobTitle}
+            onRefresh={props.refetch}
+          />
+        </TabsContent>
 
-      <TabsContent value="hierarchy">
-        <HierarchyLevelsTab 
-          hierarchyLevels={props.hierarchyLevels} 
-          onAdd={props.addHierarchyLevel}
-          onUpdate={props.updateHierarchyLevel}
-          onDelete={props.deleteHierarchyLevel}
-          onRefresh={props.refetch}
-        />
-      </TabsContent>
+        <TabsContent value="hierarchy">
+          <HierarchyLevelsTab
+            hierarchyLevels={props.hierarchyLevels}
+            onAdd={props.addHierarchyLevel}
+            onUpdate={props.updateHierarchyLevel}
+            onDelete={props.deleteHierarchyLevel}
+            onRefresh={props.refetch}
+          />
+        </TabsContent>
 
-      <TabsContent value="permissions">
-        <PermissionProfilesTab 
-          permissionProfiles={props.permissionProfiles} 
-          onAdd={props.addPermissionProfile}
-          onUpdate={props.updatePermissionProfile}
-          onDelete={props.deletePermissionProfile}
-          onRefresh={props.refetch}
-        />
-      </TabsContent>
+        <TabsContent value="permissions">
+          <PermissionProfilesTab
+            permissionProfiles={props.permissionProfiles}
+            onAdd={props.addPermissionProfile}
+            onUpdate={props.updatePermissionProfile}
+            onDelete={props.deletePermissionProfile}
+            onRefresh={props.refetch}
+          />
+        </TabsContent>
 
-      <TabsContent value="matrix">
-        <PermissionMatrixTab 
-          permissionProfiles={props.permissionProfiles}
-          users={props.users}
-          companies={props.companies}
-          departments={props.departments}
-          onRefresh={props.refetch}
-        />
-      </TabsContent>
+        <TabsContent value="matrix">
+          <PermissionMatrixTab
+            permissionProfiles={props.permissionProfiles}
+            users={props.users}
+            companies={props.companies}
+            departments={props.departments}
+            onRefresh={props.refetch}
+          />
+        </TabsContent>
 
+        <TabsContent value="export">
+          <DataExportTab />
+        </TabsContent>
 
+        <TabsContent value="fabric">
+          <FabricLakehouseSyncTab />
+        </TabsContent>
 
-      <TabsContent value="export">
-        <DataExportTab />
-      </TabsContent>
+        <TabsContent value="simulation">
+          <div className="max-w-lg">
+            <UserSimulationSelector />
+          </div>
+        </TabsContent>
 
+        <TabsContent value="workflow-migration">
+          <WorkflowMigrationTab />
+        </TabsContent>
 
-      <TabsContent value="fabric">
-        <FabricLakehouseSyncTab />
-      </TabsContent>
-
-      <TabsContent value="simulation">
-        <div className="max-w-lg">
-          <UserSimulationSelector />
-        </div>
-      </TabsContent>
-
-      <TabsContent value="workflow-migration">
-        <WorkflowMigrationTab />
-      </TabsContent>
-
-      <TabsContent value="table-lookup">
-        <TableLookupConfigTab />
-      </TabsContent>
-    </Tabs>
+        <TabsContent value="table-lookup">
+          <TableLookupConfigTab />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
