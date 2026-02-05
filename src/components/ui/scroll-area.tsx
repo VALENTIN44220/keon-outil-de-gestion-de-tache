@@ -26,13 +26,16 @@ const ScrollBar = React.forwardRef<
       // Radix can set data-state="hidden" and effectively hide the scrollbar.
       // We want it visible in premium dialogs even before interaction.
       "touch-none select-none flex data-[state=hidden]:flex data-[state=visible]:flex transition-opacity data-[state=hidden]:opacity-100 data-[state=visible]:opacity-100",
-      orientation === "vertical" && "h-full w-3.5 border-l border-l-transparent p-[1px]",
-      orientation === "horizontal" && "h-2.5 flex-col border-t border-t-transparent p-[1px]",
+      // Make the track visible (users on overlay-scrollbar OSes often think there is no scroll).
+      // Keep it theme-driven via semantic tokens.
+      "bg-muted/40 backdrop-blur-sm rounded-full",
+      orientation === "vertical" && "h-full w-3.5 border-l border-border/50 p-[2px]",
+      orientation === "horizontal" && "h-3.5 flex-col border-t border-border/50 p-[2px]",
       className,
     )}
     {...props}
   >
-    <ScrollAreaPrimitive.ScrollAreaThumb className="relative flex-1 min-h-[32px] rounded-full bg-primary/25 hover:bg-primary/40" />
+    <ScrollAreaPrimitive.ScrollAreaThumb className="relative flex-1 min-h-[32px] rounded-full bg-muted-foreground/45 hover:bg-muted-foreground/70" />
   </ScrollAreaPrimitive.ScrollAreaScrollbar>
 ));
 ScrollBar.displayName = ScrollAreaPrimitive.ScrollAreaScrollbar.displayName;
