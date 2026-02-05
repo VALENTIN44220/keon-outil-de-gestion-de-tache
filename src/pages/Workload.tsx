@@ -1,12 +1,12 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, format, addWeeks, addMonths, startOfYear, endOfYear, addYears } from 'date-fns';
+ import { useState, useEffect, useCallback, useMemo } from 'react';
+ import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, format, addWeeks, addMonths, startOfYear, endOfYear, addYears, startOfQuarter, endOfQuarter } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useWorkloadPlanning } from '@/hooks/useWorkloadPlanning';
 import { useWorkloadPreferences } from '@/hooks/useWorkloadPreferences';
 import { useWorkloadFilters } from '@/hooks/useWorkloadFilters';
 import { WorkloadFilters } from '@/components/workload/WorkloadFilters';
-import { GanttViewInteractive } from '@/components/workload/GanttViewInteractive';
-import { WorkloadCalendarNew } from '@/components/workload/WorkloadCalendarNew';
+ import { PlanningCalendarView } from '@/components/workload/calendar';
+ import { useOutlookCalendar } from '@/hooks/useOutlookCalendar';
 import { WorkloadSummaryView } from '@/components/workload/WorkloadSummaryView';
 import { LeaveManagement } from '@/components/workload/LeaveManagement';
 import { HolidayManagement } from '@/components/workload/HolidayManagement';
@@ -17,7 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { Loader2, GanttChart, CalendarDays, BarChart3, Palmtree, CalendarCheck, Download, RefreshCw, Users, FileSpreadsheet, FileJson, FileText } from 'lucide-react';
+ import { Loader2, CalendarDays, BarChart3, Palmtree, CalendarCheck, Download, RefreshCw, Users, FileSpreadsheet, FileJson, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSimulation } from '@/contexts/SimulationContext';
@@ -31,13 +31,20 @@ export default function Workload() {
   const { getActiveProfile } = useSimulation();
   const profile = getActiveProfile() || authProfile;
   const [activeView, setActiveView] = useState('workload');
-  const [activeTab, setActiveTab] = useState('gantt');
+   const [activeTab, setActiveTab] = useState('calendar');
   const [viewMode, setViewMode] = useState<'week' | 'month' | 'quarter' | 'year'>('month');
   const [startDate, setStartDate] = useState(() => startOfMonth(new Date()));
   const [endDate, setEndDate] = useState(() => endOfMonth(new Date()));
   const [selectedCalendarUserId, setSelectedCalendarUserId] = useState<string | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [useAdvancedFilters, setUseAdvancedFilters] = useState(false);
+ 
+   // Fetch Outlook calendar events for team members
+   const { events: outlookEvents, isLoading: isLoadingOutlook } = useOutlookCalendar(
+     startDate,
+     endDate,
+     true // include subordinates
+   );
 
   // Workload filters (persisted in localStorage)
   const {
@@ -291,18 +298,11 @@ export default function Workload() {
               {/* Tabs with premium underline style */}
               <TabsList className="h-auto p-1 bg-card border border-keon-200 rounded-xl shadow-premium">
                 <TabsTrigger 
-                  value="gantt" 
-                  className="gap-2 px-4 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-white rounded-lg transition-all"
-                >
-                  <GanttChart className="h-4 w-4" />
-                  <span className="hidden sm:inline font-medium">Gantt</span>
-                </TabsTrigger>
-                <TabsTrigger 
                   value="calendar" 
                   className="gap-2 px-4 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-white rounded-lg transition-all"
                 >
                   <CalendarDays className="h-4 w-4" />
-                  <span className="hidden sm:inline font-medium">Calendrier</span>
+                   <span className="hidden sm:inline font-medium">Planning</span>
                 </TabsTrigger>
                 <TabsTrigger 
                   value="summary" 
@@ -336,20 +336,6 @@ export default function Workload() {
 
               {/* Action buttons row */}
               <div className="flex items-center gap-2">
-                {/* Config Panel for Gantt */}
-                {activeTab === 'gantt' && (
-                  <GanttConfigPanel
-                    preferences={preferences}
-                    onGroupByChange={setGroupBy}
-                    onZoomChange={setZoomLevel}
-                    onToggleHeatmap={toggleHeatmap}
-                    onToggleCompact={toggleCompactMode}
-                    onColumnChange={updateColumn}
-                    onWidthChange={(width) => updatePreference('memberColumnWidth', width)}
-                    onReset={resetToDefaults}
-                  />
-                )}
-
                 {/* Export / Sync buttons */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -386,8 +372,8 @@ export default function Workload() {
               </div>
             </div>
 
-            {/* Filters for planning views */}
-            {(activeTab === 'gantt' || activeTab === 'calendar' || activeTab === 'summary') && (
+             {/* Filters for planning views - now just calendar and summary */}
+             {(activeTab === 'calendar' || activeTab === 'summary') && (
               <>
                 {/* Date range navigation */}
                 <WorkloadFilters
@@ -412,7 +398,7 @@ export default function Workload() {
               </>
             )}
 
-            {isLoading && (activeTab === 'gantt' || activeTab === 'calendar' || activeTab === 'summary') ? (
+             {isLoading && (activeTab === 'calendar' || activeTab === 'summary') ? (
               <Card>
                 <CardContent className="flex items-center justify-center h-64">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -420,53 +406,25 @@ export default function Workload() {
               </Card>
             ) : (
               <>
-                <TabsContent value="gantt" className="mt-4">
-                  <GanttViewInteractive
+                 <TabsContent value="calendar" className="mt-4 flex-1 min-h-0">
+                   <PlanningCalendarView
                     workloadData={workloadData}
-                    startDate={startDate}
-                    endDate={endDate}
-                    tasks={tasks}
-                    leaves={leaves}
-                    viewMode={viewMode}
-                    onSlotAdd={handleAddSlot}
-                    onSlotRemove={handleRemoveSlot}
-                    onSlotMove={handleMoveSlot}
-                    onMultiSlotAdd={handleAddMultipleSlots}
-                    onReassignTask={reassignTaskSlots}
-                    onResizeTask={resizeTaskSlots}
-                    onTaskCreated={(newTask) => setTasks(prev => [newTask, ...prev])}
-                    isHalfDayAvailable={isHalfDayAvailable}
-                    checkSlotLeaveConflict={checkSlotLeaveConflict}
-                    getTaskSlotsCount={getTaskSlotsCount}
-                    getTaskDuration={getTaskDuration}
-                    getTaskProgress={getTaskProgress}
-                    plannedTaskIds={plannedTaskIds}
-                    preferences={preferences}
-                    searchQuery={filters.searchQuery}
-                    selectedStatuses={filters.selectedStatuses}
-                    selectedPriorities={filters.selectedPriorities}
-                    showOnlyOverloaded={filters.showOnlyOverloaded}
-                  />
-                </TabsContent>
-
-                <TabsContent value="calendar" className="mt-4">
-                  <WorkloadCalendarNew
-                    workloadData={workloadData}
+                     startDate={startDate}
+                     endDate={endDate}
+                     tasks={tasks}
                     holidays={holidays}
                     leaves={leaves}
-                    tasks={tasks}
-                    onTaskUpdate={refetch}
+                     outlookEvents={outlookEvents}
                     viewMode={viewMode}
-                    currentDate={startDate}
-                    onNavigate={(direction) => {
+                     onNavigate={(direction: 'prev' | 'next') => {
                       const offset = direction === 'prev' ? -1 : 1;
                       let newStart: Date, newEnd: Date;
                       if (viewMode === 'week') {
                         newStart = addWeeks(startDate, offset);
                         newEnd = endOfWeek(newStart, { locale: fr });
                       } else if (viewMode === 'quarter') {
-                        newStart = addMonths(startDate, 3 * offset);
-                        newEnd = endOfMonth(addMonths(newStart, 2));
+                         newStart = offset === 1 ? startOfQuarter(addMonths(startDate, 3)) : startOfQuarter(addMonths(startDate, -3));
+                         newEnd = endOfQuarter(newStart);
                       } else if (viewMode === 'year') {
                         newStart = addYears(startDate, offset);
                         newEnd = endOfYear(newStart);
@@ -482,8 +440,8 @@ export default function Workload() {
                         setStartDate(startOfWeek(new Date(), { locale: fr }));
                         setEndDate(endOfWeek(new Date(), { locale: fr }));
                       } else if (viewMode === 'quarter') {
-                        setStartDate(startOfMonth(new Date()));
-                        setEndDate(endOfMonth(addMonths(new Date(), 2)));
+                         setStartDate(startOfQuarter(new Date()));
+                         setEndDate(endOfQuarter(new Date()));
                       } else if (viewMode === 'year') {
                         setStartDate(startOfYear(new Date()));
                         setEndDate(endOfYear(new Date()));
@@ -492,6 +450,17 @@ export default function Workload() {
                         setEndDate(endOfMonth(new Date()));
                       }
                     }}
+                     onSlotAdd={handleAddSlot}
+                     onMultiSlotAdd={handleAddMultipleSlots}
+                     onReassignTask={reassignTaskSlots}
+                     isHalfDayAvailable={isHalfDayAvailable}
+                     checkSlotLeaveConflict={checkSlotLeaveConflict}
+                     getTaskDuration={getTaskDuration}
+                     getTaskProgress={getTaskProgress}
+                     plannedTaskIds={plannedTaskIds}
+                     onTaskUpdated={refetch}
+                     searchQuery={filters.searchQuery}
+                     onSearchChange={setSearchQuery}
                   />
                 </TabsContent>
 
