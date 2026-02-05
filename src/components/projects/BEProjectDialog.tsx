@@ -11,6 +11,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { ProjectCommentsSection } from './ProjectCommentsSection';
+import { MessageCircle } from 'lucide-react';
 
 const projectSchema = z.object({
   code_projet: z.string().min(1, 'Le code projet est requis'),
@@ -154,21 +156,28 @@ export function BEProjectDialog({ open, onClose, onSave, project }: BEProjectDia
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh]">
+        <DialogTitle className="sr-only">{project ? 'Modifier le projet' : 'Nouveau projet'}</DialogTitle>
         <DialogHeader>
-          <DialogTitle>
+          <div className="text-lg font-semibold">
             {project ? 'Modifier le projet' : 'Nouveau projet'}
-          </DialogTitle>
+          </div>
         </DialogHeader>
         
         <ScrollArea className="max-h-[70vh] pr-4">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
               <Tabs defaultValue="general" className="w-full">
-                <TabsList className="grid w-full grid-cols-4">
+                <TabsList className="grid w-full grid-cols-5">
                   <TabsTrigger value="general">Général</TabsTrigger>
                   <TabsTrigger value="addresses">Adresses</TabsTrigger>
                   <TabsTrigger value="dates">Dates</TabsTrigger>
                   <TabsTrigger value="classification">Classification</TabsTrigger>
+                  {project && (
+                    <TabsTrigger value="comments" className="flex items-center gap-1.5">
+                      <MessageCircle className="h-4 w-4" />
+                      Échanges
+                    </TabsTrigger>
+                  )}
                 </TabsList>
 
                 <TabsContent value="general" className="space-y-4 mt-4">
@@ -482,6 +491,14 @@ export function BEProjectDialog({ open, onClose, onSave, project }: BEProjectDia
                     )}
                   />
                 </TabsContent>
+
+                {project && (
+                  <TabsContent value="comments" className="mt-4 -mx-4">
+                    <div className="h-[400px]">
+                      <ProjectCommentsSection projectId={project.id} />
+                    </div>
+                  </TabsContent>
+                )}
               </Tabs>
 
               <div className="flex justify-end gap-3 pt-4 border-t">
