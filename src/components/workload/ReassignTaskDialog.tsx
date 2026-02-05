@@ -108,7 +108,7 @@
            .from('profiles')
            .select('id, display_name, avatar_url, job_title, department')
            .in('id', allIds)
-           .eq('status', 'Actif')
+          .eq('status', 'active')
            .order('display_name');
  
          setTeamMembers(members || []);
