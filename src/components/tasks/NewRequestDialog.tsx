@@ -727,8 +727,8 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
               </TabsList>
             </div>
 
-            {/* Scrollable Content */}
-            <ScrollArea className="flex-1 min-h-0 pr-3" type="always">
+            {/* Scrollable Content (native scroll for reliability + visible OS scrollbar) */}
+            <div className="flex-1 min-h-0 overflow-y-auto pr-3">
               <div className="px-6 py-5">
                 {/* General Tab */}
                 <TabsContent value="general" className="mt-0 space-y-6">
@@ -1050,7 +1050,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                   </TabsContent>
                 )}
               </div>
-            </ScrollArea>
+            </div>
           </Tabs>
 
           {/* Fixed Footer */}
