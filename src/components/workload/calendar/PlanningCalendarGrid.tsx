@@ -18,6 +18,7 @@ import { format, parseISO, isWeekend, isToday, isSameDay, isSameMonth, isSameWee
 import { WeekPlanningGrid } from './WeekPlanningGrid';
 import { MonthPlanningGrid } from './MonthPlanningGrid';
 import { QuarterPlanningGrid } from './QuarterPlanningGrid';
+import { YearPlanningGrid } from './YearPlanningGrid';
  
  // Collaborator color palette (deterministic)
  const USER_COLORS = [
@@ -52,6 +53,7 @@ import { QuarterPlanningGrid } from './QuarterPlanningGrid';
    isHalfDayAvailable?: (userId: string, date: string, halfDay: 'morning' | 'afternoon') => boolean;
    checkSlotLeaveConflict?: (userId: string, date: string, halfDay: 'morning' | 'afternoon') => { hasConflict: boolean; leaveType?: string };
    isCompact?: boolean;
+  onViewModeChange?: (mode: ViewMode, anchorDate?: Date) => void;
  }
  
  export function PlanningCalendarGrid({
@@ -75,6 +77,7 @@ import { QuarterPlanningGrid } from './QuarterPlanningGrid';
    isHalfDayAvailable,
    checkSlotLeaveConflict,
    isCompact = false,
+  onViewModeChange,
  }: PlanningCalendarGridProps) {
    const [hoveredTask, setHoveredTask] = useState<string | null>(null);
  
@@ -454,6 +457,55 @@ import { QuarterPlanningGrid } from './QuarterPlanningGrid';
           dropTarget={dropTarget}
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
+          isCompact={isCompact}
+        />
+      </div>
+    );
+  }
+
+  // For year view, use the specialized YearPlanningGrid component with 12 mini-months
+  if (viewMode === 'year') {
+    const handleMonthClick = (month: Date) => {
+      if (onViewModeChange) {
+        onViewModeChange('month', month);
+      }
+    };
+    
+    return (
+      <div className="flex flex-col h-full bg-card rounded-xl border shadow-premium overflow-hidden">
+        {/* Navigation header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b bg-gradient-to-r from-muted/40 to-muted/20">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" className="h-8 w-8 shadow-sm" onClick={() => onNavigate('prev')}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="sm" className="h-8 font-medium shadow-sm" onClick={onToday}>
+              Aujourd'hui
+            </Button>
+            <Button variant="outline" size="icon" className="h-8 w-8 shadow-sm" onClick={() => onNavigate('next')}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+          
+          <h3 className="font-semibold text-foreground capitalize flex items-center gap-2">
+            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+            {periodLabel}
+          </h3>
+          
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-xs">
+              {workloadData.length} collaborateur{workloadData.length > 1 ? 's' : ''}
+            </Badge>
+          </div>
+        </div>
+
+        <YearPlanningGrid
+          workloadData={workloadData}
+          currentYear={startDate}
+          tasks={tasks}
+          holidays={holidays}
+          leaves={leaves}
+          onMonthClick={handleMonthClick}
           isCompact={isCompact}
         />
       </div>
