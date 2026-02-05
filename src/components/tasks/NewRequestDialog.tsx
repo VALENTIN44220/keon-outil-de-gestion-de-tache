@@ -672,7 +672,10 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
         if (!nextOpen) onClose();
       }}
     >
-      <DialogContent className="sm:max-w-[920px] max-h-[92vh] p-0 flex flex-col overflow-hidden rounded-3xl border-2 border-primary/10 shadow-2xl shadow-primary/5 bg-gradient-to-b from-white to-muted/20">
+      <DialogContent 
+        className="sm:max-w-[920px] max-h-[92vh] p-0 flex flex-col overflow-hidden rounded-3xl border-2 border-primary/10 shadow-2xl shadow-primary/5 bg-gradient-to-b from-white to-muted/20"
+        hideCloseButton
+      >
         {/* Custom Header */}
         <RequestDialogHeader 
           processName={linkedProcessName} 
@@ -725,7 +728,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
             </div>
 
             {/* Scrollable Content */}
-            <ScrollArea className="flex-1 min-h-0">
+            <ScrollArea className="flex-1 min-h-0" type="always">
               <div className="px-6 py-5">
                 {/* General Tab */}
                 <TabsContent value="general" className="mt-0 space-y-6">
