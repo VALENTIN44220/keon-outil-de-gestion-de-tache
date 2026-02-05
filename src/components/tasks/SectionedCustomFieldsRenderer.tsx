@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ValidatedCustomFieldsRenderer } from './ValidatedCustomFieldsRenderer';
 import { Badge } from '@/components/ui/badge';
@@ -25,6 +25,11 @@ interface FieldSection {
   isDefault?: boolean;
 }
 
+const DEBUG_REACT_185 =
+  import.meta.env.DEV &&
+  typeof window !== 'undefined' &&
+  window.localStorage?.getItem('debug-react185') === '1';
+
 export function SectionedCustomFieldsRenderer({
   processTemplateId,
   subProcessTemplateId,
@@ -41,7 +46,7 @@ export function SectionedCustomFieldsRenderer({
   useEffect(() => {
     const fetchSections = async () => {
       const orConditions: string[] = ['is_common.eq.true'];
-      
+
       if (processTemplateId) {
         orConditions.push(`process_template_id.eq.${processTemplateId}`);
       }
@@ -70,9 +75,9 @@ export function SectionedCustomFieldsRenderer({
 
     // First, group fields by their assigned sections
     for (const section of sections) {
-      const sectionFields = fields.filter(f => f.section_id === section.id);
+      const sectionFields = fields.filter((f) => f.section_id === section.id);
       if (sectionFields.length > 0) {
-        sectionFields.forEach(f => fieldsInSections.add(f.id));
+        sectionFields.forEach((f) => fieldsInSections.add(f.id));
         result.push({
           id: section.id,
           label: section.label,
@@ -82,7 +87,7 @@ export function SectionedCustomFieldsRenderer({
     }
 
     // Create a default section for fields without a section
-    const unsectionedFields = fields.filter(f => !fieldsInSections.has(f.id));
+    const unsectionedFields = fields.filter((f) => !fieldsInSections.has(f.id));
     if (unsectionedFields.length > 0) {
       // If there are no other sections, don't show "Général" tab
       if (result.length === 0) {
@@ -110,11 +115,29 @@ export function SectionedCustomFieldsRenderer({
   useEffect(() => {
     if (fieldSections.length === 0) return;
 
-    const ids = new Set(fieldSections.map(s => s.id));
+    const ids = new Set(fieldSections.map((s) => s.id));
     if (!activeTab || !ids.has(activeTab)) {
-      setActiveTab(fieldSections[0].id);
+      const next = fieldSections[0].id;
+      setActiveTab((prev) => (prev === next ? prev : next));
+
+      if (DEBUG_REACT_185) {
+        console.log('[react185] SectionedCustomFieldsRenderer setActiveTab', {
+          prev: activeTab,
+          next,
+          sectionIds: Array.from(ids),
+          processTemplateId,
+          subProcessTemplateId,
+        });
+      }
     }
-  }, [fieldSections, activeTab]);
+  }, [fieldSections, activeTab, processTemplateId, subProcessTemplateId]);
+
+  const handleTabChange = useCallback((next: string) => {
+    setActiveTab((prev) => (prev === next ? prev : next));
+    if (DEBUG_REACT_185) {
+      console.log('[react185] SectionedCustomFieldsRenderer onValueChange', { next });
+    }
+  }, []);
 
   if (fields.length === 0) {
     return (
@@ -141,7 +164,7 @@ export function SectionedCustomFieldsRenderer({
   }
 
   return (
-    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+    <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
       <TabsList className="w-full flex flex-wrap h-auto gap-1 p-1">
         {fieldSections.map((section) => (
           <TabsTrigger

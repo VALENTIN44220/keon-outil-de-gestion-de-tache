@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -21,6 +21,11 @@ interface FieldSectionGroup {
   isDefault?: boolean;
 }
 
+const DEBUG_REACT_185 =
+  import.meta.env.DEV &&
+  typeof window !== 'undefined' &&
+  window.localStorage?.getItem('debug-react185') === '1';
+
 export function StepCustomFields({ data, onDataChange }: StepCustomFieldsProps) {
   const [allFields, setAllFields] = useState<TemplateCustomField[]>([]);
   const [sections, setSections] = useState<FormSection[]>([]);
@@ -36,9 +41,11 @@ export function StepCustomFields({ data, onDataChange }: StepCustomFieldsProps) 
         // Build OR conditions for sections
         const sectionConditions: string[] = ['is_common.eq.true'];
         sectionConditions.push(`process_template_id.eq.${data.processId}`);
-        
+
         if (data.selectedSubProcesses.length > 0) {
-          const spConditions = data.selectedSubProcesses.map(id => `sub_process_template_id.eq.${id}`);
+          const spConditions = data.selectedSubProcesses.map(
+            (id) => `sub_process_template_id.eq.${id}`
+          );
           sectionConditions.push(...spConditions);
         }
 
@@ -74,8 +81,8 @@ export function StepCustomFields({ data, onDataChange }: StepCustomFieldsProps) 
 
         // Combine and deduplicate by ID
         const fieldsMap = new Map<string, TemplateCustomField>();
-        
-        for (const field of (processFields || [])) {
+
+        for (const field of processFields || []) {
           const typedField = {
             ...field,
             options: Array.isArray(field.options) ? field.options : null,
@@ -111,9 +118,9 @@ export function StepCustomFields({ data, onDataChange }: StepCustomFieldsProps) 
 
     // Group fields by their assigned sections
     for (const section of sections) {
-      const sectionFields = allFields.filter(f => f.section_id === section.id);
+      const sectionFields = allFields.filter((f) => f.section_id === section.id);
       if (sectionFields.length > 0) {
-        sectionFields.forEach(f => fieldsInSections.add(f.id));
+        sectionFields.forEach((f) => fieldsInSections.add(f.id));
         result.push({
           id: section.id,
           label: section.label,
@@ -123,7 +130,7 @@ export function StepCustomFields({ data, onDataChange }: StepCustomFieldsProps) 
     }
 
     // Create a default section for fields without a section
-    const unsectionedFields = allFields.filter(f => !fieldsInSections.has(f.id));
+    const unsectionedFields = allFields.filter((f) => !fieldsInSections.has(f.id));
     if (unsectionedFields.length > 0) {
       if (result.length === 0) {
         result.push({
@@ -145,15 +152,31 @@ export function StepCustomFields({ data, onDataChange }: StepCustomFieldsProps) 
     return result;
   }, [allFields, sections]);
 
-  // Set initial active tab
+  // Set initial active tab (guarded to avoid render loops)
   useEffect(() => {
     if (fieldSections.length === 0) return;
 
-    const ids = new Set(fieldSections.map(s => s.id));
+    const ids = new Set(fieldSections.map((s) => s.id));
     if (!activeTab || !ids.has(activeTab)) {
-      setActiveTab(fieldSections[0].id);
+      const next = fieldSections[0].id;
+      setActiveTab((prev) => (prev === next ? prev : next));
+
+      if (DEBUG_REACT_185) {
+        console.log('[react185] StepCustomFields setActiveTab', {
+          prev: activeTab,
+          next,
+          sectionIds: Array.from(ids),
+        });
+      }
     }
   }, [fieldSections, activeTab]);
+
+  const handleTabChange = useCallback((next: string) => {
+    setActiveTab((prev) => (prev === next ? prev : next));
+    if (DEBUG_REACT_185) {
+      console.log('[react185] StepCustomFields onValueChange', { next });
+    }
+  }, []);
 
   const handleFieldChange = (fieldId: string, value: any) => {
     onDataChange({
@@ -213,7 +236,7 @@ export function StepCustomFields({ data, onDataChange }: StepCustomFieldsProps) 
           </div>
         ) : (
           // Multiple sections - render as tabs
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
             <TabsList className="w-full flex flex-wrap h-auto gap-1 p-1 mb-4">
               {fieldSections.map((section) => (
                 <TabsTrigger
