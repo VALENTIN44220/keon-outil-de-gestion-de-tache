@@ -4,3 +4,4 @@
  export { PlanningCalendarView } from './PlanningCalendarView';
 export { WeekPlanningGrid } from './WeekPlanningGrid';
 export { MonthPlanningGrid } from './MonthPlanningGrid';
+export { QuarterPlanningGrid } from './QuarterPlanningGrid';
