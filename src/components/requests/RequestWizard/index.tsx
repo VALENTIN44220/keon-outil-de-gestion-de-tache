@@ -114,15 +114,31 @@ export function RequestWizardDialog({
     updateData({ processId, processName });
   };
 
-  const handleSubProcessSelectionChange = (
-    selected: string[],
-    available: SubProcessSelection[]
-  ) => {
-    updateData({
-      selectedSubProcesses: selected,
-      availableSubProcesses: available,
-    });
-  };
+  const sameStringSet = useCallback((a: string[], b: string[]) => {
+    if (a.length !== b.length) return false;
+    const setA = new Set(a);
+    for (const x of b) if (!setA.has(x)) return false;
+    return true;
+  }, []);
+
+  const handleSubProcessSelectionChange = useCallback(
+    (selected: string[], available: SubProcessSelection[]) => {
+      setData((prev) => {
+        const sameSelected = sameStringSet(selected, prev.selectedSubProcesses);
+        const prevAvailIds = prev.availableSubProcesses.map((s) => s.id).sort().join('|');
+        const nextAvailIds = available.map((s) => s.id).sort().join('|');
+        const sameAvailable = prevAvailIds === nextAvailIds;
+
+        if (sameSelected && sameAvailable) return prev;
+        return {
+          ...prev,
+          selectedSubProcesses: selected,
+          availableSubProcesses: available,
+        };
+      });
+    },
+    [sameStringSet]
+  );
 
   const canProceed = useMemo(() => {
     switch (currentStep.id) {
