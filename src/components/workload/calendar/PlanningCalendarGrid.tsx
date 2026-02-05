@@ -1,5 +1,5 @@
  import { useMemo, useCallback, useState } from 'react';
- import { format, parseISO, isWeekend, isToday, eachDayOfInterval, isSameDay, differenceInDays, addDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addMonths, addWeeks, getWeek } from 'date-fns';
+import { format, parseISO, isWeekend, isToday, eachDayOfInterval, isSameDay, getWeek } from 'date-fns';
  import { fr } from 'date-fns/locale';
  import { TeamMemberWorkload, WorkloadSlot, UserLeave, Holiday } from '@/types/workload';
  import { Task } from '@/types/task';
@@ -91,7 +91,7 @@
    // User color map
    const userColorMap = useMemo(() => {
      const map = new Map<string, typeof USER_COLORS[0]>();
-     workloadData.forEach((member, index) => {
+    (workloadData || []).forEach((member, index) => {
        map.set(member.memberId, USER_COLORS[index % USER_COLORS.length]);
      });
      return map;
@@ -100,9 +100,9 @@
    // All slots grouped by user
    const slotsByUser = useMemo(() => {
      const map = new Map<string, WorkloadSlot[]>();
-     workloadData.forEach(member => {
+    (workloadData || []).forEach(member => {
        const userSlots: WorkloadSlot[] = [];
-       member.days.forEach(day => {
+      (member.days || []).forEach(day => {
          if (day.morning.slot) userSlots.push(day.morning.slot);
          if (day.afternoon.slot) userSlots.push(day.afternoon.slot);
        });
@@ -115,7 +115,7 @@
    const tasksByUser = useMemo(() => {
      const map = new Map<string, { task: Task; slots: WorkloadSlot[]; startDate: string; endDate: string }[]>();
      
-     workloadData.forEach(member => {
+    (workloadData || []).forEach(member => {
        const userSlots = slotsByUser.get(member.memberId) || [];
        const taskMap = new Map<string, { task: Task; slots: WorkloadSlot[] }>();
        
@@ -149,12 +149,12 @@
      });
      
      return map;
-   }, [workloadData, slotsByUser, tasks]);
+  }, [workloadData, slotsByUser, tasks]);
  
    // Leaves by user and date
    const leavesByUserDate = useMemo(() => {
      const map = new Map<string, Set<string>>();
-     leaves.forEach(leave => {
+    (leaves || []).forEach(leave => {
        if (leave.status === 'cancelled') return;
        const start = parseISO(leave.start_date);
        const end = parseISO(leave.end_date);
@@ -173,14 +173,14 @@
    // Holidays by date
    const holidaysByDate = useMemo(() => {
      const map = new Map<string, Holiday>();
-     holidays.forEach(h => map.set(h.date, h));
+    (holidays || []).forEach(h => map.set(h.date, h));
      return map;
    }, [holidays]);
  
    // Outlook events by user and date
    const outlookByUserDate = useMemo(() => {
      const map = new Map<string, Map<string, OutlookEvent[]>>();
-     outlookEvents.forEach(event => {
+    (outlookEvents || []).forEach(event => {
        if (!map.has(event.user_id)) {
          map.set(event.user_id, new Map());
        }
@@ -291,7 +291,7 @@
                </div>
                
                {/* Member rows */}
-               {workloadData.map(member => {
+                {(workloadData || []).map(member => {
                  const available = member.totalSlots - member.leaveSlots - member.holidaySlots;
                  const capacityPercent = available > 0 ? Math.round((member.usedSlots / available) * 100) : 0;
                  const isOverloaded = capacityPercent > 100;
@@ -369,7 +369,7 @@
                  </div>
  
                  {/* Member timeline rows */}
-                 {workloadData.map(member => {
+              {(workloadData || []).map(member => {
                    const userTasks = tasksByUser.get(member.memberId) || [];
                    const userLeaves = leavesByUserDate.get(member.memberId) || new Set();
                    const userOutlook = outlookByUserDate.get(member.memberId) || new Map();
