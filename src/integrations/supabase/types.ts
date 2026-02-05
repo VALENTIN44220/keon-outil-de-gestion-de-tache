@@ -854,6 +854,27 @@ export type Database = {
         }
         Relationships: []
       }
+      number_counters: {
+        Row: {
+          entity_type: string
+          last_value: number
+          project_code: string
+          updated_at: string | null
+        }
+        Insert: {
+          entity_type: string
+          last_value?: number
+          project_code: string
+          updated_at?: string | null
+        }
+        Update: {
+          entity_type?: string
+          last_value?: number
+          project_code?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       outlook_calendar_events: {
         Row: {
           attendees: Json | null
@@ -1543,6 +1564,7 @@ export type Database = {
           request_id: string
           started_at: string | null
           status: string
+          sub_process_number: string | null
           sub_process_template_id: string
           updated_at: string
           workflow_run_id: string | null
@@ -1555,6 +1577,7 @@ export type Database = {
           request_id: string
           started_at?: string | null
           status?: string
+          sub_process_number?: string | null
           sub_process_template_id: string
           updated_at?: string
           workflow_run_id?: string | null
@@ -1567,6 +1590,7 @@ export type Database = {
           request_id?: string
           started_at?: string | null
           status?: string
+          sub_process_number?: string | null
           sub_process_template_id?: string
           updated_at?: string
           workflow_run_id?: string | null
@@ -1605,6 +1629,85 @@ export type Database = {
             columns: ["workflow_run_id"]
             isOneToOne: false
             referencedRelation: "workflow_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      request_trace_numbers: {
+        Row: {
+          created_at: string | null
+          id: string
+          project_code: string
+          request_id: string | null
+          request_number: string | null
+          sub_process_instance_id: string | null
+          sub_process_number: string | null
+          task_id: string | null
+          task_number: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          project_code: string
+          request_id?: string | null
+          request_number?: string | null
+          sub_process_instance_id?: string | null
+          sub_process_number?: string | null
+          task_id?: string | null
+          task_number?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          project_code?: string
+          request_id?: string | null
+          request_number?: string | null
+          sub_process_instance_id?: string | null
+          sub_process_number?: string | null
+          task_id?: string | null
+          task_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "request_trace_numbers_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "request_trace_numbers_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "request_trace_numbers_sub_process_instance_id_fkey"
+            columns: ["sub_process_instance_id"]
+            isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["sub_process_run_id"]
+          },
+          {
+            foreignKeyName: "request_trace_numbers_sub_process_instance_id_fkey"
+            columns: ["sub_process_instance_id"]
+            isOneToOne: false
+            referencedRelation: "request_sub_processes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "request_trace_numbers_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "request_trace_numbers_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
         ]
@@ -2425,6 +2528,7 @@ export type Database = {
           rbe_validation_status: string | null
           rbe_validator_id: string | null
           reporter_id: string | null
+          request_number: string | null
           requester_id: string | null
           requester_validated_at: string | null
           requester_validation_comment: string | null
@@ -2435,6 +2539,7 @@ export type Database = {
           status: string
           subcategory_id: string | null
           target_department_id: string | null
+          task_number: string | null
           title: string
           type: string
           updated_at: string
@@ -2481,6 +2586,7 @@ export type Database = {
           rbe_validation_status?: string | null
           rbe_validator_id?: string | null
           reporter_id?: string | null
+          request_number?: string | null
           requester_id?: string | null
           requester_validated_at?: string | null
           requester_validation_comment?: string | null
@@ -2491,6 +2597,7 @@ export type Database = {
           status?: string
           subcategory_id?: string | null
           target_department_id?: string | null
+          task_number?: string | null
           title: string
           type?: string
           updated_at?: string
@@ -2537,6 +2644,7 @@ export type Database = {
           rbe_validation_status?: string | null
           rbe_validator_id?: string | null
           reporter_id?: string | null
+          request_number?: string | null
           requester_id?: string | null
           requester_validated_at?: string | null
           requester_validation_comment?: string | null
@@ -2547,6 +2655,7 @@ export type Database = {
           status?: string
           subcategory_id?: string | null
           target_department_id?: string | null
+          task_number?: string | null
           title?: string
           type?: string
           updated_at?: string
@@ -4256,12 +4365,20 @@ export type Database = {
         Args: { p_reset_mode?: string; p_variable_id: string }
         Returns: number
       }
+      get_project_code_for_entity: {
+        Args: { p_be_project_id?: string; p_parent_request_id?: string }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
         Returns: boolean
+      }
+      next_entity_number: {
+        Args: { p_entity_type: string; p_project_code: string }
+        Returns: string
       }
     }
     Enums: {

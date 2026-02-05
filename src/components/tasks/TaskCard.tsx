@@ -88,6 +88,18 @@ export function TaskCard({ task, onStatusChange, onDelete, compact = false, task
           {/* Header */}
           <div className="flex items-center gap-2 mb-2">
             <div className={cn("w-2 h-2 rounded-full", statusColors[task.status])} />
+            {/* Display task number if available */}
+            {task.task_number && (
+              <Badge variant="outline" className="text-[10px] font-mono bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600">
+                {task.task_number}
+              </Badge>
+            )}
+            {/* Display request number if this is a request without task_number */}
+            {!task.task_number && task.request_number && (
+              <Badge variant="outline" className="text-[10px] font-mono bg-blue-100 dark:bg-blue-900 border-blue-300 dark:border-blue-600">
+                {task.request_number}
+              </Badge>
+            )}
             {isAssignmentTask && (
               <Badge className="text-xs flex items-center gap-1 bg-amber-500 hover:bg-amber-600 text-white">
                 <UserPlus className="h-3 w-3" />

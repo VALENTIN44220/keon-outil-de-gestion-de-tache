@@ -265,7 +265,11 @@ const Requests = () => {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(r => 
         r.title.toLowerCase().includes(query) ||
-        r.description?.toLowerCase().includes(query)
+        r.description?.toLowerCase().includes(query) ||
+        // Search by request number (D-XXX-XXXXX format)
+        r.request_number?.toLowerCase().includes(query) ||
+        // Search by task number (T-XXX-XXXX format)
+        r.task_number?.toLowerCase().includes(query)
       );
     }
 

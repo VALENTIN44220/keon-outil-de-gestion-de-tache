@@ -20,6 +20,9 @@ export interface Task {
   requester_id: string | null;
   reporter_id: string | null;
   target_department_id: string | null;
+  // Numbering fields
+  request_number: string | null;
+  task_number: string | null;
   // Validation fields (legacy)
   validator_id: string | null;
   validation_requested_at: string | null;
