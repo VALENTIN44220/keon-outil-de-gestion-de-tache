@@ -16,6 +16,7 @@ import { format, parseISO, isWeekend, isToday, isSameDay, isSameMonth, isSameWee
  import { getStatusLabel, getStatusColor } from '@/services/taskStatusService';
  import { getPeriodUnits, getColumnWidth, getPeriodLabel, type ViewMode, type PeriodUnit } from '@/utils/planningDateUtils';
 import { WeekPlanningGrid } from './WeekPlanningGrid';
+import { MonthPlanningGrid } from './MonthPlanningGrid';
  
  // Collaborator color palette (deterministic)
  const USER_COLORS = [
@@ -360,6 +361,55 @@ import { WeekPlanningGrid } from './WeekPlanningGrid';
       </div>
     );
   }
+
+  // For month view, use the specialized MonthPlanningGrid component
+  if (viewMode === 'month') {
+    return (
+      <div className="flex flex-col h-full bg-card rounded-xl border shadow-premium overflow-hidden">
+        {/* Navigation header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b bg-gradient-to-r from-muted/40 to-muted/20">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" className="h-8 w-8 shadow-sm" onClick={() => onNavigate('prev')}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="sm" className="h-8 font-medium shadow-sm" onClick={onToday}>
+              Aujourd'hui
+            </Button>
+            <Button variant="outline" size="icon" className="h-8 w-8 shadow-sm" onClick={() => onNavigate('next')}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+          
+          <h3 className="font-semibold text-foreground capitalize flex items-center gap-2">
+            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+            {periodLabel}
+          </h3>
+          
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-xs">
+              {workloadData.length} collaborateur{workloadData.length > 1 ? 's' : ''}
+            </Badge>
+          </div>
+        </div>
+
+        <MonthPlanningGrid
+          workloadData={workloadData}
+          currentMonth={startDate}
+          tasks={tasks}
+          holidays={holidays}
+          leaves={leaves}
+          outlookEvents={outlookEvents}
+          showOutlookEvents={showOutlookEvents}
+          onTaskClick={onTaskClick}
+          onSlotDrop={onSlotDrop}
+          dropTarget={dropTarget}
+          onDragOver={onDragOver}
+          onDragLeave={onDragLeave}
+          isCompact={isCompact}
+        />
+      </div>
+    );
+  }
  
    return (
      <div className="flex flex-col h-full bg-card rounded-xl border shadow-premium overflow-hidden">
@@ -554,7 +604,7 @@ import { WeekPlanningGrid } from './WeekPlanningGrid';
                                    "text-[9px] font-medium px-1.5 py-0.5 rounded-full",
                                    "bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300"
                                  )}>
-                                  {viewMode === 'month' ? 'Congé' : '🏖️'}
+                                  🏖️
                                  </span>
                                </div>
                              )}
@@ -565,7 +615,7 @@ import { WeekPlanningGrid } from './WeekPlanningGrid';
                                  <TooltipTrigger asChild>
                                    <div className="absolute inset-x-1 top-1 bottom-1 flex items-center justify-center">
                                      <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">
-                                      {viewMode === 'month' ? 'Férié' : '🎉'}
+                                      🎉
                                      </span>
                                    </div>
                                  </TooltipTrigger>
@@ -686,7 +736,7 @@ import { WeekPlanningGrid } from './WeekPlanningGrid';
          </ScrollArea>
          
          {/* Today indicator line (for week/month views) */}
-        {viewMode === 'month' && periodUnits.some(u => u.isToday) && (
+        {periodUnits.some(u => u.isToday) && (
            <div 
              className="absolute top-0 bottom-0 w-0.5 bg-primary/60 z-30 pointer-events-none"
              style={{ 
