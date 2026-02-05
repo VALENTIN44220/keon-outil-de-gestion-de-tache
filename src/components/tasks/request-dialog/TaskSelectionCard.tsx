@@ -39,10 +39,8 @@ export function TaskSelectionCard({
       <div className="flex-shrink-0">
         <Checkbox
           checked={isSelected}
-          onCheckedChange={() => onToggle()}
-          onClick={(e) => e.stopPropagation()}
           className={cn(
-            'h-4 w-4 rounded transition-all',
+            'h-4 w-4 rounded transition-all pointer-events-none',
             isSelected && 'border-primary data-[state=checked]:bg-primary'
           )}
         />
