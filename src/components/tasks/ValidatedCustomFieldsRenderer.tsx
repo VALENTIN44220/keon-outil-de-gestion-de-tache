@@ -110,6 +110,9 @@ export const ValidatedCustomFieldsRenderer = memo(function ValidatedCustomFields
 
   // Ref for scroll-to-error
   const fieldContainerRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  
+  // Ref to track which table_lookup fields we've already initiated loading for
+  const tableLookupLoadingInitiated = useRef<Set<string>>(new Set());
 
   // Fetch users for user_search fields
   useEffect(() => {
@@ -144,6 +147,7 @@ export const ValidatedCustomFieldsRenderer = memo(function ValidatedCustomFields
   }, [fields, departments.length]);
 
   // Fetch table lookup data for table_lookup fields
+  // Uses a ref to track initiated loads, preventing infinite loops from state dependencies
   useEffect(() => {
     const tableLookupFields = fields.filter(
       (f) => f.field_type === 'table_lookup' && f.lookup_table
@@ -151,9 +155,12 @@ export const ValidatedCustomFieldsRenderer = memo(function ValidatedCustomFields
 
     tableLookupFields.forEach((field) => {
       const fieldKey = field.id;
-      // IMPORTANT: this effect must see the latest state values.
-      // Otherwise it can trigger an infinite setState loop (Maximum update depth exceeded).
-      if (tableLookupData[fieldKey] || loadingTableLookup[fieldKey]) return;
+      
+      // Use ref to check if we've already started loading this field
+      if (tableLookupLoadingInitiated.current.has(fieldKey)) return;
+      
+      // Mark as initiated BEFORE setting state to prevent re-entry
+      tableLookupLoadingInitiated.current.add(fieldKey);
 
       setLoadingTableLookup((prev) => ({ ...prev, [fieldKey]: true }));
 
@@ -178,7 +185,7 @@ export const ValidatedCustomFieldsRenderer = memo(function ValidatedCustomFields
           setLoadingTableLookup((prev) => ({ ...prev, [fieldKey]: false }));
         });
     });
-  }, [fields, tableLookupData, loadingTableLookup]);
+  }, [fields]); // Only depends on fields, not on state
 
   // Validate a field in real-time
   const handleValidation = useCallback(
