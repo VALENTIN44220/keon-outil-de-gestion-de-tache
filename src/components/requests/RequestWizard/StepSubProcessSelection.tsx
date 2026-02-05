@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -36,7 +36,7 @@ export function StepSubProcessSelection({
   const [subProcesses, setSubProcesses] = useState<SubProcessSelection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch sub-processes only when processId changes - NOT when selectedSubProcesses changes
+  // Fetch sub-processes only when processId changes
   useEffect(() => {
     const fetchSubProcesses = async () => {
       if (!processId) return;
@@ -73,23 +73,23 @@ export function StepSubProcessSelection({
 
           setSubProcesses(subProcessData);
 
-          // Auto-select mandatory ones ONCE on initial load
+          // Initial selection = mandatory ones
           const mandatoryIds = subProcessData
             .filter((sp) => sp.isMandatory)
             .map((sp) => sp.id);
 
-          if (mandatoryIds.length > 0) {
-            if (DEBUG_REACT_185) {
-              console.log('[react185] StepSubProcessSelection auto-select mandatory', {
-                processId,
-                mandatoryIds,
-              });
-            }
-            // Pass mandatory IDs as initial selection
+          if (DEBUG_REACT_185) {
+            console.log('[react185] StepSubProcessSelection init selection', {
+              processId,
+              mandatoryIds,
+            });
+          }
+
+          // Always provide available list, but avoid re-setting the same selection
+          if (!sameStringSet(mandatoryIds, selectedSubProcesses)) {
             onSelectionChange(mandatoryIds, subProcessData);
           } else {
-            // No mandatory, just pass empty selection with available data
-            onSelectionChange([], subProcessData);
+            onSelectionChange(selectedSubProcesses, subProcessData);
           }
         }
       } catch (error) {
@@ -103,15 +103,21 @@ export function StepSubProcessSelection({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [processId]);
 
-  const toggleSelection = (subProcessId: string, isMandatory?: boolean) => {
-    if (isMandatory) return; // Can't deselect mandatory
+  const toggleSelection = useCallback(
+    (subProcessId: string, isMandatory?: boolean) => {
+      if (isMandatory) return; // Can't deselect mandatory
 
-    const newSelection = selectedSubProcesses.includes(subProcessId)
-      ? selectedSubProcesses.filter((id) => id !== subProcessId)
-      : [...selectedSubProcesses, subProcessId];
+      const nextSelection = selectedSubProcesses.includes(subProcessId)
+        ? selectedSubProcesses.filter((id) => id !== subProcessId)
+        : [...selectedSubProcesses, subProcessId];
 
-    onSelectionChange(newSelection, subProcesses);
-  };
+      // Idempotence guard: if no real change, do nothing
+      if (sameStringSet(nextSelection, selectedSubProcesses)) return;
+
+      onSelectionChange(nextSelection, subProcesses);
+    },
+    [onSelectionChange, selectedSubProcesses, subProcesses]
+  );
 
   const getAssignmentLabel = (type?: string) => {
     switch (type) {
@@ -187,6 +193,7 @@ export function StepSubProcessSelection({
                         checked={isSelected}
                         disabled={sp.isMandatory}
                         className="mt-1"
+                        onClick={(e) => e.stopPropagation()}
                         onCheckedChange={() => toggleSelection(sp.id, sp.isMandatory)}
                       />
                       <div className="flex-1 min-w-0">
