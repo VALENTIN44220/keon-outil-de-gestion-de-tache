@@ -56,14 +56,14 @@
  };
  
  export function BacklogSidebar({
-   tasks,
-   plannedTaskIds,
+  tasks = [],
+  plannedTaskIds = [],
    onTaskDragStart,
    getTaskDuration,
    getTaskProgress,
    isCollapsed,
    onToggleCollapse,
-   selectedTasks,
+  selectedTasks = new Set<string>(),
    onTaskSelect,
    onSelectAll,
    onClearSelection,
@@ -73,10 +73,10 @@
    const [filterBy, setFilterBy] = useState<FilterOption>('all');
  
    const availableTasks = useMemo(() => {
-     return tasks.filter(t => 
+    return (tasks || []).filter(t => 
        t.status !== 'done' && 
        t.status !== 'validated' && 
-       !plannedTaskIds.includes(t.id)
+      !(plannedTaskIds || []).includes(t.id)
      );
    }, [tasks, plannedTaskIds]);
  

@@ -50,12 +50,12 @@
  }
  
  export function PlanningCalendarView({
-   workloadData,
+  workloadData = [],
    startDate,
    endDate,
-   tasks,
-   holidays,
-   leaves,
+  tasks = [],
+  holidays = [],
+  leaves = [],
    outlookEvents = [],
    viewMode,
    onNavigate,
@@ -91,8 +91,8 @@
      if (!checkSlotLeaveConflict) return 0;
      
      let count = 0;
-     workloadData.forEach(member => {
-       member.days.forEach(day => {
+    (workloadData || []).forEach(member => {
+      (member.days || []).forEach(day => {
          if (day.morning.slot) {
            const result = checkSlotLeaveConflict(member.memberId, day.date, 'morning');
            if (result.hasConflict) count++;
@@ -168,10 +168,10 @@
    }, []);
  
    const handleSelectAll = useCallback(() => {
-     const availableTasks = tasks.filter(t => 
+    const availableTasks = (tasks || []).filter(t => 
        t.status !== 'done' && 
        t.status !== 'validated' && 
-       !plannedTaskIds.includes(t.id)
+      !(plannedTaskIds || []).includes(t.id)
      );
      setSelectedTasks(new Set(availableTasks.map(t => t.id)));
    }, [tasks, plannedTaskIds]);

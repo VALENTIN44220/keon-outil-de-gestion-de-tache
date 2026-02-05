@@ -13,18 +13,22 @@
  
  export function PlanningKPIs({ workloadData, tasks, plannedTaskIds, conflictCount = 0 }: PlanningKPIsProps) {
    const metrics = useMemo(() => {
-     const plannedCount = plannedTaskIds.length;
-     const pendingCount = tasks.filter(t => 
+    const safeWorkloadData = workloadData || [];
+    const safeTasks = tasks || [];
+    const safePlannedTaskIds = plannedTaskIds || [];
+    
+    const plannedCount = safePlannedTaskIds.length;
+    const pendingCount = safeTasks.filter(t => 
        t.status !== 'done' && 
        t.status !== 'validated' && 
-       !plannedTaskIds.includes(t.id)
+      !safePlannedTaskIds.includes(t.id)
      ).length;
      
      let totalAvailable = 0;
      let totalUsed = 0;
      let overloadedMembers = 0;
      
-     workloadData.forEach(member => {
+    safeWorkloadData.forEach(member => {
        const available = member.totalSlots - member.leaveSlots - member.holidaySlots;
        totalAvailable += available;
        totalUsed += member.usedSlots;
