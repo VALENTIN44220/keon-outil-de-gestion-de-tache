@@ -102,16 +102,37 @@
          };
  
          const subordinateIds = await findSubordinates(profile.id);
-         const allIds = [profile.id, ...subordinateIds];
- 
-         const { data: members } = await supabase
-           .from('profiles')
-           .select('id, display_name, avatar_url, job_title, department')
-           .in('id', allIds)
-          .eq('status', 'active')
-           .order('display_name');
- 
-         setTeamMembers(members || []);
+
+          // If user has no subordinates, fallback to a broader, still relevant scope
+          // to avoid an empty list (e.g., non-managers reassigning their own tasks).
+          const departmentId = (profile as any)?.department_id as string | null | undefined;
+          const companyId = (profile as any)?.company_id as string | null | undefined;
+
+          if (subordinateIds.length === 0) {
+            let query = supabase
+              .from('profiles')
+              .select('id, display_name, avatar_url, job_title, department')
+              .eq('status', 'active');
+
+            if (departmentId) {
+              query = query.eq('department_id', departmentId);
+            } else if (companyId) {
+              query = query.eq('company_id', companyId);
+            }
+
+            const { data: members } = await query.order('display_name');
+            setTeamMembers(members || []);
+          } else {
+            const allIds = [profile.id, ...subordinateIds];
+            const { data: members } = await supabase
+              .from('profiles')
+              .select('id, display_name, avatar_url, job_title, department')
+              .in('id', allIds)
+              .eq('status', 'active')
+              .order('display_name');
+
+            setTeamMembers(members || []);
+          }
        } catch (error) {
          console.error('Error fetching team members:', error);
        } finally {
