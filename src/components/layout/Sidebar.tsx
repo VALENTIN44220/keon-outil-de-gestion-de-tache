@@ -48,7 +48,7 @@ const allMenuItems = [{
   label: 'Calendrier',
   icon: Calendar,
   path: '/calendar',
-  permissionKey: 'can_access_workload' as ScreenPermissionKey
+  permissionKey: 'can_access_calendar' as ScreenPermissionKey
 }, {
   id: 'projects',
   label: 'Projets',

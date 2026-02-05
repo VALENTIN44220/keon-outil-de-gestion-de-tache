@@ -13,14 +13,12 @@ import type { PermissionProfile } from '@/types/admin';
 
 const defaultPermissions: EffectivePermissions = {
   can_access_dashboard: true,
-  can_access_tasks: true,
   can_access_requests: true,
   can_access_templates: true,
   can_access_workload: true,
-  can_access_analytics: true,
-  can_access_team: true,
-  can_access_settings: true,
+  can_access_calendar: true,
   can_access_projects: true,
+  can_access_team: true,
   can_manage_users: false,
   can_manage_templates: false,
   can_view_own_tasks: true,
@@ -120,9 +118,9 @@ export function useEffectivePermissions() {
     // Apply permission profile defaults
     if (permissionProfile) {
       const screenKeys: ScreenPermissionKey[] = [
-        'can_access_dashboard', 'can_access_tasks', 'can_access_requests',
-        'can_access_templates', 'can_access_workload', 'can_access_analytics',
-        'can_access_team', 'can_access_settings', 'can_access_projects'
+        'can_access_dashboard', 'can_access_requests', 'can_access_templates',
+        'can_access_workload', 'can_access_calendar', 'can_access_projects',
+        'can_access_team'
       ];
 
       const featureKeys: FeaturePermissionKey[] = [
@@ -153,9 +151,9 @@ export function useEffectivePermissions() {
     // Apply user-specific overrides (null = use profile default)
     if (userOverrides) {
       const allKeys: AllPermissionKeys[] = [
-        'can_access_dashboard', 'can_access_tasks', 'can_access_requests',
-        'can_access_templates', 'can_access_workload', 'can_access_analytics',
-        'can_access_team', 'can_access_settings', 'can_access_projects',
+        'can_access_dashboard', 'can_access_requests', 'can_access_templates',
+        'can_access_workload', 'can_access_calendar', 'can_access_projects',
+        'can_access_team',
         'can_manage_users', 'can_manage_templates', 'can_view_own_tasks',
         'can_manage_own_tasks', 'can_view_subordinates_tasks', 'can_manage_subordinates_tasks',
         'can_assign_to_subordinates', 'can_view_all_tasks', 'can_manage_all_tasks',
