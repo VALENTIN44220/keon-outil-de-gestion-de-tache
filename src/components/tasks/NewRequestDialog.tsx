@@ -343,10 +343,10 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
     const deptId =
       matchingRule && matchingRule.auto_assign ? matchingRule.target_department_id : null;
 
-    if (deptId && deptId !== targetDepartmentId) {
-      setTargetDepartmentId(deptId);
+    if (deptId) {
+      setTargetDepartmentId(prev => prev !== deptId ? deptId : prev);
     }
-  }, [matchingRule?.id, matchingRule?.auto_assign, matchingRule?.target_department_id, targetDepartmentId]);
+  }, [matchingRule?.id, matchingRule?.auto_assign, matchingRule?.target_department_id]);
 
   const fetchDepartments = async () => {
     const { data } = await supabase
