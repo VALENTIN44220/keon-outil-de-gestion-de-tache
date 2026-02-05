@@ -106,12 +106,15 @@ export function SectionedCustomFieldsRenderer({
     return result;
   }, [fields, sections]);
 
-  // Always ensure first section is selected when sections change
+  // Ensure first section is selected when sections change or current tab becomes invalid
   useEffect(() => {
-    if (fieldSections.length > 0 && !activeTab) {
+    if (fieldSections.length === 0) return;
+
+    const ids = new Set(fieldSections.map(s => s.id));
+    if (!activeTab || !ids.has(activeTab)) {
       setActiveTab(fieldSections[0].id);
     }
-  }, [fieldSections]);
+  }, [fieldSections, activeTab]);
 
   if (fields.length === 0) {
     return (
