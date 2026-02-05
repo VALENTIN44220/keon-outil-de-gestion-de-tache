@@ -1057,6 +1057,7 @@ export type Database = {
       permission_profiles: {
         Row: {
           can_access_analytics: boolean
+          can_access_calendar: boolean
           can_access_dashboard: boolean
           can_access_projects: boolean
           can_access_requests: boolean
@@ -1087,6 +1088,7 @@ export type Database = {
         }
         Insert: {
           can_access_analytics?: boolean
+          can_access_calendar?: boolean
           can_access_dashboard?: boolean
           can_access_projects?: boolean
           can_access_requests?: boolean
@@ -1117,6 +1119,7 @@ export type Database = {
         }
         Update: {
           can_access_analytics?: boolean
+          can_access_calendar?: boolean
           can_access_dashboard?: boolean
           can_access_projects?: boolean
           can_access_requests?: boolean
@@ -3055,6 +3058,7 @@ export type Database = {
       user_permission_overrides: {
         Row: {
           can_access_analytics: boolean | null
+          can_access_calendar: boolean | null
           can_access_dashboard: boolean | null
           can_access_projects: boolean | null
           can_access_requests: boolean | null
@@ -3084,6 +3088,7 @@ export type Database = {
         }
         Insert: {
           can_access_analytics?: boolean | null
+          can_access_calendar?: boolean | null
           can_access_dashboard?: boolean | null
           can_access_projects?: boolean | null
           can_access_requests?: boolean | null
@@ -3113,6 +3118,7 @@ export type Database = {
         }
         Update: {
           can_access_analytics?: boolean | null
+          can_access_calendar?: boolean | null
           can_access_dashboard?: boolean | null
           can_access_projects?: boolean | null
           can_access_requests?: boolean | null
