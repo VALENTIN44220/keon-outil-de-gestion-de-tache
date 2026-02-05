@@ -481,6 +481,256 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_attachments: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          file_name: string
+          id: string
+          message_id: string
+          mime_type: string
+          size_bytes: number
+          storage_bucket: string
+          storage_path: string
+          uploader_id: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          file_name: string
+          id?: string
+          message_id: string
+          mime_type: string
+          size_bytes: number
+          storage_bucket?: string
+          storage_path: string
+          uploader_id: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          file_name?: string
+          id?: string
+          message_id?: string
+          mime_type?: string
+          size_bytes?: number
+          storage_bucket?: string
+          storage_path?: string
+          uploader_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_attachments_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "chat_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_attachments_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "chat_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_attachments_uploader_id_fkey"
+            columns: ["uploader_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_conversations: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          created_by: string
+          id: string
+          last_message_at: string | null
+          last_message_preview: string | null
+          scope_id: string | null
+          scope_type: string
+          title: string | null
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          created_by: string
+          id?: string
+          last_message_at?: string | null
+          last_message_preview?: string | null
+          scope_id?: string | null
+          scope_type?: string
+          title?: string | null
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          created_by?: string
+          id?: string
+          last_message_at?: string | null
+          last_message_preview?: string | null
+          scope_id?: string | null
+          scope_type?: string
+          title?: string | null
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_conversations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_members: {
+        Row: {
+          conversation_id: string
+          id: string
+          joined_at: string
+          last_read_at: string
+          muted: boolean
+          role: string
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          id?: string
+          joined_at?: string
+          last_read_at?: string
+          muted?: boolean
+          role?: string
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          id?: string
+          joined_at?: string
+          last_read_at?: string
+          muted?: boolean
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_members_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "chat_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_messages: {
+        Row: {
+          content: string | null
+          conversation_id: string
+          created_at: string
+          deleted_at: string | null
+          edited_at: string | null
+          id: string
+          message_type: string
+          reply_to_message_id: string | null
+          sender_id: string
+        }
+        Insert: {
+          content?: string | null
+          conversation_id: string
+          created_at?: string
+          deleted_at?: string | null
+          edited_at?: string | null
+          id?: string
+          message_type?: string
+          reply_to_message_id?: string | null
+          sender_id: string
+        }
+        Update: {
+          content?: string | null
+          conversation_id?: string
+          created_at?: string
+          deleted_at?: string | null
+          edited_at?: string | null
+          id?: string
+          message_type?: string
+          reply_to_message_id?: string | null
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "chat_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_messages_reply_to_message_id_fkey"
+            columns: ["reply_to_message_id"]
+            isOneToOne: false
+            referencedRelation: "chat_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_read_receipts: {
+        Row: {
+          id: string
+          message_id: string
+          read_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          message_id: string
+          read_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          message_id?: string
+          read_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_read_receipts_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "chat_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_read_receipts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       collaborator_group_members: {
         Row: {
           created_at: string
@@ -4357,6 +4607,10 @@ export type Database = {
             Returns: boolean
           }
       cancel_request: { Args: { p_request_id: string }; Returns: undefined }
+      create_group_conversation: {
+        Args: { _created_by: string; _member_ids: string[]; _title: string }
+        Returns: string
+      }
       current_company_id: { Args: never; Returns: string }
       current_department_id: { Args: never; Returns: string }
       current_profile_id: { Args: never; Returns: string }
@@ -4368,6 +4622,10 @@ export type Database = {
           p_payload?: Json
           p_run_id?: string
         }
+        Returns: string
+      }
+      find_or_create_dm: {
+        Args: { _user_a: string; _user_b: string }
         Returns: string
       }
       generate_default_form_schema: {
@@ -4411,11 +4669,24 @@ export type Database = {
         Args: { p_be_project_id?: string; p_parent_request_id?: string }
         Returns: string
       }
+      get_total_unread_count: { Args: { _user_id: string }; Returns: number }
+      get_unread_count: {
+        Args: { _conversation_id: string; _user_id: string }
+        Returns: number
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      is_chat_admin: {
+        Args: { _conversation_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_chat_member: {
+        Args: { _conversation_id: string; _user_id: string }
         Returns: boolean
       }
       next_entity_number: {
