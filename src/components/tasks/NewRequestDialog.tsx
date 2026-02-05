@@ -976,8 +976,8 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                       <TasksEmptyState />
                     ) : (
                       <>
-                        <ScrollArea className="max-h-[320px] pr-4">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="max-h-[280px] overflow-y-auto pr-2 border rounded-xl bg-muted/20 p-3">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                             {availableSubProcesses.map((subProcess) => {
                               const isSelected = selectedSubProcessIds.includes(subProcess.id);
                               const hasCustomFields = subProcessCustomFields[subProcess.id]?.length > 0;
@@ -995,7 +995,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                               );
                             })}
                           </div>
-                        </ScrollArea>
+                        </div>
 
                         {selectedSubProcessIds.length > 0 && (
                           <div className="pt-5 border-t-2 border-dashed border-primary/20">
