@@ -147,7 +147,10 @@ export function StepCustomFields({ data, onDataChange }: StepCustomFieldsProps) 
 
   // Set initial active tab
   useEffect(() => {
-    if (fieldSections.length > 0 && !activeTab) {
+    if (fieldSections.length === 0) return;
+
+    const ids = new Set(fieldSections.map(s => s.id));
+    if (!activeTab || !ids.has(activeTab)) {
       setActiveTab(fieldSections[0].id);
     }
   }, [fieldSections, activeTab]);
