@@ -1,6 +1,5 @@
 import { Building2, X, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { DialogTitle } from '@/components/ui/dialog';
 
 interface RequestDialogHeaderProps {
   processName?: string | null;
@@ -22,11 +21,6 @@ export function RequestDialogHeader({ processName, onClose }: RequestDialogHeade
       </div>
       
       <div className="relative flex items-center justify-between px-6 py-5">
-        {/* Accessibility: Hidden DialogTitle for screen readers */}
-        <DialogTitle className="sr-only">
-          {processName ? processName : 'Nouvelle demande'}
-        </DialogTitle>
-        
         <div className="flex items-center gap-4">
           <div className="relative">
             <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary/80 text-white shadow-lg shadow-primary/25">
