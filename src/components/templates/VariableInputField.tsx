@@ -1,4 +1,5 @@
 import { useState, useRef, useMemo } from 'react';
+import { useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -6,8 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Variable, ChevronDown, Globe, Layers, GitBranch } from 'lucide-react';
+import { Variable, ChevronDown, Globe, Layers, GitBranch, Database } from 'lucide-react';
 import type { TemplateCustomField } from '@/types/customField';
+import { supabase } from '@/integrations/supabase/client';
 
 const SYSTEM_TOKENS = [
   { key: '{processus}', label: 'Nom du processus', description: 'Nom du processus en cours' },
@@ -18,7 +20,17 @@ const SYSTEM_TOKENS = [
   { key: '{echeance}', label: 'Échéance', description: 'Date d\'échéance' },
   { key: '{priorite}', label: 'Priorité', description: 'Niveau de priorité' },
   { key: '{projet}', label: 'Projet', description: 'Nom du projet associé' },
+  { key: '{code_site}', label: 'Code Site', description: 'Code du projet BE (code_projet)' },
 ];
+
+interface TableLookupConfig {
+  id: string;
+  table_name: string;
+  display_column: string;
+  label: string;
+  description: string | null;
+  is_active: boolean;
+}
 
 interface VariableInputFieldProps {
   id: string;
@@ -47,14 +59,37 @@ export function VariableInputField({
 }: VariableInputFieldProps) {
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const [tableLookupConfigs, setTableLookupConfigs] = useState<TableLookupConfig[]>([]);
+
+  // Fetch table lookup configs
+  useEffect(() => {
+    async function fetchConfigs() {
+      const { data } = await supabase
+        .from('admin_table_lookup_configs')
+        .select('id, table_name, display_column, label, description, is_active')
+        .eq('is_active', true)
+        .order('order_index');
+      if (data) {
+        setTableLookupConfigs(data);
+      }
+    }
+    fetchConfigs();
+  }, []);
 
   // Group custom fields by scope
   const groupedFields = useMemo(() => {
     const common: TemplateCustomField[] = [];
     const process: TemplateCustomField[] = [];
     const subProcess: TemplateCustomField[] = [];
+    const tableLookup: TemplateCustomField[] = [];
 
     customFields.forEach(field => {
+      // Separate table_lookup fields into their own category
+      if (field.field_type === 'table_lookup') {
+        tableLookup.push(field);
+        return;
+      }
+      
       if (field.is_common) {
         common.push(field);
       } else if (field.sub_process_template_id) {
@@ -64,7 +99,7 @@ export function VariableInputField({
       }
     });
 
-    return { common, process, subProcess };
+    return { common, process, subProcess, tableLookup };
   }, [customFields]);
 
   const handleInsertToken = (token: string) => {
@@ -234,6 +269,66 @@ export function VariableInputField({
                           <div className="flex flex-col items-start">
                             <span className="text-xs font-mono text-violet-600 dark:text-violet-400">{`{${field.name}}`}</span>
                             <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">{field.label}</span>
+                          </div>
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Table lookup custom fields */}
+                {groupedFields.tableLookup.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <Database className="h-3.5 w-3.5 text-amber-600" />
+                      <Label className="text-xs font-medium">Champs listes (depuis table)</Label>
+                      <Badge variant="outline" className="text-[9px] px-1.5 h-4 border-amber-300 text-amber-600">
+                        Table
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1">
+                      {groupedFields.tableLookup.map((field) => (
+                        <Button
+                          key={field.id}
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-auto py-1.5 px-2 justify-start text-left hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                          onClick={() => handleInsertToken(`{champ:${field.name}}`)}
+                        >
+                          <div className="flex flex-col items-start">
+                            <span className="text-xs font-mono text-amber-600 dark:text-amber-400">{`{${field.name}}`}</span>
+                            <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">{field.label}</span>
+                          </div>
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Reference lookup tables (from admin config) */}
+                {tableLookupConfigs.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <Database className="h-3.5 w-3.5 text-teal-600" />
+                      <Label className="text-xs font-medium">Tables de référence</Label>
+                      <Badge variant="outline" className="text-[9px] px-1.5 h-4 border-teal-300 text-teal-600">
+                        Référence
+                      </Badge>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1">
+                      {tableLookupConfigs.map((config) => (
+                        <Button
+                          key={config.id}
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-auto py-1.5 px-2 justify-start text-left hover:bg-teal-50 dark:hover:bg-teal-900/20"
+                          onClick={() => handleInsertToken(`{table:${config.table_name}.${config.display_column}}`)}
+                        >
+                          <div className="flex flex-col items-start">
+                            <span className="text-xs font-mono text-teal-600 dark:text-teal-400">{`{${config.table_name}}`}</span>
+                            <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">{config.label}</span>
                           </div>
                         </Button>
                       ))}
