@@ -365,12 +365,16 @@ import { format, parseISO, isWeekend, isToday, eachDayOfInterval, isSameDay, get
                          )}>
                            {format(day, viewMode === 'year' ? 'd' : 'EEE', { locale: fr })}
                          </span>
-                         <span className={cn(
-                           "text-muted-foreground",
-                           isTodayDay && "text-primary font-semibold"
-                         )}>
-                           {format(day, viewMode === 'year' ? '' : 'd MMM', { locale: fr })}
-                         </span>
+                          {viewMode !== 'year' && (
+                            <span
+                              className={cn(
+                                "text-muted-foreground",
+                                isTodayDay && "text-primary font-semibold"
+                              )}
+                            >
+                              {format(day, 'd MMM', { locale: fr })}
+                            </span>
+                          )}
                        </div>
                      );
                    })}
