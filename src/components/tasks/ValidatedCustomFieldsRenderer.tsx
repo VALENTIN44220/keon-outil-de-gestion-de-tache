@@ -151,6 +151,8 @@ export const ValidatedCustomFieldsRenderer = memo(function ValidatedCustomFields
 
     tableLookupFields.forEach((field) => {
       const fieldKey = field.id;
+      // IMPORTANT: this effect must see the latest state values.
+      // Otherwise it can trigger an infinite setState loop (Maximum update depth exceeded).
       if (tableLookupData[fieldKey] || loadingTableLookup[fieldKey]) return;
 
       setLoadingTableLookup((prev) => ({ ...prev, [fieldKey]: true }));
@@ -176,7 +178,7 @@ export const ValidatedCustomFieldsRenderer = memo(function ValidatedCustomFields
           setLoadingTableLookup((prev) => ({ ...prev, [fieldKey]: false }));
         });
     });
-  }, [fields]);
+  }, [fields, tableLookupData, loadingTableLookup]);
 
   // Validate a field in real-time
   const handleValidation = useCallback(

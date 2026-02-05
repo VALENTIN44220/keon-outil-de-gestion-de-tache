@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Task, TaskStatus, TaskPriority, AssignmentRule } from '@/types/task';
 import { cn } from '@/lib/utils';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -676,6 +676,8 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
         className="sm:max-w-[920px] max-h-[92vh] p-0 flex flex-col overflow-hidden rounded-3xl border-2 border-primary/10 shadow-2xl shadow-primary/5 bg-gradient-to-b from-white to-muted/20"
         hideCloseButton
       >
+        {/* A11y: Radix Dialog requires a DialogTitle; keep it hidden visually */}
+        <DialogTitle className="sr-only">{linkedProcessName ? linkedProcessName : 'Nouvelle demande'}</DialogTitle>
         {/* Custom Header */}
         <RequestDialogHeader 
           processName={linkedProcessName} 
