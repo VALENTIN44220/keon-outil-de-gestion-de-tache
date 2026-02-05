@@ -2,3 +2,4 @@
  export { BacklogSidebar } from './BacklogSidebar';
  export { PlanningCalendarGrid } from './PlanningCalendarGrid';
  export { PlanningCalendarView } from './PlanningCalendarView';
+export { WeekPlanningGrid } from './WeekPlanningGrid';
