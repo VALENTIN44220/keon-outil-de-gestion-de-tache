@@ -17,6 +17,7 @@ import { format, parseISO, isWeekend, isToday, isSameDay, isSameMonth, isSameWee
  import { getPeriodUnits, getColumnWidth, getPeriodLabel, type ViewMode, type PeriodUnit } from '@/utils/planningDateUtils';
 import { WeekPlanningGrid } from './WeekPlanningGrid';
 import { MonthPlanningGrid } from './MonthPlanningGrid';
+import { QuarterPlanningGrid } from './QuarterPlanningGrid';
  
  // Collaborator color palette (deterministic)
  const USER_COLORS = [
@@ -400,6 +401,54 @@ import { MonthPlanningGrid } from './MonthPlanningGrid';
           leaves={leaves}
           outlookEvents={outlookEvents}
           showOutlookEvents={showOutlookEvents}
+          onTaskClick={onTaskClick}
+          onSlotDrop={onSlotDrop}
+          dropTarget={dropTarget}
+          onDragOver={onDragOver}
+          onDragLeave={onDragLeave}
+          isCompact={isCompact}
+        />
+      </div>
+    );
+  }
+
+  // For quarter view, use the specialized QuarterPlanningGrid component
+  if (viewMode === 'quarter') {
+    return (
+      <div className="flex flex-col h-full bg-card rounded-xl border shadow-premium overflow-hidden">
+        {/* Navigation header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b bg-gradient-to-r from-muted/40 to-muted/20">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" className="h-8 w-8 shadow-sm" onClick={() => onNavigate('prev')}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="sm" className="h-8 font-medium shadow-sm" onClick={onToday}>
+              Aujourd'hui
+            </Button>
+            <Button variant="outline" size="icon" className="h-8 w-8 shadow-sm" onClick={() => onNavigate('next')}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+          
+          <h3 className="font-semibold text-foreground capitalize flex items-center gap-2">
+            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+            {periodLabel}
+          </h3>
+          
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-xs">
+              {workloadData.length} collaborateur{workloadData.length > 1 ? 's' : ''}
+            </Badge>
+          </div>
+        </div>
+
+        <QuarterPlanningGrid
+          workloadData={workloadData}
+          startDate={startDate}
+          endDate={endDate}
+          tasks={tasks}
+          holidays={holidays}
+          leaves={leaves}
           onTaskClick={onTaskClick}
           onSlotDrop={onSlotDrop}
           dropTarget={dropTarget}
