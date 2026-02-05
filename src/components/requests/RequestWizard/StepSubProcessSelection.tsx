@@ -36,6 +36,7 @@ export function StepSubProcessSelection({
   const [subProcesses, setSubProcesses] = useState<SubProcessSelection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Fetch sub-processes only when processId changes - NOT when selectedSubProcesses changes
   useEffect(() => {
     const fetchSubProcesses = async () => {
       if (!processId) return;
@@ -63,7 +64,7 @@ export function StepSubProcessSelection({
             id: sp.id,
             name: sp.name,
             description: sp.description,
-            isSelected: sp.is_mandatory || selectedSubProcesses.includes(sp.id),
+            isSelected: sp.is_mandatory,
             isMandatory: sp.is_mandatory,
             assignment_type: sp.assignment_type,
             target_manager_id: sp.target_manager_id,
@@ -72,24 +73,23 @@ export function StepSubProcessSelection({
 
           setSubProcesses(subProcessData);
 
-          // Auto-select mandatory ones (idempotent)
+          // Auto-select mandatory ones ONCE on initial load
           const mandatoryIds = subProcessData
             .filter((sp) => sp.isMandatory)
             .map((sp) => sp.id);
 
-          const nextSelection = Array.from(
-            new Set([...selectedSubProcesses, ...mandatoryIds])
-          );
-
-          if (!sameStringSet(nextSelection, selectedSubProcesses)) {
+          if (mandatoryIds.length > 0) {
             if (DEBUG_REACT_185) {
               console.log('[react185] StepSubProcessSelection auto-select mandatory', {
                 processId,
-                prev: selectedSubProcesses,
-                next: nextSelection,
+                mandatoryIds,
               });
             }
-            onSelectionChange(nextSelection, subProcessData);
+            // Pass mandatory IDs as initial selection
+            onSelectionChange(mandatoryIds, subProcessData);
+          } else {
+            // No mandatory, just pass empty selection with available data
+            onSelectionChange([], subProcessData);
           }
         }
       } catch (error) {
@@ -100,7 +100,8 @@ export function StepSubProcessSelection({
     };
 
     fetchSubProcesses();
-  }, [processId, selectedSubProcesses, onSelectionChange]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [processId]);
 
   const toggleSelection = (subProcessId: string, isMandatory?: boolean) => {
     if (isMandatory) return; // Can't deselect mandatory
