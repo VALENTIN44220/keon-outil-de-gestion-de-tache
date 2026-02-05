@@ -128,7 +128,11 @@ export function useTasks(externalScope?: TaskScope) {
       const matchesPriority = priorityFilter === 'all' || task.priority === priorityFilter;
       const matchesSearch = 
         task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (task.description?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
+        (task.description?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
+        // Search by request number (D-XXX-XXXXX format)
+        (task.request_number?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
+        // Search by task number (T-XXX-XXXX format)  
+        (task.task_number?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
       
       return matchesStatus && matchesPriority && matchesSearch;
     });

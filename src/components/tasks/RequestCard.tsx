@@ -361,6 +361,12 @@ export function RequestCard({ request, onClick, progressData, onRequestUpdated }
               )}>
                 {getStatusIcon(request.status)}
               </div>
+              {/* Display request number if available */}
+              {request.request_number && (
+                <Badge variant="outline" className="text-[10px] font-mono bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600">
+                  {request.request_number}
+                </Badge>
+              )}
               <h4 className="font-semibold text-sm truncate group-hover:text-primary transition-colors">
                 {request.title}
               </h4>

@@ -12,7 +12,8 @@ import {
   Clock,
   AlertCircle,
   Layers,
-  History
+  History,
+  Hash
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -58,6 +59,17 @@ export function SynthesisTab({
   return (
     <ScrollArea className="h-[400px] pr-4">
       <div className="space-y-6">
+        {/* Request Number - Prominent display */}
+        {task.request_number && (
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+            <Hash className="h-5 w-5 text-primary" />
+            <div>
+              <div className="text-xs text-muted-foreground">Numéro de demande</div>
+              <div className="font-mono font-semibold text-lg">{task.request_number}</div>
+            </div>
+          </div>
+        )}
+
         {/* Description */}
         {task.description && (
           <div>

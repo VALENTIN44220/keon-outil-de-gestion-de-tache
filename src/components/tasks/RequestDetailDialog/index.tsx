@@ -625,6 +625,12 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange }: Req
         <DialogHeader className="shrink-0">
           <div className="flex items-center gap-2">
             {task.type === 'request' && <Building2 className="h-5 w-5 text-primary" />}
+            {/* Display request number prominently */}
+            {task.request_number && (
+              <Badge variant="outline" className="text-xs font-mono bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600 px-2">
+                {task.request_number}
+              </Badge>
+            )}
             <Badge variant={priorityConfig[task.priority].variant}>
               <Flag className="h-3 w-3 mr-1" />
               {priorityConfig[task.priority].label}
