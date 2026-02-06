@@ -683,16 +683,22 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
   const showSubProcessTab = hasMultipleSubProcesses && availableSubProcesses.length > 0;
   const showCustomFieldsTab = customFieldsCount > 0;
 
-  const isFormDisabled = !title.trim() || !targetDepartmentId || !dueDate || isSubmitting ||
+  const isFormDisabled =
+    !title.trim() ||
+    !targetDepartmentId ||
+    !dueDate ||
+    isSubmitting ||
     (hasMultipleSubProcesses && selectedSubProcessIds.length === 0);
 
+  const handleDialogOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (!nextOpen) onClose();
+    },
+    [onClose]
+  );
+
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen) onClose();
-      }}
-    >
+    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
       <DialogContent 
         className="sm:max-w-[920px] max-h-[92vh] p-0 flex flex-col overflow-hidden rounded-3xl border-2 border-primary/10 shadow-2xl shadow-primary/5 bg-gradient-to-b from-white to-muted/20"
         hideCloseButton

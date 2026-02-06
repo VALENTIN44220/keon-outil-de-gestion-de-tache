@@ -334,8 +334,15 @@ export function RequestWizardDialog({
     }
   };
 
+  const handleDialogOpenChange = useCallback(
+    (isOpen: boolean) => {
+      if (!isOpen) onClose();
+    },
+    [onClose]
+  );
+
   return (
-    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col">
         <DialogHeader className="pb-2">
           <DialogTitle className="flex items-center gap-2">
