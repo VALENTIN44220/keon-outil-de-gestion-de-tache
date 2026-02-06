@@ -1,12 +1,16 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { AlertCircle, GitBranch, User, Users } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { cn } from '@/lib/utils';
-import { SubProcessSelection } from './types';
+import { useState, useEffect, useCallback } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+// IMPORTANT: we intentionally use a native checkbox here.
+// In Lovable preview builds, Radix Checkbox has been observed to trigger
+// "Maximum update depth exceeded" (ref/setState cascade) when used in a
+// dynamic list that re-renders frequently.
+// A native <input type="checkbox"/> avoids that entire class of issues.
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { AlertCircle, GitBranch, User, Users } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
+import { SubProcessSelection } from "./types";
 
 interface StepSubProcessSelectionProps {
   processId: string | null;
@@ -16,9 +20,7 @@ interface StepSubProcessSelectionProps {
 }
 
 const DEBUG_REACT_185 =
-  import.meta.env.DEV &&
-  typeof window !== 'undefined' &&
-  window.localStorage?.getItem('debug-react185') === '1';
+  import.meta.env.DEV && typeof window !== "undefined" && window.localStorage?.getItem("debug-react185") === "1";
 
 const sameStringSet = (a: string[], b: string[]) => {
   if (a.length !== b.length) return false;
@@ -44,7 +46,7 @@ export function StepSubProcessSelection({
       setIsLoading(true);
       try {
         const { data } = await supabase
-          .from('sub_process_templates')
+          .from("sub_process_templates")
           .select(
             `
             id,
@@ -54,10 +56,10 @@ export function StepSubProcessSelection({
             target_manager_id,
             target_department_id,
             is_mandatory
-          `
+          `,
           )
-          .eq('process_template_id', processId)
-          .order('order_index');
+          .eq("process_template_id", processId)
+          .order("order_index");
 
         if (data) {
           const subProcessData: SubProcessSelection[] = data.map((sp: any) => ({
@@ -74,12 +76,10 @@ export function StepSubProcessSelection({
           setSubProcesses(subProcessData);
 
           // Initial selection = mandatory ones
-          const mandatoryIds = subProcessData
-            .filter((sp) => sp.isMandatory)
-            .map((sp) => sp.id);
+          const mandatoryIds = subProcessData.filter((sp) => sp.isMandatory).map((sp) => sp.id);
 
           if (DEBUG_REACT_185) {
-            console.log('[react185] StepSubProcessSelection init selection', {
+            console.log("[react185] StepSubProcessSelection init selection", {
               processId,
               mandatoryIds,
             });
@@ -93,7 +93,7 @@ export function StepSubProcessSelection({
           }
         }
       } catch (error) {
-        console.error('Error fetching sub-processes:', error);
+        console.error("Error fetching sub-processes:", error);
       } finally {
         setIsLoading(false);
       }
@@ -116,31 +116,27 @@ export function StepSubProcessSelection({
 
       onSelectionChange(nextSelection, subProcesses);
     },
-    [onSelectionChange, selectedSubProcesses, subProcesses]
+    [onSelectionChange, selectedSubProcesses, subProcesses],
   );
 
   const getAssignmentLabel = (type?: string) => {
     switch (type) {
-      case 'user':
-        return 'Affectation directe';
-      case 'manager':
-        return 'Via manager';
-      case 'role':
-        return 'Par rôle';
+      case "user":
+        return "Affectation directe";
+      case "manager":
+        return "Via manager";
+      case "role":
+        return "Par rôle";
       default:
-        return 'Standard';
+        return "Standard";
     }
   };
 
   return (
     <div className="space-y-6">
       <div className="text-center mb-6">
-        <h2 className="text-2xl font-semibold mb-2">
-          Quelles tâches souhaitez-vous déclencher ?
-        </h2>
-        <p className="text-muted-foreground">
-          Sélectionnez les sous-processus à inclure dans votre demande
-        </p>
+        <h2 className="text-2xl font-semibold mb-2">Quelles tâches souhaitez-vous déclencher ?</h2>
+        <p className="text-muted-foreground">Sélectionnez les sous-processus à inclure dans votre demande</p>
         {processName && (
           <Badge variant="secondary" className="mt-3 gap-2">
             <GitBranch className="h-3 w-3" />
@@ -152,9 +148,7 @@ export function StepSubProcessSelection({
       {selectedSubProcesses.length === 0 && !isLoading && (
         <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-700">
           <AlertCircle className="h-4 w-4 shrink-0" />
-          <span className="text-sm">
-            Veuillez sélectionner au moins un sous-processus pour continuer
-          </span>
+          <span className="text-sm">Veuillez sélectionner au moins un sous-processus pour continuer</span>
         </div>
       )}
 
@@ -166,9 +160,7 @@ export function StepSubProcessSelection({
         ) : subProcesses.length === 0 ? (
           <div className="text-center py-12">
             <GitBranch className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
-            <p className="text-muted-foreground">
-              Ce processus n'a pas de sous-processus configurés
-            </p>
+            <p className="text-muted-foreground">Ce processus n'a pas de sous-processus configurés</p>
           </div>
         ) : (
           <div className="grid gap-3 md:grid-cols-2">
@@ -179,22 +171,21 @@ export function StepSubProcessSelection({
                 <Card
                   key={sp.id}
                   className={cn(
-                    'cursor-pointer transition-all',
-                    isSelected
-                      ? 'ring-2 ring-primary border-primary bg-primary/5'
-                      : 'hover:border-primary/50',
-                    sp.isMandatory && 'cursor-default'
+                    "cursor-pointer transition-all",
+                    isSelected ? "ring-2 ring-primary border-primary bg-primary/5" : "hover:border-primary/50",
+                    sp.isMandatory && "cursor-default",
                   )}
                   onClick={() => toggleSelection(sp.id, sp.isMandatory)}
                 >
                   <CardContent className="p-4">
                     <div className="flex items-start gap-3">
-                      <Checkbox
+                      <input
+                        type="checkbox"
                         checked={isSelected}
                         disabled={sp.isMandatory}
-                        className="mt-1"
+                        className="mt-1 h-4 w-4"
                         onClick={(e) => e.stopPropagation()}
-                        onCheckedChange={() => toggleSelection(sp.id, sp.isMandatory)}
+                        onChange={() => toggleSelection(sp.id, sp.isMandatory)}
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
@@ -206,13 +197,11 @@ export function StepSubProcessSelection({
                           )}
                         </div>
                         {sp.description && (
-                          <p className="text-sm text-muted-foreground line-clamp-2">
-                            {sp.description}
-                          </p>
+                          <p className="text-sm text-muted-foreground line-clamp-2">{sp.description}</p>
                         )}
                         <div className="flex items-center gap-2 mt-2">
                           <Badge variant="outline" className="text-xs gap-1">
-                            {sp.assignment_type === 'user' ? (
+                            {sp.assignment_type === "user" ? (
                               <User className="h-3 w-3" />
                             ) : (
                               <Users className="h-3 w-3" />
@@ -235,9 +224,7 @@ export function StepSubProcessSelection({
           {selectedSubProcesses.length} sous-processus sélectionné(s) sur {subProcesses.length}
         </span>
         {subProcesses.filter((sp) => sp.isMandatory).length > 0 && (
-          <span className="text-amber-600">
-            * Les éléments obligatoires ne peuvent pas être désélectionnés
-          </span>
+          <span className="text-amber-600">* Les éléments obligatoires ne peuvent pas être désélectionnés</span>
         )}
       </div>
     </div>
