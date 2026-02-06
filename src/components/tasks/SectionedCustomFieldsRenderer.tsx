@@ -111,15 +111,25 @@ export function SectionedCustomFieldsRenderer({
     return result;
   }, [fields, sections]);
 
+  // Stabilize the section IDs as a string key to avoid spurious effect re-runs
+  const sectionIdsKey = useMemo(
+    () => fieldSections.map((s) => s.id).join('|'),
+    [fieldSections]
+  );
+
   // Ensure first section is selected when sections change or current tab becomes invalid
   useEffect(() => {
     if (fieldSections.length === 0) return;
 
-    const ids = new Set(fieldSections.map((s) => s.id));
-    if (!activeTab || !ids.has(activeTab)) {
-      setActiveTab(fieldSections[0].id);
-    }
-  }, [fieldSections, activeTab]);
+    setActiveTab((prev) => {
+      const ids = new Set(fieldSections.map((s) => s.id));
+      // If previous tab is still valid, keep it
+      if (prev && ids.has(prev)) return prev;
+      // Otherwise select first section
+      return fieldSections[0].id;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sectionIdsKey]);
 
   const handleTabChange = useCallback((next: string) => {
     setActiveTab((prev) => (prev === next ? prev : next));
