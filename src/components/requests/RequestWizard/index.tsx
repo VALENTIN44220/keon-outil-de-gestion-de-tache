@@ -1,32 +1,20 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, ArrowRight, Loader2, Plus } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
-import { toast } from 'sonner';
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { ArrowLeft, ArrowRight, Loader2, Plus } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
-import { StepTypeSelection } from './StepTypeSelection';
-import { StepPersonSelection } from './StepPersonSelection';
-import { StepProcessSelection } from './StepProcessSelection';
-import { StepSubProcessSelection } from './StepSubProcessSelection';
-import { StepDetailsForm } from './StepDetailsForm';
-import { StepCustomFields } from './StepCustomFields';
-import { StepSummary } from './StepSummary';
-import {
-  RequestType,
-  RequestWizardData,
-  defaultWizardData,
-  WIZARD_STEPS,
-  SubProcessSelection,
-} from './types';
+import { StepTypeSelection } from "./StepTypeSelection";
+import { StepPersonSelection } from "./StepPersonSelection";
+import { StepProcessSelection } from "./StepProcessSelection";
+import { StepSubProcessSelection } from "./StepSubProcessSelection";
+import { StepDetailsForm } from "./StepDetailsForm";
+import { StepCustomFields } from "./StepCustomFields";
+import { StepSummary } from "./StepSummary";
+import { RequestType, RequestWizardData, defaultWizardData, WIZARD_STEPS, SubProcessSelection } from "./types";
 
 interface RequestWizardDialogProps {
   open: boolean;
@@ -35,12 +23,7 @@ interface RequestWizardDialogProps {
   initialProcessId?: string;
 }
 
-export function RequestWizardDialog({
-  open,
-  onClose,
-  onSuccess,
-  initialProcessId,
-}: RequestWizardDialogProps) {
+export function RequestWizardDialog({ open, onClose, onSuccess, initialProcessId }: RequestWizardDialogProps) {
   const { profile: currentUser } = useAuth();
   const [data, setData] = useState<RequestWizardData>(defaultWizardData);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
@@ -49,7 +32,7 @@ export function RequestWizardDialog({
 
   // Get current steps based on request type
   const steps = useMemo(() => {
-    if (!data.requestType) return [{ id: 'type', label: 'Type' }];
+    if (!data.requestType) return [{ id: "type", label: "Type" }];
     return WIZARD_STEPS[data.requestType];
   }, [data.requestType]);
 
@@ -66,7 +49,7 @@ export function RequestWizardDialog({
       if (initialProcessId) {
         setData((prev) => ({
           ...prev,
-          requestType: 'process',
+          requestType: "process",
           processId: initialProcessId,
         }));
         // Skip to subprocess selection (index 2 for process flow)
@@ -74,9 +57,9 @@ export function RequestWizardDialog({
 
         // Fetch process name
         supabase
-          .from('process_templates')
-          .select('name')
-          .eq('id', initialProcessId)
+          .from("process_templates")
+          .select("name")
+          .eq("id", initialProcessId)
           .single()
           .then(({ data: processData }) => {
             if (processData) {
@@ -91,9 +74,9 @@ export function RequestWizardDialog({
   useEffect(() => {
     if (data.targetPersonId) {
       supabase
-        .from('profiles')
-        .select('display_name')
-        .eq('id', data.targetPersonId)
+        .from("profiles")
+        .select("display_name")
+        .eq("id", data.targetPersonId)
         .single()
         .then(({ data: profile }) => {
           setTargetPersonName(profile?.display_name || undefined);
@@ -125,8 +108,14 @@ export function RequestWizardDialog({
     (selected: string[], available: SubProcessSelection[]) => {
       setData((prev) => {
         const sameSelected = sameStringSet(selected, prev.selectedSubProcesses);
-        const prevAvailIds = prev.availableSubProcesses.map((s) => s.id).sort().join('|');
-        const nextAvailIds = available.map((s) => s.id).sort().join('|');
+        const prevAvailIds = prev.availableSubProcesses
+          .map((s) => s.id)
+          .sort()
+          .join("|");
+        const nextAvailIds = available
+          .map((s) => s.id)
+          .sort()
+          .join("|");
         const sameAvailable = prevAvailIds === nextAvailIds;
 
         if (sameSelected && sameAvailable) return prev;
@@ -137,24 +126,24 @@ export function RequestWizardDialog({
         };
       });
     },
-    [sameStringSet]
+    [sameStringSet],
   );
 
   const canProceed = useMemo(() => {
     switch (currentStep.id) {
-      case 'type':
+      case "type":
         return !!data.requestType;
-      case 'person':
+      case "person":
         return !!data.targetPersonId;
-      case 'process':
+      case "process":
         return !!data.processId;
-      case 'subprocesses':
+      case "subprocesses":
         return data.selectedSubProcesses.length > 0;
-      case 'details':
+      case "details":
         return !!data.title.trim();
-      case 'fields':
+      case "fields":
         return true; // Custom fields validation could be added here
-      case 'summary':
+      case "summary":
         return true;
       default:
         return true;
@@ -175,7 +164,7 @@ export function RequestWizardDialog({
 
   const handleSubmit = async () => {
     if (!currentUser) {
-      toast.error('Vous devez être connecté');
+      toast.error("Vous devez être connecté");
       return;
     }
 
@@ -184,22 +173,22 @@ export function RequestWizardDialog({
       const userId = currentUser.id;
 
       // Determine task/request parameters
-      let taskType: 'task' | 'request' = 'task';
+      let taskType: "task" | "request" = "task";
       let assigneeId: string | null = null;
-      let status = 'todo';
+      let status = "todo";
 
-      if (data.requestType === 'personal') {
+      if (data.requestType === "personal") {
         assigneeId = userId;
-      } else if (data.requestType === 'person') {
+      } else if (data.requestType === "person") {
         assigneeId = data.targetPersonId;
-      } else if (data.requestType === 'process') {
-        taskType = 'request';
-        status = 'todo';
+      } else if (data.requestType === "process") {
+        taskType = "request";
+        status = "todo";
       }
 
       // Create the main task/request
       const { data: taskData, error: taskError } = await supabase
-        .from('tasks')
+        .from("tasks")
         .insert({
           title: data.title,
           description: data.description || null,
@@ -222,58 +211,66 @@ export function RequestWizardDialog({
       if (taskError) throw taskError;
 
       // For process requests, save sub-process selections and start workflow
-      if (data.requestType === 'process' && data.selectedSubProcesses.length > 0) {
+      if (data.requestType === "process" && data.selectedSubProcesses.length > 0) {
         // Save sub-process selections to the generic table
         const subProcessInserts = data.selectedSubProcesses.map((spId, index) => ({
           request_id: taskData.id,
           sub_process_template_id: spId,
           order_index: index,
-          status: 'pending',
+          status: "pending",
         }));
 
-        await supabase.from('request_sub_processes').insert(subProcessInserts);
+        const { error: spInsertError } = await supabase.from("request_sub_processes").insert(subProcessInserts);
+        if (spInsertError) {
+          throw new Error(`Sous-processus: ${spInsertError.message}`);
+        }
 
         // Save custom field values
         const fieldEntries = Object.entries(data.customFieldValues).filter(
-          ([_, value]) => value !== undefined && value !== null && value !== ''
+          ([_, value]) => value !== undefined && value !== null && value !== "",
         );
 
         if (fieldEntries.length > 0) {
-          await supabase.from('request_field_values').insert(
+          const { error: fieldValuesError } = await supabase.from("request_field_values").insert(
             fieldEntries.map(([fieldId, value]) => ({
               task_id: taskData.id,
               field_id: fieldId,
-              value: typeof value === 'object' ? JSON.stringify(value) : String(value),
-            }))
+              value: typeof value === "object" ? JSON.stringify(value) : String(value),
+            })),
           );
+          if (fieldValuesError) {
+            throw new Error(`Champs personnalisés: ${fieldValuesError.message}`);
+          }
         }
 
         // Emit workflow event for request creation
-        await supabase.from('workflow_events').insert({
-          event_type: 'request_created',
-          entity_type: 'request',
+        const { error: wfError } = await supabase.from("workflow_events").insert({
+          event_type: "request_created",
+          entity_type: "request",
           entity_id: taskData.id,
           triggered_by: userId,
           payload: {
-            request_type: 'process',
+            request_type: "process",
             process_id: data.processId,
             sub_process_ids: data.selectedSubProcesses,
             requester_id: userId,
           },
         });
+        if (wfError) {
+          throw new Error(`Workflow: ${wfError.message}`);
+        }
 
-        toast.success(
-          `Demande créée avec ${data.selectedSubProcesses.length} sous-processus`
-        );
+        toast.success(`Demande créée avec ${data.selectedSubProcesses.length} sous-processus`);
       } else {
-        toast.success('Tâche créée avec succès');
+        toast.success("Tâche créée avec succès");
       }
 
       onSuccess?.();
       onClose();
     } catch (error) {
-      console.error('Error creating request:', error);
-      toast.error('Erreur lors de la création');
+      console.error("Error creating request:", error);
+      const msg = error instanceof Error ? error.message : String(error);
+      toast.error(msg || "Erreur lors de la création");
     } finally {
       setIsSubmitting(false);
     }
@@ -281,28 +278,18 @@ export function RequestWizardDialog({
 
   const renderCurrentStep = () => {
     switch (currentStep.id) {
-      case 'type':
-        return (
-          <StepTypeSelection
-            selectedType={data.requestType}
-            onSelect={handleTypeSelect}
-          />
-        );
-      case 'person':
+      case "type":
+        return <StepTypeSelection selectedType={data.requestType} onSelect={handleTypeSelect} />;
+      case "person":
         return (
           <StepPersonSelection
             selectedPersonId={data.targetPersonId}
             onSelect={(id) => updateData({ targetPersonId: id })}
           />
         );
-      case 'process':
-        return (
-          <StepProcessSelection
-            selectedProcessId={data.processId}
-            onSelect={handleProcessSelect}
-          />
-        );
-      case 'subprocesses':
+      case "process":
+        return <StepProcessSelection selectedProcessId={data.processId} onSelect={handleProcessSelect} />;
+      case "subprocesses":
         return (
           <StepSubProcessSelection
             processId={data.processId}
@@ -311,24 +298,12 @@ export function RequestWizardDialog({
             onSelectionChange={handleSubProcessSelectionChange}
           />
         );
-      case 'details':
-        return (
-          <StepDetailsForm
-            data={data}
-            requestType={data.requestType!}
-            onDataChange={updateData}
-          />
-        );
-      case 'fields':
+      case "details":
+        return <StepDetailsForm data={data} requestType={data.requestType!} onDataChange={updateData} />;
+      case "fields":
         return <StepCustomFields data={data} onDataChange={updateData} />;
-      case 'summary':
-        return (
-          <StepSummary
-            data={data}
-            requestType={data.requestType!}
-            targetPersonName={targetPersonName}
-          />
-        );
+      case "summary":
+        return <StepSummary data={data} requestType={data.requestType!} targetPersonName={targetPersonName} />;
       default:
         return null;
     }
@@ -338,7 +313,7 @@ export function RequestWizardDialog({
     (isOpen: boolean) => {
       if (!isOpen) onClose();
     },
-    [onClose]
+    [onClose],
   );
 
   return (
@@ -364,12 +339,7 @@ export function RequestWizardDialog({
 
         <DialogFooter className="flex-shrink-0 gap-2 sm:gap-0">
           {currentStepIndex > 0 && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={goBack}
-              disabled={isSubmitting}
-            >
+            <Button type="button" variant="outline" onClick={goBack} disabled={isSubmitting}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Retour
             </Button>
@@ -377,7 +347,7 @@ export function RequestWizardDialog({
 
           <div className="flex-1" />
 
-          {currentStep.id === 'summary' ? (
+          {currentStep.id === "summary" ? (
             <Button onClick={handleSubmit} disabled={isSubmitting || !canProceed}>
               {isSubmitting ? (
                 <>
@@ -385,7 +355,7 @@ export function RequestWizardDialog({
                   Création...
                 </>
               ) : (
-                'Créer la demande'
+                "Créer la demande"
               )}
             </Button>
           ) : (
