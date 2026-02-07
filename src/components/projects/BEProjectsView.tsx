@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useBEProjects } from '@/hooks/useBEProjects';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { useProjectViewConfig } from '@/hooks/useProjectViewConfig';
@@ -9,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Plus, Search, Pencil, Trash2, Building2, FolderOpen, Loader2, FileDown, Filter } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Building2, FolderOpen, Loader2, FileDown, Filter, LayoutDashboard } from 'lucide-react';
 import { BEProjectDialog } from './BEProjectDialog';
 import { ALL_PROJECT_COLUMNS, ColumnDefinition } from './ProjectColumnSelector';
 import { ProjectViewSelector, ProjectView } from './ProjectViewSelector';
@@ -21,6 +22,7 @@ import { fr } from 'date-fns/locale';
 import { toast } from '@/hooks/use-toast';
 
 export function BEProjectsView() {
+  const navigate = useNavigate();
   const { projects, isLoading, searchQuery, setSearchQuery, addProject, updateProject, deleteProject } = useBEProjects();
   const { permissionProfile } = useUserPermissions();
   const { 
@@ -304,7 +306,15 @@ export function BEProjectsView() {
                         ))}
                         {(canEdit || canDelete) && (
                           <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-2">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => navigate(`/be/projects/${project.code_projet}/overview`)}
+                                title="Ouvrir le HUB projet"
+                              >
+                                <LayoutDashboard className="h-4 w-4" />
+                              </Button>
                               {canEdit && (
                                 <Button
                                   variant="ghost"

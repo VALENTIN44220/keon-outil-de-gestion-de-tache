@@ -25,6 +25,12 @@ import DesignSystem from "./pages/DesignSystem";
 import WorkflowEditor from "./pages/WorkflowEditor";
 import NotFound from "./pages/NotFound";
 
+// BE Project Hub pages
+import BEProjectHubOverview from "./pages/be/BEProjectHubOverview";
+import BEProjectHubTimeline from "./pages/be/BEProjectHubTimeline";
+import BEProjectHubDiscussions from "./pages/be/BEProjectHubDiscussions";
+import BEProjectHubFiles from "./pages/be/BEProjectHubFiles";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -142,6 +148,39 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <WorkflowEditor />
+                </ProtectedRoute>
+              }
+            />
+            {/* BE Project Hub routes */}
+            <Route
+              path="/be/projects/:code/overview"
+              element={
+                <ProtectedRoute>
+                  <BEProjectHubOverview />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/be/projects/:code/timeline"
+              element={
+                <ProtectedRoute>
+                  <BEProjectHubTimeline />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/be/projects/:code/discussions"
+              element={
+                <ProtectedRoute>
+                  <BEProjectHubDiscussions />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/be/projects/:code/files"
+              element={
+                <ProtectedRoute>
+                  <BEProjectHubFiles />
                 </ProtectedRoute>
               }
             />
