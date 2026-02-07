@@ -2431,6 +2431,7 @@ export type Database = {
           id: string
           metadata: Json | null
           reason: string | null
+          refusal_reason: string | null
           task_id: string
           to_status: string
         }
@@ -2441,6 +2442,7 @@ export type Database = {
           id?: string
           metadata?: Json | null
           reason?: string | null
+          refusal_reason?: string | null
           task_id: string
           to_status: string
         }
@@ -2451,6 +2453,7 @@ export type Database = {
           id?: string
           metadata?: Json | null
           reason?: string | null
+          refusal_reason?: string | null
           task_id?: string
           to_status?: string
         }
@@ -2586,8 +2589,10 @@ export type Database = {
           creator_company_id: string | null
           creator_department_id: string | null
           default_duration_days: number | null
+          depends_on_task_template_id: string | null
           description: string | null
           id: string
+          initial_status: string | null
           is_shared: boolean
           order_index: number | null
           priority: string
@@ -2612,8 +2617,10 @@ export type Database = {
           creator_company_id?: string | null
           creator_department_id?: string | null
           default_duration_days?: number | null
+          depends_on_task_template_id?: string | null
           description?: string | null
           id?: string
+          initial_status?: string | null
           is_shared?: boolean
           order_index?: number | null
           priority?: string
@@ -2638,8 +2645,10 @@ export type Database = {
           creator_company_id?: string | null
           creator_department_id?: string | null
           default_duration_days?: number | null
+          depends_on_task_template_id?: string | null
           description?: string | null
           id?: string
+          initial_status?: string | null
           is_shared?: boolean
           order_index?: number | null
           priority?: string
@@ -2677,6 +2686,13 @@ export type Database = {
             columns: ["creator_department_id"]
             isOneToOne: false
             referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_templates_depends_on_task_template_id_fkey"
+            columns: ["depends_on_task_template_id"]
+            isOneToOne: false
+            referencedRelation: "task_templates"
             referencedColumns: ["id"]
           },
           {
@@ -2804,11 +2820,13 @@ export type Database = {
           category_id: string | null
           created_at: string
           current_validation_level: number | null
+          depends_on_task_id: string | null
           description: string | null
           due_date: string | null
           group_assignee_ids: string[] | null
           id: string
           is_assignment_task: boolean
+          is_dependency_locked: boolean | null
           is_locked_for_validation: boolean | null
           original_assignee_id: string | null
           parent_request_id: string | null
@@ -2862,11 +2880,13 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           current_validation_level?: number | null
+          depends_on_task_id?: string | null
           description?: string | null
           due_date?: string | null
           group_assignee_ids?: string[] | null
           id?: string
           is_assignment_task?: boolean
+          is_dependency_locked?: boolean | null
           is_locked_for_validation?: boolean | null
           original_assignee_id?: string | null
           parent_request_id?: string | null
@@ -2920,11 +2940,13 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           current_validation_level?: number | null
+          depends_on_task_id?: string | null
           description?: string | null
           due_date?: string | null
           group_assignee_ids?: string[] | null
           id?: string
           is_assignment_task?: boolean
+          is_dependency_locked?: boolean | null
           is_locked_for_validation?: boolean | null
           original_assignee_id?: string | null
           parent_request_id?: string | null
@@ -2997,6 +3019,20 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_depends_on_task_id_fkey"
+            columns: ["depends_on_task_id"]
+            isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "tasks_depends_on_task_id_fkey"
+            columns: ["depends_on_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
           {
