@@ -101,7 +101,8 @@ export default function Workload() {
     companyId: filters.selectedCompanyId || undefined,
   });
 
-  // Fetch tasks for assignment
+  // Fetch tasks for planning grid - include ALL tasks (even done/validated) 
+  // so they remain visible in the calendar. Only the backlog sidebar filters them.
   useEffect(() => {
     const fetchTasks = async () => {
       if (!profile?.id) return;
@@ -109,8 +110,7 @@ export default function Workload() {
       const { data } = await supabase
         .from('tasks')
         .select('*')
-        .in('assignee_id', teamMembers.map(m => m.id))
-        .not('status', 'in', '("done","validated")');
+        .in('assignee_id', teamMembers.map(m => m.id));
       
       setTasks((data || []) as Task[]);
     };
