@@ -24,6 +24,7 @@ import Chat from "./pages/Chat";
 import DesignSystem from "./pages/DesignSystem";
 import WorkflowEditor from "./pages/WorkflowEditor";
 import NotFound from "./pages/NotFound";
+import SupplierReference from "./pages/SupplierReference";
 
 // BE Project Hub pages
 import BEProjectHubOverview from "./pages/be/BEProjectHubOverview";
@@ -181,6 +182,15 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <BEProjectHubFiles />
+                </ProtectedRoute>
+              }
+            />
+            {/* Supplier Reference */}
+            <Route
+              path="/suppliers"
+              element={
+                <ProtectedRoute>
+                  <SupplierReference />
                 </ProtectedRoute>
               }
             />

@@ -2264,6 +2264,144 @@ export type Database = {
           },
         ]
       }
+      supplier_purchase_enrichment: {
+        Row: {
+          adresse_mail: string | null
+          avenants: string | null
+          categorie: string | null
+          commentaires: string | null
+          completeness_score: number | null
+          created_at: string | null
+          date_premiere_signature: string | null
+          delai_de_paiement: string | null
+          echeances_de_paiement: string | null
+          entite: string | null
+          evolution_tarif_2026: string | null
+          exclusivite_non_sollicitation: string | null
+          famille: string | null
+          famille_source_initiale: string | null
+          garanties_bancaire_et_equipement: string | null
+          id: string
+          incoterm: string | null
+          nom_contact: string | null
+          nomfournisseur: string | null
+          penalites: string | null
+          poste: string | null
+          remise: string | null
+          rfa: string | null
+          segment: string | null
+          sous_segment: string | null
+          status: string | null
+          telephone: string | null
+          tiers: string
+          transport: string | null
+          type_de_contrat: string | null
+          updated_at: string | null
+          updated_by: string | null
+          validite_du_contrat: string | null
+          validite_prix: string | null
+        }
+        Insert: {
+          adresse_mail?: string | null
+          avenants?: string | null
+          categorie?: string | null
+          commentaires?: string | null
+          completeness_score?: number | null
+          created_at?: string | null
+          date_premiere_signature?: string | null
+          delai_de_paiement?: string | null
+          echeances_de_paiement?: string | null
+          entite?: string | null
+          evolution_tarif_2026?: string | null
+          exclusivite_non_sollicitation?: string | null
+          famille?: string | null
+          famille_source_initiale?: string | null
+          garanties_bancaire_et_equipement?: string | null
+          id?: string
+          incoterm?: string | null
+          nom_contact?: string | null
+          nomfournisseur?: string | null
+          penalites?: string | null
+          poste?: string | null
+          remise?: string | null
+          rfa?: string | null
+          segment?: string | null
+          sous_segment?: string | null
+          status?: string | null
+          telephone?: string | null
+          tiers: string
+          transport?: string | null
+          type_de_contrat?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+          validite_du_contrat?: string | null
+          validite_prix?: string | null
+        }
+        Update: {
+          adresse_mail?: string | null
+          avenants?: string | null
+          categorie?: string | null
+          commentaires?: string | null
+          completeness_score?: number | null
+          created_at?: string | null
+          date_premiere_signature?: string | null
+          delai_de_paiement?: string | null
+          echeances_de_paiement?: string | null
+          entite?: string | null
+          evolution_tarif_2026?: string | null
+          exclusivite_non_sollicitation?: string | null
+          famille?: string | null
+          famille_source_initiale?: string | null
+          garanties_bancaire_et_equipement?: string | null
+          id?: string
+          incoterm?: string | null
+          nom_contact?: string | null
+          nomfournisseur?: string | null
+          penalites?: string | null
+          poste?: string | null
+          remise?: string | null
+          rfa?: string | null
+          segment?: string | null
+          sous_segment?: string | null
+          status?: string | null
+          telephone?: string | null
+          tiers?: string
+          transport?: string | null
+          type_de_contrat?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+          validite_du_contrat?: string | null
+          validite_prix?: string | null
+        }
+        Relationships: []
+      }
+      supplier_purchase_permissions: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: string
+          is_active: boolean | null
+          role: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id?: string
+          is_active?: boolean | null
+          role: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: string
+          is_active?: boolean | null
+          role?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       task_attachments: {
         Row: {
           created_at: string
@@ -4618,6 +4756,21 @@ export type Database = {
       }
     }
     Functions: {
+      calculate_supplier_completeness: {
+        Args: {
+          p_adresse_mail: string
+          p_categorie: string
+          p_delai_de_paiement: string
+          p_entite: string
+          p_famille: string
+          p_incoterm: string
+          p_nom_contact: string
+          p_segment: string
+          p_telephone: string
+          p_type_de_contrat: string
+        }
+        Returns: number
+      }
       can_access_task: { Args: { _task_id: string }; Returns: boolean }
       can_assign_tasks: { Args: never; Returns: boolean }
       can_manage_template: { Args: { _creator_id: string }; Returns: boolean }
@@ -4721,6 +4874,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      has_supplier_access: { Args: never; Returns: boolean }
       is_chat_admin: {
         Args: { _conversation_id: string; _user_id: string }
         Returns: boolean
