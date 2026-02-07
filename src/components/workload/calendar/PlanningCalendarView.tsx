@@ -1,29 +1,31 @@
- import { useState, useMemo, useCallback } from 'react';
- import { format, parseISO, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addMonths, addWeeks, addYears, startOfYear, endOfYear } from 'date-fns';
- import { fr } from 'date-fns/locale';
- import { TeamMemberWorkload, WorkloadSlot, Holiday, UserLeave } from '@/types/workload';
- import { Task } from '@/types/task';
- import { OutlookEvent } from '@/hooks/useOutlookCalendar';
- import { TooltipProvider } from '@/components/ui/tooltip';
- import { Button } from '@/components/ui/button';
- import { Switch } from '@/components/ui/switch';
- import { Label } from '@/components/ui/label';
- import { Badge } from '@/components/ui/badge';
- import { Input } from '@/components/ui/input';
- import { 
-   DropdownMenu,
-   DropdownMenuContent,
-   DropdownMenuItem,
-   DropdownMenuTrigger,
-   DropdownMenuSeparator,
- } from '@/components/ui/dropdown-menu';
- import { cn } from '@/lib/utils';
- import { Search, Calendar, Settings2, Maximize2, Minimize2, Eye, EyeOff, CheckSquare } from 'lucide-react';
- import { PlanningKPIs } from './PlanningKPIs';
- import { BacklogSidebar } from './BacklogSidebar';
- import { PlanningCalendarGrid } from './PlanningCalendarGrid';
- import { UnifiedTaskDrawer, DrawerItem } from '../UnifiedTaskDrawer';
- import { toast } from 'sonner';
+import { useState, useMemo, useCallback } from 'react';
+import { format, parseISO, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addMonths, addWeeks, addYears, startOfYear, endOfYear } from 'date-fns';
+import { fr } from 'date-fns/locale';
+import { useNavigate } from 'react-router-dom';
+import { TeamMemberWorkload, WorkloadSlot, Holiday, UserLeave } from '@/types/workload';
+import { Task, TaskStatus } from '@/types/task';
+import { OutlookEvent } from '@/hooks/useOutlookCalendar';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
+import { cn } from '@/lib/utils';
+import { Search, Calendar, Settings2, Maximize2, Minimize2, Eye, EyeOff, CheckSquare } from 'lucide-react';
+import { PlanningKPIs } from './PlanningKPIs';
+import { BacklogSidebar } from './BacklogSidebar';
+import { PlanningCalendarGrid } from './PlanningCalendarGrid';
+import { UnifiedTaskDrawer, DrawerItem } from '../UnifiedTaskDrawer';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
  
  interface PlanningCalendarViewProps {
    workloadData: TeamMemberWorkload[];
@@ -50,43 +52,45 @@
   onViewModeChange?: (mode: 'week' | 'month' | 'quarter' | 'year', anchorDate?: Date) => void;
  }
  
- export function PlanningCalendarView({
+export function PlanningCalendarView({
   workloadData = [],
-   startDate,
-   endDate,
+  startDate,
+  endDate,
   tasks = [],
   holidays = [],
   leaves = [],
-   outlookEvents = [],
-   viewMode,
-   onNavigate,
-   onToday,
-   onSlotAdd,
-   onMultiSlotAdd,
-   onReassignTask,
-   isHalfDayAvailable,
-   checkSlotLeaveConflict,
-   getTaskDuration,
-   getTaskProgress,
-   plannedTaskIds,
-   onTaskUpdated,
-   searchQuery = '',
-   onSearchChange,
+  outlookEvents = [],
+  viewMode,
+  onNavigate,
+  onToday,
+  onSlotAdd,
+  onMultiSlotAdd,
+  onReassignTask,
+  isHalfDayAvailable,
+  checkSlotLeaveConflict,
+  getTaskDuration,
+  getTaskProgress,
+  plannedTaskIds,
+  onTaskUpdated,
+  searchQuery = '',
+  onSearchChange,
   onViewModeChange,
- }: PlanningCalendarViewProps) {
-   // UI state
-   const [isBacklogCollapsed, setIsBacklogCollapsed] = useState(false);
-   const [showOutlookEvents, setShowOutlookEvents] = useState(true);
-   const [isCompact, setIsCompact] = useState(false);
-   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
-   const [dropTarget, setDropTarget] = useState<{ userId: string; date: string; halfDay: 'morning' | 'afternoon' } | null>(null);
-   
-   // Selection state
-   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
-   
-   // Drawer state
-   const [drawerItem, setDrawerItem] = useState<DrawerItem | null>(null);
-   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+}: PlanningCalendarViewProps) {
+  const navigate = useNavigate();
+  
+  // UI state
+  const [isBacklogCollapsed, setIsBacklogCollapsed] = useState(false);
+  const [showOutlookEvents, setShowOutlookEvents] = useState(true);
+  const [isCompact, setIsCompact] = useState(false);
+  const [draggedTask, setDraggedTask] = useState<Task | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ userId: string; date: string; halfDay: 'morning' | 'afternoon' } | null>(null);
+  
+  // Selection state
+  const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
+  
+  // Drawer state
+  const [drawerItem, setDrawerItem] = useState<DrawerItem | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
  
    // Calculate conflict count
    const conflictCount = useMemo(() => {
@@ -150,37 +154,80 @@
      }
    }, [tasks, onSlotAdd, onMultiSlotAdd]);
  
-   // Task click handler
-   const handleTaskClick = useCallback((task: Task, slots: WorkloadSlot[]) => {
-     setDrawerItem({ type: 'task', task, slots });
-     setIsDrawerOpen(true);
-   }, []);
- 
-   // Selection handlers
-   const handleTaskSelect = useCallback((taskId: string, selected: boolean) => {
-     setSelectedTasks(prev => {
-       const next = new Set(prev);
-       if (selected) {
-         next.add(taskId);
-       } else {
-         next.delete(taskId);
-       }
-       return next;
-     });
-   }, []);
- 
-   const handleSelectAll = useCallback(() => {
+  // Task click handler
+  const handleTaskClick = useCallback((task: Task, slots: WorkloadSlot[]) => {
+    setDrawerItem({ type: 'task', task, slots });
+    setIsDrawerOpen(true);
+  }, []);
+
+  // Status change handler for drawer
+  const handleStatusChange = useCallback(async (taskId: string, newStatus: string) => {
+    const { error } = await supabase
+      .from('tasks')
+      .update({ status: newStatus })
+      .eq('id', taskId);
+    
+    if (error) {
+      toast.error('Erreur lors de la mise à jour du statut');
+      throw error;
+    }
+    
+    toast.success('Statut mis à jour');
+    
+    // Update drawer item with new status
+    setDrawerItem(prev => {
+      if (prev?.type === 'task' && prev.task) {
+        return { ...prev, task: { ...prev.task, status: newStatus as TaskStatus } };
+      }
+      return prev;
+    });
+    
+    onTaskUpdated?.();
+  }, [onTaskUpdated]);
+
+  // Mark done handler for drawer
+  const handleMarkDone = useCallback(async (taskId: string) => {
+    await handleStatusChange(taskId, 'done');
+  }, [handleStatusChange]);
+
+  // View task details handler
+  const handleViewDetails = useCallback((taskId: string, taskType?: string) => {
+    setIsDrawerOpen(false);
+    setDrawerItem(null);
+    
+    // Navigate to appropriate page based on task type
+    if (taskType === 'request') {
+      navigate(`/requests?task=${taskId}`);
+    } else {
+      navigate(`/?task=${taskId}`);
+    }
+  }, [navigate]);
+
+  // Selection handlers
+  const handleTaskSelect = useCallback((taskId: string, selected: boolean) => {
+    setSelectedTasks(prev => {
+      const next = new Set(prev);
+      if (selected) {
+        next.add(taskId);
+      } else {
+        next.delete(taskId);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleSelectAll = useCallback(() => {
     const availableTasks = (tasks || []).filter(t => 
-       t.status !== 'done' && 
-       t.status !== 'validated' && 
+      t.status !== 'done' && 
+      t.status !== 'validated' && 
       !(plannedTaskIds || []).includes(t.id)
-     );
-     setSelectedTasks(new Set(availableTasks.map(t => t.id)));
-   }, [tasks, plannedTaskIds]);
- 
-   const handleClearSelection = useCallback(() => {
-     setSelectedTasks(new Set());
-   }, []);
+    );
+    setSelectedTasks(new Set(availableTasks.map(t => t.id)));
+  }, [tasks, plannedTaskIds]);
+
+  const handleClearSelection = useCallback(() => {
+    setSelectedTasks(new Set());
+  }, []);
  
    return (
      <TooltipProvider>
@@ -306,16 +353,19 @@
            </div>
          </div>
  
-         {/* Task Drawer */}
-         <UnifiedTaskDrawer
-           item={drawerItem}
-           isOpen={isDrawerOpen}
-           onClose={() => {
-             setIsDrawerOpen(false);
-             setDrawerItem(null);
-             onTaskUpdated?.();
-           }}
-         />
+        {/* Task Drawer */}
+        <UnifiedTaskDrawer
+          item={drawerItem}
+          isOpen={isDrawerOpen}
+          onClose={() => {
+            setIsDrawerOpen(false);
+            setDrawerItem(null);
+            onTaskUpdated?.();
+          }}
+          onStatusChange={handleStatusChange}
+          onMarkDone={handleMarkDone}
+          onViewDetails={handleViewDetails}
+        />
        </div>
      </TooltipProvider>
    );
