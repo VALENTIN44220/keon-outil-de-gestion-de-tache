@@ -10,13 +10,11 @@ import {
   subWeeks,
   isSameMonth,
   isSameDay,
-  isSameWeek,
   addMonths,
   subMonths,
-  isWithinInterval,
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, RefreshCw, Users } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, RefreshCw, Users, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -28,6 +26,9 @@ import { cn } from '@/lib/utils';
 import { useOutlookCalendar } from '@/hooks/useOutlookCalendar';
 import { useMicrosoftConnection } from '@/hooks/useMicrosoftConnection';
 import { useTasks } from '@/hooks/useTasks';
+import { TaskDetailDialog } from '@/components/tasks/TaskDetailDialog';
+import { Task } from '@/types/task';
+import { getStatusFilterOptions, matchesStatusFilter } from '@/services/taskStatusService';
 
 interface CalendarEvent {
   id: string;
@@ -39,15 +40,21 @@ interface CalendarEvent {
   location?: string;
   isAllDay?: boolean;
   source?: string;
+  taskData?: Task;
 }
 
 type ViewMode = 'week' | 'month';
+
+// Get status filter options from centralized service
+const statusFilterOptions = getStatusFilterOptions();
 
 export function UnifiedCalendarView() {
   const [currentDate, setCurrentDate] = useState(() => new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(() => new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [includeSubordinates, setIncludeSubordinates] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   // Compute date range based on view mode - memoized
   const { startDate, endDate } = useMemo(() => {
@@ -72,7 +79,13 @@ export function UnifiedCalendarView() {
   );
   
   const { connection, isSyncing, syncCalendar } = useMicrosoftConnection();
-  const { allTasks, isLoading: isLoadingTasks } = useTasks();
+  const { allTasks, isLoading: isLoadingTasks, updateTaskStatus, deleteTask, refetch: refetchTasks } = useTasks();
+
+  // Filter tasks by status
+  const filteredTasks = useMemo(() => {
+    if (statusFilter === 'all') return allTasks;
+    return allTasks.filter(t => matchesStatusFilter(t.status, statusFilter));
+  }, [allTasks, statusFilter]);
 
   // Memoize calendar events to prevent flickering
   const calendarEvents = useMemo<CalendarEvent[]>(() => [
@@ -83,11 +96,11 @@ export function UnifiedCalendarView() {
       end: new Date(event.end_time),
       type: 'outlook' as const,
       color: 'bg-[#0078D4]',
-      location: event.location,
-      isAllDay: event.is_all_day,
+      location: event.location || undefined,
+      isAllDay: event.is_all_day || undefined,
       source: 'Outlook',
     })),
-    ...allTasks
+    ...filteredTasks
       .filter(task => task.due_date && task.type === 'task')
       .map(task => ({
         id: `task-${task.id}`,
@@ -98,8 +111,9 @@ export function UnifiedCalendarView() {
         color: task.priority === 'high' ? 'bg-destructive' : 
                task.priority === 'medium' ? 'bg-warning' : 'bg-primary',
         source: 'Tâche',
+        taskData: task,
       })),
-  ], [outlookEvents, allTasks]);
+  ], [outlookEvents, filteredTasks]);
 
   const getEventsForDate = useCallback((date: Date): CalendarEvent[] => {
     return calendarEvents.filter(event => isSameDay(event.start, date));
@@ -122,6 +136,18 @@ export function UnifiedCalendarView() {
     setCurrentDate(new Date());
     setSelectedDate(new Date());
   }, []);
+
+  const handleEventClick = useCallback((event: CalendarEvent, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (event.type === 'task' && event.taskData) {
+      setSelectedTask(event.taskData);
+    }
+  }, []);
+
+  const handleTaskUpdated = useCallback(() => {
+    refetchTasks();
+    setSelectedTask(null);
+  }, [refetchTasks]);
 
   // Memoize the title
   const periodTitle = useMemo(() => {
@@ -171,10 +197,11 @@ export function UnifiedCalendarView() {
               <div
                 key={event.id}
                 className={cn(
-                  'text-xs px-2 py-1.5 rounded text-white',
+                  'text-xs px-2 py-1.5 rounded text-white cursor-pointer hover:opacity-90 transition-opacity',
                   event.color
                 )}
                 title={event.title}
+                onClick={(e) => handleEventClick(event, e)}
               >
                 <div className="font-medium truncate">{event.title}</div>
                 {!event.isAllDay && (
@@ -192,7 +219,7 @@ export function UnifiedCalendarView() {
         {days}
       </div>
     );
-  }, [currentDate, selectedDate, getEventsForDate]);
+  }, [currentDate, selectedDate, getEventsForDate, handleEventClick]);
 
   // Render month view - memoized
   const renderMonthView = useMemo(() => {
@@ -234,10 +261,11 @@ export function UnifiedCalendarView() {
               <div
                 key={event.id}
                 className={cn(
-                  'text-[10px] px-1 py-0.5 rounded truncate text-white',
+                  'text-[10px] px-1 py-0.5 rounded truncate text-white cursor-pointer hover:opacity-90 transition-opacity',
                   event.color
                 )}
                 title={event.title}
+                onClick={(e) => handleEventClick(event, e)}
               >
                 {event.title}
               </div>
@@ -255,7 +283,7 @@ export function UnifiedCalendarView() {
     }
 
     return days;
-  }, [currentDate, selectedDate, getEventsForDate]);
+  }, [currentDate, selectedDate, getEventsForDate, handleEventClick]);
 
   // Memoize selected date events
   const selectedDateEvents = useMemo(() => {
@@ -264,172 +292,220 @@ export function UnifiedCalendarView() {
 
   const isLoading = isLoadingOutlook || isLoadingTasks;
 
+  // Count filtered tasks
+  const filteredTaskCount = filteredTasks.filter(t => t.due_date && t.type === 'task').length;
+
   return (
-    <div className="flex gap-4 h-full">
-      {/* Calendar */}
-      <Card className="flex-1">
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" onClick={() => handleNavigate('prev')}>
-                <ChevronLeft className="h-4 w-4" />
+    <>
+      <div className="flex flex-col gap-4 h-full">
+        {/* Status filter bar */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Filter className="w-4 h-4 text-muted-foreground" />
+          <span className="text-sm font-medium text-muted-foreground mr-2">Statut:</span>
+          <div className="flex bg-muted rounded-lg p-1 flex-wrap gap-1">
+            {statusFilterOptions.map((option) => (
+              <Button
+                key={option.value}
+                variant="ghost"
+                size="sm"
+                onClick={() => setStatusFilter(option.value)}
+                className={cn(
+                  "text-xs px-3 py-1 h-auto rounded-md transition-all",
+                  statusFilter === option.value
+                    ? "bg-card shadow-sm text-foreground" 
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {option.label}
               </Button>
-              <Button variant="outline" size="sm" onClick={handleToday} className="text-xs">
-                Aujourd'hui
-              </Button>
-              <Button variant="ghost" size="icon" onClick={() => handleNavigate('next')}>
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-              <CardTitle className="text-lg capitalize ml-2">
-                {periodTitle}
-              </CardTitle>
-            </div>
-            
-            <div className="flex items-center gap-4">
-              {/* View mode selector */}
-              <div className="flex bg-muted rounded-lg p-0.5">
-                <Button
-                  variant={viewMode === 'week' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  className="text-xs h-7 px-3"
-                  onClick={() => setViewMode('week')}
-                >
-                  Semaine
-                </Button>
-                <Button
-                  variant={viewMode === 'month' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  className="text-xs h-7 px-3"
-                  onClick={() => setViewMode('month')}
-                >
-                  Mois
-                </Button>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="subordinates"
-                  checked={includeSubordinates}
-                  onCheckedChange={setIncludeSubordinates}
-                />
-                <Label htmlFor="subordinates" className="text-sm flex items-center gap-1">
-                  <Users className="h-3 w-3" />
-                  Équipe
-                </Label>
-              </div>
-
-              {connection.connected && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSync}
-                  disabled={isSyncing}
-                  className="gap-2"
-                >
-                  <RefreshCw className={cn("h-3 w-3", isSyncing && "animate-spin")} />
-                  Sync
-                </Button>
-              )}
-            </div>
+            ))}
           </div>
-        </CardHeader>
-        <CardContent className="p-2">
-          {viewMode === 'week' ? (
-            renderWeekView
-          ) : (
-            <>
-              {/* Week days header */}
-              <div className="grid grid-cols-7 border-l border-t">
-                {['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map(day => (
-                  <div key={day} className="text-center text-xs font-medium py-2 border-b border-r bg-muted/50">
-                    {day}
-                  </div>
-                ))}
-                {renderMonthView}
-              </div>
-            </>
+          {statusFilter !== 'all' && (
+            <Badge variant="secondary" className="ml-2">
+              {filteredTaskCount} tâche{filteredTaskCount !== 1 ? 's' : ''}
+            </Badge>
           )}
+        </div>
 
-          {/* Legend */}
-          <div className="flex items-center gap-4 mt-3 text-xs">
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded bg-[#0078D4]" />
-              <span>Outlook</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded bg-primary" />
-              <span>Tâches</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded bg-warning" />
-              <span>Priorité moyenne</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded bg-destructive" />
-              <span>Priorité haute</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Event list sidebar */}
-      <Card className="w-80 shrink-0">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            <CalendarIcon className="h-4 w-4" />
-            {selectedDate ? (
-              <span>
-                {format(selectedDate, 'EEEE d MMM', { locale: fr })}
-              </span>
-            ) : (
-              <span>Événements</span>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <ScrollArea className="h-[400px]">
-            {isLoading ? (
-              <div className="flex items-center justify-center p-8">
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              </div>
-            ) : selectedDateEvents.length === 0 ? (
-              <div className="flex flex-col items-center justify-center p-8 text-muted-foreground">
-                <CalendarIcon className="h-8 w-8 mb-2 opacity-50" />
-                <p className="text-sm">Aucun événement</p>
-              </div>
-            ) : (
-              <div className="p-3 space-y-2">
-                {selectedDateEvents.map(event => (
-                  <div
-                    key={event.id}
-                    className={cn(
-                      'p-3 rounded-lg text-white',
-                      event.color
-                    )}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">{event.title}</p>
-                        {event.location && (
-                          <p className="text-xs opacity-80 truncate">{event.location}</p>
-                        )}
-                      </div>
-                      <span className="text-xs opacity-80 shrink-0">
-                        {event.isAllDay ? 'Journée' : format(event.start, 'HH:mm')}
-                      </span>
-                    </div>
-                    <div className="mt-1">
-                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-white/20">
-                        {event.source}
-                      </Badge>
-                    </div>
+        <div className="flex gap-4 flex-1">
+          {/* Calendar */}
+          <Card className="flex-1">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="icon" onClick={() => handleNavigate('prev')}>
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleToday} className="text-xs">
+                    Aujourd'hui
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => handleNavigate('next')}>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <CardTitle className="text-lg capitalize ml-2">
+                    {periodTitle}
+                  </CardTitle>
+                </div>
+                
+                <div className="flex items-center gap-4">
+                  {/* View mode selector */}
+                  <div className="flex bg-muted rounded-lg p-0.5">
+                    <Button
+                      variant={viewMode === 'week' ? 'secondary' : 'ghost'}
+                      size="sm"
+                      className="text-xs h-7 px-3"
+                      onClick={() => setViewMode('week')}
+                    >
+                      Semaine
+                    </Button>
+                    <Button
+                      variant={viewMode === 'month' ? 'secondary' : 'ghost'}
+                      size="sm"
+                      className="text-xs h-7 px-3"
+                      onClick={() => setViewMode('month')}
+                    >
+                      Mois
+                    </Button>
                   </div>
-                ))}
+
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      id="subordinates"
+                      checked={includeSubordinates}
+                      onCheckedChange={setIncludeSubordinates}
+                    />
+                    <Label htmlFor="subordinates" className="text-sm flex items-center gap-1">
+                      <Users className="h-3 w-3" />
+                      Équipe
+                    </Label>
+                  </div>
+
+                  {connection.connected && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSync}
+                      disabled={isSyncing}
+                      className="gap-2"
+                    >
+                      <RefreshCw className={cn("h-3 w-3", isSyncing && "animate-spin")} />
+                      Sync
+                    </Button>
+                  )}
+                </div>
               </div>
-            )}
-          </ScrollArea>
-        </CardContent>
-      </Card>
-    </div>
+            </CardHeader>
+            <CardContent className="p-2">
+              {viewMode === 'week' ? (
+                renderWeekView
+              ) : (
+                <>
+                  {/* Week days header */}
+                  <div className="grid grid-cols-7 border-l border-t">
+                    {['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map(day => (
+                      <div key={day} className="text-center text-xs font-medium py-2 border-b border-r bg-muted/50">
+                        {day}
+                      </div>
+                    ))}
+                    {renderMonthView}
+                  </div>
+                </>
+              )}
+
+              {/* Legend */}
+              <div className="flex items-center gap-4 mt-3 text-xs">
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-[#0078D4]" />
+                  <span>Outlook</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-primary" />
+                  <span>Tâches</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-warning" />
+                  <span>Priorité moyenne</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-destructive" />
+                  <span>Priorité haute</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Event list sidebar */}
+          <Card className="w-80 shrink-0">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <CalendarIcon className="h-4 w-4" />
+                {selectedDate ? (
+                  <span>
+                    {format(selectedDate, 'EEEE d MMM', { locale: fr })}
+                  </span>
+                ) : (
+                  <span>Événements</span>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <ScrollArea className="h-[400px]">
+                {isLoading ? (
+                  <div className="flex items-center justify-center p-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  </div>
+                ) : selectedDateEvents.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center p-8 text-muted-foreground">
+                    <CalendarIcon className="h-8 w-8 mb-2 opacity-50" />
+                    <p className="text-sm">Aucun événement</p>
+                  </div>
+                ) : (
+                  <div className="p-3 space-y-2">
+                    {selectedDateEvents.map(event => (
+                      <div
+                        key={event.id}
+                        className={cn(
+                          'p-3 rounded-lg text-white cursor-pointer hover:opacity-90 transition-opacity',
+                          event.color
+                        )}
+                        onClick={(e) => handleEventClick(event, e)}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">{event.title}</p>
+                            {event.location && (
+                              <p className="text-xs opacity-80 truncate">{event.location}</p>
+                            )}
+                          </div>
+                          <span className="text-xs opacity-80 shrink-0">
+                            {event.isAllDay ? 'Journée' : format(event.start, 'HH:mm')}
+                          </span>
+                        </div>
+                        <div className="mt-1">
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-white/20">
+                            {event.source}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Task detail dialog */}
+      <TaskDetailDialog
+        task={selectedTask}
+        open={!!selectedTask}
+        onClose={() => setSelectedTask(null)}
+        onStatusChange={(taskId, status) => {
+          updateTaskStatus(taskId, status);
+          handleTaskUpdated();
+        }}
+      />
+    </>
   );
 }
