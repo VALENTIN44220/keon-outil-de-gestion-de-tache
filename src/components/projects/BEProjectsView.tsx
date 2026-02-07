@@ -10,16 +10,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Plus, Search, Pencil, Trash2, Building2, FolderOpen, Loader2, FileDown, Filter, LayoutDashboard } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Building2, FolderOpen, Loader2, FileDown, Filter, LayoutDashboard, LayoutGrid, List, Kanban } from 'lucide-react';
 import { BEProjectDialog } from './BEProjectDialog';
 import { ALL_PROJECT_COLUMNS, ColumnDefinition } from './ProjectColumnSelector';
-import { ProjectViewSelector, ProjectView } from './ProjectViewSelector';
 import { ProjectKanbanView, GroupByField } from './ProjectKanbanView';
 import { ProjectViewConfigPanel } from './ProjectViewConfigPanel';
 import { useFilteredProjects } from './ProjectFilters';
+import { BEProjectCardsView } from './BEProjectCardsView';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { toast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
+
+type ViewType = 'cards' | 'table' | 'kanban';
 
 export function BEProjectsView() {
   const navigate = useNavigate();
@@ -38,8 +41,8 @@ export function BEProjectsView() {
   const [editingProject, setEditingProject] = useState<BEProject | null>(null);
   const [deletingProject, setDeletingProject] = useState<BEProject | null>(null);
   
-  // View state
-  const [currentView, setCurrentView] = useState<ProjectView>('table');
+  // View state - default to cards
+  const [currentView, setCurrentView] = useState<ViewType>('cards');
   const [kanbanGroupBy, setKanbanGroupBy] = useState<GroupByField>('status');
 
   // Get active config
@@ -157,13 +160,13 @@ export function BEProjectsView() {
   };
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
-      active: { variant: 'default', label: 'Actif' },
-      closed: { variant: 'secondary', label: 'Clôturé' },
-      on_hold: { variant: 'outline', label: 'En attente' },
+    const variants: Record<string, { className: string; label: string }> = {
+      active: { className: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20', label: 'Actif' },
+      closed: { className: 'bg-slate-500/10 text-slate-600 border-slate-500/20', label: 'Clôturé' },
+      on_hold: { className: 'bg-amber-500/10 text-amber-600 border-amber-500/20', label: 'En attente' },
     };
-    const config = variants[status] || { variant: 'outline', label: status };
-    return <Badge variant={config.variant}>{config.label}</Badge>;
+    const config = variants[status] || { className: 'bg-slate-500/10 text-slate-600', label: status };
+    return <Badge className={cn('border', config.className)}>{config.label}</Badge>;
   };
 
   const renderCellValue = (project: BEProject, key: string) => {
@@ -197,24 +200,26 @@ export function BEProjectsView() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-display font-bold text-foreground flex items-center gap-2">
-            <FolderOpen className="h-6 w-6" />
+          <h1 className="text-3xl font-display font-bold text-foreground flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-primary/10">
+              <FolderOpen className="h-7 w-7 text-primary" />
+            </div>
             PROJETS
           </h1>
-          <p className="text-muted-foreground mt-1">
-            Liste des projets
+          <p className="text-muted-foreground mt-2 max-w-xl">
+            Gérez vos projets BE, suivez leur avancement et accédez au hub détaillé de chaque projet.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <Button variant="outline" className="gap-2" onClick={handleExportCSV}>
             <FileDown className="h-4 w-4" />
             Export CSV
           </Button>
 
           {canCreate && (
-            <Button onClick={handleAddProject} className="gap-2">
+            <Button onClick={handleAddProject} className="gap-2 shadow-sm">
               <Plus className="h-4 w-4" />
               Nouveau projet
             </Button>
@@ -223,10 +228,10 @@ export function BEProjectsView() {
       </div>
 
       {/* Search and View Controls */}
-      <Card>
-        <CardContent className="pt-4">
+      <Card className="border-border/50">
+        <CardContent className="p-4">
           <div className="flex items-center gap-4 flex-wrap">
-            <div className="relative flex-1 min-w-[250px]">
+            <div className="relative flex-1 min-w-[280px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Rechercher par code ou nom de projet..."
@@ -235,7 +240,38 @@ export function BEProjectsView() {
                 className="pl-10"
               />
             </div>
-            <ProjectViewSelector currentView={currentView} onViewChange={setCurrentView} />
+            
+            {/* View Toggle */}
+            <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-lg">
+              <Button
+                variant={currentView === 'cards' ? 'default' : 'ghost'}
+                size="sm"
+                className={cn('h-8 px-3 gap-2', currentView === 'cards' && 'shadow-sm')}
+                onClick={() => setCurrentView('cards')}
+              >
+                <LayoutGrid className="h-4 w-4" />
+                <span className="hidden sm:inline">Cards</span>
+              </Button>
+              <Button
+                variant={currentView === 'table' ? 'default' : 'ghost'}
+                size="sm"
+                className={cn('h-8 px-3 gap-2', currentView === 'table' && 'shadow-sm')}
+                onClick={() => setCurrentView('table')}
+              >
+                <List className="h-4 w-4" />
+                <span className="hidden sm:inline">Table</span>
+              </Button>
+              <Button
+                variant={currentView === 'kanban' ? 'default' : 'ghost'}
+                size="sm"
+                className={cn('h-8 px-3 gap-2', currentView === 'kanban' && 'shadow-sm')}
+                onClick={() => setCurrentView('kanban')}
+              >
+                <Kanban className="h-4 w-4" />
+                <span className="hidden sm:inline">Kanban</span>
+              </Button>
+            </div>
+
             {currentView === 'table' && (
               <ProjectViewConfigPanel
                 config={activeConfig}
@@ -247,7 +283,7 @@ export function BEProjectsView() {
               />
             )}
             {activeFiltersCount > 0 && (
-              <Badge variant="secondary" className="gap-1">
+              <Badge variant="secondary" className="gap-1 px-3 py-1">
                 <Filter className="h-3 w-3" />
                 {activeFiltersCount} filtre{activeFiltersCount > 1 ? 's' : ''} actif{activeFiltersCount > 1 ? 's' : ''}
               </Badge>
@@ -257,7 +293,17 @@ export function BEProjectsView() {
       </Card>
 
       {/* Projects View */}
-      {currentView === 'kanban' ? (
+      {currentView === 'cards' && (
+        <BEProjectCardsView
+          projects={filteredProjects}
+          canEdit={canEdit}
+          canDelete={canDelete}
+          onEdit={handleEditProject}
+          onDelete={setDeletingProject}
+        />
+      )}
+
+      {currentView === 'kanban' && (
         <ProjectKanbanView
           projects={filteredProjects}
           groupBy={kanbanGroupBy}
@@ -265,30 +311,35 @@ export function BEProjectsView() {
           onProjectClick={canEdit ? handleEditProject : undefined}
           canEdit={canEdit}
         />
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Building2 className="h-5 w-5" />
-              Liste des projets ({filteredProjects.length}{filteredProjects.length !== projects.length ? ` / ${projects.length}` : ''})
+      )}
+
+      {currentView === 'table' && (
+        <Card className="border-border/50">
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Building2 className="h-5 w-5 text-muted-foreground" />
+              Liste des projets
+              <Badge variant="secondary" className="ml-2">
+                {filteredProjects.length}{filteredProjects.length !== projects.length ? ` / ${projects.length}` : ''}
+              </Badge>
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             {filteredProjects.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
+              <div className="text-center py-12 text-muted-foreground">
                 {searchQuery || activeFiltersCount > 0 ? 'Aucun projet trouvé pour ces critères' : 'Aucun projet créé'}
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto rounded-lg border">
                 <Table>
                   <TableHeader>
-                    <TableRow>
+                    <TableRow className="bg-muted/30 hover:bg-muted/30">
                       {orderedVisibleColumns.map(col => (
-                        <TableHead key={col.key}>
+                        <TableHead key={col.key} className="font-semibold">
                           <div className="flex items-center gap-1">
                             {col.label}
                             {columnFilters[col.key]?.value && (
-                              <Filter className="h-3 w-3 text-keon-blue" />
+                              <Filter className="h-3 w-3 text-primary" />
                             )}
                           </div>
                         </TableHead>
@@ -298,18 +349,30 @@ export function BEProjectsView() {
                   </TableHeader>
                   <TableBody>
                     {filteredProjects.map((project) => (
-                      <TableRow key={project.id}>
+                      <TableRow 
+                        key={project.id} 
+                        className="group cursor-pointer hover:bg-muted/30"
+                        onClick={() => navigate(`/be/projects/${project.code_projet}/overview`)}
+                      >
                         {orderedVisibleColumns.map(col => (
-                          <TableCell key={col.key} className={col.key === 'code_projet' ? 'font-mono font-medium' : col.key === 'nom_projet' ? 'font-medium' : 'text-muted-foreground'}>
+                          <TableCell 
+                            key={col.key} 
+                            className={cn(
+                              col.key === 'code_projet' && 'font-mono font-medium text-primary',
+                              col.key === 'nom_projet' && 'font-medium',
+                              !['code_projet', 'nom_projet', 'status'].includes(col.key) && 'text-muted-foreground'
+                            )}
+                          >
                             {renderCellValue(project, col.key)}
                           </TableCell>
                         ))}
                         {(canEdit || canDelete) && (
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-1">
+                          <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                               <Button
                                 variant="ghost"
                                 size="icon"
+                                className="h-8 w-8"
                                 onClick={() => navigate(`/be/projects/${project.code_projet}/overview`)}
                                 title="Ouvrir le HUB projet"
                               >
@@ -319,6 +382,7 @@ export function BEProjectsView() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
+                                  className="h-8 w-8"
                                   onClick={() => handleEditProject(project)}
                                 >
                                   <Pencil className="h-4 w-4" />
@@ -328,8 +392,8 @@ export function BEProjectsView() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
+                                  className="h-8 w-8 text-destructive hover:text-destructive"
                                   onClick={() => setDeletingProject(project)}
-                                  className="text-destructive hover:text-destructive"
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
