@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -29,13 +29,14 @@ export function useProjectViewConfig() {
   const [activeViewType, setActiveViewType] = useState<'standard' | 'custom'>('standard');
   const [isLoading, setIsLoading] = useState(true);
 
-  const defaultColumns = getDefaultVisibleColumns();
-  const defaultOrder = ALL_PROJECT_COLUMNS.map(c => c.key);
+  // Memoize default values to prevent infinite loops
+  const defaultColumns = useMemo(() => getDefaultVisibleColumns(), []);
+  const defaultOrder = useMemo(() => ALL_PROJECT_COLUMNS.map(c => c.key), []);
 
-  const parseFilters = (data: Json | null): Record<string, ColumnFilter> => {
+  const parseFilters = useCallback((data: Json | null): Record<string, ColumnFilter> => {
     if (!data || typeof data !== 'object' || Array.isArray(data)) return {};
     return data as unknown as Record<string, ColumnFilter>;
-  };
+  }, []);
 
   const fetchConfigs = useCallback(async () => {
     if (!user) return;
@@ -99,7 +100,7 @@ export function useProjectViewConfig() {
     } finally {
       setIsLoading(false);
     }
-  }, [user, defaultColumns, defaultOrder]);
+  }, [user?.id, defaultColumns, defaultOrder, parseFilters]);
 
   useEffect(() => {
     fetchConfigs();

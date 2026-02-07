@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { BEProjectHubLayout } from '@/components/be/BEProjectHubLayout';
 import { 
   useBEProjectByCode, 
@@ -12,9 +12,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { 
   Search, 
   FileText, 
@@ -22,15 +22,18 @@ import {
   Film, 
   Music, 
   File,
-  Download,
   ExternalLink,
   MessageSquare,
-  FileStack
+  FileStack,
+  Eye,
+  X,
+  FolderOpen
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 const getFileIcon = (mimeType: string) => {
   if (mimeType.startsWith('image/')) return Image;
@@ -40,6 +43,14 @@ const getFileIcon = (mimeType: string) => {
   return File;
 };
 
+const getFileColor = (mimeType: string) => {
+  if (mimeType.startsWith('image/')) return 'text-pink-500 bg-pink-500/10';
+  if (mimeType.startsWith('video/')) return 'text-purple-500 bg-purple-500/10';
+  if (mimeType.startsWith('audio/')) return 'text-orange-500 bg-orange-500/10';
+  if (mimeType.includes('pdf')) return 'text-red-500 bg-red-500/10';
+  return 'text-blue-500 bg-blue-500/10';
+};
+
 const formatFileSize = (bytes: number) => {
   if (bytes === 0) return '-';
   if (bytes < 1024) return `${bytes} B`;
@@ -47,9 +58,11 @@ const formatFileSize = (bytes: number) => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
+type FilterType = 'all' | 'image' | 'document' | 'video' | 'audio';
+type SourceFilter = 'all' | 'task' | 'chat';
+
 export default function BEProjectHubFiles() {
   const { code } = useParams<{ code: string }>();
-  const navigate = useNavigate();
   
   const { data: project, isLoading: projectLoading } = useBEProjectByCode(code);
   const { data: tasks = [], isLoading: tasksLoading } = useBEProjectTasks(project?.id);
@@ -66,8 +79,9 @@ export default function BEProjectHubFiles() {
   );
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [sourceFilter, setSourceFilter] = useState<string>('all');
-  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all');
+  const [typeFilter, setTypeFilter] = useState<FilterType>('all');
+  const [previewFile, setPreviewFile] = useState<{ url: string; name: string; type: string } | null>(null);
 
   // Filter files
   const filteredFiles = useMemo(() => {
@@ -88,15 +102,22 @@ export default function BEProjectHubFiles() {
     });
   }, [files, searchQuery, sourceFilter, typeFilter]);
 
-  const handleDownload = async (file: ProjectFile) => {
+  // Stats
+  const stats = useMemo(() => ({
+    total: files.length,
+    images: files.filter(f => f.mime_type.startsWith('image/')).length,
+    documents: files.filter(f => f.mime_type.includes('pdf') || f.mime_type.includes('document')).length,
+    fromTasks: files.filter(f => f.source === 'task').length,
+    fromChat: files.filter(f => f.source === 'chat').length,
+  }), [files]);
+
+  const handleOpen = async (file: ProjectFile) => {
     try {
       let url: string | null = null;
       
       if (file.source === 'task' && file.file_path) {
-        // Task attachments use direct URL
         url = file.file_path;
       } else if (file.source === 'chat' && file.storage_path) {
-        // Chat attachments use signed URL
         const { data } = await supabase.storage
           .from('chat-attachments')
           .createSignedUrl(file.storage_path, 3600);
@@ -104,7 +125,12 @@ export default function BEProjectHubFiles() {
       }
 
       if (url) {
-        window.open(url, '_blank');
+        // Check if we can preview
+        if (file.mime_type.startsWith('image/') || file.mime_type === 'application/pdf') {
+          setPreviewFile({ url, name: file.file_name, type: file.mime_type });
+        } else {
+          window.open(url, '_blank');
+        }
       } else {
         throw new Error('URL non disponible');
       }
@@ -124,8 +150,9 @@ export default function BEProjectHubFiles() {
     return (
       <BEProjectHubLayout>
         <div className="space-y-4">
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-[400px] w-full" />
+          <Skeleton className="h-20 w-full rounded-xl" />
+          <Skeleton className="h-16 w-full rounded-xl" />
+          <Skeleton className="h-[400px] w-full rounded-xl" />
         </div>
       </BEProjectHubLayout>
     );
@@ -134,11 +161,70 @@ export default function BEProjectHubFiles() {
   return (
     <BEProjectHubLayout>
       <div className="space-y-4">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <Card className="border-border/50">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-blue-500/10">
+                <FileStack className="h-5 w-5 text-blue-500" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{stats.total}</p>
+                <p className="text-xs text-muted-foreground">Total fichiers</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-border/50">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-pink-500/10">
+                <Image className="h-5 w-5 text-pink-500" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{stats.images}</p>
+                <p className="text-xs text-muted-foreground">Images</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-border/50">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-red-500/10">
+                <FileText className="h-5 w-5 text-red-500" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{stats.documents}</p>
+                <p className="text-xs text-muted-foreground">Documents</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-border/50">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-amber-500/10">
+                <FolderOpen className="h-5 w-5 text-amber-500" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{stats.fromTasks}</p>
+                <p className="text-xs text-muted-foreground">Depuis tâches</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-border/50">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-purple-500/10">
+                <MessageSquare className="h-5 w-5 text-purple-500" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">{stats.fromChat}</p>
+                <p className="text-xs text-muted-foreground">Depuis discussions</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Filters */}
-        <Card>
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-4 flex-wrap">
-              <div className="relative flex-1 min-w-[200px]">
+        <Card className="border-border/50">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="relative flex-1 min-w-[200px] max-w-md">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Rechercher un fichier..."
@@ -148,70 +234,95 @@ export default function BEProjectHubFiles() {
                 />
               </div>
               
-              <Select value={sourceFilter} onValueChange={setSourceFilter}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Source" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Toutes sources</SelectItem>
-                  <SelectItem value="task">Tâches</SelectItem>
-                  <SelectItem value="chat">Discussions</SelectItem>
-                </SelectContent>
-              </Select>
+              {/* Type Chips */}
+              <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-lg">
+                {([
+                  { value: 'all', label: 'Tous' },
+                  { value: 'image', label: 'Images' },
+                  { value: 'document', label: 'Documents' },
+                  { value: 'video', label: 'Vidéos' },
+                ] as { value: FilterType; label: string }[]).map(opt => (
+                  <Button
+                    key={opt.value}
+                    variant={typeFilter === opt.value ? 'default' : 'ghost'}
+                    size="sm"
+                    className={cn('h-7 px-3 text-xs', typeFilter === opt.value && 'shadow-sm')}
+                    onClick={() => setTypeFilter(opt.value)}
+                  >
+                    {opt.label}
+                  </Button>
+                ))}
+              </div>
 
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous types</SelectItem>
-                  <SelectItem value="image">Images</SelectItem>
-                  <SelectItem value="document">Documents</SelectItem>
-                  <SelectItem value="video">Vidéos</SelectItem>
-                  <SelectItem value="audio">Audio</SelectItem>
-                </SelectContent>
-              </Select>
+              {/* Source Chips */}
+              <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-lg">
+                {([
+                  { value: 'all', label: 'Toutes sources' },
+                  { value: 'task', label: 'Tâches' },
+                  { value: 'chat', label: 'Discussions' },
+                ] as { value: SourceFilter; label: string }[]).map(opt => (
+                  <Button
+                    key={opt.value}
+                    variant={sourceFilter === opt.value ? 'default' : 'ghost'}
+                    size="sm"
+                    className={cn('h-7 px-3 text-xs', sourceFilter === opt.value && 'shadow-sm')}
+                    onClick={() => setSourceFilter(opt.value)}
+                  >
+                    {opt.label}
+                  </Button>
+                ))}
+              </div>
             </div>
           </CardContent>
         </Card>
 
         {/* Files Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileStack className="h-5 w-5" />
-              Fichiers ({filteredFiles.length})
+        <Card className="border-border/50">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <FileStack className="h-5 w-5 text-muted-foreground" />
+              Fichiers
+              <Badge variant="secondary" className="ml-2">
+                {filteredFiles.length}
+              </Badge>
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             {filteredFiles.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <File className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>Aucun fichier trouvé</p>
+              <div className="text-center py-16 text-muted-foreground">
+                <div className="p-4 rounded-full bg-muted inline-block mb-4">
+                  <File className="h-8 w-8 opacity-50" />
+                </div>
+                <p className="font-medium">Aucun fichier trouvé</p>
+                <p className="text-sm mt-1">Modifiez vos filtres ou ajoutez des fichiers</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto rounded-lg border">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Nom</TableHead>
-                      <TableHead>Source</TableHead>
-                      <TableHead>Élément</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Taille</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                    <TableRow className="bg-muted/30 hover:bg-muted/30">
+                      <TableHead className="font-semibold">Nom</TableHead>
+                      <TableHead className="font-semibold">Source</TableHead>
+                      <TableHead className="font-semibold">Élément</TableHead>
+                      <TableHead className="font-semibold">Date</TableHead>
+                      <TableHead className="font-semibold">Taille</TableHead>
+                      <TableHead className="text-right font-semibold">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredFiles.map((file) => {
                       const Icon = getFileIcon(file.mime_type);
+                      const colorClass = getFileColor(file.mime_type);
+                      const canPreview = file.mime_type.startsWith('image/') || file.mime_type === 'application/pdf';
                       
                       return (
-                        <TableRow key={file.id}>
+                        <TableRow key={file.id} className="group">
                           <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Icon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                              <span className="truncate max-w-[200px]" title={file.file_name}>
+                            <div className="flex items-center gap-3">
+                              <div className={cn('p-2 rounded-lg', colorClass)}>
+                                <Icon className="h-4 w-4" />
+                              </div>
+                              <span className="truncate max-w-[200px] font-medium" title={file.file_name}>
                                 {file.file_name}
                               </span>
                             </div>
@@ -220,7 +331,7 @@ export default function BEProjectHubFiles() {
                             <Badge variant="outline" className="gap-1">
                               {file.source === 'task' ? (
                                 <>
-                                  <FileText className="h-3 w-3" />
+                                  <FolderOpen className="h-3 w-3" />
                                   Tâche
                                 </>
                               ) : (
@@ -247,14 +358,28 @@ export default function BEProjectHubFiles() {
                             </span>
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDownload(file)}
-                              title="Ouvrir"
-                            >
-                              <ExternalLink className="h-4 w-4" />
-                            </Button>
+                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              {canPreview && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => handleOpen(file)}
+                                  title="Prévisualiser"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => handleOpen(file)}
+                                title="Ouvrir"
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
@@ -266,6 +391,40 @@ export default function BEProjectHubFiles() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Preview Dialog */}
+      <Dialog open={!!previewFile} onOpenChange={() => setPreviewFile(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden">
+          <DialogHeader className="p-4 border-b">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="truncate pr-8">{previewFile?.name}</DialogTitle>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-4 top-4"
+                onClick={() => setPreviewFile(null)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </DialogHeader>
+          <div className="flex-1 p-4 overflow-auto bg-muted/30">
+            {previewFile?.type.startsWith('image/') ? (
+              <img 
+                src={previewFile.url} 
+                alt={previewFile.name}
+                className="max-w-full max-h-[70vh] mx-auto rounded-lg shadow-lg"
+              />
+            ) : previewFile?.type === 'application/pdf' ? (
+              <iframe
+                src={previewFile.url}
+                className="w-full h-[70vh] rounded-lg"
+                title={previewFile.name}
+              />
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
     </BEProjectHubLayout>
   );
 }
