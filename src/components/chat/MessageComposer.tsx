@@ -1,15 +1,17 @@
-import { useState, useRef, useCallback, KeyboardEvent, DragEvent } from 'react';
+import { useState, useRef, useCallback, KeyboardEvent, DragEvent, useEffect } from 'react';
 import { Send, Paperclip, X, FileText, Image as ImageIcon, File, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { useRequestMentions, RequestMention } from '@/hooks/useRequestMentions';
+import { MentionPopover } from './MentionPopover';
 
 interface MessageComposerProps {
   onSend: (content: string, attachments: File[]) => Promise<boolean>;
   sending: boolean;
   disabled?: boolean;
   placeholder?: string;
+  onMentionSelect?: (mention: RequestMention) => void;
 }
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
@@ -19,13 +21,20 @@ export function MessageComposer({
   onSend,
   sending,
   disabled = false,
-  placeholder = "Écrivez un message...",
+  placeholder = "Écrivez un message... (@ pour mentionner une demande)",
+  onMentionSelect,
 }: MessageComposerProps) {
   const [content, setContent] = useState('');
   const [attachments, setAttachments] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Mention state
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionStartIndex, setMentionStartIndex] = useState<number | null>(null);
+  const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
+  const { suggestions, loading: mentionLoading, searchRequests, clearSuggestions } = useRequestMentions();
 
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
@@ -39,6 +48,59 @@ export function MessageComposer({
     return File;
   };
 
+  // Detect @ mention in content
+  useEffect(() => {
+    const cursorPos = textareaRef.current?.selectionStart ?? content.length;
+    const textBeforeCursor = content.slice(0, cursorPos);
+    
+    // Find @ that starts a mention (preceded by space or at start)
+    const mentionMatch = textBeforeCursor.match(/(?:^|\s)@([^\s@]*)$/);
+    
+    if (mentionMatch) {
+      const query = mentionMatch[1];
+      setMentionQuery(query);
+      setMentionStartIndex(cursorPos - query.length - 1); // -1 for @
+      setSelectedMentionIndex(0);
+      searchRequests(query);
+    } else {
+      if (mentionQuery !== null) {
+        setMentionQuery(null);
+        setMentionStartIndex(null);
+        clearSuggestions();
+      }
+    }
+  }, [content, searchRequests, clearSuggestions, mentionQuery]);
+
+  const insertMention = useCallback((mention: RequestMention) => {
+    if (mentionStartIndex === null) return;
+
+    const before = content.slice(0, mentionStartIndex);
+    const cursorPos = textareaRef.current?.selectionStart ?? content.length;
+    const after = content.slice(cursorPos);
+    
+    // Insert the mention reference
+    const mentionText = `@${mention.request_number} `;
+    const newContent = before + mentionText + after;
+    
+    setContent(newContent);
+    setMentionQuery(null);
+    setMentionStartIndex(null);
+    clearSuggestions();
+
+    // Notify parent to switch conversation if needed
+    onMentionSelect?.(mention);
+
+    // Focus and position cursor after mention
+    setTimeout(() => {
+      if (textareaRef.current) {
+        const newPos = before.length + mentionText.length;
+        textareaRef.current.selectionStart = newPos;
+        textareaRef.current.selectionEnd = newPos;
+        textareaRef.current.focus();
+      }
+    }, 0);
+  }, [content, mentionStartIndex, clearSuggestions, onMentionSelect]);
+
   const handleSend = async () => {
     if ((!content.trim() && attachments.length === 0) || disabled || sending) return;
     
@@ -51,6 +113,37 @@ export function MessageComposer({
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    // Handle mention navigation
+    if (mentionQuery !== null && suggestions.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedMentionIndex(prev => 
+          prev < suggestions.length - 1 ? prev + 1 : 0
+        );
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedMentionIndex(prev => 
+          prev > 0 ? prev - 1 : suggestions.length - 1
+        );
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        insertMention(suggestions[selectedMentionIndex]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setMentionQuery(null);
+        setMentionStartIndex(null);
+        clearSuggestions();
+        return;
+      }
+    }
+
+    // Normal send on Enter
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -76,7 +169,6 @@ export function MessageComposer({
     if (e.target.files) {
       handleFileSelect(e.target.files);
     }
-    // Reset input so same file can be selected again
     e.target.value = '';
   };
 
@@ -117,7 +209,7 @@ export function MessageComposer({
   return (
     <div 
       className={cn(
-        "border-t bg-background p-4 transition-colors",
+        "relative border-t bg-background p-4 transition-colors",
         isDragging && "bg-primary/5 border-primary"
       )}
       onDragEnter={handleDragEnter}
@@ -125,6 +217,16 @@ export function MessageComposer({
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
+      {/* Mention autocomplete popover */}
+      <MentionPopover
+        suggestions={suggestions}
+        loading={mentionLoading}
+        selectedIndex={selectedMentionIndex}
+        onSelect={insertMention}
+        position={null}
+        visible={mentionQuery !== null}
+      />
+
       {/* Attachments preview */}
       {attachments.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-3">
@@ -210,7 +312,7 @@ export function MessageComposer({
 
       {/* Helper text */}
       <p className="text-xs text-muted-foreground mt-2">
-        Entrée pour envoyer, Shift+Entrée pour une nouvelle ligne
+        @ pour mentionner une demande • Entrée pour envoyer • Shift+Entrée pour nouvelle ligne
       </p>
     </div>
   );
