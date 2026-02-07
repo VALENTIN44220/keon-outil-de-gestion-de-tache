@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useChat } from '@/hooks/useChat';
 import { useChatMessages } from '@/hooks/useChatMessages';
+import { useRequestMentions, RequestMention } from '@/hooks/useRequestMentions';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,10 +15,12 @@ import {
   NewGroupDialog,
 } from '@/components/chat';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 import type { ConversationWithDetails } from '@/types/chat';
 
 export default function Chat() {
   const { profile } = useAuth();
+  const { toast } = useToast();
   const isMobile = useIsMobile();
   const {
     conversations,
@@ -29,6 +32,8 @@ export default function Chat() {
     refreshConversations,
   } = useChat();
 
+  const { getOrCreateRequestChat } = useRequestMentions();
+  
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [showNewChat, setShowNewChat] = useState(false);
   const [showNewGroup, setShowNewGroup] = useState(false);
@@ -137,6 +142,22 @@ export default function Chat() {
     refreshConversations();
   };
 
+  // Handle mention select - switch to request's conversation
+  const handleMentionSelect = async (mention: RequestMention) => {
+    const conversationId = await getOrCreateRequestChat(mention.id);
+    if (conversationId) {
+      await refreshConversations();
+      setSelectedConversationId(conversationId);
+      if (isMobile) {
+        setShowConversationList(false);
+      }
+      toast({
+        title: 'Conversation de la demande',
+        description: `Vous êtes dans le chat de ${mention.request_number}`,
+      });
+    }
+  };
+
   return (
     <div className="flex min-h-screen bg-background">
       <Sidebar activeView="chat" onViewChange={() => {}} />
@@ -188,6 +209,7 @@ export default function Chat() {
                 <MessageComposer
                   onSend={handleSendMessage}
                   sending={sending}
+                  onMentionSelect={handleMentionSelect}
                 />
               </>
             ) : (

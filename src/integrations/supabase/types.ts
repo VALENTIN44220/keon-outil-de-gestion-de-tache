@@ -4628,6 +4628,10 @@ export type Database = {
         Args: { _user_a: string; _user_b: string }
         Returns: string
       }
+      find_or_create_request_chat: {
+        Args: { _request_id: string; _user_id: string }
+        Returns: string
+      }
       generate_default_form_schema: {
         Args: { p_process_id: string }
         Returns: Json
