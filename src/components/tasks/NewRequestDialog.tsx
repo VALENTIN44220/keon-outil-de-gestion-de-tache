@@ -619,8 +619,23 @@ export function NewRequestDialog({
                 targetManagerId,
               });
             } catch (err: any) {
+              const errMsg =
+                err instanceof Error
+                  ? err.message
+                  : typeof err === "string"
+                    ? err
+                    : err && typeof err === "object" && typeof err.message === "string"
+                      ? err.message
+                      : (() => {
+                          try {
+                            return JSON.stringify(err);
+                          } catch {
+                            return "Erreur inconnue";
+                          }
+                        })();
+
               throw new Error(
-                `Erreur génération des affectations (sous-processus ${subProcessId}) : ${err?.message || String(err)}`,
+                `Erreur génération des affectations (sous-processus ${subProcessId}) : ${errMsg}`,
               );
             }
             totalAssignments += count;
@@ -647,8 +662,23 @@ export function NewRequestDialog({
             targetManagerId,
           });
         } catch (err: any) {
+          const errMsg =
+            err instanceof Error
+              ? err.message
+              : typeof err === "string"
+                ? err
+                : err && typeof err === "object" && typeof err.message === "string"
+                  ? err.message
+                  : (() => {
+                      try {
+                        return JSON.stringify(err);
+                      } catch {
+                        return "Erreur inconnue";
+                      }
+                    })();
+
           throw new Error(
-            `Erreur génération des affectations (sous-processus ${linkedSubProcessId}) : ${err?.message || String(err)}`,
+            `Erreur génération des affectations (sous-processus ${linkedSubProcessId}) : ${errMsg}`,
           );
         }
         toast.success("Demande créée avec succès");
@@ -660,8 +690,23 @@ export function NewRequestDialog({
             targetDepartmentId,
           });
         } catch (err: any) {
+          const errMsg =
+            err instanceof Error
+              ? err.message
+              : typeof err === "string"
+                ? err
+                : err && typeof err === "object" && typeof err.message === "string"
+                  ? err.message
+                  : (() => {
+                      try {
+                        return JSON.stringify(err);
+                      } catch {
+                        return "Erreur inconnue";
+                      }
+                    })();
+
           throw new Error(
-            `Erreur génération des affectations (processus ${linkedProcessId}) : ${err?.message || String(err)}`,
+            `Erreur génération des affectations (processus ${linkedProcessId}) : ${errMsg}`,
           );
         }
         toast.success("Demande créée avec succès");
@@ -674,7 +719,23 @@ export function NewRequestDialog({
       onClose();
     } catch (error) {
       console.error("Error creating request:", error);
-      const msg = error instanceof Error ? error.message : String(error);
+      const msg = (() => {
+        if (error instanceof Error) return error.message;
+        if (typeof error === "string") return error;
+        if (error && typeof error === "object") {
+          const anyErr = error as any;
+          if (typeof anyErr.message === "string" && anyErr.message.trim()) return anyErr.message;
+          if (typeof anyErr.error_description === "string" && anyErr.error_description.trim()) return anyErr.error_description;
+          if (typeof anyErr.details === "string" && anyErr.details.trim()) return anyErr.details;
+          try {
+            return JSON.stringify(error);
+          } catch {
+            return "Erreur lors de la création de la demande";
+          }
+        }
+        return "Erreur lors de la création de la demande";
+      })();
+
       toast.error(msg || "Erreur lors de la création de la demande");
     } finally {
       setIsSubmitting(false);
