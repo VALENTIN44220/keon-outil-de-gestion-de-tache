@@ -7,8 +7,9 @@ import { format, isSameDay, parseISO, startOfMonth, endOfMonth, eachDayOfInterva
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { TaskCard } from './TaskCard';
-import { ClipboardList, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ClipboardList, ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { getStatusFilterOptions, matchesStatusFilter, getStatusColor, getStatusLabel } from '@/services/taskStatusService';
 
 interface CalendarViewProps {
   tasks: Task[];
@@ -27,13 +28,23 @@ const priorityColors: Record<string, string> = {
   low: 'bg-green-500',
 };
 
+// Get status filter options from centralized service
+const statusFilterOptions = getStatusFilterOptions();
+
 export function CalendarView({ tasks, onStatusChange, onDelete, groupBy, groupLabels, progressMap, onTaskUpdated }: CalendarViewProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+
+  // Filter tasks by status
+  const filteredTasks = useMemo(() => {
+    if (statusFilter === 'all') return tasks;
+    return tasks.filter(t => matchesStatusFilter(t.status, statusFilter));
+  }, [tasks, statusFilter]);
 
   const tasksWithDueDate = useMemo(() => 
-    tasks.filter(t => t.due_date), 
-    [tasks]
+    filteredTasks.filter(t => t.due_date), 
+    [filteredTasks]
   );
 
   const tasksByDate = useMemo(() => {
@@ -56,8 +67,8 @@ export function CalendarView({ tasks, onStatusChange, onDelete, groupBy, groupLa
   }, [selectedDate, tasksByDate]);
 
   const tasksWithoutDueDate = useMemo(() => 
-    tasks.filter(t => !t.due_date),
-    [tasks]
+    filteredTasks.filter(t => !t.due_date),
+    [filteredTasks]
   );
 
   // Custom day render to show task indicators
@@ -85,16 +96,52 @@ export function CalendarView({ tasks, onStatusChange, onDelete, groupBy, groupLa
     },
   };
 
-  if (tasks.length === 0) {
+  // Status filter bar component
+  const StatusFilterBar = () => (
+    <div className="flex items-center gap-2 mb-4 flex-wrap">
+      <Filter className="w-4 h-4 text-muted-foreground" />
+      <span className="text-sm font-medium text-muted-foreground mr-2">Statut:</span>
+      <div className="flex bg-muted rounded-lg p-1 flex-wrap gap-1">
+        {statusFilterOptions.map((option) => (
+          <Button
+            key={option.value}
+            variant="ghost"
+            size="sm"
+            onClick={() => setStatusFilter(option.value)}
+            className={cn(
+              "text-xs px-3 py-1 h-auto rounded-md transition-all",
+              statusFilter === option.value
+                ? "bg-card shadow-sm text-foreground" 
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {option.label}
+          </Button>
+        ))}
+      </div>
+      {statusFilter !== 'all' && (
+        <Badge variant="secondary" className="ml-2">
+          {filteredTasks.length} tâche{filteredTasks.length !== 1 ? 's' : ''}
+        </Badge>
+      )}
+    </div>
+  );
+
+  if (filteredTasks.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
-          <ClipboardList className="w-8 h-8 text-muted-foreground" />
+      <div className="space-y-4">
+        <StatusFilterBar />
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+            <ClipboardList className="w-8 h-8 text-muted-foreground" />
+          </div>
+          <h3 className="text-lg font-medium text-foreground mb-1">Aucune tâche trouvée</h3>
+          <p className="text-sm text-muted-foreground">
+            {statusFilter !== 'all' 
+              ? 'Aucune tâche avec ce statut. Modifiez vos filtres.' 
+              : 'Modifiez vos filtres ou créez une nouvelle tâche'}
+          </p>
         </div>
-        <h3 className="text-lg font-medium text-foreground mb-1">Aucune tâche trouvée</h3>
-        <p className="text-sm text-muted-foreground">
-          Modifiez vos filtres ou créez une nouvelle tâche
-        </p>
       </div>
     );
   }
@@ -160,9 +207,13 @@ export function CalendarView({ tasks, onStatusChange, onDelete, groupBy, groupLa
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Calendar */}
-      <Card className="lg:col-span-2">
+    <div className="space-y-4">
+      {/* Status filter bar */}
+      <StatusFilterBar />
+      
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Calendar */}
+        <Card className="lg:col-span-2">
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <CardTitle>Calendrier des tâches</CardTitle>
@@ -291,6 +342,7 @@ export function CalendarView({ tasks, onStatusChange, onDelete, groupBy, groupLa
           </CardContent>
         </Card>
       )}
+      </div>
     </div>
   );
 }
