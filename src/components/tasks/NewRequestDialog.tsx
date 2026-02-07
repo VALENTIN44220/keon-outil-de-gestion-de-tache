@@ -825,36 +825,42 @@ export function NewRequestDialog({
                   <FileText className="h-4 w-4" />
                   <span>Général</span>
                 </TabsTrigger>
-                {showSubProcessTab && (
-                  <TabsTrigger
-                    value="subprocesses"
-                    className="flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl font-semibold transition-all duration-200 data-[state=active]:shadow-lg data-[state=active]:bg-white data-[state=active]:text-primary data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-white/50"
+                {/* Always render TabsTrigger to avoid React DOM unmount issues, hide with CSS */}
+                <TabsTrigger
+                  value="subprocesses"
+                  className={cn(
+                    "flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl font-semibold transition-all duration-200 data-[state=active]:shadow-lg data-[state=active]:bg-white data-[state=active]:text-primary data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-white/50",
+                    !showSubProcessTab && "hidden"
+                  )}
+                  disabled={!showSubProcessTab}
+                >
+                  <CheckSquare className="h-4 w-4" />
+                  <span>Tâches</span>
+                  <Badge
+                    variant={selectedSubProcessIds.length > 0 ? "default" : "secondary"}
+                    className={cn(
+                      "ml-1.5 text-[10px] px-2 py-0.5 rounded-full font-bold",
+                      selectedSubProcessIds.length > 0 && "bg-primary shadow-sm",
+                    )}
                   >
-                    <CheckSquare className="h-4 w-4" />
-                    <span>Tâches</span>
-                    <Badge
-                      variant={selectedSubProcessIds.length > 0 ? "default" : "secondary"}
-                      className={cn(
-                        "ml-1.5 text-[10px] px-2 py-0.5 rounded-full font-bold",
-                        selectedSubProcessIds.length > 0 && "bg-primary shadow-sm",
-                      )}
-                    >
-                      {selectedSubProcessIds.length}
-                    </Badge>
-                  </TabsTrigger>
-                )}
-                {showCustomFieldsTab && (
-                  <TabsTrigger
-                    value="customfields"
-                    className="flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl font-semibold transition-all duration-200 data-[state=active]:shadow-lg data-[state=active]:bg-white data-[state=active]:text-primary data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-white/50"
-                  >
-                    <FormInput className="h-4 w-4" />
-                    <span>Détails de la demande</span>
-                    <Badge variant="secondary" className="ml-1.5 text-[10px] px-2 py-0.5 rounded-full font-bold">
-                      {customFieldsCount}
-                    </Badge>
-                  </TabsTrigger>
-                )}
+                    {selectedSubProcessIds.length}
+                  </Badge>
+                </TabsTrigger>
+                {/* Always render TabsTrigger to avoid React DOM unmount issues, hide with CSS */}
+                <TabsTrigger
+                  value="customfields"
+                  className={cn(
+                    "flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl font-semibold transition-all duration-200 data-[state=active]:shadow-lg data-[state=active]:bg-white data-[state=active]:text-primary data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-white/50",
+                    !showCustomFieldsTab && "hidden"
+                  )}
+                  disabled={!showCustomFieldsTab}
+                >
+                  <FormInput className="h-4 w-4" />
+                  <span>Détails de la demande</span>
+                  <Badge variant="secondary" className="ml-1.5 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                    {customFieldsCount}
+                  </Badge>
+                </TabsTrigger>
               </TabsList>
             </div>
 
@@ -1093,80 +1099,82 @@ export function NewRequestDialog({
                   </div>
                 </TabsContent>
 
-                {/* Sub-processes/Tasks Tab */}
-                {showSubProcessTab && (
-                  <TabsContent value="subprocesses" className="mt-0 space-y-5">
-                    {/* Info banner */}
-                    <div className="rounded-2xl border-2 border-info/30 bg-gradient-to-r from-info/10 via-info/5 to-transparent p-5">
-                      <div className="flex items-start gap-3">
-                        <div className="p-2 rounded-xl bg-info/20">
-                          <Info className="h-5 w-5 text-info" />
-                        </div>
-                        <p className="text-sm text-muted-foreground leading-relaxed">
-                          Sélectionnez les tâches à réaliser pour cette demande. Chaque tâche cochée déclenchera la
-                          création des actions correspondantes.
-                        </p>
-                      </div>
-                    </div>
-
-                    {availableSubProcesses.length === 0 ? (
-                      <TasksEmptyState />
-                    ) : (
-                      <>
-                        <div className="max-h-[280px] overflow-y-auto pr-2 border rounded-xl bg-muted/20 p-3">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                            {availableSubProcesses.map((subProcess) => {
-                              const isSelected = selectedSubProcessIds.includes(subProcess.id);
-                              const hasCustomFields = subProcessCustomFields[subProcess.id]?.length > 0;
-
-                              return (
-                                <TaskSelectionCard
-                                  key={subProcess.id}
-                                  id={subProcess.id}
-                                  name={subProcess.name}
-                                  description={subProcess.description}
-                                  isSelected={isSelected}
-                                  hasCustomFields={hasCustomFields}
-                                  onToggle={() => toggleSubProcess(subProcess.id)}
-                                />
-                              );
-                            })}
+                {/* Sub-processes/Tasks Tab - Always render to avoid React DOM issues */}
+                <TabsContent value="subprocesses" className="mt-0 space-y-5">
+                  {showSubProcessTab ? (
+                    <>
+                      {/* Info banner */}
+                      <div className="rounded-2xl border-2 border-info/30 bg-gradient-to-r from-info/10 via-info/5 to-transparent p-5">
+                        <div className="flex items-start gap-3">
+                          <div className="p-2 rounded-xl bg-info/20">
+                            <Info className="h-5 w-5 text-info" />
                           </div>
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            Sélectionnez les tâches à réaliser pour cette demande. Chaque tâche cochée déclenchera la
+                            création des actions correspondantes.
+                          </p>
                         </div>
+                      </div>
 
-                        {selectedSubProcessIds.length > 0 && (
-                          <div className="pt-5 border-t-2 border-dashed border-primary/20">
-                            <p className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
-                              <CheckSquare className="h-4 w-4 text-primary" />
-                              Tâches sélectionnées ({selectedSubProcessIds.length})
-                            </p>
-                            <div className="flex flex-wrap gap-2">
-                              {selectedSubProcessIds.map((spId) => {
-                                const sp = availableSubProcesses.find((s) => s.id === spId);
-                                return sp ? (
-                                  <Badge
-                                    key={spId}
-                                    variant="default"
-                                    className="cursor-pointer hover:bg-primary/80 transition-all rounded-lg px-3 py-1.5 gap-1.5 font-medium shadow-sm"
-                                    onClick={() => toggleSubProcess(spId)}
-                                  >
-                                    {sp.name}
-                                    <span className="ml-1 opacity-70 hover:opacity-100">×</span>
-                                  </Badge>
-                                ) : null;
+                      {availableSubProcesses.length === 0 ? (
+                        <TasksEmptyState />
+                      ) : (
+                        <>
+                          <div className="max-h-[280px] overflow-y-auto pr-2 border rounded-xl bg-muted/20 p-3">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                              {availableSubProcesses.map((subProcess) => {
+                                const isSelected = selectedSubProcessIds.includes(subProcess.id);
+                                const hasCustomFields = subProcessCustomFields[subProcess.id]?.length > 0;
+
+                                return (
+                                  <TaskSelectionCard
+                                    key={subProcess.id}
+                                    id={subProcess.id}
+                                    name={subProcess.name}
+                                    description={subProcess.description}
+                                    isSelected={isSelected}
+                                    hasCustomFields={hasCustomFields}
+                                    onToggle={() => toggleSubProcess(subProcess.id)}
+                                  />
+                                );
                               })}
                             </div>
                           </div>
-                        )}
-                      </>
-                    )}
-                  </TabsContent>
-                )}
 
-                {/* Custom Fields Tab */}
-                {showCustomFieldsTab && (
-                  <TabsContent value="customfields" className="mt-0 space-y-5">
-                    {loadingProcessFields ? (
+                          {selectedSubProcessIds.length > 0 && (
+                            <div className="pt-5 border-t-2 border-dashed border-primary/20">
+                              <p className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
+                                <CheckSquare className="h-4 w-4 text-primary" />
+                                Tâches sélectionnées ({selectedSubProcessIds.length})
+                              </p>
+                              <div className="flex flex-wrap gap-2">
+                                {selectedSubProcessIds.map((spId) => {
+                                  const sp = availableSubProcesses.find((s) => s.id === spId);
+                                  return sp ? (
+                                    <Badge
+                                      key={spId}
+                                      variant="default"
+                                      className="cursor-pointer hover:bg-primary/80 transition-all rounded-lg px-3 py-1.5 gap-1.5 font-medium shadow-sm"
+                                      onClick={() => toggleSubProcess(spId)}
+                                    >
+                                      {sp.name}
+                                      <span className="ml-1 opacity-70 hover:opacity-100">×</span>
+                                    </Badge>
+                                  ) : null;
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </>
+                  ) : null}
+                </TabsContent>
+
+                {/* Custom Fields Tab - Always render to avoid React DOM issues */}
+                <TabsContent value="customfields" className="mt-0 space-y-5">
+                  {showCustomFieldsTab ? (
+                    loadingProcessFields ? (
                       <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
                         <div className="w-12 h-12 border-3 border-primary/30 border-t-primary rounded-full animate-spin mb-4" />
                         <p className="text-sm font-medium">Chargement des champs...</p>
@@ -1183,9 +1191,9 @@ export function NewRequestDialog({
                           disabled={isSubmitting}
                         />
                       </div>
-                    )}
-                  </TabsContent>
-                )}
+                    )
+                  ) : null}
+                </TabsContent>
               </div>
             </div>
           </Tabs>
