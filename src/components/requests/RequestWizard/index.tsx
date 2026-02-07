@@ -140,7 +140,7 @@ export function RequestWizardDialog({ open, onClose, onSuccess, initialProcessId
       case "subprocesses":
         return data.selectedSubProcesses.length > 0;
       case "details":
-        return !!data.title.trim();
+        return !!data.title.trim() && !!data.dueDate;
       case "fields":
         return true; // Custom fields validation could be added here
       case "summary":
