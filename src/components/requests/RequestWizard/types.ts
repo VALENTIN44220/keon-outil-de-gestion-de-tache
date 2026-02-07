@@ -96,6 +96,7 @@ export const WIZARD_STEPS: Record<RequestType, WizardStep[]> = {
     { id: 'type', label: 'Type', description: 'Choisir le type de demande' },
     { id: 'process', label: 'Processus', description: 'Choisir le processus' },
     { id: 'subprocesses', label: 'Sous-processus', description: 'Sélectionner les tâches' },
+    { id: 'details', label: 'Détails', description: 'Informations de la demande' },
     { id: 'fields', label: 'Formulaire', description: 'Remplir les champs' },
     { id: 'summary', label: 'Récapitulatif', description: 'Vérifier et créer' },
   ],
