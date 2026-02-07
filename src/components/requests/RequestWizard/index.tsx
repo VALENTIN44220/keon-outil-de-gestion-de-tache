@@ -269,7 +269,26 @@ export function RequestWizardDialog({ open, onClose, onSuccess, initialProcessId
       onClose();
     } catch (error) {
       console.error("Error creating request:", error);
-      const msg = error instanceof Error ? error.message : String(error);
+
+      // Supabase/Postgrest errors are often plain objects (not instanceof Error),
+      // so String(error) becomes "[object Object]".
+      const msg = (() => {
+        if (error instanceof Error) return error.message;
+        if (typeof error === "string") return error;
+        if (error && typeof error === "object") {
+          const anyErr = error as any;
+          if (typeof anyErr.message === "string" && anyErr.message.trim()) return anyErr.message;
+          if (typeof anyErr.error_description === "string" && anyErr.error_description.trim()) return anyErr.error_description;
+          if (typeof anyErr.details === "string" && anyErr.details.trim()) return anyErr.details;
+          try {
+            return JSON.stringify(error);
+          } catch {
+            return "Erreur lors de la création";
+          }
+        }
+        return "Erreur lors de la création";
+      })();
+
       toast.error(msg || "Erreur lors de la création");
     } finally {
       setIsSubmitting(false);
