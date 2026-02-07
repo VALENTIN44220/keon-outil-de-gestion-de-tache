@@ -66,6 +66,7 @@ interface UnifiedTaskDrawerProps {
   onAssigneeChange?: (taskId: string, assigneeId: string) => Promise<void>;
   onSlotDelete?: (slotId: string) => Promise<void>;
   onMarkDone?: (taskId: string) => Promise<void>;
+  onViewDetails?: (taskId: string, taskType?: string) => void;
   teamMembers?: { id: string; display_name: string; avatar_url?: string }[];
 }
 
@@ -104,6 +105,7 @@ export function UnifiedTaskDrawer({
   onAssigneeChange,
   onSlotDelete,
   onMarkDone,
+  onViewDetails,
   teamMembers = [],
 }: UnifiedTaskDrawerProps) {
   const [comment, setComment] = useState('');
@@ -458,7 +460,12 @@ export function UnifiedTaskDrawer({
 
         {/* Footer */}
         <div className="p-4 border-t bg-muted/30 flex items-center gap-2">
-          <Button variant="outline" size="sm" className="gap-2 flex-1">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="gap-2 flex-1"
+            onClick={() => onViewDetails?.(task.id, task.type)}
+          >
             <ExternalLink className="h-4 w-4" />
             Voir détails
           </Button>
