@@ -1,38 +1,37 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
-import { Task, TaskStatus, TaskPriority, AssignmentRule } from "@/types/task";
-import { cn } from "@/lib/utils";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CategorySelect } from "@/components/templates/CategorySelect";
-import { useCategories } from "@/hooks/useCategories";
-import { useAssignmentRules } from "@/hooks/useAssignmentRules";
-import { useRequestWorkflow } from "@/hooks/useRequestWorkflow";
-import { useCustomFields } from "@/hooks/useCustomFields";
-import { supabase } from "@/integrations/supabase/client";
-import { validateCustomFields } from "./CustomFieldsRenderer";
-import { SectionedCustomFieldsRenderer } from "./SectionedCustomFieldsRenderer";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { useAuth } from "@/contexts/AuthContext";
-import { Badge } from "@/components/ui/badge";
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { Task, TaskStatus, TaskPriority, AssignmentRule } from '@/types/task';
+import { cn } from '@/lib/utils';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import {
-  Info,
-  ArrowRight,
-  Workflow,
-  FormInput,
-  CheckSquare,
-  FileText,
-  Calendar,
-  AlertCircle,
-  Folder,
-} from "lucide-react";
-import { BEProjectSelect } from "@/components/be/BEProjectSelect";
-import { toast } from "sonner";
-import { TemplateCustomField } from "@/types/customField";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { CategorySelect } from '@/components/templates/CategorySelect';
+import { useCategories } from '@/hooks/useCategories';
+import { useAssignmentRules } from '@/hooks/useAssignmentRules';
+import { useRequestWorkflow } from '@/hooks/useRequestWorkflow';
+import { useCustomFields } from '@/hooks/useCustomFields';
+import { supabase } from '@/integrations/supabase/client';
+import { validateCustomFields } from './CustomFieldsRenderer';
+import { SectionedCustomFieldsRenderer } from './SectionedCustomFieldsRenderer';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { useAuth } from '@/contexts/AuthContext';
+import { Badge } from '@/components/ui/badge';
+import { 
+  Info, ArrowRight, Workflow, FormInput, CheckSquare, FileText, 
+  Calendar, AlertCircle, Folder
+} from 'lucide-react';
+import { BEProjectSelect } from '@/components/be/BEProjectSelect';
+import { toast } from 'sonner';
+import { TemplateCustomField } from '@/types/customField';
 
 import {
   RequestDialogHeader,
@@ -41,7 +40,7 @@ import {
   PriorityBadge,
   TasksEmptyState,
   TaskSelectionCard,
-} from "./request-dialog";
+} from './request-dialog';
 
 interface Department {
   id: string;
@@ -68,46 +67,39 @@ interface LinkItem {
   id: string;
   name: string;
   url: string;
-  type: "link" | "file";
+  type: 'link' | 'file';
 }
 
 interface NewRequestDialogProps {
   open: boolean;
   onClose: () => void;
   onAdd: (
-    task: Omit<Task, "id" | "user_id" | "created_at" | "updated_at">,
+    task: Omit<Task, 'id' | 'user_id' | 'created_at' | 'updated_at'>, 
     checklistItems?: ChecklistItem[],
-    links?: LinkItem[],
+    links?: LinkItem[]
   ) => Promise<void>;
   onTasksCreated?: () => void;
   initialProcessTemplateId?: string;
   initialSubProcessTemplateId?: string;
 }
 
-export function NewRequestDialog({
-  open,
-  onClose,
-  onAdd,
-  onTasksCreated,
-  initialProcessTemplateId,
-  initialSubProcessTemplateId,
-}: NewRequestDialogProps) {
+export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initialProcessTemplateId, initialSubProcessTemplateId }: NewRequestDialogProps) {
   const { profile: currentUser } = useAuth();
   const { generatePendingAssignments, getProcessTemplateForSubcategory } = useRequestWorkflow();
-
+  
   // Form state
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [priority, setPriority] = useState<TaskPriority>("medium");
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [priority, setPriority] = useState<TaskPriority>('medium');
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [subcategoryId, setSubcategoryId] = useState<string | null>(null);
-  const [dueDate, setDueDate] = useState("");
+  const [dueDate, setDueDate] = useState('');
   const [targetDepartmentId, setTargetDepartmentId] = useState<string | null>(null);
   const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
   const [links, setLinks] = useState<LinkItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [beProjectId, setBeProjectId] = useState<string | null>(null);
-
+  
   // Process/sub-process state
   const [departments, setDepartments] = useState<Department[]>([]);
   const [linkedProcessId, setLinkedProcessId] = useState<string | null>(null);
@@ -138,7 +130,7 @@ export function NewRequestDialog({
   // Find matching assignment rule (memoized)
   const matchingRule: AssignmentRule | null = useMemo(
     () => findMatchingRule(categoryId, subcategoryId),
-    [findMatchingRule, categoryId, subcategoryId],
+    [findMatchingRule, categoryId, subcategoryId]
   );
   const requiresValidation = matchingRule?.requires_validation || false;
 
@@ -150,14 +142,14 @@ export function NewRequestDialog({
         ? [linkedSubProcessId]
         : [];
     const allRelevantIds = Array.from(
-      new Set([...relevantSubProcessIds, ...availableSubProcesses.map((sp) => sp.id)]),
+      new Set([...relevantSubProcessIds, ...availableSubProcesses.map((sp) => sp.id)])
     ).sort();
-    return allRelevantIds.join("|");
+    return allRelevantIds.join('|');
   }, [hasMultipleSubProcesses, selectedSubProcessIds, linkedSubProcessId, availableSubProcesses]);
 
   // Fetch custom fields for relevant sub-processes
   useEffect(() => {
-    const allRelevantIds = relevantIdsKey ? relevantIdsKey.split("|").filter(Boolean) : [];
+    const allRelevantIds = relevantIdsKey ? relevantIdsKey.split('|').filter(Boolean) : [];
 
     if (allRelevantIds.length === 0) {
       setSubProcessCustomFields((prev) => (Object.keys(prev).length === 0 ? prev : {}));
@@ -168,10 +160,10 @@ export function NewRequestDialog({
 
     (async () => {
       const { data, error } = await supabase
-        .from("template_custom_fields")
-        .select("*")
-        .in("sub_process_template_id", allRelevantIds)
-        .order("order_index");
+        .from('template_custom_fields')
+        .select('*')
+        .in('sub_process_template_id', allRelevantIds)
+        .order('order_index');
 
       if (cancelled || error) return;
 
@@ -185,9 +177,9 @@ export function NewRequestDialog({
           fieldsMap[spId].push({
             ...field,
             field_type: field.field_type,
-            options: (field.options || null) as unknown as TemplateCustomField["options"],
-            condition_operator: field.condition_operator as TemplateCustomField["condition_operator"],
-            conditions_logic: (field.conditions_logic || "AND") as "AND" | "OR",
+            options: (field.options || null) as unknown as TemplateCustomField['options'],
+            condition_operator: field.condition_operator as TemplateCustomField['condition_operator'],
+            conditions_logic: (field.conditions_logic || 'AND') as 'AND' | 'OR',
             validation_params: field.validation_params as Record<string, any> | null,
             additional_conditions: field.additional_conditions as Array<{
               field_id: string;
@@ -201,7 +193,10 @@ export function NewRequestDialog({
       setSubProcessCustomFields((prev) => {
         const prevKeys = Object.keys(prev);
         const nextKeys = Object.keys(fieldsMap);
-        if (prevKeys.length === nextKeys.length && prevKeys.every((k) => fieldsMap[k]?.length === prev[k]?.length)) {
+        if (
+          prevKeys.length === nextKeys.length &&
+          prevKeys.every((k) => fieldsMap[k]?.length === prev[k]?.length)
+        ) {
           return prev;
         }
         return fieldsMap;
@@ -237,7 +232,11 @@ export function NewRequestDialog({
       setLinkedProcessId(processId);
 
       if (processId) {
-        const { data } = await supabase.from("process_templates").select("name").eq("id", processId).single();
+        const { data } = await supabase
+          .from('process_templates')
+          .select('name')
+          .eq('id', processId)
+          .single();
         setLinkedProcessName(data?.name || null);
       }
     };
@@ -252,31 +251,31 @@ export function NewRequestDialog({
 
       if (initialSubProcessTemplateId) {
         const { data: subProcess } = await supabase
-          .from("sub_process_templates")
-          .select("id, name, process_template_id, target_department_id, target_manager_id, assignment_type")
-          .eq("id", initialSubProcessTemplateId)
+          .from('sub_process_templates')
+          .select('id, name, process_template_id, target_department_id, target_manager_id, assignment_type')
+          .eq('id', initialSubProcessTemplateId)
           .single();
-
+        
         if (subProcess) {
           setLinkedSubProcessId(subProcess.id);
           setLinkedSubProcessName(subProcess.name);
           setSelectedSubProcessIds([subProcess.id]);
           setHasMultipleSubProcesses(false);
-
+          
           if (subProcess.target_department_id) {
             setTargetDepartmentId(subProcess.target_department_id);
           }
 
           const { data: process } = await supabase
-            .from("process_templates")
-            .select("id, name, department, category_id, subcategory_id, target_department_id")
-            .eq("id", subProcess.process_template_id)
+            .from('process_templates')
+            .select('id, name, department, category_id, subcategory_id, target_department_id')
+            .eq('id', subProcess.process_template_id)
             .single();
-
+          
           if (process) {
             setLinkedProcessId(process.id);
             setLinkedProcessName(process.name);
-
+            
             if (process.category_id) {
               setCategoryId(process.category_id);
               setProcessImposedValues(true);
@@ -285,7 +284,7 @@ export function NewRequestDialog({
               setSubcategoryId(process.subcategory_id);
               setProcessImposedValues(true);
             }
-
+            
             if (subProcess.target_department_id) {
               setTargetDepartmentId(subProcess.target_department_id);
               setProcessImposedValues(true);
@@ -294,9 +293,9 @@ export function NewRequestDialog({
               setProcessImposedValues(true);
             } else if (process.department) {
               const { data: deptData } = await supabase
-                .from("departments")
-                .select("id")
-                .eq("name", process.department)
+                .from('departments')
+                .select('id')
+                .eq('name', process.department)
                 .single();
               if (deptData) {
                 setTargetDepartmentId(deptData.id);
@@ -307,15 +306,15 @@ export function NewRequestDialog({
         }
       } else if (initialProcessTemplateId) {
         const { data } = await supabase
-          .from("process_templates")
-          .select("id, name, department, category_id, subcategory_id, target_department_id")
-          .eq("id", initialProcessTemplateId)
+          .from('process_templates')
+          .select('id, name, department, category_id, subcategory_id, target_department_id')
+          .eq('id', initialProcessTemplateId)
           .single();
-
+        
         if (data) {
           setLinkedProcessId(data.id);
           setLinkedProcessName(data.name);
-
+          
           if (data.category_id) {
             setCategoryId(data.category_id);
             setProcessImposedValues(true);
@@ -324,15 +323,15 @@ export function NewRequestDialog({
             setSubcategoryId(data.subcategory_id);
             setProcessImposedValues(true);
           }
-
+          
           if (data.target_department_id) {
             setTargetDepartmentId(data.target_department_id);
             setProcessImposedValues(true);
           } else if (data.department) {
             const { data: deptData } = await supabase
-              .from("departments")
-              .select("id")
-              .eq("name", data.department)
+              .from('departments')
+              .select('id')
+              .eq('name', data.department)
               .single();
             if (deptData) {
               setTargetDepartmentId(deptData.id);
@@ -341,13 +340,11 @@ export function NewRequestDialog({
           }
 
           const { data: subProcessData } = await supabase
-            .from("sub_process_templates")
-            .select(
-              "id, name, process_template_id, description, target_manager_id, target_department_id, assignment_type",
-            )
-            .eq("process_template_id", data.id)
-            .order("order_index", { ascending: true });
-
+            .from('sub_process_templates')
+            .select('id, name, process_template_id, description, target_manager_id, target_department_id, assignment_type')
+            .eq('process_template_id', data.id)
+            .order('order_index', { ascending: true });
+          
           if (subProcessData && subProcessData.length > 0) {
             setAvailableSubProcesses(subProcessData);
             setHasMultipleSubProcesses(true);
@@ -364,22 +361,26 @@ export function NewRequestDialog({
 
   // Auto-apply assignment rule
   useEffect(() => {
-    const deptId = matchingRule && matchingRule.auto_assign ? matchingRule.target_department_id : null;
+    const deptId =
+      matchingRule && matchingRule.auto_assign ? matchingRule.target_department_id : null;
 
     if (deptId) {
-      setTargetDepartmentId((prev) => (prev !== deptId ? deptId : prev));
+      setTargetDepartmentId(prev => prev !== deptId ? deptId : prev);
     }
   }, [matchingRule?.id, matchingRule?.auto_assign, matchingRule?.target_department_id]);
 
   const fetchDepartments = async () => {
-    const { data } = await supabase.from("departments").select("id, name").order("name");
+    const { data } = await supabase
+      .from('departments')
+      .select('id, name')
+      .order('name');
     if (data) setDepartments(data);
   };
 
   const toggleSubProcess = (subProcessId: string) => {
-    setSelectedSubProcessIds((prev) => {
+    setSelectedSubProcessIds(prev => {
       if (prev.includes(subProcessId)) {
-        return prev.filter((id) => id !== subProcessId);
+        return prev.filter(id => id !== subProcessId);
       } else {
         return [...prev, subProcessId];
       }
@@ -400,16 +401,14 @@ export function NewRequestDialog({
       }
     }
 
-    const relevantSubProcessIds = hasMultipleSubProcesses
-      ? selectedSubProcessIds
-      : linkedSubProcessId
-        ? [linkedSubProcessId]
-        : [];
+    const relevantSubProcessIds = hasMultipleSubProcesses 
+      ? selectedSubProcessIds 
+      : (linkedSubProcessId ? [linkedSubProcessId] : []);
 
     for (const spId of relevantSubProcessIds) {
       const spFields = subProcessCustomFields[spId] || [];
       const spSpecificFields: TemplateCustomField[] = [];
-
+      
       for (const field of spFields) {
         if (field.is_common) {
           if (!commonFieldsSet.has(field.id)) {
@@ -421,28 +420,21 @@ export function NewRequestDialog({
       }
 
       if (spSpecificFields.length > 0) {
-        const sp = availableSubProcesses.find((s) => s.id === spId);
+        const sp = availableSubProcesses.find(s => s.id === spId);
         subProcessFieldGroups.push({
           subProcessId: spId,
-          subProcessName: sp?.name || "Sous-processus",
+          subProcessName: sp?.name || 'Sous-processus',
           fields: spSpecificFields,
         });
       }
     }
-
+    
     return {
       commonFields: Array.from(commonFieldsSet.values()),
       processFields: processSpecificFields,
       subProcessFieldGroups,
     };
-  }, [
-    processFields,
-    hasMultipleSubProcesses,
-    selectedSubProcessIds,
-    linkedSubProcessId,
-    subProcessCustomFields,
-    availableSubProcesses,
-  ]);
+  }, [processFields, hasMultipleSubProcesses, selectedSubProcessIds, linkedSubProcessId, subProcessCustomFields, availableSubProcesses]);
 
   const customFieldsCount = useMemo(() => {
     const { commonFields, processFields: pFields, subProcessFieldGroups } = visibleCustomFields;
@@ -464,19 +456,19 @@ export function NewRequestDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    
     if (!title.trim()) {
-      toast.error("Le titre est obligatoire");
+      toast.error('Le titre est obligatoire');
       return;
     }
 
     if (!targetDepartmentId) {
-      toast.error("Veuillez sélectionner un service cible");
+      toast.error('Veuillez sélectionner un service cible');
       return;
     }
 
     if (!priority) {
-      toast.error("La priorité est obligatoire");
+      toast.error('La priorité est obligatoire');
       return;
     }
 
@@ -486,33 +478,33 @@ export function NewRequestDialog({
     }
 
     if (hasMultipleSubProcesses && selectedSubProcessIds.length === 0) {
-      toast.error("Veuillez sélectionner au moins un sous-processus");
+      toast.error('Veuillez sélectionner au moins un sous-processus');
       return;
     }
 
     const { isValid, errors } = validateCustomFields(allFieldsFlat, customFieldValues);
     if (!isValid) {
       setFieldErrors(errors);
-      toast.error("Veuillez corriger les erreurs dans les champs personnalisés");
+      toast.error('Veuillez corriger les erreurs dans les champs personnalisés');
       return;
     }
 
     setIsSubmitting(true);
-
+    
     try {
       const userId = (await supabase.auth.getUser()).data.user?.id;
-      if (!userId) throw new Error("Utilisateur non connecté");
+      if (!userId) throw new Error('Utilisateur non connecté');
 
-      const selectedCategory = categories.find((c) => c.id === categoryId);
+      const selectedCategory = categories.find(c => c.id === categoryId);
 
       const { data: requestData, error: requestError } = await supabase
-        .from("tasks")
+        .from('tasks')
         .insert({
           title: title.trim(),
           description: description.trim() || null,
           priority,
-          status: "todo",
-          type: "request",
+          status: 'todo',
+          type: 'request',
           category: selectedCategory?.name || null,
           category_id: categoryId,
           subcategory_id: subcategoryId,
@@ -537,218 +529,128 @@ export function NewRequestDialog({
 
       if (requestError) throw requestError;
 
-      // Defensive: make sure we always have an id before continuing
-      if (!requestData?.id) {
-        throw new Error("Création de la demande: aucune donnée retournée (id manquant)");
-      }
-
       if (checklistItems.length > 0) {
-        const { error: checklistError } = await supabase.from("task_checklists").insert(
-          checklistItems.map((item) => ({
+        await supabase.from('task_checklists').insert(
+          checklistItems.map(item => ({
             task_id: requestData.id,
             title: item.title,
             order_index: item.order_index,
-          })),
+          }))
         );
-        if (checklistError) {
-          throw new Error(`Création checklist: ${checklistError.message}`);
-        }
       }
 
       if (links.length > 0) {
-        const { error: attachmentsError } = await supabase.from("task_attachments").insert(
-          links.map((link) => ({
+        await supabase.from('task_attachments').insert(
+          links.map(link => ({
             task_id: requestData.id,
             name: link.name,
             url: link.url,
             type: link.type,
             uploaded_by: currentUser?.id || null,
-          })),
+          }))
         );
-        if (attachmentsError) {
-          throw new Error(`Ajout liens/pièces jointes: ${attachmentsError.message}`);
-        }
       }
 
       const fieldValuesToInsert = Object.entries(customFieldValues)
-        .filter(([_, value]) => value !== undefined && value !== null && value !== "")
+        .filter(([_, value]) => value !== undefined && value !== null && value !== '')
         .map(([fieldId, value]) => ({
           task_id: requestData.id,
           field_id: fieldId,
-          value: typeof value === "object" ? JSON.stringify(value) : String(value),
+          value: typeof value === 'object' ? JSON.stringify(value) : String(value),
         }));
 
       if (fieldValuesToInsert.length > 0) {
-        const { error: fieldError } = await supabase.from("request_field_values").insert(fieldValuesToInsert);
-
+        const { error: fieldError } = await supabase
+          .from('request_field_values')
+          .insert(fieldValuesToInsert);
+        
         if (fieldError) {
-          throw new Error(`Enregistrement champs personnalisés: ${fieldError.message}`);
+          console.error('Error saving custom field values:', fieldError);
         }
       }
 
       if (hasMultipleSubProcesses && selectedSubProcessIds.length > 0) {
         let totalAssignments = 0;
 
-        for (let index = 0; index < selectedSubProcessIds.length; index++) {
-          const subProcessId = selectedSubProcessIds[index];
+        for (let i = 0; i < selectedSubProcessIds.length; i++) {
+          const subProcessId = selectedSubProcessIds[i];
+          const { error: linkErr } = await supabase
+            .from('request_sub_processes')
+            .insert({
+              request_id: requestData.id,
+              sub_process_template_id: subProcessId,
+              order_index: i,
+              status: 'pending',
+            });
 
-          // IMPORTANT: store multi sub-process selections in the generic table used by workflows
-          const { error: spLinkError } = await supabase.from("request_sub_processes").insert({
-            request_id: requestData.id,
-            sub_process_template_id: subProcessId,
-            order_index: index,
-            status: "pending",
-          });
+          if (linkErr) throw linkErr;
 
-          if (spLinkError) {
-            throw new Error(`Erreur liaison sous-processus (${subProcessId}) : ${spLinkError.message}`);
-          }
-
-          const subProcess = availableSubProcesses.find((sp) => sp.id === subProcessId);
+          const subProcess = availableSubProcesses.find(sp => sp.id === subProcessId);
           const subProcessDeptId = subProcess?.target_department_id || targetDepartmentId;
           const targetManagerId = subProcess?.target_manager_id || undefined;
 
           if (linkedProcessId && subProcessDeptId) {
-            let count = 0;
-            try {
-              count = await generatePendingAssignments({
-                parentRequestId: requestData.id,
-                processTemplateId: linkedProcessId,
-                targetDepartmentId: subProcessDeptId,
-                subProcessTemplateId: subProcessId,
-                targetManagerId,
-              });
-            } catch (err: any) {
-              const errMsg =
-                err instanceof Error
-                  ? err.message
-                  : typeof err === "string"
-                    ? err
-                    : err && typeof err === "object" && typeof err.message === "string"
-                      ? err.message
-                      : (() => {
-                          try {
-                            return JSON.stringify(err);
-                          } catch {
-                            return "Erreur inconnue";
-                          }
-                        })();
-
-              throw new Error(
-                `Erreur génération des affectations (sous-processus ${subProcessId}) : ${errMsg}`,
-              );
-            }
+            const count = await generatePendingAssignments({
+              parentRequestId: requestData.id,
+              processTemplateId: linkedProcessId,
+              targetDepartmentId: subProcessDeptId,
+              subProcessTemplateId: subProcessId,
+              targetManagerId,
+            });
             totalAssignments += count;
           }
         }
 
-        toast.success(`Demande créée avec ${selectedSubProcessIds.length} sous-processus sélectionné(s)`);
+        toast.success(
+          `Demande créée avec ${selectedSubProcessIds.length} sous-processus sélectionné(s)`
+        );
       } else if (linkedSubProcessId && targetDepartmentId) {
         const { data: subProcess } = await supabase
-          .from("sub_process_templates")
-          .select("target_manager_id, target_department_id")
-          .eq("id", linkedSubProcessId)
+          .from('sub_process_templates')
+          .select('target_manager_id, target_department_id')
+          .eq('id', linkedSubProcessId)
           .single();
 
         const subProcessDeptId = subProcess?.target_department_id || targetDepartmentId;
         const targetManagerId = subProcess?.target_manager_id || undefined;
 
-        try {
-          await generatePendingAssignments({
-            parentRequestId: requestData.id,
-            processTemplateId: linkedProcessId || "",
-            targetDepartmentId: subProcessDeptId,
-            subProcessTemplateId: linkedSubProcessId,
-            targetManagerId,
-          });
-        } catch (err: any) {
-          const errMsg =
-            err instanceof Error
-              ? err.message
-              : typeof err === "string"
-                ? err
-                : err && typeof err === "object" && typeof err.message === "string"
-                  ? err.message
-                  : (() => {
-                      try {
-                        return JSON.stringify(err);
-                      } catch {
-                        return "Erreur inconnue";
-                      }
-                    })();
-
-          throw new Error(
-            `Erreur génération des affectations (sous-processus ${linkedSubProcessId}) : ${errMsg}`,
-          );
-        }
-        toast.success("Demande créée avec succès");
+        await generatePendingAssignments({
+          parentRequestId: requestData.id,
+          processTemplateId: linkedProcessId || '',
+          targetDepartmentId: subProcessDeptId,
+          subProcessTemplateId: linkedSubProcessId,
+          targetManagerId,
+        });
+        toast.success('Demande créée avec succès');
       } else if (linkedProcessId && targetDepartmentId) {
-        try {
-          await generatePendingAssignments({
-            parentRequestId: requestData.id,
-            processTemplateId: linkedProcessId,
-            targetDepartmentId,
-          });
-        } catch (err: any) {
-          const errMsg =
-            err instanceof Error
-              ? err.message
-              : typeof err === "string"
-                ? err
-                : err && typeof err === "object" && typeof err.message === "string"
-                  ? err.message
-                  : (() => {
-                      try {
-                        return JSON.stringify(err);
-                      } catch {
-                        return "Erreur inconnue";
-                      }
-                    })();
-
-          throw new Error(
-            `Erreur génération des affectations (processus ${linkedProcessId}) : ${errMsg}`,
-          );
-        }
-        toast.success("Demande créée avec succès");
+        await generatePendingAssignments({
+          parentRequestId: requestData.id,
+          processTemplateId: linkedProcessId,
+          targetDepartmentId,
+        });
+        toast.success('Demande créée avec succès');
       } else {
-        toast.success("Demande créée avec succès");
+        toast.success('Demande créée avec succès');
       }
 
       onTasksCreated?.();
       resetForm();
       onClose();
     } catch (error) {
-      console.error("Error creating request:", error);
-      const msg = (() => {
-        if (error instanceof Error) return error.message;
-        if (typeof error === "string") return error;
-        if (error && typeof error === "object") {
-          const anyErr = error as any;
-          if (typeof anyErr.message === "string" && anyErr.message.trim()) return anyErr.message;
-          if (typeof anyErr.error_description === "string" && anyErr.error_description.trim()) return anyErr.error_description;
-          if (typeof anyErr.details === "string" && anyErr.details.trim()) return anyErr.details;
-          try {
-            return JSON.stringify(error);
-          } catch {
-            return "Erreur lors de la création de la demande";
-          }
-        }
-        return "Erreur lors de la création de la demande";
-      })();
-
-      toast.error(msg || "Erreur lors de la création de la demande");
+      console.error('Error creating request:', error);
+      toast.error((error as any)?.message || (error as any)?.details || 'Erreur lors de la création de la demande');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const resetForm = () => {
-    setTitle("");
-    setDescription("");
-    setPriority("medium");
+    setTitle('');
+    setDescription('');
+    setPriority('medium');
     setCategoryId(null);
     setSubcategoryId(null);
-    setDueDate("");
+    setDueDate('');
     setTargetDepartmentId(null);
     setChecklistItems([]);
     setLinks([]);
@@ -782,7 +684,7 @@ export function NewRequestDialog({
 
   const getDepartmentName = (depId: string | null) => {
     if (!depId) return null;
-    return departments.find((d) => d.id === depId)?.name || null;
+    return departments.find(d => d.id === depId)?.name || null;
   };
 
   const showSubProcessTab = hasMultipleSubProcesses && availableSubProcesses.length > 0;
@@ -799,68 +701,65 @@ export function NewRequestDialog({
     (nextOpen: boolean) => {
       if (!nextOpen) onClose();
     },
-    [onClose],
+    [onClose]
   );
 
   return (
     <Dialog open={open} onOpenChange={handleDialogOpenChange}>
-      <DialogContent
+      <DialogContent 
         className="sm:max-w-[920px] max-h-[92vh] p-0 flex flex-col overflow-hidden rounded-3xl border-2 border-primary/10 shadow-2xl shadow-primary/5 bg-gradient-to-b from-white to-muted/20"
         hideCloseButton
       >
         {/* A11y: Radix Dialog requires a DialogTitle; keep it hidden visually */}
-        <DialogTitle className="sr-only">{linkedProcessName ? linkedProcessName : "Nouvelle demande"}</DialogTitle>
+        <DialogTitle className="sr-only">{linkedProcessName ? linkedProcessName : 'Nouvelle demande'}</DialogTitle>
         {/* Custom Header */}
-        <RequestDialogHeader processName={linkedProcessName} onClose={onClose} />
-
+        <RequestDialogHeader 
+          processName={linkedProcessName} 
+          onClose={onClose} 
+        />
+        
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {/* Tabs */}
           <Tabs defaultValue="general" className="flex-1 flex flex-col min-h-0 overflow-hidden">
             <div className="px-6 pt-5 pb-2 flex-shrink-0 bg-gradient-to-b from-white to-transparent">
               <TabsList className="w-full bg-muted/40 p-1.5 rounded-2xl h-auto flex-wrap gap-1 border border-border/50">
-                <TabsTrigger
-                  value="general"
+                <TabsTrigger 
+                  value="general" 
                   className="flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl font-semibold transition-all duration-200 data-[state=active]:shadow-lg data-[state=active]:bg-white data-[state=active]:text-primary data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-white/50"
                 >
                   <FileText className="h-4 w-4" />
                   <span>Général</span>
                 </TabsTrigger>
-                {/* Always render TabsTrigger to avoid React DOM unmount issues, hide with CSS */}
-                <TabsTrigger
-                  value="subprocesses"
-                  className={cn(
-                    "flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl font-semibold transition-all duration-200 data-[state=active]:shadow-lg data-[state=active]:bg-white data-[state=active]:text-primary data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-white/50",
-                    !showSubProcessTab && "hidden"
-                  )}
-                  disabled={!showSubProcessTab}
-                >
-                  <CheckSquare className="h-4 w-4" />
-                  <span>Tâches</span>
-                  <Badge
-                    variant={selectedSubProcessIds.length > 0 ? "default" : "secondary"}
-                    className={cn(
-                      "ml-1.5 text-[10px] px-2 py-0.5 rounded-full font-bold",
-                      selectedSubProcessIds.length > 0 && "bg-primary shadow-sm",
-                    )}
+                {showSubProcessTab && (
+                  <TabsTrigger 
+                    value="subprocesses" 
+                    className="flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl font-semibold transition-all duration-200 data-[state=active]:shadow-lg data-[state=active]:bg-white data-[state=active]:text-primary data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-white/50"
                   >
-                    {selectedSubProcessIds.length}
-                  </Badge>
-                </TabsTrigger>
-                {/* Always render TabsTrigger to avoid React DOM unmount issues, hide with CSS */}
-                <TabsTrigger
-                  value="customfields"
-                  className={cn(
-                    "flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl font-semibold transition-all duration-200 data-[state=active]:shadow-lg data-[state=active]:bg-white data-[state=active]:text-primary data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-white/50",
-                    !showCustomFieldsTab && "hidden"
-                  )}
-                  disabled={!showCustomFieldsTab}
-                >
-                  <FormInput className="h-4 w-4" />
-                  <span>Détails de la demande</span>
-                  <Badge variant="secondary" className="ml-1.5 text-[10px] px-2 py-0.5 rounded-full font-bold">
-                    {customFieldsCount}
-                  </Badge>
-                </TabsTrigger>
+                    <CheckSquare className="h-4 w-4" />
+                    <span>Tâches</span>
+                    <Badge 
+                      variant={selectedSubProcessIds.length > 0 ? "default" : "secondary"} 
+                      className={cn(
+                        "ml-1.5 text-[10px] px-2 py-0.5 rounded-full font-bold",
+                        selectedSubProcessIds.length > 0 && "bg-primary shadow-sm"
+                      )}
+                    >
+                      {selectedSubProcessIds.length}
+                    </Badge>
+                  </TabsTrigger>
+                )}
+                {showCustomFieldsTab && (
+                  <TabsTrigger 
+                    value="customfields" 
+                    className="flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl font-semibold transition-all duration-200 data-[state=active]:shadow-lg data-[state=active]:bg-white data-[state=active]:text-primary data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-white/50"
+                  >
+                    <FormInput className="h-4 w-4" />
+                    <span>Détails de la demande</span>
+                    <Badge variant="secondary" className="ml-1.5 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                      {customFieldsCount}
+                    </Badge>
+                  </TabsTrigger>
+                )}
               </TabsList>
             </div>
 
@@ -932,7 +831,10 @@ export function NewRequestDialog({
                       </div>
                       Projet associé
                     </Label>
-                    <BEProjectSelect value={beProjectId} onChange={setBeProjectId} />
+                    <BEProjectSelect
+                      value={beProjectId}
+                      onChange={setBeProjectId}
+                    />
                   </div>
 
                   {/* Process Info Banner */}
@@ -945,13 +847,13 @@ export function NewRequestDialog({
                         </div>
                         <div className="flex-1">
                           <p className="text-base font-bold text-primary font-display tracking-wide">
-                            {linkedSubProcessName
+                            {linkedSubProcessName 
                               ? `${linkedProcessName} → ${linkedSubProcessName}`
-                              : linkedProcessName}
+                              : linkedProcessName
+                            }
                           </p>
                           <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
-                            Cette demande déclenchera automatiquement la création des tâches du{" "}
-                            {linkedSubProcessId ? "sous-processus" : "processus"}.
+                            Cette demande déclenchera automatiquement la création des tâches du {linkedSubProcessId ? 'sous-processus' : 'processus'}.
                           </p>
                         </div>
                       </div>
@@ -966,30 +868,24 @@ export function NewRequestDialog({
                           <Info className="h-5 w-5 text-info" />
                         </div>
                         <div className="flex-1">
-                          <p className="text-sm font-semibold text-foreground">
-                            Règle d'affectation: {matchingRule.name}
-                          </p>
+                          <p className="text-sm font-semibold text-foreground">Règle d'affectation: {matchingRule.name}</p>
                           <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground flex-wrap">
                             {matchingRule.auto_assign ? (
                               <>
                                 <span>Affectation automatique</span>
                                 <ArrowRight className="h-3 w-3" />
-                                <Badge
-                                  variant="outline"
-                                  className="rounded-lg border-primary/30 text-primary bg-primary/5"
-                                >
-                                  {matchingRule.target_department_id
+                                <Badge variant="outline" className="rounded-lg border-primary/30 text-primary bg-primary/5">
+                                  {matchingRule.target_department_id 
                                     ? `Service: ${getDepartmentName(matchingRule.target_department_id)}`
-                                    : "Personne assignée"}
+                                    : 'Personne assignée'
+                                  }
                                 </Badge>
                               </>
                             ) : (
                               <span>Veuillez sélectionner le service cible ci-dessous</span>
                             )}
                             {matchingRule.requires_validation && (
-                              <Badge variant="secondary" className="ml-2 rounded-lg">
-                                Validation requise
-                              </Badge>
+                              <Badge variant="secondary" className="ml-2 rounded-lg">Validation requise</Badge>
                             )}
                           </div>
                         </div>
@@ -1005,8 +901,8 @@ export function NewRequestDialog({
                           Service cible
                           <span className="text-destructive text-lg leading-none">*</span>
                         </Label>
-                        <Select
-                          value={targetDepartmentId || ""}
+                        <Select 
+                          value={targetDepartmentId || ''} 
                           onValueChange={(v) => setTargetDepartmentId(v || null)}
                           disabled={matchingRule?.auto_assign && matchingRule?.target_department_id ? true : false}
                         >
@@ -1014,7 +910,7 @@ export function NewRequestDialog({
                             <SelectValue placeholder="Sélectionner un service" />
                           </SelectTrigger>
                           <SelectContent className="bg-white z-50 rounded-xl border-2">
-                            {departments.map((dept) => (
+                            {departments.map(dept => (
                               <SelectItem key={dept.id} value={dept.id} className="rounded-lg">
                                 {dept.name}
                               </SelectItem>
@@ -1079,18 +975,16 @@ export function NewRequestDialog({
                         required
                         className={cn(
                           "h-12 rounded-xl border-2 transition-all",
-                          !dueDate
-                            ? "border-warning/50 bg-warning/5 focus-visible:ring-warning/20 focus-visible:border-warning"
-                            : "focus-visible:ring-primary/20 focus-visible:border-primary",
+                          !dueDate 
+                            ? "border-warning/50 bg-warning/5 focus-visible:ring-warning/20 focus-visible:border-warning" 
+                            : "focus-visible:ring-primary/20 focus-visible:border-primary"
                         )}
                       />
                     </div>
                     {!dueDate && (
                       <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-warning/10 border border-warning/20">
                         <AlertCircle className="h-4 w-4 text-warning flex-shrink-0" />
-                        <p className="text-xs font-medium text-warning">
-                          L'échéance est obligatoire pour soumettre la demande
-                        </p>
+                        <p className="text-xs font-medium text-warning">L'échéance est obligatoire pour soumettre la demande</p>
                       </div>
                     )}
                     <p className="text-xs text-muted-foreground pl-1">
@@ -1099,82 +993,79 @@ export function NewRequestDialog({
                   </div>
                 </TabsContent>
 
-                {/* Sub-processes/Tasks Tab - Always render to avoid React DOM issues */}
-                <TabsContent value="subprocesses" className="mt-0 space-y-5">
-                  {showSubProcessTab ? (
-                    <>
-                      {/* Info banner */}
-                      <div className="rounded-2xl border-2 border-info/30 bg-gradient-to-r from-info/10 via-info/5 to-transparent p-5">
-                        <div className="flex items-start gap-3">
-                          <div className="p-2 rounded-xl bg-info/20">
-                            <Info className="h-5 w-5 text-info" />
-                          </div>
-                          <p className="text-sm text-muted-foreground leading-relaxed">
-                            Sélectionnez les tâches à réaliser pour cette demande. Chaque tâche cochée déclenchera la
-                            création des actions correspondantes.
-                          </p>
+                {/* Sub-processes/Tasks Tab */}
+                {showSubProcessTab && (
+                  <TabsContent value="subprocesses" className="mt-0 space-y-5">
+                    {/* Info banner */}
+                    <div className="rounded-2xl border-2 border-info/30 bg-gradient-to-r from-info/10 via-info/5 to-transparent p-5">
+                      <div className="flex items-start gap-3">
+                        <div className="p-2 rounded-xl bg-info/20">
+                          <Info className="h-5 w-5 text-info" />
                         </div>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                          Sélectionnez les tâches à réaliser pour cette demande. Chaque tâche cochée déclenchera la création des actions correspondantes.
+                        </p>
                       </div>
+                    </div>
 
-                      {availableSubProcesses.length === 0 ? (
-                        <TasksEmptyState />
-                      ) : (
-                        <>
-                          <div className="max-h-[280px] overflow-y-auto pr-2 border rounded-xl bg-muted/20 p-3">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                              {availableSubProcesses.map((subProcess) => {
-                                const isSelected = selectedSubProcessIds.includes(subProcess.id);
-                                const hasCustomFields = subProcessCustomFields[subProcess.id]?.length > 0;
+                    {availableSubProcesses.length === 0 ? (
+                      <TasksEmptyState />
+                    ) : (
+                      <>
+                        <div className="max-h-[280px] overflow-y-auto pr-2 border rounded-xl bg-muted/20 p-3">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            {availableSubProcesses.map((subProcess) => {
+                              const isSelected = selectedSubProcessIds.includes(subProcess.id);
+                              const hasCustomFields = subProcessCustomFields[subProcess.id]?.length > 0;
+                              
+                              return (
+                                <TaskSelectionCard
+                                  key={subProcess.id}
+                                  id={subProcess.id}
+                                  name={subProcess.name}
+                                  description={subProcess.description}
+                                  isSelected={isSelected}
+                                  hasCustomFields={hasCustomFields}
+                                  onToggle={() => toggleSubProcess(subProcess.id)}
+                                />
+                              );
+                            })}
+                          </div>
+                        </div>
 
-                                return (
-                                  <TaskSelectionCard
-                                    key={subProcess.id}
-                                    id={subProcess.id}
-                                    name={subProcess.name}
-                                    description={subProcess.description}
-                                    isSelected={isSelected}
-                                    hasCustomFields={hasCustomFields}
-                                    onToggle={() => toggleSubProcess(subProcess.id)}
-                                  />
-                                );
+                        {selectedSubProcessIds.length > 0 && (
+                          <div className="pt-5 border-t-2 border-dashed border-primary/20">
+                            <p className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
+                              <CheckSquare className="h-4 w-4 text-primary" />
+                              Tâches sélectionnées ({selectedSubProcessIds.length})
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {selectedSubProcessIds.map(spId => {
+                                const sp = availableSubProcesses.find(s => s.id === spId);
+                                return sp ? (
+                                  <Badge 
+                                    key={spId} 
+                                    variant="default"
+                                    className="cursor-pointer hover:bg-primary/80 transition-all rounded-lg px-3 py-1.5 gap-1.5 font-medium shadow-sm"
+                                    onClick={() => toggleSubProcess(spId)}
+                                  >
+                                    {sp.name}
+                                    <span className="ml-1 opacity-70 hover:opacity-100">×</span>
+                                  </Badge>
+                                ) : null;
                               })}
                             </div>
                           </div>
+                        )}
+                      </>
+                    )}
+                  </TabsContent>
+                )}
 
-                          {selectedSubProcessIds.length > 0 && (
-                            <div className="pt-5 border-t-2 border-dashed border-primary/20">
-                              <p className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
-                                <CheckSquare className="h-4 w-4 text-primary" />
-                                Tâches sélectionnées ({selectedSubProcessIds.length})
-                              </p>
-                              <div className="flex flex-wrap gap-2">
-                                {selectedSubProcessIds.map((spId) => {
-                                  const sp = availableSubProcesses.find((s) => s.id === spId);
-                                  return sp ? (
-                                    <Badge
-                                      key={spId}
-                                      variant="default"
-                                      className="cursor-pointer hover:bg-primary/80 transition-all rounded-lg px-3 py-1.5 gap-1.5 font-medium shadow-sm"
-                                      onClick={() => toggleSubProcess(spId)}
-                                    >
-                                      {sp.name}
-                                      <span className="ml-1 opacity-70 hover:opacity-100">×</span>
-                                    </Badge>
-                                  ) : null;
-                                })}
-                              </div>
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </>
-                  ) : null}
-                </TabsContent>
-
-                {/* Custom Fields Tab - Always render to avoid React DOM issues */}
-                <TabsContent value="customfields" className="mt-0 space-y-5">
-                  {showCustomFieldsTab ? (
-                    loadingProcessFields ? (
+                {/* Custom Fields Tab */}
+                {showCustomFieldsTab && (
+                  <TabsContent value="customfields" className="mt-0 space-y-5">
+                    {loadingProcessFields ? (
                       <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
                         <div className="w-12 h-12 border-3 border-primary/30 border-t-primary rounded-full animate-spin mb-4" />
                         <p className="text-sm font-medium">Chargement des champs...</p>
@@ -1191,15 +1082,19 @@ export function NewRequestDialog({
                           disabled={isSubmitting}
                         />
                       </div>
-                    )
-                  ) : null}
-                </TabsContent>
+                    )}
+                  </TabsContent>
+                )}
               </div>
             </div>
           </Tabs>
 
           {/* Fixed Footer */}
-          <RequestDialogFooter onClose={onClose} isSubmitting={isSubmitting} isDisabled={isFormDisabled} />
+          <RequestDialogFooter
+            onClose={onClose}
+            isSubmitting={isSubmitting}
+            isDisabled={isFormDisabled}
+          />
         </form>
       </DialogContent>
     </Dialog>
