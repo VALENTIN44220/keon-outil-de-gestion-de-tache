@@ -60,6 +60,9 @@ const ALL_TABLES = [
   'workflow_templates',
   'workflow_validation_instances',
   'workload_slots',
+  // Suppliers
+  'supplier_purchase_enrichment',
+  'supplier_purchase_permissions',
 ];
 
 // Get Fabric table name with prefix
