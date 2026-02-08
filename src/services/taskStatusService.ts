@@ -40,18 +40,26 @@ export const TASK_STATUS_SHORT_LABELS: Record<TaskStatus, string> = {
 };
 
 // Couleurs des badges de statut
-export const TASK_STATUS_COLORS: Record<TaskStatus, { bg: string; text: string; border: string; gradient?: string }> = {
-  'to_assign': { bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-200', gradient: 'from-amber-500 to-amber-400' },
-  'todo': { bg: 'bg-slate-100', text: 'text-slate-800', border: 'border-slate-200', gradient: 'from-slate-500 to-slate-400' },
-  'in-progress': { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-200', gradient: 'from-blue-500 to-blue-400' },
-  'done': { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-200', gradient: 'from-green-500 to-green-400' },
-  'pending_validation_1': { bg: 'bg-violet-100', text: 'text-violet-800', border: 'border-violet-200', gradient: 'from-violet-500 to-violet-400' },
-  'pending_validation_2': { bg: 'bg-violet-100', text: 'text-violet-800', border: 'border-violet-200', gradient: 'from-violet-500 to-violet-400' },
-  'validated': { bg: 'bg-emerald-100', text: 'text-emerald-800', border: 'border-emerald-200', gradient: 'from-emerald-500 to-emerald-400' },
-  'refused': { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-200', gradient: 'from-red-500 to-red-400' },
-  'review': { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-200', gradient: 'from-purple-500 to-purple-400' },
-  'cancelled': { bg: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-200', gradient: 'from-gray-400 to-gray-300' },
+export const TASK_STATUS_COLORS: Record<TaskStatus, { bg: string; text: string; border: string; gradient?: string; calendar?: string }> = {
+  'to_assign': { bg: 'bg-amber-100', text: 'text-amber-800', border: 'border-amber-200', gradient: 'from-amber-500 to-amber-400', calendar: 'bg-amber-500' },
+  'todo': { bg: 'bg-slate-100', text: 'text-slate-800', border: 'border-slate-200', gradient: 'from-slate-500 to-slate-400', calendar: 'bg-slate-500' },
+  'in-progress': { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-200', gradient: 'from-blue-500 to-blue-400', calendar: 'bg-blue-500' },
+  'done': { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-200', gradient: 'from-green-500 to-green-400', calendar: 'bg-green-500' },
+  'pending_validation_1': { bg: 'bg-violet-100', text: 'text-violet-800', border: 'border-violet-200', gradient: 'from-violet-500 to-violet-400', calendar: 'bg-violet-500' },
+  'pending_validation_2': { bg: 'bg-violet-100', text: 'text-violet-800', border: 'border-violet-200', gradient: 'from-violet-500 to-violet-400', calendar: 'bg-violet-500' },
+  'validated': { bg: 'bg-emerald-100', text: 'text-emerald-800', border: 'border-emerald-200', gradient: 'from-emerald-500 to-emerald-400', calendar: 'bg-emerald-500' },
+  'refused': { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-200', gradient: 'from-red-500 to-red-400', calendar: 'bg-red-500' },
+  'review': { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-200', gradient: 'from-purple-500 to-purple-400', calendar: 'bg-purple-500' },
+  'cancelled': { bg: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-200', gradient: 'from-gray-400 to-gray-300', calendar: 'bg-gray-400' },
 };
+
+/**
+ * Obtient la couleur de calendrier pour un statut (format Tailwind class)
+ */
+export function getStatusCalendarColor(status: TaskStatus | string): string {
+  const colors = TASK_STATUS_COLORS[status as TaskStatus];
+  return colors?.calendar || 'bg-primary';
+}
 
 // ============================================================================
 // HELPERS POUR L'UI (UTILISER CES FONCTIONS PARTOUT)

@@ -28,7 +28,7 @@ import { useMicrosoftConnection } from '@/hooks/useMicrosoftConnection';
 import { useTasks } from '@/hooks/useTasks';
 import { TaskDetailDialog } from '@/components/tasks/TaskDetailDialog';
 import { Task } from '@/types/task';
-import { getStatusFilterOptions, matchesStatusFilter } from '@/services/taskStatusService';
+import { getStatusFilterOptions, matchesStatusFilter, getStatusCalendarColor, getStatusShortLabel } from '@/services/taskStatusService';
 
 interface CalendarEvent {
   id: string;
@@ -108,9 +108,8 @@ export function UnifiedCalendarView() {
         start: new Date(task.due_date!),
         end: new Date(task.due_date!),
         type: 'task' as const,
-        color: task.priority === 'high' ? 'bg-destructive' : 
-               task.priority === 'medium' ? 'bg-warning' : 'bg-primary',
-        source: 'Tâche',
+        color: getStatusCalendarColor(task.status),
+        source: getStatusShortLabel(task.status),
         taskData: task,
       })),
   ], [outlookEvents, filteredTasks]);
@@ -413,22 +412,34 @@ export function UnifiedCalendarView() {
               )}
 
               {/* Legend */}
-              <div className="flex items-center gap-4 mt-3 text-xs">
+              <div className="flex items-center gap-4 mt-3 text-xs flex-wrap">
                 <div className="flex items-center gap-1">
                   <div className="w-3 h-3 rounded bg-[#0078D4]" />
                   <span>Outlook</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <div className="w-3 h-3 rounded bg-primary" />
-                  <span>Tâches</span>
+                  <div className="w-3 h-3 rounded bg-slate-500" />
+                  <span>À faire</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <div className="w-3 h-3 rounded bg-warning" />
-                  <span>Priorité moyenne</span>
+                  <div className="w-3 h-3 rounded bg-blue-500" />
+                  <span>En cours</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <div className="w-3 h-3 rounded bg-destructive" />
-                  <span>Priorité haute</span>
+                  <div className="w-3 h-3 rounded bg-violet-500" />
+                  <span>Validation</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-green-500" />
+                  <span>Terminé</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-emerald-500" />
+                  <span>Validé</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-purple-500" />
+                  <span>À corriger</span>
                 </div>
               </div>
             </CardContent>
