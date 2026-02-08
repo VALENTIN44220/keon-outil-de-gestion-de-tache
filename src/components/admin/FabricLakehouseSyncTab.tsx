@@ -91,6 +91,10 @@ const ALL_TABLES = [
   { name: 'workload_slots', label: 'Créneaux charge' },
   { name: 'user_permission_overrides', label: 'Surcharges permissions' },
   { name: 'user_process_template_overrides', label: 'Surcharges processus' },
+  
+  // Fournisseurs
+  { name: 'supplier_purchase_enrichment', label: 'Enrichissement fournisseurs' },
+  { name: 'supplier_purchase_permissions', label: 'Permissions fournisseurs' },
 ];
 
 // Get Fabric table name with prefix
