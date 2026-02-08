@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, BarChart3, Users, ChevronLeft, ChevronRight, Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText, ArrowLeftRight, Calendar, MessageCircle } from 'lucide-react';
+import { LayoutDashboard, BarChart3, Users, ChevronLeft, ChevronRight, Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText, ArrowLeftRight, Calendar, MessageCircle, Building2 } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
 import { useAuth } from '@/contexts/AuthContext';
@@ -68,6 +68,12 @@ const allMenuItems = [{
   icon: Users,
   path: '/',
   permissionKey: 'can_access_team' as ScreenPermissionKey
+}, {
+  id: 'suppliers',
+  label: 'Fournisseurs',
+  icon: Building2,
+  path: '/suppliers',
+  permissionKey: 'can_access_dashboard' as ScreenPermissionKey // Access controlled by supplier_purchase_permissions
 }];
 
 const adminMenuItem = {
@@ -126,6 +132,12 @@ const menuColors: Record<string, { bg: string; text: string; border: string; ico
     text: 'text-accent', 
     border: 'border-accent',
     iconBg: 'bg-gradient-to-br from-accent to-accent/80'
+  },
+  suppliers: { 
+    bg: 'bg-[#10B981]/10', 
+    text: 'text-[#10B981]', 
+    border: 'border-[#10B981]',
+    iconBg: 'bg-gradient-to-br from-[#10B981] to-[#10B981]/80'
   },
   admin: { 
     bg: 'bg-destructive/10', 
