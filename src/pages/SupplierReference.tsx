@@ -19,10 +19,11 @@ export default function SupplierReference() {
 
   // Auto-refresh on page load (with throttle in the hook)
   useEffect(() => {
-    if (hasAccess) {
-      refresh();
-    }
-  }, [hasAccess]);
+  if (hasAccess) {
+    refresh();
+  }
+}, [hasAccess, refresh]);
+
 
   const handleOpenSupplier = (id: string) => {
     setSelectedSupplierId(id);
