@@ -1,282 +1,206 @@
-import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
-export type SupplierStatus = 'a_completer' | 'en_cours' | 'complet' | null;
+export type SupplierStatus = "all" | "a_completer" | "en_cours" | "complet";
 
-export type SupplierFilters = {
+export interface SupplierFilters {
   search: string;
-  status: 'all' | 'a_completer' | 'en_cours' | 'complet';
-  entite: string;      // 'all' ou valeur
-  categorie: string;   // 'all' ou valeur
-  segment: string;     // 'all' ou valeur
-  sous_segment?: string; // 'all' ou valeur
+  status: SupplierStatus;
+  entite: string;
+  categorie: string;
+  segment: string;
+  sous_segment?: string;
+  // Filtres de date (YYYY-MM-DD) sur les champs Supabase
+  validitePrixFrom?: string;
+  validitePrixTo?: string;
+  validiteContratFrom?: string;
+  validiteContratTo?: string;
 
-  // format YYYY-MM-DD (input type="date")
-  validite_prix_from?: string;
-  validite_prix_to?: string;
-  validite_contrat_from?: string;
-  validite_contrat_to?: string;
-};
+  // Pagination
+  page?: number;
+  pageSize?: number;
+}
 
-export type SupplierRow = {
+export interface SupplierRow {
   id: string;
-  tiers: string;
+  tiers: string | null;
   nomfournisseur: string | null;
   categorie: string | null;
   famille: string | null;
   segment: string | null;
   sous_segment: string | null;
   entite: string | null;
-  status: SupplierStatus;
-  completeness_score: number | null;
+
   validite_prix: string | null;
   validite_du_contrat: string | null;
-  created_at: string | null;
-  updated_at: string | null;
-  updated_by: string | null;
-  // + autres champs éventuels, gardés dynamiquement
-  [k: string]: any;
-};
 
-type FilterOptions = {
+  completeness_score: number | null;
+  status: "a_completer" | "en_cours" | "complet" | null;
+
+  updated_at: string | null;
+  created_at?: string | null;
+}
+
+export interface SupplierFilterOptions {
   entites: string[];
   categories: string[];
   segments: string[];
-  sous_segments: string[];
-  stats?: {
-    a_completer: number;
-    en_cours: number;
-    complet: number;
-  };
-};
+  sousSegments: string[];
+}
 
-function uniqSorted(arr: (string | null | undefined)[]) {
+const DEFAULT_PAGE_SIZE = 200;
+
+function uniqSorted(values: (string | null | undefined)[]) {
   return Array.from(
-    new Set(arr.map(v => (v ?? '').trim()).filter(Boolean))
-  ).sort((a, b) => a.localeCompare(b, 'fr'));
+    new Set(values.map(v => (v ?? "").trim()).filter(v => v.length > 0))
+  ).sort((a, b) => a.localeCompare(b));
 }
 
-function applySearch(q: any, search: string) {
-  const s = (search || '').trim();
-  if (!s) return q;
+export function useSupplierEnrichment(filters: SupplierFilters) {
+  const pageSize = filters.pageSize ?? DEFAULT_PAGE_SIZE;
+  const page = Math.max(1, filters.page ?? 1);
 
-  // PostgREST: or=(col.ilike.*x*,col2.ilike.*x*)
-  const pattern = `*${s.replace(/\*/g, '').replace(/,/g, ' ')}*`;
-  return q.or(
-    [
-      `tiers.ilike.${pattern}`,
-      `nomfournisseur.ilike.${pattern}`,
-      `famille.ilike.${pattern}`,
-      `segment.ilike.${pattern}`,
-      `sous_segment.ilike.${pattern}`,
-      `entite.ilike.${pattern}`,
-      `categorie.ilike.${pattern}`,
-    ].join(',')
-  );
-}
-
-function applyFilters(q: any, f: SupplierFilters) {
-  if (f.status && f.status !== 'all') q = q.eq('status', f.status);
-  if (f.entite && f.entite !== 'all') q = q.eq('entite', f.entite);
-  if (f.categorie && f.categorie !== 'all') q = q.eq('categorie', f.categorie);
-  if (f.segment && f.segment !== 'all') q = q.eq('segment', f.segment);
-  if (f.sous_segment && f.sous_segment !== 'all') q = q.eq('sous_segment', f.sous_segment);
-
-  // dates (on compare en ISO, Supabase stocke souvent en date ou string ISO)
-  if (f.validite_prix_from) q = q.gte('validite_prix', f.validite_prix_from);
-  if (f.validite_prix_to) q = q.lte('validite_prix', f.validite_prix_to);
-
-  if (f.validite_contrat_from) q = q.gte('validite_du_contrat', f.validite_contrat_from);
-  if (f.validite_contrat_to) q = q.lte('validite_du_contrat', f.validite_contrat_to);
-
-  return q;
-}
-
-export function useSupplierEnrichment(filters: SupplierFilters, page = 0, pageSize = 200) {
   const [suppliers, setSuppliers] = useState<SupplierRow[]>([]);
   const [total, setTotal] = useState<number>(0);
-  const [filterOptions, setFilterOptions] = useState<FilterOptions>({
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  const [filterOptions, setFilterOptions] = useState<SupplierFilterOptions>({
     entites: [],
     categories: [],
     segments: [],
-    sous_segments: [],
+    sousSegments: [],
   });
-  const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  const key = useMemo(() => JSON.stringify({ filters, page, pageSize }), [filters, page, pageSize]);
+  const normalized = useMemo(() => {
+    return {
+      search: (filters.search ?? "").trim(),
+      status: filters.status ?? "all",
+      entite: filters.entite ?? "all",
+      categorie: filters.categorie ?? "all",
+      segment: filters.segment ?? "all",
+      sous_segment: filters.sous_segment ?? "all",
 
+      validitePrixFrom: filters.validitePrixFrom,
+      validitePrixTo: filters.validitePrixTo,
+      validiteContratFrom: filters.validiteContratFrom,
+      validiteContratTo: filters.validiteContratTo,
+
+      page,
+      pageSize,
+    };
+  }, [filters, page, pageSize]);
+
+  // Charge les options de filtres (distinct) une fois (ou rarement)
   useEffect(() => {
     let cancelled = false;
 
-    async function run() {
-      setIsLoading(true);
+    (async () => {
+      try {
+        // On ne récupère que les colonnes nécessaires, sans pagination stricte,
+        // car le but est uniquement de construire les listes de filtres.
+        const { data, error } = await supabase
+          .from("supplier_purchase_enrichment")
+          .select("entite,categorie,segment,sous_segment");
 
-      // 1) Liste paginée + total
-      let q = supabase
-        .from('supplier_purchase_enrichment')
-        .select('*', { count: 'exact' });
+        if (error) throw error;
+        if (cancelled) return;
 
-      q = applySearch(q, filters.search);
-      q = applyFilters(q, filters);
-
-      // tri (adapter si besoin)
-      q = q.order('tiers', { ascending: true });
-
-      const from = page * pageSize;
-      const to = from + pageSize - 1;
-      q = q.range(from, to);
-
-      const { data, error, count } = await q;
-      if (cancelled) return;
-
-      if (error) {
-        // en prod: toast
-        console.error('useSupplierEnrichment list error', error);
-        setSuppliers([]);
-        setTotal(0);
-      } else {
-        setSuppliers((data as SupplierRow[]) ?? []);
-        setTotal(count ?? 0);
-      }
-
-      // 2) Options de filtres (sur dataset filtré par search uniquement, pour rester cohérent)
-      // Si tu veux options globales (toutes valeurs), retire applySearch/applyFilters ici.
-      let qOpt = supabase
-        .from('supplier_purchase_enrichment')
-        .select('entite,categorie,segment,sous_segment,status', { count: 'exact' });
-
-      qOpt = applySearch(qOpt, filters.search);
-      // IMPORTANT: on ne filtre PAS par entité/catégorie/segment ici sinon les listes se vident
-      // (on veut “toutes les catégories/segments disponibles”)
-      // Donc on n'appelle pas applyFilters()
-
-      const { data: optData, error: optErr } = await qOpt;
-      if (cancelled) return;
-
-      if (optErr) {
-        console.error('useSupplierEnrichment options error', optErr);
-        setFilterOptions(prev => ({ ...prev }));
-      } else {
-        const rows = (optData as any[]) ?? [];
-        const entites = uniqSorted(rows.map(r => r.entite));
-        const categories = uniqSorted(rows.map(r => r.categorie));
-        const segments = uniqSorted(rows.map(r => r.segment));
-        const sous_segments = uniqSorted(rows.map(r => r.sous_segment));
-
-        const stats = {
-          a_completer: rows.filter(r => r.status === 'a_completer').length,
-          en_cours: rows.filter(r => r.status === 'en_cours').length,
-          complet: rows.filter(r => r.status === 'complet').length,
-        };
-
-        setFilterOptions({ entites, categories, segments, sous_segments, stats });
-      }
-
-      setIsLoading(false);
-    }
-
-    run();
-    return () => {
-      cancelled = true;
-    };
-  }, [key]);
-
-  return { suppliers, total, isLoading, filterOptions };
-}
-
-/**
- * ✅ FIX: export attendu par SupplierDetailDrawer.tsx
- */
-export function useSupplierById(id: string | null) {
-  const [supplier, setSupplier] = useState<SupplierRow | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<any>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function run() {
-      if (!id) {
-        setSupplier(null);
-        setIsLoading(false);
-        setError(null);
-        return;
-      }
-
-      setIsLoading(true);
-      setError(null);
-
-      const { data, error: err } = await supabase
-        .from('supplier_purchase_enrichment')
-        .select('*')
-        .eq('id', id)
-        .maybeSingle();
-
-      if (cancelled) return;
-
-      if (err) {
-        console.error('useSupplierById error', err);
-        setError(err);
-        setSupplier(null);
-      } else {
-        setSupplier((data as SupplierRow) ?? null);
-      }
-      setIsLoading(false);
-    }
-
-    run();
-    return () => {
-      cancelled = true;
-    };
-  }, [id]);
-
-  return { supplier, isLoading, error };
-}
-
-/**
- * ✅ Export attendu par SupplierReference.tsx
- * Dans ton contexte, "refresh depuis datalake" = relancer une synchro
- * côté Fabric qui upsert dans Supabase.
- *
- * Ici on fait une implémentation safe:
- * - throttle simple (évite spam)
- * - appel HTTP sur une URL de webhook / endpoint si tu en as une
- *
- * IMPORTANT:
- * - Remplace REFRESH_ENDPOINT par ton vrai endpoint (Power Automate / Azure Function / Fabric Pipeline API / etc.)
- * - Si tu n’as pas d’endpoint, on garde un "no-op" qui ne casse pas l’app.
- */
-import { useCallback, useRef, useState } from 'react';
-
-const REFRESH_ENDPOINT = import.meta.env.VITE_SUPPLIERS_REFRESH_URL as string | undefined;
-
-export function useRefreshFromDatalake() {
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const lastRunRef = useRef<number>(0);
-
-  const refresh = useCallback(async () => {
-    // throttle 30s
-    const now = Date.now();
-    if (now - lastRunRef.current < 30_000) return;
-    lastRunRef.current = now;
-
-    setIsRefreshing(true);
-    try {
-      // Si tu as un endpoint (recommandé)
-      if (REFRESH_ENDPOINT) {
-        const r = await fetch(REFRESH_ENDPOINT, { method: 'POST' });
-        if (!r.ok) {
-          const txt = await r.text().catch(() => '');
-          throw new Error(`Refresh endpoint failed: ${r.status} ${txt}`);
+        setFilterOptions({
+          entites: uniqSorted(data?.map(r => r.entite)),
+          categories: uniqSorted(data?.map(r => r.categorie)),
+          segments: uniqSorted(data?.map(r => r.segment)),
+          sousSegments: uniqSorted(data?.map(r => r.sous_segment)),
+        });
+      } catch (e) {
+        if (!cancelled) {
+          setFilterOptions({ entites: [], categories: [], segments: [], sousSegments: [] });
         }
-      } else {
-        // Pas d’endpoint configuré: on ne fait rien, mais on ne casse pas l’UI
-        console.warn('VITE_SUPPLIERS_REFRESH_URL non défini: refresh() no-op');
       }
-    } finally {
-      setIsRefreshing(false);
-    }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  return { refresh, isRefreshing };
+  // Charge la liste paginée + filtrée
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoading(true);
+
+    (async () => {
+      try {
+        let q = supabase
+          .from("supplier_purchase_enrichment")
+          .select(
+            "id,tiers,nomfournisseur,categorie,famille,segment,sous_segment,entite,validite_prix,validite_du_contrat,completeness_score,status,updated_at,created_at",
+            { count: "exact" }
+          );
+
+        // Search multi-colonnes
+        if (normalized.search) {
+          const s = normalized.search.replace(/,/g, " ").trim();
+          // ilike avec OR via .or()
+          q = q.or(
+            [
+              `tiers.ilike.%${s}%`,
+              `nomfournisseur.ilike.%${s}%`,
+              `famille.ilike.%${s}%`,
+              `segment.ilike.%${s}%`,
+              `sous_segment.ilike.%${s}%`,
+              `entite.ilike.%${s}%`,
+              `categorie.ilike.%${s}%`,
+            ].join(",")
+          );
+        }
+
+        // Filtres simples
+        if (normalized.status !== "all") q = q.eq("status", normalized.status);
+        if (normalized.entite !== "all") q = q.eq("entite", normalized.entite);
+        if (normalized.categorie !== "all") q = q.eq("categorie", normalized.categorie);
+        if (normalized.segment !== "all") q = q.eq("segment", normalized.segment);
+        if (normalized.sous_segment !== "all") q = q.eq("sous_segment", normalized.sous_segment);
+
+        // Filtres date (strings YYYY-MM-DD dans Supabase)
+        if (normalized.validitePrixFrom) q = q.gte("validite_prix", normalized.validitePrixFrom);
+        if (normalized.validitePrixTo) q = q.lte("validite_prix", normalized.validitePrixTo);
+        if (normalized.validiteContratFrom) q = q.gte("validite_du_contrat", normalized.validiteContratFrom);
+        if (normalized.validiteContratTo) q = q.lte("validite_du_contrat", normalized.validiteContratTo);
+
+        // Tri stable : updated_at desc, puis tiers
+        q = q.order("updated_at", { ascending: false, nullsFirst: false }).order("tiers", { ascending: true });
+
+        // Pagination 200 / page
+        const from = (normalized.page - 1) * normalized.pageSize;
+        const to = from + normalized.pageSize - 1;
+
+        const { data, error, count } = await q.range(from, to);
+        if (error) throw error;
+
+        if (cancelled) return;
+        setSuppliers((data as SupplierRow[]) ?? []);
+        setTotal(count ?? 0);
+      } catch (e) {
+        if (!cancelled) {
+          setSuppliers([]);
+          setTotal(0);
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [normalized]);
+
+  return {
+    suppliers,
+    total,
+    page,
+    pageSize,
+    isLoading,
+    filterOptions,
+  };
 }
