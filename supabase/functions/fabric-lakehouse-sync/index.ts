@@ -309,8 +309,9 @@ function transformRecord(tableName: string, record: Record<string, unknown>): Re
   return transformed;
 }
 
+// deno-lint-ignore no-explicit-any
 async function upsertBatch(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   tableName: string,
   batch: Record<string, unknown>[],
 ): Promise<{ ok: boolean; error?: string }> {
@@ -320,12 +321,13 @@ async function upsertBatch(
 
   const safeBatch =
     tableName === "supplier_purchase_enrichment"
-      ? batch.filter((r) => typeof (r as any).tiers === "string" && ((r as any).tiers as string).trim().length > 0)
+      ? batch.filter((r) => typeof (r as Record<string, unknown>).tiers === "string" && ((r as Record<string, unknown>).tiers as string).trim().length > 0)
       : batch;
 
   if (!safeBatch.length) return { ok: true };
 
-  const { error } = await supabase.from(tableName).upsert(safeBatch, {
+  // deno-lint-ignore no-explicit-any
+  const { error } = await supabase.from(tableName).upsert(safeBatch as any, {
     onConflict: onConflictKey,
     returning: "minimal",
   });
@@ -334,9 +336,9 @@ async function upsertBatch(
     console.error("SUPABASE UPSERT ERROR", {
       table: tableName,
       onConflict: onConflictKey,
-      code: (error as any).code,
-      details: (error as any).details,
-      hint: (error as any).hint,
+      code: (error as Record<string, unknown>).code,
+      details: (error as Record<string, unknown>).details,
+      hint: (error as Record<string, unknown>).hint,
       message: error.message,
     });
     return { ok: false, error: error.message };
@@ -346,11 +348,11 @@ async function upsertBatch(
 }
 
 /**
- * IMPORT NDJSON streaming ONLY
- * => évite resp.text() => évite WORKER_LIMIT
+ * IMPORT NDJSON streaming ONLY - memory optimized
  */
+// deno-lint-ignore no-explicit-any
 async function importNdjsonStreaming(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   tableName: string,
   fileUrl: string,
   accessToken: string,
@@ -365,8 +367,9 @@ async function importNdjsonStreaming(
     return { imported: 0, failed: true, error: `Failed to read file (${resp.status}): ${txt}` };
   }
 
-  const BATCH_SIZE = tableName === "supplier_purchase_enrichment" ? 25 : 150;
-  const PAUSE_MS = tableName === "supplier_purchase_enrichment" ? 40 : 10;
+  // Smaller batches for memory optimization
+  const BATCH_SIZE = tableName === "supplier_purchase_enrichment" ? 15 : 100;
+  const PAUSE_MS = tableName === "supplier_purchase_enrichment" ? 50 : 15;
 
   const decoder = new TextDecoder();
   const reader = resp.body.getReader();
