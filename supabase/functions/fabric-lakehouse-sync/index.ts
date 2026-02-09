@@ -97,7 +97,10 @@ async function getOneLakeToken(): Promise<string> {
   const tenantId = Deno.env.get("AZURE_TENANT_ID");
   const clientId = Deno.env.get("AZURE_CLIENT_ID");
   const clientSecret = Deno.env.get("AZURE_CLIENT_SECRET");
-  if (!tenantId || !clientId || !clientSecret) throw new Error("Azure credentials not configured");
+
+  if (!tenantId || !clientId || !clientSecret) {
+    throw new Error("Azure credentials not configured");
+  }
 
   const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
   const body = new URLSearchParams({
@@ -125,9 +128,13 @@ async function getOneLakeToken(): Promise<string> {
 
 // ---------------- OneLake write helpers (SYNC) ----------------
 async function writeFileToOneLake(accessToken: string, filePath: string, contentString: string): Promise<void> {
+  // Create file
   const createResponse = await fetch(`${filePath}?resource=file`, {
     method: "PUT",
-    headers: { Authorization: `Bearer ${accessToken}`, "Content-Length": "0" },
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Length": "0",
+    },
   });
 
   if (!createResponse.ok && createResponse.status !== 201 && createResponse.status !== 409) {
@@ -140,6 +147,7 @@ async function writeFileToOneLake(accessToken: string, filePath: string, content
   const contentBytes = encoder.encode(contentString);
   const contentLength = contentBytes.length;
 
+  // Append content
   const appendResponse = await fetch(`${filePath}?action=append&position=0`, {
     method: "PATCH",
     headers: {
@@ -156,9 +164,12 @@ async function writeFileToOneLake(accessToken: string, filePath: string, content
     throw new Error(`Failed to append data: ${appendResponse.status}`);
   }
 
+  // Flush
   const flushResponse = await fetch(`${filePath}?action=flush&position=${contentLength}`, {
     method: "PATCH",
-    headers: { Authorization: `Bearer ${accessToken}` },
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
   });
 
   if (!flushResponse.ok && flushResponse.status !== 200) {
@@ -177,6 +188,7 @@ async function uploadAsCSV(
 ): Promise<number> {
   const root = lakehouseRootUrl("https://onelake.dfs.fabric.microsoft.com", workspaceId, lakehouseId);
   const csvPath = `${root}/Files/${fabricTableName}.csv`;
+
   if (!data.length) return 0;
 
   const allKeys = new Set<string>();
@@ -197,7 +209,9 @@ async function uploadAsCSV(
     csvRows.push(values.join(","));
   }
 
-  await writeFileToOneLake(accessToken, csvPath, csvRows.join("\n"));
+  const csvContent = csvRows.join("\n");
+  console.log(`Uploading CSV to: ${csvPath} (${data.length} rows)`);
+  await writeFileToOneLake(accessToken, csvPath, csvContent);
   return data.length;
 }
 
@@ -210,6 +224,7 @@ async function uploadAsJSON(
 ): Promise<void> {
   const root = lakehouseRootUrl("https://onelake.dfs.fabric.microsoft.com", workspaceId, lakehouseId);
   const jsonPath = `${root}/Files/${fabricTableName}.json`;
+  console.log(`Uploading JSON to: ${jsonPath}`);
   await writeFileToOneLake(accessToken, jsonPath, JSON.stringify(data, null, 2));
 }
 
@@ -221,42 +236,45 @@ async function checkOneLakeAccess(
   try {
     const root = lakehouseRootUrl("https://onelake.dfs.fabric.microsoft.com", workspaceId, lakehouseId);
     const listPath = `${root}/Files?resource=filesystem&recursive=false`;
+    const headers = {
+      Authorization: `Bearer ${accessToken}`,
+      "x-ms-version": "2021-06-08",
+      "x-ms-date": new Date().toUTCString(),
+    };
 
-    const resp = await fetch(listPath, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "x-ms-version": "2021-06-08",
-        "x-ms-date": new Date().toUTCString(),
-      },
-    });
+    console.log(`Checking OneLake access at: ${listPath}`);
+    const resp = await fetch(listPath, { method: "GET", headers });
+    console.log(`OneLake response status: ${resp.status}`);
 
     if (resp.ok || resp.status === 200) return { success: true, message: "OneLake access verified" };
 
     const errorText = await resp.text();
+    console.error(`OneLake access error: ${errorText}`);
     return { success: false, message: `Access denied: ${resp.status} - ${errorText}` };
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "Unknown error";
-    return { success: false, message: `Connection error: ${msg}` };
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return { success: false, message: `Connection error: ${errorMessage}` };
   }
 }
 
 // ---------------- Import helpers ----------------
 function stripUnderscoreColumns(record: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(record)) if (!k.startsWith("_")) out[k] = v;
+  for (const [k, v] of Object.entries(record)) {
+    if (!k.startsWith("_")) out[k] = v;
+  }
   return out;
 }
 
 function transformRecord(tableName: string, record: Record<string, unknown>): Record<string, unknown> {
-  const r = stripUnderscoreColumns(record);
+  const transformed = stripUnderscoreColumns(record);
 
   if (tableName === "user_leaves") {
-    if (r.start_half_day === "AM") r.start_half_day = "morning";
-    else if (r.start_half_day === "PM") r.start_half_day = "afternoon";
+    if (transformed.start_half_day === "AM") transformed.start_half_day = "morning";
+    else if (transformed.start_half_day === "PM") transformed.start_half_day = "afternoon";
 
-    if (r.end_half_day === "AM") r.end_half_day = "morning";
-    else if (r.end_half_day === "PM") r.end_half_day = "afternoon";
+    if (transformed.end_half_day === "AM") transformed.end_half_day = "morning";
+    else if (transformed.end_half_day === "PM") transformed.end_half_day = "afternoon";
 
     const leaveTypeMapping: Record<string, string> = {
       "Congés payés": "paid",
@@ -273,16 +291,16 @@ function transformRecord(tableName: string, record: Record<string, unknown>): Re
       CSS: "unpaid",
     };
 
-    if (typeof r.leave_type === "string") {
-      const lt = r.leave_type;
-      if (leaveTypeMapping[lt]) r.leave_type = leaveTypeMapping[lt];
+    if (typeof transformed.leave_type === "string") {
+      const lt = transformed.leave_type;
+      if (leaveTypeMapping[lt]) transformed.leave_type = leaveTypeMapping[lt];
       else {
         const lower = lt.toLowerCase();
-        if (lower.includes("congés payés") || lower.includes("cp")) r.leave_type = "paid";
-        else if (lower.includes("rtt")) r.leave_type = "rtt";
-        else if (lower.includes("maladie") || lower.includes("sick")) r.leave_type = "sick";
-        else if (lower.includes("sans solde") || lower.includes("css")) r.leave_type = "unpaid";
-        else r.leave_type = "other";
+        if (lower.includes("congés payés") || lower.includes("cp")) transformed.leave_type = "paid";
+        else if (lower.includes("rtt")) transformed.leave_type = "rtt";
+        else if (lower.includes("maladie") || lower.includes("sick")) transformed.leave_type = "sick";
+        else if (lower.includes("sans solde") || lower.includes("css")) transformed.leave_type = "unpaid";
+        else transformed.leave_type = "other";
       }
     }
 
@@ -294,13 +312,13 @@ function transformRecord(tableName: string, record: Record<string, unknown>): Re
       rejected: "cancelled",
     };
 
-    if (typeof r.status === "string") {
-      const lower = r.status.toLowerCase();
-      r.status = statusMapping[lower] || "declared";
+    if (typeof transformed.status === "string") {
+      const lower = transformed.status.toLowerCase();
+      transformed.status = statusMapping[lower] || "declared";
     }
   }
 
-  return r;
+  return transformed;
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -312,8 +330,7 @@ async function upsertBatch(
 ): Promise<{ ok: boolean; error?: string }> {
   if (!batch.length) return { ok: true };
 
-  // supplier_purchase_enrichment: upsert par clé métier "tiers"
-  // => nécessite un unique index sur tiers côté Supabase
+  // supplier_purchase_enrichment : upsert sur "tiers" (clé métier)
   const onConflictKey = tableName === "supplier_purchase_enrichment" ? "tiers" : "id";
 
   const { error } = await supabase.from(tableName).upsert(batch, {
@@ -325,7 +342,7 @@ async function upsertBatch(
   return { ok: true };
 }
 
-// NDJSON streaming (safe WORKER_LIMIT)
+// NDJSON streaming (WORKER_LIMIT safe)
 async function importNdjsonStreaming(
   supabase: ReturnType<typeof createClient>,
   tableName: string,
@@ -334,7 +351,10 @@ async function importNdjsonStreaming(
 ): Promise<{ imported: number; failed: boolean; error?: string }> {
   const resp = await fetch(fileUrl, {
     method: "GET",
-    headers: { Authorization: `Bearer ${accessToken}`, "x-ms-version": "2021-06-08" },
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "x-ms-version": "2021-06-08",
+    },
   });
 
   if (!resp.ok || !resp.body) {
@@ -353,10 +373,14 @@ async function importNdjsonStreaming(
 
   const flush = async (): Promise<{ ok: boolean; error?: string }> => {
     if (!batch.length) return { ok: true };
+
     const f = await upsertBatch(supabase, tableName, batch);
     if (!f.ok) return f;
+
     imported += batch.length;
     batch = [];
+
+    // mini yield (réduit les pics)
     await sleep(tableName === "supplier_purchase_enrichment" ? 35 : 10);
     return { ok: true };
   };
@@ -371,6 +395,7 @@ async function importNdjsonStreaming(
     while ((idx = buffer.indexOf("\n")) >= 0) {
       const line = buffer.slice(0, idx).trim();
       buffer = buffer.slice(idx + 1);
+
       if (!line) continue;
 
       let obj: Record<string, unknown>;
@@ -389,6 +414,7 @@ async function importNdjsonStreaming(
     }
   }
 
+  // last buffer (if no newline at EOF)
   const last = buffer.trim();
   if (last) {
     try {
@@ -404,19 +430,17 @@ async function importNdjsonStreaming(
   return { imported, failed: false };
 }
 
-// JSON array fallback (for small tables only)
+// JSON array fallback: autorisé uniquement pour petites tables (ex user_leaves)
 async function importJsonArrayText(
   supabase: ReturnType<typeof createClient>,
   tableName: string,
   text: string,
 ): Promise<{ imported: number; failed: boolean; error?: string }> {
-  // supplier_purchase_enrichment: tableau JSON interdit (WORKER_LIMIT)
   if (tableName === "supplier_purchase_enrichment") {
     return {
       imported: 0,
       failed: true,
-      error:
-        "supplier_purchase_enrichment doit être en NDJSON (1 ligne = 1 JSON). Export Fabric en tableau JSON refusé.",
+      error: "supplier_purchase_enrichment doit être en NDJSON (1 ligne = 1 JSON).",
     };
   }
 
@@ -434,7 +458,6 @@ async function importJsonArrayText(
     const batch = records.slice(i, i + BATCH_SIZE).map((r) => transformRecord(tableName, r));
     const f = await upsertBatch(supabase, tableName, batch);
     if (!f.ok) return { imported, failed: true, error: f.error };
-
     imported += batch.length;
     await sleep(5);
   }
@@ -442,24 +465,44 @@ async function importJsonArrayText(
   return { imported, failed: false };
 }
 
+// Read small file entirely (for format sniff). Keep it low.
 async function fetchFileText(
   accessToken: string,
   fileUrl: string,
 ): Promise<{ ok: boolean; text?: string; error?: string }> {
   const resp = await fetch(fileUrl, {
     method: "GET",
-    headers: { Authorization: `Bearer ${accessToken}`, "x-ms-version": "2021-06-08" },
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "x-ms-version": "2021-06-08",
+    },
   });
   if (!resp.ok) {
     const t = await resp.text().catch(() => "");
     return { ok: false, error: `GET failed (${resp.status}): ${t}` };
   }
+
+  // WARNING: keep this only for small files. For big files, use NDJSON streaming.
   const text = await resp.text();
   return { ok: true, text };
 }
 
+// Check file exists
+async function existsFile(accessToken: string, fileUrl: string): Promise<boolean> {
+  const head = await fetch(`${fileUrl}?action=getStatus`, {
+    method: "HEAD",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "x-ms-version": "2021-06-08",
+    },
+  });
+  return head.ok || head.status === 200;
+}
+
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
 
   try {
     const { action, tables } = await req.json();
@@ -468,10 +511,12 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const workspaceId = Deno.env.get("FABRIC_WORKSPACE_ID");
     const lakehouseId = Deno.env.get("FABRIC_LAKEHOUSE_ID");
-    if (!workspaceId || !lakehouseId) throw new Error("Fabric Lakehouse credentials not configured");
+
+    if (!workspaceId || !lakehouseId) {
+      throw new Error("Fabric Lakehouse credentials not configured");
+    }
 
     const supabase = createClient(supabaseUrl, supabaseKey);
-
     const accessToken = await getOneLakeToken();
 
     if (action === "diagnose") {
@@ -489,19 +534,26 @@ Deno.serve(async (req) => {
       );
     }
 
+    // -----------------
+    // SYNC (Supabase -> OneLake Files) : inchangé
+    // -----------------
     if (action === "sync") {
       const tablesToSync = tables && tables.length > 0 ? tables : ALL_TABLES;
       const results: SyncResult[] = [];
 
       for (const tableName of tablesToSync) {
         const fabricTableName = getFabricTableName(tableName);
+
         try {
+          console.log(`Syncing table: ${tableName} -> ${fabricTableName}`);
+
           const { data, error } = await supabase.from(tableName).select("*");
           if (error) {
             results.push({ table: tableName, fabricTable: fabricTableName, success: false, error: error.message });
             continue;
           }
-          if (!data || !data.length) {
+
+          if (!data || data.length === 0) {
             results.push({ table: tableName, fabricTable: fabricTableName, success: true, rowCount: 0 });
             continue;
           }
@@ -510,9 +562,9 @@ Deno.serve(async (req) => {
           await uploadAsJSON(accessToken, workspaceId, lakehouseId, fabricTableName, data);
 
           results.push({ table: tableName, fabricTable: fabricTableName, success: true, rowCount });
-        } catch (e: unknown) {
-          const msg = e instanceof Error ? e.message : "Unknown error";
-          results.push({ table: tableName, fabricTable: fabricTableName, success: false, error: msg });
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : "Unknown error";
+          results.push({ table: tableName, fabricTable: fabricTableName, success: false, error: errorMessage });
         }
       }
 
@@ -557,41 +609,54 @@ Deno.serve(async (req) => {
       );
     }
 
+    // -----------------
+    // IMPORT (OneLake Files -> Supabase) : lit dans Files/ (pas _sync_back)
+    // -----------------
     if (action === "import") {
       const tablesToImport = tables && tables.length > 0 ? tables : ALL_TABLES;
       const results: SyncResult[] = [];
-      const syncBackPath = `${lakehouseRootUrl("https://onelake.dfs.fabric.microsoft.com", workspaceId, lakehouseId)}/Files/_sync_back`;
+
+      const root = lakehouseRootUrl("https://onelake.dfs.fabric.microsoft.com", workspaceId, lakehouseId);
+      const filesPath = `${root}/Files`; // <-- IMPORTANT: plus de _sync_back
 
       for (const inputName of tablesToImport) {
         const tableName = inputName.startsWith(TABLE_PREFIX) ? getSupabaseTableName(inputName) : inputName;
         const fabricTableName = getFabricTableName(tableName);
 
         try {
-          const possibleFiles = [`${syncBackPath}/${fabricTableName}.json`, `${syncBackPath}/${tableName}.json`];
+          console.log(`Importing table: ${fabricTableName} -> ${tableName}`);
+
+          // Cherche dans Files/ (sans _sync_back)
+          const candidates = [`${filesPath}/${fabricTableName}.json`, `${filesPath}/${tableName}.json`];
 
           let usedPath = "";
-          let found = false;
-
-          for (const filePath of possibleFiles) {
-            const head = await fetch(`${filePath}?action=getStatus`, {
-              method: "HEAD",
-              headers: { Authorization: `Bearer ${accessToken}`, "x-ms-version": "2021-06-08" },
-            });
-            if (head.ok || head.status === 200) {
-              usedPath = filePath;
-              found = true;
+          for (const p of candidates) {
+            if (await existsFile(accessToken, p)) {
+              usedPath = p;
               break;
             }
           }
 
-          if (!found) {
+          if (!usedPath) {
             results.push({ table: tableName, fabricTable: fabricTableName, success: true, rowCount: 0 });
             continue;
           }
 
-          // Décider format: NDJSON (preferred) vs JSON array
-          // - supplier_purchase_enrichment: NDJSON obligatoire
-          // - autres: auto (si ça commence par '[' => JSON array)
+          // Sniff format (petits fichiers) pour décider JSON array vs NDJSON
+          // supplier_purchase_enrichment : NDJSON obligatoire (stream)
+          if (tableName === "supplier_purchase_enrichment") {
+            const out = await importNdjsonStreaming(supabase, tableName, usedPath, accessToken);
+            results.push({
+              table: tableName,
+              fabricTable: fabricTableName,
+              success: !out.failed,
+              rowCount: out.imported,
+              error: out.error,
+              usedPath,
+            });
+            continue;
+          }
+
           const peek = await fetchFileText(accessToken, usedPath);
           if (!peek.ok || !peek.text) {
             results.push({
@@ -610,9 +675,10 @@ Deno.serve(async (req) => {
           let out: { imported: number; failed: boolean; error?: string };
 
           if (trimmed.startsWith("[")) {
+            // JSON array ok (petit)
             out = await importJsonArrayText(supabase, tableName, trimmed);
           } else {
-            // NDJSON (streaming) => re-fetch in streaming mode
+            // NDJSON streaming (safe)
             out = await importNdjsonStreaming(supabase, tableName, usedPath, accessToken);
           }
 
@@ -624,9 +690,9 @@ Deno.serve(async (req) => {
             error: out.error,
             usedPath,
           });
-        } catch (e: unknown) {
-          const msg = e instanceof Error ? e.message : "Unknown error";
-          results.push({ table: tableName, fabricTable: fabricTableName, success: false, error: msg });
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : "Unknown error";
+          results.push({ table: tableName, fabricTable: fabricTableName, success: false, error: errorMessage });
         }
       }
 
@@ -647,28 +713,26 @@ Deno.serve(async (req) => {
       );
     }
 
+    // List files available for import in Files/ (pas _sync_back)
     if (action === "list-import-files") {
       const root = lakehouseRootUrl("https://onelake.dfs.fabric.microsoft.com", workspaceId, lakehouseId);
-      const syncBackPath = `${root}/Files/_sync_back`;
+      const filesPath = `${root}/Files`;
 
       try {
         const files: string[] = [];
 
         for (const tableName of ALL_TABLES) {
           const prefixed = getFabricTableName(tableName);
-          const candidates = [`${syncBackPath}/${prefixed}.json`, `${syncBackPath}/${tableName}.json`];
+          const candidates = [`${filesPath}/${prefixed}.json`, `${filesPath}/${tableName}.json`];
 
           let found: string | null = null;
           for (const candidatePath of candidates) {
-            const head = await fetch(`${candidatePath}?action=getStatus`, {
-              method: "HEAD",
-              headers: { Authorization: `Bearer ${accessToken}`, "x-ms-version": "2021-06-08" },
-            });
-            if (head.ok || head.status === 200) {
+            if (await existsFile(accessToken, candidatePath)) {
               found = candidatePath.endsWith(`/${prefixed}.json`) ? prefixed : tableName;
               break;
             }
           }
+
           if (found) files.push(found);
         }
 
@@ -678,17 +742,23 @@ Deno.serve(async (req) => {
             files,
             message:
               files.length > 0
-                ? `${files.length} fichier(s) trouvé(s) pour import (Files/_sync_back)`
-                : "Aucun fichier JSON trouvé dans Files/_sync_back.",
+                ? `${files.length} fichier(s) trouvé(s) pour import (Files/)`
+                : "Aucun fichier JSON trouvé dans Files/.",
             tablePrefix: TABLE_PREFIX,
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Unknown error";
-        return new Response(JSON.stringify({ success: false, files: [], error: msg, tablePrefix: TABLE_PREFIX }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        return new Response(
+          JSON.stringify({
+            success: false,
+            files: [],
+            error: errorMessage,
+            tablePrefix: TABLE_PREFIX,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
       }
     }
 
