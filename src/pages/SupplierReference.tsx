@@ -1,9 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useSupplierAccess } from '@/hooks/useSupplierAccess';
 import { SupplierListView } from '@/components/suppliers/SupplierListView';
 import { SupplierDetailDrawer } from '@/components/suppliers/SupplierDetailDrawer';
-import { useRefreshFromDatalake } from '@/hooks/useSupplierEnrichment';
 import { Loader2, ArrowLeft, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -11,19 +10,10 @@ import { useAuth } from '@/contexts/AuthContext';
 
 export default function SupplierReference() {
   const { hasAccess, isLoading: accessLoading } = useSupplierAccess();
-  const { refresh, isRefreshing } = useRefreshFromDatalake();
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const navigate = useNavigate();
   const { profile } = useAuth();
-
-  // Auto-refresh on page load (with throttle in the hook)
-  useEffect(() => {
-  if (hasAccess) {
-    refresh();
-  }
-}, [hasAccess, refresh]);
-
 
   const handleOpenSupplier = (id: string) => {
     setSelectedSupplierId(id);
@@ -52,7 +42,6 @@ export default function SupplierReference() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Simple Header */}
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
         <div className="flex items-center justify-between h-16 px-6">
           <div className="flex items-center gap-4">
@@ -71,13 +60,8 @@ export default function SupplierReference() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="p-6">
-        <SupplierListView 
-          onOpenSupplier={handleOpenSupplier}
-          onRefresh={refresh}
-          isRefreshing={isRefreshing}
-        />
+        <SupplierListView onOpenSupplier={handleOpenSupplier} />
       </main>
 
       <SupplierDetailDrawer
