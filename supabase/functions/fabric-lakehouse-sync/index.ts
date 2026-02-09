@@ -617,4 +617,22 @@ Deno.serve(async (req) => {
           success: true,
           files,
           message:
-            files.length >
+            files.length > 0
+              ? `${files.length} fichier(s) trouvé(s) pour import (Files/_sync_back)`
+              : "Aucun fichier NDJSON trouvé dans Files/_sync_back.",
+          tablePrefix: TABLE_PREFIX,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    throw new Error(`Unknown action: ${action}`);
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "Unknown error";
+    console.error("Fabric Lakehouse sync error:", e);
+    return new Response(JSON.stringify({ success: false, error: msg }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+});
