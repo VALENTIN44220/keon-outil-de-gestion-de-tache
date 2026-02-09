@@ -196,4 +196,22 @@ export function useRefreshFromDatalake() {
       await queryClient.invalidateQueries({ queryKey: ['supplier-enrichment'] });
       await queryClient.invalidateQueries({ queryKey: ['supplier-filter-options'] });
 
-      setLastRefresh(new D
+      setLastRefresh(new Date());
+      toast({
+        title: 'Actualisation terminée',
+        description: 'Les données fournisseurs ont été mises à jour.',
+      });
+    } catch (error) {
+      console.error('Refresh error:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de rafraîchir les données.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [lastRefresh, queryClient]);
+
+  return { refresh, isRefreshing, lastRefresh };
+}
