@@ -19,7 +19,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useSupplierEnrichment, SupplierFilters } from '@/hooks/useSupplierEnrichment';
-import { Search, RefreshCw, Building2, Filter, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Building2, Filter, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -27,9 +27,8 @@ import { Progress } from '@/components/ui/progress';
 
 interface SupplierListViewProps {
   onOpenSupplier: (id: string) => void;
-  onRefresh: () => void;
-  isRefreshing: boolean;
 }
+
 
 type DateTone = 'past' | 'soon' | 'future' | 'none';
 
@@ -65,7 +64,8 @@ function safeFormatDate(iso?: string | null) {
   return format(d, 'dd/MM/yyyy', { locale: fr });
 }
 
-export function SupplierListView({ onOpenSupplier, onRefresh, isRefreshing }: SupplierListViewProps) {
+export function SupplierListView({ onOpenSupplier }: SupplierListViewProps)
+ {
   const pageSize = 200;
 
   const [page, setPage] = useState(0);
@@ -124,10 +124,6 @@ export function SupplierListView({ onOpenSupplier, onRefresh, isRefreshing }: Su
             <p className="text-muted-foreground">Service Achats</p>
           </div>
         </div>
-        <Button onClick={onRefresh} disabled={isRefreshing} className="gap-2">
-          <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-          Rafraîchir depuis datalake
-        </Button>
       </div>
 
       {/* Stats Cards */}
