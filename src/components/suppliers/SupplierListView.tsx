@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,7 +19,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useSupplierEnrichment, SupplierFilters } from '@/hooks/useSupplierEnrichment';
-import { Search, RefreshCw, Building2, Filter, ExternalLink } from 'lucide-react';
+import { Search, RefreshCw, Building2, Filter, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -31,29 +31,85 @@ interface SupplierListViewProps {
   isRefreshing: boolean;
 }
 
+type DateTone = 'past' | 'soon' | 'future' | 'none';
+
+function dateTone(iso?: string | null): DateTone {
+  if (!iso) return 'none';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return 'none';
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const dd = new Date(d);
+  dd.setHours(0, 0, 0, 0);
+
+  const diffDays = Math.floor((dd.getTime() - today.getTime()) / 86400000);
+  if (diffDays < 0) return 'past';
+  if (diffDays <= 30) return 'soon';
+  return 'future';
+}
+
+function dateClass(iso?: string | null): string {
+  const t = dateTone(iso);
+  if (t === 'past') return 'text-red-600 font-semibold';
+  if (t === 'soon') return 'text-orange-600 font-semibold';
+  if (t === 'future') return 'text-green-700';
+  return 'text-muted-foreground';
+}
+
+function safeFormatDate(iso?: string | null) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return format(d, 'dd/MM/yyyy', { locale: fr });
+}
+
 export function SupplierListView({ onOpenSupplier, onRefresh, isRefreshing }: SupplierListViewProps) {
+  const pageSize = 200;
+
+  const [page, setPage] = useState(0);
+
   const [filters, setFilters] = useState<SupplierFilters>({
     search: '',
     status: 'all',
     entite: 'all',
     categorie: 'all',
     segment: 'all',
+    sous_segment: 'all',
+    validite_prix_from: '',
+    validite_prix_to: '',
+    validite_contrat_from: '',
+    validite_contrat_to: '',
   });
 
-  const { suppliers, isLoading, filterOptions } = useSupplierEnrichment(filters);
+  const updateFilters = (patch: Partial<SupplierFilters>) => {
+    setFilters(prev => ({ ...prev, ...patch }));
+    setPage(0);
+  };
+
+  const { suppliers, total, isLoading, filterOptions } = useSupplierEnrichment(filters, page, pageSize);
+
+  const totalPages = useMemo(() => Math.max(1, Math.ceil((total || 0) / pageSize)), [total, pageSize]);
+
+  useEffect(() => {
+    if (page >= totalPages) setPage(Math.max(0, totalPages - 1));
+  }, [page, totalPages]);
 
   const statusConfig = {
-    a_completer: { label: 'À compléter', variant: 'destructive' as const, color: 'bg-destructive/10 text-destructive' },
-    en_cours: { label: 'En cours', variant: 'warning' as const, color: 'bg-warning/10 text-warning' },
-    complet: { label: 'Complet', variant: 'success' as const, color: 'bg-success/10 text-success' },
-  };
+    a_completer: { label: 'À compléter', color: 'bg-destructive/10 text-destructive' },
+    en_cours: { label: 'En cours', color: 'bg-warning/10 text-warning' },
+    complet: { label: 'Complet', color: 'bg-success/10 text-success' },
+  } as const;
 
-  const stats = {
-    total: suppliers.length,
-    aCompleter: suppliers.filter(s => s.status === 'a_completer').length,
-    enCours: suppliers.filter(s => s.status === 'en_cours').length,
-    complet: suppliers.filter(s => s.status === 'complet').length,
-  };
+  const stats = useMemo(() => {
+    return {
+      total,
+      aCompleter: filterOptions?.stats?.a_completer ?? 0,
+      enCours: filterOptions?.stats?.en_cours ?? 0,
+      complet: filterOptions?.stats?.complet ?? 0,
+    };
+  }, [total, filterOptions]);
 
   return (
     <div className="space-y-6">
@@ -78,7 +134,7 @@ export function SupplierListView({ onOpenSupplier, onRefresh, isRefreshing }: Su
       <div className="grid grid-cols-4 gap-4">
         <Card className="p-4">
           <div className="text-sm text-muted-foreground">Total</div>
-          <div className="text-2xl font-bold">{stats.total}</div>
+          <div className="text-2xl font-bold">{stats.total ?? 0}</div>
         </Card>
         <Card className="p-4 border-l-4 border-l-destructive">
           <div className="text-sm text-muted-foreground">À compléter</div>
@@ -103,19 +159,16 @@ export function SupplierListView({ onOpenSupplier, onRefresh, isRefreshing }: Su
               <Input
                 placeholder="Rechercher TIERS, Nom, Famille, Segment, Entité..."
                 value={filters.search}
-                onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                onChange={(e) => updateFilters({ search: e.target.value })}
                 className="pl-9"
               />
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Filter className="h-4 w-4 text-muted-foreground" />
-            
-            <Select
-              value={filters.status}
-              onValueChange={(value) => setFilters(prev => ({ ...prev, status: value }))}
-            >
+
+            <Select value={filters.status} onValueChange={(value) => updateFilters({ status: value })}>
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
@@ -127,50 +180,97 @@ export function SupplierListView({ onOpenSupplier, onRefresh, isRefreshing }: Su
               </SelectContent>
             </Select>
 
-            <Select
-              value={filters.entite}
-              onValueChange={(value) => setFilters(prev => ({ ...prev, entite: value }))}
-            >
+            <Select value={filters.entite} onValueChange={(value) => updateFilters({ entite: value })}>
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="Entité" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Toutes entités</SelectItem>
-                {filterOptions.entites.map(e => (
-                  <SelectItem key={e} value={e}>{e}</SelectItem>
+                {filterOptions.entites.map((e) => (
+                  <SelectItem key={e} value={e}>
+                    {e}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
-            <Select
-              value={filters.categorie}
-              onValueChange={(value) => setFilters(prev => ({ ...prev, categorie: value }))}
-            >
+            <Select value={filters.categorie} onValueChange={(value) => updateFilters({ categorie: value })}>
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="Catégorie" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Toutes catégories</SelectItem>
-                {filterOptions.categories.map(c => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                {filterOptions.categories.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
-            <Select
-              value={filters.segment}
-              onValueChange={(value) => setFilters(prev => ({ ...prev, segment: value }))}
-            >
+            <Select value={filters.segment} onValueChange={(value) => updateFilters({ segment: value })}>
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="Segment" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tous segments</SelectItem>
-                {filterOptions.segments.map(s => (
-                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                {filterOptions.segments.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+
+            <Select value={filters.sous_segment ?? 'all'} onValueChange={(value) => updateFilters({ sous_segment: value })}>
+              <SelectTrigger className="w-[170px]">
+                <SelectValue placeholder="Sous-segment" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous sous-segments</SelectItem>
+                {filterOptions.sous_segments.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Date filters */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
+          <div>
+            <div className="text-xs text-muted-foreground mb-1">Validité prix - du</div>
+            <Input
+              type="date"
+              value={filters.validite_prix_from || ''}
+              onChange={(e) => updateFilters({ validite_prix_from: e.target.value })}
+            />
+          </div>
+          <div>
+            <div className="text-xs text-muted-foreground mb-1">Validité prix - au</div>
+            <Input
+              type="date"
+              value={filters.validite_prix_to || ''}
+              onChange={(e) => updateFilters({ validite_prix_to: e.target.value })}
+            />
+          </div>
+          <div>
+            <div className="text-xs text-muted-foreground mb-1">Validité contrat - du</div>
+            <Input
+              type="date"
+              value={filters.validite_contrat_from || ''}
+              onChange={(e) => updateFilters({ validite_contrat_from: e.target.value })}
+            />
+          </div>
+          <div>
+            <div className="text-xs text-muted-foreground mb-1">Validité contrat - au</div>
+            <Input
+              type="date"
+              value={filters.validite_contrat_to || ''}
+              onChange={(e) => updateFilters({ validite_contrat_to: e.target.value })}
+            />
           </div>
         </div>
       </Card>
@@ -187,29 +287,33 @@ export function SupplierListView({ onOpenSupplier, onRefresh, isRefreshing }: Su
               <TableHead>Famille</TableHead>
               <TableHead>Segment</TableHead>
               <TableHead className="w-[150px]">Complétude</TableHead>
+              <TableHead className="w-[140px]">Validité prix</TableHead>
+              <TableHead className="w-[140px]">Validité contrat</TableHead>
               <TableHead>Mise à jour</TableHead>
               <TableHead className="w-[80px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              Array.from({ length: 5 }).map((_, i) => (
+              Array.from({ length: 8 }).map((_, i) => (
                 <TableRow key={i}>
-                  {Array.from({ length: 9 }).map((_, j) => (
-                    <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
+                  {Array.from({ length: 11 }).map((_, j) => (
+                    <TableCell key={j}>
+                      <Skeleton className="h-4 w-full" />
+                    </TableCell>
                   ))}
                 </TableRow>
               ))
             ) : suppliers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                   Aucun fournisseur trouvé
                 </TableCell>
               </TableRow>
             ) : (
               suppliers.map((supplier) => (
-                <TableRow 
-                  key={supplier.id} 
+                <TableRow
+                  key={supplier.id}
                   className="cursor-pointer hover:bg-muted/50"
                   onClick={() => onOpenSupplier(supplier.id)}
                 >
@@ -219,27 +323,45 @@ export function SupplierListView({ onOpenSupplier, onRefresh, isRefreshing }: Su
                   <TableCell>{supplier.categorie || '—'}</TableCell>
                   <TableCell>{supplier.famille || '—'}</TableCell>
                   <TableCell>
-                    {supplier.segment && (
+                    {supplier.segment ? (
                       <span>
                         {supplier.segment}
-                        {supplier.sous_segment && <span className="text-muted-foreground"> / {supplier.sous_segment}</span>}
+                        {supplier.sous_segment && (
+                          <span className="text-muted-foreground"> / {supplier.sous_segment}</span>
+                        )}
                       </span>
+                    ) : (
+                      '—'
                     )}
-                    {!supplier.segment && '—'}
                   </TableCell>
+
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <Progress value={supplier.completeness_score} className="h-2 flex-1" />
-                      <Badge className={statusConfig[supplier.status].color}>
-                        {supplier.completeness_score}%
-                      </Badge>
+                      <Progress value={supplier.completeness_score ?? 0} className="h-2 flex-1" />
+                      {supplier.status ? (
+                        <Badge className={statusConfig[supplier.status]?.color ?? 'bg-muted text-muted-foreground'}>
+                          {supplier.completeness_score ?? 0}%
+                        </Badge>
+                      ) : (
+                        <Badge className="bg-muted text-muted-foreground">{supplier.completeness_score ?? 0}%</Badge>
+                      )}
                     </div>
                   </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {format(new Date(supplier.updated_at), 'dd/MM/yyyy', { locale: fr })}
+
+                  <TableCell className={`text-sm ${dateClass((supplier as any).validite_prix)}`}>
+                    {safeFormatDate((supplier as any).validite_prix)}
                   </TableCell>
+
+                  <TableCell className={`text-sm ${dateClass((supplier as any).validite_du_contrat)}`}>
+                    {safeFormatDate((supplier as any).validite_du_contrat)}
+                  </TableCell>
+
+                  <TableCell className="text-muted-foreground text-sm">
+                    {safeFormatDate(supplier.updated_at)}
+                  </TableCell>
+
                   <TableCell>
-                    <Button variant="ghost" size="icon">
+                    <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); onOpenSupplier(supplier.id); }}>
                       <ExternalLink className="h-4 w-4" />
                     </Button>
                   </TableCell>
@@ -248,6 +370,37 @@ export function SupplierListView({ onOpenSupplier, onRefresh, isRefreshing }: Su
             )}
           </TableBody>
         </Table>
+
+        {/* Pagination */}
+        <div className="flex items-center justify-between gap-2 px-4 py-3 border-t">
+          <div className="text-sm text-muted-foreground">
+            {(total ?? 0)} lignes — page {page + 1} / {totalPages} — {pageSize} / page
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page === 0 || isLoading}
+              onClick={() => setPage(p => Math.max(0, p - 1))}
+              className="gap-2"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Précédent
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page + 1 >= totalPages || isLoading}
+              onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+              className="gap-2"
+            >
+              Suivant
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
       </Card>
     </div>
   );
