@@ -13,10 +13,12 @@ export interface SupplierEnrichment {
   segment: string | null;
   sous_segment: string | null;
   entite: string | null;
+
   type_de_contrat: string | null;
-  validite_prix: string | null;
-  validite_du_contrat: string | null;
+  validite_prix: string | null;         // "YYYY-MM-DD" ou null
+  validite_du_contrat: string | null;   // "YYYY-MM-DD" ou null
   date_premiere_signature: string | null;
+
   avenants: string | null;
   evolution_tarif_2026: string | null;
   echeances_de_paiement: string | null;
@@ -33,6 +35,7 @@ export interface SupplierEnrichment {
   adresse_mail: string | null;
   telephone: string | null;
   commentaires: string | null;
+
   completeness_score: number;
   status: 'a_completer' | 'en_cours' | 'complet';
   created_at: string;
@@ -42,81 +45,122 @@ export interface SupplierEnrichment {
 
 export interface SupplierFilters {
   search: string;
-  status: string;
-  entite: string;
-  categorie: string;
-  segment: string;
+  status: string;        // 'all' | ...
+  entite: string;        // 'all' | ...
+  categorie: string;     // 'all' | ...
+  segment: string;       // 'all' | ...
+  sous_segment: string;  // 'all' | ...
+
+  validite_prix_from?: string;       // "YYYY-MM-DD"
+  validite_prix_to?: string;         // "YYYY-MM-DD"
+  validite_contrat_from?: string;    // "YYYY-MM-DD"
+  validite_contrat_to?: string;      // "YYYY-MM-DD"
 }
 
-const PAGE_SIZE = 1000;
+const PAGE_SIZE_DEFAULT = 200;
 
-async function fetchAllSuppliers(filters: SupplierFilters): Promise<SupplierEnrichment[]> {
-  const all: SupplierEnrichment[] = [];
-  let from = 0;
-
-  while (true) {
-    let query = supabase
-      .from('supplier_purchase_enrichment')
-      .select('*')
-      .order('updated_at', { ascending: false })
-      .range(from, from + PAGE_SIZE - 1);
-
-    if (filters.search) {
-      query = query.or(
-        `tiers.ilike.%${filters.search}%,nomfournisseur.ilike.%${filters.search}%,famille.ilike.%${filters.search}%,segment.ilike.%${filters.search}%,entite.ilike.%${filters.search}%`
-      );
-    }
-    if (filters.status && filters.status !== 'all') query = query.eq('status', filters.status);
-    if (filters.entite && filters.entite !== 'all') query = query.eq('entite', filters.entite);
-    if (filters.categorie && filters.categorie !== 'all') query = query.eq('categorie', filters.categorie);
-    if (filters.segment && filters.segment !== 'all') query = query.eq('segment', filters.segment);
-
-    const { data, error } = await query;
-    if (error) throw error;
-
-    const page = (data ?? []) as SupplierEnrichment[];
-    all.push(...page);
-
-    if (page.length < PAGE_SIZE) break; // dernière page
-    from += PAGE_SIZE;
+// ---------- Helpers ----------
+function applyCommonFilters(
+  query: ReturnType<typeof supabase.from>,
+  filters: SupplierFilters
+) {
+  // search multi-colonnes
+  if (filters.search) {
+    query = query.or(
+      `tiers.ilike.%${filters.search}%,nomfournisseur.ilike.%${filters.search}%,famille.ilike.%${filters.search}%,segment.ilike.%${filters.search}%,sous_segment.ilike.%${filters.search}%,entite.ilike.%${filters.search}%`
+    );
   }
 
-  return all;
+  if (filters.status && filters.status !== 'all') query = query.eq('status', filters.status);
+  if (filters.entite && filters.entite !== 'all') query = query.eq('entite', filters.entite);
+  if (filters.categorie && filters.categorie !== 'all') query = query.eq('categorie', filters.categorie);
+  if (filters.segment && filters.segment !== 'all') query = query.eq('segment', filters.segment);
+  if (filters.sous_segment && filters.sous_segment !== 'all') query = query.eq('sous_segment', filters.sous_segment);
+
+  // Filtres de date (string ISO "YYYY-MM-DD" => OK en comparaison lexicographique)
+  if (filters.validite_prix_from) query = query.gte('validite_prix', filters.validite_prix_from);
+  if (filters.validite_prix_to) query = query.lte('validite_prix', filters.validite_prix_to);
+
+  if (filters.validite_contrat_from) query = query.gte('validite_du_contrat', filters.validite_contrat_from);
+  if (filters.validite_contrat_to) query = query.lte('validite_du_contrat', filters.validite_contrat_to);
+
+  return query;
 }
 
-async function fetchAllFilterOptions(): Promise<{ entites: string[]; categories: string[]; segments: string[] }> {
-  const rows: { entite: string | null; categorie: string | null; segment: string | null }[] = [];
+async function fetchSuppliersPage(filters: SupplierFilters, page: number, pageSize: number) {
+  const from = page * pageSize;
+  const to = from + pageSize - 1;
+
+  // count exact = total lignes correspondant aux filtres
+  let query = supabase
+    .from('supplier_purchase_enrichment')
+    .select('*', { count: 'exact' })
+    .order('updated_at', { ascending: false });
+
+  query = applyCommonFilters(query, filters);
+
+  const { data, error, count } = await query.range(from, to);
+  if (error) throw error;
+
+  return {
+    rows: (data ?? []) as SupplierEnrichment[],
+    total: count ?? 0,
+  };
+}
+
+async function fetchAllFilterOptions(): Promise<{
+  entites: string[];
+  categories: string[];
+  segments: string[];
+  sous_segments: string[];
+}> {
+  // On pagine, sinon Supabase/PostgREST limite à 1000
+  const PAGE = 1000;
   let from = 0;
+
+  const rows: { entite: string | null; categorie: string | null; segment: string | null; sous_segment: string | null }[] = [];
 
   while (true) {
     const { data, error } = await supabase
       .from('supplier_purchase_enrichment')
-      .select('entite,categorie,segment')
-      .range(from, from + PAGE_SIZE - 1);
+      .select('entite,categorie,segment,sous_segment')
+      .range(from, from + PAGE - 1);
 
     if (error) throw error;
 
-    const page = (data ?? []) as { entite: string | null; categorie: string | null; segment: string | null }[];
+    const page = (data ?? []) as typeof rows;
     rows.push(...page);
 
-    if (page.length < PAGE_SIZE) break;
-    from += PAGE_SIZE;
+    if (page.length < PAGE) break;
+    from += PAGE;
   }
 
   const entites = [...new Set(rows.map(r => r.entite).filter(Boolean))] as string[];
   const categories = [...new Set(rows.map(r => r.categorie).filter(Boolean))] as string[];
   const segments = [...new Set(rows.map(r => r.segment).filter(Boolean))] as string[];
+  const sous_segments = [...new Set(rows.map(r => r.sous_segment).filter(Boolean))] as string[];
 
-  return { entites, categories, segments };
+  // tri alpha
+  entites.sort();
+  categories.sort();
+  segments.sort();
+  sous_segments.sort();
+
+  return { entites, categories, segments, sous_segments };
 }
 
-export function useSupplierEnrichment(filters: SupplierFilters) {
+// ---------- Hook principal ----------
+export function useSupplierEnrichment(filters: SupplierFilters, page: number, pageSize = PAGE_SIZE_DEFAULT) {
   const queryClient = useQueryClient();
 
-  const { data: suppliers = [], isLoading, refetch } = useQuery({
-    queryKey: ['supplier-enrichment', filters],
-    queryFn: () => fetchAllSuppliers(filters),
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ['supplier-enrichment', filters, page, pageSize],
+    queryFn: () => fetchSuppliersPage(filters, page, pageSize),
+    keepPreviousData: true,
   });
+
+  const suppliers = data?.rows ?? [];
+  const total = data?.total ?? 0;
 
   const updateSupplier = useMutation({
     mutationFn: async ({ id, ...updates }: Partial<SupplierEnrichment> & { id: string }) => {
@@ -132,6 +176,7 @@ export function useSupplierEnrichment(filters: SupplierFilters) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['supplier-enrichment'] });
+      queryClient.invalidateQueries({ queryKey: ['supplier-filter-options'] });
     },
     onError: (error) => {
       toast({
@@ -146,36 +191,20 @@ export function useSupplierEnrichment(filters: SupplierFilters) {
   const { data: filterOptions } = useQuery({
     queryKey: ['supplier-filter-options'],
     queryFn: fetchAllFilterOptions,
+    staleTime: 5 * 60 * 1000,
   });
 
   return {
     suppliers,
+    total,
     isLoading,
     refetch,
     updateSupplier,
-    filterOptions: filterOptions || { entites: [], categories: [], segments: [] },
+    filterOptions: filterOptions || { entites: [], categories: [], segments: [], sous_segments: [] },
   };
 }
 
-export function useSupplierById(id: string | null) {
-  return useQuery({
-    queryKey: ['supplier-enrichment', id],
-    queryFn: async () => {
-      if (!id) return null;
-
-      const { data, error } = await supabase
-        .from('supplier_purchase_enrichment')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (error) throw error;
-      return data as SupplierEnrichment;
-    },
-    enabled: !!id,
-  });
-}
-
+// ---------- Refresh button ----------
 export function useRefreshFromDatalake() {
   const queryClient = useQueryClient();
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -191,23 +220,15 @@ export function useRefreshFromDatalake() {
     }
 
     setIsRefreshing(true);
-
     try {
       await queryClient.invalidateQueries({ queryKey: ['supplier-enrichment'] });
       await queryClient.invalidateQueries({ queryKey: ['supplier-filter-options'] });
 
       setLastRefresh(new Date());
-      toast({
-        title: 'Actualisation terminée',
-        description: 'Les données fournisseurs ont été mises à jour.',
-      });
+      toast({ title: 'Actualisation terminée', description: 'Données mises à jour.' });
     } catch (error) {
       console.error('Refresh error:', error);
-      toast({
-        title: 'Erreur',
-        description: 'Impossible de rafraîchir les données.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Erreur', description: 'Impossible de rafraîchir.', variant: 'destructive' });
     } finally {
       setIsRefreshing(false);
     }
