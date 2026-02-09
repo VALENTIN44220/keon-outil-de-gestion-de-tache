@@ -48,44 +48,74 @@ export interface SupplierFilters {
   segment: string;
 }
 
+const PAGE_SIZE = 1000;
+
+async function fetchAllSuppliers(filters: SupplierFilters): Promise<SupplierEnrichment[]> {
+  const all: SupplierEnrichment[] = [];
+  let from = 0;
+
+  while (true) {
+    let query = supabase
+      .from('supplier_purchase_enrichment')
+      .select('*')
+      .order('updated_at', { ascending: false })
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (filters.search) {
+      query = query.or(
+        `tiers.ilike.%${filters.search}%,nomfournisseur.ilike.%${filters.search}%,famille.ilike.%${filters.search}%,segment.ilike.%${filters.search}%,entite.ilike.%${filters.search}%`
+      );
+    }
+    if (filters.status && filters.status !== 'all') query = query.eq('status', filters.status);
+    if (filters.entite && filters.entite !== 'all') query = query.eq('entite', filters.entite);
+    if (filters.categorie && filters.categorie !== 'all') query = query.eq('categorie', filters.categorie);
+    if (filters.segment && filters.segment !== 'all') query = query.eq('segment', filters.segment);
+
+    const { data, error } = await query;
+    if (error) throw error;
+
+    const page = (data ?? []) as SupplierEnrichment[];
+    all.push(...page);
+
+    if (page.length < PAGE_SIZE) break; // dernière page
+    from += PAGE_SIZE;
+  }
+
+  return all;
+}
+
+async function fetchAllFilterOptions(): Promise<{ entites: string[]; categories: string[]; segments: string[] }> {
+  const rows: { entite: string | null; categorie: string | null; segment: string | null }[] = [];
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await supabase
+      .from('supplier_purchase_enrichment')
+      .select('entite,categorie,segment')
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (error) throw error;
+
+    const page = (data ?? []) as { entite: string | null; categorie: string | null; segment: string | null }[];
+    rows.push(...page);
+
+    if (page.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+
+  const entites = [...new Set(rows.map(r => r.entite).filter(Boolean))] as string[];
+  const categories = [...new Set(rows.map(r => r.categorie).filter(Boolean))] as string[];
+  const segments = [...new Set(rows.map(r => r.segment).filter(Boolean))] as string[];
+
+  return { entites, categories, segments };
+}
+
 export function useSupplierEnrichment(filters: SupplierFilters) {
   const queryClient = useQueryClient();
 
   const { data: suppliers = [], isLoading, refetch } = useQuery({
     queryKey: ['supplier-enrichment', filters],
-    queryFn: async () => {
-      let query = supabase
-        .from('supplier_purchase_enrichment')
-        .select('*')
-        .order('updated_at', { ascending: false });
-
-      if (filters.search) {
-        query = query.or(
-          `tiers.ilike.%${filters.search}%,nomfournisseur.ilike.%${filters.search}%,famille.ilike.%${filters.search}%,segment.ilike.%${filters.search}%,entite.ilike.%${filters.search}%`
-        );
-      }
-
-      if (filters.status && filters.status !== 'all') {
-        query = query.eq('status', filters.status);
-      }
-
-      if (filters.entite && filters.entite !== 'all') {
-        query = query.eq('entite', filters.entite);
-      }
-
-      if (filters.categorie && filters.categorie !== 'all') {
-        query = query.eq('categorie', filters.categorie);
-      }
-
-      if (filters.segment && filters.segment !== 'all') {
-        query = query.eq('segment', filters.segment);
-      }
-
-      const { data, error } = await query;
-      
-      if (error) throw error;
-      return data as SupplierEnrichment[];
-    },
+    queryFn: () => fetchAllSuppliers(filters),
   });
 
   const updateSupplier = useMutation({
@@ -113,22 +143,9 @@ export function useSupplierEnrichment(filters: SupplierFilters) {
     },
   });
 
-  // Get unique values for filters
   const { data: filterOptions } = useQuery({
     queryKey: ['supplier-filter-options'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('supplier_purchase_enrichment')
-        .select('entite, categorie, segment');
-
-      if (error) throw error;
-
-      const entites = [...new Set(data?.map(s => s.entite).filter(Boolean))];
-      const categories = [...new Set(data?.map(s => s.categorie).filter(Boolean))];
-      const segments = [...new Set(data?.map(s => s.segment).filter(Boolean))];
-
-      return { entites, categories, segments };
-    },
+    queryFn: fetchAllFilterOptions,
   });
 
   return {
@@ -145,7 +162,7 @@ export function useSupplierById(id: string | null) {
     queryKey: ['supplier-enrichment', id],
     queryFn: async () => {
       if (!id) return null;
-      
+
       const { data, error } = await supabase
         .from('supplier_purchase_enrichment')
         .select('*')
@@ -165,7 +182,6 @@ export function useRefreshFromDatalake() {
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
   const refresh = useCallback(async () => {
-    // Throttle: don't refresh more than once per minute
     if (lastRefresh && Date.now() - lastRefresh.getTime() < 60000) {
       toast({
         title: 'Actualisation récente',
@@ -175,34 +191,9 @@ export function useRefreshFromDatalake() {
     }
 
     setIsRefreshing(true);
-    
-    try {
-      // For now, we'll simulate the refresh - in production this would call
-      // an edge function that fetches the JSON from SharePoint/Fabric
-      // and upserts the data
-      
-      // Placeholder: Call an edge function or direct API
-      // const response = await supabase.functions.invoke('sync-suppliers-datalake');
-      
-      // For demo, we'll just refetch from the database
-      await queryClient.invalidateQueries({ queryKey: ['supplier-enrichment'] });
-      
-      setLastRefresh(new Date());
-      toast({
-        title: 'Actualisation terminée',
-        description: 'Les données fournisseurs ont été mises à jour.',
-      });
-    } catch (error) {
-      console.error('Refresh error:', error);
-      toast({
-        title: 'Erreur',
-        description: 'Impossible de rafraîchir les données.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [lastRefresh, queryClient]);
 
-  return { refresh, isRefreshing, lastRefresh };
-}
+    try {
+      await queryClient.invalidateQueries({ queryKey: ['supplier-enrichment'] });
+      await queryClient.invalidateQueries({ queryKey: ['supplier-filter-options'] });
+
+      setLastRefresh(new D
