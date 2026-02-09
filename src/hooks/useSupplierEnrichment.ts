@@ -232,3 +232,51 @@ export function useSupplierById(id: string | null) {
 
   return { supplier, isLoading, error };
 }
+
+/**
+ * ✅ Export attendu par SupplierReference.tsx
+ * Dans ton contexte, "refresh depuis datalake" = relancer une synchro
+ * côté Fabric qui upsert dans Supabase.
+ *
+ * Ici on fait une implémentation safe:
+ * - throttle simple (évite spam)
+ * - appel HTTP sur une URL de webhook / endpoint si tu en as une
+ *
+ * IMPORTANT:
+ * - Remplace REFRESH_ENDPOINT par ton vrai endpoint (Power Automate / Azure Function / Fabric Pipeline API / etc.)
+ * - Si tu n’as pas d’endpoint, on garde un "no-op" qui ne casse pas l’app.
+ */
+import { useCallback, useRef, useState } from 'react';
+
+const REFRESH_ENDPOINT = import.meta.env.VITE_SUPPLIERS_REFRESH_URL as string | undefined;
+
+export function useRefreshFromDatalake() {
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const lastRunRef = useRef<number>(0);
+
+  const refresh = useCallback(async () => {
+    // throttle 30s
+    const now = Date.now();
+    if (now - lastRunRef.current < 30_000) return;
+    lastRunRef.current = now;
+
+    setIsRefreshing(true);
+    try {
+      // Si tu as un endpoint (recommandé)
+      if (REFRESH_ENDPOINT) {
+        const r = await fetch(REFRESH_ENDPOINT, { method: 'POST' });
+        if (!r.ok) {
+          const txt = await r.text().catch(() => '');
+          throw new Error(`Refresh endpoint failed: ${r.status} ${txt}`);
+        }
+      } else {
+        // Pas d’endpoint configuré: on ne fait rien, mais on ne casse pas l’UI
+        console.warn('VITE_SUPPLIERS_REFRESH_URL non défini: refresh() no-op');
+      }
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  return { refresh, isRefreshing };
+}
