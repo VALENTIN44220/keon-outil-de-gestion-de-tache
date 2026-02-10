@@ -2264,6 +2264,30 @@ export type Database = {
           },
         ]
       }
+      supplier_categorisation: {
+        Row: {
+          active: boolean
+          categorie: string
+          famille: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          categorie: string
+          famille: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          categorie?: string
+          famille?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       supplier_purchase_enrichment: {
         Row: {
           adresse_mail: string | null
@@ -2399,6 +2423,36 @@ export type Database = {
           is_active?: boolean | null
           role?: string
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      supplier_taxonomy: {
+        Row: {
+          active: boolean
+          categorie: string
+          famille: string
+          id: string
+          segment: string
+          sous_segment: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          categorie: string
+          famille: string
+          id?: string
+          segment: string
+          sous_segment?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          categorie?: string
+          famille?: string
+          id?: string
+          segment?: string
+          sous_segment?: string | null
+          updated_at?: string
         }
         Relationships: []
       }

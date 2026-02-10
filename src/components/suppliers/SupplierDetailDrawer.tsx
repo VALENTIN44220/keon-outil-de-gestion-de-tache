@@ -92,8 +92,6 @@ const ENTITES = ["NASKEO", "PRODEVAL", "KEON", "Autre"];
 const TYPES_CONTRAT = ["Contrat cadre", "Commande ponctuelle", "Appel d'offres", "Marché", "Convention"];
 const DELAIS_PAIEMENT = ["Comptant", "30 jours", "45 jours", "60 jours", "90 jours"];
 const INCOTERMS = ["EXW", "FCA", "CPT", "CIP", "DAP", "DPU", "DDP", "FAS", "FOB", "CFR", "CIF"];
-const { data: categories = [], isLoading: catLoading } = useSupplierCategories();
-const { data: familles = [], isLoading: famLoading } = useSupplierFamillesByCategorie(formData.categorie);
 
 
 export function SupplierDetailDrawer({ supplierId, open, onClose }: SupplierDetailDrawerProps) {
@@ -101,6 +99,9 @@ export function SupplierDetailDrawer({ supplierId, open, onClose }: SupplierDeta
   const [isLoading, setIsLoading] = useState(false);
 
   const [formData, setFormData] = useState<Partial<SupplierRow>>({});
+
+  const { data: categories = [], isLoading: catLoading } = useSupplierCategories();
+  const { data: familles = [], isLoading: famLoading } = useSupplierFamillesByCategorie(formData.categorie as string | null);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [pendingSave, setPendingSave] = useState<Partial<SupplierRow> | null>(null);
 
