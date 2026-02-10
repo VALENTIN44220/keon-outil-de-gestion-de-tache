@@ -116,8 +116,9 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
   // ✅ Référentiel Catégorie/Famille depuis public.categories (sync Fabric)
   const { data: categories = [] } = useSupplierCategories();
   const selectedCategorie = filters.categorie !== "all" ? filters.categorie : null;
-  const { data: familles = [] } = useSupplierFamillesByCategorie(selectedCategorie);
-
+  const { data: familles = [] } = useSupplierFamillesByCategorie(
+  filters.categorie !== "all" ? filters.categorie : null
+);
   const famillesDisabled = !selectedCategorie || familles.length === 0;
 
   return (
