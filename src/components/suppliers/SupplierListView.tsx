@@ -30,7 +30,6 @@ interface SupplierListViewProps {
   onOpenSupplier: (id: string) => void;
 }
 
-
 type DateTone = 'past' | 'soon' | 'future' | 'none';
 
 function dateTone(iso?: string | null): DateTone {
@@ -65,10 +64,8 @@ function safeFormatDate(iso?: string | null) {
   return format(d, 'dd/MM/yyyy', { locale: fr });
 }
 
-export function SupplierListView({ onOpenSupplier }: SupplierListViewProps)
- {
+export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
   const pageSize = 200;
-
   const [page, setPage] = useState(0);
 
   const [filters, setFilters] = useState<SupplierFilters>({
@@ -76,6 +73,7 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps)
     status: 'all',
     entite: 'all',
     categorie: 'all',
+    famille: 'all',          // ✅ AJOUT
     segment: 'all',
     sous_segment: 'all',
     validite_prix_from: '',
@@ -91,7 +89,10 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps)
 
   const { suppliers, total, isLoading, filterOptions } = useSupplierEnrichment(filters, page, pageSize);
 
-  const totalPages = useMemo(() => Math.max(1, Math.ceil((total || 0) / pageSize)), [total, pageSize]);
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil((total || 0) / pageSize)),
+    [total, pageSize]
+  );
 
   useEffect(() => {
     if (page >= totalPages) setPage(Math.max(0, totalPages - 1));
@@ -112,9 +113,12 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps)
     };
   }, [total, filterOptions]);
 
- const { data: categories = [] } = useSupplierCategories();
-const { data: familles = [] } = useSupplierFamillesByCategorie(filters.categorie !== "all" ? filters.categorie : null);
-  
+  // ✅ Référentiel Catégorie/Famille depuis public.categories (sync Fabric)
+  const { data: categories = [] } = useSupplierCategories();
+  const selectedCategorie = filters.categorie !== "all" ? filters.categorie : null;
+  const { data: familles = [] } = useSupplierFamillesByCategorie(selectedCategorie);
+
+  const famillesDisabled = !selectedCategorie || familles.length === 0;
 
   return (
     <div className="space-y-6">
@@ -169,7 +173,10 @@ const { data: familles = [] } = useSupplierFamillesByCategorie(filters.categorie
           <div className="flex items-center gap-2 flex-wrap">
             <Filter className="h-4 w-4 text-muted-foreground" />
 
-            <Select value={filters.status} onValueChange={(value) => updateFilters({ status: value })}>
+            <Select
+              value={filters.status}
+              onValueChange={(value) => updateFilters({ status: value })}
+            >
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
@@ -181,58 +188,99 @@ const { data: familles = [] } = useSupplierFamillesByCategorie(filters.categorie
               </SelectContent>
             </Select>
 
-            <Select value={filters.entite} onValueChange={(value) => updateFilters({ entite: value })}>
+            <Select
+              value={filters.entite}
+              onValueChange={(value) => updateFilters({ entite: value })}
+            >
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="Entité" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Toutes entités</SelectItem>
                 {filterOptions.entites.map((e) => (
-                  <SelectItem key={e} value={e}>
-                    {e}
-                  </SelectItem>
+                  <SelectItem key={e} value={e}>{e}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
-            <Select value={filters.categorie} onValueChange={(value) => updateFilters({ categorie: value, /* reset famille si tu ajoutes un filtre famille */ })}>
-              <SelectTrigger className="w-[150px]">
+            {/* ✅ Catégorie (référentiel) */}
+            <Select
+              value={filters.categorie}
+              onValueChange={(value) =>
+                updateFilters({
+                  categorie: value,
+                  famille: 'all',       // ✅ cascade reset
+                  segment: 'all',
+                  sous_segment: 'all',
+                })
+              }
+            >
+              <SelectTrigger className="w-[170px]">
                 <SelectValue placeholder="Catégorie" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Toutes catégories</SelectItem>
                 {categories.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
-                  </SelectItem>
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
-            <Select value={filters.segment} onValueChange={(value) => updateFilters({ segment: value })}>
-              <SelectTrigger className="w-[150px]">
+            {/* ✅ Famille (liée à Catégorie) */}
+            <Select
+              value={filters.famille}
+              onValueChange={(value) =>
+                updateFilters({
+                  famille: value,
+                  segment: 'all',       // ✅ cascade reset
+                  sous_segment: 'all',
+                })
+              }
+              disabled={famillesDisabled}
+            >
+              <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder={famillesDisabled ? "Famille (sélectionne une catégorie)" : "Famille"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Toutes familles</SelectItem>
+                {familles.map((f) => (
+                  <SelectItem key={f} value={f}>{f}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Segment (Option A : valeurs existantes sur supplier_purchase_enrichment) */}
+            <Select
+              value={filters.segment}
+              onValueChange={(value) =>
+                updateFilters({
+                  segment: value,
+                  sous_segment: 'all', // ✅ cascade reset
+                })
+              }
+            >
+              <SelectTrigger className="w-[170px]">
                 <SelectValue placeholder="Segment" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tous segments</SelectItem>
                 {filterOptions.segments.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {s}
-                  </SelectItem>
+                  <SelectItem key={s} value={s}>{s}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
-            <Select value={filters.sous_segment ?? 'all'} onValueChange={(value) => updateFilters({ sous_segment: value })}>
-              <SelectTrigger className="w-[170px]">
+            <Select
+              value={filters.sous_segment ?? 'all'}
+              onValueChange={(value) => updateFilters({ sous_segment: value })}
+            >
+              <SelectTrigger className="w-[190px]">
                 <SelectValue placeholder="Sous-segment" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tous sous-segments</SelectItem>
                 {filterOptions.sous_segments.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {s}
-                  </SelectItem>
+                  <SelectItem key={s} value={s}>{s}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -294,6 +342,7 @@ const { data: familles = [] } = useSupplierFamillesByCategorie(filters.categorie
               <TableHead className="w-[80px]"></TableHead>
             </TableRow>
           </TableHeader>
+
           <TableBody>
             {isLoading ? (
               Array.from({ length: 8 }).map((_, i) => (
@@ -362,7 +411,11 @@ const { data: familles = [] } = useSupplierFamillesByCategorie(filters.categorie
                   </TableCell>
 
                   <TableCell>
-                    <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); onOpenSupplier(supplier.id); }}>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => { e.stopPropagation(); onOpenSupplier(supplier.id); }}
+                    >
                       <ExternalLink className="h-4 w-4" />
                     </Button>
                   </TableCell>
