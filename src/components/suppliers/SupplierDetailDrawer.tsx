@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-
+import { useSupplierCategories, useSupplierFamillesByCategorie } from "@/hooks/useSupplierCategorisation";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+
 import {
   Select,
   SelectContent,
@@ -86,12 +87,14 @@ type SupplierRow = {
   updated_at: string | null;
 };
 
-const CATEGORIES = ["Stratégique", "Critique", "Standard", "Non critique"];
 const SEGMENTS = ["Production", "Services", "IT", "Maintenance", "Transport", "Énergie", "Autre"];
 const ENTITES = ["NASKEO", "PRODEVAL", "KEON", "Autre"];
 const TYPES_CONTRAT = ["Contrat cadre", "Commande ponctuelle", "Appel d'offres", "Marché", "Convention"];
 const DELAIS_PAIEMENT = ["Comptant", "30 jours", "45 jours", "60 jours", "90 jours"];
 const INCOTERMS = ["EXW", "FCA", "CPT", "CIP", "DAP", "DPU", "DDP", "FAS", "FOB", "CFR", "CIF"];
+const { data: categories = [], isLoading: catLoading } = useSupplierCategories();
+const { data: familles = [], isLoading: famLoading } = useSupplierFamillesByCategorie(formData.categorie);
+
 
 export function SupplierDetailDrawer({ supplierId, open, onClose }: SupplierDetailDrawerProps) {
   const [supplier, setSupplier] = useState<SupplierRow | null>(null);
@@ -342,12 +345,20 @@ export function SupplierDetailDrawer({ supplierId, open, onClose }: SupplierDeta
             >
               <div className="grid grid-cols-2 gap-4">
                 <FormField label="Catégorie *">
-                  <Select value={formData.categorie || ""} onValueChange={(v) => handleFieldChange("categorie", v)}>
+                  <Select
+                    value={formData.categorie || ""}
+                    onValueChange={(v) => {
+                      // si la catégorie change : reset famille (sinon incohérence)
+                      handleFieldChange("categorie", v);
+                      handleFieldChange("famille", null);
+                    }}
+                    disabled={catLoading}
+                  >
                     <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner..." />
+                      <SelectValue placeholder={catLoading ? "Chargement..." : "Sélectionner..."} />
                     </SelectTrigger>
                     <SelectContent>
-                      {CATEGORIES.map((c) => (
+                      {categories.map((c) => (
                         <SelectItem key={c} value={c}>
                           {c}
                         </SelectItem>
@@ -356,28 +367,34 @@ export function SupplierDetailDrawer({ supplierId, open, onClose }: SupplierDeta
                   </Select>
                 </FormField>
 
-                <FormField label="Famille *">
-                  <Input
-                    value={formData.famille || ""}
-                    onChange={(e) => handleFieldChange("famille", e.target.value)}
-                    placeholder="Famille produit/service"
-                  />
-                </FormField>
 
-                <FormField label="Segment *">
-                  <Select value={formData.segment || ""} onValueChange={(v) => handleFieldChange("segment", v)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SEGMENTS.map((s) => (
-                        <SelectItem key={s} value={s}>
-                          {s}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FormField>
+               <FormField label="Famille *">
+                <Select
+                  value={formData.famille || ""}
+                  onValueChange={(v) => handleFieldChange("famille", v)}
+                  disabled={!formData.categorie || famLoading}
+                >
+                  <SelectTrigger>
+                    <SelectValue
+                      placeholder={
+                        !formData.categorie
+                          ? "Choisir une catégorie d’abord"
+                          : famLoading
+                            ? "Chargement..."
+                            : "Sélectionner..."
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {familles.map((f) => (
+                      <SelectItem key={f} value={f}>
+                        {f}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormField>
+
 
                 <FormField label="Sous-segment">
                   <Input
