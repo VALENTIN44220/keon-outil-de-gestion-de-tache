@@ -7,11 +7,15 @@ export interface SupplierEnrichment {
   id: string;
   tiers: string;
   nomfournisseur: string | null;
+
+  // valeurs "référentielles" côté app (Option A)
   categorie: string | null;
   famille_source_initiale: string | null;
   famille: string | null;
+
   segment: string | null;
   sous_segment: string | null;
+
   entite: string | null;
   type_de_contrat: string | null;
   validite_prix: string | null;
@@ -33,6 +37,7 @@ export interface SupplierEnrichment {
   adresse_mail: string | null;
   telephone: string | null;
   commentaires: string | null;
+
   completeness_score: number;
   status: 'a_completer' | 'en_cours' | 'complet';
   created_at: string;
@@ -53,11 +58,26 @@ export interface SupplierFilters {
   validite_contrat_to?: string; // yyyy-mm-dd
 }
 
+/**
+ * Option A (rapide) :
+ * - CATEGORIES + FAMILLES viennent du référentiel Supabase "categories" (alimenté par le lakehouse)
+ * - SEGMENTS + SOUS-SEGMENTS restent issus des données existantes (supplier_purchase_enrichment) tant que tu n'as pas créé les tables de référence.
+ *
+ * IMPORTANT:
+ * - Pour lier Catégorie -> Famille dans l'UI, on expose `famillesByCategorie`.
+ * - Pour lier Segment -> Sous-segment, on expose `sousSegmentsBySegment`.
+ */
 type FilterOptions = {
   entites: string[];
   categories: string[];
+  familles: string[]; // flat (utile si besoin)
   segments: string[];
   sous_segments: string[];
+
+  // NEW: hiérarchies pour selects dépendants
+  famillesByCategorie: Record<string, string[]>;
+  sousSegmentsBySegment: Record<string, string[]>;
+
   stats: {
     total: number;
     a_completer: number;
@@ -66,16 +86,11 @@ type FilterOptions = {
   };
 };
 
-function applyFilters(
-  q: any,
-  filters: SupplierFilters,
-  opts?: { excludeStatus?: boolean }
-) {
+function applyFilters(q: any, filters: SupplierFilters, opts?: { excludeStatus?: boolean }) {
   let query = q;
 
   const search = (filters.search || '').trim();
   if (search) {
-    // OR multi-colonnes
     query = query.or(
       [
         `tiers.ilike.%${search}%`,
@@ -96,12 +111,11 @@ function applyFilters(
   if (filters.segment && filters.segment !== 'all') query = query.eq('segment', filters.segment);
   if (filters.sous_segment && filters.sous_segment !== 'all') query = query.eq('sous_segment', filters.sous_segment);
 
-  // Dates (YYYY-MM-DD). On filtre uniquement si non vide.
   if (filters.validite_prix_from) query = query.gte('validite_prix', filters.validite_prix_from);
   if (filters.validite_prix_to) query = query.lte('validite_prix', filters.validite_prix_to);
 
   if (filters.validite_contrat_from) query = query.gte('validite_du_contrat', filters.validite_contrat_from);
-  if (filters.validite_contrat_to) query = query.lte('validite_du_contrat', filters.validite_contrat_to);
+  if (filters.validite_contrat_to) query = query.lte('validite_du_contrat', filters.validite_du_contrat_to);
 
   return query;
 }
@@ -136,21 +150,80 @@ export function useSupplierEnrichment(filters: SupplierFilters, page = 0, pageSi
 
   // OPTIONS de filtres + stats (sans pagination)
   const optionsQuery = useQuery({
-    queryKey: ['supplier-enrichment', 'filter-options'],
+    queryKey: ['supplier-enrichment', 'filter-options', filters],
     queryFn: async (): Promise<FilterOptions> => {
-      // On récupère uniquement les colonnes nécessaires aux options (pas *)
-      const { data, error } = await supabase
+      /**
+       * 1) Référentiel Catégorie/Famille (table Supabase: categories)
+       *    Colonnes attendues: catfam_key, categorie, famille, active
+       */
+      const { data: catData, error: catErr } = await supabase
+        .from('categories')
+        .select('categorie,famille,active');
+
+      if (catErr) throw catErr;
+
+      const activeCatRows = (catData ?? []).filter((r: any) => r.active !== false);
+
+      const famillesByCategorie: Record<string, string[]> = {};
+      for (const r of activeCatRows as any[]) {
+        const c = (r.categorie ?? '').toString().trim();
+        const f = (r.famille ?? '').toString().trim();
+        if (!c || !f) continue;
+        if (!famillesByCategorie[c]) famillesByCategorie[c] = [];
+        famillesByCategorie[c].push(f);
+      }
+
+      // tri + dédup
+      const categories = Object.keys(famillesByCategorie).sort((a, b) => a.localeCompare(b, 'fr'));
+      for (const c of categories) {
+        famillesByCategorie[c] = Array.from(new Set(famillesByCategorie[c])).sort((a, b) =>
+          a.localeCompare(b, 'fr')
+        );
+      }
+      const familles = Array.from(
+        new Set(activeCatRows.map((r: any) => (r.famille ?? '').toString().trim()).filter(Boolean))
+      ).sort((a, b) => a.localeCompare(b, 'fr'));
+
+      /**
+       * 2) Segments / sous-segments (Option A: on garde le comportement actuel = issus des données)
+       *    Si tu crées des tables de référence plus tard, on bascule ici sans toucher l’UI.
+       */
+      const { data: optData, error: optErr } = await supabase
         .from('supplier_purchase_enrichment')
-        .select('entite,categorie,segment,sous_segment,status');
+        .select('entite,segment,sous_segment,status');
 
-      if (error) throw error;
+      if (optErr) throw optErr;
 
-      const entites = Array.from(new Set((data ?? []).map((r: any) => r.entite).filter(Boolean))).sort();
-      const categories = Array.from(new Set((data ?? []).map((r: any) => r.categorie).filter(Boolean))).sort();
-      const segments = Array.from(new Set((data ?? []).map((r: any) => r.segment).filter(Boolean))).sort();
-      const sous_segments = Array.from(new Set((data ?? []).map((r: any) => r.sous_segment).filter(Boolean))).sort();
+      const entites = Array.from(new Set((optData ?? []).map((r: any) => r.entite).filter(Boolean))).sort((a, b) =>
+        String(a).localeCompare(String(b), 'fr')
+      );
 
-      // Stats : on les calcule côté API avec count exact, en réappliquant les filtres SAUF status
+      const segments = Array.from(new Set((optData ?? []).map((r: any) => r.segment).filter(Boolean))).sort((a, b) =>
+        String(a).localeCompare(String(b), 'fr')
+      );
+
+      const sous_segments = Array.from(new Set((optData ?? []).map((r: any) => r.sous_segment).filter(Boolean))).sort(
+        (a, b) => String(a).localeCompare(String(b), 'fr')
+      );
+
+      // NEW: segment -> sous_segments (dépendance)
+      const sousSegmentsBySegment: Record<string, string[]> = {};
+      for (const r of (optData ?? []) as any[]) {
+        const s = (r.segment ?? '').toString().trim();
+        const ss = (r.sous_segment ?? '').toString().trim();
+        if (!s || !ss) continue;
+        if (!sousSegmentsBySegment[s]) sousSegmentsBySegment[s] = [];
+        sousSegmentsBySegment[s].push(ss);
+      }
+      for (const s of Object.keys(sousSegmentsBySegment)) {
+        sousSegmentsBySegment[s] = Array.from(new Set(sousSegmentsBySegment[s])).sort((a, b) =>
+          a.localeCompare(b, 'fr')
+        );
+      }
+
+      /**
+       * 3) Stats (count exact) en réappliquant les filtres SAUF status
+       */
       const baseCountQuery = () =>
         applyFilters(
           supabase.from('supplier_purchase_enrichment').select('id', { count: 'exact', head: true }),
@@ -168,8 +241,11 @@ export function useSupplierEnrichment(filters: SupplierFilters, page = 0, pageSi
       return {
         entites,
         categories,
+        familles,
         segments,
         sous_segments,
+        famillesByCategorie,
+        sousSegmentsBySegment,
         stats: {
           total: total ?? 0,
           a_completer: a ?? 0,
@@ -210,12 +286,15 @@ export function useSupplierEnrichment(filters: SupplierFilters, page = 0, pageSi
     total: listQuery.data?.total ?? 0,
     isLoading: listQuery.isLoading,
     filterOptions:
-      optionsQuery.data ??
+      (optionsQuery.data as FilterOptions) ??
       ({
         entites: [],
         categories: [],
+        familles: [],
         segments: [],
         sous_segments: [],
+        famillesByCategorie: {},
+        sousSegmentsBySegment: {},
         stats: { total: 0, a_completer: 0, en_cours: 0, complet: 0 },
       } as FilterOptions),
     updateSupplier,
