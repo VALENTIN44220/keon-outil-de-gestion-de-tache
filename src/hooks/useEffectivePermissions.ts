@@ -19,6 +19,7 @@ const defaultPermissions: EffectivePermissions = {
   can_access_calendar: true,
   can_access_projects: true,
   can_access_team: true,
+  can_access_suppliers: false,
   can_manage_users: false,
   can_manage_templates: false,
   can_view_own_tasks: true,
