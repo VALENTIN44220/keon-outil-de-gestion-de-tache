@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { Task, TaskStats } from '@/types/task';
 import { 
   WidgetConfig, 
@@ -18,11 +18,13 @@ import { DataTableWidget } from './widgets/DataTableWidget';
 import { AddWidgetDialog } from './widgets/AddWidgetDialog';
 import { ProgressRing } from './ProgressRing';
 import { Button } from '@/components/ui/button';
-import { Plus, Filter, RotateCcw, Settings2 } from 'lucide-react';
+import { Plus, RotateCcw, Settings2, Save, Check } from 'lucide-react';
 import { format, subDays, startOfWeek, startOfMonth, startOfQuarter, startOfYear, isWithinInterval } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface ConfigurableDashboardProps {
   tasks: Task[];
@@ -46,6 +48,7 @@ export function ConfigurableDashboard({
   globalProgress,
   onTaskClick 
 }: ConfigurableDashboardProps) {
+  const { user } = useAuth();
   const [widgets, setWidgets] = useState<WidgetConfig[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     try {
@@ -55,10 +58,72 @@ export function ConfigurableDashboard({
     }
   });
   const [filters, setFilters] = useState<CrossFilters>(DEFAULT_CROSS_FILTERS);
-  const [showFilters, setShowFilters] = useState(false);
+  const [pendingFilters, setPendingFilters] = useState<CrossFilters>(DEFAULT_CROSS_FILTERS);
+  const [filtersLoaded, setFiltersLoaded] = useState(false);
+  const [filtersDirty, setFiltersDirty] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [draggedWidget, setDraggedWidget] = useState<string | null>(null);
+
+  // Load saved filters from DB
+  useEffect(() => {
+    if (!user?.id) return;
+    (async () => {
+      const { data } = await (supabase as any)
+        .from('user_dashboard_filters')
+        .select('filters')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (data?.filters) {
+        // Restore dates from JSON
+        const restored: CrossFilters = {
+          ...DEFAULT_CROSS_FILTERS,
+          ...data.filters,
+          dateRange: {
+            start: data.filters.dateRange?.start ? new Date(data.filters.dateRange.start) : null,
+            end: data.filters.dateRange?.end ? new Date(data.filters.dateRange.end) : null,
+          },
+        };
+        setFilters(restored);
+        setPendingFilters(restored);
+      }
+      setFiltersLoaded(true);
+    })();
+  }, [user?.id]);
+
+  // Track dirty state
+  const handlePendingFiltersChange = useCallback((newFilters: CrossFilters) => {
+    setPendingFilters(newFilters);
+    setFiltersDirty(true);
+  }, []);
+
+  // Save filters to DB
+  const handleSaveFilters = useCallback(async () => {
+    if (!user?.id) return;
+    setIsSaving(true);
+    try {
+      // Serialize dates
+      const toSave = {
+        ...pendingFilters,
+        dateRange: {
+          start: pendingFilters.dateRange.start?.toISOString() ?? null,
+          end: pendingFilters.dateRange.end?.toISOString() ?? null,
+        },
+      };
+      const { error } = await (supabase as any)
+        .from('user_dashboard_filters')
+        .upsert({ user_id: user.id, filters: toSave, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+      if (error) throw error;
+      setFilters(pendingFilters);
+      setFiltersDirty(false);
+      toast.success('Filtres enregistrés');
+    } catch (err: any) {
+      toast.error('Erreur lors de la sauvegarde des filtres');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [user?.id, pendingFilters]);
 
   // Save widgets to localStorage
   useEffect(() => {
@@ -300,23 +365,30 @@ export function ConfigurableDashboard({
 
   return (
     <div className="space-y-4">
+      {/* Cross Filters Panel - always visible */}
+      <CrossFiltersPanel
+        filters={pendingFilters}
+        onFiltersChange={handlePendingFiltersChange}
+      />
+
       {/* Toolbar */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
-          <Button
-            variant={showFilters ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setShowFilters(!showFilters)}
-            className="gap-2"
-          >
-            <Filter className="h-4 w-4" />
-            Filtres
-            {(filters.assigneeIds.length + filters.statuses.length + filters.priorities.length) > 0 && (
-              <span className="ml-1 px-1.5 py-0.5 bg-white/20 rounded text-xs">
-                {filters.assigneeIds.length + filters.statuses.length + filters.priorities.length}
-              </span>
-            )}
-          </Button>
+          {filtersDirty && (
+            <Button
+              size="sm"
+              onClick={handleSaveFilters}
+              disabled={isSaving}
+              className="gap-2"
+            >
+              {isSaving ? (
+                <RotateCcw className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              Valider et enregistrer
+            </Button>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -344,15 +416,6 @@ export function ConfigurableDashboard({
           )}
         </div>
       </div>
-
-      {/* Cross Filters Panel */}
-      {showFilters && (
-        <CrossFiltersPanel
-          filters={filters}
-          onFiltersChange={setFilters}
-          onClose={() => setShowFilters(false)}
-        />
-      )}
 
       {/* Task count indicator */}
       <div className="text-sm text-keon-600">

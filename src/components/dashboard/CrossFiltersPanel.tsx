@@ -27,6 +27,7 @@ interface CrossFiltersPanelProps {
   filters: CrossFilters;
   onFiltersChange: (filters: CrossFilters) => void;
   onClose?: () => void;
+  onSave?: () => void;
 }
 
 const PERIODS = [
