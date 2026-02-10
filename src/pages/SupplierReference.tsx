@@ -7,7 +7,7 @@ import { Loader2 } from 'lucide-react';
 import { Sidebar } from '@/components/layout/Sidebar';
 
 export default function SupplierReference() {
-  const { hasAccess, isLoading: accessLoading } = useSupplierAccess();
+  const { hasAccess, role, isLoading: accessLoading } = useSupplierAccess();
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeView, setActiveView] = useState('suppliers');
@@ -45,6 +45,7 @@ export default function SupplierReference() {
         supplierId={selectedSupplierId}
         open={drawerOpen}
         onClose={handleCloseDrawer}
+        canEdit={role === 'achat'}
       />
     </div>
   );

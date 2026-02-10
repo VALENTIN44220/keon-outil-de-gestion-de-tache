@@ -41,6 +41,7 @@ interface SupplierDetailDrawerProps {
   supplierId: string | null;
   open: boolean;
   onClose: () => void;
+  canEdit?: boolean;
 }
 
 // Types alignés sur la table Supabase (supplier_purchase_enrichment)
@@ -94,7 +95,7 @@ const DELAIS_PAIEMENT = ["Comptant", "30 jours", "45 jours", "60 jours", "90 jou
 const INCOTERMS = ["EXW", "FCA", "CPT", "CIP", "DAP", "DPU", "DDP", "FAS", "FOB", "CFR", "CIF"];
 
 
-export function SupplierDetailDrawer({ supplierId, open, onClose }: SupplierDetailDrawerProps) {
+export function SupplierDetailDrawer({ supplierId, open, onClose, canEdit = true }: SupplierDetailDrawerProps) {
   const [supplier, setSupplier] = useState<SupplierRow | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -194,6 +195,7 @@ export function SupplierDetailDrawer({ supplierId, open, onClose }: SupplierDeta
   }, [pendingSave, supplierId]);
 
   const handleFieldChange = (field: keyof SupplierRow, value: any) => {
+    if (!canEdit) return;
     const newData = { ...formData, [field]: value };
     setFormData(newData);
     setPendingSave(newData);
@@ -303,10 +305,10 @@ export function SupplierDetailDrawer({ supplierId, open, onClose }: SupplierDeta
                     )}
                   </div>
 
-                  <Button onClick={handleMarkComplete} disabled={formData.status === "complet"}>
-                    <Check className="h-4 w-4 mr-2" />
-                    Marquer complet
-                  </Button>
+                   <Button onClick={handleMarkComplete} disabled={!canEdit || formData.status === "complet"}>
+                     <Check className="h-4 w-4 mr-2" />
+                     Marquer complet
+                   </Button>
                 </div>
               </div>
             </SheetHeader>
@@ -353,7 +355,7 @@ export function SupplierDetailDrawer({ supplierId, open, onClose }: SupplierDeta
                       handleFieldChange("categorie", v);
                       handleFieldChange("famille", null);
                     }}
-                    disabled={catLoading}
+                    disabled={catLoading || !canEdit}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder={catLoading ? "Chargement..." : "Sélectionner..."} />
@@ -373,7 +375,7 @@ export function SupplierDetailDrawer({ supplierId, open, onClose }: SupplierDeta
                 <Select
                   value={formData.famille || ""}
                   onValueChange={(v) => handleFieldChange("famille", v)}
-                  disabled={!formData.categorie || famLoading}
+                  disabled={!canEdit || !formData.categorie || famLoading}
                 >
                   <SelectTrigger>
                     <SelectValue
@@ -402,11 +404,12 @@ export function SupplierDetailDrawer({ supplierId, open, onClose }: SupplierDeta
                     value={formData.sous_segment || ""}
                     onChange={(e) => handleFieldChange("sous_segment", e.target.value)}
                     placeholder="Précision..."
+                    disabled={!canEdit}
                   />
                 </FormField>
 
                 <FormField label="Entité *" className="col-span-2">
-                  <Select value={formData.entite || ""} onValueChange={(v) => handleFieldChange("entite", v)}>
+                  <Select value={formData.entite || ""} onValueChange={(v) => handleFieldChange("entite", v)} disabled={!canEdit}>
                     <SelectTrigger>
                       <SelectValue placeholder="Sélectionner..." />
                     </SelectTrigger>
@@ -434,6 +437,7 @@ export function SupplierDetailDrawer({ supplierId, open, onClose }: SupplierDeta
                   <Select
                     value={formData.type_de_contrat || ""}
                     onValueChange={(v) => handleFieldChange("type_de_contrat", v)}
+                    disabled={!canEdit}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Sélectionner..." />
@@ -453,6 +457,7 @@ export function SupplierDetailDrawer({ supplierId, open, onClose }: SupplierDeta
                     value={formData.evolution_tarif_2026 || ""}
                     onChange={(e) => handleFieldChange("evolution_tarif_2026", e.target.value)}
                     placeholder="+3%, stable, etc."
+                    disabled={!canEdit}
                   />
                 </FormField>
 
@@ -461,6 +466,7 @@ export function SupplierDetailDrawer({ supplierId, open, onClose }: SupplierDeta
                     type="date"
                     value={formData.validite_prix || ""}
                     onChange={(e) => handleFieldChange("validite_prix", e.target.value)}
+                    disabled={!canEdit}
                   />
                 </FormField>
 
@@ -469,6 +475,7 @@ export function SupplierDetailDrawer({ supplierId, open, onClose }: SupplierDeta
                     type="date"
                     value={formData.validite_du_contrat || ""}
                     onChange={(e) => handleFieldChange("validite_du_contrat", e.target.value)}
+                    disabled={!canEdit}
                   />
                 </FormField>
 
@@ -477,6 +484,7 @@ export function SupplierDetailDrawer({ supplierId, open, onClose }: SupplierDeta
                     type="date"
                     value={formData.date_premiere_signature || ""}
                     onChange={(e) => handleFieldChange("date_premiere_signature", e.target.value)}
+                    disabled={!canEdit}
                   />
                 </FormField>
 
@@ -486,6 +494,7 @@ export function SupplierDetailDrawer({ supplierId, open, onClose }: SupplierDeta
                     onChange={(e) => handleFieldChange("avenants", e.target.value)}
                     placeholder="Détail des avenants..."
                     rows={2}
+                    disabled={!canEdit}
                   />
                 </FormField>
               </div>
@@ -503,6 +512,7 @@ export function SupplierDetailDrawer({ supplierId, open, onClose }: SupplierDeta
                   <Select
                     value={formData.delai_de_paiement || ""}
                     onValueChange={(v) => handleFieldChange("delai_de_paiement", v)}
+                    disabled={!canEdit}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Sélectionner..." />
@@ -522,6 +532,7 @@ export function SupplierDetailDrawer({ supplierId, open, onClose }: SupplierDeta
                     value={formData.echeances_de_paiement || ""}
                     onChange={(e) => handleFieldChange("echeances_de_paiement", e.target.value)}
                     placeholder="Ex: fin de mois"
+                    disabled={!canEdit}
                   />
                 </FormField>
 
@@ -531,6 +542,7 @@ export function SupplierDetailDrawer({ supplierId, open, onClose }: SupplierDeta
                     onChange={(e) => handleFieldChange("penalites", e.target.value)}
                     placeholder="Conditions de pénalités..."
                     rows={2}
+                    disabled={!canEdit}
                   />
                 </FormField>
 
@@ -539,6 +551,7 @@ export function SupplierDetailDrawer({ supplierId, open, onClose }: SupplierDeta
                     value={formData.exclusivite_non_sollicitation || ""}
                     onChange={(e) => handleFieldChange("exclusivite_non_sollicitation", e.target.value)}
                     placeholder="Oui / Non / Détails..."
+                    disabled={!canEdit}
                   />
                 </FormField>
 
@@ -547,6 +560,7 @@ export function SupplierDetailDrawer({ supplierId, open, onClose }: SupplierDeta
                     value={formData.remise || ""}
                     onChange={(e) => handleFieldChange("remise", e.target.value)}
                     placeholder="% ou montant"
+                    disabled={!canEdit}
                   />
                 </FormField>
 
@@ -555,6 +569,7 @@ export function SupplierDetailDrawer({ supplierId, open, onClose }: SupplierDeta
                     value={formData.rfa || ""}
                     onChange={(e) => handleFieldChange("rfa", e.target.value)}
                     placeholder="Ristourne fin d'année"
+                    disabled={!canEdit}
                   />
                 </FormField>
               </div>
@@ -569,7 +584,7 @@ export function SupplierDetailDrawer({ supplierId, open, onClose }: SupplierDeta
             >
               <div className="grid grid-cols-2 gap-4">
                 <FormField label="Incoterm *">
-                  <Select value={formData.incoterm || ""} onValueChange={(v) => handleFieldChange("incoterm", v)}>
+                  <Select value={formData.incoterm || ""} onValueChange={(v) => handleFieldChange("incoterm", v)} disabled={!canEdit}>
                     <SelectTrigger>
                       <SelectValue placeholder="Sélectionner..." />
                     </SelectTrigger>
@@ -588,6 +603,7 @@ export function SupplierDetailDrawer({ supplierId, open, onClose }: SupplierDeta
                     value={formData.transport || ""}
                     onChange={(e) => handleFieldChange("transport", e.target.value)}
                     placeholder="Conditions de transport"
+                    disabled={!canEdit}
                   />
                 </FormField>
 
@@ -597,6 +613,7 @@ export function SupplierDetailDrawer({ supplierId, open, onClose }: SupplierDeta
                     onChange={(e) => handleFieldChange("garanties_bancaire_et_equipement", e.target.value)}
                     placeholder="Détails des garanties..."
                     rows={2}
+                    disabled={!canEdit}
                   />
                 </FormField>
               </div>
@@ -615,6 +632,7 @@ export function SupplierDetailDrawer({ supplierId, open, onClose }: SupplierDeta
                     value={formData.nom_contact || ""}
                     onChange={(e) => handleFieldChange("nom_contact", e.target.value)}
                     placeholder="Prénom NOM"
+                    disabled={!canEdit}
                   />
                 </FormField>
 
@@ -623,6 +641,7 @@ export function SupplierDetailDrawer({ supplierId, open, onClose }: SupplierDeta
                     value={formData.poste || ""}
                     onChange={(e) => handleFieldChange("poste", e.target.value)}
                     placeholder="Fonction"
+                    disabled={!canEdit}
                   />
                 </FormField>
 
@@ -632,6 +651,7 @@ export function SupplierDetailDrawer({ supplierId, open, onClose }: SupplierDeta
                     value={formData.adresse_mail || ""}
                     onChange={(e) => handleFieldChange("adresse_mail", e.target.value)}
                     placeholder="email@example.com"
+                    disabled={!canEdit}
                   />
                 </FormField>
 
@@ -641,6 +661,7 @@ export function SupplierDetailDrawer({ supplierId, open, onClose }: SupplierDeta
                     value={formData.telephone || ""}
                     onChange={(e) => handleFieldChange("telephone", e.target.value)}
                     placeholder="+33 1 23 45 67 89"
+                    disabled={!canEdit}
                   />
                 </FormField>
               </div>
@@ -659,6 +680,7 @@ export function SupplierDetailDrawer({ supplierId, open, onClose }: SupplierDeta
                   onChange={(e) => handleFieldChange("commentaires", e.target.value)}
                   placeholder="Notes, remarques, historique..."
                   rows={4}
+                  disabled={!canEdit}
                 />
               </FormField>
             </CollapsibleSection>
