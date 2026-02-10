@@ -1,23 +1,33 @@
+// src/hooks/useSupplierCategorisation.ts
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export type SupplierCategorie = string;
 export type SupplierFamille = string;
 
+type CategoryRow = {
+  categorie: string | null;
+  famille: string | null;
+  active: boolean | null;
+};
+
 export function useSupplierCategories() {
   return useQuery({
-    queryKey: ["supplier_categorisation", "categories"],
+    queryKey: ["categories_ref", "categories"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("supplier_categorisation")
-        .select("categorie")
+        .from("categories") // ✅ table réelle
+        .select("categorie,active")
         .eq("active", true);
 
       if (error) throw error;
 
-      // distinct + tri
       const uniq = Array.from(
-        new Set((data ?? []).map((r: any) => (r.categorie ?? "").trim()).filter(Boolean))
+        new Set(
+          (data ?? [])
+            .map((r: any) => (r.categorie ?? "").trim())
+            .filter(Boolean)
+        )
       ).sort((a, b) => a.localeCompare(b, "fr"));
 
       return uniq as SupplierCategorie[];
@@ -28,19 +38,23 @@ export function useSupplierCategories() {
 
 export function useSupplierFamillesByCategorie(categorie?: string | null) {
   return useQuery({
-    queryKey: ["supplier_categorisation", "familles", categorie ?? ""],
-    enabled: !!categorie,
+    queryKey: ["categories_ref", "familles", categorie ?? ""],
+    enabled: !!categorie && categorie !== "all",
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("supplier_categorisation")
-        .select("famille")
+        .from("categories") // ✅ table réelle
+        .select("famille,active,categorie")
         .eq("active", true)
         .eq("categorie", categorie as string);
 
       if (error) throw error;
 
       const uniq = Array.from(
-        new Set((data ?? []).map((r: any) => (r.famille ?? "").trim()).filter(Boolean))
+        new Set(
+          (data ?? [])
+            .map((r: any) => (r.famille ?? "").trim())
+            .filter(Boolean)
+        )
       ).sort((a, b) => a.localeCompare(b, "fr"));
 
       return uniq as SupplierFamille[];
