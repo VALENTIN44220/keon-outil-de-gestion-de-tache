@@ -16,7 +16,7 @@ export function useSupplierCategories() {
     queryKey: ["categories_ref", "categories"],
     queryFn: async () => {
       const { data, error } = await (supabase as any)
-        .from("categories")
+        .from("supplier_categorisation")
         .select("categorie,active")
         .eq("active", true);
 
@@ -42,7 +42,7 @@ export function useSupplierFamillesByCategorie(categorie?: string | null) {
     enabled: !!categorie && categorie !== "all",
     queryFn: async () => {
       const { data, error } = await (supabase as any)
-        .from("categories")
+        .from("supplier_categorisation")
         .select("famille,active,categorie")
         .eq("active", true)
         .eq("categorie", categorie as string);

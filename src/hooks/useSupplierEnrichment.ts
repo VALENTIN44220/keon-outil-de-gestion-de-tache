@@ -63,7 +63,6 @@ export interface SupplierFilters {
 }
 
 type CategoryRow = {
-  catfam_key: string;
   categorie: string | null;
   famille: string | null;
   active: boolean | null;
@@ -152,20 +151,19 @@ export function useSupplierEnrichment(filters: SupplierFilters, page = 0, pageSi
     queryKey: ['supplier-enrichment', 'filter-options', filters.categorie, filters.famille, filters.segment],
     queryFn: async (): Promise<FilterOptions> => {
       // 1) Référentiel Catégorie/Famille depuis Supabase public.categories
-      const { data: catData, error: catErr } = await supabase
-        .from('categories')
-        .select('catfam_key,categorie,famille,active');
+      const { data: catData, error: catErr } = await (supabase as any)
+        .from('supplier_categorisation')
+        .select('categorie,famille,active');
 
       if (catErr) throw catErr;
 
       const activeCats = (catData ?? [])
         .filter((r: any) => r.active !== false)
         .map((r: any) => ({
-          catfam_key: r.catfam_key,
           categorie: r.categorie ?? null,
           famille: r.famille ?? null,
           active: r.active ?? true,
-        })) as CategoryRow[];
+        }));
 
       const allCategories = Array.from(
         new Set(activeCats.map(r => r.categorie).filter(Boolean) as string[])
