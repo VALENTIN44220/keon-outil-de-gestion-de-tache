@@ -15,8 +15,8 @@ export function useSupplierCategories() {
   return useQuery({
     queryKey: ["categories_ref", "categories"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("categories") // ✅ table réelle
+      const { data, error } = await (supabase as any)
+        .from("categories")
         .select("categorie,active")
         .eq("active", true);
 
@@ -28,7 +28,7 @@ export function useSupplierCategories() {
             .map((r: any) => (r.categorie ?? "").trim())
             .filter(Boolean)
         )
-      ).sort((a, b) => a.localeCompare(b, "fr"));
+      ).sort((a: string, b: string) => a.localeCompare(b, "fr"));
 
       return uniq as SupplierCategorie[];
     },
@@ -41,8 +41,8 @@ export function useSupplierFamillesByCategorie(categorie?: string | null) {
     queryKey: ["categories_ref", "familles", categorie ?? ""],
     enabled: !!categorie && categorie !== "all",
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("categories") // ✅ table réelle
+      const { data, error } = await (supabase as any)
+        .from("categories")
         .select("famille,active,categorie")
         .eq("active", true)
         .eq("categorie", categorie as string);
@@ -55,7 +55,7 @@ export function useSupplierFamillesByCategorie(categorie?: string | null) {
             .map((r: any) => (r.famille ?? "").trim())
             .filter(Boolean)
         )
-      ).sort((a, b) => a.localeCompare(b, "fr"));
+      ).sort((a: string, b: string) => a.localeCompare(b, "fr"));
 
       return uniq as SupplierFamille[];
     },
