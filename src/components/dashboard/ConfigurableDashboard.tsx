@@ -365,13 +365,7 @@ export function ConfigurableDashboard({
 
   return (
     <div className="space-y-4">
-      {/* Cross Filters Panel - always visible */}
-      <CrossFiltersPanel
-        filters={pendingFilters}
-        onFiltersChange={handlePendingFiltersChange}
-      />
-
-      {/* Toolbar */}
+      {/* Toolbar - above filters */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           {filtersDirty && (
@@ -417,11 +411,11 @@ export function ConfigurableDashboard({
         </div>
       </div>
 
-      {/* Task count indicator */}
-      <div className="text-sm text-keon-600">
-        {filteredTasks.length} tâche{filteredTasks.length !== 1 ? 's' : ''} 
-        {filteredTasks.length !== tasks.length && ` (sur ${tasks.length} au total)`}
-      </div>
+      {/* Cross Filters Panel - always visible */}
+      <CrossFiltersPanel
+        filters={pendingFilters}
+        onFiltersChange={handlePendingFiltersChange}
+      />
 
       {/* Widget Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
