@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
+import { useSupplierCategories, useSupplierFamillesByCategorie } from "@/hooks/useSupplierCategorisation";
 import {
   Select,
   SelectContent,
@@ -111,6 +112,10 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps)
     };
   }, [total, filterOptions]);
 
+ const { data: categories = [] } = useSupplierCategories();
+const { data: familles = [] } = useSupplierFamillesByCategorie(filters.categorie !== "all" ? filters.categorie : null);
+  
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -190,13 +195,13 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps)
               </SelectContent>
             </Select>
 
-            <Select value={filters.categorie} onValueChange={(value) => updateFilters({ categorie: value })}>
+            <Select value={filters.categorie} onValueChange={(value) => updateFilters({ categorie: value, /* reset famille si tu ajoutes un filtre famille */ })}>
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="Catégorie" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Toutes catégories</SelectItem>
-                {filterOptions.categories.map((c) => (
+                {categories.map((c) => (
                   <SelectItem key={c} value={c}>
                     {c}
                   </SelectItem>
