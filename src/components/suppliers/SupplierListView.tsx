@@ -1,5 +1,5 @@
 // SupplierListView.tsx (remplacer le composant complet par celui-ci)
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +20,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { useTableSort } from '@/hooks/useTableSort';
 import { useSupplierEnrichment, SupplierFilters } from '@/hooks/useSupplierEnrichment';
 import { Search, Building2, Filter, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
@@ -90,7 +92,9 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
   };
 
   // ✅ Options et liste : le hook useSupplierEnrichment calcule maintenant categories/familles/segments/sous_segments
-  const { suppliers, total, isLoading, filterOptions } = useSupplierEnrichment(filters, page, pageSize);
+  const { suppliers: rawSuppliers, total, isLoading, filterOptions } = useSupplierEnrichment(filters, page, pageSize);
+
+  const { sortedData: suppliers, sortConfig, handleSort } = useTableSort(rawSuppliers, 'updated_at', 'desc');
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil((total || 0) / pageSize)), [total, pageSize]);
 
@@ -330,16 +334,16 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[120px]">TIERS</TableHead>
-              <TableHead>Nom Fournisseur</TableHead>
-              <TableHead>Entité</TableHead>
-              <TableHead>Catégorie</TableHead>
-              <TableHead>Famille</TableHead>
-              <TableHead>Segment</TableHead>
-              <TableHead className="w-[150px]">Complétude</TableHead>
-              <TableHead className="w-[140px]">Validité prix</TableHead>
-              <TableHead className="w-[140px]">Validité contrat</TableHead>
-              <TableHead>Mise à jour</TableHead>
+              <SortableTableHead sortKey="tiers" currentSortKey={String(sortConfig.key)} currentDirection={sortConfig.direction} onSort={handleSort} className="w-[120px]">TIERS</SortableTableHead>
+              <SortableTableHead sortKey="nomfournisseur" currentSortKey={String(sortConfig.key)} currentDirection={sortConfig.direction} onSort={handleSort}>Nom Fournisseur</SortableTableHead>
+              <SortableTableHead sortKey="entite" currentSortKey={String(sortConfig.key)} currentDirection={sortConfig.direction} onSort={handleSort}>Entité</SortableTableHead>
+              <SortableTableHead sortKey="categorie" currentSortKey={String(sortConfig.key)} currentDirection={sortConfig.direction} onSort={handleSort}>Catégorie</SortableTableHead>
+              <SortableTableHead sortKey="famille" currentSortKey={String(sortConfig.key)} currentDirection={sortConfig.direction} onSort={handleSort}>Famille</SortableTableHead>
+              <SortableTableHead sortKey="segment" currentSortKey={String(sortConfig.key)} currentDirection={sortConfig.direction} onSort={handleSort}>Segment</SortableTableHead>
+              <SortableTableHead sortKey="completeness_score" currentSortKey={String(sortConfig.key)} currentDirection={sortConfig.direction} onSort={handleSort} className="w-[150px]">Complétude</SortableTableHead>
+              <SortableTableHead sortKey="validite_prix" currentSortKey={String(sortConfig.key)} currentDirection={sortConfig.direction} onSort={handleSort} className="w-[140px]">Validité prix</SortableTableHead>
+              <SortableTableHead sortKey="validite_du_contrat" currentSortKey={String(sortConfig.key)} currentDirection={sortConfig.direction} onSort={handleSort} className="w-[140px]">Validité contrat</SortableTableHead>
+              <SortableTableHead sortKey="updated_at" currentSortKey={String(sortConfig.key)} currentDirection={sortConfig.direction} onSort={handleSort}>Mise à jour</SortableTableHead>
               <TableHead className="w-[80px]"></TableHead>
             </TableRow>
           </TableHeader>
