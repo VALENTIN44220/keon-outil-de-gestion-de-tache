@@ -1,3 +1,4 @@
+// SupplierListView.tsx (remplacer le composant complet par celui-ci)
 import { useEffect, useMemo, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -66,6 +67,7 @@ function safeFormatDate(iso?: string | null) {
 
 export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
   const pageSize = 200;
+
   const [page, setPage] = useState(0);
 
   const [filters, setFilters] = useState<SupplierFilters>({
@@ -73,7 +75,7 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
     status: 'all',
     entite: 'all',
     categorie: 'all',
-    famille: 'all',          // ✅ AJOUT
+    famille: 'all',     // ✅ ajouté
     segment: 'all',
     sous_segment: 'all',
     validite_prix_from: '',
@@ -87,12 +89,10 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
     setPage(0);
   };
 
+  // ✅ Options et liste : le hook useSupplierEnrichment calcule maintenant categories/familles/segments/sous_segments
   const { suppliers, total, isLoading, filterOptions } = useSupplierEnrichment(filters, page, pageSize);
 
-  const totalPages = useMemo(
-    () => Math.max(1, Math.ceil((total || 0) / pageSize)),
-    [total, pageSize]
-  );
+  const totalPages = useMemo(() => Math.max(1, Math.ceil((total || 0) / pageSize)), [total, pageSize]);
 
   useEffect(() => {
     if (page >= totalPages) setPage(Math.max(0, totalPages - 1));
@@ -113,13 +113,30 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
     };
   }, [total, filterOptions]);
 
-  // ✅ Référentiel Catégorie/Famille depuis public.categories (sync Fabric)
+  // ✅ Référentiel Cat/Famille depuis Supabase (table categories)
   const { data: categories = [] } = useSupplierCategories();
+
+  // ✅ Familles dépend de la catégorie sélectionnée
   const selectedCategorie = filters.categorie !== "all" ? filters.categorie : null;
-  const { data: familles = [] } = useSupplierFamillesByCategorie(
-  filters.categorie !== "all" ? filters.categorie : null
-);
-  const famillesDisabled = !selectedCategorie || familles.length === 0;
+  const { data: famillesByCategorie = [] } = useSupplierFamillesByCategorie(selectedCategorie);
+
+  // ✅ en mode "all", on peut proposer toutes les familles venant de filterOptions (si dispo)
+  const famillesList = useMemo(() => {
+    if (filters.categorie !== "all") return famillesByCategorie;
+    return filterOptions.familles ?? [];
+  }, [filters.categorie, famillesByCategorie, filterOptions.familles]);
+
+  // ✅ garde-fou : si une famille sélectionnée n’existe plus après changement de catégorie, on reset
+  useEffect(() => {
+    if (filters.famille !== 'all' && famillesList.length > 0 && !famillesList.includes(filters.famille)) {
+      updateFilters({ famille: 'all' });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [familiesKey(famillesList)]);
+
+  function familiesKey(arr: string[]) {
+    return arr.join('|');
+  }
 
   return (
     <div className="space-y-6">
@@ -163,7 +180,7 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Rechercher TIERS, Nom, Famille, Segment, Entité..."
+                placeholder="Rechercher TIERS, Nom, Catégorie, Famille, Segment, Entité..."
                 value={filters.search}
                 onChange={(e) => updateFilters({ search: e.target.value })}
                 className="pl-9"
@@ -174,10 +191,7 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
           <div className="flex items-center gap-2 flex-wrap">
             <Filter className="h-4 w-4 text-muted-foreground" />
 
-            <Select
-              value={filters.status}
-              onValueChange={(value) => updateFilters({ status: value })}
-            >
+            <Select value={filters.status} onValueChange={(value) => updateFilters({ status: value })}>
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
@@ -189,10 +203,7 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
               </SelectContent>
             </Select>
 
-            <Select
-              value={filters.entite}
-              onValueChange={(value) => updateFilters({ entite: value })}
-            >
+            <Select value={filters.entite} onValueChange={(value) => updateFilters({ entite: value })}>
               <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="Entité" />
               </SelectTrigger>
@@ -204,19 +215,19 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
               </SelectContent>
             </Select>
 
-            {/* ✅ Catégorie (référentiel) */}
+            {/* ✅ Catégorie -> reset Famille + Segment + Sous-segment (cascade) */}
             <Select
               value={filters.categorie}
               onValueChange={(value) =>
                 updateFilters({
                   categorie: value,
-                  famille: 'all',       // ✅ cascade reset
+                  famille: 'all',
                   segment: 'all',
                   sous_segment: 'all',
                 })
               }
             >
-              <SelectTrigger className="w-[170px]">
+              <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Catégorie" />
               </SelectTrigger>
               <SelectContent>
@@ -227,39 +238,31 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
               </SelectContent>
             </Select>
 
-            {/* ✅ Famille (liée à Catégorie) */}
+            {/* ✅ Famille dépend de Catégorie -> reset Segment + Sous-segment */}
             <Select
               value={filters.famille}
               onValueChange={(value) =>
                 updateFilters({
                   famille: value,
-                  segment: 'all',       // ✅ cascade reset
+                  segment: 'all',
                   sous_segment: 'all',
                 })
               }
-              disabled={famillesDisabled}
+              disabled={filters.categorie !== 'all' && famillesList.length === 0}
             >
               <SelectTrigger className="w-[220px]">
-                <SelectValue placeholder={famillesDisabled ? "Famille (sélectionne une catégorie)" : "Famille"} />
+                <SelectValue placeholder="Famille" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Toutes familles</SelectItem>
-                {familles.map((f) => (
+                {famillesList.map((f) => (
                   <SelectItem key={f} value={f}>{f}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
-            {/* Segment (Option A : valeurs existantes sur supplier_purchase_enrichment) */}
-            <Select
-              value={filters.segment}
-              onValueChange={(value) =>
-                updateFilters({
-                  segment: value,
-                  sous_segment: 'all', // ✅ cascade reset
-                })
-              }
-            >
+            {/* Segments / sous-segments (Option A) restent issus des données, mais cascades via hook */}
+            <Select value={filters.segment} onValueChange={(value) => updateFilters({ segment: value, sous_segment: 'all' })}>
               <SelectTrigger className="w-[170px]">
                 <SelectValue placeholder="Segment" />
               </SelectTrigger>
@@ -271,10 +274,7 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
               </SelectContent>
             </Select>
 
-            <Select
-              value={filters.sous_segment ?? 'all'}
-              onValueChange={(value) => updateFilters({ sous_segment: value })}
-            >
+            <Select value={filters.sous_segment ?? 'all'} onValueChange={(value) => updateFilters({ sous_segment: value })}>
               <SelectTrigger className="w-[190px]">
                 <SelectValue placeholder="Sous-segment" />
               </SelectTrigger>
@@ -373,6 +373,7 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
                   <TableCell>{supplier.entite || '—'}</TableCell>
                   <TableCell>{supplier.categorie || '—'}</TableCell>
                   <TableCell>{supplier.famille || '—'}</TableCell>
+
                   <TableCell>
                     {supplier.segment ? (
                       <span>
@@ -415,7 +416,10 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={(e) => { e.stopPropagation(); onOpenSupplier(supplier.id); }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenSupplier(supplier.id);
+                      }}
                     >
                       <ExternalLink className="h-4 w-4" />
                     </Button>
@@ -437,7 +441,7 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
               variant="outline"
               size="sm"
               disabled={page === 0 || isLoading}
-              onClick={() => setPage(p => Math.max(0, p - 1))}
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
               className="gap-2"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -448,7 +452,7 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
               variant="outline"
               size="sm"
               disabled={page + 1 >= totalPages || isLoading}
-              onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               className="gap-2"
             >
               Suivant
