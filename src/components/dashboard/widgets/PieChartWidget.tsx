@@ -8,6 +8,22 @@ interface PieChartWidgetProps {
 
 const COLORS = ['#4DBEC8', '#78C050', '#FF9432', '#8b5cf6', '#ef4444', '#f97316'];
 
+function renderCustomLabel(props: any) {
+  const { name, percent, x, y, midAngle } = props;
+  if (percent < 0.05) return null;
+  const RADIAN = Math.PI / 180;
+  const radius = 12;
+  const nx = x + radius * Math.cos(-midAngle * RADIAN);
+  const ny = y + radius * Math.sin(-midAngle * RADIAN);
+  const anchor = midAngle > 90 && midAngle < 270 ? 'end' : 'start';
+  const pct = (percent * 100).toFixed(0);
+  return (
+    <text x={nx} y={ny} textAnchor={anchor} dominantBaseline="central" fontSize={11} fill="#374151">
+      {`${name} (${pct}%)`}
+    </text>
+  );
+}
+
 export function PieChartWidget({ data, isDonut = true }: PieChartWidgetProps) {
   const total = data.reduce((sum, d) => sum + d.value, 0);
 
@@ -17,12 +33,12 @@ export function PieChartWidget({ data, isDonut = true }: PieChartWidgetProps) {
         <Pie
           data={data}
           cx="50%"
-          cy="50%"
-          innerRadius={isDonut ? '55%' : 0}
-          outerRadius="80%"
+          cy="45%"
+          innerRadius={isDonut ? '45%' : 0}
+          outerRadius="65%"
           paddingAngle={2}
           dataKey="value"
-          label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+          label={renderCustomLabel}
           labelLine={{ stroke: '#9ca3af', strokeWidth: 1 }}
         >
           {data.map((entry, index) => (
