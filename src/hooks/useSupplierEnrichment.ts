@@ -67,7 +67,7 @@ type FilterOptions = {
 };
 
 function applyFilters(
-  q: ReturnType<typeof supabase.from>,
+  q: any,
   filters: SupplierFilters,
   opts?: { excludeStatus?: boolean }
 ) {
@@ -110,7 +110,7 @@ export function useSupplierEnrichment(filters: SupplierFilters, page = 0, pageSi
   const queryClient = useQueryClient();
 
   // LISTE paginée + total
-  const listQuery = useQuery({
+  const listQuery = useQuery<{ suppliers: SupplierEnrichment[]; total: number }>({
     queryKey: ['supplier-enrichment', 'list', filters, page, pageSize],
     queryFn: async () => {
       const from = page * pageSize;
@@ -131,7 +131,7 @@ export function useSupplierEnrichment(filters: SupplierFilters, page = 0, pageSi
         total: count ?? 0,
       };
     },
-    keepPreviousData: true,
+    placeholderData: (prev) => prev,
   });
 
   // OPTIONS de filtres + stats (sans pagination)
