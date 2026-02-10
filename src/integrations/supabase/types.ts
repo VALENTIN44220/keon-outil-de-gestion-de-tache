@@ -1375,6 +1375,7 @@ export type Database = {
           can_access_projects: boolean
           can_access_requests: boolean
           can_access_settings: boolean
+          can_access_suppliers: boolean
           can_access_tasks: boolean
           can_access_team: boolean
           can_access_templates: boolean
@@ -1406,6 +1407,7 @@ export type Database = {
           can_access_projects?: boolean
           can_access_requests?: boolean
           can_access_settings?: boolean
+          can_access_suppliers?: boolean
           can_access_tasks?: boolean
           can_access_team?: boolean
           can_access_templates?: boolean
@@ -1437,6 +1439,7 @@ export type Database = {
           can_access_projects?: boolean
           can_access_requests?: boolean
           can_access_settings?: boolean
+          can_access_suppliers?: boolean
           can_access_tasks?: boolean
           can_access_team?: boolean
           can_access_templates?: boolean
@@ -3692,6 +3695,7 @@ export type Database = {
           can_access_projects: boolean | null
           can_access_requests: boolean | null
           can_access_settings: boolean | null
+          can_access_suppliers: boolean | null
           can_access_tasks: boolean | null
           can_access_team: boolean | null
           can_access_templates: boolean | null
@@ -3722,6 +3726,7 @@ export type Database = {
           can_access_projects?: boolean | null
           can_access_requests?: boolean | null
           can_access_settings?: boolean | null
+          can_access_suppliers?: boolean | null
           can_access_tasks?: boolean | null
           can_access_team?: boolean | null
           can_access_templates?: boolean | null
@@ -3752,6 +3757,7 @@ export type Database = {
           can_access_projects?: boolean | null
           can_access_requests?: boolean | null
           can_access_settings?: boolean | null
+          can_access_suppliers?: boolean | null
           can_access_tasks?: boolean | null
           can_access_team?: boolean | null
           can_access_templates?: boolean | null
