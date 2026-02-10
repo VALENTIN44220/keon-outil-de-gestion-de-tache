@@ -264,8 +264,8 @@ export function SupplierDetailDrawer({ supplierId, open, onClose, canEdit = true
         ) : supplier ? (
           <div className="space-y-6">
             {/* Header */}
-            <SheetHeader className="sticky top-0 bg-background z-10 pb-4 border-b">
-              <div className="flex items-start justify-between gap-3">
+            <SheetHeader className="sticky top-0 bg-background z-10 pb-4 border-b pt-6">
+              <div className="flex items-start justify-between gap-3 pr-8">
                 <div>
                   <SheetTitle className="text-xl flex items-center gap-2">
                     <span className="font-mono bg-muted px-2 py-1 rounded">{supplier.tiers}</span>
@@ -283,7 +283,7 @@ export function SupplierDetailDrawer({ supplierId, open, onClose, canEdit = true
                   </div>
                 </div>
 
-                <div className="flex flex-col items-end gap-2">
+                <div className="flex flex-col items-end gap-2 shrink-0">
                   <div className="flex items-center gap-2">
                     {saveStatus === "saving" && (
                       <span className="text-sm text-muted-foreground flex items-center gap-1">
