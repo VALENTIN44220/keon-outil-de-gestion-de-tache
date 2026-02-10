@@ -21,8 +21,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
-import { useTableSort } from '@/hooks/useTableSort';
-import { useSupplierEnrichment, SupplierFilters } from '@/hooks/useSupplierEnrichment';
+import { useSupplierEnrichment, SupplierFilters, SupplierSortConfig } from '@/hooks/useSupplierEnrichment';
 import { Search, Building2, Filter, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -91,10 +90,21 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
     setPage(0);
   };
 
-  // ✅ Options et liste : le hook useSupplierEnrichment calcule maintenant categories/familles/segments/sous_segments
-  const { suppliers: rawSuppliers, total, isLoading, filterOptions } = useSupplierEnrichment(filters, page, pageSize);
+  // Server-side sort config
+  const [sortConfig, setSortConfig] = useState<SupplierSortConfig>({ key: 'updated_at', direction: 'desc' });
 
-  const { sortedData: suppliers, sortConfig, handleSort } = useTableSort(rawSuppliers, 'updated_at', 'desc');
+  const handleSort = useCallback((key: string) => {
+    setSortConfig((current) => {
+      if (current.key === key) {
+        if (current.direction === 'asc') return { key, direction: 'desc' };
+        if (current.direction === 'desc') return { key: '', direction: null };
+      }
+      return { key, direction: 'asc' };
+    });
+    setPage(0);
+  }, []);
+
+  const { suppliers, total, isLoading, filterOptions } = useSupplierEnrichment(filters, page, pageSize, sortConfig);
 
   const totalPages = useMemo(() => Math.max(1, Math.ceil((total || 0) / pageSize)), [total, pageSize]);
 
@@ -329,21 +339,48 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
         </div>
       </Card>
 
+      {/* Top Pagination */}
+      <div className="flex items-center justify-end gap-2">
+        <span className="text-sm text-muted-foreground mr-2">
+          Page {page + 1} / {totalPages}
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={page === 0 || isLoading}
+          onClick={() => setPage((p) => Math.max(0, p - 1))}
+          className="gap-2"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Précédent
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={page + 1 >= totalPages || isLoading}
+          onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+          className="gap-2"
+        >
+          Suivant
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+
       {/* Table */}
       <Card>
         <Table>
           <TableHeader>
             <TableRow>
-              <SortableTableHead sortKey="tiers" currentSortKey={String(sortConfig.key)} currentDirection={sortConfig.direction} onSort={handleSort} className="w-[120px]">TIERS</SortableTableHead>
-              <SortableTableHead sortKey="nomfournisseur" currentSortKey={String(sortConfig.key)} currentDirection={sortConfig.direction} onSort={handleSort}>Nom Fournisseur</SortableTableHead>
-              <SortableTableHead sortKey="entite" currentSortKey={String(sortConfig.key)} currentDirection={sortConfig.direction} onSort={handleSort}>Entité</SortableTableHead>
-              <SortableTableHead sortKey="categorie" currentSortKey={String(sortConfig.key)} currentDirection={sortConfig.direction} onSort={handleSort}>Catégorie</SortableTableHead>
-              <SortableTableHead sortKey="famille" currentSortKey={String(sortConfig.key)} currentDirection={sortConfig.direction} onSort={handleSort}>Famille</SortableTableHead>
-              <SortableTableHead sortKey="segment" currentSortKey={String(sortConfig.key)} currentDirection={sortConfig.direction} onSort={handleSort}>Segment</SortableTableHead>
-              <SortableTableHead sortKey="completeness_score" currentSortKey={String(sortConfig.key)} currentDirection={sortConfig.direction} onSort={handleSort} className="w-[150px]">Complétude</SortableTableHead>
-              <SortableTableHead sortKey="validite_prix" currentSortKey={String(sortConfig.key)} currentDirection={sortConfig.direction} onSort={handleSort} className="w-[140px]">Validité prix</SortableTableHead>
-              <SortableTableHead sortKey="validite_du_contrat" currentSortKey={String(sortConfig.key)} currentDirection={sortConfig.direction} onSort={handleSort} className="w-[140px]">Validité contrat</SortableTableHead>
-              <SortableTableHead sortKey="updated_at" currentSortKey={String(sortConfig.key)} currentDirection={sortConfig.direction} onSort={handleSort}>Mise à jour</SortableTableHead>
+              <SortableTableHead sortKey="tiers" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort} className="w-[120px]">TIERS</SortableTableHead>
+              <SortableTableHead sortKey="nomfournisseur" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>Nom Fournisseur</SortableTableHead>
+              <SortableTableHead sortKey="entite" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>Entité</SortableTableHead>
+              <SortableTableHead sortKey="categorie" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>Catégorie</SortableTableHead>
+              <SortableTableHead sortKey="famille" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>Famille</SortableTableHead>
+              <SortableTableHead sortKey="segment" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>Segment</SortableTableHead>
+              <SortableTableHead sortKey="completeness_score" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort} className="w-[150px]">Complétude</SortableTableHead>
+              <SortableTableHead sortKey="validite_prix" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort} className="w-[140px]">Validité prix</SortableTableHead>
+              <SortableTableHead sortKey="validite_du_contrat" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort} className="w-[140px]">Validité contrat</SortableTableHead>
+              <SortableTableHead sortKey="updated_at" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>Mise à jour</SortableTableHead>
               <TableHead className="w-[80px]"></TableHead>
             </TableRow>
           </TableHeader>

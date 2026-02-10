@@ -120,19 +120,28 @@ function applyFilters(q: any, filters: SupplierFilters, opts?: { excludeStatus?:
   return query;
 }
 
-export function useSupplierEnrichment(filters: SupplierFilters, page = 0, pageSize = 200) {
+export interface SupplierSortConfig {
+  key: string;
+  direction: 'asc' | 'desc' | null;
+}
+
+export function useSupplierEnrichment(filters: SupplierFilters, page = 0, pageSize = 200, sortConfig?: SupplierSortConfig) {
   const queryClient = useQueryClient();
 
   const listQuery = useQuery<{ suppliers: SupplierEnrichment[]; total: number }>({
-    queryKey: ['supplier-enrichment', 'list', filters, page, pageSize],
+    queryKey: ['supplier-enrichment', 'list', filters, page, pageSize, sortConfig?.key, sortConfig?.direction],
     queryFn: async () => {
       const from = page * pageSize;
       const to = from + pageSize - 1;
 
       let q = supabase
         .from('supplier_purchase_enrichment')
-        .select('*', { count: 'exact' })
-        .order('updated_at', { ascending: false });
+        .select('*', { count: 'exact' });
+
+      // Server-side sorting
+      const sortKey = sortConfig?.key && sortConfig?.direction ? sortConfig.key : 'updated_at';
+      const ascending = sortConfig?.key && sortConfig?.direction ? sortConfig.direction === 'asc' : false;
+      q = q.order(sortKey, { ascending, nullsFirst: false });
 
       q = applyFilters(q, filters);
 
