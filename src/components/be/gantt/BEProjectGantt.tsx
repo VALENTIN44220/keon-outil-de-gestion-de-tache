@@ -157,13 +157,6 @@ export function BEProjectGantt({
     }
 
     // 'all' mode: fit all tasks + milestones
-    if (filteredTasks.length === 0) {
-      return {
-        start: subDays(startOfWeek(today, { locale: fr }), 7),
-        end: addDays(endOfWeek(today, { locale: fr }), 30),
-      };
-    }
-
     const dates: Date[] = [today];
     filteredTasks.forEach(t => {
       if (t.created_at) dates.push(new Date(t.created_at));
@@ -173,6 +166,14 @@ export function BEProjectGantt({
     milestones.forEach(m => {
       if (m.date) dates.push(new Date(m.date));
     });
+
+    // If only today (no tasks, no milestones), use a small default range
+    if (dates.length === 1 && filteredTasks.length === 0 && milestones.length === 0) {
+      return {
+        start: subDays(startOfWeek(today, { locale: fr }), 7),
+        end: addDays(endOfWeek(today, { locale: fr }), 30),
+      };
+    }
 
     const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
     const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
