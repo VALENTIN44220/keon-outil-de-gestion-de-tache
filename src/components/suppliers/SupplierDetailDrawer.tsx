@@ -352,8 +352,9 @@ export function SupplierDetailDrawer({ supplierId, open, onClose, canEdit = true
                     value={formData.categorie || ""}
                     onValueChange={(v) => {
                       // si la catégorie change : reset famille (sinon incohérence)
-                      handleFieldChange("categorie", v);
-                      handleFieldChange("famille", null);
+                      const newData = { ...formData, categorie: v, famille: null };
+                      setFormData(newData);
+                      setPendingSave(newData);
                     }}
                     disabled={catLoading || !canEdit}
                   >
