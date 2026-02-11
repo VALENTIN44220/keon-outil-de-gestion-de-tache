@@ -7,6 +7,8 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { 
   ChevronDown, 
   ChevronRight, 
@@ -22,16 +24,21 @@ import {
   endOfWeek,
   startOfMonth,
   endOfMonth,
+  startOfYear,
+  endOfYear,
   eachDayOfInterval,
   eachWeekOfInterval,
+  eachMonthOfInterval,
   isWeekend,
   isSameDay,
-  getWeek
+  getWeek,
+  differenceInMonths
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
-type ZoomLevel = 'week' | 'month' | 'quarter';
+type ZoomLevel = 'week' | 'month' | 'quarter' | 'year';
+type PeriodMode = 'all' | 'current_year' | 'custom';
 
 interface Milestone {
   label: string;
@@ -44,6 +51,12 @@ interface BEProjectGanttProps {
   project: BEProject;
   zoom: ZoomLevel;
   onZoomChange: (zoom: ZoomLevel) => void;
+  periodMode: PeriodMode;
+  onPeriodModeChange: (mode: PeriodMode) => void;
+  customStart?: string;
+  customEnd?: string;
+  onCustomStartChange?: (v: string) => void;
+  onCustomEndChange?: (v: string) => void;
   searchQuery?: string;
   statusFilter?: string;
 }
@@ -65,6 +78,12 @@ export function BEProjectGantt({
   project, 
   zoom, 
   onZoomChange,
+  periodMode,
+  onPeriodModeChange,
+  customStart,
+  customEnd,
+  onCustomStartChange,
+  onCustomEndChange,
   searchQuery = '',
   statusFilter = 'all'
 }: BEProjectGanttProps) {
@@ -117,10 +136,27 @@ export function BEProjectGantt({
     return sortedGroups;
   }, [filteredTasks]);
 
-  // Calculate date range
+  // Calculate date range based on period mode
   const dateRange = useMemo(() => {
     const today = new Date();
-    
+
+    if (periodMode === 'current_year') {
+      return {
+        start: startOfYear(today),
+        end: endOfYear(today),
+      };
+    }
+
+    if (periodMode === 'custom' && customStart && customEnd) {
+      try {
+        return {
+          start: new Date(customStart),
+          end: new Date(customEnd),
+        };
+      } catch { /* fall through */ }
+    }
+
+    // 'all' mode: fit all tasks + milestones
     if (filteredTasks.length === 0) {
       return {
         start: subDays(startOfWeek(today, { locale: fr }), 7),
@@ -145,7 +181,7 @@ export function BEProjectGantt({
       start: subDays(startOfMonth(minDate), 7),
       end: addDays(endOfMonth(maxDate), 14),
     };
-  }, [filteredTasks, milestones]);
+  }, [filteredTasks, milestones, periodMode, customStart, customEnd]);
 
   // Generate timeline units
   const timelineData = useMemo(() => {
@@ -174,15 +210,22 @@ export function BEProjectGantt({
     return { days, weeks, months };
   }, [dateRange]);
 
-  // Day width based on zoom
+  // Day width based on zoom (for year view we use month-based width calculated differently)
   const dayWidth = useMemo(() => {
     switch (zoom) {
       case 'week': return 48;
       case 'month': return 24;
       case 'quarter': return 8;
+      case 'year': return 4; // narrow per-day, months will span ~120px
       default: return 24;
     }
   }, [zoom]);
+
+  // For year view: generate months array for the header
+  const yearMonths = useMemo(() => {
+    if (zoom !== 'year') return [];
+    return eachMonthOfInterval({ start: dateRange.start, end: dateRange.end });
+  }, [zoom, dateRange]);
 
   const toggleGroup = useCallback((status: string) => {
     setCollapsedGroups(prev => {
@@ -228,22 +271,55 @@ export function BEProjectGantt({
             )}
           </div>
 
-          {/* Zoom Controls */}
-          <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
-            {(['week', 'month', 'quarter'] as ZoomLevel[]).map(level => (
-              <Button
-                key={level}
-                variant={zoom === level ? 'default' : 'ghost'}
-                size="sm"
-                className={cn(
-                  'h-7 px-3 text-xs',
-                  zoom === level && 'shadow-sm'
-                )}
-                onClick={() => onZoomChange(level)}
-              >
-                {level === 'week' ? 'Semaine' : level === 'month' ? 'Mois' : 'Trimestre'}
-              </Button>
-            ))}
+          {/* Period + Zoom Controls */}
+          <div className="flex items-center gap-3">
+            {/* Period selector */}
+            <Select value={periodMode} onValueChange={(v) => onPeriodModeChange(v as PeriodMode)}>
+              <SelectTrigger className="w-[160px] h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tout afficher</SelectItem>
+                <SelectItem value="current_year">Année en cours</SelectItem>
+                <SelectItem value="custom">Période</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {periodMode === 'custom' && (
+              <div className="flex items-center gap-2">
+                <Input
+                  type="date"
+                  value={customStart || ''}
+                  onChange={(e) => onCustomStartChange?.(e.target.value)}
+                  className="h-8 w-[140px] text-xs"
+                />
+                <span className="text-xs text-muted-foreground">→</span>
+                <Input
+                  type="date"
+                  value={customEnd || ''}
+                  onChange={(e) => onCustomEndChange?.(e.target.value)}
+                  className="h-8 w-[140px] text-xs"
+                />
+              </div>
+            )}
+
+            {/* Zoom Controls */}
+            <div className="flex items-center gap-1 p-1 bg-muted rounded-lg">
+              {(['week', 'month', 'quarter', 'year'] as ZoomLevel[]).map(level => (
+                <Button
+                  key={level}
+                  variant={zoom === level ? 'default' : 'ghost'}
+                  size="sm"
+                  className={cn(
+                    'h-7 px-3 text-xs',
+                    zoom === level && 'shadow-sm'
+                  )}
+                  onClick={() => onZoomChange(level)}
+                >
+                  {level === 'week' ? 'Semaine' : level === 'month' ? 'Mois' : level === 'quarter' ? 'Trimestre' : 'Année'}
+                </Button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -353,49 +429,90 @@ export function BEProjectGantt({
             <div className="min-w-max">
               {/* Timeline Header */}
               <div className="h-14 border-b bg-muted/50 sticky top-0 z-10">
-                {/* Months Row */}
-                <div className="h-7 flex border-b">
-                  {timelineData.months.map((month, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-center text-xs font-medium border-r bg-muted/30"
-                      style={{ width: month.days * dayWidth }}
-                    >
-                      {format(month.date, 'MMMM yyyy', { locale: fr })}
-                    </div>
-                  ))}
-                </div>
-                
-                {/* Days/Weeks Row */}
-                <div className="h-7 flex">
-                  {timelineData.days.map((day, idx) => {
-                    const isToday = isSameDay(day, today);
-                    const isWeekendDay = isWeekend(day);
-                    const showLabel = zoom === 'week' || (zoom === 'month' && day.getDate() % 2 === 1);
-                    const isFirstOfWeek = day.getDay() === 1;
-                    const isQuarterView = zoom === 'quarter';
-
-                    return (
+                {zoom === 'year' ? (
+                  <>
+                    {/* Year Row */}
+                    <div className="h-7 flex border-b">
                       <div
-                        key={idx}
-                        className={cn(
-                          'flex items-center justify-center text-[10px] border-r',
-                          isToday && 'bg-primary/10 font-bold text-primary',
-                          isWeekendDay && !isToday && 'bg-muted/50',
-                          isFirstOfWeek && zoom !== 'week' && 'border-l-2 border-l-border'
-                        )}
-                        style={{ width: dayWidth }}
+                        className="flex items-center justify-center text-xs font-medium border-r bg-muted/30"
+                        style={{ width: timelineData.days.length * dayWidth }}
                       >
-                        {showLabel && !isQuarterView && (
-                          <span>{format(day, 'd')}</span>
-                        )}
-                        {isQuarterView && isFirstOfWeek && (
-                          <span className="text-[9px]">S{getWeek(day)}</span>
-                        )}
+                        {format(dateRange.start, 'yyyy')}
+                        {format(dateRange.start, 'yyyy') !== format(dateRange.end, 'yyyy') && 
+                          ` – ${format(dateRange.end, 'yyyy')}`}
                       </div>
-                    );
-                  })}
-                </div>
+                    </div>
+                    {/* Month columns */}
+                    <div className="h-7 flex">
+                      {yearMonths.map((monthDate, idx) => {
+                        const mStart = new Date(Math.max(monthDate.getTime(), dateRange.start.getTime()));
+                        const mEnd = endOfMonth(monthDate);
+                        const actualEnd = new Date(Math.min(mEnd.getTime(), dateRange.end.getTime()));
+                        const daysInMonth = differenceInDays(actualEnd, mStart) + 1;
+                        if (daysInMonth <= 0) return null;
+                        const isCurrent = isSameDay(startOfMonth(today), startOfMonth(monthDate));
+                        return (
+                          <div
+                            key={idx}
+                            className={cn(
+                              'flex items-center justify-center text-[10px] font-medium border-r capitalize',
+                              isCurrent && 'bg-primary/10 text-primary font-bold'
+                            )}
+                            style={{ width: daysInMonth * dayWidth }}
+                          >
+                            {format(monthDate, 'MMM', { locale: fr })}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {/* Months Row */}
+                    <div className="h-7 flex border-b">
+                      {timelineData.months.map((month, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-center text-xs font-medium border-r bg-muted/30"
+                          style={{ width: month.days * dayWidth }}
+                        >
+                          {format(month.date, 'MMMM yyyy', { locale: fr })}
+                        </div>
+                      ))}
+                    </div>
+                    
+                    {/* Days/Weeks Row */}
+                    <div className="h-7 flex">
+                      {timelineData.days.map((day, idx) => {
+                        const isToday = isSameDay(day, today);
+                        const isWeekendDay = isWeekend(day);
+                        const showLabel = zoom === 'week' || (zoom === 'month' && day.getDate() % 2 === 1);
+                        const isFirstOfWeek = day.getDay() === 1;
+                        const isQuarterView = zoom === 'quarter';
+
+                        return (
+                          <div
+                            key={idx}
+                            className={cn(
+                              'flex items-center justify-center text-[10px] border-r',
+                              isToday && 'bg-primary/10 font-bold text-primary',
+                              isWeekendDay && !isToday && 'bg-muted/50',
+                              isFirstOfWeek && zoom !== 'week' && 'border-l-2 border-l-border'
+                            )}
+                            style={{ width: dayWidth }}
+                          >
+                            {showLabel && !isQuarterView && (
+                              <span>{format(day, 'd')}</span>
+                            )}
+                            {isQuarterView && isFirstOfWeek && (
+                              <span className="text-[9px]">S{getWeek(day)}</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Milestone Markers */}

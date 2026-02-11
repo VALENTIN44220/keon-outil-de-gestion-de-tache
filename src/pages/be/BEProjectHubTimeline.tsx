@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Search } from 'lucide-react';
 
-type ZoomLevel = 'week' | 'month' | 'quarter';
+type ZoomLevel = 'week' | 'month' | 'quarter' | 'year';
+type PeriodMode = 'all' | 'current_year' | 'custom';
 
 export default function BEProjectHubTimeline() {
   const { code } = useParams<{ code: string }>();
@@ -19,6 +20,9 @@ export default function BEProjectHubTimeline() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [zoom, setZoom] = useState<ZoomLevel>('month');
+  const [periodMode, setPeriodMode] = useState<PeriodMode>('all');
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
 
   if (projectLoading || tasksLoading) {
     return (
@@ -80,6 +84,12 @@ export default function BEProjectHubTimeline() {
           project={project}
           zoom={zoom}
           onZoomChange={setZoom}
+          periodMode={periodMode}
+          onPeriodModeChange={setPeriodMode}
+          customStart={customStart}
+          customEnd={customEnd}
+          onCustomStartChange={setCustomStart}
+          onCustomEndChange={setCustomEnd}
           searchQuery={searchQuery}
           statusFilter={statusFilter}
         />
