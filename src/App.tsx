@@ -25,7 +25,7 @@ import DesignSystem from "./pages/DesignSystem";
 import WorkflowEditor from "./pages/WorkflowEditor";
 import NotFound from "./pages/NotFound";
 import SupplierReference from "./pages/SupplierReference";
-import MaterialRequests from "./pages/MaterialRequests";
+// MaterialRequests is now embedded in ProcessTracking
 import ProcessTracking from "./pages/ProcessTracking";
 
 // BE Project Hub pages
@@ -193,15 +193,6 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <SupplierReference />
-                </ProtectedRoute>
-              }
-            />
-            {/* Material Requests */}
-            <Route
-              path="/material-requests"
-              element={
-                <ProtectedRoute>
-                  <MaterialRequests />
                 </ProtectedRoute>
               }
             />
