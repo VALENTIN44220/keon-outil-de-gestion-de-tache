@@ -1,10 +1,10 @@
 import { useEffect, useState, useMemo, lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, ShieldX } from 'lucide-react';
@@ -92,18 +92,6 @@ export default function ProcessTracking() {
     setSearchParams({ process: value }, { replace: true });
   };
 
-  // Set of tabs that have been visited (for lazy loading)
-  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set());
-  useEffect(() => {
-    if (activeTab) {
-      setVisitedTabs(prev => {
-        if (prev.has(activeTab)) return prev;
-        const next = new Set(prev);
-        next.add(activeTab);
-        return next;
-      });
-    }
-  }, [activeTab]);
 
   if (isLoading) {
     return (
@@ -120,57 +108,69 @@ export default function ProcessTracking() {
     );
   }
 
+  const activeProcess = processes.find(p => p.id === activeTab);
+
   return (
     <div className="flex h-screen bg-background">
       <Sidebar activeView={activeView} onViewChange={setActiveView} />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header title="Suivi des processus" searchQuery="" onSearchChange={() => {}} />
-      <main className="p-6">
-        {processes.length === 0 ? (
-          <div className="flex flex-col items-center justify-center min-h-[400px] border-2 border-dashed border-border rounded-xl gap-4">
-            <div className="p-3 rounded-full bg-muted">
-              <ShieldX className="h-8 w-8 text-muted-foreground" />
+        <div className="flex-1 flex overflow-hidden">
+          {/* Process sidebar */}
+          <aside className="w-56 flex-shrink-0 border-r border-border bg-muted/30 overflow-y-auto">
+            <div className="p-3 space-y-1">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-2">Processus</p>
+              {processes.length === 0 ? (
+                <p className="text-sm text-muted-foreground px-3 py-4">Aucun processus accessible</p>
+              ) : (
+                processes.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => handleTabChange(p.id)}
+                    className={cn(
+                      "w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 text-left",
+                      activeTab === p.id
+                        ? "bg-primary/10 text-primary border-l-4 border-primary"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground border-l-4 border-transparent"
+                    )}
+                  >
+                    <span className="truncate">{p.name}</span>
+                    {typeof p.task_count === 'number' && (
+                      <Badge variant="secondary" className="text-xs px-1.5 py-0 min-w-[1.25rem] h-5 flex-shrink-0">
+                        {p.task_count}
+                      </Badge>
+                    )}
+                  </button>
+                ))
+              )}
             </div>
-            <div className="text-center space-y-1">
-              <p className="text-lg font-medium text-foreground">
-                Aucun processus accessible
-              </p>
-              <p className="text-sm text-muted-foreground max-w-md">
-                Vous n'avez accès à aucun processus pour le moment. Contactez votre administrateur pour obtenir les droits de lecture sur un ou plusieurs processus.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <Tabs value={activeTab} onValueChange={handleTabChange}>
-            <TabsList className="flex-wrap h-auto gap-1 mb-6">
-              {processes.map((p) => (
-                <TabsTrigger key={p.id} value={p.id} className="text-sm gap-2">
-                  {p.name}
-                  {typeof p.task_count === 'number' && (
-                    <Badge variant="secondary" className="text-xs px-1.5 py-0 min-w-[1.25rem] h-5">
-                      {p.task_count}
-                    </Badge>
-                  )}
-                </TabsTrigger>
-              ))}
-            </TabsList>
+          </aside>
 
-            {processes.map((p) => (
-              <TabsContent key={p.id} value={p.id}>
-                {visitedTabs.has(p.id) ? (
-                  <Suspense fallback={
-                    <div className="flex items-center justify-center h-64">
-                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    </div>
-                  }>
-                    <ProcessDashboard processId={p.id} canWrite={p.can_write} processName={p.name} />
-                  </Suspense>
-                ) : null}
-              </TabsContent>
-            ))}
-          </Tabs>
-        )}
-      </main>
+          {/* Main content */}
+          <main className="flex-1 overflow-y-auto p-6">
+            {processes.length === 0 ? (
+              <div className="flex flex-col items-center justify-center min-h-[400px] border-2 border-dashed border-border rounded-xl gap-4">
+                <div className="p-3 rounded-full bg-muted">
+                  <ShieldX className="h-8 w-8 text-muted-foreground" />
+                </div>
+                <div className="text-center space-y-1">
+                  <p className="text-lg font-medium text-foreground">Aucun processus accessible</p>
+                  <p className="text-sm text-muted-foreground max-w-md">
+                    Contactez votre administrateur pour obtenir les droits de lecture.
+                  </p>
+                </div>
+              </div>
+            ) : activeProcess ? (
+              <Suspense fallback={
+                <div className="flex items-center justify-center h-64">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              }>
+                <ProcessDashboard processId={activeProcess.id} canWrite={activeProcess.can_write} processName={activeProcess.name} />
+              </Suspense>
+            ) : null}
+          </main>
+        </div>
       </div>
     </div>
   );
