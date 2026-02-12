@@ -44,7 +44,6 @@ export default function ProcessTracking() {
         const { data } = await (supabase as any)
           .from('process_templates')
           .select('id, name')
-          .eq('is_active', true)
           .order('name');
         processList = (data || []).map((p: any) => ({ ...p, can_write: true }));
       } else {
@@ -55,7 +54,6 @@ export default function ProcessTracking() {
           const { data } = await (supabase as any)
             .from('process_templates')
             .select('id, name')
-            .eq('is_active', true)
             .in('id', accessibleIds)
             .order('name');
           processList = (data || []).map((p: any) => ({
