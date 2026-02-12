@@ -148,29 +148,40 @@ async function getValidAccessToken(
   return connection.access_token;
 }
 
-// Fetch calendar events from Microsoft Graph
+// Fetch calendar events from Microsoft Graph (with pagination)
 async function fetchCalendarEvents(
   accessToken: string,
   startDate: string,
   endDate: string
 ): Promise<any[]> {
-  const url = `${MICROSOFT_GRAPH_URL}/me/calendarView?startDateTime=${startDate}&endDateTime=${endDate}&$orderby=start/dateTime&$top=100`;
+  const allEvents: any[] = [];
+  let url: string | null = `${MICROSOFT_GRAPH_URL}/me/calendarView?startDateTime=${startDate}&endDateTime=${endDate}&$orderby=start/dateTime&$top=500`;
 
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
-  });
+  while (url) {
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        Prefer: 'odata.maxpagesize=500',
+      },
+    });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('Calendar fetch error:', errorText);
-    throw new Error(`Failed to fetch calendar: ${response.status}`);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Calendar fetch error:', errorText);
+      throw new Error(`Failed to fetch calendar: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const events = data.value || [];
+    allEvents.push(...events);
+
+    // Follow @odata.nextLink for pagination
+    url = data['@odata.nextLink'] || null;
   }
 
-  const data = await response.json();
-  return data.value || [];
+  console.log(`Fetched ${allEvents.length} calendar events total`);
+  return allEvents;
 }
 
 // Send email via Microsoft Graph
