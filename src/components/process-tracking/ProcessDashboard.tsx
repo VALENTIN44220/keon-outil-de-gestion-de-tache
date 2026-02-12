@@ -80,13 +80,7 @@ export function ProcessDashboard({ processId, canWrite, processName }: ProcessDa
     );
   }
 
-  const dashboardContent = tasks.length === 0 ? (
-    <div className="flex items-center justify-center min-h-[400px] border-2 border-dashed border-border rounded-xl">
-      <p className="text-muted-foreground text-lg">
-        Aucune demande pour ce processus.
-      </p>
-    </div>
-  ) : (
+  const dashboardContent = (
     <ConfigurableDashboard
       tasks={tasks}
       stats={stats}
