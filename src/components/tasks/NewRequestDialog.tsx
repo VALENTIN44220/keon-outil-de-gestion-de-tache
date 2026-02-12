@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Task, TaskStatus, TaskPriority, AssignmentRule } from '@/types/task';
 import { cn } from '@/lib/utils';
+import { DEMANDE_MATERIEL_SP_ID } from '@/components/requests/RequestWizard/types';
+import { MaterialRequestLines, MaterialLine } from '@/components/maintenance/MaterialRequestLines';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,7 +29,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
 import { 
   Info, ArrowRight, Workflow, FormInput, CheckSquare, FileText, 
-  Calendar, AlertCircle, Folder
+  Calendar, AlertCircle, Folder, Package
 } from 'lucide-react';
 import { BEProjectSelect } from '@/components/be/BEProjectSelect';
 import { toast } from 'sonner';
@@ -114,6 +116,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [subProcessCustomFields, setSubProcessCustomFields] = useState<Record<string, TemplateCustomField[]>>({});
+  const [materialLines, setMaterialLines] = useState<MaterialLine[]>([]);
 
   // Fetch custom fields for the process
   const { fields: processFields, isLoading: loadingProcessFields } = useCustomFields({
@@ -633,6 +636,34 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
         toast.success('Demande créée avec succès');
       }
 
+      // Persist material request lines
+      if (hasMaterialSubProcess && materialLines.length > 0) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('id, display_name')
+          .eq('user_id', (await supabase.auth.getUser()).data.user?.id || '')
+          .single();
+
+        const materialRows = materialLines
+          .filter(l => l.article !== null)
+          .map(l => ({
+            request_id: requestData.id,
+            request_number: requestData.request_number || null,
+            demandeur_id: profileData?.id || null,
+            demandeur_nom: profileData?.display_name || null,
+            article_id: l.article!.id,
+            ref: l.article!.ref,
+            des: l.article!.des,
+            quantite: l.quantite,
+            etat_commande: 'En attente validation',
+          }));
+
+        const { error: matError } = await supabase.from('demande_materiel').insert(materialRows);
+        if (matError) {
+          console.error('Error saving material lines:', matError);
+        }
+      }
+
       onTasksCreated?.();
       resetForm();
       onClose();
@@ -666,6 +697,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
     setCustomFieldValues({});
     setFieldErrors({});
     setSubProcessCustomFields({});
+    setMaterialLines([]);
   };
 
   const handleAddCategory = async (name: string) => {
@@ -689,12 +721,19 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
 
   const showSubProcessTab = hasMultipleSubProcesses && availableSubProcesses.length > 0;
   const showCustomFieldsTab = customFieldsCount > 0;
+  const hasMaterialSubProcess = selectedSubProcessIds.includes(DEMANDE_MATERIEL_SP_ID) || linkedSubProcessId === DEMANDE_MATERIEL_SP_ID;
+  const showMaterialTab = hasMaterialSubProcess;
+
+  const materialValid = !hasMaterialSubProcess || (
+    materialLines.length > 0 && materialLines.every(l => l.article !== null && l.quantite > 0)
+  );
 
   const isFormDisabled =
     !title.trim() ||
     !targetDepartmentId ||
     !dueDate ||
     isSubmitting ||
+    !materialValid ||
     (hasMultipleSubProcesses && selectedSubProcessIds.length === 0);
 
   const handleDialogOpenChange = useCallback(
@@ -757,6 +796,24 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                     <span>Détails de la demande</span>
                     <Badge variant="secondary" className="ml-1.5 text-[10px] px-2 py-0.5 rounded-full font-bold">
                       {customFieldsCount}
+                    </Badge>
+                  </TabsTrigger>
+                )}
+                {showMaterialTab && (
+                  <TabsTrigger 
+                    value="material" 
+                    className="flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl font-semibold transition-all duration-200 data-[state=active]:shadow-lg data-[state=active]:bg-white data-[state=active]:text-primary data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-white/50"
+                  >
+                    <Package className="h-4 w-4" />
+                    <span>Articles</span>
+                    <Badge 
+                      variant={materialLines.length > 0 ? "default" : "secondary"} 
+                      className={cn(
+                        "ml-1.5 text-[10px] px-2 py-0.5 rounded-full font-bold",
+                        materialLines.length > 0 && "bg-primary shadow-sm"
+                      )}
+                    >
+                      {materialLines.length}
                     </Badge>
                   </TabsTrigger>
                 )}
@@ -1083,6 +1140,34 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                         />
                       </div>
                     )}
+                  </TabsContent>
+                )}
+
+                {/* Material Lines Tab */}
+                {showMaterialTab && (
+                  <TabsContent value="material" className="mt-0 space-y-5">
+                    <div className="bg-white rounded-2xl border-2 border-border/50 p-5 shadow-sm">
+                      <div className="mb-4">
+                        <h3 className="text-sm font-semibold flex items-center gap-2">
+                          <Package className="h-4 w-4 text-warning" />
+                          Articles à commander
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Sélectionnez les articles de maintenance et indiquez les quantités souhaitées
+                        </p>
+                      </div>
+                      {materialLines.length === 0 && (
+                        <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-700 mb-4">
+                          <Package className="h-4 w-4 shrink-0" />
+                          <span className="text-sm">Ajoutez au moins un article pour pouvoir soumettre la demande</span>
+                        </div>
+                      )}
+                      <MaterialRequestLines
+                        lines={materialLines}
+                        onChange={setMaterialLines}
+                        disabled={isSubmitting}
+                      />
+                    </div>
                   </TabsContent>
                 )}
               </div>
