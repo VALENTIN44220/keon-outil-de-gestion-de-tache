@@ -2,7 +2,8 @@ import { useEffect, useState, useMemo, lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { PageHeader } from '@/components/layout/PageHeader';
+import { Sidebar } from '@/components/layout/Sidebar';
+import { Header } from '@/components/layout/Header';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +21,7 @@ interface ProcessTab {
 }
 
 export default function ProcessTracking() {
+  const [activeView, setActiveView] = useState('process-tracking');
   const [searchParams, setSearchParams] = useSearchParams();
   const [processes, setProcesses] = useState<ProcessTab[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -107,19 +109,24 @@ export default function ProcessTracking() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background">
-        <PageHeader title="Suivi des processus" />
-        <div className="p-6 space-y-4">
-          <Skeleton className="h-10 w-full max-w-2xl" />
-          <Skeleton className="h-64 w-full" />
+      <div className="flex h-screen bg-background">
+        <Sidebar activeView={activeView} onViewChange={setActiveView} />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <Header title="Suivi des processus" searchQuery="" onSearchChange={() => {}} />
+          <div className="p-6 space-y-4">
+            <Skeleton className="h-10 w-full max-w-2xl" />
+            <Skeleton className="h-64 w-full" />
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <PageHeader title="Suivi des processus" />
+    <div className="flex h-screen bg-background">
+      <Sidebar activeView={activeView} onViewChange={setActiveView} />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <Header title="Suivi des processus" searchQuery="" onSearchChange={() => {}} />
       <main className="p-6">
         {processes.length === 0 ? (
           <div className="flex flex-col items-center justify-center min-h-[400px] border-2 border-dashed border-border rounded-xl gap-4">
@@ -166,6 +173,7 @@ export default function ProcessTracking() {
           </Tabs>
         )}
       </main>
+      </div>
     </div>
   );
 }
