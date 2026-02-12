@@ -59,6 +59,39 @@ export type Database = {
         }
         Relationships: []
       }
+      articles: {
+        Row: {
+          art_id: number
+          created_at: string
+          des: string | null
+          id: string
+          prix_moy: number | null
+          qte: number | null
+          ref: string | null
+          updated_at: string
+        }
+        Insert: {
+          art_id: number
+          created_at?: string
+          des?: string | null
+          id?: string
+          prix_moy?: number | null
+          qte?: number | null
+          ref?: string | null
+          updated_at?: string
+        }
+        Update: {
+          art_id?: number
+          created_at?: string
+          des?: string | null
+          id?: string
+          prix_moy?: number | null
+          qte?: number | null
+          ref?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       assignment_rules: {
         Row: {
           auto_assign: boolean | null
