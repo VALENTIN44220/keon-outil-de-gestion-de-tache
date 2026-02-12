@@ -61,6 +61,8 @@ const ALL_TABLES = [
   // Suppliers
   "supplier_purchase_enrichment",
   "supplier_purchase_permissions",
+  // Articles (Fabric notebook)
+  "articles",
 ];
 
 function getFabricTableName(supabaseTableName: string): string {
