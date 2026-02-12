@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Grid3X3, Monitor, Workflow, User, Plus, Minus, RotateCcw, Check, X, AlertCircle, ChevronDown, Building2 } from 'lucide-react';
+import { Grid3X3, Monitor, Workflow, User, Plus, Minus, RotateCcw, Check, X, AlertCircle, ChevronDown, Building2, Eye, Pencil, ClipboardList } from 'lucide-react';
 import { toast } from 'sonner';
 import { RefreshButton } from './RefreshButton';
 import { supabase } from '@/integrations/supabase/client';
@@ -42,6 +42,8 @@ export function PermissionMatrixTab({
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [userOverrideDialogOpen, setUserOverrideDialogOpen] = useState(false);
+  const [selectedTrackingUserId, setSelectedTrackingUserId] = useState<string | null>(null);
+  const [trackingAccess, setTrackingAccess] = useState<Record<string, { can_read: boolean; can_write: boolean }>>({});
   
   const {
     isLoading,
@@ -73,6 +75,64 @@ export function PermissionMatrixTab({
     }
     fetchProcessTemplates();
   }, []);
+
+  // Fetch process tracking access for selected user
+  useEffect(() => {
+    if (!selectedTrackingUserId) {
+      setTrackingAccess({});
+      return;
+    }
+    async function fetchTrackingAccess() {
+      const { data } = await (supabase as any)
+        .from('process_tracking_access')
+        .select('process_template_id, can_read, can_write')
+        .eq('profile_id', selectedTrackingUserId);
+      
+      const map: Record<string, { can_read: boolean; can_write: boolean }> = {};
+      (data || []).forEach((row: any) => {
+        map[row.process_template_id] = { can_read: row.can_read, can_write: row.can_write };
+      });
+      setTrackingAccess(map);
+    }
+    fetchTrackingAccess();
+  }, [selectedTrackingUserId]);
+
+  const handleTrackingToggle = async (processId: string, field: 'can_read' | 'can_write') => {
+    if (!selectedTrackingUserId) return;
+    const current = trackingAccess[processId];
+    
+    try {
+      if (!current) {
+        // Insert new row
+        const newValues = { can_read: field === 'can_read', can_write: field === 'can_write' };
+        await (supabase as any)
+          .from('process_tracking_access')
+          .insert({ profile_id: selectedTrackingUserId, process_template_id: processId, ...newValues });
+        setTrackingAccess(prev => ({ ...prev, [processId]: newValues }));
+      } else {
+        const newValue = !current[field];
+        // If turning off can_read, also turn off can_write
+        const updates: any = { [field]: newValue };
+        if (field === 'can_read' && !newValue) {
+          updates.can_write = false;
+        }
+        // If turning on can_write, also ensure can_read
+        if (field === 'can_write' && newValue) {
+          updates.can_read = true;
+        }
+        
+        await (supabase as any)
+          .from('process_tracking_access')
+          .update(updates)
+          .eq('profile_id', selectedTrackingUserId)
+          .eq('process_template_id', processId);
+        setTrackingAccess(prev => ({ ...prev, [processId]: { ...prev[processId], ...updates } }));
+      }
+      toast.success('Accès mis à jour');
+    } catch (error: any) {
+      toast.error(error.message || 'Erreur');
+    }
+  };
 
   const selectedProfile = permissionProfiles.find(p => p.id === selectedProfileId);
   const selectedUser = users.find(u => u.id === selectedUserId);
@@ -378,6 +438,89 @@ export function PermissionMatrixTab({
               {selectedProfileId && processTemplates.length === 0 && (
                 <p className="text-muted-foreground text-center py-8">
                   Aucun processus de demande configuré
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Process Tracking Access Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <ClipboardList className="h-5 w-5" />
+                Accès au suivi des processus
+              </CardTitle>
+              <CardDescription>
+                Sélectionnez un utilisateur puis définissez ses droits de lecture/écriture par processus
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Select value={selectedTrackingUserId || ''} onValueChange={setSelectedTrackingUserId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner un utilisateur" />
+                </SelectTrigger>
+                <SelectContent>
+                  {users.map(u => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {u.display_name || 'Sans nom'}
+                      {u.department?.name ? ` — ${u.department.name}` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {selectedTrackingUserId && processTemplates.length > 0 && (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Processus</TableHead>
+                      <TableHead className="text-center w-24">
+                        <span className="flex items-center justify-center gap-1">
+                          <Eye className="h-3.5 w-3.5" /> Lecture
+                        </span>
+                      </TableHead>
+                      <TableHead className="text-center w-24">
+                        <span className="flex items-center justify-center gap-1">
+                          <Pencil className="h-3.5 w-3.5" /> Écriture
+                        </span>
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {processTemplates.map(pt => {
+                      const access = trackingAccess[pt.id];
+                      const canRead = access?.can_read ?? false;
+                      const canWrite = access?.can_write ?? false;
+                      return (
+                        <TableRow key={pt.id}>
+                          <TableCell>
+                            <p className="font-medium text-sm">{pt.name}</p>
+                            {pt.description && (
+                              <p className="text-xs text-muted-foreground">{pt.description}</p>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <PermissionCell
+                              value={canRead}
+                              onChange={() => handleTrackingToggle(pt.id, 'can_read')}
+                            />
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <PermissionCell
+                              value={canWrite}
+                              onChange={() => handleTrackingToggle(pt.id, 'can_write')}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+
+              {!selectedTrackingUserId && (
+                <p className="text-muted-foreground text-center py-8">
+                  Sélectionnez un utilisateur pour configurer l'accès au suivi des processus
                 </p>
               )}
             </CardContent>
