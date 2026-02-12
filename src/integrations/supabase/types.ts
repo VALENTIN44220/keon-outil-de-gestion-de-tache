@@ -2271,6 +2271,7 @@ export type Database = {
         Row: {
           active: boolean
           categorie: string
+          catfam_key: string
           famille: string
           id: string
           updated_at: string
@@ -2278,6 +2279,7 @@ export type Database = {
         Insert: {
           active?: boolean
           categorie: string
+          catfam_key: string
           famille: string
           id?: string
           updated_at?: string
@@ -2285,6 +2287,7 @@ export type Database = {
         Update: {
           active?: boolean
           categorie?: string
+          catfam_key?: string
           famille?: string
           id?: string
           updated_at?: string
