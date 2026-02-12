@@ -915,6 +915,73 @@ export type Database = {
         }
         Relationships: []
       }
+      demande_materiel: {
+        Row: {
+          article_id: string | null
+          created_at: string
+          demandeur_id: string | null
+          demandeur_nom: string | null
+          des: string
+          etat_commande: string
+          id: string
+          quantite: number
+          ref: string
+          request_id: string
+          request_number: string | null
+          updated_at: string
+        }
+        Insert: {
+          article_id?: string | null
+          created_at?: string
+          demandeur_id?: string | null
+          demandeur_nom?: string | null
+          des: string
+          etat_commande?: string
+          id?: string
+          quantite?: number
+          ref: string
+          request_id: string
+          request_number?: string | null
+          updated_at?: string
+        }
+        Update: {
+          article_id?: string | null
+          created_at?: string
+          demandeur_id?: string | null
+          demandeur_nom?: string | null
+          des?: string
+          etat_commande?: string
+          id?: string
+          quantite?: number
+          ref?: string
+          request_id?: string
+          request_number?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demande_materiel_demandeur_id_fkey"
+            columns: ["demandeur_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demande_materiel_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "demande_materiel_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       departments: {
         Row: {
           company_id: string | null
