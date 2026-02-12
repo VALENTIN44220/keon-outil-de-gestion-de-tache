@@ -8,6 +8,7 @@ export const SCREEN_PERMISSIONS = [
   'can_access_projects',
   'can_access_team',
   'can_access_suppliers',
+  'can_access_process_tracking',
 ] as const;
 
 export type ScreenPermissionKey = typeof SCREEN_PERMISSIONS[number];
@@ -44,6 +45,7 @@ export const SCREEN_LABELS: Record<ScreenPermissionKey, string> = {
   can_access_projects: 'Projets',
   can_access_team: 'Équipe',
   can_access_suppliers: 'Fournisseurs',
+  can_access_process_tracking: 'Suivi processus',
 };
 
 // User permission overrides (null = use profile default)
@@ -59,6 +61,7 @@ export interface UserPermissionOverride {
   can_access_projects: boolean | null;
   can_access_team: boolean | null;
   can_access_suppliers: boolean | null;
+  can_access_process_tracking: boolean | null;
   // Task permissions
   can_manage_users: boolean | null;
   can_manage_templates: boolean | null;
@@ -107,6 +110,7 @@ export interface EffectivePermissions {
   can_access_projects: boolean;
   can_access_team: boolean;
   can_access_suppliers: boolean;
+  can_access_process_tracking: boolean;
   // Task permissions
   can_manage_users: boolean;
   can_manage_templates: boolean;
