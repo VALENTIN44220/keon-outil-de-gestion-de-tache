@@ -54,17 +54,26 @@ import {
 
 // Available tables that can be configured
 const AVAILABLE_TABLES = [
-  { name: 'profiles', label: 'Utilisateurs (profiles)', columns: ['id', 'display_name', 'email', 'job_title', 'department', 'company'] },
-  { name: 'departments', label: 'Services (departments)', columns: ['id', 'name', 'description'] },
+  { name: 'profiles', label: 'Utilisateurs (profiles)', columns: ['id', 'user_id', 'display_name', 'email', 'job_title', 'department', 'company', 'manager_id', 'department_id', 'company_id', 'job_title_id', 'hierarchy_level_id', 'permission_profile_id', 'avatar_url'] },
+  { name: 'departments', label: 'Services (departments)', columns: ['id', 'name', 'description', 'company_id', 'id_services_lucca'] },
   { name: 'companies', label: 'Sociétés (companies)', columns: ['id', 'name', 'description'] },
-  { name: 'job_titles', label: 'Postes (job_titles)', columns: ['id', 'name', 'description'] },
-  { name: 'be_projects', label: 'Projets BE (be_projects)', columns: ['id', 'code_projet', 'nom_projet', 'status', 'region', 'departement'] },
+  { name: 'job_titles', label: 'Postes (job_titles)', columns: ['id', 'name', 'description', 'department_id'] },
+  { name: 'be_projects', label: 'Projets BE (be_projects)', columns: ['id', 'code_projet', 'nom_projet', 'status', 'region', 'departement', 'description', 'typologie', 'pays', 'pays_site', 'adresse_site', 'adresse_societe', 'siret', 'actionnariat', 'regime_icpe', 'code_divalto', 'charge_affaires_id', 'developpeur_id', 'ingenieur_etudes_id', 'ingenieur_realisation_id', 'projeteur_id'] },
   { name: 'categories', label: 'Catégories (categories)', columns: ['id', 'name', 'description'] },
-  { name: 'subcategories', label: 'Sous-catégories (subcategories)', columns: ['id', 'name', 'description'] },
-  { name: 'collaborator_groups', label: 'Groupes (collaborator_groups)', columns: ['id', 'name', 'description'] },
+  { name: 'collaborator_groups', label: 'Groupes (collaborator_groups)', columns: ['id', 'name', 'description', 'company_id', 'department_id'] },
   { name: 'hierarchy_levels', label: 'Niveaux hiérarchiques', columns: ['id', 'name', 'level', 'description'] },
   { name: 'process_templates', label: 'Modèles de processus', columns: ['id', 'name', 'description'] },
   { name: 'sub_process_templates', label: 'Modèles de sous-processus', columns: ['id', 'name', 'description'] },
+  { name: 'task_templates', label: 'Modèles de tâches', columns: ['id', 'name', 'description'] },
+  { name: 'articles', label: 'Articles', columns: ['id', 'art_id', 'ref', 'des', 'prix_moy', 'qte'] },
+  { name: 'supplier_purchase_enrichment', label: 'Fournisseurs (enrichissement)', columns: ['id', 'nom_fournisseur', 'categorie', 'famille', 'segment', 'entite', 'delai_de_paiement', 'incoterm', 'adresse_mail', 'telephone', 'type_de_contrat', 'nom_contact', 'status', 'completeness_score'] },
+  { name: 'permission_profiles', label: 'Profils de permissions', columns: ['id', 'name', 'description'] },
+  { name: 'assignment_rules', label: 'Règles d\'assignation', columns: ['id', 'name', 'description', 'priority', 'is_active'] },
+  { name: 'holidays', label: 'Jours fériés', columns: ['id', 'name', 'date', 'is_national', 'company_id'] },
+  { name: 'tasks', label: 'Tâches / Demandes (tasks)', columns: ['id', 'title', 'description', 'status', 'priority', 'type', 'request_number', 'task_number'] },
+  { name: 'be_task_labels', label: 'Labels BE', columns: ['id', 'code', 'name', 'description', 'color', 'is_active', 'order_index'] },
+  { name: 'notification_preferences', label: 'Préférences de notifications', columns: ['id', 'user_id', 'event_type', 'channel', 'enabled'] },
+  { name: 'datalake_table_catalog', label: 'Catalogue Datalake', columns: ['id', 'table_name', 'display_name', 'description', 'sync_enabled'] },
 ];
 
 export function TableLookupConfigTab() {

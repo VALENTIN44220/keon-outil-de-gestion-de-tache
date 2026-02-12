@@ -27,60 +27,8 @@ interface TableViewDialogProps {
   tableLabel: string;
 }
 
-type TableName = 'companies' | 'departments' | 'job_titles' | 'hierarchy_levels' | 'permission_profiles' | 'profiles' | 'assignment_rules' | 'categories';
-
-const TABLE_COLUMNS: Record<TableName, { key: string; label: string }[]> = {
-  companies: [
-    { key: 'id', label: 'ID' },
-    { key: 'name', label: 'Nom' },
-    { key: 'description', label: 'Description' },
-  ],
-  departments: [
-    { key: 'id', label: 'ID' },
-    { key: 'name', label: 'Nom' },
-    { key: 'description', label: 'Description' },
-    { key: 'company_id', label: 'Société ID' },
-    { key: 'id_services_lucca', label: 'ID Lucca' },
-  ],
-  job_titles: [
-    { key: 'id', label: 'ID' },
-    { key: 'name', label: 'Nom' },
-    { key: 'description', label: 'Description' },
-    { key: 'department_id', label: 'Service ID' },
-  ],
-  hierarchy_levels: [
-    { key: 'id', label: 'ID' },
-    { key: 'name', label: 'Nom' },
-    { key: 'level', label: 'Niveau' },
-    { key: 'description', label: 'Description' },
-  ],
-  permission_profiles: [
-    { key: 'id', label: 'ID' },
-    { key: 'name', label: 'Nom' },
-    { key: 'description', label: 'Description' },
-  ],
-  profiles: [
-    { key: 'id', label: 'ID' },
-    { key: 'display_name', label: 'Nom' },
-    { key: 'company_id', label: 'Société ID' },
-    { key: 'department_id', label: 'Service ID' },
-    { key: 'job_title_id', label: 'Poste ID' },
-    { key: 'manager_id', label: 'Manager ID' },
-    { key: 'id_lucca', label: 'ID Lucca' },
-  ],
-  assignment_rules: [
-    { key: 'id', label: 'ID' },
-    { key: 'name', label: 'Nom' },
-    { key: 'description', label: 'Description' },
-    { key: 'priority', label: 'Priorité' },
-    { key: 'is_active', label: 'Actif' },
-  ],
-  categories: [
-    { key: 'id', label: 'ID' },
-    { key: 'name', label: 'Nom' },
-    { key: 'description', label: 'Description' },
-  ],
-};
+// Dynamic: we no longer restrict to a fixed set of tables
+// We'll auto-detect columns from the data itself
 
 export function TableViewDialog({
   open,
@@ -103,13 +51,12 @@ export function TableViewDialog({
     setError(null);
     try {
       const { data: result, error: queryError } = await supabase
-        .from(tableName as TableName)
+        .from(tableName as any)
         .select('*')
-        .order('created_at', { ascending: false })
         .limit(500);
 
       if (queryError) throw queryError;
-      setData(result || []);
+      setData((result as unknown as Record<string, unknown>[]) || []);
     } catch (err) {
       console.error('Error loading table data:', err);
       setError(err instanceof Error ? err.message : 'Erreur lors du chargement');
@@ -118,7 +65,10 @@ export function TableViewDialog({
     }
   };
 
-  const columns = TABLE_COLUMNS[tableName as TableName] || [];
+  // Auto-detect columns from data
+  const columns = data.length > 0
+    ? Object.keys(data[0]).map(key => ({ key, label: key }))
+    : [];
 
   const formatCellValue = (value: unknown): string => {
     if (value === null || value === undefined) return '-';
