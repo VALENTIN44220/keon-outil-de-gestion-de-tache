@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useTableLookupConfigs, TableLookupConfig } from '@/hooks/useTableLookupConfigs';
+import { TableViewDialog } from './TableViewDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -50,6 +51,7 @@ import {
   Columns,
   Filter,
   Loader2,
+  Eye,
 } from 'lucide-react';
 
 // Available tables that can be configured
@@ -87,6 +89,7 @@ export function TableLookupConfigTab() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [viewingTable, setViewingTable] = useState<{ name: string; label: string } | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -482,6 +485,10 @@ export function TableLookupConfigTab() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="bg-popover">
+                            <DropdownMenuItem onClick={() => setViewingTable({ name: config.table_name, label: config.label })}>
+                              <Eye className="h-4 w-4 mr-2" />
+                              Consulter
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleOpenEdit(config)}>
                               <Pencil className="h-4 w-4 mr-2" />
                               Modifier
@@ -545,6 +552,14 @@ export function TableLookupConfigTab() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Table View Dialog */}
+      <TableViewDialog
+        open={!!viewingTable}
+        onOpenChange={(open) => { if (!open) setViewingTable(null); }}
+        tableName={viewingTable?.name || ''}
+        tableLabel={viewingTable?.label || ''}
+      />
     </div>
   );
 }
