@@ -5,6 +5,8 @@ import {
   endOfMonth,
   startOfWeek,
   endOfWeek,
+  startOfYear,
+  endOfYear,
   addDays,
   addWeeks,
   subWeeks,
@@ -12,9 +14,12 @@ import {
   isSameDay,
   addMonths,
   subMonths,
+  eachDayOfInterval,
+  isWithinInterval,
+  parseISO,
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, RefreshCw, Users, Filter } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, RefreshCw, Users, Filter, Palmtree } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -26,6 +31,7 @@ import { cn } from '@/lib/utils';
 import { useOutlookCalendar } from '@/hooks/useOutlookCalendar';
 import { useMicrosoftConnection } from '@/hooks/useMicrosoftConnection';
 import { useTasks } from '@/hooks/useTasks';
+import { useUserLeaves } from '@/hooks/useUserLeaves';
 import { TaskDetailDialog } from '@/components/tasks/TaskDetailDialog';
 import { Task } from '@/types/task';
 import { getStatusFilterOptions, matchesStatusFilter, getStatusCalendarColor, getStatusShortLabel } from '@/services/taskStatusService';
@@ -35,7 +41,7 @@ interface CalendarEvent {
   title: string;
   start: Date;
   end: Date;
-  type: 'outlook' | 'task';
+  type: 'outlook' | 'task' | 'leave';
   color: string;
   location?: string;
   isAllDay?: boolean;
@@ -56,21 +62,14 @@ export function UnifiedCalendarView() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
-  // Compute date range based on view mode - memoized
+  // Sync range = full current year
   const { startDate, endDate } = useMemo(() => {
-    if (viewMode === 'week') {
-      const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
-      const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
-      return {
-        startDate: subWeeks(weekStart, 1),
-        endDate: addWeeks(weekEnd, 1),
-      };
-    }
+    const now = new Date();
     return {
-      startDate: startOfMonth(subMonths(currentDate, 1)),
-      endDate: endOfMonth(addMonths(currentDate, 1)),
+      startDate: startOfYear(now),
+      endDate: endOfYear(now),
     };
-  }, [currentDate, viewMode]);
+  }, []);
 
   const { events: outlookEvents, isLoading: isLoadingOutlook, refetch: refetchOutlook } = useOutlookCalendar(
     startDate,
@@ -80,12 +79,52 @@ export function UnifiedCalendarView() {
   
   const { connection, isSyncing, syncCalendar } = useMicrosoftConnection();
   const { allTasks, isLoading: isLoadingTasks, updateTaskStatus, deleteTask, refetch: refetchTasks } = useTasks();
+  const { leaves, isLoading: isLoadingLeaves } = useUserLeaves();
 
   // Filter tasks by status
   const filteredTasks = useMemo(() => {
     if (statusFilter === 'all') return allTasks;
     return allTasks.filter(t => matchesStatusFilter(t.status, statusFilter));
   }, [allTasks, statusFilter]);
+
+  // Build leave events (expand each leave into individual days)
+  const leaveEvents = useMemo<CalendarEvent[]>(() => {
+    const events: CalendarEvent[] = [];
+    const leaveTypeLabels: Record<string, string> = {
+      paid: 'Congé payé',
+      unpaid: 'Congé sans solde',
+      sick: 'Maladie',
+      rtt: 'RTT',
+      other: 'Autre absence',
+    };
+    
+    leaves
+      .filter(l => l.status === 'declared')
+      .forEach(leave => {
+        try {
+          const start = parseISO(leave.start_date);
+          const end = parseISO(leave.end_date);
+          const days = eachDayOfInterval({ start, end });
+          const label = leaveTypeLabels[leave.leave_type] || 'Congé';
+          
+          days.forEach(day => {
+            events.push({
+              id: `leave-${leave.id}-${format(day, 'yyyy-MM-dd')}`,
+              title: leave.description ? `${label} - ${leave.description}` : label,
+              start: day,
+              end: day,
+              type: 'leave',
+              color: 'bg-amber-500',
+              isAllDay: true,
+              source: 'Congé',
+            });
+          });
+        } catch {
+          // skip invalid dates
+        }
+      });
+    return events;
+  }, [leaves]);
 
   // Memoize calendar events to prevent flickering
   const calendarEvents = useMemo<CalendarEvent[]>(() => [
@@ -112,16 +151,19 @@ export function UnifiedCalendarView() {
         source: getStatusShortLabel(task.status),
         taskData: task,
       })),
-  ], [outlookEvents, filteredTasks]);
+    ...leaveEvents,
+  ], [outlookEvents, filteredTasks, leaveEvents]);
 
   const getEventsForDate = useCallback((date: Date): CalendarEvent[] => {
     return calendarEvents.filter(event => isSameDay(event.start, date));
   }, [calendarEvents]);
 
   const handleSync = useCallback(async () => {
-    await syncCalendar(startDate.toISOString(), endDate.toISOString());
+    const yearStart = startOfYear(new Date());
+    const yearEnd = endOfYear(new Date());
+    await syncCalendar(yearStart.toISOString(), yearEnd.toISOString());
     refetchOutlook();
-  }, [syncCalendar, startDate, endDate, refetchOutlook]);
+  }, [syncCalendar, refetchOutlook]);
 
   const handleNavigate = useCallback((direction: 'prev' | 'next') => {
     if (viewMode === 'week') {
@@ -289,7 +331,7 @@ export function UnifiedCalendarView() {
     return selectedDate ? getEventsForDate(selectedDate) : [];
   }, [selectedDate, getEventsForDate]);
 
-  const isLoading = isLoadingOutlook || isLoadingTasks;
+  const isLoading = isLoadingOutlook || isLoadingTasks || isLoadingLeaves;
 
   // Count filtered tasks
   const filteredTaskCount = filteredTasks.filter(t => t.due_date && t.type === 'task').length;
@@ -440,6 +482,10 @@ export function UnifiedCalendarView() {
                 <div className="flex items-center gap-1">
                   <div className="w-3 h-3 rounded bg-purple-500" />
                   <span>À corriger</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-amber-500" />
+                  <span>Congé</span>
                 </div>
               </div>
             </CardContent>
