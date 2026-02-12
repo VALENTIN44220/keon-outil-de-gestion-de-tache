@@ -26,6 +26,7 @@ import WorkflowEditor from "./pages/WorkflowEditor";
 import NotFound from "./pages/NotFound";
 import SupplierReference from "./pages/SupplierReference";
 import MaterialRequests from "./pages/MaterialRequests";
+import ProcessTracking from "./pages/ProcessTracking";
 
 // BE Project Hub pages
 import BEProjectHubOverview from "./pages/be/BEProjectHubOverview";
@@ -201,6 +202,15 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <MaterialRequests />
+                </ProtectedRoute>
+              }
+            />
+            {/* Process Tracking */}
+            <Route
+              path="/process-tracking"
+              element={
+                <ProtectedRoute>
+                  <ProcessTracking />
                 </ProtectedRoute>
               }
             />

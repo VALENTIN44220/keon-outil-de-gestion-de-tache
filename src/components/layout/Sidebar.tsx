@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, BarChart3, Users, ChevronLeft, ChevronRight, Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText, ArrowLeftRight, Calendar, MessageCircle, Building2, Wrench } from 'lucide-react';
+import { LayoutDashboard, BarChart3, Users, ChevronLeft, ChevronRight, Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText, ArrowLeftRight, Calendar, MessageCircle, Building2, Wrench, ClipboardList } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
 import { useAuth } from '@/contexts/AuthContext';
@@ -80,6 +80,12 @@ const allMenuItems = [{
   icon: Wrench,
   path: '/material-requests',
   permissionKey: 'can_access_requests' as ScreenPermissionKey
+}, {
+  id: 'process-tracking',
+  label: 'Suivi des processus',
+  icon: ClipboardList,
+  path: '/process-tracking',
+  permissionKey: 'can_access_requests' as ScreenPermissionKey
 }];
 
 const adminMenuItem = {
@@ -150,6 +156,12 @@ const menuColors: Record<string, { bg: string; text: string; border: string; ico
     text: 'text-warning', 
     border: 'border-warning',
     iconBg: 'bg-gradient-to-br from-warning to-warning/80'
+  },
+  'process-tracking': { 
+    bg: 'bg-[#6366F1]/10', 
+    text: 'text-[#6366F1]', 
+    border: 'border-[#6366F1]',
+    iconBg: 'bg-gradient-to-br from-[#6366F1] to-[#6366F1]/80'
   },
   admin: { 
     bg: 'bg-destructive/10', 
