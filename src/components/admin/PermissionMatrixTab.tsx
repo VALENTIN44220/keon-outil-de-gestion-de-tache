@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { RefreshButton } from './RefreshButton';
 import { supabase } from '@/integrations/supabase/client';
 import { usePermissionMatrix } from '@/hooks/usePermissionMatrix';
+import { BulkTrackingAccessPanel } from './BulkTrackingAccessPanel';
 import { SCREEN_PERMISSIONS, SCREEN_LABELS, FEATURE_PERMISSIONS, type AllPermissionKeys, type ScreenPermissionKey } from '@/types/permissions';
 import type { PermissionProfile, UserProfile, Company, Department } from '@/types/admin';
 
@@ -44,6 +45,9 @@ export function PermissionMatrixTab({
   const [userOverrideDialogOpen, setUserOverrideDialogOpen] = useState(false);
   const [selectedTrackingUserId, setSelectedTrackingUserId] = useState<string | null>(null);
   const [trackingAccess, setTrackingAccess] = useState<Record<string, { can_read: boolean; can_write: boolean }>>({});
+  const [trackingMode, setTrackingMode] = useState<'user' | 'profile' | 'company' | 'department'>('user');
+  const [trackingFilterId, setTrackingFilterId] = useState<string | null>(null);
+  const [isBulkSaving, setIsBulkSaving] = useState(false);
   
   const {
     isLoading,
@@ -451,25 +455,111 @@ export function PermissionMatrixTab({
                 Accès au suivi des processus
               </CardTitle>
               <CardDescription>
-                Sélectionnez un utilisateur puis définissez ses droits de lecture/écriture par processus
+                Paramétrez l'accès en masse par profil, société ou service, ou individuellement par utilisateur
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Select value={selectedTrackingUserId || ''} onValueChange={setSelectedTrackingUserId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner un utilisateur" />
-                </SelectTrigger>
-                <SelectContent>
-                  {users.map(u => (
-                    <SelectItem key={u.id} value={u.id}>
-                      {u.display_name || 'Sans nom'}
-                      {u.department?.name ? ` — ${u.department.name}` : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {/* Mode selector */}
+              <div className="grid grid-cols-4 gap-2">
+                {([
+                  { value: 'profile' as const, label: 'Par profil', icon: Grid3X3 },
+                  { value: 'company' as const, label: 'Par société', icon: Building2 },
+                  { value: 'department' as const, label: 'Par service', icon: Workflow },
+                  { value: 'user' as const, label: 'Par utilisateur', icon: User },
+                ]).map(mode => {
+                  const Icon = mode.icon;
+                  const isActive = trackingMode === mode.value;
+                  return (
+                    <button
+                      key={mode.value}
+                      onClick={() => {
+                        setTrackingMode(mode.value);
+                        setTrackingFilterId(null);
+                        setSelectedTrackingUserId(null);
+                        setTrackingAccess({});
+                      }}
+                      className={`flex items-center justify-center gap-1.5 p-2 rounded-lg border text-xs font-medium transition-all ${
+                        isActive
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border hover:border-primary/50 text-muted-foreground'
+                      }`}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      {mode.label}
+                    </button>
+                  );
+                })}
+              </div>
 
-              {selectedTrackingUserId && processTemplates.length > 0 && (
+              {/* Filter selector based on mode */}
+              {trackingMode === 'user' && (
+                <Select value={selectedTrackingUserId || ''} onValueChange={setSelectedTrackingUserId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner un utilisateur" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {users.map(u => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.display_name || 'Sans nom'}
+                        {u.department?.name ? ` — ${u.department.name}` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {trackingMode === 'profile' && (
+                <Select value={trackingFilterId || ''} onValueChange={setTrackingFilterId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner un profil de droits" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {permissionProfiles.map(p => (
+                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {trackingMode === 'company' && (
+                <Select value={trackingFilterId || ''} onValueChange={setTrackingFilterId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner une société" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {companies.map(c => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {trackingMode === 'department' && (
+                <Select value={trackingFilterId || ''} onValueChange={setTrackingFilterId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner un service" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {departments.map(d => (
+                      <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {/* Bulk mode: show process list with toggles to apply in mass */}
+              {trackingMode !== 'user' && trackingFilterId && processTemplates.length > 0 && (
+                <BulkTrackingAccessPanel
+                  trackingMode={trackingMode}
+                  trackingFilterId={trackingFilterId}
+                  processTemplates={processTemplates}
+                  users={users}
+                  permissionProfiles={permissionProfiles}
+                />
+              )}
+
+              {/* Individual user mode */}
+              {trackingMode === 'user' && selectedTrackingUserId && processTemplates.length > 0 && (
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -518,9 +608,12 @@ export function PermissionMatrixTab({
                 </Table>
               )}
 
-              {!selectedTrackingUserId && (
+              {((trackingMode === 'user' && !selectedTrackingUserId) || (trackingMode !== 'user' && !trackingFilterId)) && (
                 <p className="text-muted-foreground text-center py-8">
-                  Sélectionnez un utilisateur pour configurer l'accès au suivi des processus
+                  {trackingMode === 'user'
+                    ? 'Sélectionnez un utilisateur pour configurer l\'accès au suivi des processus'
+                    : `Sélectionnez un${trackingMode === 'company' ? 'e société' : trackingMode === 'department' ? ' service' : ' profil'} pour configurer l'accès en masse`
+                  }
                 </p>
               )}
             </CardContent>
