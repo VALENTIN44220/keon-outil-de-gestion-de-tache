@@ -103,7 +103,7 @@ export default function ProcessTracking() {
 
             {processes.map((p) => (
               <TabsContent key={p.id} value={p.id}>
-                <ProcessDashboard processId={p.id} canWrite={p.can_write} />
+                <ProcessDashboard processId={p.id} canWrite={p.can_write} processName={p.name} />
               </TabsContent>
             ))}
           </Tabs>

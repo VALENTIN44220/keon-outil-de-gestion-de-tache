@@ -3,24 +3,28 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Task, TaskStats } from '@/types/task';
 import { ConfigurableDashboard } from '@/components/dashboard/ConfigurableDashboard';
+import { MaterialRequestsPanel } from './MaterialRequestsPanel';
 import { Loader2 } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 interface ProcessDashboardProps {
   processId: string;
   canWrite: boolean;
+  processName?: string;
 }
 
-export function ProcessDashboard({ processId, canWrite }: ProcessDashboardProps) {
+export function ProcessDashboard({ processId, canWrite, processName }: ProcessDashboardProps) {
   const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const hasMaterialSection = processName?.toUpperCase().includes('MAINTENANCE') ?? false;
 
   useEffect(() => {
     if (!user || !processId) return;
 
     async function fetchProcessTasks() {
       setIsLoading(true);
-      // Fetch all requests + tasks linked to this process
       const { data, error } = await (supabase as any)
         .from('tasks')
         .select('*')
@@ -35,7 +39,6 @@ export function ProcessDashboard({ processId, canWrite }: ProcessDashboardProps)
 
     fetchProcessTasks();
 
-    // Subscribe to realtime changes
     const channel = supabase
       .channel(`process-tracking-${processId}`)
       .on('postgres_changes', {
@@ -77,17 +80,13 @@ export function ProcessDashboard({ processId, canWrite }: ProcessDashboardProps)
     );
   }
 
-  if (tasks.length === 0) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px] border-2 border-dashed border-border rounded-xl">
-        <p className="text-muted-foreground text-lg">
-          Aucune demande pour ce processus.
-        </p>
-      </div>
-    );
-  }
-
-  return (
+  const dashboardContent = tasks.length === 0 ? (
+    <div className="flex items-center justify-center min-h-[400px] border-2 border-dashed border-border rounded-xl">
+      <p className="text-muted-foreground text-lg">
+        Aucune demande pour ce processus.
+      </p>
+    </div>
+  ) : (
     <ConfigurableDashboard
       tasks={tasks}
       stats={stats}
@@ -95,5 +94,24 @@ export function ProcessDashboard({ processId, canWrite }: ProcessDashboardProps)
       processId={processId}
       canEdit={canWrite}
     />
+  );
+
+  if (!hasMaterialSection) {
+    return dashboardContent;
+  }
+
+  return (
+    <Tabs defaultValue="dashboard" className="space-y-4">
+      <TabsList>
+        <TabsTrigger value="dashboard">Tableau de bord</TabsTrigger>
+        <TabsTrigger value="material">Demandes matériel</TabsTrigger>
+      </TabsList>
+      <TabsContent value="dashboard">
+        {dashboardContent}
+      </TabsContent>
+      <TabsContent value="material">
+        <MaterialRequestsPanel canWrite={canWrite} />
+      </TabsContent>
+    </Tabs>
   );
 }
