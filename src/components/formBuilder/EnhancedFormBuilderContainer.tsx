@@ -95,9 +95,9 @@ export function EnhancedFormBuilderContainer({
     }
   }, [schema.common_fields]);
 
-  // Handle adding a new field from the palette
+  // Handle adding a new field from the palette (click or drop)
   const handleAddField = useCallback(
-    async (config: FieldTypeConfig) => {
+    async (config: FieldTypeConfig, targetSectionId?: string | null) => {
       if (!canManage) return;
 
       setIsCreatingField(true);
@@ -109,6 +109,8 @@ export function EnhancedFormBuilderContainer({
           .eq('user_id', user?.id)
           .single();
 
+        const sectionId = targetSectionId !== undefined ? targetSectionId : (selectedSectionId || null);
+
         const fieldData: any = {
           name: `${config.type}_${Date.now()}`,
           label: config.label,
@@ -118,7 +120,7 @@ export function EnhancedFormBuilderContainer({
           is_common: false,
           process_template_id: processTemplateId || null,
           sub_process_template_id: subProcessTemplateId || null,
-          section_id: selectedSectionId || null,
+          section_id: sectionId,
           column_span: 2,
           column_index: 0,
           row_index: fields.length,
@@ -155,6 +157,14 @@ export function EnhancedFormBuilderContainer({
       }
     },
     [canManage, processTemplateId, subProcessTemplateId, selectedSectionId, fields.length, loadData, selectField]
+  );
+
+  // Handle drop from palette into a specific section
+  const handleDropNewField = useCallback(
+    (config: FieldTypeConfig, targetSectionId: string | null) => {
+      handleAddField(config, targetSectionId);
+    },
+    [handleAddField]
   );
 
   // Handle deleting a field
@@ -375,6 +385,7 @@ export function EnhancedFormBuilderContainer({
           onDeleteField={handleDeleteField}
           onDuplicateField={handleDuplicateField}
           onSetGridColumns={setGridColumns}
+          onDropNewField={handleDropNewField}
           canManage={canManage}
         />
 

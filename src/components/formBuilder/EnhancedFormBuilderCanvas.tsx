@@ -61,6 +61,7 @@ interface EnhancedFormBuilderCanvasProps {
   onDeleteField: (fieldId: string) => void;
   onDuplicateField: (fieldId: string) => void;
   onSetGridColumns: (columns: 1 | 2 | 3 | 4) => void;
+  onDropNewField?: (config: FieldTypeConfig, targetSectionId: string | null) => void;
   canManage: boolean;
 }
 
@@ -100,6 +101,7 @@ export const EnhancedFormBuilderCanvas = memo(function EnhancedFormBuilderCanvas
   onDeleteField,
   onDuplicateField,
   onSetGridColumns,
+  onDropNewField,
   canManage,
 }: EnhancedFormBuilderCanvasProps) {
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
@@ -195,13 +197,16 @@ export const EnhancedFormBuilderCanvas = memo(function EnhancedFormBuilderCanvas
     }
 
     // Check for new field from palette
-    try {
-      const configData = e.dataTransfer.getData('application/json');
-      if (configData) {
-        // This will be handled by the parent component
+    if (!draggedFieldId) {
+      try {
+        const configData = e.dataTransfer.getData('application/json');
+        if (configData && onDropNewField) {
+          const config = JSON.parse(configData) as FieldTypeConfig;
+          onDropNewField(config, targetSectionId);
+        }
+      } catch (err) {
+        // Not valid JSON data
       }
-    } catch (err) {
-      // Not JSON data
     }
 
     setDraggedFieldId(null);
