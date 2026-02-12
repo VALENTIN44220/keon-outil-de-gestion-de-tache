@@ -1744,6 +1744,51 @@ export type Database = {
           },
         ]
       }
+      process_tracking_access: {
+        Row: {
+          can_read: boolean
+          can_write: boolean
+          created_at: string
+          id: string
+          process_template_id: string
+          profile_id: string
+          updated_at: string
+        }
+        Insert: {
+          can_read?: boolean
+          can_write?: boolean
+          created_at?: string
+          id?: string
+          process_template_id: string
+          profile_id: string
+          updated_at?: string
+        }
+        Update: {
+          can_read?: boolean
+          can_write?: boolean
+          created_at?: string
+          id?: string
+          process_template_id?: string
+          profile_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "process_tracking_access_process_template_id_fkey"
+            columns: ["process_template_id"]
+            isOneToOne: false
+            referencedRelation: "process_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "process_tracking_access_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -4961,6 +5006,10 @@ export type Database = {
       can_access_task: { Args: { _task_id: string }; Returns: boolean }
       can_assign_tasks: { Args: never; Returns: boolean }
       can_manage_template: { Args: { _creator_id: string }; Returns: boolean }
+      can_read_process_tracking: {
+        Args: { _process_template_id: string }
+        Returns: boolean
+      }
       can_view_template:
         | {
             Args: {
@@ -4982,6 +5031,10 @@ export type Database = {
             }
             Returns: boolean
           }
+      can_write_process_tracking: {
+        Args: { _process_template_id: string }
+        Returns: boolean
+      }
       cancel_request: { Args: { p_request_id: string }; Returns: undefined }
       create_group_conversation: {
         Args: { _created_by: string; _member_ids: string[]; _title: string }
