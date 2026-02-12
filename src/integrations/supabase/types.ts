@@ -1566,6 +1566,47 @@ export type Database = {
         }
         Relationships: []
       }
+      process_dashboard_configs: {
+        Row: {
+          columns_config: Json
+          created_at: string
+          filters_config: Json
+          id: string
+          process_template_id: string
+          updated_at: string
+          user_id: string
+          widgets_config: Json
+        }
+        Insert: {
+          columns_config?: Json
+          created_at?: string
+          filters_config?: Json
+          id?: string
+          process_template_id: string
+          updated_at?: string
+          user_id: string
+          widgets_config?: Json
+        }
+        Update: {
+          columns_config?: Json
+          created_at?: string
+          filters_config?: Json
+          id?: string
+          process_template_id?: string
+          updated_at?: string
+          user_id?: string
+          widgets_config?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "process_dashboard_configs_process_template_id_fkey"
+            columns: ["process_template_id"]
+            isOneToOne: false
+            referencedRelation: "process_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       process_template_visible_companies: {
         Row: {
           company_id: string

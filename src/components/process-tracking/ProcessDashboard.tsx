@@ -92,6 +92,8 @@ export function ProcessDashboard({ processId, canWrite }: ProcessDashboardProps)
       tasks={tasks}
       stats={stats}
       globalProgress={globalProgress}
+      processId={processId}
+      canEdit={canWrite}
     />
   );
 }
