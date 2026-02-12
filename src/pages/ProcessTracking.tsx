@@ -1,16 +1,22 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ProcessDashboard } from '@/components/process-tracking/ProcessDashboard';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, ShieldX } from 'lucide-react';
+
+const ProcessDashboard = lazy(() =>
+  import('@/components/process-tracking/ProcessDashboard').then(m => ({ default: m.ProcessDashboard }))
+);
 
 interface ProcessTab {
   id: string;
   name: string;
   can_write: boolean;
+  task_count?: number;
 }
 
 export default function ProcessTracking() {
@@ -57,6 +63,23 @@ export default function ProcessTracking() {
         }
       }
 
+      // Fetch task counts per process in one query
+      if (processList.length > 0) {
+        const ids = processList.map(p => p.id);
+        const { data: countData } = await (supabase as any)
+          .from('tasks')
+          .select('process_template_id')
+          .in('process_template_id', ids);
+
+        if (countData) {
+          const counts = new Map<string, number>();
+          (countData as any[]).forEach(row => {
+            counts.set(row.process_template_id, (counts.get(row.process_template_id) || 0) + 1);
+          });
+          processList = processList.map(p => ({ ...p, task_count: counts.get(p.id) || 0 }));
+        }
+      }
+
       setProcesses(processList);
       setIsLoading(false);
     }
@@ -68,6 +91,19 @@ export default function ProcessTracking() {
   const handleTabChange = (value: string) => {
     setSearchParams({ process: value }, { replace: true });
   };
+
+  // Set of tabs that have been visited (for lazy loading)
+  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    if (activeTab) {
+      setVisitedTabs(prev => {
+        if (prev.has(activeTab)) return prev;
+        const next = new Set(prev);
+        next.add(activeTab);
+        return next;
+      });
+    }
+  }, [activeTab]);
 
   if (isLoading) {
     return (
@@ -86,24 +122,45 @@ export default function ProcessTracking() {
       <PageHeader title="Suivi des processus" />
       <main className="p-6">
         {processes.length === 0 ? (
-          <div className="flex items-center justify-center min-h-[400px] border-2 border-dashed border-border rounded-xl">
-            <p className="text-muted-foreground text-lg">
-              Aucun processus accessible. Contactez un administrateur pour obtenir l'accès.
-            </p>
+          <div className="flex flex-col items-center justify-center min-h-[400px] border-2 border-dashed border-border rounded-xl gap-4">
+            <div className="p-3 rounded-full bg-muted">
+              <ShieldX className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <div className="text-center space-y-1">
+              <p className="text-lg font-medium text-foreground">
+                Aucun processus accessible
+              </p>
+              <p className="text-sm text-muted-foreground max-w-md">
+                Vous n'avez accès à aucun processus pour le moment. Contactez votre administrateur pour obtenir les droits de lecture sur un ou plusieurs processus.
+              </p>
+            </div>
           </div>
         ) : (
           <Tabs value={activeTab} onValueChange={handleTabChange}>
             <TabsList className="flex-wrap h-auto gap-1 mb-6">
               {processes.map((p) => (
-                <TabsTrigger key={p.id} value={p.id} className="text-sm">
+                <TabsTrigger key={p.id} value={p.id} className="text-sm gap-2">
                   {p.name}
+                  {typeof p.task_count === 'number' && (
+                    <Badge variant="secondary" className="text-xs px-1.5 py-0 min-w-[1.25rem] h-5">
+                      {p.task_count}
+                    </Badge>
+                  )}
                 </TabsTrigger>
               ))}
             </TabsList>
 
             {processes.map((p) => (
               <TabsContent key={p.id} value={p.id}>
-                <ProcessDashboard processId={p.id} canWrite={p.can_write} processName={p.name} />
+                {visitedTabs.has(p.id) ? (
+                  <Suspense fallback={
+                    <div className="flex items-center justify-center h-64">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    </div>
+                  }>
+                    <ProcessDashboard processId={p.id} canWrite={p.can_write} processName={p.name} />
+                  </Suspense>
+                ) : null}
               </TabsContent>
             ))}
           </Tabs>
