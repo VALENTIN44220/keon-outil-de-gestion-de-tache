@@ -13,8 +13,9 @@ import { StepProcessSelection } from "./StepProcessSelection";
 import { StepSubProcessSelection } from "./StepSubProcessSelection";
 import { StepDetailsForm } from "./StepDetailsForm";
 import { StepCustomFields } from "./StepCustomFields";
+import { StepMaterialLines } from "./StepMaterialLines";
 import { StepSummary } from "./StepSummary";
-import { RequestType, RequestWizardData, defaultWizardData, WIZARD_STEPS, SubProcessSelection } from "./types";
+import { RequestType, RequestWizardData, defaultWizardData, WIZARD_STEPS, SubProcessSelection, DEMANDE_MATERIEL_SP_ID } from "./types";
 
 interface RequestWizardDialogProps {
   open: boolean;
@@ -30,11 +31,28 @@ export function RequestWizardDialog({ open, onClose, onSuccess, initialProcessId
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [targetPersonName, setTargetPersonName] = useState<string>();
 
-  // Get current steps based on request type
+  // Check if material sub-process is selected
+  const hasMaterialSubProcess = data.selectedSubProcesses.includes(DEMANDE_MATERIEL_SP_ID);
+
+  // Get current steps based on request type, inject material step if needed
   const steps = useMemo(() => {
     if (!data.requestType) return [{ id: "type", label: "Type" }];
-    return WIZARD_STEPS[data.requestType];
-  }, [data.requestType]);
+    const baseSteps = [...WIZARD_STEPS[data.requestType]];
+    
+    // Inject "material" step after "subprocesses" if material sub-process is selected
+    if (data.requestType === 'process' && hasMaterialSubProcess) {
+      const subProcessIndex = baseSteps.findIndex(s => s.id === 'subprocesses');
+      if (subProcessIndex >= 0) {
+        baseSteps.splice(subProcessIndex + 1, 0, { 
+          id: 'material', 
+          label: 'Articles', 
+          description: 'Sélectionner les articles' 
+        });
+      }
+    }
+    
+    return baseSteps;
+  }, [data.requestType, hasMaterialSubProcess]);
 
   const currentStep = steps[currentStepIndex];
   const progress = ((currentStepIndex + 1) / steps.length) * 100;
@@ -141,8 +159,12 @@ export function RequestWizardDialog({ open, onClose, onSuccess, initialProcessId
         return data.selectedSubProcesses.length > 0;
       case "details":
         return !!data.title.trim() && !!data.dueDate;
+      case "material":
+        // At least 1 line, each line must have an article and quantity > 0
+        return data.materialLines.length > 0 && 
+          data.materialLines.every(l => l.article !== null && l.quantite > 0);
       case "fields":
-        return true; // Custom fields validation could be added here
+        return true;
       case "summary":
         return true;
       default:
@@ -260,6 +282,35 @@ export function RequestWizardDialog({ open, onClose, onSuccess, initialProcessId
           throw new Error(`Workflow: ${wfError.message}`);
         }
 
+        // Create material request lines if applicable
+        if (hasMaterialSubProcess && data.materialLines.length > 0) {
+          // Get current user profile for demandeur info
+          const { data: profileData } = await supabase
+            .from("profiles")
+            .select("id, display_name")
+            .eq("user_id", userId)
+            .single();
+
+          const materialRows = data.materialLines
+            .filter((l) => l.article !== null)
+            .map((l) => ({
+              request_id: taskData.id,
+              request_number: taskData.request_number || null,
+              demandeur_id: profileData?.id || null,
+              demandeur_nom: profileData?.display_name || null,
+              article_id: l.article!.id,
+              ref: l.article!.ref,
+              des: l.article!.des,
+              quantite: l.quantite,
+              etat_commande: "En attente validation",
+            }));
+
+          const { error: matError } = await supabase.from("demande_materiel").insert(materialRows);
+          if (matError) {
+            throw new Error(`Lignes matériel: ${matError.message}`);
+          }
+        }
+
         toast.success(`Demande créée avec ${data.selectedSubProcesses.length} sous-processus`);
       } else {
         toast.success("Tâche créée avec succès");
@@ -319,6 +370,8 @@ export function RequestWizardDialog({ open, onClose, onSuccess, initialProcessId
         );
       case "details":
         return <StepDetailsForm data={data} requestType={data.requestType!} onDataChange={updateData} />;
+      case "material":
+        return <StepMaterialLines data={data} onDataChange={updateData} />;
       case "fields":
         return <StepCustomFields data={data} onDataChange={updateData} />;
       case "summary":

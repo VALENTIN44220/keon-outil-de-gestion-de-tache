@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Task, TaskStatus, TaskPriority } from '@/types/task';
+import { useMaterialValidation } from '@/hooks/useMaterialValidation';
 import {
   Dialog,
   DialogContent,
@@ -53,8 +54,9 @@ import {
   Info,
   LayoutDashboard,
   GitBranch,
-  Ban
+   Ban,
 } from 'lucide-react';
+import { ThumbsUp, ThumbsDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -79,6 +81,10 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange }: Req
   // Active tab management
   const [activeTab, setActiveTab] = useState<string>('synthesis');
   
+  // Material validation
+  const { validateMaterialRequest, refuseMaterialRequest, isMaterialRequest, isProcessing: isValidating } = useMaterialValidation();
+  const showValidationButtons = task ? isMaterialRequest(task.source_process_template_id) && task.status === 'todo' : false;
+
   // Cancel request dialog state
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
@@ -770,8 +776,34 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange }: Req
           <Button variant="outline" onClick={onClose}>
             Fermer
           </Button>
+          {/* Material request validation buttons */}
+          {showValidationButtons && (
+            <>
+              <Button
+                variant="destructive"
+                disabled={isValidating}
+                onClick={async () => {
+                  const ok = await refuseMaterialRequest(task.id);
+                  if (ok) { onStatusChange(task.id, 'refused'); onClose(); }
+                }}
+              >
+                <ThumbsDown className="h-4 w-4 mr-2" />
+                Refuser
+              </Button>
+              <Button
+                disabled={isValidating}
+                onClick={async () => {
+                  const ok = await validateMaterialRequest(task.id);
+                  if (ok) { onStatusChange(task.id, 'validated'); onClose(); }
+                }}
+              >
+                <ThumbsUp className="h-4 w-4 mr-2" />
+                Valider la demande
+              </Button>
+            </>
+          )}
           {/* Cancel button - available for all non-terminal statuses */}
-          {canCancel && (
+          {canCancel && !showValidationButtons && (
             <Button 
               variant="destructive" 
               onClick={() => setIsCancelDialogOpen(true)}
