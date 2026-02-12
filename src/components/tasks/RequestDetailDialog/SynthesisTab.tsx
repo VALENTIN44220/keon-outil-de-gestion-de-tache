@@ -20,6 +20,7 @@ import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { SubProcessGroup, priorityConfig, statusConfig } from './types';
 import { AuditTimeline } from '@/components/execution/AuditTimeline';
+import { MaterialRequestSection } from '@/components/maintenance/MaterialRequestSection';
 
 interface SynthesisTabProps {
   task: Task;
@@ -77,6 +78,9 @@ export function SynthesisTab({
             <p className="text-sm whitespace-pre-wrap">{task.description}</p>
           </div>
         )}
+
+        {/* Material Request Lines */}
+        <MaterialRequestSection requestId={task.id} />
 
         {/* Metadata - Read only, from process/request */}
         <div className="grid grid-cols-2 gap-4 text-sm">

@@ -25,6 +25,12 @@ export interface SubProcessSelection {
   target_department_id?: string | null;
 }
 
+export interface MaterialLineData {
+  id: string;
+  article: { id: string; ref: string; des: string } | null;
+  quantite: number;
+}
+
 export interface RequestWizardData {
   // Step 1: Type selection
   requestType: RequestType | null;
@@ -58,6 +64,9 @@ export interface RequestWizardData {
   // Checklist & links
   checklistItems: Array<{ id: string; title: string; order_index: number }>;
   links: Array<{ id: string; name: string; url: string; type: 'link' | 'file' }>;
+
+  // Material request lines (for "Demande de matériel")
+  materialLines: MaterialLineData[];
 }
 
 export const defaultWizardData: RequestWizardData = {
@@ -78,7 +87,13 @@ export const defaultWizardData: RequestWizardData = {
   targetDepartmentId: null,
   checklistItems: [],
   links: [],
+  materialLines: [],
 };
+
+// Sub-process ID for "Demande de matériel"
+export const DEMANDE_MATERIEL_SP_ID = 'b2c3d4e5-f6a7-8901-bcde-f12345678901';
+// Process ID for "SERVICE MAINTENANCE"
+export const SERVICE_MAINTENANCE_PROCESS_ID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
 
 export const WIZARD_STEPS: Record<RequestType, WizardStep[]> = {
   personal: [
