@@ -49,7 +49,7 @@ export const DEFAULT_WIDGETS: WidgetConfig[] = [
   { id: 'bar-1', type: 'bar-chart', title: 'Par statut', dataKey: 'status', size: { w: 2, h: 3 }, position: { x: 0, y: 2 } },
   { id: 'pie-1', type: 'pie-chart', title: 'Par priorité', dataKey: 'priority', size: { w: 2, h: 3 }, position: { x: 2, y: 2 } },
   { id: 'line-1', type: 'line-chart', title: 'Évolution temporelle', dataKey: 'timeline', size: { w: 4, h: 3 }, position: { x: 0, y: 5 } },
-  { id: 'table-1', type: 'data-table', title: 'Liste des tâches', size: { w: 4, h: 4 }, position: { x: 0, y: 8 } },
+  { id: 'table-1', type: 'data-table', title: 'Liste des demandes', size: { w: 4, h: 4 }, position: { x: 0, y: 8 } },
 ];
 
 export interface ChartDataPoint {

@@ -35,6 +35,15 @@ export function DataTableWidget({ tasks, onTaskClick }: DataTableWidgetProps) {
         <TableHeader>
           <TableRow className="bg-keon-50">
             <SortableTableHead
+              sortKey="request_number"
+              currentSortKey={sortConfig.key as string}
+              currentDirection={sortConfig.direction}
+              onSort={handleSort}
+              className="font-semibold text-keon-900"
+            >
+              N° Demande
+            </SortableTableHead>
+            <SortableTableHead
               sortKey="title"
               currentSortKey={sortConfig.key as string}
               currentDirection={sortConfig.direction}
@@ -83,6 +92,9 @@ export function DataTableWidget({ tasks, onTaskClick }: DataTableWidgetProps) {
                 className="cursor-pointer hover:bg-keon-50 transition-colors"
                 onClick={() => onTaskClick?.(task)}
               >
+                <TableCell className="text-sm text-keon-600 whitespace-nowrap">
+                  {(task as any).request_number || '-'}
+                </TableCell>
                 <TableCell className="font-medium text-keon-900 max-w-[200px] truncate">
                   {task.title}
                 </TableCell>
@@ -104,8 +116,8 @@ export function DataTableWidget({ tasks, onTaskClick }: DataTableWidgetProps) {
           })}
           {displayTasks.length === 0 && (
             <TableRow>
-              <TableCell colSpan={4} className="text-center text-keon-500 py-8">
-                Aucune tâche à afficher
+              <TableCell colSpan={5} className="text-center text-keon-500 py-8">
+                Aucune demande à afficher
               </TableCell>
             </TableRow>
           )}
@@ -113,7 +125,7 @@ export function DataTableWidget({ tasks, onTaskClick }: DataTableWidgetProps) {
       </Table>
       {tasks.length > 50 && (
         <p className="text-xs text-keon-500 text-center py-2">
-          Affichage des 50 premières tâches sur {tasks.length}
+          Affichage des 50 premières demandes sur {tasks.length}
         </p>
       )}
     </div>
