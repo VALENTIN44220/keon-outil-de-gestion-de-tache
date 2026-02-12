@@ -1472,6 +1472,7 @@ export type Database = {
           can_access_analytics: boolean
           can_access_calendar: boolean
           can_access_dashboard: boolean
+          can_access_process_tracking: boolean
           can_access_projects: boolean
           can_access_requests: boolean
           can_access_settings: boolean
@@ -1504,6 +1505,7 @@ export type Database = {
           can_access_analytics?: boolean
           can_access_calendar?: boolean
           can_access_dashboard?: boolean
+          can_access_process_tracking?: boolean
           can_access_projects?: boolean
           can_access_requests?: boolean
           can_access_settings?: boolean
@@ -1536,6 +1538,7 @@ export type Database = {
           can_access_analytics?: boolean
           can_access_calendar?: boolean
           can_access_dashboard?: boolean
+          can_access_process_tracking?: boolean
           can_access_projects?: boolean
           can_access_requests?: boolean
           can_access_settings?: boolean
@@ -3905,6 +3908,7 @@ export type Database = {
           can_access_analytics: boolean | null
           can_access_calendar: boolean | null
           can_access_dashboard: boolean | null
+          can_access_process_tracking: boolean | null
           can_access_projects: boolean | null
           can_access_requests: boolean | null
           can_access_settings: boolean | null
@@ -3936,6 +3940,7 @@ export type Database = {
           can_access_analytics?: boolean | null
           can_access_calendar?: boolean | null
           can_access_dashboard?: boolean | null
+          can_access_process_tracking?: boolean | null
           can_access_projects?: boolean | null
           can_access_requests?: boolean | null
           can_access_settings?: boolean | null
@@ -3967,6 +3972,7 @@ export type Database = {
           can_access_analytics?: boolean | null
           can_access_calendar?: boolean | null
           can_access_dashboard?: boolean | null
+          can_access_process_tracking?: boolean | null
           can_access_projects?: boolean | null
           can_access_requests?: boolean | null
           can_access_settings?: boolean | null

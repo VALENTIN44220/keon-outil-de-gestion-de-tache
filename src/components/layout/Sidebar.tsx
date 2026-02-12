@@ -79,7 +79,7 @@ const allMenuItems = [{
   label: 'Suivi des processus',
   icon: ClipboardList,
   path: '/process-tracking',
-  permissionKey: 'can_access_requests' as ScreenPermissionKey
+  permissionKey: 'can_access_process_tracking' as ScreenPermissionKey
 }];
 
 const adminMenuItem = {
