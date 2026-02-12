@@ -63,18 +63,21 @@ export default function ProcessTracking() {
         }
       }
 
-      // Fetch task counts per process in one query
+      // Fetch task counts per process in one query using both columns
       if (processList.length > 0) {
         const ids = processList.map(p => p.id);
         const { data: countData } = await (supabase as any)
           .from('tasks')
-          .select('process_template_id')
-          .in('process_template_id', ids);
+          .select('process_template_id, source_process_template_id')
+          .or(ids.map(id => `process_template_id.eq.${id},source_process_template_id.eq.${id}`).join(','));
 
         if (countData) {
           const counts = new Map<string, number>();
           (countData as any[]).forEach(row => {
-            counts.set(row.process_template_id, (counts.get(row.process_template_id) || 0) + 1);
+            const pid = row.process_template_id || row.source_process_template_id;
+            if (pid) {
+              counts.set(pid, (counts.get(pid) || 0) + 1);
+            }
           });
           processList = processList.map(p => ({ ...p, task_count: counts.get(p.id) || 0 }));
         }

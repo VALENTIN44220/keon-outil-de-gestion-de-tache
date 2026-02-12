@@ -28,7 +28,7 @@ export function ProcessDashboard({ processId, canWrite, processName }: ProcessDa
       const { data, error } = await (supabase as any)
         .from('tasks')
         .select('*')
-        .eq('process_template_id', processId)
+        .or(`process_template_id.eq.${processId},source_process_template_id.eq.${processId}`)
         .order('created_at', { ascending: false });
 
       if (!error && data) {
@@ -45,9 +45,11 @@ export function ProcessDashboard({ processId, canWrite, processName }: ProcessDa
         event: '*',
         schema: 'public',
         table: 'tasks',
-        filter: `process_template_id=eq.${processId}`,
-      }, () => {
-        fetchProcessTasks();
+      }, (payload: any) => {
+        const row = payload.new || payload.old;
+        if (row?.process_template_id === processId || row?.source_process_template_id === processId) {
+          fetchProcessTasks();
+        }
       })
       .subscribe();
 
