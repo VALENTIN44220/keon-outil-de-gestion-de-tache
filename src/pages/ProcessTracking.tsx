@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ProcessDashboard } from '@/components/process-tracking/ProcessDashboard';
 
 interface ProcessTab {
   id: string;
@@ -22,7 +23,6 @@ export default function ProcessTracking() {
     if (!user) return;
 
     async function load() {
-      // Fetch user's accessible processes via the access table + admin fallback
       const { data: accessRows } = await (supabase as any)
         .from('process_tracking_access')
         .select('process_template_id, can_write')
@@ -33,7 +33,6 @@ export default function ProcessTracking() {
       let processList: ProcessTab[] = [];
 
       if (isAdmin?.data === true) {
-        // Admin sees all active processes
         const { data } = await (supabase as any)
           .from('process_templates')
           .select('id, name')
@@ -41,7 +40,6 @@ export default function ProcessTracking() {
           .order('name');
         processList = (data || []).map((p: any) => ({ ...p, can_write: true }));
       } else {
-        // Non-admin: only processes they have read access to
         const accessibleIds = (accessRows || []).map((r: any) => r.process_template_id);
         const writeMap = new Map((accessRows || []).map((r: any) => [r.process_template_id, r.can_write]));
 
@@ -105,16 +103,7 @@ export default function ProcessTracking() {
 
             {processes.map((p) => (
               <TabsContent key={p.id} value={p.id}>
-                <div className="flex items-center justify-center min-h-[400px] border-2 border-dashed border-border rounded-xl">
-                  <div className="text-center space-y-2">
-                    <p className="text-muted-foreground">
-                      Contenu du suivi pour <span className="font-semibold text-foreground">{p.name}</span> — à venir.
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Accès : {p.can_write ? '✏️ Lecture & Écriture' : '👁️ Lecture seule'}
-                    </p>
-                  </div>
-                </div>
+                <ProcessDashboard processId={p.id} canWrite={p.can_write} />
               </TabsContent>
             ))}
           </Tabs>
