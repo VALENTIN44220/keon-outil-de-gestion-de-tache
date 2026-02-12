@@ -31,6 +31,10 @@ interface ConfigurableDashboardProps {
   stats: TaskStats;
   globalProgress: number;
   onTaskClick?: (task: Task) => void;
+  /** When set, config is persisted per-process in process_dashboard_configs instead of localStorage */
+  processId?: string;
+  /** Whether the user can edit (customize) the dashboard layout */
+  canEdit?: boolean;
 }
 
 const STORAGE_KEY = 'dashboard-widgets-config';
@@ -46,11 +50,17 @@ export function ConfigurableDashboard({
   tasks, 
   stats, 
   globalProgress,
-  onTaskClick 
+  onTaskClick,
+  processId,
+  canEdit = true,
 }: ConfigurableDashboardProps) {
   const { user } = useAuth();
+  const isProcessMode = !!processId;
+  const storageKey = isProcessMode ? `process-dashboard-widgets-${processId}` : STORAGE_KEY;
+
   const [widgets, setWidgets] = useState<WidgetConfig[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    if (isProcessMode) return DEFAULT_WIDGETS; // will be loaded from DB
+    const saved = localStorage.getItem(storageKey);
     try {
       return saved ? JSON.parse(saved) : DEFAULT_WIDGETS;
     } catch {
@@ -66,31 +76,58 @@ export function ConfigurableDashboard({
   const [isEditing, setIsEditing] = useState(false);
   const [draggedWidget, setDraggedWidget] = useState<string | null>(null);
 
-  // Load saved filters from DB
+  // Load saved config from DB (process mode or global)
   useEffect(() => {
     if (!user?.id) return;
     (async () => {
-      const { data } = await (supabase as any)
-        .from('user_dashboard_filters')
-        .select('filters')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      if (data?.filters) {
-        // Restore dates from JSON
-        const restored: CrossFilters = {
-          ...DEFAULT_CROSS_FILTERS,
-          ...data.filters,
-          dateRange: {
-            start: data.filters.dateRange?.start ? new Date(data.filters.dateRange.start) : null,
-            end: data.filters.dateRange?.end ? new Date(data.filters.dateRange.end) : null,
-          },
-        };
-        setFilters(restored);
-        setPendingFilters(restored);
+      if (isProcessMode) {
+        // Load from process_dashboard_configs
+        const { data } = await (supabase as any)
+          .from('process_dashboard_configs')
+          .select('widgets_config, filters_config')
+          .eq('process_template_id', processId)
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (data) {
+          if (data.widgets_config && Array.isArray(data.widgets_config) && data.widgets_config.length > 0) {
+            setWidgets(data.widgets_config);
+          }
+          if (data.filters_config && Object.keys(data.filters_config).length > 0) {
+            const restored: CrossFilters = {
+              ...DEFAULT_CROSS_FILTERS,
+              ...data.filters_config,
+              dateRange: {
+                start: data.filters_config.dateRange?.start ? new Date(data.filters_config.dateRange.start) : null,
+                end: data.filters_config.dateRange?.end ? new Date(data.filters_config.dateRange.end) : null,
+              },
+            };
+            setFilters(restored);
+            setPendingFilters(restored);
+          }
+        }
+      } else {
+        // Load from user_dashboard_filters (global mode)
+        const { data } = await (supabase as any)
+          .from('user_dashboard_filters')
+          .select('filters')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (data?.filters) {
+          const restored: CrossFilters = {
+            ...DEFAULT_CROSS_FILTERS,
+            ...data.filters,
+            dateRange: {
+              start: data.filters.dateRange?.start ? new Date(data.filters.dateRange.start) : null,
+              end: data.filters.dateRange?.end ? new Date(data.filters.dateRange.end) : null,
+            },
+          };
+          setFilters(restored);
+          setPendingFilters(restored);
+        }
       }
       setFiltersLoaded(true);
     })();
-  }, [user?.id]);
+  }, [user?.id, processId, isProcessMode]);
 
   // Track dirty state
   const handlePendingFiltersChange = useCallback((newFilters: CrossFilters) => {
@@ -98,36 +135,51 @@ export function ConfigurableDashboard({
     setFiltersDirty(true);
   }, []);
 
-  // Save filters to DB
+  // Save filters (and widgets in process mode) to DB
   const handleSaveFilters = useCallback(async () => {
     if (!user?.id) return;
     setIsSaving(true);
     try {
-      // Serialize dates
-      const toSave = {
+      const serializedFilters = {
         ...pendingFilters,
         dateRange: {
           start: pendingFilters.dateRange.start?.toISOString() ?? null,
           end: pendingFilters.dateRange.end?.toISOString() ?? null,
         },
       };
-      const { error } = await (supabase as any)
-        .from('user_dashboard_filters')
-        .upsert({ user_id: user.id, filters: toSave, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
-      if (error) throw error;
+
+      if (isProcessMode) {
+        const { error } = await (supabase as any)
+          .from('process_dashboard_configs')
+          .upsert({
+            process_template_id: processId,
+            user_id: user.id,
+            widgets_config: widgets,
+            filters_config: serializedFilters,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'process_template_id,user_id' });
+        if (error) throw error;
+      } else {
+        const { error } = await (supabase as any)
+          .from('user_dashboard_filters')
+          .upsert({ user_id: user.id, filters: serializedFilters, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+        if (error) throw error;
+      }
       setFilters(pendingFilters);
       setFiltersDirty(false);
-      toast.success('Filtres enregistrés');
+      toast.success('Configuration enregistrée');
     } catch (err: any) {
-      toast.error('Erreur lors de la sauvegarde des filtres');
+      toast.error('Erreur lors de la sauvegarde');
     } finally {
       setIsSaving(false);
     }
-  }, [user?.id, pendingFilters]);
+  }, [user?.id, pendingFilters, isProcessMode, processId, widgets]);
 
-  // Save widgets to localStorage
+  // Save widgets to localStorage (global mode only)
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(widgets));
+    if (!isProcessMode) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(widgets));
+    }
   }, [widgets]);
 
   // Filter tasks based on cross-filters
@@ -279,20 +331,23 @@ export function ConfigurableDashboard({
       position: { x: 0, y: widgets.length },
     };
     setWidgets(prev => [...prev, newWidget]);
+    if (isProcessMode) setFiltersDirty(true);
     toast.success('Widget ajouté');
-  }, [widgets.length]);
+  }, [widgets.length, isProcessMode]);
 
   // Remove widget
   const handleRemoveWidget = useCallback((widgetId: string) => {
     setWidgets(prev => prev.filter(w => w.id !== widgetId));
+    if (isProcessMode) setFiltersDirty(true);
     toast.success('Widget supprimé');
-  }, []);
+  }, [isProcessMode]);
 
   // Reset to default
   const handleReset = useCallback(() => {
     setWidgets(DEFAULT_WIDGETS);
+    if (isProcessMode) setFiltersDirty(true);
     toast.success('Tableau de bord réinitialisé');
-  }, []);
+  }, [isProcessMode]);
 
   // Drag and drop handlers
   const handleDragStart = (widgetId: string) => {
@@ -385,30 +440,32 @@ export function ConfigurableDashboard({
           )}
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button
-            variant={isEditing ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setIsEditing(!isEditing)}
-            className="gap-2"
-          >
-            <Settings2 className="h-4 w-4" />
-            {isEditing ? 'Terminer' : 'Personnaliser'}
-          </Button>
-          
-          {isEditing && (
-            <>
-              <Button variant="outline" size="sm" onClick={() => setIsAddDialogOpen(true)} className="gap-2">
-                <Plus className="h-4 w-4" />
-                Ajouter
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleReset} className="gap-2">
-                <RotateCcw className="h-4 w-4" />
-                Réinitialiser
-              </Button>
-            </>
-          )}
-        </div>
+        {canEdit && (
+          <div className="flex items-center gap-2">
+            <Button
+              variant={isEditing ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setIsEditing(!isEditing)}
+              className="gap-2"
+            >
+              <Settings2 className="h-4 w-4" />
+              {isEditing ? 'Terminer' : 'Personnaliser'}
+            </Button>
+            
+            {isEditing && (
+              <>
+                <Button variant="outline" size="sm" onClick={() => setIsAddDialogOpen(true)} className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Ajouter
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleReset} className="gap-2">
+                  <RotateCcw className="h-4 w-4" />
+                  Réinitialiser
+                </Button>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Cross Filters Panel - always visible */}
