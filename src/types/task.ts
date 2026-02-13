@@ -61,6 +61,20 @@ export interface Task {
   requester_validated_at: string | null;
   requester_validation_status: ValidationStatus | null;
   requester_validation_comment: string | null;
+  // Request validation (before task creation)
+  request_validation_enabled?: boolean;
+  request_validation_status?: string;
+  request_validator_type_1?: string | null;
+  request_validator_id_1?: string | null;
+  request_validated_by_1?: string | null;
+  request_validation_1_at?: string | null;
+  request_validation_1_comment?: string | null;
+  request_validator_type_2?: string | null;
+  request_validator_id_2?: string | null;
+  request_validated_by_2?: string | null;
+  request_validation_2_at?: string | null;
+  request_validation_2_comment?: string | null;
+  request_validation_refusal_action?: string | null;
   // Metadata
   created_at: string;
   updated_at: string;

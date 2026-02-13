@@ -163,14 +163,41 @@ export function useCreateRequest() {
     }
 
     try {
+      // 0. Check if process has request validation enabled
+      const { data: processTemplate } = await (supabase as any)
+        .from('process_templates')
+        .select('settings')
+        .eq('id', data.processTemplateId)
+        .single();
+
+      const requestValidationConfig = processTemplate?.settings?.request_validation;
+      const hasRequestValidation = requestValidationConfig?.enabled === true;
+
+      // Determine initial status and validation fields
+      const initialStatus: TaskStatus = hasRequestValidation ? 'todo' : 'in-progress';
+      const requestValidationStatus = hasRequestValidation ? 'pending_level_1' : 'none';
+
+      // Resolve validator for level 1
+      let validatorId1: string | null = null;
+      let validatorType1: string | null = null;
+      if (hasRequestValidation) {
+        validatorType1 = requestValidationConfig.level_1.type;
+        if (validatorType1 === 'manager') {
+          // Use the requester's manager
+          validatorId1 = profile.manager_id || null;
+        } else {
+          validatorId1 = requestValidationConfig.level_1.target_id || null;
+        }
+      }
+
       // 1. Créer la demande principale (request)
-      const { data: request, error: requestError } = await supabase
+      const { data: request, error: requestError } = await (supabase as any)
         .from('tasks')
         .insert({
           title: data.title,
           description: data.description,
           priority: data.priority || 'medium',
-          status: 'in-progress' as TaskStatus, // La demande est en cours dès création
+          status: initialStatus,
           type: 'request',
           due_date: data.dueDate,
           user_id: user.id,
@@ -180,6 +207,18 @@ export function useCreateRequest() {
           target_department_id: data.targetDepartmentId,
           category_id: data.categoryId,
           subcategory_id: data.subcategoryId,
+          // Request validation fields
+          request_validation_enabled: hasRequestValidation,
+          request_validation_status: requestValidationStatus,
+          request_validator_type_1: validatorType1,
+          request_validator_id_1: validatorId1,
+          request_validator_type_2: hasRequestValidation && requestValidationConfig.level_2?.enabled
+            ? requestValidationConfig.level_2.type : null,
+          request_validator_id_2: hasRequestValidation && requestValidationConfig.level_2?.enabled
+            ? (requestValidationConfig.level_2.type === 'manager'
+              ? (profile.manager_id || null)
+              : requestValidationConfig.level_2.target_id || null)
+            : null,
         })
         .select()
         .single();
@@ -190,7 +229,7 @@ export function useCreateRequest() {
       const subProcessInserts = data.selectedSubProcessIds.map((spId, index) => ({
         request_id: request.id,
         sub_process_template_id: spId,
-        status: 'pending',
+        status: hasRequestValidation ? 'waiting_validation' : 'pending',
         order_index: index,
       }));
 
@@ -211,58 +250,60 @@ export function useCreateRequest() {
         await supabase.from('request_field_values').insert(fieldInserts);
       }
 
-      // 4. Démarrer le workflow du processus si disponible
-      const workflowId = await getActiveWorkflow(data.processTemplateId);
-      
-      if (workflowId) {
-        // Créer le workflow run
-        const { data: workflowRun, error: runError } = await supabase
-          .from('workflow_runs')
-          .insert([{
-            workflow_id: workflowId,
-            workflow_version: 1,
-            trigger_entity_type: 'request' as const,
-            trigger_entity_id: request.id,
-            status: 'running' as const,
-            context_data: JSON.stringify({
-              entityType: 'request',
-              entityId: request.id,
-              requester_id: profile.id,
-              department_id: data.targetDepartmentId,
-              selected_sub_processes: data.selectedSubProcessIds,
-              custom_fields: data.customFieldValues,
-            }) as unknown as Json,
-            started_by: user.id,
-            execution_log: JSON.stringify([{
-              timestamp: new Date().toISOString(),
-              action: 'workflow_started',
-              details: { triggered_by: user.id }
-            }]) as unknown as Json,
-          }])
-          .select()
-          .single();
+      // 4. Démarrer le workflow SEULEMENT si pas de validation de demande en attente
+      if (!hasRequestValidation) {
+        const workflowId = await getActiveWorkflow(data.processTemplateId);
+        
+        if (workflowId) {
+          const { data: workflowRun, error: runError } = await supabase
+            .from('workflow_runs')
+            .insert([{
+              workflow_id: workflowId,
+              workflow_version: 1,
+              trigger_entity_type: 'request' as const,
+              trigger_entity_id: request.id,
+              status: 'running' as const,
+              context_data: JSON.stringify({
+                entityType: 'request',
+                entityId: request.id,
+                requester_id: profile.id,
+                department_id: data.targetDepartmentId,
+                selected_sub_processes: data.selectedSubProcessIds,
+                custom_fields: data.customFieldValues,
+              }) as unknown as Json,
+              started_by: user.id,
+              execution_log: JSON.stringify([{
+                timestamp: new Date().toISOString(),
+                action: 'workflow_started',
+                details: { triggered_by: user.id }
+              }]) as unknown as Json,
+            }])
+            .select()
+            .single();
 
-        if (!runError && workflowRun) {
-          // Lier le workflow run à la demande
-          await supabase
-            .from('tasks')
-            .update({ workflow_run_id: workflowRun.id })
-            .eq('id', request.id);
+          if (!runError && workflowRun) {
+            await supabase
+              .from('tasks')
+              .update({ workflow_run_id: workflowRun.id })
+              .eq('id', request.id);
+          }
         }
       }
 
       // 5. Émettre l'événement de création
       await emitWorkflowEvent(
-        'request_created',
+        hasRequestValidation ? 'validation_requested' : 'request_created',
         'request',
         request.id,
         {
           request_title: data.title,
           requester_id: profile.id,
           requester_name: profile.display_name,
+          validator_id: validatorId1 || undefined,
           custom_data: {
             process_template_id: data.processTemplateId,
             selected_sub_processes: data.selectedSubProcessIds,
+            request_validation_enabled: hasRequestValidation,
           },
         }
       );
