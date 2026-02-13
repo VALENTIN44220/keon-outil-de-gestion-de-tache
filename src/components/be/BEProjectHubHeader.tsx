@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { BEProject } from '@/types/beProject';
 import { Task } from '@/types/task';
@@ -14,7 +15,8 @@ import {
   Clock,
   CheckCircle2,
   AlertTriangle,
-  TrendingUp
+  TrendingUp,
+  Pencil
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -27,6 +29,7 @@ interface BEProjectHubHeaderProps {
     overdueTasks: number;
     progress: number;
   };
+  onEditProject?: () => void;
 }
 
 const statusLabels: Record<string, { label: string; className: string }> = {
@@ -42,7 +45,7 @@ const navItems = [
   { value: 'files', label: 'Fichiers', icon: Paperclip },
 ];
 
-export function BEProjectHubHeader({ project, stats }: BEProjectHubHeaderProps) {
+export function BEProjectHubHeader({ project, stats, onEditProject }: BEProjectHubHeaderProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -89,6 +92,17 @@ export function BEProjectHubHeader({ project, stats }: BEProjectHubHeaderProps) 
               <Badge className={cn('border shrink-0', statusConfig.className)}>
                 {statusConfig.label}
               </Badge>
+              {onEditProject && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 gap-1.5 shrink-0"
+                  onClick={onEditProject}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  Modifier
+                </Button>
+              )}
             </div>
             {project.description && (
               <p className="text-sm text-muted-foreground line-clamp-1 max-w-2xl">
