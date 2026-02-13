@@ -1,4 +1,4 @@
-import { ReactNode, useMemo } from 'react';
+import { ReactNode, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useBEProjectByCode, useBEProjectTasks, useBEProjectStats } from '@/hooks/useBEProjectHub';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -7,6 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Building2, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { BEProjectHubHeader } from './BEProjectHubHeader';
+import { BEProjectDialog } from '@/components/projects/BEProjectDialog';
+import { useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface BEProjectHubLayoutProps {
   children: ReactNode;
@@ -15,11 +19,29 @@ interface BEProjectHubLayoutProps {
 export function BEProjectHubLayout({ children }: BEProjectHubLayoutProps) {
   const { code } = useParams<{ code: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   
   const { data: project, isLoading: projectLoading, error } = useBEProjectByCode(code);
   const { data: tasks = [], isLoading: tasksLoading } = useBEProjectTasks(project?.id);
   
   const stats = useBEProjectStats(project?.id, tasks);
+
+  const handleSaveProject = async (data: any) => {
+    if (!project) return;
+    const { error } = await supabase
+      .from('be_projects')
+      .update(data)
+      .eq('id', project.id);
+    
+    if (error) {
+      toast.error('Erreur lors de la mise à jour');
+      return;
+    }
+    toast.success('Projet mis à jour');
+    queryClient.invalidateQueries({ queryKey: ['be-project', code] });
+    setEditDialogOpen(false);
+  };
 
   if (projectLoading || tasksLoading) {
     return (
@@ -64,13 +86,24 @@ export function BEProjectHubLayout({ children }: BEProjectHubLayoutProps) {
       <Sidebar activeView="projects" onViewChange={() => {}} />
       
       <main className="flex-1 flex flex-col min-w-0">
-        <BEProjectHubHeader project={project} stats={stats} />
+        <BEProjectHubHeader 
+          project={project} 
+          stats={stats} 
+          onEditProject={() => setEditDialogOpen(true)} 
+        />
 
         {/* Content */}
         <div className="flex-1 p-6 overflow-auto">
           {children}
         </div>
       </main>
+
+      <BEProjectDialog
+        open={editDialogOpen}
+        onClose={() => setEditDialogOpen(false)}
+        project={project}
+        onSave={handleSaveProject}
+      />
     </div>
   );
 }
