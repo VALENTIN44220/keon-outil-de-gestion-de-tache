@@ -8,10 +8,28 @@ import { Header } from '@/components/layout/Header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, ShieldX } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const ProcessDashboard = lazy(() =>
   import('@/components/process-tracking/ProcessDashboard').then(m => ({ default: m.ProcessDashboard }))
 );
+
+const PROCESS_COLORS = [
+  { bg: 'bg-[hsl(210,80%,55%)]', ring: 'ring-[hsl(210,80%,55%)]' },
+  { bg: 'bg-[hsl(150,60%,42%)]', ring: 'ring-[hsl(150,60%,42%)]' },
+  { bg: 'bg-[hsl(25,90%,55%)]', ring: 'ring-[hsl(25,90%,55%)]' },
+  { bg: 'bg-[hsl(280,65%,55%)]', ring: 'ring-[hsl(280,65%,55%)]' },
+  { bg: 'bg-[hsl(350,70%,55%)]', ring: 'ring-[hsl(350,70%,55%)]' },
+  { bg: 'bg-[hsl(180,60%,42%)]', ring: 'ring-[hsl(180,60%,42%)]' },
+  { bg: 'bg-[hsl(45,85%,50%)]', ring: 'ring-[hsl(45,85%,50%)]' },
+  { bg: 'bg-[hsl(320,60%,50%)]', ring: 'ring-[hsl(320,60%,50%)]' },
+];
+
+function getProcessInitials(name: string): string {
+  const words = name.trim().split(/\s+/);
+  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+  return name.substring(0, 2).toUpperCase();
+}
 
 interface ProcessTab {
   id: string;
@@ -62,7 +80,6 @@ export default function ProcessTracking() {
       }
     }
 
-    // Fetch task counts per process in one query using both columns
     if (processList.length > 0) {
       const ids = processList.map(p => p.id);
       const { data: countData } = await (supabase as any)
@@ -90,7 +107,6 @@ export default function ProcessTracking() {
     loadProcesses();
   }, [loadProcesses]);
 
-  // Realtime sync: update sidebar when process_templates change
   useEffect(() => {
     const channel = supabase
       .channel('process-templates-sync')
@@ -109,7 +125,6 @@ export default function ProcessTracking() {
   const handleTabChange = (value: string) => {
     setSearchParams({ process: value }, { replace: true });
   };
-
 
   if (isLoading) {
     return (
@@ -135,31 +150,57 @@ export default function ProcessTracking() {
         <Header title="Suivi des processus" searchQuery="" onSearchChange={() => {}} />
         <div className="flex-1 flex overflow-hidden">
           {/* Process sidebar */}
-          <aside className="w-56 flex-shrink-0 border-r border-border bg-muted/30 overflow-y-auto">
-            <div className="p-3 space-y-1">
+          <aside className="w-60 flex-shrink-0 border-r border-border bg-muted/30 overflow-y-auto">
+            <div className="p-3 space-y-1.5">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-2">Processus</p>
               {processes.length === 0 ? (
                 <p className="text-sm text-muted-foreground px-3 py-4">Aucun processus accessible</p>
               ) : (
-                processes.map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => handleTabChange(p.id)}
-                    className={cn(
-                      "w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 text-left",
-                      activeTab === p.id
-                        ? "bg-primary/10 text-primary border-l-4 border-primary"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground border-l-4 border-transparent"
-                    )}
-                  >
-                    <span className="truncate">{p.name}</span>
-                    {typeof p.task_count === 'number' && (
-                      <Badge variant="secondary" className="text-xs px-1.5 py-0 min-w-[1.25rem] h-5 flex-shrink-0">
-                        {p.task_count}
-                      </Badge>
-                    )}
-                  </button>
-                ))
+                <TooltipProvider delayDuration={300}>
+                  {processes.map((p, index) => {
+                    const isActive = activeTab === p.id;
+                    const color = PROCESS_COLORS[index % PROCESS_COLORS.length];
+                    return (
+                      <Tooltip key={p.id}>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={() => handleTabChange(p.id)}
+                            className={cn(
+                              "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 text-left",
+                              isActive
+                                ? `bg-card shadow-md ring-2 ${color.ring} ring-offset-1 ring-offset-background`
+                                : "hover:bg-muted/80 hover:shadow-sm"
+                            )}
+                          >
+                            <div className={cn(
+                              "flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold text-white shadow-sm transition-transform",
+                              color.bg,
+                              isActive && "scale-110"
+                            )}>
+                              {getProcessInitials(p.name)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <span className={cn(
+                                "block truncate text-sm",
+                                isActive ? "text-foreground font-semibold" : "text-muted-foreground"
+                              )}>
+                                {p.name}
+                              </span>
+                              {typeof p.task_count === 'number' && (
+                                <span className="text-xs text-muted-foreground">
+                                  {p.task_count} demande{p.task_count !== 1 ? 's' : ''}
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right" className="text-xs">
+                          {p.name}
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  })}
+                </TooltipProvider>
               )}
             </div>
           </aside>
