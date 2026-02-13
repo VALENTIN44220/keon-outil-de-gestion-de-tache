@@ -73,7 +73,7 @@ const allMenuItems = [{
   label: 'Fournisseurs',
   icon: Building2,
   path: '/suppliers',
-  permissionKey: 'can_access_dashboard' as ScreenPermissionKey // Access controlled by supplier_purchase_permissions
+  permissionKey: 'can_access_suppliers' as ScreenPermissionKey
 }, {
   id: 'process-tracking',
   label: 'Suivi des processus',

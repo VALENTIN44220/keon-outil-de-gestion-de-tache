@@ -122,7 +122,7 @@ export function useEffectivePermissions() {
       const screenKeys: ScreenPermissionKey[] = [
         'can_access_dashboard', 'can_access_requests', 'can_access_templates',
         'can_access_workload', 'can_access_calendar', 'can_access_projects',
-        'can_access_team'
+        'can_access_team', 'can_access_suppliers', 'can_access_process_tracking'
       ];
 
       const featureKeys: FeaturePermissionKey[] = [
@@ -155,7 +155,7 @@ export function useEffectivePermissions() {
       const allKeys: AllPermissionKeys[] = [
         'can_access_dashboard', 'can_access_requests', 'can_access_templates',
         'can_access_workload', 'can_access_calendar', 'can_access_projects',
-        'can_access_team',
+        'can_access_team', 'can_access_suppliers', 'can_access_process_tracking',
         'can_manage_users', 'can_manage_templates', 'can_view_own_tasks',
         'can_manage_own_tasks', 'can_view_subordinates_tasks', 'can_manage_subordinates_tasks',
         'can_assign_to_subordinates', 'can_view_all_tasks', 'can_manage_all_tasks',
