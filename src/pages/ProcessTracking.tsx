@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, lazy, Suspense } from 'react';
+import { useEffect, useState, useMemo, useCallback, lazy, Suspense } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
@@ -27,67 +27,82 @@ export default function ProcessTracking() {
   const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
 
-  useEffect(() => {
+  const loadProcesses = useCallback(async () => {
     if (!user) return;
 
-    async function load() {
-      const { data: accessRows } = await (supabase as any)
-        .from('process_tracking_access')
-        .select('process_template_id, can_write')
-        .eq('can_read', true);
+    const { data: accessRows } = await (supabase as any)
+      .from('process_tracking_access')
+      .select('process_template_id, can_write')
+      .eq('can_read', true);
 
-      const isAdmin = await (supabase as any).rpc('has_role', { _user_id: user!.id, _role: 'admin' });
+    const isAdmin = await (supabase as any).rpc('has_role', { _user_id: user!.id, _role: 'admin' });
 
-      let processList: ProcessTab[] = [];
+    let processList: ProcessTab[] = [];
 
-      if (isAdmin?.data === true) {
+    if (isAdmin?.data === true) {
+      const { data } = await (supabase as any)
+        .from('process_templates')
+        .select('id, name')
+        .order('name');
+      processList = (data || []).map((p: any) => ({ ...p, can_write: true }));
+    } else {
+      const accessibleIds = (accessRows || []).map((r: any) => r.process_template_id);
+      const writeMap = new Map((accessRows || []).map((r: any) => [r.process_template_id, r.can_write]));
+
+      if (accessibleIds.length > 0) {
         const { data } = await (supabase as any)
           .from('process_templates')
           .select('id, name')
+          .in('id', accessibleIds)
           .order('name');
-        processList = (data || []).map((p: any) => ({ ...p, can_write: true }));
-      } else {
-        const accessibleIds = (accessRows || []).map((r: any) => r.process_template_id);
-        const writeMap = new Map((accessRows || []).map((r: any) => [r.process_template_id, r.can_write]));
-
-        if (accessibleIds.length > 0) {
-          const { data } = await (supabase as any)
-            .from('process_templates')
-            .select('id, name')
-            .in('id', accessibleIds)
-            .order('name');
-          processList = (data || []).map((p: any) => ({
-            ...p,
-            can_write: writeMap.get(p.id) || false,
-          }));
-        }
+        processList = (data || []).map((p: any) => ({
+          ...p,
+          can_write: writeMap.get(p.id) || false,
+        }));
       }
-
-      // Fetch task counts per process in one query using both columns
-      if (processList.length > 0) {
-        const ids = processList.map(p => p.id);
-        const { data: countData } = await (supabase as any)
-          .from('tasks')
-          .select('process_template_id, source_process_template_id')
-          .or(ids.map(id => `process_template_id.eq.${id},source_process_template_id.eq.${id}`).join(','));
-
-        if (countData) {
-          const counts = new Map<string, number>();
-          (countData as any[]).forEach(row => {
-            const pid = row.process_template_id || row.source_process_template_id;
-            if (pid) {
-              counts.set(pid, (counts.get(pid) || 0) + 1);
-            }
-          });
-          processList = processList.map(p => ({ ...p, task_count: counts.get(p.id) || 0 }));
-        }
-      }
-
-      setProcesses(processList);
-      setIsLoading(false);
     }
-    load();
+
+    // Fetch task counts per process in one query using both columns
+    if (processList.length > 0) {
+      const ids = processList.map(p => p.id);
+      const { data: countData } = await (supabase as any)
+        .from('tasks')
+        .select('process_template_id, source_process_template_id')
+        .or(ids.map(id => `process_template_id.eq.${id},source_process_template_id.eq.${id}`).join(','));
+
+      if (countData) {
+        const counts = new Map<string, number>();
+        (countData as any[]).forEach(row => {
+          const pid = row.process_template_id || row.source_process_template_id;
+          if (pid) {
+            counts.set(pid, (counts.get(pid) || 0) + 1);
+          }
+        });
+        processList = processList.map(p => ({ ...p, task_count: counts.get(p.id) || 0 }));
+      }
+    }
+
+    setProcesses(processList);
+    setIsLoading(false);
   }, [user]);
+
+  useEffect(() => {
+    loadProcesses();
+  }, [loadProcesses]);
+
+  // Realtime sync: update sidebar when process_templates change
+  useEffect(() => {
+    const channel = supabase
+      .channel('process-templates-sync')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'process_templates' },
+        () => { loadProcesses(); }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [loadProcesses]);
 
   const activeTab = searchParams.get('process') || processes[0]?.id || '';
 
