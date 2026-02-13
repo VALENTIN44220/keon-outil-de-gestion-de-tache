@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Building2, Save, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { RequestValidationConfigPanel } from '@/components/templates/RequestValidationConfigPanel';
 import { ProcessWithTasks } from '@/types/template';
 import { toast } from 'sonner';
 
@@ -117,6 +118,14 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
         </CardContent>
       </Card>
 
+      {/* Validation de la demande */}
+      <RequestValidationConfigPanel
+        entityType="process"
+        entityId={process.id}
+        currentSettings={(process as any).settings || null}
+        canManage={canManage}
+        onUpdate={onUpdate}
+      />
 
       <Card>
         <CardHeader>

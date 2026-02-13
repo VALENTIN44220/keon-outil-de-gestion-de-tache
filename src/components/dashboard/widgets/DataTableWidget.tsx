@@ -10,6 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { REQUEST_VALIDATION_STATUS_LABELS } from '@/services/requestValidationService';
 import { ChevronDown, ChevronRight, Columns3, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { TASK_STATUS_LABELS, TASK_STATUS_COLORS } from '@/services/taskStatusService';
@@ -64,6 +65,19 @@ const ALL_COLUMNS: ColumnDef[] = [
   { key: 'status', label: 'Statut', defaultVisible: true, render: (t) => renderStatus(t.status) },
   { key: 'priority', label: 'Priorité', defaultVisible: true, render: (t) => renderPriority(t.priority) },
   { key: 'due_date', label: 'Échéance', defaultVisible: true, render: (t) => renderDate(t.due_date) },
+  { key: 'request_validation_status', label: 'Validation demande', defaultVisible: false, render: (t) => {
+    const status = t.request_validation_status || 'none';
+    if (status === 'none') return '-';
+    const label = REQUEST_VALIDATION_STATUS_LABELS[status] || status;
+    const colorMap: Record<string, string> = {
+      'pending_level_1': 'bg-amber-100 text-amber-800',
+      'pending_level_2': 'bg-amber-100 text-amber-800',
+      'validated': 'bg-emerald-100 text-emerald-800',
+      'refused': 'bg-red-100 text-red-800',
+      'returned': 'bg-violet-100 text-violet-800',
+    };
+    return <Badge className={cn('text-xs', colorMap[status] || '')}>{label}</Badge>;
+  }},
   { key: 'created_at', label: 'Créé le', defaultVisible: false, render: (t) => renderDate(t.created_at) },
   { key: 'updated_at', label: 'Modifié le', defaultVisible: false, render: (t) => renderDate(t.updated_at) },
   { key: 'type', label: 'Type', defaultVisible: false, render: (t) => t.type === 'request' ? 'Demande' : 'Tâche' },

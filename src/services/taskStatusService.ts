@@ -20,10 +20,26 @@ export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
   'pending_validation_1': 'En attente de validation',
   'pending_validation_2': 'En attente de validation (N2)',
   'validated': 'Validé / Terminé',
-  'refused': 'Refusé', // Statut transitoire (audit uniquement)
+  'refused': 'Refusé',
   'review': 'À corriger',
   'cancelled': 'Annulé',
 };
+
+// Labels enrichis qui tiennent compte de la validation de la demande
+export function getEnrichedStatusLabel(task: { status: string; request_validation_status?: string }): string {
+  if (task.request_validation_status && task.request_validation_status !== 'none') {
+    const rvLabels: Record<string, string> = {
+      'pending_level_1': 'Validation demande (N1)',
+      'pending_level_2': 'Validation demande (N2)',
+      'returned': 'Retournée au demandeur',
+      'refused': 'Demande refusée',
+    };
+    if (rvLabels[task.request_validation_status]) {
+      return rvLabels[task.request_validation_status];
+    }
+  }
+  return TASK_STATUS_LABELS[task.status as TaskStatus] || task.status;
+}
 
 // Libellés simplifiés pour affichage compact
 export const TASK_STATUS_SHORT_LABELS: Record<TaskStatus, string> = {
