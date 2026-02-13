@@ -22,6 +22,8 @@ export interface BEProject {
   actionnariat: string | null;
   regime_icpe: string | null;
   typologie: string | null;
+  // Localisation
+  gps_coordinates: string | null;
   // Équipe projet
   charge_affaires_id: string | null;
   developpeur_id: string | null;
