@@ -2,6 +2,12 @@ import { useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
+import {
   Eye,
   EyeOff,
   ZoomIn,
@@ -9,6 +15,8 @@ import {
   RotateCcw,
   Save,
   Loader2,
+  Layers,
+  Settings2,
 } from 'lucide-react';
 import { useFormBuilder } from '@/hooks/useFormBuilder';
 import { useFormSchema } from '@/hooks/useFormSchema';
@@ -388,22 +396,51 @@ export function EnhancedFormBuilderContainer({
           onDropNewField={handleDropNewField}
           canManage={canManage}
         />
-
-        {/* Right: Properties panel */}
-        {canManage && !previewMode && (
-          <EnhancedPropertiesPanel
-            selectedSection={selectedSection}
-            selectedField={selectedField as FormField | null}
-            allFields={fields as FormField[]}
-            allSections={sections}
-            onUpdateSection={updateSection}
-            onUpdateField={updateField}
-            onDeleteSection={deleteSection}
-            onDeleteField={handleDeleteField}
-            canManage={canManage}
-          />
-        )}
       </div>
+
+      {/* Properties Sheet (full-page side panel) */}
+      <Sheet
+        open={!!(selectedSection || selectedField)}
+        onOpenChange={(open) => {
+          if (!open) {
+            selectSection(null);
+            selectField(null);
+          }
+        }}
+      >
+        <SheetContent className="w-full sm:max-w-lg md:max-w-xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              {selectedSection ? (
+                <>
+                  <Layers className="h-5 w-5 text-primary" />
+                  Propriétés de la section
+                </>
+              ) : selectedField ? (
+                <>
+                  <Settings2 className="h-5 w-5 text-primary" />
+                  Propriétés du champ
+                </>
+              ) : null}
+            </SheetTitle>
+          </SheetHeader>
+          {canManage && (
+            <div className="mt-4">
+              <EnhancedPropertiesPanel
+                selectedSection={selectedSection}
+                selectedField={selectedField as FormField | null}
+                allFields={fields as FormField[]}
+                allSections={sections}
+                onUpdateSection={updateSection}
+                onUpdateField={updateField}
+                onDeleteSection={deleteSection}
+                onDeleteField={handleDeleteField}
+                canManage={canManage}
+              />
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
 
       {/* Creating field indicator */}
       {isCreatingField && (
