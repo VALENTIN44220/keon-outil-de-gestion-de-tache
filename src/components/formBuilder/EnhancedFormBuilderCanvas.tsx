@@ -184,7 +184,8 @@ export const EnhancedFormBuilderCanvas = memo(function EnhancedFormBuilderCanvas
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
+    // Use 'copy' for palette drags, 'move' for existing field reorder
+    e.dataTransfer.dropEffect = draggedFieldId ? 'move' : 'copy';
   };
 
   const handleDrop = (e: React.DragEvent, targetSectionId: string | null) => {

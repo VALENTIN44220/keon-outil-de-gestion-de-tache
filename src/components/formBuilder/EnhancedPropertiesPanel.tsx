@@ -141,12 +141,10 @@ export const EnhancedPropertiesPanel = memo(function EnhancedPropertiesPanel({
   // Empty state
   if (!selectedSection && !selectedField) {
     return (
-      <div className="w-80 border-l bg-card flex flex-col h-full">
-        <div className="flex-1 flex items-center justify-center p-6">
-          <div className="text-center text-muted-foreground">
-            <Settings2 className="h-12 w-12 mx-auto mb-4 opacity-20" />
-            <p className="text-sm">Sélectionnez un élément pour voir ses propriétés</p>
-          </div>
+      <div className="flex items-center justify-center p-6">
+        <div className="text-center text-muted-foreground">
+          <Settings2 className="h-12 w-12 mx-auto mb-4 opacity-20" />
+          <p className="text-sm">Sélectionnez un élément pour voir ses propriétés</p>
         </div>
       </div>
     );
@@ -155,7 +153,7 @@ export const EnhancedPropertiesPanel = memo(function EnhancedPropertiesPanel({
   // Section properties
   if (localSection) {
     return (
-      <div className="w-80 border-l bg-card flex flex-col h-full">
+      <div className="flex flex-col">
         <div className="p-3 border-b flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Layers className="h-4 w-4 text-primary" />
@@ -368,7 +366,7 @@ export const EnhancedPropertiesPanel = memo(function EnhancedPropertiesPanel({
   // Field properties
   if (localField) {
     return (
-      <div className="w-80 border-l bg-card flex flex-col h-full">
+      <div className="flex flex-col">
         <div className="p-3 border-b flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Type className="h-4 w-4 text-primary" />
