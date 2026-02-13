@@ -120,6 +120,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   Building2: () => <span className="text-base">🏢</span>,
   Paperclip: () => <span className="text-base">📎</span>,
   Database: () => <span className="text-base">🗃️</span>,
+  Table2: () => <span className="text-base">📊</span>,
 };
 
 const CATEGORY_LABELS: Record<string, string> = {

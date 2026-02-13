@@ -13,7 +13,8 @@ export type CustomFieldType =
   | 'user_search'
   | 'department_search'
   | 'file'
-  | 'table_lookup';
+  | 'table_lookup'
+  | 'repeatable_table';
 
 export const FIELD_TYPE_LABELS: Record<CustomFieldType, string> = {
   text: 'Texte court',
@@ -31,6 +32,7 @@ export const FIELD_TYPE_LABELS: Record<CustomFieldType, string> = {
   department_search: 'Recherche service',
   file: 'Fichier',
   table_lookup: 'Liste depuis table',
+  repeatable_table: 'Table multi-lignes',
 };
 
 export const FIELD_TYPE_ICONS: Record<CustomFieldType, string> = {
@@ -49,6 +51,7 @@ export const FIELD_TYPE_ICONS: Record<CustomFieldType, string> = {
   department_search: 'Building2',
   file: 'Paperclip',
   table_lookup: 'Database',
+  repeatable_table: 'Table2',
 };
 
 // Available tables for table_lookup fields

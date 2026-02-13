@@ -121,7 +121,7 @@ export function useCustomFields(options: UseCustomFieldsOptions = {}) {
         .insert({
           name: field.name,
           label: field.label,
-          field_type: field.field_type,
+          field_type: field.field_type as any,
           description: field.description,
           process_template_id: field.process_template_id,
           sub_process_template_id: field.sub_process_template_id,
@@ -171,7 +171,7 @@ export function useCustomFields(options: UseCustomFieldsOptions = {}) {
         .update({
           name: updates.name,
           label: updates.label,
-          field_type: updates.field_type,
+          field_type: updates.field_type as any,
           description: updates.description,
           is_required: updates.is_required,
           options: updates.options as any,

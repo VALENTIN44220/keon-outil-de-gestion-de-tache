@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { RepeatableTableRenderer } from './RepeatableTableRenderer';
 import { TemplateCustomField, CustomFieldType, LOOKUP_TABLES } from '@/types/customField';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -71,6 +72,7 @@ const FIELD_ICONS: Record<CustomFieldType, React.ElementType> = {
   department_search: Building2,
   file: Paperclip,
   table_lookup: Database,
+  repeatable_table: Database,
 };
 
 export function CustomFieldsRenderer({
@@ -509,6 +511,16 @@ export function CustomFieldsRenderer({
               )}
             </SelectContent>
           </Select>
+        );
+
+      case 'repeatable_table':
+        return (
+          <RepeatableTableRenderer
+            field={field}
+            value={value || null}
+            onChange={handleChange}
+            disabled={disabled}
+          />
         );
 
       default:

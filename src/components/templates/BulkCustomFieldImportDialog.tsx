@@ -187,7 +187,7 @@ export function BulkCustomFieldImportDialog({
         order_index: index,
       }));
 
-      const { error } = await supabase.from('template_custom_fields').insert(fieldsToInsert);
+      const { error } = await supabase.from('template_custom_fields').insert(fieldsToInsert as any);
 
       if (error) throw error;
 
