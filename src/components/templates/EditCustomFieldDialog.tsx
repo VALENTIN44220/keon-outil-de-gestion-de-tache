@@ -150,7 +150,7 @@ export function EditCustomFieldDialog({
         .update({
           name: name.trim(),
           label: label.trim(),
-          field_type: fieldType,
+          field_type: fieldType as any,
           description: description.trim() || null,
           is_required: isRequired,
           placeholder: placeholder.trim() || null,

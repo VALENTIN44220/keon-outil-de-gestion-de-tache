@@ -59,6 +59,7 @@ const FIELD_TYPE_ICON_MAP: Record<CustomFieldType, React.ElementType> = {
   department_search: Building2,
   file: Paperclip,
   table_lookup: Database,
+  repeatable_table: Database,
 };
 
 export function ProcessCustomFieldsEditor({ 

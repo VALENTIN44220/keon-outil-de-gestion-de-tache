@@ -48,6 +48,7 @@ const FIELD_ICONS: Record<CustomFieldType, string> = {
   department_search: '🏢',
   file: '📎',
   table_lookup: '🗃️',
+  repeatable_table: '📊',
 };
 
 export const FormBuilderCanvas = memo(function FormBuilderCanvas({

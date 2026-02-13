@@ -82,6 +82,7 @@ const FIELD_ICONS: Record<CustomFieldType, string> = {
   department_search: '🏢',
   file: '📎',
   table_lookup: '🗃️',
+  repeatable_table: '📊',
 };
 
 export const EnhancedFormBuilderCanvas = memo(function EnhancedFormBuilderCanvas({
@@ -572,13 +573,19 @@ export const EnhancedFormBuilderCanvas = memo(function EnhancedFormBuilderCanvas
 
             {/* Empty state */}
             {sections.length === 0 && orphanFields.length === 0 && (
-              <div className="border-2 border-dashed border-muted rounded-xl p-12 text-center">
+              <div
+                className="border-2 border-dashed border-muted rounded-xl p-12 text-center"
+                onDragEnter={(e) => handleDragEnter(e, null)}
+                onDragLeave={handleDragLeave}
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, null)}
+              >
                 <Layers className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
                 <h3 className="text-lg font-medium text-muted-foreground mb-2">
-                  Formulaire vide
+                  {dropTargetSectionId === null && !draggedFieldId ? 'Formulaire vide' : 'Déposez le champ ici'}
                 </h3>
                 <p className="text-sm text-muted-foreground mb-4">
-                  Ajoutez une section et glissez des champs depuis la bibliothèque
+                  Cliquez sur un champ dans la bibliothèque ou glissez-le ici
                 </p>
                 {canManage && (
                   <Button onClick={onAddSection}>

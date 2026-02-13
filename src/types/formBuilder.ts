@@ -327,6 +327,20 @@ export const FIELD_TYPE_CONFIGS: FieldTypeConfig[] = [
     category: 'special',
     description: 'Upload de fichier',
   },
+  {
+    type: 'repeatable_table',
+    label: 'Table multi-lignes',
+    icon: 'Table2',
+    category: 'special',
+    description: 'Zone de champs multiples avec ajout de lignes',
+    defaultProps: {
+      options: [
+        { value: 'col_1', label: 'Colonne 1' },
+        { value: 'col_2', label: 'Colonne 2' },
+        { value: 'col_3', label: 'Quantité' },
+      ] as any,
+    },
+  },
 ];
 
 // =====================
