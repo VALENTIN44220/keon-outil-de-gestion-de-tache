@@ -392,7 +392,7 @@ export function ConfigurableDashboard({
       case 'line-chart':
         return <LineChartWidget data={getTimelineData()} />;
       case 'data-table':
-        return <DataTableWidget tasks={filteredTasks} onTaskClick={onTaskClick} />;
+        return <DataTableWidget tasks={filteredTasks} onTaskClick={onTaskClick} processId={processId} />;
       case 'progress-ring':
         return (
           <div className="flex items-center justify-center h-full">
@@ -410,7 +410,7 @@ export function ConfigurableDashboard({
       case 'stats-summary':
         return 'h-[200px]';
       case 'data-table':
-        return 'h-[400px]';
+        return 'h-[500px]';
       case 'line-chart':
         return 'h-[300px]';
       default:
