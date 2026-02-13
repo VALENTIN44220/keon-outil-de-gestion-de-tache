@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
+import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
 import { useSupplierAccess } from '@/hooks/useSupplierAccess';
 import { SupplierListView } from '@/components/suppliers/SupplierListView';
 import { SupplierDetailDrawer } from '@/components/suppliers/SupplierDetailDrawer';
@@ -7,7 +8,8 @@ import { Loader2 } from 'lucide-react';
 import { Sidebar } from '@/components/layout/Sidebar';
 
 export default function SupplierReference() {
-  const { hasAccess, role, isLoading: accessLoading } = useSupplierAccess();
+  const { effectivePermissions, isLoading: permLoading } = useEffectivePermissions();
+  const { role, isLoading: accessLoading } = useSupplierAccess();
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeView, setActiveView] = useState('suppliers');
@@ -22,7 +24,7 @@ export default function SupplierReference() {
     setSelectedSupplierId(null);
   };
 
-  if (accessLoading) {
+  if (permLoading || accessLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -30,7 +32,7 @@ export default function SupplierReference() {
     );
   }
 
-  if (!hasAccess) {
+  if (!effectivePermissions.can_access_suppliers) {
     return <Navigate to="/" replace />;
   }
 
