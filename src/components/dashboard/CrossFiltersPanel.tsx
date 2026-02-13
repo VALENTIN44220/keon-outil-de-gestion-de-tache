@@ -139,7 +139,7 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose }: CrossFi
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
         {/* Period selector */}
         <div className="space-y-2">
           <Label className="text-xs text-keon-600 flex items-center gap-1">
@@ -299,39 +299,64 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose }: CrossFi
           </Popover>
         </div>
 
-        {/* Status & Priority toggles */}
+        {/* Status multi-select dropdown */}
         <div className="space-y-2">
-          <Label className="text-xs text-keon-600">Statut / Priorité</Label>
-          <div className="flex flex-wrap gap-1">
-            {STATUSES.map(s => (
-              <Badge
-                key={s.value}
-                variant={filters.statuses.includes(s.value as any) ? 'default' : 'outline'}
-                className={cn(
-                  'cursor-pointer text-xs transition-all',
-                  filters.statuses.includes(s.value as any) ? s.color + ' text-white' : ''
-                )}
-                onClick={() => handleStatusToggle(s.value, !filters.statuses.includes(s.value as any))}
-              >
-                {s.label}
-              </Badge>
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-1">
-            {PRIORITIES.map(p => (
-              <Badge
-                key={p.value}
-                variant={filters.priorities.includes(p.value as any) ? 'default' : 'outline'}
-                className={cn(
-                  'cursor-pointer text-xs transition-all',
-                  filters.priorities.includes(p.value as any) ? p.color + ' text-white' : ''
-                )}
-                onClick={() => handlePriorityToggle(p.value, !filters.priorities.includes(p.value as any))}
-              >
-                {p.label}
-              </Badge>
-            ))}
-          </div>
+          <Label className="text-xs text-keon-600">Statut ({filters.statuses.length})</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-full h-9 justify-between">
+                <span className="truncate">
+                  {filters.statuses.length > 0 ? `${filters.statuses.length} sélectionné(s)` : 'Tous'}
+                </span>
+                <ChevronDown className="h-4 w-4 ml-2" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-2" align="start">
+              <div className="space-y-2">
+                {STATUSES.map(s => (
+                  <div key={s.value} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`status-${s.value}`}
+                      checked={filters.statuses.includes(s.value as any)}
+                      onCheckedChange={(checked) => handleStatusToggle(s.value, !!checked)}
+                    />
+                    <div className={cn('w-2.5 h-2.5 rounded-full', s.color)} />
+                    <Label htmlFor={`status-${s.value}`} className="text-sm cursor-pointer">{s.label}</Label>
+                  </div>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        {/* Priority multi-select dropdown */}
+        <div className="space-y-2">
+          <Label className="text-xs text-keon-600">Priorité ({filters.priorities.length})</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-full h-9 justify-between">
+                <span className="truncate">
+                  {filters.priorities.length > 0 ? `${filters.priorities.length} sélectionné(s)` : 'Toutes'}
+                </span>
+                <ChevronDown className="h-4 w-4 ml-2" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-2" align="start">
+              <div className="space-y-2">
+                {PRIORITIES.map(p => (
+                  <div key={p.value} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`priority-${p.value}`}
+                      checked={filters.priorities.includes(p.value as any)}
+                      onCheckedChange={(checked) => handlePriorityToggle(p.value, !!checked)}
+                    />
+                    <div className={cn('w-2.5 h-2.5 rounded-full', p.color)} />
+                    <Label htmlFor={`priority-${p.value}`} className="text-sm cursor-pointer">{p.label}</Label>
+                  </div>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
     </div>
