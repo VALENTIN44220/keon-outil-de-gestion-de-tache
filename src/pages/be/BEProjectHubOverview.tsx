@@ -123,7 +123,28 @@ export default function BEProjectHubOverview() {
                   <DescriptionItem label="Pays site" value={project.pays_site} />
                   <DescriptionItem label="Région" value={project.region} />
                   <DescriptionItem label="Département" value={project.departement} />
+                  <DescriptionItem label="Coordonnées GPS" value={project.gps_coordinates} mono />
                 </div>
+
+                {/* Map embed */}
+                {project.gps_coordinates && (() => {
+                  const parts = project.gps_coordinates.split(',').map(s => s.trim());
+                  const lat = parseFloat(parts[0]);
+                  const lon = parseFloat(parts[1]);
+                  if (isNaN(lat) || isNaN(lon)) return null;
+                  return (
+                    <div className="mt-3 rounded-lg overflow-hidden border border-border">
+                      <iframe
+                        title="Localisation du projet"
+                        width="100%"
+                        height="200"
+                        style={{ border: 0 }}
+                        loading="lazy"
+                        src={`https://www.openstreetmap.org/export/embed.html?bbox=${lon - 0.01},${lat - 0.01},${lon + 0.01},${lat + 0.01}&layer=mapnik&marker=${lat},${lon}`}
+                      />
+                    </div>
+                  );
+                })()}
               </div>
             </CardContent>
           </Card>
