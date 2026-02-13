@@ -26,6 +26,7 @@ const projectSchema = z.object({
   pays_site: z.string().nullable().optional(),
   region: z.string().nullable().optional(),
   departement: z.string().nullable().optional(),
+  gps_coordinates: z.string().nullable().optional(),
   // Identifiants
   code_divalto: z.string().nullable().optional(),
   siret: z.string().nullable().optional(),
@@ -63,6 +64,7 @@ export function BEProjectDialog({ open, onClose, onSave, project }: BEProjectDia
       pays_site: null,
       region: null,
       departement: null,
+      gps_coordinates: null,
       code_divalto: null,
       siret: null,
       date_cloture_bancaire: null,
@@ -88,6 +90,7 @@ export function BEProjectDialog({ open, onClose, onSave, project }: BEProjectDia
         pays_site: project.pays_site,
         region: project.region,
         departement: project.departement,
+        gps_coordinates: (project as any).gps_coordinates,
         code_divalto: project.code_divalto,
         siret: project.siret,
         date_cloture_bancaire: project.date_cloture_bancaire,
@@ -110,6 +113,7 @@ export function BEProjectDialog({ open, onClose, onSave, project }: BEProjectDia
         pays_site: null,
         region: null,
         departement: null,
+        gps_coordinates: null,
         code_divalto: null,
         siret: null,
         date_cloture_bancaire: null,
@@ -135,6 +139,7 @@ export function BEProjectDialog({ open, onClose, onSave, project }: BEProjectDia
       pays_site: data.pays_site || null,
       region: data.region || null,
       departement: data.departement || null,
+      gps_coordinates: data.gps_coordinates || null,
       code_divalto: data.code_divalto || null,
       siret: data.siret || null,
       date_cloture_bancaire: data.date_cloture_bancaire || null,
@@ -334,6 +339,20 @@ export function BEProjectDialog({ open, onClose, onSave, project }: BEProjectDia
                         <FormLabel>Département</FormLabel>
                         <FormControl>
                           <Input {...field} value={field.value || ''} placeholder="Ex: 75 - Paris" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                   />
+
+                  <FormField
+                    control={form.control}
+                    name="gps_coordinates"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Coordonnées GPS</FormLabel>
+                        <FormControl>
+                          <Input {...field} value={field.value || ''} placeholder="Ex: 48.8566, 2.3522" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

@@ -124,6 +124,7 @@ export function BEProjectsView() {
       'actionnariat',
       'regime_icpe',
       'typologie',
+      'gps_coordinates',
       'status',
     ];
 

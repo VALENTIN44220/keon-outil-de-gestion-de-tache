@@ -1,0 +1,1 @@
+ALTER TABLE public.be_projects ADD COLUMN gps_coordinates text DEFAULT NULL;

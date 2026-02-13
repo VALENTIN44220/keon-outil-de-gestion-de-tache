@@ -32,6 +32,7 @@ export const ALL_PROJECT_COLUMNS: ColumnDefinition[] = [
   { key: 'adresse_site', label: 'Adresse site', defaultVisible: false },
   { key: 'adresse_societe', label: 'Adresse société', defaultVisible: false },
   { key: 'description', label: 'Description', defaultVisible: false },
+  { key: 'gps_coordinates', label: 'Coordonnées GPS', defaultVisible: false },
   { key: 'created_at', label: 'Créé le', defaultVisible: true },
 ];
 

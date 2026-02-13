@@ -228,6 +228,7 @@ export type Database = {
           departement: string | null
           description: string | null
           developpeur_id: string | null
+          gps_coordinates: string | null
           id: string
           ingenieur_etudes_id: string | null
           ingenieur_realisation_id: string | null
@@ -258,6 +259,7 @@ export type Database = {
           departement?: string | null
           description?: string | null
           developpeur_id?: string | null
+          gps_coordinates?: string | null
           id?: string
           ingenieur_etudes_id?: string | null
           ingenieur_realisation_id?: string | null
@@ -288,6 +290,7 @@ export type Database = {
           departement?: string | null
           description?: string | null
           developpeur_id?: string | null
+          gps_coordinates?: string | null
           id?: string
           ingenieur_etudes_id?: string | null
           ingenieur_realisation_id?: string | null
