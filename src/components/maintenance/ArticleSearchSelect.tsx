@@ -38,8 +38,8 @@ export function ArticleSearchSelect({ value, onSelect, disabled }: ArticleSearch
       let q = supabase
         .from('articles')
         .select('id, art_id, ref, des, prix_moy, qte')
-        .like('ref', 'ASM%')
-        .neq('des', 'ARTICLE MAINTENANCE NON DEFINI')
+        .not('des', 'is', null)
+        .neq('des', '')
         .order('des', { ascending: true })
         .limit(50);
 
