@@ -20,13 +20,19 @@ interface Article {
   qte: number | null;
 }
 
+export interface ArticleFilterConfig {
+  ref_prefix?: string | null;
+  exclude_des?: string | null;
+}
+
 interface ArticleSearchSelectProps {
   value?: { id: string; ref: string; des: string } | null;
   onSelect: (article: { id: string; ref: string; des: string }) => void;
   disabled?: boolean;
+  filterConfig?: ArticleFilterConfig;
 }
 
-export function ArticleSearchSelect({ value, onSelect, disabled }: ArticleSearchSelectProps) {
+export function ArticleSearchSelect({ value, onSelect, disabled, filterConfig }: ArticleSearchSelectProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [articles, setArticles] = useState<Article[]>([]);
@@ -43,8 +49,17 @@ export function ArticleSearchSelect({ value, onSelect, disabled }: ArticleSearch
         .order('des', { ascending: true })
         .limit(50);
 
+      // Apply ref prefix filter if configured
+      if (filterConfig?.ref_prefix) {
+        q = q.like('ref', `${filterConfig.ref_prefix}%`);
+      }
+
+      // Apply exclude_des filter if configured
+      if (filterConfig?.exclude_des) {
+        q = q.not('des', 'ilike', `%${filterConfig.exclude_des}%`);
+      }
+
       if (query.trim()) {
-        // Search on both des and ref
         q = q.or(`des.ilike.%${query}%,ref.ilike.%${query}%`);
       }
 
@@ -56,7 +71,7 @@ export function ArticleSearchSelect({ value, onSelect, disabled }: ArticleSearch
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [filterConfig]);
 
   useEffect(() => {
     if (open) {

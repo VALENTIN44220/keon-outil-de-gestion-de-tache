@@ -41,6 +41,7 @@ import {
   ArrowLeft,
   GitBranch,
   ExternalLink,
+  Package,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { SubProcessTemplate, TaskTemplate, ASSIGNMENT_TYPE_LABELS } from '@/types/template';
@@ -125,6 +126,12 @@ export function SubProcessConfigView({
     modifiable_at_request: false,
   });
 
+  // Article filter config (stored in form_schema)
+  const [articleFilter, setArticleFilter] = useState({
+    ref_prefix: '',
+    exclude_des: '',
+  });
+
   useEffect(() => {
     if (open && subProcessId) {
       fetchData();
@@ -154,6 +161,18 @@ export function SubProcessConfigView({
           target_group_id: spData.target_group_id,
           modifiable_at_request: false,
         });
+
+        // Load article filter from form_schema
+        const formSchema = (spData as any).form_schema;
+        if (formSchema && typeof formSchema === 'object') {
+          const af = (formSchema as any).article_filter;
+          if (af) {
+            setArticleFilter({
+              ref_prefix: af.ref_prefix || '',
+              exclude_des: af.exclude_des || '',
+            });
+          }
+        }
         
         // Load validation levels from validation_config JSONB column
         const validationConfig = (spData as any).validation_config;
@@ -207,12 +226,23 @@ export function SubProcessConfigView({
     setIsSaving(true);
 
     try {
+      // Build form_schema with article filter
+      const existingSchema = (subProcess as any).form_schema || {};
+      const updatedSchema = {
+        ...existingSchema,
+        article_filter: {
+          ref_prefix: articleFilter.ref_prefix || null,
+          exclude_des: articleFilter.exclude_des || null,
+        },
+      };
+
       const { error } = await supabase
         .from('sub_process_templates')
         .update({
           name: formData.name,
           description: formData.description || null,
           is_mandatory: formData.is_mandatory,
+          form_schema: updatedSchema,
         })
         .eq('id', subProcessId);
 
@@ -469,6 +499,45 @@ export function SubProcessConfigView({
                         disabled={!canManage}
                       />
                     </div>
+
+                    <Separator />
+
+                    <Card className="border-warning/30 bg-warning/5">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm flex items-center gap-2">
+                          <Package className="h-4 w-4 text-warning" />
+                          Filtre des articles
+                        </CardTitle>
+                        <CardDescription className="text-xs">
+                          Restreindre les articles disponibles dans le sélecteur de ce sous-processus
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="space-y-2">
+                          <Label className="text-xs">Préfixe de référence</Label>
+                          <Input
+                            value={articleFilter.ref_prefix}
+                            onChange={(e) => setArticleFilter({ ...articleFilter, ref_prefix: e.target.value })}
+                            placeholder="Ex: ASM, AD0, AS0... (vide = tous)"
+                            className="h-8 text-sm"
+                            disabled={!canManage}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Seuls les articles dont la référence commence par ce préfixe seront affichés
+                          </p>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs">Exclure les désignations contenant</Label>
+                          <Input
+                            value={articleFilter.exclude_des}
+                            onChange={(e) => setArticleFilter({ ...articleFilter, exclude_des: e.target.value })}
+                            placeholder="Ex: NON DEFINI (vide = aucune exclusion)"
+                            className="h-8 text-sm"
+                            disabled={!canManage}
+                          />
+                        </div>
+                      </CardContent>
+                    </Card>
                     {canManage && (
                       <Button onClick={handleSaveGeneral} disabled={isSaving}>
                         {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}

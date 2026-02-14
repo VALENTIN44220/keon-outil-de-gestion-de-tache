@@ -3,7 +3,7 @@ import { Plus, Trash2, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArticleSearchSelect } from './ArticleSearchSelect';
+import { ArticleSearchSelect, ArticleFilterConfig } from './ArticleSearchSelect';
 
 export interface MaterialLine {
   id: string;
@@ -15,9 +15,10 @@ interface MaterialRequestLinesProps {
   lines: MaterialLine[];
   onChange: (lines: MaterialLine[]) => void;
   disabled?: boolean;
+  articleFilterConfig?: ArticleFilterConfig;
 }
 
-export function MaterialRequestLines({ lines, onChange, disabled }: MaterialRequestLinesProps) {
+export function MaterialRequestLines({ lines, onChange, disabled, articleFilterConfig }: MaterialRequestLinesProps) {
   const addLine = () => {
     onChange([
       ...lines,
@@ -60,6 +61,7 @@ export function MaterialRequestLines({ lines, onChange, disabled }: MaterialRequ
                 value={line.article}
                 onSelect={(article) => updateLine(index, { article })}
                 disabled={disabled}
+                filterConfig={articleFilterConfig}
               />
             </div>
             <div className="w-24 space-y-2">
