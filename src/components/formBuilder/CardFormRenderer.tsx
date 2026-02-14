@@ -472,6 +472,12 @@ export const CardFormRenderer = memo(function CardFormRenderer({
     [schema.sections]
   );
 
+  // Find fields not placed in any section
+  const unplacedFields = useMemo(() => {
+    const placedFieldIds = new Set(schema.placements.map((p) => p.field_id));
+    return fields.filter((f) => !placedFieldIds.has(f.id));
+  }, [fields, schema.placements]);
+
   return (
     <div className={cn('space-y-4', className)}>
       {/* Common fields */}
@@ -479,6 +485,43 @@ export const CardFormRenderer = memo(function CardFormRenderer({
 
       {/* Sections */}
       {sortedSections.map(renderSection)}
+
+      {/* Unplaced fields */}
+      {unplacedFields.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-semibold">Autres champs</CardTitle>
+              <Badge variant="outline" className="text-[10px]">
+                {unplacedFields.length} champ{unplacedFields.length > 1 ? 's' : ''}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className={cn(
+              'grid gap-4',
+              schema.global_settings.columns === 1 && 'grid-cols-1',
+              schema.global_settings.columns === 2 && 'grid-cols-2',
+              schema.global_settings.columns === 3 && 'grid-cols-3',
+              schema.global_settings.columns === 4 && 'grid-cols-4',
+              !schema.global_settings.columns && 'grid-cols-2',
+            )}>
+              {unplacedFields.map((field) => {
+                const defaultPlacement: FormSchemaPlacement = {
+                  field_id: field.id,
+                  section_id: '__unplaced__',
+                  order_index: 0,
+                  column_span: field.field_type === 'repeatable_table' ? (schema.global_settings.columns || 2) : 1,
+                  column_index: 0,
+                  row_index: 0,
+                  overrides: {},
+                };
+                return renderFieldInput(field, defaultPlacement, values[field.id], readOnly);
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Submit button */}
       {onSubmit && (
