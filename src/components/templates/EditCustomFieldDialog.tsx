@@ -30,6 +30,7 @@ import { useTableLookupConfigs } from '@/hooks/useTableLookupConfigs';
 import { useProcessTemplates } from '@/hooks/useProcessTemplates';
 import { useAllSubProcessTemplates } from '@/hooks/useAllSubProcessTemplates';
 import { Plus, Trash2, Globe, Workflow, GitBranch } from 'lucide-react';
+import { RepeatableTableColumnsEditor } from './RepeatableTableColumnsEditor';
 
 interface EditCustomFieldDialogProps {
   field: TemplateCustomField | null;
@@ -157,7 +158,9 @@ export function EditCustomFieldDialog({
           default_value: defaultValue.trim() || null,
           options: ['select', 'multiselect'].includes(fieldType)
             ? (options.filter((o) => o.value && o.label) as any)
-            : null,
+            : fieldType === 'repeatable_table'
+              ? (options.filter((o) => o.value && o.label) as any)
+              : null,
           lookup_table: fieldType === 'table_lookup' && lookupConfigId ? activeConfigs.find(c => c.id === lookupConfigId)?.table_name : null,
           lookup_value_column: fieldType === 'table_lookup' && lookupConfigId ? activeConfigs.find(c => c.id === lookupConfigId)?.value_column : null,
           lookup_label_column: fieldType === 'table_lookup' && lookupConfigId ? activeConfigs.find(c => c.id === lookupConfigId)?.display_column : null,
@@ -285,6 +288,14 @@ export function EditCustomFieldDialog({
                 )}
               </div>
             </div>
+          )}
+
+          {/* Repeatable table columns configuration */}
+          {fieldType === 'repeatable_table' && (
+            <RepeatableTableColumnsEditor
+              columns={options}
+              onChange={setOptions}
+            />
           )}
 
           {/* Table lookup configuration */}

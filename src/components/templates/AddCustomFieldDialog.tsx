@@ -30,6 +30,7 @@ import {
 import { useTableLookupConfigs } from '@/hooks/useTableLookupConfigs';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Trash2 } from 'lucide-react';
+import { RepeatableTableColumnsEditor } from './RepeatableTableColumnsEditor';
 
 interface AddCustomFieldDialogProps {
   open: boolean;
@@ -162,7 +163,11 @@ export function AddCustomFieldDialog({
         is_required: isRequired,
         placeholder: placeholder.trim() || null,
         default_value: defaultValue.trim() || null,
-        options: ['select', 'multiselect'].includes(fieldType) ? options.filter(o => o.value && o.label) : null,
+        options: ['select', 'multiselect'].includes(fieldType)
+          ? options.filter(o => o.value && o.label)
+          : fieldType === 'repeatable_table'
+            ? options.filter(o => o.value && o.label)
+            : null,
         is_common: scope === 'common',
         process_template_id: scope === 'process' ? processId : null,
         sub_process_template_id: scope === 'sub_process' ? subProcessId : null,
@@ -297,6 +302,14 @@ export function AddCustomFieldDialog({
                 )}
               </div>
             </div>
+          )}
+
+          {/* Repeatable table columns configuration */}
+          {fieldType === 'repeatable_table' && (
+            <RepeatableTableColumnsEditor
+              columns={options}
+              onChange={setOptions}
+            />
           )}
 
           {/* Table lookup configuration */}
