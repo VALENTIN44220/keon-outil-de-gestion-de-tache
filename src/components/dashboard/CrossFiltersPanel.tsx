@@ -40,9 +40,16 @@ const PERIODS = [
 ];
 
 const STATUSES = [
-  { value: 'todo', label: 'À faire', color: 'bg-keon-orange' },
-  { value: 'in-progress', label: 'En cours', color: 'bg-keon-blue' },
-  { value: 'done', label: 'Terminé', color: 'bg-keon-green' },
+  { value: 'to_assign', label: 'À affecter', color: 'bg-amber-500' },
+  { value: 'todo', label: 'À faire', color: 'bg-slate-500' },
+  { value: 'in-progress', label: 'En cours', color: 'bg-blue-500' },
+  { value: 'done', label: 'Terminé', color: 'bg-green-500' },
+  { value: 'pending_validation_1', label: 'En attente de validation', color: 'bg-violet-500' },
+  { value: 'pending_validation_2', label: 'Validation N2', color: 'bg-violet-500' },
+  { value: 'validated', label: 'Validé / Terminé', color: 'bg-emerald-500' },
+  { value: 'refused', label: 'Refusé', color: 'bg-red-500' },
+  { value: 'review', label: 'À corriger', color: 'bg-purple-500' },
+  { value: 'cancelled', label: 'Annulé', color: 'bg-gray-400' },
 ];
 
 const PRIORITIES = [
