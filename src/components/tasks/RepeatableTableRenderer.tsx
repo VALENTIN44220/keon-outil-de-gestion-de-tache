@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,32 +34,34 @@ interface RepeatableTableRendererProps {
   disabled?: boolean;
 }
 
-// Cache for lookup data to avoid redundant fetches
-const lookupCache: Record<string, { value: string; label: string }[]> = {};
+// Cache for lookup data
+const lookupCache: Record<string, Record<string, any>[]> = {};
 
-async function fetchLookupOptions(col: FieldOption): Promise<{ value: string; label: string }[]> {
-  const cacheKey = `${col.lookupTable}_${col.lookupLabelColumn}_${col.lookupValueColumn}_${col.lookupFilterColumn}_${col.lookupFilterValue}`;
+async function fetchLookupRows(col: FieldOption): Promise<Record<string, any>[]> {
+  if (!col.lookupTable) return [];
+
+  // Build select columns: value + label + display columns
+  const selectCols = new Set<string>();
+  if (col.lookupValueColumn) selectCols.add(col.lookupValueColumn);
+  if (col.lookupLabelColumn) selectCols.add(col.lookupLabelColumn);
+  (col.lookupDisplayColumns || []).forEach(c => selectCols.add(c));
+
+  const cacheKey = `${col.lookupTable}_${[...selectCols].sort().join(',')}_${col.lookupFilterColumn}_${col.lookupFilterValue}`;
   if (lookupCache[cacheKey]) return lookupCache[cacheKey];
-
-  if (!col.lookupTable || !col.lookupLabelColumn || !col.lookupValueColumn) return [];
 
   let query = supabase
     .from(col.lookupTable as any)
-    .select(`${col.lookupValueColumn}, ${col.lookupLabelColumn}`)
-    .order(col.lookupLabelColumn);
+    .select([...selectCols].join(', '))
+    .order(col.lookupLabelColumn || [...selectCols][0]);
 
   if (col.lookupFilterColumn && col.lookupFilterValue) {
     query = query.ilike(col.lookupFilterColumn, `%${col.lookupFilterValue}%`);
   }
 
   const { data } = await query.limit(500);
-  const options = (data || []).map((row: any) => ({
-    value: String(row[col.lookupValueColumn!]),
-    label: String(row[col.lookupLabelColumn!]),
-  }));
-
-  lookupCache[cacheKey] = options;
-  return options;
+  const rows = (data || []) as Record<string, any>[];
+  lookupCache[cacheKey] = rows;
+  return rows;
 }
 
 export function RepeatableTableRenderer({
@@ -68,37 +70,78 @@ export function RepeatableTableRenderer({
   onChange,
   disabled,
 }: RepeatableTableRendererProps) {
-  const columns: FieldOption[] = (field.options as FieldOption[]) || [];
+  const configColumns: FieldOption[] = (field.options as FieldOption[]) || [];
   const rows: RepeatableTableRow[] = value || [];
-  const [lookupOptions, setLookupOptions] = useState<Record<string, { value: string; label: string }[]>>({});
+  const [lookupData, setLookupData] = useState<Record<string, Record<string, any>[]>>({});
 
   // Fetch lookup data for table_lookup columns
   useEffect(() => {
-    const lookupCols = columns.filter(c => c.columnType === 'table_lookup' && c.lookupTable);
+    const lookupCols = configColumns.filter(c => c.columnType === 'table_lookup' && c.lookupTable);
     if (lookupCols.length === 0) return;
 
     Promise.all(
       lookupCols.map(async (col) => {
-        const options = await fetchLookupOptions(col);
-        return { key: col.value, options };
+        const data = await fetchLookupRows(col);
+        return { key: col.value, data };
       })
     ).then((results) => {
-      const map: Record<string, { value: string; label: string }[]> = {};
-      results.forEach(r => { map[r.key] = r.options; });
-      setLookupOptions(map);
+      const map: Record<string, Record<string, any>[]> = {};
+      results.forEach(r => { map[r.key] = r.data; });
+      setLookupData(map);
     });
-  }, [columns]);
+  }, [configColumns]);
+
+  // Build the effective display columns: lookup columns expand into multiple table columns
+  const displayColumns = useMemo(() => {
+    const result: {
+      key: string;
+      label: string;
+      sourceCol: FieldOption;
+      type: 'input' | 'lookup_search' | 'lookup_display';
+      dbColumn?: string;
+    }[] = [];
+
+    configColumns.forEach(col => {
+      if (col.columnType === 'table_lookup') {
+        // The search/select column
+        result.push({
+          key: col.value,
+          label: col.lookupLabelColumn || col.label,
+          sourceCol: col,
+          type: 'lookup_search',
+        });
+        // Additional display columns from the source table
+        (col.lookupDisplayColumns || []).forEach(dc => {
+          if (dc !== col.lookupLabelColumn) {
+            result.push({
+              key: `${col.value}__${dc}`,
+              label: dc,
+              sourceCol: col,
+              type: 'lookup_display',
+              dbColumn: dc,
+            });
+          }
+        });
+      } else {
+        result.push({
+          key: col.value,
+          label: col.label,
+          sourceCol: col,
+          type: 'input',
+        });
+      }
+    });
+
+    return result;
+  }, [configColumns]);
 
   const addRow = useCallback(() => {
     const newRow: RepeatableTableRow = {
       id: `row-${Date.now()}`,
-      values: columns.reduce((acc, col) => {
-        acc[col.value] = '';
-        return acc;
-      }, {} as Record<string, string>),
+      values: {},
     };
     onChange(field.id, [...rows, newRow]);
-  }, [columns, rows, onChange, field.id]);
+  }, [rows, onChange, field.id]);
 
   const removeRow = useCallback(
     (rowId: string) => {
@@ -111,12 +154,12 @@ export function RepeatableTableRenderer({
   );
 
   const updateCell = useCallback(
-    (rowId: string, colValue: string, cellValue: string) => {
+    (rowId: string, colKey: string, cellValue: string) => {
       onChange(
         field.id,
         rows.map((r) =>
           r.id === rowId
-            ? { ...r, values: { ...r.values, [colValue]: cellValue } }
+            ? { ...r, values: { ...r.values, [colKey]: cellValue } }
             : r
         )
       );
@@ -124,7 +167,39 @@ export function RepeatableTableRenderer({
     [rows, onChange, field.id]
   );
 
-  if (columns.length === 0) {
+  // When a lookup value is selected, auto-fill display columns
+  const handleLookupSelect = useCallback(
+    (rowId: string, col: FieldOption, selectedValue: string) => {
+      const data = lookupData[col.value] || [];
+      const selectedRow = data.find(
+        r => String(r[col.lookupLabelColumn || '']) === selectedValue
+      );
+
+      const updates: Record<string, string> = {
+        [col.value]: selectedValue,
+      };
+
+      if (selectedRow) {
+        (col.lookupDisplayColumns || []).forEach(dc => {
+          if (dc !== col.lookupLabelColumn) {
+            updates[`${col.value}__${dc}`] = String(selectedRow[dc] ?? '');
+          }
+        });
+      }
+
+      onChange(
+        field.id,
+        rows.map((r) =>
+          r.id === rowId
+            ? { ...r, values: { ...r.values, ...updates } }
+            : r
+        )
+      );
+    },
+    [rows, onChange, field.id, lookupData]
+  );
+
+  if (configColumns.length === 0) {
     return (
       <div className="text-sm text-muted-foreground text-center py-4 border border-dashed rounded-lg">
         Aucune colonne configurée pour cette table.
@@ -132,9 +207,40 @@ export function RepeatableTableRenderer({
     );
   }
 
-  const renderCell = (row: RepeatableTableRow, col: FieldOption) => {
-    const cellValue = row.values[col.value] || '';
-    const colType = col.columnType || 'text';
+  const renderCell = (row: RepeatableTableRow, dc: typeof displayColumns[0]) => {
+    const cellValue = row.values[dc.key] || '';
+
+    if (dc.type === 'lookup_display') {
+      // Read-only auto-filled column
+      return (
+        <span className="text-sm text-muted-foreground px-2 py-1 block bg-muted/30 rounded min-h-[32px] flex items-center">
+          {cellValue || '—'}
+        </span>
+      );
+    }
+
+    if (dc.type === 'lookup_search') {
+      const col = dc.sourceCol;
+      const data = lookupData[col.value] || [];
+      const options = data.map(r => ({
+        value: String(r[col.lookupLabelColumn || '']),
+        label: String(r[col.lookupLabelColumn || '']),
+      }));
+
+      return (
+        <SearchableSelect
+          value={cellValue}
+          onValueChange={(v) => handleLookupSelect(row.id, col, v)}
+          placeholder={dc.label}
+          searchPlaceholder="Rechercher..."
+          triggerClassName="h-8 text-sm"
+          options={options}
+        />
+      );
+    }
+
+    // Free input columns
+    const colType = dc.sourceCol.columnType || 'text';
 
     switch (colType) {
       case 'number':
@@ -142,10 +248,10 @@ export function RepeatableTableRenderer({
           <Input
             type="number"
             value={cellValue}
-            onChange={(e) => updateCell(row.id, col.value, e.target.value)}
+            onChange={(e) => updateCell(row.id, dc.key, e.target.value)}
             className="h-8 text-sm"
             disabled={disabled}
-            placeholder={col.label}
+            placeholder={dc.label}
           />
         );
 
@@ -153,15 +259,15 @@ export function RepeatableTableRenderer({
         return (
           <Select
             value={cellValue || '__empty__'}
-            onValueChange={(v) => updateCell(row.id, col.value, v === '__empty__' ? '' : v)}
+            onValueChange={(v) => updateCell(row.id, dc.key, v === '__empty__' ? '' : v)}
             disabled={disabled}
           >
             <SelectTrigger className="h-8 text-sm">
-              <SelectValue placeholder={col.label} />
+              <SelectValue placeholder={dc.label} />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="__empty__">—</SelectItem>
-              {(col.selectOptions || []).map((opt) => (
+              {(dc.sourceCol.selectOptions || []).map((opt) => (
                 <SelectItem key={opt.value} value={opt.value}>
                   {opt.label}
                 </SelectItem>
@@ -170,31 +276,14 @@ export function RepeatableTableRenderer({
           </Select>
         );
 
-      case 'table_lookup': {
-        const options = lookupOptions[col.value] || [];
-        return (
-          <SearchableSelect
-            value={cellValue}
-            onValueChange={(v) => updateCell(row.id, col.value, v)}
-            placeholder={col.label}
-            searchPlaceholder="Rechercher..."
-            triggerClassName="h-8 text-sm"
-            options={[
-              { value: '__empty__', label: '—' },
-              ...options,
-            ]}
-          />
-        );
-      }
-
-      default: // text
+      default:
         return (
           <Input
             value={cellValue}
-            onChange={(e) => updateCell(row.id, col.value, e.target.value)}
+            onChange={(e) => updateCell(row.id, dc.key, e.target.value)}
             className="h-8 text-sm"
             disabled={disabled}
-            placeholder={col.label}
+            placeholder={dc.label}
           />
         );
     }
@@ -215,13 +304,16 @@ export function RepeatableTableRenderer({
       )}
 
       {rows.length > 0 && (
-        <div className="border rounded-lg overflow-hidden">
+        <div className="border rounded-lg overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
-                {columns.map((col) => (
-                  <TableHead key={col.value} className="text-xs font-medium">
-                    {col.label}
+                {displayColumns.map((dc) => (
+                  <TableHead key={dc.key} className="text-xs font-medium whitespace-nowrap">
+                    {dc.label}
+                    {dc.type === 'lookup_display' && (
+                      <span className="text-muted-foreground ml-1">(auto)</span>
+                    )}
                   </TableHead>
                 ))}
                 {!disabled && <TableHead className="w-10" />}
@@ -230,9 +322,9 @@ export function RepeatableTableRenderer({
             <TableBody>
               {rows.map((row) => (
                 <TableRow key={row.id}>
-                  {columns.map((col) => (
-                    <TableCell key={col.value} className="p-1.5">
-                      {renderCell(row, col)}
+                  {displayColumns.map((dc) => (
+                    <TableCell key={dc.key} className="p-1.5">
+                      {renderCell(row, dc)}
                     </TableCell>
                   ))}
                   {!disabled && (

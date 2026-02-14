@@ -69,10 +69,10 @@ export type LookupTableName = typeof LOOKUP_TABLES[number]['value'];
 export type RepeatableColumnType = 'text' | 'number' | 'select' | 'table_lookup';
 
 export const REPEATABLE_COLUMN_TYPE_LABELS: Record<RepeatableColumnType, string> = {
-  text: 'Texte',
+  text: 'Texte libre',
   number: 'Nombre',
   select: 'Liste déroulante',
-  table_lookup: 'Référence table',
+  table_lookup: 'Depuis une table',
 };
 
 export interface FieldOption {
@@ -86,6 +86,8 @@ export interface FieldOption {
   lookupLabelColumn?: string;
   lookupFilterColumn?: string;
   lookupFilterValue?: string;
+  // Columns to display from the lookup table (auto-fill from source)
+  lookupDisplayColumns?: string[];
   selectOptions?: { value: string; label: string }[];
 }
 
