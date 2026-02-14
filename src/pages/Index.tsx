@@ -14,6 +14,7 @@ import { PendingAssignmentsView } from '@/components/tasks/PendingAssignmentsVie
 import { TeamModule } from '@/components/team/TeamModule';
 import { TaskDetailDialog } from '@/components/tasks/TaskDetailDialog';
 import { RequestDetailDialog } from '@/components/tasks/RequestDetailDialog';
+import { PlannerSyncPanel } from '@/components/planner/PlannerSyncPanel';
 import { useTasks } from '@/hooks/useTasks';
 import { useTaskScope, TaskScope } from '@/hooks/useTaskScope';
 import { useTasksProgress } from '@/hooks/useChecklists';
@@ -25,7 +26,7 @@ import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Workflow, ChevronDown, ChevronUp, Eye } from 'lucide-react';
+import { Loader2, Workflow, ChevronDown, ChevronUp, Eye, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useCategories } from '@/hooks/useCategories';
@@ -38,7 +39,7 @@ const Index = () => {
   const [taskView, setTaskView] = useState<TaskView>('grid');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [showFullStats, setShowFullStats] = useState(false);
-  const [dashboardMode, setDashboardMode] = useState<'tasks' | 'analytics' | 'tracking'>('tasks');
+  const [dashboardMode, setDashboardMode] = useState<'tasks' | 'analytics' | 'tracking' | 'planner'>('tasks');
   
   // Request tracking state
   const [myRequests, setMyRequests] = useState<Task[]>([]);
@@ -304,10 +305,21 @@ const Index = () => {
               </Badge>
             )}
           </Button>
+          <Button
+            variant={dashboardMode === 'planner' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setDashboardMode('planner')}
+            className="text-xs gap-1"
+          >
+            <Zap className="h-3.5 w-3.5" />
+            Planner
+          </Button>
         </div>
       </div>
 
-      {dashboardMode === 'tracking' ? (
+      {dashboardMode === 'planner' ? (
+        <PlannerSyncPanel />
+      ) : dashboardMode === 'tracking' ? (
         /* Request tracking dashboard */
         isLoadingRequests ? (
           <div className="flex items-center justify-center h-64">
