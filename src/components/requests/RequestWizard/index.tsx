@@ -30,9 +30,31 @@ export function RequestWizardDialog({ open, onClose, onSuccess, initialProcessId
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [targetPersonName, setTargetPersonName] = useState<string>();
+  const [articleFilterConfig, setArticleFilterConfig] = useState<{ ref_prefix?: string | null; exclude_des?: string | null } | undefined>();
 
   // Check if material sub-process is selected
   const hasMaterialSubProcess = data.selectedSubProcesses.includes(DEMANDE_MATERIEL_SP_ID);
+
+  // Fetch article filter config when material sub-process is selected
+  useEffect(() => {
+    if (hasMaterialSubProcess) {
+      supabase
+        .from('sub_process_templates')
+        .select('form_schema')
+        .eq('id', DEMANDE_MATERIEL_SP_ID)
+        .single()
+        .then(({ data: spData }) => {
+          const schema = (spData as any)?.form_schema;
+          if (schema?.article_filter) {
+            setArticleFilterConfig(schema.article_filter);
+          } else {
+            setArticleFilterConfig(undefined);
+          }
+        });
+    } else {
+      setArticleFilterConfig(undefined);
+    }
+  }, [hasMaterialSubProcess]);
 
   // Get current steps based on request type, inject material step if needed
   const steps = useMemo(() => {
@@ -371,7 +393,7 @@ export function RequestWizardDialog({ open, onClose, onSuccess, initialProcessId
       case "details":
         return <StepDetailsForm data={data} requestType={data.requestType!} onDataChange={updateData} />;
       case "material":
-        return <StepMaterialLines data={data} onDataChange={updateData} />;
+        return <StepMaterialLines data={data} onDataChange={updateData} articleFilterConfig={articleFilterConfig} />;
       case "fields":
         return <StepCustomFields data={data} onDataChange={updateData} />;
       case "summary":
