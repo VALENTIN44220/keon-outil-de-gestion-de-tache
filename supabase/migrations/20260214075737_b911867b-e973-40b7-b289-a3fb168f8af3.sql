@@ -1,0 +1,1 @@
+ALTER TYPE custom_field_type ADD VALUE 'repeatable_table';

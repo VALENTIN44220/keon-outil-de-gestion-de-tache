@@ -5265,6 +5265,7 @@ export type Database = {
         | "department_search"
         | "file"
         | "table_lookup"
+        | "repeatable_table"
       datalake_sync_direction: "app_to_datalake" | "datalake_to_app"
       datalake_sync_mode: "full" | "incremental"
       datalake_upsert_strategy: "insert_only" | "upsert" | "overwrite"
@@ -5457,6 +5458,7 @@ export const Constants = {
         "department_search",
         "file",
         "table_lookup",
+        "repeatable_table",
       ],
       datalake_sync_direction: ["app_to_datalake", "datalake_to_app"],
       datalake_sync_mode: ["full", "incremental"],
