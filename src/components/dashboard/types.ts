@@ -37,7 +37,7 @@ export interface CrossFilters {
 export const DEFAULT_CROSS_FILTERS: CrossFilters = {
   searchQuery: '',
   dateRange: { start: null, end: null },
-  period: 'month',
+  period: 'all',
   assigneeIds: [],
   departmentIds: [],
   categoryIds: [],
