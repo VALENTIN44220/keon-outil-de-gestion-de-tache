@@ -66,9 +66,27 @@ export const LOOKUP_TABLES = [
 
 export type LookupTableName = typeof LOOKUP_TABLES[number]['value'];
 
+export type RepeatableColumnType = 'text' | 'number' | 'select' | 'table_lookup';
+
+export const REPEATABLE_COLUMN_TYPE_LABELS: Record<RepeatableColumnType, string> = {
+  text: 'Texte',
+  number: 'Nombre',
+  select: 'Liste déroulante',
+  table_lookup: 'Référence table',
+};
+
 export interface FieldOption {
   value: string;
   label: string;
+  // Extended properties for repeatable_table columns
+  columnType?: RepeatableColumnType;
+  lookupConfigId?: string;
+  lookupTable?: string;
+  lookupValueColumn?: string;
+  lookupLabelColumn?: string;
+  lookupFilterColumn?: string;
+  lookupFilterValue?: string;
+  selectOptions?: { value: string; label: string }[];
 }
 
 export interface TemplateCustomField {
