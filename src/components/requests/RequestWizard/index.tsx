@@ -31,6 +31,7 @@ export function RequestWizardDialog({ open, onClose, onSuccess, initialProcessId
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [targetPersonName, setTargetPersonName] = useState<string>();
   const [articleFilterConfig, setArticleFilterConfig] = useState<{ ref_prefix?: string | null; exclude_des?: string | null } | undefined>();
+  const [commonFieldsConfig, setCommonFieldsConfig] = useState<any>(undefined);
 
   // Check if material sub-process is selected
   const hasMaterialSubProcess = data.selectedSubProcesses.includes(DEMANDE_MATERIEL_SP_ID);
@@ -109,6 +110,32 @@ export function RequestWizardDialog({ open, onClose, onSuccess, initialProcessId
       }
     }
   }, [open, initialProcessId]);
+
+  // Fetch common fields config when process is selected
+  useEffect(() => {
+    if (data.processId) {
+      supabase
+        .from('process_templates')
+        .select('settings')
+        .eq('id', data.processId)
+        .single()
+        .then(({ data: ptData }) => {
+          const settings = (ptData as any)?.settings;
+          if (settings?.common_fields_config) {
+            setCommonFieldsConfig(settings.common_fields_config);
+            // Apply default priority if priority is imposed
+            const priorityCfg = settings.common_fields_config.priority;
+            if (priorityCfg && !priorityCfg.editable && priorityCfg.default_value) {
+              setData((prev) => ({ ...prev, priority: priorityCfg.default_value }));
+            }
+          } else {
+            setCommonFieldsConfig(undefined);
+          }
+        });
+    } else {
+      setCommonFieldsConfig(undefined);
+    }
+  }, [data.processId]);
 
   // Fetch target person name when selected
   useEffect(() => {
@@ -391,7 +418,7 @@ export function RequestWizardDialog({ open, onClose, onSuccess, initialProcessId
           />
         );
       case "details":
-        return <StepDetailsForm data={data} requestType={data.requestType!} onDataChange={updateData} />;
+        return <StepDetailsForm data={data} requestType={data.requestType!} onDataChange={updateData} commonFieldsConfig={commonFieldsConfig} />;
       case "material":
         return <StepMaterialLines data={data} onDataChange={updateData} articleFilterConfig={articleFilterConfig} />;
       case "fields":
