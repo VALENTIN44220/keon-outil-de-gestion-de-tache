@@ -185,16 +185,17 @@ export function ConfigurableDashboard({
   // Filter tasks based on cross-filters
   const filteredTasks = useMemo(() => {
     let result = tasks;
+    const activeFilters = pendingFilters;
 
     // Date range filter
-    if (filters.period !== 'all' || filters.dateRange.start) {
+    if (activeFilters.period !== 'all' || activeFilters.dateRange.start) {
       const now = new Date();
       let startDate: Date;
       
-      if (filters.dateRange.start) {
-        startDate = filters.dateRange.start;
+      if (activeFilters.dateRange.start) {
+        startDate = activeFilters.dateRange.start;
       } else {
-        switch (filters.period) {
+        switch (activeFilters.period) {
           case 'day': startDate = subDays(now, 1); break;
           case 'week': startDate = startOfWeek(now, { locale: fr }); break;
           case 'month': startDate = startOfMonth(now); break;
@@ -204,7 +205,7 @@ export function ConfigurableDashboard({
         }
       }
       
-      const endDate = filters.dateRange.end || now;
+      const endDate = activeFilters.dateRange.end || now;
       
       result = result.filter(t => {
         const taskDate = new Date(t.created_at);
@@ -213,32 +214,32 @@ export function ConfigurableDashboard({
     }
 
     // Assignee filter
-    if (filters.assigneeIds.length > 0) {
-      result = result.filter(t => t.assignee_id && filters.assigneeIds.includes(t.assignee_id));
+    if (activeFilters.assigneeIds.length > 0) {
+      result = result.filter(t => t.assignee_id && activeFilters.assigneeIds.includes(t.assignee_id));
     }
 
     // Department filter
-    if (filters.departmentIds.length > 0) {
-      result = result.filter(t => t.target_department_id && filters.departmentIds.includes(t.target_department_id));
+    if (activeFilters.departmentIds.length > 0) {
+      result = result.filter(t => t.target_department_id && activeFilters.departmentIds.includes(t.target_department_id));
     }
 
     // Category filter
-    if (filters.categoryIds.length > 0) {
-      result = result.filter(t => t.category_id && filters.categoryIds.includes(t.category_id));
+    if (activeFilters.categoryIds.length > 0) {
+      result = result.filter(t => t.category_id && activeFilters.categoryIds.includes(t.category_id));
     }
 
     // Status filter
-    if (filters.statuses.length > 0) {
-      result = result.filter(t => filters.statuses.includes(t.status));
+    if (activeFilters.statuses.length > 0) {
+      result = result.filter(t => activeFilters.statuses.includes(t.status));
     }
 
     // Priority filter
-    if (filters.priorities.length > 0) {
-      result = result.filter(t => filters.priorities.includes(t.priority));
+    if (activeFilters.priorities.length > 0) {
+      result = result.filter(t => activeFilters.priorities.includes(t.priority));
     }
 
     return result;
-  }, [tasks, filters]);
+  }, [tasks, pendingFilters]);
 
   // Calculate filtered stats
   const filteredStats = useMemo((): TaskStats => {
