@@ -1,15 +1,23 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Building2, Save, Loader2 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Save, Loader2, Eye, Lock, FormInput } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { RequestValidationConfigPanel } from '@/components/templates/RequestValidationConfigPanel';
 import { ProcessWithTasks } from '@/types/template';
 import { toast } from 'sonner';
+import {
+  CommonFieldsConfig,
+  CommonFieldConfig,
+  DEFAULT_COMMON_FIELDS_CONFIG,
+  COMMON_FIELD_LABELS,
+} from '@/types/commonFieldsConfig';
 
 interface ProcessSettingsTabProps {
   process: ProcessWithTasks;
@@ -25,12 +33,29 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
     description: process.description || '',
   });
 
+  // Common fields config
+  const [commonFieldsConfig, setCommonFieldsConfig] = useState<CommonFieldsConfig>(
+    DEFAULT_COMMON_FIELDS_CONFIG
+  );
+  const [isSavingFields, setIsSavingFields] = useState(false);
+
   // Sync formData when process prop changes
   useEffect(() => {
     setFormData({
       name: process.name,
       description: process.description || '',
     });
+
+    // Load common fields config from settings
+    const settings = (process as any).settings;
+    if (settings?.common_fields_config) {
+      setCommonFieldsConfig({
+        ...DEFAULT_COMMON_FIELDS_CONFIG,
+        ...settings.common_fields_config,
+      });
+    } else {
+      setCommonFieldsConfig(DEFAULT_COMMON_FIELDS_CONFIG);
+    }
   }, [process.id, process.name, process.description]);
 
   const handleSave = async () => {
@@ -48,7 +73,7 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
 
       toast.success('Paramètres enregistrés');
       setIsEditing(false);
-      onUpdate(); // Notify parent to refresh data
+      onUpdate();
     } catch (error) {
       console.error('Error updating process:', error);
       toast.error('Erreur lors de la sauvegarde');
@@ -56,6 +81,44 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
       setIsSaving(false);
     }
   };
+
+  const updateFieldConfig = (
+    fieldKey: keyof CommonFieldsConfig,
+    updates: Partial<CommonFieldConfig>
+  ) => {
+    setCommonFieldsConfig((prev) => ({
+      ...prev,
+      [fieldKey]: { ...prev[fieldKey], ...updates },
+    }));
+  };
+
+  const handleSaveFieldsConfig = async () => {
+    setIsSavingFields(true);
+    try {
+      const existingSettings = (process as any).settings || {};
+      const updatedSettings = {
+        ...existingSettings,
+        common_fields_config: commonFieldsConfig,
+      };
+
+      const { error } = await supabase
+        .from('process_templates')
+        .update({ settings: updatedSettings })
+        .eq('id', process.id);
+
+      if (error) throw error;
+
+      toast.success('Configuration des champs enregistrée');
+      onUpdate();
+    } catch (error) {
+      console.error('Error saving fields config:', error);
+      toast.error('Erreur lors de la sauvegarde');
+    } finally {
+      setIsSavingFields(false);
+    }
+  };
+
+  const fieldKeys = Object.keys(commonFieldsConfig) as (keyof CommonFieldsConfig)[];
 
   return (
     <div className="space-y-6">
@@ -105,13 +168,106 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
               </Button>
               <Button variant="outline" onClick={() => {
                 setIsEditing(false);
-                // Reset to current process values
                 setFormData({
                   name: process.name,
                   description: process.description || '',
                 });
               }}>
                 Annuler
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Configuration des champs généraux */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <FormInput className="h-4 w-4 text-primary" />
+            Champs généraux de la demande
+          </CardTitle>
+          <CardDescription className="text-xs">
+            Configurez la visibilité et l'éditabilité des champs du formulaire de création de demande
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-1">
+          {/* Header row */}
+          <div className="grid grid-cols-[1fr_80px_80px_140px] gap-2 items-center px-2 pb-2 border-b">
+            <span className="text-xs font-medium text-muted-foreground">Champ</span>
+            <span className="text-xs font-medium text-muted-foreground text-center flex items-center gap-1 justify-center">
+              <Eye className="h-3 w-3" /> Visible
+            </span>
+            <span className="text-xs font-medium text-muted-foreground text-center flex items-center gap-1 justify-center">
+              <Lock className="h-3 w-3" /> Modifiable
+            </span>
+            <span className="text-xs font-medium text-muted-foreground text-center">
+              Valeur imposée
+            </span>
+          </div>
+
+          {fieldKeys.map((key) => {
+            const config = commonFieldsConfig[key];
+            const showDefaultValue = key === 'priority' && config.visible && !config.editable;
+
+            return (
+              <div
+                key={key}
+                className="grid grid-cols-[1fr_80px_80px_140px] gap-2 items-center px-2 py-2 rounded hover:bg-muted/50"
+              >
+                <span className="text-sm font-medium">{COMMON_FIELD_LABELS[key]}</span>
+
+                <div className="flex justify-center">
+                  <Switch
+                    checked={config.visible}
+                    onCheckedChange={(checked) =>
+                      updateFieldConfig(key, { visible: checked })
+                    }
+                    disabled={!canManage || key === 'title'}
+                  />
+                </div>
+
+                <div className="flex justify-center">
+                  <Switch
+                    checked={config.editable}
+                    onCheckedChange={(checked) =>
+                      updateFieldConfig(key, { editable: checked })
+                    }
+                    disabled={!canManage || !config.visible || key === 'title'}
+                  />
+                </div>
+
+                <div className="flex justify-center">
+                  {showDefaultValue ? (
+                    <Select
+                      value={config.default_value || 'medium'}
+                      onValueChange={(v) => updateFieldConfig(key, { default_value: v })}
+                      disabled={!canManage}
+                    >
+                      <SelectTrigger className="h-7 text-xs w-28">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">Basse</SelectItem>
+                        <SelectItem value="medium">Moyenne</SelectItem>
+                        <SelectItem value="high">Haute</SelectItem>
+                        <SelectItem value="urgent">Urgente</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+
+          {canManage && (
+            <div className="pt-3 border-t mt-2">
+              <Button size="sm" onClick={handleSaveFieldsConfig} disabled={isSavingFields}>
+                {isSavingFields && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                <Save className="h-3 w-3 mr-1" />
+                Enregistrer la configuration
               </Button>
             </div>
           )}

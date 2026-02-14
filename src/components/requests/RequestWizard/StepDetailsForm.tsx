@@ -11,16 +11,30 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { BEProjectSelect } from '@/components/be/BEProjectSelect';
 import { RequestWizardData, RequestType } from './types';
+import { CommonFieldsConfig, DEFAULT_COMMON_FIELDS_CONFIG } from '@/types/commonFieldsConfig';
+
+const PRIORITY_LABELS: Record<string, string> = {
+  low: 'Basse',
+  medium: 'Moyenne',
+  high: 'Haute',
+  urgent: 'Urgente',
+};
 
 interface StepDetailsFormProps {
   data: RequestWizardData;
   requestType: RequestType;
   onDataChange: (updates: Partial<RequestWizardData>) => void;
+  commonFieldsConfig?: CommonFieldsConfig;
 }
 
-export function StepDetailsForm({ data, requestType, onDataChange }: StepDetailsFormProps) {
+export function StepDetailsForm({ data, requestType, onDataChange, commonFieldsConfig }: StepDetailsFormProps) {
   const isPersonal = requestType === 'personal';
   const isPerson = requestType === 'person';
+
+  // Only apply config for process requests
+  const cfg = requestType === 'process' && commonFieldsConfig
+    ? commonFieldsConfig
+    : DEFAULT_COMMON_FIELDS_CONFIG;
 
   return (
     <div className="space-y-6">
@@ -41,70 +55,91 @@ export function StepDetailsForm({ data, requestType, onDataChange }: StepDetails
 
       <ScrollArea className="h-[450px] pr-4">
         <div className="space-y-5 pb-4">
-          <div className="space-y-2">
-            <Label htmlFor="title">Titre *</Label>
-            <Input
-              id="title"
-              value={data.title}
-              onChange={(e) => onDataChange({ title: e.target.value })}
-              placeholder={
-                isPersonal
-                  ? 'Ex: Préparer la présentation trimestrielle'
-                  : 'Ex: Demande de matériel informatique'
-              }
-            />
-          </div>
+          {/* Title - always visible (enforced in config) */}
+          {cfg.title.visible && (
+            <div className="space-y-2">
+              <Label htmlFor="title">Titre *</Label>
+              <Input
+                id="title"
+                value={data.title}
+                onChange={(e) => onDataChange({ title: e.target.value })}
+                placeholder={
+                  isPersonal
+                    ? 'Ex: Préparer la présentation trimestrielle'
+                    : 'Ex: Demande de matériel informatique'
+                }
+                disabled={!cfg.title.editable}
+              />
+            </div>
+          )}
 
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              value={data.description}
-              onChange={(e) => onDataChange({ description: e.target.value })}
-              placeholder="Décrivez les détails de votre demande..."
-              rows={4}
-            />
-          </div>
+          {/* Description */}
+          {cfg.description.visible && (
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                value={data.description}
+                onChange={(e) => onDataChange({ description: e.target.value })}
+                placeholder="Décrivez les détails de votre demande..."
+                rows={4}
+                disabled={!cfg.description.editable}
+              />
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Priorité</Label>
-              <Select
-                value={data.priority}
-                onValueChange={(v) =>
-                  onDataChange({ priority: v as 'low' | 'medium' | 'high' | 'urgent' })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="low">Basse</SelectItem>
-                  <SelectItem value="medium">Moyenne</SelectItem>
-                  <SelectItem value="high">Haute</SelectItem>
-                  <SelectItem value="urgent">Urgente</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Priority */}
+            {cfg.priority.visible && (
+              <div className="space-y-2">
+                <Label>Priorité</Label>
+                {cfg.priority.editable ? (
+                  <Select
+                    value={data.priority}
+                    onValueChange={(v) =>
+                      onDataChange({ priority: v as 'low' | 'medium' | 'high' | 'urgent' })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Basse</SelectItem>
+                      <SelectItem value="medium">Moyenne</SelectItem>
+                      <SelectItem value="high">Haute</SelectItem>
+                      <SelectItem value="urgent">Urgente</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="flex items-center h-10 px-3 rounded-md border bg-muted/50 text-sm">
+                    {PRIORITY_LABELS[cfg.priority.default_value || data.priority] || data.priority}
+                  </div>
+                )}
+              </div>
+            )}
 
-            <div className="space-y-2">
-              <Label htmlFor="dueDate">Échéance *</Label>
-              <Input
-                id="dueDate"
-                type="date"
-                value={data.dueDate || ''}
-                onChange={(e) => onDataChange({ dueDate: e.target.value || null })}
-                required
-                className={!data.dueDate ? 'border-destructive/50' : ''}
-              />
-              {!data.dueDate && (
-                <p className="text-xs text-destructive">L'échéance est obligatoire</p>
-              )}
-            </div>
+            {/* Due date */}
+            {cfg.due_date.visible && (
+              <div className="space-y-2">
+                <Label htmlFor="dueDate">Échéance *</Label>
+                <Input
+                  id="dueDate"
+                  type="date"
+                  value={data.dueDate || ''}
+                  onChange={(e) => onDataChange({ dueDate: e.target.value || null })}
+                  required
+                  className={!data.dueDate ? 'border-destructive/50' : ''}
+                  disabled={!cfg.due_date.editable}
+                />
+                {!data.dueDate && (
+                  <p className="text-xs text-destructive">L'échéance est obligatoire</p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* BE Project selection for process requests */}
-          {requestType === 'process' && (
+          {requestType === 'process' && cfg.be_project.visible && cfg.be_project.editable && (
             <BEProjectSelect
               value={data.beProjectId}
               onChange={(value) => onDataChange({ beProjectId: value })}
