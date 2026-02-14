@@ -71,7 +71,7 @@ export function RepeatableTableRenderer({
   disabled,
 }: RepeatableTableRendererProps) {
   const configColumns: FieldOption[] = (field.options as FieldOption[]) || [];
-  const rows: RepeatableTableRow[] = value || [];
+  const rows: RepeatableTableRow[] = Array.isArray(value) ? value : [];
   const [lookupData, setLookupData] = useState<Record<string, Record<string, any>[]>>({});
 
   // Fetch lookup data for table_lookup columns
