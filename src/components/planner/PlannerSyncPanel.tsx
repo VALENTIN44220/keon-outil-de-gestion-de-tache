@@ -8,8 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, RefreshCw, Plus, Trash2, ArrowLeftRight, ArrowRight, ArrowLeft, CheckCircle2, AlertCircle, Calendar, Clock, Zap } from 'lucide-react';
-import { usePlannerSync, PlannerPlan } from '@/hooks/usePlannerSync';
+import { Loader2, RefreshCw, Plus, Trash2, ArrowLeftRight, ArrowRight, ArrowLeft, CheckCircle2, AlertCircle, Calendar, Clock, Zap, Settings2 } from 'lucide-react';
+import { usePlannerSync, PlannerPlan, PlanMapping } from '@/hooks/usePlannerSync';
+import { PlannerMappingDialog } from './PlannerMappingDialog';
 import { useCategories } from '@/hooks/useCategories';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -36,6 +37,7 @@ export function PlannerSyncPanel() {
   const [selectedPlanId, setSelectedPlanId] = useState<string>('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('none');
   const [selectedDirection, setSelectedDirection] = useState<'both' | 'from_planner' | 'to_planner'>('both');
+  const [mappingDialogMapping, setMappingDialogMapping] = useState<PlanMapping | null>(null);
 
   useEffect(() => {
     if (showAddPlan && plans.length === 0) {
@@ -278,6 +280,15 @@ export function PlannerSyncPanel() {
                       <Button
                         variant="outline"
                         size="sm"
+                        onClick={() => setMappingDialogMapping(mapping)}
+                        className="gap-1"
+                        title="Configurer le mapping"
+                      >
+                        <Settings2 className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => syncPlan(mapping.id)}
                         disabled={!!isSyncing || !mapping.sync_enabled}
                         className="gap-1"
@@ -372,6 +383,18 @@ export function PlannerSyncPanel() {
             </ScrollArea>
           </CardContent>
         </Card>
+      )}
+
+      {/* Mapping Dialog */}
+      {mappingDialogMapping && (
+        <PlannerMappingDialog
+          open={!!mappingDialogMapping}
+          onOpenChange={(open) => { if (!open) setMappingDialogMapping(null); }}
+          mapping={mappingDialogMapping}
+          onSave={() => {
+            setMappingDialogMapping(null);
+          }}
+        />
       )}
     </div>
   );
