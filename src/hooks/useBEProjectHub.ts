@@ -28,13 +28,15 @@ export function useBEProjectByCode(code: string | undefined) {
 }
 
 // =========== useBEProjectTasks ===========
+// Fetches all tasks linked to a project: direct (be_project_id) + child tasks (parent_request_id)
 export function useBEProjectTasks(projectId: string | undefined) {
   return useQuery({
     queryKey: ['be-project-tasks', projectId],
     queryFn: async () => {
       if (!projectId) return [];
 
-      const { data, error } = await supabase
+      // 1. Get direct project tasks (requests + tasks with be_project_id)
+      const { data: directTasks, error: directError } = await supabase
         .from('tasks')
         .select(`
           *,
@@ -44,8 +46,36 @@ export function useBEProjectTasks(projectId: string | undefined) {
         .eq('be_project_id', projectId)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      return (data || []) as Task[];
+      if (directError) throw directError;
+
+      const allTasks = [...(directTasks || [])] as Task[];
+      
+      // 2. Get child tasks of requests (they may not have be_project_id set)
+      const requestIds = allTasks.filter(t => t.type === 'request').map(t => t.id);
+      
+      if (requestIds.length > 0) {
+        const { data: childTasks, error: childError } = await supabase
+          .from('tasks')
+          .select(`
+            *,
+            assignee:profiles!tasks_assignee_id_fkey(id, display_name, avatar_url),
+            requester:profiles!tasks_requester_id_fkey(id, display_name)
+          `)
+          .in('parent_request_id', requestIds)
+          .order('created_at', { ascending: false });
+
+        if (childError) throw childError;
+
+        // Add child tasks that aren't already in the list
+        const existingIds = new Set(allTasks.map(t => t.id));
+        for (const child of (childTasks || [])) {
+          if (!existingIds.has(child.id)) {
+            allTasks.push(child as Task);
+          }
+        }
+      }
+
+      return allTasks;
     },
     enabled: !!projectId,
   });
