@@ -17,7 +17,7 @@ import {
   Clock,
   Building2,
   Eye,
-  Target,
+  
   Users,
   Zap,
   ArrowLeft,
@@ -27,7 +27,7 @@ import { ProcessWithTasks } from '@/types/template';
 import { ProcessSettingsTab } from '@/components/templates/UnifiedModelView/ProcessSettingsTab';
 import { ProcessAccessTab } from '@/components/templates/UnifiedModelView/ProcessAccessTab';
 import { ProcessSubProcessesTab } from '@/components/templates/UnifiedModelView/ProcessSubProcessesTab';
-import { ProcessTargetsTab } from '@/components/templates/UnifiedModelView/ProcessTargetsTab';
+
 import { ProcessAssignmentTab } from '@/components/templates/UnifiedModelView/ProcessAssignmentTab';
 import { ProcessCustomFieldsTab } from '@/components/templates/UnifiedModelView/ProcessCustomFieldsTab';
 
@@ -162,7 +162,7 @@ export default function ProcessSettings() {
     { id: 'access', label: 'Accès', icon: Eye },
     { id: 'subprocesses', label: 'Sous-proc.', icon: GitBranch },
     { id: 'fields', label: 'Champs', icon: FormInput },
-    { id: 'targets', label: 'Cibles', icon: Target },
+    
     { id: 'assignment', label: 'Affectation', icon: Users },
     { id: 'notifications', label: 'Notifs', icon: Bell },
     { id: 'workflow', label: 'Workflow', icon: Zap },
@@ -288,13 +288,8 @@ export default function ProcessSettings() {
                   />
                 </TabsContent>
 
-                <TabsContent value="targets" className="mt-0">
-                  <ProcessTargetsTab
-                    process={process}
-                    onUpdate={handleUpdate}
-                    canManage={canManage}
-                  />
-                </TabsContent>
+
+
 
                 <TabsContent value="assignment" className="mt-0">
                   <ProcessAssignmentTab
