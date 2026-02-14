@@ -40,8 +40,9 @@ import {
 } from 'lucide-react';
 import type { FormSection, FormField, ValidationType, ConditionOperator } from '@/types/formBuilder';
 import { VALIDATION_TYPE_LABELS, CONDITION_OPERATOR_LABELS } from '@/types/formBuilder';
-import { FIELD_TYPE_LABELS } from '@/types/customField';
+import { FIELD_TYPE_LABELS, FieldOption } from '@/types/customField';
 import { ValidationPropertiesPanel } from './ValidationPropertiesPanel';
+import { RepeatableTableColumnsEditor } from '@/components/templates/RepeatableTableColumnsEditor';
 import { cn } from '@/lib/utils';
 
 interface EnhancedPropertiesPanelProps {
@@ -512,6 +513,17 @@ export const EnhancedPropertiesPanel = memo(function EnhancedPropertiesPanel({
                   />
                 </div>
               </div>
+
+              {/* Repeatable Table Columns Config */}
+              {localField.field_type === 'repeatable_table' && canManage && (
+                <>
+                  <Separator />
+                  <RepeatableTableColumnsEditor
+                    columns={(localField.options as FieldOption[]) || []}
+                    onChange={(cols) => handleFieldChange('options', cols)}
+                  />
+                </>
+              )}
             </TabsContent>
 
             {/* Layout Tab */}
