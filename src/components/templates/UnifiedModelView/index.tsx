@@ -17,7 +17,7 @@ import {
   Building2,
   Timer,
   Eye,
-  Target,
+  
   Users,
   
   Zap,
@@ -27,7 +27,7 @@ import { ProcessWithTasks } from '@/types/template';
 import { ProcessSettingsTab } from './ProcessSettingsTab';
 import { ProcessAccessTab } from './ProcessAccessTab';
 import { ProcessSubProcessesTab } from './ProcessSubProcessesTab';
-import { ProcessTargetsTab } from './ProcessTargetsTab';
+
 import { ProcessAssignmentTab } from './ProcessAssignmentTab';
 import { ProcessCustomFieldsTab } from './ProcessCustomFieldsTab';
 
@@ -154,7 +154,7 @@ export function UnifiedModelView({
     { id: 'access', label: 'Accès', icon: Eye },
     { id: 'subprocesses', label: 'Sous-proc.', icon: GitBranch },
     { id: 'fields', label: 'Champs', icon: FormInput },
-    { id: 'targets', label: 'Cibles', icon: Target },
+    
     { id: 'assignment', label: 'Affectation', icon: Users },
     { id: 'notifications', label: 'Notifs', icon: Bell },
     { id: 'workflow', label: 'Workflow', icon: Zap },
@@ -250,13 +250,8 @@ export function UnifiedModelView({
                 />
               </TabsContent>
 
-              <TabsContent value="targets" className="mt-0">
-                <ProcessTargetsTab
-                  process={process}
-                  onUpdate={onUpdate}
-                  canManage={canManage}
-                />
-              </TabsContent>
+
+
 
               <TabsContent value="assignment" className="mt-0">
                 <ProcessAssignmentTab
