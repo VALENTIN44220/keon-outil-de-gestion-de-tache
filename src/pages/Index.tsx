@@ -13,6 +13,7 @@ import { CreateFromTemplateDialog } from '@/components/tasks/CreateFromTemplateD
 import { PendingAssignmentsView } from '@/components/tasks/PendingAssignmentsView';
 import { TeamModule } from '@/components/team/TeamModule';
 import { TaskDetailDialog } from '@/components/tasks/TaskDetailDialog';
+import { RequestDetailDialog } from '@/components/tasks/RequestDetailDialog';
 import { useTasks } from '@/hooks/useTasks';
 import { useTaskScope, TaskScope } from '@/hooks/useTaskScope';
 import { useTasksProgress } from '@/hooks/useChecklists';
@@ -21,20 +22,29 @@ import { useCommentNotifications } from '@/hooks/useCommentNotifications';
 import { useUnassignedTasks } from '@/hooks/useUnassignedTasks';
 import { usePendingAssignments } from '@/hooks/usePendingAssignments';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Loader2, Workflow, ChevronDown, ChevronUp } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, Workflow, ChevronDown, ChevronUp, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useCategories } from '@/hooks/useCategories';
-import { Task } from '@/types/task';
+import { Task, TaskStats } from '@/types/task';
 
 const Index = () => {
+  const { profile } = useAuth();
   const [activeView, setActiveView] = useState('dashboard');
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const [taskView, setTaskView] = useState<TaskView>('grid');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [showFullStats, setShowFullStats] = useState(false);
-  const [dashboardMode, setDashboardMode] = useState<'tasks' | 'analytics'>('tasks');
+  const [dashboardMode, setDashboardMode] = useState<'tasks' | 'analytics' | 'tracking'>('tasks');
+  
+  // Request tracking state
+  const [myRequests, setMyRequests] = useState<Task[]>([]);
+  const [isLoadingRequests, setIsLoadingRequests] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState<Task | null>(null);
+  const [isRequestDetailOpen, setIsRequestDetailOpen] = useState(false);
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFiltersState>({
     assigneeId: 'all',
     requesterId: 'all',
@@ -89,6 +99,48 @@ const Index = () => {
       return value !== 'all';
     });
   }, [advancedFilters]);
+
+  // Fetch user's requests for tracking tab
+  const fetchMyRequests = useCallback(async () => {
+    if (!profile?.id) return;
+    setIsLoadingRequests(true);
+    try {
+      const { data } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('type', 'request')
+        .eq('requester_id', profile.id)
+        .order('created_at', { ascending: false });
+      setMyRequests((data || []) as Task[]);
+    } catch (error) {
+      console.error('Error fetching requests:', error);
+    } finally {
+      setIsLoadingRequests(false);
+    }
+  }, [profile?.id]);
+
+  useEffect(() => {
+    if (dashboardMode === 'tracking') {
+      fetchMyRequests();
+    }
+  }, [dashboardMode, fetchMyRequests]);
+
+  // Stats for request tracking dashboard
+  const requestStats = useMemo((): TaskStats => {
+    const total = myRequests.length;
+    const todo = myRequests.filter(t => t.status === 'todo').length;
+    const inProgress = myRequests.filter(t => t.status === 'in-progress').length;
+    const done = myRequests.filter(t => t.status === 'done').length;
+    const pendingValidation = myRequests.filter(t => t.status === 'pending_validation_1' || t.status === 'pending_validation_2').length;
+    const validated = myRequests.filter(t => t.status === 'validated').length;
+    const refused = myRequests.filter(t => t.status === 'refused').length;
+    return {
+      total, todo, inProgress, done, pendingValidation, validated, refused,
+      completionRate: total > 0 ? Math.round(((done + validated) / total) * 100) : 0,
+    };
+  }, [myRequests]);
+
+  const requestGlobalProgress = requestStats.completionRate;
 
   // Fetch profiles for group labels
   useEffect(() => {
@@ -219,7 +271,7 @@ const Index = () => {
 
   const renderDashboardContent = () => (
     <>
-      {/* Mode toggle: Tasks vs Analytics */}
+      {/* Mode toggle: Tasks vs Analytics vs Tracking */}
       <div className="flex items-center gap-2 mb-4">
         <div className="flex bg-white rounded-lg border-2 border-keon-200 p-1">
           <Button
@@ -238,10 +290,41 @@ const Index = () => {
           >
             Tableau de bord analytique
           </Button>
+          <Button
+            variant={dashboardMode === 'tracking' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setDashboardMode('tracking')}
+            className="text-xs gap-1"
+          >
+            <Eye className="h-3.5 w-3.5" />
+            Suivi des demandes
+            {myRequests.length > 0 && (
+              <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">
+                {myRequests.length}
+              </Badge>
+            )}
+          </Button>
         </div>
       </div>
 
-      {dashboardMode === 'analytics' ? (
+      {dashboardMode === 'tracking' ? (
+        /* Request tracking dashboard */
+        isLoadingRequests ? (
+          <div className="flex items-center justify-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : (
+          <ConfigurableDashboard
+            tasks={myRequests}
+            stats={requestStats}
+            globalProgress={requestGlobalProgress}
+            onTaskClick={(task) => {
+              setSelectedRequest(task);
+              setIsRequestDetailOpen(true);
+            }}
+          />
+        )
+      ) : dashboardMode === 'analytics' ? (
         /* Configurable Dashboard with widgets */
         <ConfigurableDashboard
           tasks={allTasks}
@@ -376,6 +459,19 @@ const Index = () => {
           onClose={() => {
             setIsCommentDetailOpen(false);
             setSelectedTaskForComment(null);
+          }}
+          onStatusChange={updateTaskStatus}
+        />
+      )}
+
+      {selectedRequest && (
+        <RequestDetailDialog
+          task={selectedRequest}
+          open={isRequestDetailOpen}
+          onClose={() => {
+            setIsRequestDetailOpen(false);
+            setSelectedRequest(null);
+            fetchMyRequests();
           }}
           onStatusChange={updateTaskStatus}
         />
