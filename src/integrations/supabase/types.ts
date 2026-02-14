@@ -1572,10 +1572,56 @@ export type Database = {
         }
         Relationships: []
       }
+      planner_bucket_mappings: {
+        Row: {
+          created_at: string
+          id: string
+          mapped_subcategory_id: string | null
+          plan_mapping_id: string
+          planner_bucket_id: string
+          planner_bucket_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mapped_subcategory_id?: string | null
+          plan_mapping_id: string
+          planner_bucket_id: string
+          planner_bucket_name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mapped_subcategory_id?: string | null
+          plan_mapping_id?: string
+          planner_bucket_id?: string
+          planner_bucket_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planner_bucket_mappings_mapped_subcategory_id_fkey"
+            columns: ["mapped_subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "subcategories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planner_bucket_mappings_plan_mapping_id_fkey"
+            columns: ["plan_mapping_id"]
+            isOneToOne: false
+            referencedRelation: "planner_plan_mappings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       planner_plan_mappings: {
         Row: {
           created_at: string
           id: string
+          import_states: string[] | null
           last_sync_at: string | null
           mapped_category_id: string | null
           mapped_process_template_id: string | null
@@ -1591,6 +1637,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          import_states?: string[] | null
           last_sync_at?: string | null
           mapped_category_id?: string | null
           mapped_process_template_id?: string | null
@@ -1606,6 +1653,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          import_states?: string[] | null
           last_sync_at?: string | null
           mapped_category_id?: string | null
           mapped_process_template_id?: string | null

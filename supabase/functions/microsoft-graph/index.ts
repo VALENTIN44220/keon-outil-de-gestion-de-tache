@@ -223,6 +223,16 @@ async function getPlannerPlans(accessToken: string): Promise<any[]> {
   return allPlans;
 }
 
+// Get buckets from a specific plan
+async function getPlannerBuckets(accessToken: string, planId: string): Promise<any[]> {
+  const resp = await fetch(`${MICROSOFT_GRAPH_URL}/planner/plans/${planId}/buckets`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!resp.ok) throw new Error(`Failed to fetch buckets: ${resp.status}`);
+  const data = await resp.json();
+  return (data.value || []).map((b: any) => ({ id: b.id, name: b.name, orderHint: b.orderHint, planId: b.planId }));
+}
+
 // Get tasks from a specific plan
 async function getPlannerTasks(accessToken: string, planId: string): Promise<any[]> {
   const allTasks: any[] = [];
@@ -500,6 +510,21 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (action === 'planner-get-buckets') {
+      if (!userId) throw new Error('User not authenticated');
+      const accessToken = await getValidAccessToken(supabase, userId);
+      if (!accessToken) {
+        return new Response(JSON.stringify({ success: false, error: 'No valid Microsoft connection' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const { planId } = params;
+      const buckets = await getPlannerBuckets(accessToken, planId);
+      return new Response(JSON.stringify({ success: true, buckets }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     if (action === 'planner-get-tasks') {
       if (!userId) throw new Error('User not authenticated');
       const accessToken = await getValidAccessToken(supabase, userId);
@@ -555,6 +580,23 @@ Deno.serve(async (req) => {
 
       const plannerTasks = await getPlannerTasks(accessToken, mapping.planner_plan_id);
 
+      // Get bucket mappings for subcategory resolution
+      const { data: bucketMappings } = await supabase
+        .from('planner_bucket_mappings')
+        .select('*')
+        .eq('plan_mapping_id', planMappingId);
+      const bucketToSubcategory = new Map((bucketMappings || []).map(bm => [bm.planner_bucket_id, bm.mapped_subcategory_id]));
+
+      // Import state filter
+      const importStates: string[] = mapping.import_states || ['notStarted', 'inProgress', 'completed'];
+
+      // Map Planner percentComplete to state string for filtering
+      function getPlannerState(percent: number): string {
+        if (percent === 100) return 'completed';
+        if (percent > 0) return 'inProgress';
+        return 'notStarted';
+      }
+
       // Get existing links
       const { data: existingLinks } = await supabase
         .from('planner_task_links')
@@ -581,9 +623,16 @@ Deno.serve(async (req) => {
         for (const pt of plannerTasks) {
           if (linkedPlannerIds.has(pt.id)) continue;
 
+          // Filter by state
+          const taskState = getPlannerState(pt.percentComplete || 0);
+          if (!importStates.includes(taskState)) continue;
+
           try {
             const status = plannerPercentToStatus(pt.percentComplete || 0);
             const priority = plannerPriorityToApp(pt.priority || 5);
+
+            // Resolve subcategory from bucket mapping
+            const subcategoryId = pt.bucketId ? bucketToSubcategory.get(pt.bucketId) : null;
 
             const { data: newTask, error: insertErr } = await supabase
               .from('tasks')
@@ -597,6 +646,7 @@ Deno.serve(async (req) => {
                 user_id: userId,
                 assignee_id: userProfile?.id,
                 category_id: mapping.mapped_category_id,
+                subcategory_id: subcategoryId || null,
                 source_process_template_id: mapping.mapped_process_template_id,
               })
               .select()

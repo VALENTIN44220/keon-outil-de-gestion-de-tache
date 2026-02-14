@@ -23,6 +23,7 @@ export interface PlanMapping {
   mapped_process_template_id: string | null;
   sync_enabled: boolean;
   sync_direction: 'to_planner' | 'from_planner' | 'both';
+  import_states: string[];
   last_sync_at: string | null;
   created_at: string;
   updated_at: string;
