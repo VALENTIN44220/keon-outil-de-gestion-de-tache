@@ -1572,6 +1572,174 @@ export type Database = {
         }
         Relationships: []
       }
+      planner_plan_mappings: {
+        Row: {
+          created_at: string
+          id: string
+          last_sync_at: string | null
+          mapped_category_id: string | null
+          mapped_process_template_id: string | null
+          planner_group_id: string | null
+          planner_group_name: string | null
+          planner_plan_id: string
+          planner_plan_title: string
+          sync_direction: string
+          sync_enabled: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_sync_at?: string | null
+          mapped_category_id?: string | null
+          mapped_process_template_id?: string | null
+          planner_group_id?: string | null
+          planner_group_name?: string | null
+          planner_plan_id: string
+          planner_plan_title: string
+          sync_direction?: string
+          sync_enabled?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_sync_at?: string | null
+          mapped_category_id?: string | null
+          mapped_process_template_id?: string | null
+          planner_group_id?: string | null
+          planner_group_name?: string | null
+          planner_plan_id?: string
+          planner_plan_title?: string
+          sync_direction?: string
+          sync_enabled?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planner_plan_mappings_mapped_category_id_fkey"
+            columns: ["mapped_category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planner_plan_mappings_mapped_process_template_id_fkey"
+            columns: ["mapped_process_template_id"]
+            isOneToOne: false
+            referencedRelation: "process_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      planner_sync_logs: {
+        Row: {
+          created_at: string
+          direction: string
+          errors: Json | null
+          id: string
+          plan_mapping_id: string | null
+          status: string
+          tasks_pulled: number
+          tasks_pushed: number
+          tasks_updated: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          direction: string
+          errors?: Json | null
+          id?: string
+          plan_mapping_id?: string | null
+          status?: string
+          tasks_pulled?: number
+          tasks_pushed?: number
+          tasks_updated?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          direction?: string
+          errors?: Json | null
+          id?: string
+          plan_mapping_id?: string | null
+          status?: string
+          tasks_pulled?: number
+          tasks_pushed?: number
+          tasks_updated?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planner_sync_logs_plan_mapping_id_fkey"
+            columns: ["plan_mapping_id"]
+            isOneToOne: false
+            referencedRelation: "planner_plan_mappings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      planner_task_links: {
+        Row: {
+          created_at: string
+          id: string
+          last_synced_at: string
+          local_task_id: string
+          plan_mapping_id: string
+          planner_etag: string | null
+          planner_task_id: string
+          sync_status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_synced_at?: string
+          local_task_id: string
+          plan_mapping_id: string
+          planner_etag?: string | null
+          planner_task_id: string
+          sync_status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_synced_at?: string
+          local_task_id?: string
+          plan_mapping_id?: string
+          planner_etag?: string | null
+          planner_task_id?: string
+          sync_status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planner_task_links_local_task_id_fkey"
+            columns: ["local_task_id"]
+            isOneToOne: true
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "planner_task_links_local_task_id_fkey"
+            columns: ["local_task_id"]
+            isOneToOne: true
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "planner_task_links_plan_mapping_id_fkey"
+            columns: ["plan_mapping_id"]
+            isOneToOne: false
+            referencedRelation: "planner_plan_mappings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       process_dashboard_configs: {
         Row: {
           columns_config: Json
