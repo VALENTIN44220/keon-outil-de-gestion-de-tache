@@ -17,6 +17,7 @@ import {
   CommonFieldConfig,
   DEFAULT_COMMON_FIELDS_CONFIG,
   COMMON_FIELD_LABELS,
+  TITLE_PATTERN_VARIABLES,
 } from '@/types/commonFieldsConfig';
 
 interface ProcessSettingsTabProps {
@@ -208,56 +209,99 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
 
           {fieldKeys.map((key) => {
             const config = commonFieldsConfig[key];
-            const showDefaultValue = key === 'priority' && config.visible && !config.editable;
+            const showPriorityDefault = key === 'priority' && config.visible && !config.editable;
+            const showTitlePattern = key === 'title' && !config.editable;
 
             return (
-              <div
-                key={key}
-                className="grid grid-cols-[1fr_80px_80px_140px] gap-2 items-center px-2 py-2 rounded hover:bg-muted/50"
-              >
-                <span className="text-sm font-medium">{COMMON_FIELD_LABELS[key]}</span>
+              <div key={key} className="space-y-2">
+                <div className="grid grid-cols-[1fr_80px_80px_140px] gap-2 items-center px-2 py-2 rounded hover:bg-muted/50">
+                  <span className="text-sm font-medium">{COMMON_FIELD_LABELS[key]}</span>
 
-                <div className="flex justify-center">
-                  <Switch
-                    checked={config.visible}
-                    onCheckedChange={(checked) =>
-                      updateFieldConfig(key, { visible: checked })
-                    }
-                    disabled={!canManage || key === 'title'}
-                  />
+                  <div className="flex justify-center">
+                    <Switch
+                      checked={config.visible}
+                      onCheckedChange={(checked) =>
+                        updateFieldConfig(key, { visible: checked })
+                      }
+                      disabled={!canManage || key === 'title'}
+                    />
+                  </div>
+
+                  <div className="flex justify-center">
+                    <Switch
+                      checked={config.editable}
+                      onCheckedChange={(checked) =>
+                        updateFieldConfig(key, { editable: checked })
+                      }
+                      disabled={!canManage || !config.visible}
+                    />
+                  </div>
+
+                  <div className="flex justify-center">
+                    {showPriorityDefault ? (
+                      <Select
+                        value={config.default_value || 'medium'}
+                        onValueChange={(v) => updateFieldConfig(key, { default_value: v })}
+                        disabled={!canManage}
+                      >
+                        <SelectTrigger className="h-7 text-xs w-28">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="low">Basse</SelectItem>
+                          <SelectItem value="medium">Moyenne</SelectItem>
+                          <SelectItem value="high">Haute</SelectItem>
+                          <SelectItem value="urgent">Urgente</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </div>
                 </div>
 
-                <div className="flex justify-center">
-                  <Switch
-                    checked={config.editable}
-                    onCheckedChange={(checked) =>
-                      updateFieldConfig(key, { editable: checked })
-                    }
-                    disabled={!canManage || !config.visible || key === 'title'}
-                  />
-                </div>
-
-                <div className="flex justify-center">
-                  {showDefaultValue ? (
-                    <Select
-                      value={config.default_value || 'medium'}
-                      onValueChange={(v) => updateFieldConfig(key, { default_value: v })}
+                {/* Title pattern config when title is imposed */}
+                {showTitlePattern && (
+                  <div className="ml-4 pl-4 border-l-2 border-primary/30 space-y-2 pb-2">
+                    <Label className="text-xs font-medium">Modèle de titre automatique</Label>
+                    <Input
+                      value={(commonFieldsConfig.title as any).title_pattern || ''}
+                      onChange={(e) =>
+                        setCommonFieldsConfig((prev) => ({
+                          ...prev,
+                          title: { ...prev.title, title_pattern: e.target.value },
+                        }))
+                      }
+                      placeholder="Ex: {process} - {user} - {date}"
+                      className="h-8 text-sm"
                       disabled={!canManage}
-                    >
-                      <SelectTrigger className="h-7 text-xs w-28">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="low">Basse</SelectItem>
-                        <SelectItem value="medium">Moyenne</SelectItem>
-                        <SelectItem value="high">Haute</SelectItem>
-                        <SelectItem value="urgent">Urgente</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">—</span>
-                  )}
-                </div>
+                    />
+                    <div className="flex flex-wrap gap-1">
+                      {TITLE_PATTERN_VARIABLES.map((v) => (
+                        <Button
+                          key={v.key}
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-6 text-xs px-2"
+                          disabled={!canManage}
+                          onClick={() => {
+                            const current = (commonFieldsConfig.title as any).title_pattern || '';
+                            setCommonFieldsConfig((prev) => ({
+                              ...prev,
+                              title: { ...prev.title, title_pattern: current + v.key },
+                            }));
+                          }}
+                        >
+                          {v.key} <span className="text-muted-foreground ml-1">{v.label}</span>
+                        </Button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Le titre sera généré automatiquement à la création de la demande
+                    </p>
+                  </div>
+                )}
               </div>
             );
           })}

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -11,7 +12,8 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { BEProjectSelect } from '@/components/be/BEProjectSelect';
 import { RequestWizardData, RequestType } from './types';
-import { CommonFieldsConfig, DEFAULT_COMMON_FIELDS_CONFIG } from '@/types/commonFieldsConfig';
+import { CommonFieldsConfig, DEFAULT_COMMON_FIELDS_CONFIG, resolveTitlePattern } from '@/types/commonFieldsConfig';
+import { useAuth } from '@/contexts/AuthContext';
 
 const PRIORITY_LABELS: Record<string, string> = {
   low: 'Basse',
@@ -28,6 +30,7 @@ interface StepDetailsFormProps {
 }
 
 export function StepDetailsForm({ data, requestType, onDataChange, commonFieldsConfig }: StepDetailsFormProps) {
+  const { profile } = useAuth();
   const isPersonal = requestType === 'personal';
   const isPerson = requestType === 'person';
 
@@ -35,6 +38,19 @@ export function StepDetailsForm({ data, requestType, onDataChange, commonFieldsC
   const cfg = requestType === 'process' && commonFieldsConfig
     ? commonFieldsConfig
     : DEFAULT_COMMON_FIELDS_CONFIG;
+
+  // Auto-generate title when pattern is set and title is not editable
+  useEffect(() => {
+    if (cfg.title.visible && !cfg.title.editable && cfg.title.title_pattern) {
+      const generated = resolveTitlePattern(cfg.title.title_pattern, {
+        processName: data.processName || '',
+        userName: profile?.display_name || '',
+      });
+      if (generated && generated !== data.title) {
+        onDataChange({ title: generated });
+      }
+    }
+  }, [cfg.title.editable, cfg.title.title_pattern, data.processName, profile?.display_name]);
 
   return (
     <div className="space-y-6">
@@ -55,21 +71,31 @@ export function StepDetailsForm({ data, requestType, onDataChange, commonFieldsC
 
       <ScrollArea className="h-[450px] pr-4">
         <div className="space-y-5 pb-4">
-          {/* Title - always visible (enforced in config) */}
+          {/* Title */}
           {cfg.title.visible && (
             <div className="space-y-2">
-              <Label htmlFor="title">Titre *</Label>
-              <Input
-                id="title"
-                value={data.title}
-                onChange={(e) => onDataChange({ title: e.target.value })}
-                placeholder={
-                  isPersonal
-                    ? 'Ex: Préparer la présentation trimestrielle'
-                    : 'Ex: Demande de matériel informatique'
-                }
-                disabled={!cfg.title.editable}
-              />
+              <Label htmlFor="title">
+                Titre {cfg.title.editable ? '*' : ''}
+                {!cfg.title.editable && (
+                  <span className="text-xs text-muted-foreground ml-2">(généré automatiquement)</span>
+                )}
+              </Label>
+              {cfg.title.editable ? (
+                <Input
+                  id="title"
+                  value={data.title}
+                  onChange={(e) => onDataChange({ title: e.target.value })}
+                  placeholder={
+                    isPersonal
+                      ? 'Ex: Préparer la présentation trimestrielle'
+                      : 'Ex: Demande de matériel informatique'
+                  }
+                />
+              ) : (
+                <div className="flex items-center h-10 px-3 rounded-md border bg-muted/50 text-sm">
+                  {data.title || 'Titre auto-généré à la création'}
+                </div>
+              )}
             </div>
           )}
 
