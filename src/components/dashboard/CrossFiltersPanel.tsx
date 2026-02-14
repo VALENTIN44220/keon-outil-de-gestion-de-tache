@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { CrossFilters, DEFAULT_CROSS_FILTERS } from './types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   Calendar as CalendarIcon, 
@@ -16,18 +17,24 @@ import {
   Filter, 
   X, 
   RotateCcw,
-  ChevronDown
+  ChevronDown,
+  Search,
+  Save,
+  FolderOpen,
+  Trash2,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 interface CrossFiltersPanelProps {
   filters: CrossFilters;
   onFiltersChange: (filters: CrossFilters) => void;
   onClose?: () => void;
-  onSave?: () => void;
+  processId?: string;
 }
 
 const PERIODS = [
@@ -59,11 +66,114 @@ const PRIORITIES = [
   { value: 'low', label: 'Basse', color: 'bg-keon-green' },
 ];
 
-export function CrossFiltersPanel({ filters, onFiltersChange, onClose }: CrossFiltersPanelProps) {
+interface FilterPreset {
+  id: string;
+  name: string;
+  filters: any;
+}
+
+function MultiSelectDropdown({
+  label,
+  icon,
+  items,
+  selectedIds,
+  onChange,
+  idKey = 'id',
+  labelKey = 'name',
+  colorKey,
+  colorDotKey,
+}: {
+  label: string;
+  icon?: React.ReactNode;
+  items: any[];
+  selectedIds: string[];
+  onChange: (ids: string[]) => void;
+  idKey?: string;
+  labelKey?: string;
+  colorKey?: string;
+  colorDotKey?: string;
+}) {
+  const allSelected = items.length > 0 && selectedIds.length === items.length;
+  const noneSelected = selectedIds.length === 0;
+
+  const handleToggleAll = (checked: boolean) => {
+    if (checked) {
+      onChange(items.map(i => i[idKey]));
+    } else {
+      onChange([]);
+    }
+  };
+
+  const handleToggle = (value: string, checked: boolean) => {
+    const updated = checked
+      ? [...selectedIds, value]
+      : selectedIds.filter(v => v !== value);
+    onChange(updated);
+  };
+
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs text-keon-600 flex items-center gap-1">
+        {icon}
+        {label} ({selectedIds.length})
+      </Label>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="outline" className="w-full h-9 justify-between text-sm">
+            <span className="truncate">
+              {noneSelected ? 'Tous' : `${selectedIds.length} sélectionné(s)`}
+            </span>
+            <ChevronDown className="h-4 w-4 ml-2 shrink-0" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-64 p-2" align="start">
+          <div className="space-y-2">
+            {/* Select All / None */}
+            <div className="flex items-center gap-2 pb-2 border-b">
+              <Checkbox
+                id={`all-${label}`}
+                checked={allSelected}
+                onCheckedChange={(checked) => handleToggleAll(!!checked)}
+              />
+              <Label htmlFor={`all-${label}`} className="text-sm font-medium cursor-pointer">
+                Tous
+              </Label>
+            </div>
+            <ScrollArea className="h-48">
+              <div className="space-y-2">
+                {items.map(item => (
+                  <div key={item[idKey]} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`${label}-${item[idKey]}`}
+                      checked={selectedIds.includes(item[idKey])}
+                      onCheckedChange={(checked) => handleToggle(item[idKey], !!checked)}
+                    />
+                    {colorDotKey && (
+                      <div className={cn('w-2.5 h-2.5 rounded-full shrink-0', item[colorDotKey])} />
+                    )}
+                    <Label htmlFor={`${label}-${item[idKey]}`} className="text-sm cursor-pointer truncate">
+                      {item[labelKey] || 'Sans nom'}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
+export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId }: CrossFiltersPanelProps) {
+  const { user } = useAuth();
   const [profiles, setProfiles] = useState<{ id: string; display_name: string }[]>([]);
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [processes, setProcesses] = useState<{ id: string; name: string }[]>([]);
+  const [presets, setPresets] = useState<FilterPreset[]>([]);
+  const [presetName, setPresetName] = useState('');
+  const [showSavePreset, setShowSavePreset] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -82,37 +192,78 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose }: CrossFi
     fetchData();
   }, []);
 
+  // Load presets
+  useEffect(() => {
+    if (!user?.id) return;
+    (async () => {
+      const query = (supabase as any)
+        .from('user_filter_presets')
+        .select('id, name, filters')
+        .eq('user_id', user.id);
+      if (processId) {
+        query.eq('process_template_id', processId);
+      } else {
+        query.is('process_template_id', null);
+      }
+      const { data } = await query.order('created_at', { ascending: false });
+      if (data) setPresets(data);
+    })();
+  }, [user?.id, processId]);
+
   const handleReset = () => {
     onFiltersChange(DEFAULT_CROSS_FILTERS);
   };
 
-  const handleMultiSelect = (
-    key: 'assigneeIds' | 'departmentIds' | 'categoryIds' | 'processIds',
-    value: string,
-    checked: boolean
-  ) => {
-    const current = filters[key];
-    const updated = checked
-      ? [...current, value]
-      : current.filter(v => v !== value);
-    onFiltersChange({ ...filters, [key]: updated });
+  const handleSavePreset = async () => {
+    if (!user?.id || !presetName.trim()) return;
+    const serialized = {
+      ...filters,
+      dateRange: {
+        start: filters.dateRange.start?.toISOString() ?? null,
+        end: filters.dateRange.end?.toISOString() ?? null,
+      },
+    };
+    const { data, error } = await (supabase as any)
+      .from('user_filter_presets')
+      .insert({
+        user_id: user.id,
+        name: presetName.trim(),
+        filters: serialized,
+        process_template_id: processId ?? null,
+      })
+      .select('id, name, filters')
+      .single();
+    if (error) {
+      toast.error('Erreur lors de la sauvegarde');
+      return;
+    }
+    setPresets(prev => [data, ...prev]);
+    setPresetName('');
+    setShowSavePreset(false);
+    toast.success('Contexte enregistré');
   };
 
-  const handleStatusToggle = (status: string, checked: boolean) => {
-    const updated = checked
-      ? [...filters.statuses, status as any]
-      : filters.statuses.filter(s => s !== status);
-    onFiltersChange({ ...filters, statuses: updated });
+  const handleLoadPreset = (preset: FilterPreset) => {
+    const restored: CrossFilters = {
+      ...DEFAULT_CROSS_FILTERS,
+      ...preset.filters,
+      dateRange: {
+        start: preset.filters.dateRange?.start ? new Date(preset.filters.dateRange.start) : null,
+        end: preset.filters.dateRange?.end ? new Date(preset.filters.dateRange.end) : null,
+      },
+    };
+    onFiltersChange(restored);
+    toast.success(`Contexte "${preset.name}" appliqué`);
   };
 
-  const handlePriorityToggle = (priority: string, checked: boolean) => {
-    const updated = checked
-      ? [...filters.priorities, priority as any]
-      : filters.priorities.filter(p => p !== priority);
-    onFiltersChange({ ...filters, priorities: updated });
+  const handleDeletePreset = async (presetId: string) => {
+    await (supabase as any).from('user_filter_presets').delete().eq('id', presetId);
+    setPresets(prev => prev.filter(p => p.id !== presetId));
+    toast.success('Contexte supprimé');
   };
 
   const activeFiltersCount = 
+    (filters.searchQuery ? 1 : 0) +
     filters.assigneeIds.length + 
     filters.departmentIds.length + 
     filters.categoryIds.length + 
@@ -121,9 +272,14 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose }: CrossFi
     filters.priorities.length +
     (filters.dateRange.start ? 1 : 0);
 
+  // Status/Priority items formatted for MultiSelectDropdown
+  const statusItems = STATUSES.map(s => ({ id: s.value, name: s.label, color: s.color }));
+  const priorityItems = PRIORITIES.map(p => ({ id: p.value, name: p.label, color: p.color }));
+
   return (
     <div className="bg-gradient-to-r from-white to-keon-50 border-2 border-keon-200 rounded-xl p-4 mb-4 shadow-keon">
-      <div className="flex items-center justify-between mb-4">
+      {/* Header row */}
+      <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Filter className="h-5 w-5 text-keon-blue" />
           <h3 className="font-semibold text-keon-900">Filtres croisés</h3>
@@ -134,6 +290,62 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose }: CrossFi
           )}
         </div>
         <div className="flex items-center gap-2">
+          {/* Preset selector */}
+          {presets.length > 0 && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1 text-keon-600">
+                  <FolderOpen className="h-4 w-4" />
+                  Contextes
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-2" align="end">
+                <div className="space-y-1">
+                  {presets.map(p => (
+                    <div key={p.id} className="flex items-center justify-between gap-1 p-1.5 rounded hover:bg-muted">
+                      <button
+                        className="text-sm text-left flex-1 truncate"
+                        onClick={() => handleLoadPreset(p)}
+                      >
+                        {p.name}
+                      </button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 shrink-0"
+                        onClick={() => handleDeletePreset(p.id)}
+                      >
+                        <Trash2 className="h-3 w-3 text-destructive" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
+          {/* Save preset */}
+          <Popover open={showSavePreset} onOpenChange={setShowSavePreset}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1 text-keon-600">
+                <Save className="h-4 w-4" />
+                Enregistrer
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 p-3" align="end">
+              <div className="space-y-2">
+                <Label className="text-xs">Nom du contexte</Label>
+                <Input
+                  value={presetName}
+                  onChange={(e) => setPresetName(e.target.value)}
+                  placeholder="Ex: Vue département IT"
+                  className="h-8"
+                />
+                <Button size="sm" className="w-full" onClick={handleSavePreset} disabled={!presetName.trim()}>
+                  Enregistrer
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
           <Button variant="ghost" size="sm" onClick={handleReset} className="gap-1 text-keon-600">
             <RotateCcw className="h-4 w-4" />
             Réinitialiser
@@ -146,9 +358,27 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose }: CrossFi
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
-        {/* Period selector */}
-        <div className="space-y-2">
+      {/* Filters grid - aligned */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 items-end">
+        {/* Search */}
+        <div className="space-y-1.5 col-span-2 md:col-span-1">
+          <Label className="text-xs text-keon-600 flex items-center gap-1">
+            <Search className="h-3 w-3" />
+            Recherche
+          </Label>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              value={filters.searchQuery}
+              onChange={(e) => onFiltersChange({ ...filters, searchQuery: e.target.value })}
+              placeholder="Rechercher..."
+              className="h-9 pl-8"
+            />
+          </div>
+        </div>
+
+        {/* Period */}
+        <div className="space-y-1.5">
           <Label className="text-xs text-keon-600 flex items-center gap-1">
             <CalendarIcon className="h-3 w-3" />
             Période
@@ -169,12 +399,12 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose }: CrossFi
         </div>
 
         {/* Date range */}
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <Label className="text-xs text-keon-600">Plage de dates</Label>
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="w-full h-9 justify-start text-left font-normal">
-                <CalendarIcon className="mr-2 h-4 w-4" />
+              <Button variant="outline" className="w-full h-9 justify-start text-left font-normal text-sm">
+                <CalendarIcon className="mr-2 h-3.5 w-3.5" />
                 {filters.dateRange.start ? (
                   filters.dateRange.end ? (
                     <>
@@ -203,168 +433,50 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose }: CrossFi
         </div>
 
         {/* Assignees */}
-        <div className="space-y-2">
-          <Label className="text-xs text-keon-600 flex items-center gap-1">
-            <Users className="h-3 w-3" />
-            Assignés ({filters.assigneeIds.length})
-          </Label>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="w-full h-9 justify-between">
-                <span className="truncate">
-                  {filters.assigneeIds.length > 0 ? `${filters.assigneeIds.length} sélectionné(s)` : 'Tous'}
-                </span>
-                <ChevronDown className="h-4 w-4 ml-2" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-64 p-2" align="start">
-              <ScrollArea className="h-48">
-                <div className="space-y-2">
-                  {profiles.map(p => (
-                    <div key={p.id} className="flex items-center gap-2">
-                      <Checkbox
-                        id={`assignee-${p.id}`}
-                        checked={filters.assigneeIds.includes(p.id)}
-                        onCheckedChange={(checked) => handleMultiSelect('assigneeIds', p.id, !!checked)}
-                      />
-                      <Label htmlFor={`assignee-${p.id}`} className="text-sm cursor-pointer">
-                        {p.display_name || 'Sans nom'}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </PopoverContent>
-          </Popover>
-        </div>
+        <MultiSelectDropdown
+          label="Assignés"
+          icon={<Users className="h-3 w-3" />}
+          items={profiles}
+          selectedIds={filters.assigneeIds}
+          onChange={(ids) => onFiltersChange({ ...filters, assigneeIds: ids })}
+          labelKey="display_name"
+        />
 
         {/* Departments */}
-        <div className="space-y-2">
-          <Label className="text-xs text-keon-600 flex items-center gap-1">
-            <Building2 className="h-3 w-3" />
-            Départements ({filters.departmentIds.length})
-          </Label>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="w-full h-9 justify-between">
-                <span className="truncate">
-                  {filters.departmentIds.length > 0 ? `${filters.departmentIds.length} sélectionné(s)` : 'Tous'}
-                </span>
-                <ChevronDown className="h-4 w-4 ml-2" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-64 p-2" align="start">
-              <ScrollArea className="h-48">
-                <div className="space-y-2">
-                  {departments.map(d => (
-                    <div key={d.id} className="flex items-center gap-2">
-                      <Checkbox
-                        id={`dept-${d.id}`}
-                        checked={filters.departmentIds.includes(d.id)}
-                        onCheckedChange={(checked) => handleMultiSelect('departmentIds', d.id, !!checked)}
-                      />
-                      <Label htmlFor={`dept-${d.id}`} className="text-sm cursor-pointer">{d.name}</Label>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </PopoverContent>
-          </Popover>
-        </div>
+        <MultiSelectDropdown
+          label="Départements"
+          icon={<Building2 className="h-3 w-3" />}
+          items={departments}
+          selectedIds={filters.departmentIds}
+          onChange={(ids) => onFiltersChange({ ...filters, departmentIds: ids })}
+        />
 
         {/* Categories */}
-        <div className="space-y-2">
-          <Label className="text-xs text-keon-600 flex items-center gap-1">
-            <Tags className="h-3 w-3" />
-            Catégories ({filters.categoryIds.length})
-          </Label>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="w-full h-9 justify-between">
-                <span className="truncate">
-                  {filters.categoryIds.length > 0 ? `${filters.categoryIds.length} sélectionné(s)` : 'Toutes'}
-                </span>
-                <ChevronDown className="h-4 w-4 ml-2" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-64 p-2" align="start">
-              <ScrollArea className="h-48">
-                <div className="space-y-2">
-                  {categories.map(c => (
-                    <div key={c.id} className="flex items-center gap-2">
-                      <Checkbox
-                        id={`cat-${c.id}`}
-                        checked={filters.categoryIds.includes(c.id)}
-                        onCheckedChange={(checked) => handleMultiSelect('categoryIds', c.id, !!checked)}
-                      />
-                      <Label htmlFor={`cat-${c.id}`} className="text-sm cursor-pointer">{c.name}</Label>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </PopoverContent>
-          </Popover>
-        </div>
+        <MultiSelectDropdown
+          label="Catégories"
+          icon={<Tags className="h-3 w-3" />}
+          items={categories}
+          selectedIds={filters.categoryIds}
+          onChange={(ids) => onFiltersChange({ ...filters, categoryIds: ids })}
+        />
 
-        {/* Status multi-select dropdown */}
-        <div className="space-y-2">
-          <Label className="text-xs text-keon-600">Statut ({filters.statuses.length})</Label>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="w-full h-9 justify-between">
-                <span className="truncate">
-                  {filters.statuses.length > 0 ? `${filters.statuses.length} sélectionné(s)` : 'Tous'}
-                </span>
-                <ChevronDown className="h-4 w-4 ml-2" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-56 p-2" align="start">
-              <div className="space-y-2">
-                {STATUSES.map(s => (
-                  <div key={s.value} className="flex items-center gap-2">
-                    <Checkbox
-                      id={`status-${s.value}`}
-                      checked={filters.statuses.includes(s.value as any)}
-                      onCheckedChange={(checked) => handleStatusToggle(s.value, !!checked)}
-                    />
-                    <div className={cn('w-2.5 h-2.5 rounded-full', s.color)} />
-                    <Label htmlFor={`status-${s.value}`} className="text-sm cursor-pointer">{s.label}</Label>
-                  </div>
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover>
-        </div>
+        {/* Status */}
+        <MultiSelectDropdown
+          label="Statut"
+          items={statusItems}
+          selectedIds={filters.statuses as string[]}
+          onChange={(ids) => onFiltersChange({ ...filters, statuses: ids as any })}
+          colorDotKey="color"
+        />
 
-        {/* Priority multi-select dropdown */}
-        <div className="space-y-2">
-          <Label className="text-xs text-keon-600">Priorité ({filters.priorities.length})</Label>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant="outline" className="w-full h-9 justify-between">
-                <span className="truncate">
-                  {filters.priorities.length > 0 ? `${filters.priorities.length} sélectionné(s)` : 'Toutes'}
-                </span>
-                <ChevronDown className="h-4 w-4 ml-2" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-56 p-2" align="start">
-              <div className="space-y-2">
-                {PRIORITIES.map(p => (
-                  <div key={p.value} className="flex items-center gap-2">
-                    <Checkbox
-                      id={`priority-${p.value}`}
-                      checked={filters.priorities.includes(p.value as any)}
-                      onCheckedChange={(checked) => handlePriorityToggle(p.value, !!checked)}
-                    />
-                    <div className={cn('w-2.5 h-2.5 rounded-full', p.color)} />
-                    <Label htmlFor={`priority-${p.value}`} className="text-sm cursor-pointer">{p.label}</Label>
-                  </div>
-                ))}
-              </div>
-            </PopoverContent>
-          </Popover>
-        </div>
+        {/* Priority */}
+        <MultiSelectDropdown
+          label="Priorité"
+          items={priorityItems}
+          selectedIds={filters.priorities as string[]}
+          onChange={(ids) => onFiltersChange({ ...filters, priorities: ids as any })}
+          colorDotKey="color"
+        />
       </div>
     </div>
   );

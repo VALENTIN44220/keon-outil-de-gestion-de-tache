@@ -3836,6 +3836,36 @@ export type Database = {
         }
         Relationships: []
       }
+      user_filter_presets: {
+        Row: {
+          created_at: string
+          filters: Json
+          id: string
+          name: string
+          process_template_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          filters?: Json
+          id?: string
+          name: string
+          process_template_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          filters?: Json
+          id?: string
+          name?: string
+          process_template_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_leaves: {
         Row: {
           created_at: string
