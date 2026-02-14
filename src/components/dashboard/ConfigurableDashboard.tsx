@@ -187,6 +187,16 @@ export function ConfigurableDashboard({
     let result = tasks;
     const activeFilters = pendingFilters;
 
+    // Search query filter
+    if (activeFilters.searchQuery) {
+      const q = activeFilters.searchQuery.toLowerCase();
+      result = result.filter(t =>
+        (t.title && t.title.toLowerCase().includes(q)) ||
+        (t.description && t.description.toLowerCase().includes(q)) ||
+        (t.request_number && t.request_number.toLowerCase().includes(q))
+      );
+    }
+
     // Date range filter
     if (activeFilters.period !== 'all' || activeFilters.dateRange.start) {
       const now = new Date();

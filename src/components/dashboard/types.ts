@@ -23,6 +23,7 @@ export interface DashboardLayout {
 }
 
 export interface CrossFilters {
+  searchQuery: string;
   dateRange: { start: Date | null; end: Date | null };
   period: 'day' | 'week' | 'month' | 'quarter' | 'year' | 'all';
   assigneeIds: string[];
@@ -34,6 +35,7 @@ export interface CrossFilters {
 }
 
 export const DEFAULT_CROSS_FILTERS: CrossFilters = {
+  searchQuery: '',
   dateRange: { start: null, end: null },
   period: 'month',
   assigneeIds: [],
