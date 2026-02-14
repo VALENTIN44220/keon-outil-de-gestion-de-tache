@@ -1,5 +1,6 @@
 import { memo, useState, useMemo, useCallback, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { RepeatableTableRenderer } from '@/components/tasks/RepeatableTableRenderer';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -647,6 +648,22 @@ function renderInput(
           })}
         </div>
       );
+
+    case 'repeatable_table': {
+      let parsedValue: any[] = [];
+      try {
+        parsedValue = typeof value === 'string' ? JSON.parse(value || '[]') : (value || []);
+      } catch { parsedValue = []; }
+      return (
+        <div style={{ gridColumn: 'span 2 / span 2' }}>
+          <RepeatableTableRenderer
+            field={field}
+            value={parsedValue}
+            onChange={(val) => onChange(field.id, val)}
+          />
+        </div>
+      );
+    }
 
     default:
       return (
