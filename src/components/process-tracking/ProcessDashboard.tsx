@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Task, TaskStats } from '@/types/task';
@@ -6,6 +6,10 @@ import { ConfigurableDashboard } from '@/components/dashboard/ConfigurableDashbo
 import { MaterialRequestsPanel } from './MaterialRequestsPanel';
 import { Loader2 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+
+const ProcessTaskManagement = lazy(() =>
+  import('./ProcessTaskManagement').then(m => ({ default: m.ProcessTaskManagement }))
+);
 
 interface ProcessDashboardProps {
   processId: string;
@@ -82,32 +86,44 @@ export function ProcessDashboard({ processId, canWrite, processName }: ProcessDa
     );
   }
 
-  const dashboardContent = (
-    <ConfigurableDashboard
-      tasks={tasks}
-      stats={stats}
-      globalProgress={globalProgress}
-      processId={processId}
-      canEdit={canWrite}
-    />
+  const suspenseFallback = (
+    <div className="flex items-center justify-center h-64">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
   );
 
-  if (!hasMaterialSection) {
-    return dashboardContent;
-  }
+  const tabs = [
+    { value: 'dashboard', label: 'Tableau de bord' },
+    { value: 'tasks', label: 'Gestion des tâches' },
+    ...(hasMaterialSection ? [{ value: 'material', label: 'Demandes matériel' }] : []),
+  ];
 
   return (
     <Tabs defaultValue="dashboard" className="space-y-4">
       <TabsList>
-        <TabsTrigger value="dashboard">Tableau de bord</TabsTrigger>
-        <TabsTrigger value="material">Demandes matériel</TabsTrigger>
+        {tabs.map(tab => (
+          <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>
+        ))}
       </TabsList>
       <TabsContent value="dashboard">
-        {dashboardContent}
+        <ConfigurableDashboard
+          tasks={tasks}
+          stats={stats}
+          globalProgress={globalProgress}
+          processId={processId}
+          canEdit={canWrite}
+        />
       </TabsContent>
-      <TabsContent value="material">
-        <MaterialRequestsPanel canWrite={canWrite} />
+      <TabsContent value="tasks">
+        <Suspense fallback={suspenseFallback}>
+          <ProcessTaskManagement processId={processId} canWrite={canWrite} />
+        </Suspense>
       </TabsContent>
+      {hasMaterialSection && (
+        <TabsContent value="material">
+          <MaterialRequestsPanel canWrite={canWrite} />
+        </TabsContent>
+      )}
     </Tabs>
   );
 }
