@@ -4,6 +4,8 @@ import { Header } from '@/components/layout/Header';
 import { DashboardToolbar, KanbanGroupMode } from '@/components/dashboard/DashboardToolbar';
 import { DashboardStats } from '@/components/dashboard/DashboardStats';
 import { ConfigurableDashboard } from '@/components/dashboard/ConfigurableDashboard';
+import { CrossFiltersPanel } from '@/components/dashboard/CrossFiltersPanel';
+import { CrossFilters, DEFAULT_CROSS_FILTERS } from '@/components/dashboard/types';
 import { TaskList } from '@/components/tasks/TaskList';
 import { AdvancedFilters, AdvancedFiltersState } from '@/components/tasks/AdvancedFilters';
 import { TaskView } from '@/components/tasks/TaskViewSelector';
@@ -43,6 +45,7 @@ const Index = () => {
   const [dashboardMode, setDashboardMode] = useState<'tasks' | 'analytics' | 'tracking' | 'planner'>('tasks');
   const [isBulkCategoryOpen, setIsBulkCategoryOpen] = useState(false);
   const [kanbanGroupMode, setKanbanGroupMode] = useState<KanbanGroupMode>('status');
+  const [crossFilters, setCrossFilters] = useState<CrossFilters>(DEFAULT_CROSS_FILTERS);
   
   // Request tracking state
   const [myRequests, setMyRequests] = useState<Task[]>([]);
@@ -385,6 +388,12 @@ const Index = () => {
             hasActiveAdvancedFilters={hasActiveAdvancedFilters}
             kanbanGroupMode={kanbanGroupMode}
             onKanbanGroupModeChange={setKanbanGroupMode}
+          />
+
+          {/* Cross Filters Panel */}
+          <CrossFiltersPanel
+            filters={crossFilters}
+            onFiltersChange={setCrossFilters}
           />
 
           {/* Advanced Filters Panel */}
