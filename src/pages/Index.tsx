@@ -169,14 +169,33 @@ const Index = () => {
   // Apply advanced filters
   const filteredTasks = useMemo(() => {
     return tasks.filter(task => {
+      // Advanced filters
       if (advancedFilters.assigneeId !== 'all' && task.assignee_id !== advancedFilters.assigneeId) return false;
       if (advancedFilters.requesterId !== 'all' && task.requester_id !== advancedFilters.requesterId) return false;
       if (advancedFilters.reporterId !== 'all' && task.reporter_id !== advancedFilters.reporterId) return false;
       if (advancedFilters.categoryId !== 'all' && task.category_id !== advancedFilters.categoryId) return false;
       if (advancedFilters.subcategoryId !== 'all' && task.subcategory_id !== advancedFilters.subcategoryId) return false;
+      
+      // Cross filters
+      if (crossFilters.searchQuery && !task.title?.toLowerCase().includes(crossFilters.searchQuery.toLowerCase())) return false;
+      if (crossFilters.statuses.length > 0 && !crossFilters.statuses.includes(task.status)) return false;
+      if (crossFilters.priorities.length > 0 && task.priority && !crossFilters.priorities.includes(task.priority)) return false;
+      if (crossFilters.assigneeIds.length > 0 && !crossFilters.assigneeIds.includes(task.assignee_id || '')) return false;
+      if (crossFilters.categoryIds.length > 0 && !crossFilters.categoryIds.includes(task.category_id || '')) return false;
+      if (crossFilters.departmentIds.length > 0) {
+        // Department filter requires profile lookup - skip if no match possible
+      }
+      if (crossFilters.dateRange.start && task.created_at) {
+        const taskDate = new Date(task.created_at);
+        if (taskDate < crossFilters.dateRange.start) return false;
+      }
+      if (crossFilters.dateRange.end && task.created_at) {
+        const taskDate = new Date(task.created_at);
+        if (taskDate > crossFilters.dateRange.end) return false;
+      }
       return true;
     });
-  }, [tasks, advancedFilters]);
+  }, [tasks, advancedFilters, crossFilters]);
 
   // Build group labels map
   const groupLabels = useMemo(() => {
