@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Plus, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -183,6 +183,33 @@ export function ServiceGroupsTab({ departments }: ServiceGroupsTabProps) {
           </Card>
         ))}
       </div>
+
+      {/* Unassigned departments */}
+      {(() => {
+        const assignedIds = new Set(groups.flatMap(g => g.department_ids));
+        const unassigned = departments.filter(d => !assignedIds.has(d.id));
+        if (unassigned.length === 0) return null;
+        return (
+          <Card className="border-dashed border-warning/50">
+            <CardHeader className="py-3 flex flex-row items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-warning" />
+              <CardTitle className="text-sm font-medium text-warning">
+                {unassigned.length} service{unassigned.length > 1 ? 's' : ''} non affecté{unassigned.length > 1 ? 's' : ''}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0 pb-3">
+              <div className="flex flex-wrap gap-1">
+                {unassigned.map(d => (
+                  <Badge key={d.id} variant="outline" className="text-xs">
+                    {d.name}
+                    {d.company?.name && <span className="ml-1 opacity-60">({d.company.name})</span>}
+                  </Badge>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
