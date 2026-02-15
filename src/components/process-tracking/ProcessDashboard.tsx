@@ -4,6 +4,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Task, TaskStats } from '@/types/task';
 import { ConfigurableDashboard } from '@/components/dashboard/ConfigurableDashboard';
 import { MaterialRequestsPanel } from './MaterialRequestsPanel';
+import { SupplierListView } from '@/components/suppliers/SupplierListView';
+import { SupplierDetailDrawer } from '@/components/suppliers/SupplierDetailDrawer';
+import { useSupplierAccess } from '@/hooks/useSupplierAccess';
 import { Loader2 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
@@ -21,8 +24,12 @@ export function ProcessDashboard({ processId, canWrite, processName }: ProcessDa
   const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
+  const [supplierDrawerOpen, setSupplierDrawerOpen] = useState(false);
+  const { role: supplierRole } = useSupplierAccess();
 
   const hasMaterialSection = processName?.toUpperCase().includes('MAINTENANCE') ?? false;
+  const hasSupplierSection = processName?.toUpperCase().includes('ACHAT') ?? false;
 
   useEffect(() => {
     if (!user || !processId) return;
@@ -96,7 +103,13 @@ export function ProcessDashboard({ processId, canWrite, processName }: ProcessDa
     { value: 'dashboard', label: 'Tableau de bord' },
     { value: 'tasks', label: 'Gestion des tâches' },
     ...(hasMaterialSection ? [{ value: 'material', label: 'Demandes matériel' }] : []),
+    ...(hasSupplierSection ? [{ value: 'suppliers', label: 'Référentiel fournisseurs' }] : []),
   ];
+
+  const handleOpenSupplier = (id: string) => {
+    setSelectedSupplierId(id);
+    setSupplierDrawerOpen(true);
+  };
 
   return (
     <Tabs defaultValue="dashboard" className="space-y-4">
@@ -122,6 +135,17 @@ export function ProcessDashboard({ processId, canWrite, processName }: ProcessDa
       {hasMaterialSection && (
         <TabsContent value="material">
           <MaterialRequestsPanel canWrite={canWrite} />
+        </TabsContent>
+      )}
+      {hasSupplierSection && (
+        <TabsContent value="suppliers">
+          <SupplierListView onOpenSupplier={handleOpenSupplier} />
+          <SupplierDetailDrawer
+            supplierId={selectedSupplierId}
+            open={supplierDrawerOpen}
+            onClose={() => { setSupplierDrawerOpen(false); setSelectedSupplierId(null); }}
+            canEdit={supplierRole === 'achat'}
+          />
         </TabsContent>
       )}
     </Tabs>
