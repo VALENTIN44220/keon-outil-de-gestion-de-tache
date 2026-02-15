@@ -28,6 +28,7 @@ interface AddProcessDialogProps {
       category_id?: string | null;
       subcategory_id?: string | null;
       target_department_id?: string | null;
+      service_group_id?: string | null;
     },
     visibilityCompanyIds: string[],
     visibilityDepartmentIds: string[]
@@ -46,13 +47,13 @@ export function AddProcessDialog({ open, onClose, onAdd }: AddProcessDialogProps
   const [visibilityDepartmentIds, setVisibilityDepartmentIds] = useState<string[]>([]);
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [subcategoryId, setSubcategoryId] = useState<string | null>(null);
-  const [targetDepartmentId, setTargetDepartmentId] = useState<string | null>(null);
-  const [departmentsList, setDepartmentsList] = useState<{ id: string; name: string }[]>([]);
+  const [serviceGroupId, setServiceGroupId] = useState<string | null>(null);
+  const [serviceGroups, setServiceGroups] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from('departments').select('id, name').order('name');
-      if (data) setDepartmentsList(data);
+      const { data } = await (supabase as any).from('service_groups').select('id, name').order('name');
+      if (data) setServiceGroups(data);
     })();
   }, []);
 
@@ -97,7 +98,8 @@ export function AddProcessDialog({ open, onClose, onAdd }: AddProcessDialogProps
         category_id: categoryId,
         subcategory_id: subcategoryId,
         target_company_id: null,
-        target_department_id: targetDepartmentId,
+        target_department_id: null,
+        service_group_id: serviceGroupId,
       },
       visibilityCompanyIds,
       visibilityDepartmentIds
@@ -117,7 +119,7 @@ export function AddProcessDialog({ open, onClose, onAdd }: AddProcessDialogProps
     setVisibilityDepartmentIds([]);
     setCategoryId(null);
     setSubcategoryId(null);
-    setTargetDepartmentId(null);
+    setServiceGroupId(null);
   };
 
   return (
@@ -163,23 +165,23 @@ export function AddProcessDialog({ open, onClose, onAdd }: AddProcessDialogProps
           />
 
           <div className="space-y-2">
-            <Label>Service rattaché</Label>
+            <Label>Groupe de services</Label>
             <Select
-              value={targetDepartmentId || '__none__'}
-              onValueChange={(v) => setTargetDepartmentId(v === '__none__' ? null : v)}
+              value={serviceGroupId || '__none__'}
+              onValueChange={(v) => setServiceGroupId(v === '__none__' ? null : v)}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Sélectionner un service" />
+                <SelectValue placeholder="Sélectionner un groupe" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__none__">Aucun service</SelectItem>
-                {departmentsList.map(d => (
-                  <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                <SelectItem value="__none__">Aucun groupe</SelectItem>
+                {serviceGroups.map(g => (
+                  <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Détermine sous quel service ce processus apparaîtra dans le suivi.
+              Détermine sous quel groupe de services ce processus apparaîtra dans le suivi.
             </p>
           </div>
 

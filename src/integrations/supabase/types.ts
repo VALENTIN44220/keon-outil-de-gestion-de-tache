@@ -1914,6 +1914,7 @@ export type Database = {
           id: string
           is_shared: boolean
           name: string
+          service_group_id: string | null
           settings: Json | null
           subcategory_id: string | null
           target_company_id: string | null
@@ -1934,6 +1935,7 @@ export type Database = {
           id?: string
           is_shared?: boolean
           name: string
+          service_group_id?: string | null
           settings?: Json | null
           subcategory_id?: string | null
           target_company_id?: string | null
@@ -1954,6 +1956,7 @@ export type Database = {
           id?: string
           is_shared?: boolean
           name?: string
+          service_group_id?: string | null
           settings?: Json | null
           subcategory_id?: string | null
           target_company_id?: string | null
@@ -1982,6 +1985,13 @@ export type Database = {
             columns: ["creator_department_id"]
             isOneToOne: false
             referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "process_templates_service_group_id_fkey"
+            columns: ["service_group_id"]
+            isOneToOne: false
+            referencedRelation: "service_groups"
             referencedColumns: ["id"]
           },
           {
@@ -2414,6 +2424,66 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      service_group_departments: {
+        Row: {
+          created_at: string
+          department_id: string
+          id: string
+          service_group_id: string
+        }
+        Insert: {
+          created_at?: string
+          department_id: string
+          id?: string
+          service_group_id: string
+        }
+        Update: {
+          created_at?: string
+          department_id?: string
+          id?: string
+          service_group_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_group_departments_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "service_group_departments_service_group_id_fkey"
+            columns: ["service_group_id"]
+            isOneToOne: false
+            referencedRelation: "service_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      service_groups: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       sub_process_template_visible_companies: {
         Row: {
