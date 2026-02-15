@@ -18,6 +18,7 @@ import {
   X, 
   RotateCcw,
   ChevronDown,
+  ChevronUp,
   Search,
   Save,
   FolderOpen,
@@ -167,6 +168,7 @@ function MultiSelectDropdown({
 
 export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId }: CrossFiltersPanelProps) {
   const { user } = useAuth();
+  const [collapsed, setCollapsed] = useState(false);
   const [profiles, setProfiles] = useState<{ id: string; display_name: string }[]>([]);
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
@@ -279,8 +281,12 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
   return (
     <div className="bg-gradient-to-r from-white to-keon-50 border-2 border-keon-200 rounded-xl p-4 mb-4 shadow-keon">
       {/* Header row */}
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+        >
+          {collapsed ? <ChevronDown className="h-4 w-4 text-keon-600" /> : <ChevronUp className="h-4 w-4 text-keon-600" />}
           <Filter className="h-5 w-5 text-keon-blue" />
           <h3 className="font-semibold text-keon-900">Filtres croisés</h3>
           {activeFiltersCount > 0 && (
@@ -288,7 +294,7 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
               {activeFiltersCount} actif{activeFiltersCount > 1 ? 's' : ''}
             </Badge>
           )}
-        </div>
+        </button>
         <div className="flex items-center gap-2">
           {/* Preset selector */}
           {presets.length > 0 && (
@@ -358,8 +364,9 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
         </div>
       </div>
 
-      {/* Filters grid - aligned */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 items-end">
+      {/* Filters grid - collapsible */}
+      {!collapsed && (
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 items-end mt-3">
         {/* Search */}
         <div className="space-y-1.5 col-span-2 md:col-span-1">
           <Label className="text-xs text-keon-600 flex items-center gap-1">
@@ -478,6 +485,7 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
           colorDotKey="color"
         />
       </div>
+      )}
     </div>
   );
 }
