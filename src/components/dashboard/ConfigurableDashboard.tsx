@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { WidgetSizePreset } from './widgets/WidgetWrapper';
+import { WidgetSizePreset, HeightPreset } from './widgets/WidgetWrapper';
 import { Task, TaskStats } from '@/types/task';
 import { 
   WidgetConfig, 
@@ -53,6 +53,34 @@ const getSizePreset = (widget: WidgetConfig): WidgetSizePreset => {
   if (widget.size.w >= 3) return 'large';
   if (widget.size.h >= 3) return 'medium';
   return 'small';
+};
+
+// Height preset to pixel mapping
+const HEIGHT_PRESET_PX: Record<HeightPreset, number> = {
+  xs: 150,
+  sm: 250,
+  md: 350,
+  lg: 450,
+  xl: 600,
+};
+
+// Derive height preset from widget h value
+const getHeightPresetFromWidget = (widget: WidgetConfig): HeightPreset => {
+  const h = widget.size.h;
+  if (h <= 1) return 'xs';
+  if (h <= 2) return 'sm';
+  if (h <= 3) return 'md';
+  if (h <= 4) return 'lg';
+  return 'xl';
+};
+
+// Height preset to h dimension mapping
+const HEIGHT_PRESET_TO_H: Record<HeightPreset, number> = {
+  xs: 1,
+  sm: 2,
+  md: 3,
+  lg: 4,
+  xl: 5,
 };
 
 // Size preset to dimensions mapping
@@ -377,10 +405,18 @@ export function ConfigurableDashboard({
     toast.success('Tableau de bord réinitialisé');
   }, [isProcessMode]);
 
-  // Resize widget
+  // Resize widget (width preset)
   const handleResizeWidget = useCallback((widgetId: string, preset: WidgetSizePreset) => {
     setWidgets(prev => prev.map(w => 
-      w.id === widgetId ? { ...w, size: PRESET_DIMENSIONS[preset] } : w
+      w.id === widgetId ? { ...w, size: { ...PRESET_DIMENSIONS[preset], h: w.size.h } } : w
+    ));
+    if (isProcessMode) setFiltersDirty(true);
+  }, [isProcessMode]);
+
+  // Resize widget height
+  const handleHeightChange = useCallback((widgetId: string, preset: HeightPreset) => {
+    setWidgets(prev => prev.map(w => 
+      w.id === widgetId ? { ...w, size: { ...w.size, h: HEIGHT_PRESET_TO_H[preset] } } : w
     ));
     if (isProcessMode) setFiltersDirty(true);
   }, [isProcessMode]);
@@ -442,21 +478,10 @@ export function ConfigurableDashboard({
     }
   }, [filteredStats, filteredTasks, getChartData, getTimelineData, onTaskClick]);
 
-  // Get height class based on widget size dimensions
-  const getHeightClass = (widget: WidgetConfig) => {
-    const preset = getSizePreset(widget);
-    switch (preset) {
-      case 'small':
-        return 'h-[200px]';
-      case 'medium':
-        return 'h-[300px]';
-      case 'large':
-        return 'h-[350px]';
-      case 'full':
-        return 'h-[500px]';
-      default:
-        return 'h-[280px]';
-    }
+  // Get height style based on widget h dimension
+  const getHeightStyle = (widget: WidgetConfig): React.CSSProperties => {
+    const preset = getHeightPresetFromWidget(widget);
+    return { height: `${HEIGHT_PRESET_PX[preset]}px` };
   };
 
   return (
@@ -521,11 +546,11 @@ export function ConfigurableDashboard({
           <div
             key={widget.id}
             className={cn(
-              getHeightClass(widget),
               getGridClasses(widget),
               isEditing && 'cursor-move',
               draggedWidget === widget.id && 'opacity-50'
             )}
+            style={getHeightStyle(widget)}
             draggable={isEditing}
             onDragStart={() => handleDragStart(widget.id)}
             onDragOver={(e) => handleDragOver(e, widget.id)}
@@ -537,6 +562,8 @@ export function ConfigurableDashboard({
               isDragging={draggedWidget === widget.id}
               sizePreset={isEditing ? getSizePreset(widget) : undefined}
               onResize={isEditing ? (preset) => handleResizeWidget(widget.id, preset) : undefined}
+              heightPreset={isEditing ? getHeightPresetFromWidget(widget) : undefined}
+              onHeightChange={isEditing ? (preset) => handleHeightChange(widget.id, preset) : undefined}
             >
               {renderWidgetContent(widget)}
             </WidgetWrapper>

@@ -1,10 +1,12 @@
 import { ReactNode } from 'react';
-import { GripVertical, Maximize2, Minimize2, X, Settings, RectangleHorizontal, Square, RectangleVertical } from 'lucide-react';
+import { GripVertical, Maximize2, Minimize2, X, Settings, RectangleHorizontal, Square, RectangleVertical, ChevronUp, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 
 export type WidgetSizePreset = 'small' | 'medium' | 'large' | 'full';
+
+export type HeightPreset = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 
 interface WidgetWrapperProps {
   title: string;
@@ -19,6 +21,10 @@ interface WidgetWrapperProps {
   sizePreset?: WidgetSizePreset;
   /** Called when the user picks a new size */
   onResize?: (preset: WidgetSizePreset) => void;
+  /** Current height preset */
+  heightPreset?: HeightPreset;
+  /** Called when the user picks a new height */
+  onHeightChange?: (preset: HeightPreset) => void;
 }
 
 const SIZE_OPTIONS: { preset: WidgetSizePreset; label: string; icon: typeof Square; desc: string }[] = [
@@ -26,6 +32,14 @@ const SIZE_OPTIONS: { preset: WidgetSizePreset; label: string; icon: typeof Squa
   { preset: 'medium', label: 'Moyen', icon: RectangleHorizontal, desc: '1 col · standard' },
   { preset: 'large', label: 'Large', icon: RectangleHorizontal, desc: '2 col · standard' },
   { preset: 'full', label: 'Pleine largeur', icon: RectangleVertical, desc: '2 col · étendu' },
+];
+
+const HEIGHT_OPTIONS: { preset: HeightPreset; label: string; px: string }[] = [
+  { preset: 'xs', label: 'Très petit', px: '150px' },
+  { preset: 'sm', label: 'Petit', px: '250px' },
+  { preset: 'md', label: 'Moyen', px: '350px' },
+  { preset: 'lg', label: 'Grand', px: '450px' },
+  { preset: 'xl', label: 'Très grand', px: '600px' },
 ];
 
 export function WidgetWrapper({
@@ -39,6 +53,8 @@ export function WidgetWrapper({
   isDragging,
   sizePreset,
   onResize,
+  heightPreset,
+  onHeightChange,
 }: WidgetWrapperProps) {
   return (
     <div
@@ -84,6 +100,37 @@ export function WidgetWrapper({
                         <span className="block text-sm leading-tight">{opt.label}</span>
                         <span className="block text-[10px] text-muted-foreground leading-tight">{opt.desc}</span>
                       </div>
+                    </button>
+                  );
+                })}
+              </PopoverContent>
+            </Popover>
+          )}
+          {onHeightChange && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7" title="Hauteur">
+                  <ChevronUp className="h-3 w-3 text-keon-500 -mb-1" />
+                  <ChevronDown className="h-3 w-3 text-keon-500 -mt-1" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-44 p-1.5" align="end">
+                <p className="text-xs font-semibold text-muted-foreground mb-1.5 px-1">Hauteur</p>
+                {HEIGHT_OPTIONS.map(opt => {
+                  const isActive = heightPreset === opt.preset;
+                  return (
+                    <button
+                      key={opt.preset}
+                      className={cn(
+                        'flex items-center justify-between w-full px-2 py-1.5 rounded-md text-sm transition-colors',
+                        isActive
+                          ? 'bg-primary/10 text-primary font-medium'
+                          : 'hover:bg-muted text-foreground'
+                      )}
+                      onClick={() => onHeightChange(opt.preset)}
+                    >
+                      <span>{opt.label}</span>
+                      <span className="text-[10px] text-muted-foreground">{opt.px}</span>
                     </button>
                   );
                 })}
