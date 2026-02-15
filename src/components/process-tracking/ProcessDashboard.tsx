@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
+import { useState, useEffect, useMemo, lazy, Suspense, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Task, TaskStats } from '@/types/task';
@@ -15,12 +15,16 @@ const ProcessTaskManagement = lazy(() =>
 );
 
 interface ProcessDashboardProps {
-  processId: string;
+  // Single process mode
+  processId?: string;
+  // Department mode - aggregate all tasks for a department
+  departmentId?: string;
+  processIds?: string[];
   canWrite: boolean;
   processName?: string;
 }
 
-export function ProcessDashboard({ processId, canWrite, processName }: ProcessDashboardProps) {
+export function ProcessDashboard({ processId, departmentId, processIds, canWrite, processName }: ProcessDashboardProps) {
   const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -31,43 +35,89 @@ export function ProcessDashboard({ processId, canWrite, processName }: ProcessDa
   const hasMaterialSection = processName?.toUpperCase().includes('MAINTENANCE') ?? false;
   const hasSupplierSection = processName?.toUpperCase().includes('ACHAT') ?? false;
 
-  useEffect(() => {
-    if (!user || !processId) return;
+  const isDeptMode = !!departmentId && !processId;
+  const effectiveProcessId = processId || departmentId || '';
 
-    async function fetchProcessTasks() {
-      setIsLoading(true);
-      const { data, error } = await (supabase as any)
-        .from('tasks')
-        .select('*')
-        .or(`process_template_id.eq.${processId},source_process_template_id.eq.${processId}`)
-        .order('created_at', { ascending: false });
+  const fetchTasks = useCallback(async () => {
+    if (!user) return;
+    setIsLoading(true);
 
-      if (!error && data) {
-        setTasks(data as Task[]);
+    let query = (supabase as any).from('tasks').select('*');
+
+    if (isDeptMode && departmentId) {
+      // Department mode: fetch tasks by department + all process tasks
+      // We need tasks where:
+      // 1. target_department_id = departmentId
+      // 2. OR process_template_id/source_process_template_id in processIds
+      // 3. OR assignee is in this department
+      const conditions: string[] = [];
+      conditions.push(`target_department_id.eq.${departmentId}`);
+      if (processIds && processIds.length > 0) {
+        processIds.forEach(pid => {
+          conditions.push(`process_template_id.eq.${pid}`);
+          conditions.push(`source_process_template_id.eq.${pid}`);
+        });
       }
-      setIsLoading(false);
+      query = query.or(conditions.join(','));
+    } else if (processId) {
+      query = query.or(`process_template_id.eq.${processId},source_process_template_id.eq.${processId}`);
     }
 
-    fetchProcessTasks();
+    const { data, error } = await query.order('created_at', { ascending: false });
+
+    if (!error && data) {
+      if (isDeptMode && departmentId) {
+        // Also fetch tasks where assignee belongs to this department
+        const { data: deptProfiles } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('department_id', departmentId);
+
+        if (deptProfiles && deptProfiles.length > 0) {
+          const deptProfileIds = new Set(deptProfiles.map(p => p.id));
+          // Fetch additional tasks by assignee (avoid duplicates)
+          const existingIds = new Set((data as any[]).map(t => t.id));
+          const { data: assigneeTasks } = await (supabase as any)
+            .from('tasks')
+            .select('*')
+            .in('assignee_id', Array.from(deptProfileIds))
+            .order('created_at', { ascending: false });
+
+          if (assigneeTasks) {
+            const extra = (assigneeTasks as any[]).filter(t => !existingIds.has(t.id));
+            setTasks([...data, ...extra] as Task[]);
+          } else {
+            setTasks(data as Task[]);
+          }
+        } else {
+          setTasks(data as Task[]);
+        }
+      } else {
+        setTasks(data as Task[]);
+      }
+    }
+    setIsLoading(false);
+  }, [user, processId, departmentId, isDeptMode, processIds]);
+
+  useEffect(() => {
+    fetchTasks();
 
     const channel = supabase
-      .channel(`process-tracking-${processId}`)
+      .channel(`process-tracking-${effectiveProcessId}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'tasks',
-      }, (payload: any) => {
-        const row = payload.new || payload.old;
-        if (row?.process_template_id === processId || row?.source_process_template_id === processId) {
-          fetchProcessTasks();
-        }
+      }, () => {
+        // In dept mode, refetch all; in process mode, check relevance
+        fetchTasks();
       })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, processId]);
+  }, [fetchTasks, effectiveProcessId]);
 
   const stats: TaskStats = useMemo(() => {
     const total = tasks.length;
@@ -123,13 +173,18 @@ export function ProcessDashboard({ processId, canWrite, processName }: ProcessDa
           tasks={tasks}
           stats={stats}
           globalProgress={globalProgress}
-          processId={processId}
+          processId={effectiveProcessId}
           canEdit={canWrite}
         />
       </TabsContent>
       <TabsContent value="tasks">
         <Suspense fallback={suspenseFallback}>
-          <ProcessTaskManagement processId={processId} canWrite={canWrite} />
+          <ProcessTaskManagement
+            processId={processId}
+            departmentId={departmentId}
+            processIds={processIds}
+            canWrite={canWrite}
+          />
         </Suspense>
       </TabsContent>
       {hasMaterialSection && (

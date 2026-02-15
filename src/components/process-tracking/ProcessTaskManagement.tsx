@@ -17,11 +17,13 @@ import { Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface ProcessTaskManagementProps {
-  processId: string;
+  processId?: string;
+  departmentId?: string;
+  processIds?: string[];
   canWrite?: boolean;
 }
 
-export function ProcessTaskManagement({ processId, canWrite = false }: ProcessTaskManagementProps) {
+export function ProcessTaskManagement({ processId, departmentId, processIds, canWrite = false }: ProcessTaskManagementProps) {
   const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -32,42 +34,80 @@ export function ProcessTaskManagement({ processId, canWrite = false }: ProcessTa
   const [profilesMap, setProfilesMap] = useState<Map<string, string>>(new Map());
   const { categories } = useCategories();
 
-  const fetchProcessTasks = useCallback(async () => {
-    if (!user || !processId) return;
+  const isDeptMode = !!departmentId && !processId;
+  const effectiveId = processId || departmentId || '';
+
+  const fetchTasks = useCallback(async () => {
+    if (!user || !effectiveId) return;
     setIsLoading(true);
-    const { data, error } = await (supabase as any)
-      .from('tasks')
-      .select('*')
-      .or(`process_template_id.eq.${processId},source_process_template_id.eq.${processId}`)
-      .order('created_at', { ascending: false });
+
+    let query = (supabase as any).from('tasks').select('*');
+
+    if (isDeptMode && departmentId) {
+      const conditions: string[] = [];
+      conditions.push(`target_department_id.eq.${departmentId}`);
+      if (processIds && processIds.length > 0) {
+        processIds.forEach(pid => {
+          conditions.push(`process_template_id.eq.${pid}`);
+          conditions.push(`source_process_template_id.eq.${pid}`);
+        });
+      }
+      query = query.or(conditions.join(','));
+    } else if (processId) {
+      query = query.or(`process_template_id.eq.${processId},source_process_template_id.eq.${processId}`);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
 
     if (!error && data) {
-      setTasks(data as Task[]);
+      if (isDeptMode && departmentId) {
+        const { data: deptProfiles } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('department_id', departmentId);
+
+        if (deptProfiles && deptProfiles.length > 0) {
+          const existingIds = new Set((data as any[]).map(t => t.id));
+          const { data: assigneeTasks } = await (supabase as any)
+            .from('tasks')
+            .select('*')
+            .in('assignee_id', deptProfiles.map(p => p.id))
+            .order('created_at', { ascending: false });
+
+          if (assigneeTasks) {
+            const extra = (assigneeTasks as any[]).filter(t => !existingIds.has(t.id));
+            setTasks([...data, ...extra] as Task[]);
+          } else {
+            setTasks(data as Task[]);
+          }
+        } else {
+          setTasks(data as Task[]);
+        }
+      } else {
+        setTasks(data as Task[]);
+      }
     }
     setIsLoading(false);
-  }, [user, processId]);
+  }, [user, processId, departmentId, isDeptMode, processIds, effectiveId]);
 
   useEffect(() => {
-    fetchProcessTasks();
+    fetchTasks();
 
     const channel = supabase
-      .channel(`process-task-mgmt-${processId}`)
+      .channel(`process-task-mgmt-${effectiveId}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'tasks',
-      }, (payload: any) => {
-        const row = payload.new || payload.old;
-        if (row?.process_template_id === processId || row?.source_process_template_id === processId) {
-          fetchProcessTasks();
-        }
+      }, () => {
+        fetchTasks();
       })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [fetchProcessTasks]);
+  }, [fetchTasks, effectiveId]);
 
   // Fetch profiles
   useEffect(() => {
@@ -107,9 +147,9 @@ export function ProcessTaskManagement({ processId, canWrite = false }: ProcessTa
     if (error) {
       toast.error('Erreur lors de la mise à jour du statut');
     } else {
-      fetchProcessTasks();
+      fetchTasks();
     }
-  }, [fetchProcessTasks]);
+  }, [fetchTasks]);
 
   const deleteTask = useCallback(async (taskId: string) => {
     const { error } = await supabase
@@ -119,9 +159,9 @@ export function ProcessTaskManagement({ processId, canWrite = false }: ProcessTa
     if (error) {
       toast.error('Erreur lors de la suppression');
     } else {
-      fetchProcessTasks();
+      fetchTasks();
     }
-  }, [fetchProcessTasks]);
+  }, [fetchTasks]);
 
   // Apply cross filters
   const filteredTasks = useMemo(() => {
@@ -188,7 +228,7 @@ export function ProcessTaskManagement({ processId, canWrite = false }: ProcessTa
             onDelete={deleteTask}
             groupLabels={groupLabels}
             progressMap={progressMap}
-            onTaskUpdated={fetchProcessTasks}
+            onTaskUpdated={fetchTasks}
             kanbanGroupMode={kanbanGroupMode}
             categoryMap={categoryMap}
             assigneeMap={assigneeMap}
@@ -202,7 +242,7 @@ export function ProcessTaskManagement({ processId, canWrite = false }: ProcessTa
             onDelete={deleteTask}
             groupLabels={groupLabels}
             progressMap={progressMap}
-            onTaskUpdated={fetchProcessTasks}
+            onTaskUpdated={fetchTasks}
           />
         );
       case 'table':
@@ -212,7 +252,7 @@ export function ProcessTaskManagement({ processId, canWrite = false }: ProcessTa
             onStatusChange={updateTaskStatus}
             onDelete={deleteTask}
             progressMap={progressMap}
-            onTaskUpdated={fetchProcessTasks}
+            onTaskUpdated={fetchTasks}
           />
         );
       default:
@@ -223,7 +263,7 @@ export function ProcessTaskManagement({ processId, canWrite = false }: ProcessTa
             onDelete={deleteTask}
             groupLabels={groupLabels}
             progressMap={progressMap}
-            onTaskUpdated={fetchProcessTasks}
+            onTaskUpdated={fetchTasks}
           />
         );
     }
@@ -241,7 +281,7 @@ export function ProcessTaskManagement({ processId, canWrite = false }: ProcessTa
       <CrossFiltersPanel
         filters={crossFilters}
         onFiltersChange={setCrossFilters}
-        processId={processId}
+        processId={effectiveId}
       />
 
       <div className="mb-4">
