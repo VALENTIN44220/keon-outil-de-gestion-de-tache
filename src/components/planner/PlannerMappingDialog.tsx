@@ -150,132 +150,134 @@ export function PlannerMappingDialog({ open, onOpenChange, mapping, onSave }: Pl
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>Configuration du mapping — {mapping.planner_plan_title}</DialogTitle>
         </DialogHeader>
 
-        {isLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-5 w-5 animate-spin mr-2" />
-            <span className="text-sm text-muted-foreground">Chargement des compartiments...</span>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {/* State Filter */}
-            <div className="space-y-3">
-              <Label className="font-medium">États des tâches à importer</Label>
-              <div className="flex flex-wrap gap-2">
-                {PLANNER_STATES.map(state => (
-                  <label
-                    key={state.value}
-                    className="flex items-center gap-2 cursor-pointer"
-                  >
-                    <Checkbox
-                      checked={importStates.includes(state.value)}
-                      onCheckedChange={() => toggleState(state.value)}
-                    />
-                    <Badge variant="outline" className={state.color}>
-                      {state.label}
-                    </Badge>
-                  </label>
-                ))}
-              </div>
-              {importStates.length === 0 && (
-                <p className="text-xs text-destructive">Sélectionnez au moins un état</p>
-              )}
+        <div className="flex-1 overflow-y-auto min-h-0">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin mr-2" />
+              <span className="text-sm text-muted-foreground">Chargement des compartiments...</span>
             </div>
-
-            <Separator />
-
-            {/* Bucket → Subcategory Mapping */}
-            <div className="space-y-3">
-              <Label className="font-medium">
-                Mapping des compartiments → Sous-catégories
-              </Label>
-              {!mapping.mapped_category_id ? (
-                <p className="text-sm text-muted-foreground">
-                  Associez d'abord une catégorie au plan pour pouvoir mapper les compartiments aux sous-catégories.
-                </p>
-              ) : subcategories.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Aucune sous-catégorie disponible pour la catégorie "{selectedCategory?.name}".
-                </p>
-              ) : bucketMappings.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Aucun compartiment trouvé dans ce plan Planner.
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {bucketMappings.map(bm => (
-                    <div key={bm.planner_bucket_id} className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 text-sm font-medium truncate min-w-0">
-                          {bm.planner_bucket_name}
-                        </div>
-                        <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                        <Select
-                          value={bm.mapped_subcategory_id || 'none'}
-                          onValueChange={(v) => {
-                            if (v === '__create__') {
-                              setNewSubName(prev => ({ ...prev, [bm.planner_bucket_id]: bm.planner_bucket_name }));
-                            } else {
-                              updateBucketMapping(bm.planner_bucket_id, v === 'none' ? null : v);
-                              setNewSubName(prev => ({ ...prev, [bm.planner_bucket_id]: '' }));
-                            }
-                          }}
-                        >
-                          <SelectTrigger className="w-48 h-8 text-xs">
-                            <SelectValue placeholder="Aucune" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">Aucune</SelectItem>
-                            {subcategories.map(sub => (
-                              <SelectItem key={sub.id} value={sub.id}>{sub.name}</SelectItem>
-                            ))}
-                            <SelectItem value="__create__" className="text-primary font-medium">
-                              <span className="flex items-center gap-1"><Plus className="h-3 w-3" /> Nouvelle sous-catégorie</span>
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      {newSubName[bm.planner_bucket_id] !== undefined && newSubName[bm.planner_bucket_id] !== '' && !bm.mapped_subcategory_id?.startsWith('__') && (
-                        <div className="flex items-center gap-1 ml-auto" style={{ maxWidth: '12rem' }}>
-                          <Input
-                            value={newSubName[bm.planner_bucket_id] || ''}
-                            onChange={(e) => setNewSubName(prev => ({ ...prev, [bm.planner_bucket_id]: e.target.value }))}
-                            placeholder="Nom..."
-                            className="h-7 text-xs"
-                            onKeyDown={(e) => e.key === 'Enter' && handleCreateSubcategory(bm.planner_bucket_id)}
-                          />
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7"
-                            disabled={creatingForBucket === bm.planner_bucket_id}
-                            onClick={() => handleCreateSubcategory(bm.planner_bucket_id)}
-                          >
-                            {creatingForBucket === bm.planner_bucket_id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3 text-primary" />}
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7"
-                            onClick={() => setNewSubName(prev => ({ ...prev, [bm.planner_bucket_id]: '' }))}
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      )}
-                    </div>
+          ) : (
+            <div className="space-y-6 pr-1">
+              {/* State Filter */}
+              <div className="space-y-3">
+                <Label className="font-medium">États des tâches à importer</Label>
+                <div className="flex flex-wrap gap-2">
+                  {PLANNER_STATES.map(state => (
+                    <label
+                      key={state.value}
+                      className="flex items-center gap-2 cursor-pointer"
+                    >
+                      <Checkbox
+                        checked={importStates.includes(state.value)}
+                        onCheckedChange={() => toggleState(state.value)}
+                      />
+                      <Badge variant="outline" className={state.color}>
+                        {state.label}
+                      </Badge>
+                    </label>
                   ))}
                 </div>
-              )}
-            </div>
-          </div>
-        )}
+                {importStates.length === 0 && (
+                  <p className="text-xs text-destructive">Sélectionnez au moins un état</p>
+                )}
+              </div>
 
-        <DialogFooter>
+              <Separator />
+
+              {/* Bucket → Subcategory Mapping */}
+              <div className="space-y-3">
+                <Label className="font-medium">
+                  Mapping des compartiments → Sous-catégories
+                </Label>
+                {!mapping.mapped_category_id ? (
+                  <p className="text-sm text-muted-foreground">
+                    Associez d'abord une catégorie au plan pour pouvoir mapper les compartiments aux sous-catégories.
+                  </p>
+                ) : subcategories.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Aucune sous-catégorie disponible pour la catégorie "{selectedCategory?.name}".
+                  </p>
+                ) : bucketMappings.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Aucun compartiment trouvé dans ce plan Planner.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {bucketMappings.map(bm => (
+                      <div key={bm.planner_bucket_id} className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 text-sm font-medium truncate min-w-0">
+                            {bm.planner_bucket_name}
+                          </div>
+                          <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          <Select
+                            value={bm.mapped_subcategory_id || 'none'}
+                            onValueChange={(v) => {
+                              if (v === '__create__') {
+                                setNewSubName(prev => ({ ...prev, [bm.planner_bucket_id]: bm.planner_bucket_name }));
+                              } else {
+                                updateBucketMapping(bm.planner_bucket_id, v === 'none' ? null : v);
+                                setNewSubName(prev => ({ ...prev, [bm.planner_bucket_id]: '' }));
+                              }
+                            }}
+                          >
+                            <SelectTrigger className="w-48 h-8 text-xs">
+                              <SelectValue placeholder="Aucune" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">Aucune</SelectItem>
+                              {subcategories.map(sub => (
+                                <SelectItem key={sub.id} value={sub.id}>{sub.name}</SelectItem>
+                              ))}
+                              <SelectItem value="__create__" className="text-primary font-medium">
+                                <span className="flex items-center gap-1"><Plus className="h-3 w-3" /> Nouvelle sous-catégorie</span>
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {newSubName[bm.planner_bucket_id] !== undefined && newSubName[bm.planner_bucket_id] !== '' && !bm.mapped_subcategory_id?.startsWith('__') && (
+                          <div className="flex items-center gap-1 ml-auto" style={{ maxWidth: '12rem' }}>
+                            <Input
+                              value={newSubName[bm.planner_bucket_id] || ''}
+                              onChange={(e) => setNewSubName(prev => ({ ...prev, [bm.planner_bucket_id]: e.target.value }))}
+                              placeholder="Nom..."
+                              className="h-7 text-xs"
+                              onKeyDown={(e) => e.key === 'Enter' && handleCreateSubcategory(bm.planner_bucket_id)}
+                            />
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7"
+                              disabled={creatingForBucket === bm.planner_bucket_id}
+                              onClick={() => handleCreateSubcategory(bm.planner_bucket_id)}
+                            >
+                              {creatingForBucket === bm.planner_bucket_id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3 text-primary" />}
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7"
+                              onClick={() => setNewSubName(prev => ({ ...prev, [bm.planner_bucket_id]: '' }))}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter className="flex-shrink-0 border-t pt-4">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>Annuler</Button>
           <Button onClick={handleSave} disabled={isSaving || importStates.length === 0}>
             {isSaving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
