@@ -17,14 +17,15 @@ const ProcessTaskManagement = lazy(() =>
 interface ProcessDashboardProps {
   // Single process mode
   processId?: string;
-  // Department mode - aggregate all tasks for a department
-  departmentId?: string;
+  // Service group mode - aggregate all tasks for departments in a service group
+  departmentId?: string; // service group id (used as key)
+  departmentIds?: string[]; // actual department IDs in this group
   processIds?: string[];
   canWrite: boolean;
   processName?: string;
 }
 
-export function ProcessDashboard({ processId, departmentId, processIds, canWrite, processName }: ProcessDashboardProps) {
+export function ProcessDashboard({ processId, departmentId, departmentIds, processIds, canWrite, processName }: ProcessDashboardProps) {
   const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -45,20 +46,23 @@ export function ProcessDashboard({ processId, departmentId, processIds, canWrite
     let query = (supabase as any).from('tasks').select('*');
 
     if (isDeptMode && departmentId) {
-      // Department mode: fetch tasks by department + all process tasks
-      // We need tasks where:
-      // 1. target_department_id = departmentId
-      // 2. OR process_template_id/source_process_template_id in processIds
-      // 3. OR assignee is in this department
+      // Service group mode: fetch tasks by departments + all process tasks
       const conditions: string[] = [];
-      conditions.push(`target_department_id.eq.${departmentId}`);
+      // Add all department IDs from this service group
+      if (departmentIds && departmentIds.length > 0) {
+        departmentIds.forEach(did => {
+          conditions.push(`target_department_id.eq.${did}`);
+        });
+      }
       if (processIds && processIds.length > 0) {
         processIds.forEach(pid => {
           conditions.push(`process_template_id.eq.${pid}`);
           conditions.push(`source_process_template_id.eq.${pid}`);
         });
       }
-      query = query.or(conditions.join(','));
+      if (conditions.length > 0) {
+        query = query.or(conditions.join(','));
+      }
     } else if (processId) {
       query = query.or(`process_template_id.eq.${processId},source_process_template_id.eq.${processId}`);
     }
@@ -66,16 +70,15 @@ export function ProcessDashboard({ processId, departmentId, processIds, canWrite
     const { data, error } = await query.order('created_at', { ascending: false });
 
     if (!error && data) {
-      if (isDeptMode && departmentId) {
-        // Also fetch tasks where assignee belongs to this department
+      if (isDeptMode && departmentIds && departmentIds.length > 0) {
+        // Also fetch tasks where assignee belongs to any department in this group
         const { data: deptProfiles } = await supabase
           .from('profiles')
           .select('id')
-          .eq('department_id', departmentId);
+          .in('department_id', departmentIds);
 
         if (deptProfiles && deptProfiles.length > 0) {
           const deptProfileIds = new Set(deptProfiles.map(p => p.id));
-          // Fetch additional tasks by assignee (avoid duplicates)
           const existingIds = new Set((data as any[]).map(t => t.id));
           const { data: assigneeTasks } = await (supabase as any)
             .from('tasks')
@@ -97,7 +100,7 @@ export function ProcessDashboard({ processId, departmentId, processIds, canWrite
       }
     }
     setIsLoading(false);
-  }, [user, processId, departmentId, isDeptMode, processIds]);
+  }, [user, processId, departmentId, departmentIds, isDeptMode, processIds]);
 
   useEffect(() => {
     fetchTasks();

@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Loader2, ShieldX, ChevronRight, Building2 } from 'lucide-react';
+import { Loader2, ShieldX, ChevronRight } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
@@ -41,33 +41,46 @@ interface ProcessInfo {
   name: string;
   can_write: boolean;
   task_count?: number;
-  target_department_id: string | null;
+  service_group_id: string | null;
 }
 
-interface DepartmentGroup {
+interface ServiceGroupInfo {
+  id: string;
+  name: string;
+  department_ids: string[];
+}
+
+interface SidebarGroup {
   id: string;
   name: string;
   processes: ProcessInfo[];
   totalTasks: number;
+  departmentIds: string[];
 }
 
 export default function ProcessTracking() {
   const [activeView, setActiveView] = useState('process-tracking');
   const [searchParams, setSearchParams] = useSearchParams();
   const [processes, setProcesses] = useState<ProcessInfo[]>([]);
-  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
+  const [serviceGroups, setServiceGroups] = useState<ServiceGroupInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [openDepts, setOpenDepts] = useState<Set<string>>(new Set());
+  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
   const { user } = useAuth();
 
   const loadData = useCallback(async () => {
     if (!user) return;
 
-    // Fetch departments
-    const { data: deptData } = await supabase.from('departments').select('id, name').order('name');
-    setDepartments(deptData || []);
+    // Fetch service groups + their departments
+    const { data: sgData } = await (supabase as any).from('service_groups').select('id, name').order('name');
+    const { data: sgDeptData } = await (supabase as any).from('service_group_departments').select('service_group_id, department_id');
 
-    // Fetch processes (same logic as before)
+    const groups: ServiceGroupInfo[] = (sgData || []).map((sg: any) => ({
+      ...sg,
+      department_ids: (sgDeptData || []).filter((d: any) => d.service_group_id === sg.id).map((d: any) => d.department_id),
+    }));
+    setServiceGroups(groups);
+
+    // Fetch processes
     const { data: accessRows } = await (supabase as any)
       .from('process_tracking_access')
       .select('process_template_id, can_write')
@@ -80,7 +93,7 @@ export default function ProcessTracking() {
     if (isAdmin?.data === true) {
       const { data } = await (supabase as any)
         .from('process_templates')
-        .select('id, name, target_department_id')
+        .select('id, name, service_group_id')
         .order('name');
       processList = (data || []).map((p: any) => ({ ...p, can_write: true }));
     } else {
@@ -90,7 +103,7 @@ export default function ProcessTracking() {
       if (accessibleIds.length > 0) {
         const { data } = await (supabase as any)
           .from('process_templates')
-          .select('id, name, target_department_id')
+          .select('id, name, service_group_id')
           .in('id', accessibleIds)
           .order('name');
         processList = (data || []).map((p: any) => ({
@@ -132,26 +145,27 @@ export default function ProcessTracking() {
     return () => { supabase.removeChannel(channel); };
   }, [loadData]);
 
-  // Group processes by department
-  const departmentGroups = useMemo(() => {
-    const deptMap = new Map<string, string>();
-    departments.forEach(d => deptMap.set(d.id, d.name));
+  // Group processes by service group
+  const sidebarGroups = useMemo(() => {
+    const sgMap = new Map<string, ServiceGroupInfo>();
+    serviceGroups.forEach(sg => sgMap.set(sg.id, sg));
 
-    const groups = new Map<string, DepartmentGroup>();
+    const groups = new Map<string, SidebarGroup>();
     const unassigned: ProcessInfo[] = [];
 
     processes.forEach(p => {
-      if (p.target_department_id && deptMap.has(p.target_department_id)) {
-        const deptId = p.target_department_id;
-        if (!groups.has(deptId)) {
-          groups.set(deptId, {
-            id: deptId,
-            name: deptMap.get(deptId)!,
+      if (p.service_group_id && sgMap.has(p.service_group_id)) {
+        const sg = sgMap.get(p.service_group_id)!;
+        if (!groups.has(sg.id)) {
+          groups.set(sg.id, {
+            id: sg.id,
+            name: sg.name,
             processes: [],
             totalTasks: 0,
+            departmentIds: sg.department_ids,
           });
         }
-        const g = groups.get(deptId)!;
+        const g = groups.get(sg.id)!;
         g.processes.push(p);
         g.totalTasks += p.task_count || 0;
       } else {
@@ -159,61 +173,57 @@ export default function ProcessTracking() {
       }
     });
 
-    // Also create groups for departments that have no process but might have tasks
-    // (they'll be shown when navigated to via dept-level view)
+    const result: SidebarGroup[] = Array.from(groups.values()).sort((a, b) => a.name.localeCompare(b.name));
 
-    const result: DepartmentGroup[] = Array.from(groups.values()).sort((a, b) => a.name.localeCompare(b.name));
-
-    // Processes without department go into "Non rattachés"
     if (unassigned.length > 0) {
       result.push({
         id: 'unassigned',
         name: 'Non rattachés',
         processes: unassigned,
         totalTasks: unassigned.reduce((sum, p) => sum + (p.task_count || 0), 0),
+        departmentIds: [],
       });
     }
 
-    return result.sort((a, b) => a.name.localeCompare(b.name));
-  }, [processes, departments]);
+    return result;
+  }, [processes, serviceGroups]);
 
-  // Auto-open the active department
-  const activeMode = searchParams.get('mode'); // 'dept' or null (process)
+  // Auto-open the active group
+  const activeMode = searchParams.get('mode');
   const activeId = searchParams.get('id') || '';
 
   useEffect(() => {
-    if (activeId && departmentGroups.length > 0) {
-      // Find which department contains the active process or is the active dept
-      for (const g of departmentGroups) {
+    if (activeId && sidebarGroups.length > 0) {
+      for (const g of sidebarGroups) {
         if (g.id === activeId || g.processes.some(p => p.id === activeId)) {
-          setOpenDepts(prev => new Set([...prev, g.id]));
+          setOpenGroups(prev => new Set([...prev, g.id]));
           break;
         }
       }
     }
-  }, [activeId, departmentGroups]);
+  }, [activeId, sidebarGroups]);
 
   // Default selection
   useEffect(() => {
-    if (!isLoading && !activeId && departmentGroups.length > 0) {
-      const firstGroup = departmentGroups[0];
-      setSearchParams({ mode: 'dept', id: firstGroup.id }, { replace: true });
+    if (!isLoading && !activeId && sidebarGroups.length > 0) {
+      const firstGroup = sidebarGroups[0];
+      setSearchParams({ mode: 'group', id: firstGroup.id }, { replace: true });
     }
-  }, [isLoading, activeId, departmentGroups, setSearchParams]);
+  }, [isLoading, activeId, sidebarGroups, setSearchParams]);
 
-  const handleSelectDept = (deptId: string) => {
-    setSearchParams({ mode: 'dept', id: deptId }, { replace: true });
+  const handleSelectGroup = (groupId: string) => {
+    setSearchParams({ mode: 'group', id: groupId }, { replace: true });
   };
 
   const handleSelectProcess = (processId: string) => {
     setSearchParams({ mode: 'process', id: processId }, { replace: true });
   };
 
-  const toggleDept = (deptId: string) => {
-    setOpenDepts(prev => {
+  const toggleGroup = (groupId: string) => {
+    setOpenGroups(prev => {
       const next = new Set(prev);
-      if (next.has(deptId)) next.delete(deptId);
-      else next.add(deptId);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
       return next;
     });
   };
@@ -235,8 +245,7 @@ export default function ProcessTracking() {
 
   // Find active context
   const activeProcess = activeMode === 'process' ? processes.find(p => p.id === activeId) : null;
-  const activeDeptGroup = activeMode === 'dept' ? departmentGroups.find(g => g.id === activeId) : null;
-  // If no mode but we have an id, check both
+  const activeGroup = (activeMode === 'group' || activeMode === 'dept') ? sidebarGroups.find(g => g.id === activeId) : null;
   const resolvedProcess = activeProcess || (!activeMode ? processes.find(p => p.id === activeId) : null);
 
   return (
@@ -245,38 +254,27 @@ export default function ProcessTracking() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header title="Suivi des processus" searchQuery="" onSearchChange={() => {}} />
         <div className="flex-1 flex overflow-hidden">
-          {/* Department sidebar */}
+          {/* Sidebar */}
           <aside className="w-64 flex-shrink-0 border-r border-border bg-muted/30 overflow-y-auto">
             <div className="p-3 space-y-1">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-2">Services</p>
-              {departmentGroups.length === 0 ? (
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-2">Groupes de services</p>
+              {sidebarGroups.length === 0 ? (
                 <p className="text-sm text-muted-foreground px-3 py-4">Aucun processus accessible</p>
               ) : (
                 <TooltipProvider delayDuration={300}>
-                  {departmentGroups.map((group, idx) => {
+                  {sidebarGroups.map((group, idx) => {
                     const color = DEPT_COLORS[idx % DEPT_COLORS.length];
-                    const isOpen = openDepts.has(group.id);
-                    const isDeptActive = activeMode === 'dept' && activeId === group.id;
-                    const isRealDept = !group.id.startsWith('process-');
-                    const hasSingleProcess = group.processes.length === 1 && !isRealDept;
+                    const isOpen = openGroups.has(group.id);
+                    const isGroupActive = (activeMode === 'group' || activeMode === 'dept') && activeId === group.id;
 
                     return (
-                      <Collapsible key={group.id} open={isOpen} onOpenChange={() => toggleDept(group.id)}>
+                      <Collapsible key={group.id} open={isOpen} onOpenChange={() => toggleGroup(group.id)}>
                         <div className="flex items-center gap-1">
-                          {/* Department header button */}
                           <button
-                            onClick={() => {
-                              if (isRealDept) {
-                                handleSelectDept(group.id);
-                              } else if (hasSingleProcess) {
-                                handleSelectProcess(group.processes[0].id);
-                              } else {
-                                toggleDept(group.id);
-                              }
-                            }}
+                            onClick={() => handleSelectGroup(group.id)}
                             className={cn(
                               "flex-1 flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all text-left",
-                              isDeptActive
+                              isGroupActive
                                 ? `bg-card shadow-md ring-2 ${color.ring} ring-offset-1 ring-offset-background`
                                 : "hover:bg-muted/80"
                             )}
@@ -284,14 +282,14 @@ export default function ProcessTracking() {
                             <div className={cn(
                               "flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white shadow-sm",
                               color.bg,
-                              isDeptActive && "scale-110"
+                              isGroupActive && "scale-110"
                             )}>
                               {getInitials(group.name)}
                             </div>
                             <div className="flex-1 min-w-0">
                               <span className={cn(
                                 "block truncate text-sm",
-                                isDeptActive ? "text-foreground font-semibold" : "text-muted-foreground"
+                                isGroupActive ? "text-foreground font-semibold" : "text-muted-foreground"
                               )}>
                                 {group.name}
                               </span>
@@ -300,14 +298,13 @@ export default function ProcessTracking() {
                               </span>
                             </div>
                           </button>
-                          {/* Expand/collapse toggle for groups with multiple processes */}
-                          {group.processes.length > 1 || isRealDept ? (
+                          {group.processes.length > 0 && (
                             <CollapsibleTrigger asChild>
                               <button className="p-1 rounded hover:bg-muted/60 text-muted-foreground">
                                 <ChevronRight className={cn("h-3.5 w-3.5 transition-transform", isOpen && "rotate-90")} />
                               </button>
                             </CollapsibleTrigger>
-                          ) : null}
+                          )}
                         </div>
 
                         <CollapsibleContent>
@@ -348,7 +345,7 @@ export default function ProcessTracking() {
 
           {/* Main content */}
           <main className="flex-1 overflow-y-auto p-6">
-            {departmentGroups.length === 0 ? (
+            {sidebarGroups.length === 0 ? (
               <div className="flex flex-col items-center justify-center min-h-[400px] border-2 border-dashed border-border rounded-xl gap-4">
                 <div className="p-3 rounded-full bg-muted">
                   <ShieldX className="h-8 w-8 text-muted-foreground" />
@@ -360,13 +357,14 @@ export default function ProcessTracking() {
                   </p>
                 </div>
               </div>
-            ) : activeDeptGroup ? (
+            ) : activeGroup ? (
               <Suspense fallback={<div className="flex items-center justify-center h-64"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
                 <ProcessDashboard
-                  departmentId={activeDeptGroup.id}
-                  processIds={activeDeptGroup.processes.map(p => p.id)}
-                  canWrite={activeDeptGroup.processes.some(p => p.can_write)}
-                  processName={activeDeptGroup.name}
+                  departmentId={activeGroup.id}
+                  departmentIds={activeGroup.departmentIds}
+                  processIds={activeGroup.processes.map(p => p.id)}
+                  canWrite={activeGroup.processes.some(p => p.can_write)}
+                  processName={activeGroup.name}
                 />
               </Suspense>
             ) : resolvedProcess ? (

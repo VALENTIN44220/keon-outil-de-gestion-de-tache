@@ -33,9 +33,9 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
   const [formData, setFormData] = useState({
     name: process.name,
     description: process.description || '',
-    target_department_id: (process as any).target_department_id || '',
+    service_group_id: (process as any).service_group_id || '',
   });
-  const [departmentsList, setDepartmentsList] = useState<{ id: string; name: string }[]>([]);
+  const [serviceGroups, setServiceGroups] = useState<{ id: string; name: string }[]>([]);
 
   // Common fields config
   const [commonFieldsConfig, setCommonFieldsConfig] = useState<CommonFieldsConfig>(
@@ -44,11 +44,11 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
   const [isSavingFields, setIsSavingFields] = useState(false);
   const [beProjects, setBeProjects] = useState<{ id: string; nom_projet: string; code_projet: string }[]>([]);
   const [beProjectSearch, setBeProjectSearch] = useState('');
-  // Fetch departments
+  // Fetch service groups
   useEffect(() => {
     (async () => {
-      const { data } = await supabase.from('departments').select('id, name').order('name');
-      if (data) setDepartmentsList(data);
+      const { data } = await (supabase as any).from('service_groups').select('id, name').order('name');
+      if (data) setServiceGroups(data);
     })();
   }, []);
 
@@ -57,7 +57,7 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
     setFormData({
       name: process.name,
       description: process.description || '',
-      target_department_id: (process as any).target_department_id || '',
+      service_group_id: (process as any).service_group_id || '',
     });
 
     // Load common fields config from settings
@@ -91,7 +91,7 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
         .update({
           name: formData.name,
           description: formData.description || null,
-          target_department_id: formData.target_department_id || null,
+          service_group_id: formData.service_group_id || null,
         })
         .eq('id', process.id);
 
@@ -186,25 +186,25 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
           </div>
 
           <div className="space-y-2">
-            <Label>Service rattaché</Label>
+            <Label>Groupe de services</Label>
             {isEditing ? (
               <Select
-                value={formData.target_department_id}
-                onValueChange={(v) => setFormData({ ...formData, target_department_id: v === '__none__' ? '' : v })}
+                value={formData.service_group_id}
+                onValueChange={(v) => setFormData({ ...formData, service_group_id: v === '__none__' ? '' : v })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Aucun service" />
+                  <SelectValue placeholder="Aucun groupe" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none__">Aucun service</SelectItem>
-                  {departmentsList.map(d => (
-                    <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                  <SelectItem value="__none__">Aucun groupe</SelectItem>
+                  {serviceGroups.map(g => (
+                    <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             ) : (
               <p className="text-sm text-muted-foreground">
-                {departmentsList.find(d => d.id === formData.target_department_id)?.name || 'Non rattaché'}
+                {serviceGroups.find(g => g.id === formData.service_group_id)?.name || 'Non rattaché'}
               </p>
             )}
           </div>
@@ -221,7 +221,7 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
                 setFormData({
                   name: process.name,
                   description: process.description || '',
-                  target_department_id: (process as any).target_department_id || '',
+                  service_group_id: (process as any).service_group_id || '',
                 });
               }}>
                 Annuler
