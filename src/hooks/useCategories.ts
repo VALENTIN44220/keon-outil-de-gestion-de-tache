@@ -7,22 +7,26 @@ export function useCategories() {
   const [categories, setCategories] = useState<CategoryWithSubcategories[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchCategories = useCallback(async () => {
+  const fetchCategories = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true);
     try {
       // Fetch categories
-      const { data: categoriesData, error: categoriesError } = await supabase
+      const categoriesQuery = supabase
         .from('categories')
         .select('*')
         .order('name');
+      if (signal) categoriesQuery.abortSignal(signal);
+      const { data: categoriesData, error: categoriesError } = await categoriesQuery;
 
       if (categoriesError) throw categoriesError;
 
       // Fetch subcategories
-      const { data: subcategoriesData, error: subcategoriesError } = await supabase
+      const subcategoriesQuery = supabase
         .from('subcategories')
         .select('*')
         .order('name');
+      if (signal) subcategoriesQuery.abortSignal(signal);
+      const { data: subcategoriesData, error: subcategoriesError } = await subcategoriesQuery;
 
       if (subcategoriesError) throw subcategoriesError;
 
@@ -33,7 +37,9 @@ export function useCategories() {
       }));
 
       setCategories(categoriesWithSubs);
-    } catch (error) {
+    } catch (error: any) {
+      // Ignore abort errors (component unmount)
+      if (error?.name === 'AbortError' || error?.message?.includes('AbortError')) return;
       console.error('Error fetching categories:', error);
       toast.error('Erreur lors du chargement des catégories');
     } finally {
@@ -42,7 +48,9 @@ export function useCategories() {
   }, []);
 
   useEffect(() => {
-    fetchCategories();
+    const controller = new AbortController();
+    fetchCategories(controller.signal);
+    return () => controller.abort();
   }, [fetchCategories]);
 
   const addCategory = async (name: string, description?: string): Promise<Category | undefined> => {
