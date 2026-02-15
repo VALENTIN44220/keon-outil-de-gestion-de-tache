@@ -376,13 +376,6 @@ const Index = () => {
           <DashboardToolbar
             currentView={taskView}
             onViewChange={setTaskView}
-            statusFilter={statusFilter}
-            priorityFilter={priorityFilter}
-            onStatusChange={setStatusFilter}
-            onPriorityChange={setPriorityFilter}
-            showAdvancedFilters={showAdvancedFilters}
-            onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
-            hasActiveAdvancedFilters={hasActiveAdvancedFilters}
             kanbanGroupMode={kanbanGroupMode}
             onKanbanGroupModeChange={setKanbanGroupMode}
           />
@@ -392,14 +385,6 @@ const Index = () => {
             filters={crossFilters}
             onFiltersChange={setCrossFilters}
           />
-
-          {/* Advanced Filters Panel */}
-          {showAdvancedFilters && (
-            <AdvancedFilters
-              filters={advancedFilters}
-              onFiltersChange={setAdvancedFilters}
-            />
-          )}
 
           {/* Collapsible Stats */}
           <div className="mb-4">
