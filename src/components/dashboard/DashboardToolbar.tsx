@@ -1,24 +1,14 @@
-import { TaskScope } from '@/hooks/useTaskScope';
 import { TaskView } from '@/components/tasks/TaskViewSelector';
 import { TaskStatus, TaskPriority } from '@/types/task';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { User, Users, Building2, LayoutGrid, Columns, Calendar, Filter, X, Layers } from 'lucide-react';
+import { LayoutGrid, Columns, Calendar, Filter, X, Layers } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export type KanbanGroupMode = 'status' | 'category' | 'priority' | 'assignee';
 
-interface ScopeOption {
-  value: TaskScope;
-  label: string;
-}
-
 interface DashboardToolbarProps {
-  // Scope
-  scope: TaskScope;
-  availableScopes: ScopeOption[];
-  onScopeChange: (scope: TaskScope) => void;
   // View
   currentView: TaskView;
   onViewChange: (view: TaskView) => void;
@@ -36,11 +26,6 @@ interface DashboardToolbarProps {
   onKanbanGroupModeChange?: (mode: KanbanGroupMode) => void;
 }
 
-const scopeIcons: Record<TaskScope, React.ElementType> = {
-  my_tasks: User,
-  department_tasks: Users,
-  all_tasks: Building2,
-};
 
 const viewOptions: { value: TaskView; label: string; icon: React.ElementType }[] = [
   { value: 'grid', label: 'Grille', icon: LayoutGrid },
@@ -64,9 +49,6 @@ const priorityOptions: { value: TaskPriority | 'all'; label: string; color?: str
 ];
 
 export function DashboardToolbar({
-  scope,
-  availableScopes,
-  onScopeChange,
   currentView,
   onViewChange,
   statusFilter,
@@ -81,38 +63,6 @@ export function DashboardToolbar({
 }: DashboardToolbarProps) {
   return (
     <div className="flex flex-wrap items-center gap-3 p-3 bg-keon-50 rounded-sm border border-keon-300 mb-4">
-      {/* Scope selector */}
-      {availableScopes.length > 1 && (
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-keon-700 hidden sm:inline">Périmètre:</span>
-          <div className="flex bg-white rounded-sm border border-keon-300 p-0.5">
-            {availableScopes.map((option) => {
-              const Icon = scopeIcons[option.value];
-              return (
-                <Button
-                  key={option.value}
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onScopeChange(option.value)}
-                  className={cn(
-                    "text-xs px-2 py-1 h-7 rounded-sm transition-all gap-1",
-                    scope === option.value 
-                      ? "bg-keon-900 text-white shadow-keon-sm" 
-                      : "text-keon-700 hover:text-keon-900 hover:bg-keon-100"
-                  )}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  <span className="hidden md:inline">{option.label}</span>
-                </Button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Divider */}
-      <div className="h-6 w-px bg-keon-300 hidden sm:block" />
-
       {/* View selector */}
       <div className="flex bg-white rounded-sm border border-keon-300 p-0.5">
         {viewOptions.map((option) => {
