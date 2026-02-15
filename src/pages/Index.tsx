@@ -26,11 +26,12 @@ import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Workflow, ChevronDown, ChevronUp, Eye, Zap } from 'lucide-react';
+import { Loader2, Workflow, ChevronDown, ChevronUp, Eye, Zap, Tags } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useCategories } from '@/hooks/useCategories';
 import { Task, TaskStats } from '@/types/task';
+import { BulkCategoryAssignDialog } from '@/components/tasks/BulkCategoryAssignDialog';
 
 const Index = () => {
   const { profile } = useAuth();
@@ -40,6 +41,7 @@ const Index = () => {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [showFullStats, setShowFullStats] = useState(false);
   const [dashboardMode, setDashboardMode] = useState<'tasks' | 'analytics' | 'tracking' | 'planner'>('tasks');
+  const [isBulkCategoryOpen, setIsBulkCategoryOpen] = useState(false);
   
   // Request tracking state
   const [myRequests, setMyRequests] = useState<Task[]>([]);
@@ -393,8 +395,16 @@ const Index = () => {
             />
           </div>
 
-          {/* Action button */}
-          <div className="flex justify-end mb-4">
+          {/* Action buttons */}
+          <div className="flex justify-end gap-2 mb-4">
+            <Button 
+              variant="outline" 
+              onClick={() => setIsBulkCategoryOpen(true)}
+              className="gap-2 border-keon-300 text-keon-700 hover:bg-keon-100"
+            >
+              <Tags className="h-4 w-4" />
+              Catégoriser en masse
+            </Button>
             <Button 
               variant="outline" 
               onClick={() => setIsTemplateDialogOpen(true)}
@@ -488,6 +498,13 @@ const Index = () => {
           onStatusChange={updateTaskStatus}
         />
       )}
+
+      <BulkCategoryAssignDialog
+        open={isBulkCategoryOpen}
+        onOpenChange={setIsBulkCategoryOpen}
+        tasks={allTasks}
+        onComplete={refetch}
+      />
     </div>
   );
 };
