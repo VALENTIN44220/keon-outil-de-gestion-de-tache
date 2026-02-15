@@ -11,6 +11,7 @@ import { AdvancedFilters, AdvancedFiltersState } from '@/components/tasks/Advanc
 import { TaskView } from '@/components/tasks/TaskViewSelector';
 import { KanbanBoard } from '@/components/tasks/KanbanBoard';
 import { CalendarView } from '@/components/tasks/CalendarView';
+import { DenseTableView } from '@/components/tasks/DenseTableView';
 import { CreateFromTemplateDialog } from '@/components/tasks/CreateFromTemplateDialog';
 import { PendingAssignmentsView } from '@/components/tasks/PendingAssignmentsView';
 import { TeamModule } from '@/components/team/TeamModule';
@@ -274,6 +275,16 @@ const Index = () => {
             onDelete={deleteTask}
             groupBy={advancedFilters.groupBy}
             groupLabels={groupLabels}
+            progressMap={progressMap}
+            onTaskUpdated={refetch}
+          />
+        );
+      case 'table':
+        return (
+          <DenseTableView
+            tasks={filteredTasks}
+            onStatusChange={updateTaskStatus}
+            onDelete={deleteTask}
             progressMap={progressMap}
             onTaskUpdated={refetch}
           />

@@ -1,7 +1,7 @@
 import { TaskView } from '@/components/tasks/TaskViewSelector';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { LayoutGrid, Columns, Calendar, Layers } from 'lucide-react';
+import { LayoutGrid, Columns, Calendar, TableProperties, Layers } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export type KanbanGroupMode = 'status' | 'category' | 'priority' | 'assignee';
@@ -17,6 +17,7 @@ const viewOptions: { value: TaskView; label: string; icon: React.ElementType }[]
   { value: 'grid', label: 'Grille', icon: LayoutGrid },
   { value: 'kanban', label: 'Kanban', icon: Columns },
   { value: 'calendar', label: 'Calendrier', icon: Calendar },
+  { value: 'table', label: 'Tableau', icon: TableProperties },
 ];
 
 export function DashboardToolbar({
