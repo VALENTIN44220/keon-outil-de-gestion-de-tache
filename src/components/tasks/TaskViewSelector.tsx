@@ -1,8 +1,8 @@
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { LayoutGrid, Columns, Calendar } from 'lucide-react';
+import { LayoutGrid, Columns, Calendar, TableProperties } from 'lucide-react';
 
-export type TaskView = 'grid' | 'kanban' | 'calendar';
+export type TaskView = 'grid' | 'kanban' | 'calendar' | 'table';
 
 interface TaskViewSelectorProps {
   currentView: TaskView;
@@ -13,6 +13,7 @@ const viewOptions: { value: TaskView; label: string; icon: React.ElementType }[]
   { value: 'grid', label: 'Grille', icon: LayoutGrid },
   { value: 'kanban', label: 'Kanban', icon: Columns },
   { value: 'calendar', label: 'Calendrier', icon: Calendar },
+  { value: 'table', label: 'Tableau', icon: TableProperties },
 ];
 
 export function TaskViewSelector({ currentView, onViewChange }: TaskViewSelectorProps) {
