@@ -20,13 +20,17 @@ import { TaskTableWidget } from './widgets/TaskTableWidget';
 import { AddWidgetDialog } from './widgets/AddWidgetDialog';
 import { ProgressRing } from './ProgressRing';
 import { Button } from '@/components/ui/button';
-import { Plus, RotateCcw, Settings2, Save, Check } from 'lucide-react';
+import { Plus, RotateCcw, Settings2, Save, Check, Download, Upload, Trash2 } from 'lucide-react';
 import { format, subDays, startOfWeek, startOfMonth, startOfQuarter, startOfYear, isWithinInterval } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 interface ConfigurableDashboardProps {
   tasks: Task[];
@@ -121,7 +125,53 @@ export function ConfigurableDashboard({
   const [isEditing, setIsEditing] = useState(false);
   const [draggedWidget, setDraggedWidget] = useState<string | null>(null);
 
-  // Load saved config from DB (process mode or global)
+  // Layout presets state
+  const [layoutPresets, setLayoutPresets] = useState<{ id: string; name: string; widgets_config: WidgetConfig[] }[]>([]);
+  const [savePresetDialogOpen, setSavePresetDialogOpen] = useState(false);
+  const [presetName, setPresetName] = useState('');
+
+  // Load layout presets
+  useEffect(() => {
+    if (!user?.id) return;
+    (async () => {
+      const { data } = await (supabase as any)
+        .from('widget_layout_presets')
+        .select('id, name, widgets_config')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      if (data) setLayoutPresets(data);
+    })();
+  }, [user?.id]);
+
+  // Save current layout as preset
+  const handleSavePreset = useCallback(async () => {
+    if (!user?.id || !presetName.trim()) return;
+    const { data, error } = await (supabase as any)
+      .from('widget_layout_presets')
+      .insert({ user_id: user.id, name: presetName.trim(), widgets_config: widgets })
+      .select('id, name, widgets_config')
+      .single();
+    if (error) { toast.error('Erreur'); return; }
+    setLayoutPresets(prev => [data, ...prev]);
+    setSavePresetDialogOpen(false);
+    setPresetName('');
+    toast.success(`Preset "${data.name}" enregistré`);
+  }, [user?.id, presetName, widgets]);
+
+  // Load a preset
+  const handleLoadPreset = useCallback((preset: { widgets_config: WidgetConfig[] }) => {
+    setWidgets(preset.widgets_config);
+    if (isProcessMode) setFiltersDirty(true);
+    toast.success('Layout chargé');
+  }, [isProcessMode]);
+
+  // Delete a preset
+  const handleDeletePreset = useCallback(async (presetId: string) => {
+    await (supabase as any).from('widget_layout_presets').delete().eq('id', presetId);
+    setLayoutPresets(prev => prev.filter(p => p.id !== presetId));
+    toast.success('Preset supprimé');
+  }, []);
+
   useEffect(() => {
     if (!user?.id) return;
     (async () => {
@@ -528,6 +578,45 @@ export function ConfigurableDashboard({
                   <RotateCcw className="h-4 w-4" />
                   Réinitialiser
                 </Button>
+
+                {/* Save / Load layout presets */}
+                <Button variant="outline" size="sm" onClick={() => setSavePresetDialogOpen(true)} className="gap-2">
+                  <Save className="h-4 w-4" />
+                  Sauver layout
+                </Button>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-2" disabled={layoutPresets.length === 0}>
+                      <Download className="h-4 w-4" />
+                      Charger layout
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 p-2" align="end">
+                    <p className="text-xs font-semibold text-muted-foreground mb-2 px-1">Layouts enregistrés</p>
+                    {layoutPresets.length === 0 && (
+                      <p className="text-xs text-muted-foreground px-1">Aucun preset enregistré</p>
+                    )}
+                    {layoutPresets.map(preset => (
+                      <div key={preset.id} className="flex items-center justify-between gap-1 px-2 py-1.5 rounded-md hover:bg-muted">
+                        <button
+                          className="flex-1 text-left text-sm truncate"
+                          onClick={() => handleLoadPreset(preset)}
+                        >
+                          {preset.name}
+                          <span className="text-[10px] text-muted-foreground ml-1">({preset.widgets_config.length} widgets)</span>
+                        </button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 shrink-0 hover:text-destructive"
+                          onClick={() => handleDeletePreset(preset.id)}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </PopoverContent>
+                </Popover>
               </>
             )}
           </div>
@@ -577,6 +666,29 @@ export function ConfigurableDashboard({
         onClose={() => setIsAddDialogOpen(false)}
         onAdd={handleAddWidget}
       />
+
+      {/* Save Layout Preset Dialog */}
+      <Dialog open={savePresetDialogOpen} onOpenChange={setSavePresetDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Sauvegarder le layout</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Label htmlFor="preset-name">Nom du preset</Label>
+            <Input
+              id="preset-name"
+              placeholder="Ex: Mon layout tableaux de bord"
+              value={presetName}
+              onChange={(e) => setPresetName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSavePreset()}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setSavePresetDialogOpen(false)}>Annuler</Button>
+            <Button size="sm" onClick={handleSavePreset} disabled={!presetName.trim()}>Enregistrer</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

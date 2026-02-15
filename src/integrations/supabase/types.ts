@@ -1819,15 +1819,7 @@ export type Database = {
           user_id?: string
           widgets_config?: Json
         }
-        Relationships: [
-          {
-            foreignKeyName: "process_dashboard_configs_process_template_id_fkey"
-            columns: ["process_template_id"]
-            isOneToOne: false
-            referencedRelation: "process_templates"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       process_template_visible_companies: {
         Row: {
@@ -4428,6 +4420,33 @@ export type Database = {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
           user_id?: string
+        }
+        Relationships: []
+      }
+      widget_layout_presets: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+          widgets_config: Json
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+          widgets_config?: Json
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+          widgets_config?: Json
         }
         Relationships: []
       }
