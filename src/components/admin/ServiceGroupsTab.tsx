@@ -5,10 +5,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Plus, Pencil, Trash2, Loader2, AlertTriangle } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, AlertTriangle, Search, Filter } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import type { Department } from '@/types/admin';
 
 interface ServiceGroup {
@@ -31,6 +32,8 @@ export function ServiceGroupsTab({ departments }: ServiceGroupsTabProps) {
   const [description, setDescription] = useState('');
   const [selectedDeptIds, setSelectedDeptIds] = useState<Set<string>>(new Set());
   const [isSaving, setIsSaving] = useState(false);
+  const [deptSearch, setDeptSearch] = useState('');
+  const [showUnassignedOnly, setShowUnassignedOnly] = useState(false);
 
   const fetchGroups = useCallback(async () => {
     setIsLoading(true);
@@ -52,6 +55,8 @@ export function ServiceGroupsTab({ departments }: ServiceGroupsTabProps) {
     setName('');
     setDescription('');
     setSelectedDeptIds(new Set());
+    setDeptSearch('');
+    setShowUnassignedOnly(false);
     setDialogOpen(true);
   };
 
@@ -60,6 +65,8 @@ export function ServiceGroupsTab({ departments }: ServiceGroupsTabProps) {
     setName(g.name);
     setDescription(g.description || '');
     setSelectedDeptIds(new Set(g.department_ids));
+    setDeptSearch('');
+    setShowUnassignedOnly(false);
     setDialogOpen(true);
   };
 
@@ -227,19 +234,54 @@ export function ServiceGroupsTab({ departments }: ServiceGroupsTabProps) {
             </div>
             <div className="space-y-2">
               <Label>Services inclus</Label>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    value={deptSearch}
+                    onChange={e => setDeptSearch(e.target.value)}
+                    placeholder="Rechercher un service..."
+                    className="pl-8 h-9 text-sm"
+                  />
+                </div>
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground whitespace-nowrap cursor-pointer">
+                  <Switch
+                    checked={showUnassignedOnly}
+                    onCheckedChange={setShowUnassignedOnly}
+                    className="scale-75"
+                  />
+                  Non affectés
+                </label>
+              </div>
               <div className="max-h-48 overflow-y-auto border rounded-md p-2 space-y-1">
-                {departments.map(d => (
-                  <label key={d.id} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-muted/50 cursor-pointer">
-                    <Checkbox
-                      checked={selectedDeptIds.has(d.id)}
-                      onCheckedChange={() => toggleDept(d.id)}
-                    />
-                    <span className="text-sm">{d.name}</span>
-                    {d.company?.name && (
-                      <Badge variant="outline" className="text-[10px] ml-auto">{d.company.name}</Badge>
-                    )}
-                  </label>
-                ))}
+                {(() => {
+                  const assignedIds = new Set(groups.flatMap(g => g.department_ids));
+                  // When editing, don't count current group's departments as "assigned"
+                  if (editingGroup) {
+                    editingGroup.department_ids.forEach(id => assignedIds.delete(id));
+                  }
+                  const filtered = departments.filter(d => {
+                    if (deptSearch && !d.name.toLowerCase().includes(deptSearch.toLowerCase()) && !d.company?.name?.toLowerCase().includes(deptSearch.toLowerCase())) return false;
+                    if (showUnassignedOnly && assignedIds.has(d.id) && !selectedDeptIds.has(d.id)) return false;
+                    return true;
+                  });
+                  if (filtered.length === 0) return <span className="text-xs text-muted-foreground italic p-2">Aucun service trouvé</span>;
+                  return filtered.map(d => (
+                    <label key={d.id} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-muted/50 cursor-pointer">
+                      <Checkbox
+                        checked={selectedDeptIds.has(d.id)}
+                        onCheckedChange={() => toggleDept(d.id)}
+                      />
+                      <span className="text-sm">{d.name}</span>
+                      {assignedIds.has(d.id) && !selectedDeptIds.has(d.id) && (
+                        <Badge variant="outline" className="text-[10px] text-warning border-warning/30">Affecté</Badge>
+                      )}
+                      {d.company?.name && (
+                        <Badge variant="outline" className="text-[10px] ml-auto">{d.company.name}</Badge>
+                      )}
+                    </label>
+                  ));
+                })()}
               </div>
             </div>
           </div>
