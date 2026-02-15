@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -56,6 +56,20 @@ export function BulkCategoryAssignDialog({ open, onOpenChange, tasks, onComplete
   const [searchQuery, setSearchQuery] = useState('');
   const [filterSource, setFilterSource] = useState<'all' | 'planner' | 'no_category'>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [plannerTaskIds, setPlannerTaskIds] = useState<Set<string>>(new Set());
+
+  // Fetch planner task IDs when dialog opens
+  useEffect(() => {
+    if (!open) return;
+    (async () => {
+      const { data } = await supabase
+        .from('planner_task_links')
+        .select('local_task_id');
+      if (data) {
+        setPlannerTaskIds(new Set(data.map(d => d.local_task_id)));
+      }
+    })();
+  }, [open]);
 
   // Available subcategories based on selected category
   const subcategories = useMemo(() => {
@@ -78,8 +92,7 @@ export function BulkCategoryAssignDialog({ open, onOpenChange, tasks, onComplete
 
       // Source filter
       if (filterSource === 'no_category' && task.category_id) return false;
-      // Note: 'planner' filter checks for tasks without category (typical of Planner imports)
-      if (filterSource === 'planner' && task.category_id) return false;
+      if (filterSource === 'planner' && !plannerTaskIds.has(task.id)) return false;
 
       // Status filter
       if (filterStatus !== 'all' && task.status !== filterStatus) return false;
