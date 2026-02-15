@@ -145,7 +145,7 @@ export function ServiceGroupsTab({ departments }: ServiceGroupsTabProps) {
         </Button>
       </div>
 
-      <div className="grid gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         {groups.length === 0 ? (
           <Card>
             <CardContent className="py-8 text-center text-muted-foreground text-sm">
