@@ -43,6 +43,7 @@ const ALL_COLUMNS: ColumnDef[] = [
   { key: 'progress', label: 'Progression', defaultVisible: false },
   { key: 'created_at', label: 'Créé le', defaultVisible: false },
   { key: 'updated_at', label: 'Modifié le', defaultVisible: false },
+  { key: 'planner_labels', label: 'Étiquettes Planner', defaultVisible: false },
 ];
 
 const STORAGE_KEY = 'dense-table-visible-columns';
@@ -161,6 +162,19 @@ export function DenseTableView({ tasks, onStatusChange, onDelete, progressMap, o
         return <span className="text-xs">{format(new Date(task.created_at), 'dd/MM/yy HH:mm', { locale: fr })}</span>;
       case 'updated_at':
         return <span className="text-xs">{format(new Date(task.updated_at), 'dd/MM/yy HH:mm', { locale: fr })}</span>;
+      case 'planner_labels': {
+        const labels = task.planner_labels;
+        if (!labels || labels.length === 0) return <span className="text-xs text-muted-foreground">—</span>;
+        return (
+          <div className="flex flex-wrap gap-0.5">
+            {labels.map((label, i) => (
+              <Badge key={i} variant="outline" className="text-[9px] px-1 py-0 bg-violet-50 text-violet-700 dark:bg-violet-900 dark:text-violet-200 border-violet-200">
+                {label}
+              </Badge>
+            ))}
+          </div>
+        );
+      }
       default:
         return null;
     }
