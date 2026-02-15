@@ -46,6 +46,15 @@ export function AddProcessDialog({ open, onClose, onAdd }: AddProcessDialogProps
   const [visibilityDepartmentIds, setVisibilityDepartmentIds] = useState<string[]>([]);
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [subcategoryId, setSubcategoryId] = useState<string | null>(null);
+  const [targetDepartmentId, setTargetDepartmentId] = useState<string | null>(null);
+  const [departmentsList, setDepartmentsList] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from('departments').select('id, name').order('name');
+      if (data) setDepartmentsList(data);
+    })();
+  }, []);
 
   const isValidVisibility = () => {
     if (visibilityLevel === 'internal_company' && visibilityCompanyIds.length === 0) {
@@ -88,7 +97,7 @@ export function AddProcessDialog({ open, onClose, onAdd }: AddProcessDialogProps
         category_id: categoryId,
         subcategory_id: subcategoryId,
         target_company_id: null,
-        target_department_id: null, // Service cible défini au niveau des sous-processus
+        target_department_id: targetDepartmentId,
       },
       visibilityCompanyIds,
       visibilityDepartmentIds
@@ -108,6 +117,7 @@ export function AddProcessDialog({ open, onClose, onAdd }: AddProcessDialogProps
     setVisibilityDepartmentIds([]);
     setCategoryId(null);
     setSubcategoryId(null);
+    setTargetDepartmentId(null);
   };
 
   return (
@@ -152,10 +162,24 @@ export function AddProcessDialog({ open, onClose, onAdd }: AddProcessDialogProps
             onAddSubcategory={handleAddSubcategory}
           />
 
-          <div className="p-3 bg-muted/50 rounded-md">
-            <p className="text-sm text-muted-foreground">
-              💡 Le(s) service(s) cible(s) seront définis au niveau des sous-processus. 
-              Un processus peut contenir des sous-processus affectés à différents services.
+          <div className="space-y-2">
+            <Label>Service rattaché</Label>
+            <Select
+              value={targetDepartmentId || '__none__'}
+              onValueChange={(v) => setTargetDepartmentId(v === '__none__' ? null : v)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Sélectionner un service" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">Aucun service</SelectItem>
+                {departmentsList.map(d => (
+                  <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Détermine sous quel service ce processus apparaîtra dans le suivi.
             </p>
           </div>
 
