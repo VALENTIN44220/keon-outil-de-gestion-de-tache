@@ -233,6 +233,42 @@ async function getPlannerBuckets(accessToken: string, planId: string): Promise<a
   return (data.value || []).map((b: any) => ({ id: b.id, name: b.name, orderHint: b.orderHint, planId: b.planId }));
 }
 
+// Get plan details (category descriptions = label names)
+async function getPlannerPlanDetails(accessToken: string, planId: string): Promise<any> {
+  const resp = await fetch(`${MICROSOFT_GRAPH_URL}/planner/plans/${planId}/details`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!resp.ok) {
+    console.error('Failed to fetch plan details:', resp.status);
+    return { categoryDescriptions: {} };
+  }
+  return await resp.json();
+}
+
+// Resolve applied categories to label names
+function resolveLabels(appliedCategories: Record<string, boolean> | null, categoryDescriptions: Record<string, string>): string[] {
+  if (!appliedCategories) return [];
+  const defaultNames: Record<string, string> = {
+    category1: 'Rose', category2: 'Rouge', category3: 'Jaune',
+    category4: 'Vert', category5: 'Bleu', category6: 'Violet',
+    category7: 'Bronze', category8: 'Citron vert', category9: 'Aqua',
+    category10: 'Gris', category11: 'Argent', category12: 'Marron',
+    category13: 'Canneberge', category14: 'Orange', category15: 'Pêche',
+    category16: 'Érable', category17: 'Sarcelle', category18: 'Bleu acier',
+    category19: 'Ardoise', category20: 'Lilas', category21: 'Aubergine',
+    category22: 'Pistache', category23: 'Olive', category24: 'Charbon',
+    category25: 'Cuivre',
+  };
+  const labels: string[] = [];
+  for (const [key, applied] of Object.entries(appliedCategories)) {
+    if (applied) {
+      const name = categoryDescriptions[key] || defaultNames[key] || key;
+      labels.push(name);
+    }
+  }
+  return labels;
+}
+
 // Get tasks from a specific plan
 async function getPlannerTasks(accessToken: string, planId: string): Promise<any[]> {
   const allTasks: any[] = [];
@@ -611,6 +647,15 @@ Deno.serve(async (req) => {
       let tasksUpdated = 0;
       const errors: any[] = [];
 
+      // Get plan details for label names
+      let categoryDescriptions: Record<string, string> = {};
+      try {
+        const planDetails = await getPlannerPlanDetails(accessToken, mapping.planner_plan_id);
+        categoryDescriptions = planDetails.categoryDescriptions || {};
+      } catch (e) {
+        console.error('Failed to fetch plan details for labels:', e);
+      }
+
       // Get user's profile_id
       const { data: userProfile } = await supabase
         .from('profiles')
@@ -634,6 +679,9 @@ Deno.serve(async (req) => {
             // Resolve subcategory from bucket mapping
             const subcategoryId = pt.bucketId ? bucketToSubcategory.get(pt.bucketId) : null;
 
+            // Resolve Planner labels
+            const plannerLabels = resolveLabels(pt.appliedCategories || null, categoryDescriptions);
+
             const { data: newTask, error: insertErr } = await supabase
               .from('tasks')
               .insert({
@@ -648,6 +696,7 @@ Deno.serve(async (req) => {
                 category_id: mapping.mapped_category_id,
                 subcategory_id: subcategoryId || null,
                 source_process_template_id: mapping.mapped_process_template_id,
+                planner_labels: plannerLabels.length > 0 ? plannerLabels : null,
               })
               .select()
               .single();
@@ -695,6 +744,13 @@ Deno.serve(async (req) => {
             if (plannerTask.dueDateTime) {
               const dueDate = plannerTask.dueDateTime.substring(0, 10);
               if (dueDate !== localTask.due_date) updates.due_date = dueDate;
+            }
+
+            // Update planner labels
+            const newLabels = resolveLabels(plannerTask.appliedCategories || null, categoryDescriptions);
+            const currentLabels = localTask.planner_labels || [];
+            if (JSON.stringify(newLabels.sort()) !== JSON.stringify([...currentLabels].sort())) {
+              updates.planner_labels = newLabels.length > 0 ? newLabels : null;
             }
 
             if (Object.keys(updates).length > 0) {

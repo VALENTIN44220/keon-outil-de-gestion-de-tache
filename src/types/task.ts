@@ -75,6 +75,8 @@ export interface Task {
   request_validation_2_at?: string | null;
   request_validation_2_comment?: string | null;
   request_validation_refusal_action?: string | null;
+  // Planner labels
+  planner_labels?: string[] | null;
   // Metadata
   created_at: string;
   updated_at: string;

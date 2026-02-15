@@ -3437,6 +3437,7 @@ export type Database = {
           original_assignee_id: string | null
           parent_request_id: string | null
           parent_sub_process_run_id: string | null
+          planner_labels: string[] | null
           priority: string
           process_template_id: string | null
           rbe_validated_at: string | null
@@ -3510,6 +3511,7 @@ export type Database = {
           original_assignee_id?: string | null
           parent_request_id?: string | null
           parent_sub_process_run_id?: string | null
+          planner_labels?: string[] | null
           priority?: string
           process_template_id?: string | null
           rbe_validated_at?: string | null
@@ -3583,6 +3585,7 @@ export type Database = {
           original_assignee_id?: string | null
           parent_request_id?: string | null
           parent_sub_process_run_id?: string | null
+          planner_labels?: string[] | null
           priority?: string
           process_template_id?: string | null
           rbe_validated_at?: string | null
