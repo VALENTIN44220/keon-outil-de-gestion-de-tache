@@ -22,11 +22,14 @@ import {
 } from '@/components/ui/table';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { useSupplierEnrichment, SupplierFilters, SupplierSortConfig } from '@/hooks/useSupplierEnrichment';
-import { Search, Building2, Filter, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Building2, Filter, ExternalLink, ChevronLeft, ChevronRight, LayoutGrid, List } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
+import { cn } from '@/lib/utils';
+
+type SupplierViewMode = 'table' | 'grid';
 
 interface SupplierListViewProps {
   onOpenSupplier: (id: string) => void;
@@ -68,6 +71,7 @@ function safeFormatDate(iso?: string | null) {
 
 export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
   const pageSize = 200;
+  const [viewMode, setViewMode] = useState<SupplierViewMode>('table');
 
   const [page, setPage] = useState(0);
 
@@ -164,6 +168,27 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
             <h1 className="text-2xl font-bold text-foreground">Référentiel Fournisseurs</h1>
             <p className="text-muted-foreground">Service Achats</p>
           </div>
+        </div>
+        {/* View Toggle */}
+        <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-lg">
+          <Button
+            variant={viewMode === 'grid' ? 'default' : 'ghost'}
+            size="sm"
+            className={cn('h-8 px-3 gap-2', viewMode === 'grid' && 'shadow-sm')}
+            onClick={() => setViewMode('grid')}
+          >
+            <LayoutGrid className="h-4 w-4" />
+            <span className="hidden sm:inline">Grille</span>
+          </Button>
+          <Button
+            variant={viewMode === 'table' ? 'default' : 'ghost'}
+            size="sm"
+            className={cn('h-8 px-3 gap-2', viewMode === 'table' && 'shadow-sm')}
+            onClick={() => setViewMode('table')}
+          >
+            <List className="h-4 w-4" />
+            <span className="hidden sm:inline">Table</span>
+          </Button>
         </div>
       </div>
 
@@ -366,142 +391,232 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
         </Button>
       </div>
 
-      {/* Table */}
-      <Card>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <SortableTableHead sortKey="tiers" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort} className="w-[120px]">TIERS</SortableTableHead>
-              <SortableTableHead sortKey="nomfournisseur" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>Nom Fournisseur</SortableTableHead>
-              <SortableTableHead sortKey="entite" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>Entité</SortableTableHead>
-              <SortableTableHead sortKey="categorie" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>Catégorie</SortableTableHead>
-              <SortableTableHead sortKey="famille" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>Famille</SortableTableHead>
-              <SortableTableHead sortKey="segment" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>Segment</SortableTableHead>
-              <SortableTableHead sortKey="completeness_score" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort} className="w-[150px]">Complétude</SortableTableHead>
-              <SortableTableHead sortKey="validite_prix" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort} className="w-[140px]">Validité prix</SortableTableHead>
-              <SortableTableHead sortKey="validite_du_contrat" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort} className="w-[140px]">Validité contrat</SortableTableHead>
-              <SortableTableHead sortKey="updated_at" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>Mise à jour</SortableTableHead>
-              <TableHead className="w-[80px]"></TableHead>
-            </TableRow>
-          </TableHeader>
-
-          <TableBody>
-            {isLoading ? (
-              Array.from({ length: 8 }).map((_, i) => (
-                <TableRow key={i}>
-                  {Array.from({ length: 11 }).map((_, j) => (
-                    <TableCell key={j}>
-                      <Skeleton className="h-4 w-full" />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : suppliers.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
-                  Aucun fournisseur trouvé
-                </TableCell>
-              </TableRow>
-            ) : (
-              suppliers.map((supplier) => (
-                <TableRow
+      {/* Grid View */}
+      {viewMode === 'grid' && (
+        isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Card key={i} className="p-4">
+                <Skeleton className="h-5 w-3/4 mb-3" />
+                <Skeleton className="h-4 w-1/2 mb-2" />
+                <Skeleton className="h-3 w-full mb-1" />
+                <Skeleton className="h-3 w-2/3" />
+              </Card>
+            ))}
+          </div>
+        ) : suppliers.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">Aucun fournisseur trouvé</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {suppliers.map((supplier) => {
+              const score = supplier.completeness_score ?? 0;
+              const st = supplier.status ? statusConfig[supplier.status] : null;
+              return (
+                <Card
                   key={supplier.id}
-                  className="cursor-pointer hover:bg-muted/50"
+                  className="p-4 cursor-pointer hover:shadow-md transition-shadow border-l-4"
+                  style={{
+                    borderLeftColor: score >= 80 ? 'hsl(var(--success))' : score >= 40 ? 'hsl(var(--warning))' : 'hsl(var(--destructive))',
+                  }}
                   onClick={() => onOpenSupplier(supplier.id)}
                 >
-                  <TableCell className="font-mono font-medium">{supplier.tiers}</TableCell>
-                  <TableCell className="font-medium">{supplier.nomfournisseur || '—'}</TableCell>
-                  <TableCell>{supplier.entite || '—'}</TableCell>
-                  <TableCell>{supplier.categorie || '—'}</TableCell>
-                  <TableCell>{supplier.famille || '—'}</TableCell>
-
-                  <TableCell>
-                    {supplier.segment ? (
-                      <span>
-                        {supplier.segment}
-                        {supplier.sous_segment && (
-                          <span className="text-muted-foreground"> / {supplier.sous_segment}</span>
-                        )}
-                      </span>
-                    ) : (
-                      '—'
-                    )}
-                  </TableCell>
-
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Progress value={supplier.completeness_score ?? 0} className="h-2 flex-1" />
-                      {supplier.status ? (
-                        <Badge className={statusConfig[supplier.status]?.color ?? 'bg-muted text-muted-foreground'}>
-                          {supplier.completeness_score ?? 0}%
-                        </Badge>
-                      ) : (
-                        <Badge className="bg-muted text-muted-foreground">{supplier.completeness_score ?? 0}%</Badge>
-                      )}
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm truncate">{supplier.nomfournisseur || '—'}</p>
+                      <p className="font-mono text-xs text-muted-foreground">{supplier.tiers}</p>
                     </div>
-                  </TableCell>
+                    {st && (
+                      <Badge className={cn('text-[10px] px-1.5 py-0 shrink-0', st.color)}>
+                        {score}%
+                      </Badge>
+                    )}
+                  </div>
 
-                  <TableCell className={`text-sm ${dateClass((supplier as any).validite_prix)}`}>
-                    {safeFormatDate((supplier as any).validite_prix)}
-                  </TableCell>
+                  <Progress value={score} className="h-1.5 mb-3" />
 
-                  <TableCell className={`text-sm ${dateClass((supplier as any).validite_du_contrat)}`}>
-                    {safeFormatDate((supplier as any).validite_du_contrat)}
-                  </TableCell>
+                  <div className="space-y-1 text-xs text-muted-foreground">
+                    {supplier.entite && (
+                      <div className="flex justify-between">
+                        <span>Entité</span>
+                        <span className="text-foreground font-medium truncate ml-2">{supplier.entite}</span>
+                      </div>
+                    )}
+                    {supplier.categorie && (
+                      <div className="flex justify-between">
+                        <span>Catégorie</span>
+                        <span className="text-foreground font-medium truncate ml-2">{supplier.categorie}</span>
+                      </div>
+                    )}
+                    {supplier.famille && (
+                      <div className="flex justify-between">
+                        <span>Famille</span>
+                        <span className="text-foreground font-medium truncate ml-2">{supplier.famille}</span>
+                      </div>
+                    )}
+                    {supplier.segment && (
+                      <div className="flex justify-between">
+                        <span>Segment</span>
+                        <span className="text-foreground font-medium truncate ml-2">
+                          {supplier.segment}
+                          {supplier.sous_segment && ` / ${supplier.sous_segment}`}
+                        </span>
+                      </div>
+                    )}
+                  </div>
 
-                  <TableCell className="text-muted-foreground text-sm">
-                    {safeFormatDate(supplier.updated_at)}
-                  </TableCell>
+                  <div className="flex items-center justify-between mt-3 pt-2 border-t text-[10px] text-muted-foreground">
+                    <span className={dateClass((supplier as any).validite_prix)}>
+                      Prix: {safeFormatDate((supplier as any).validite_prix)}
+                    </span>
+                    <span className={dateClass((supplier as any).validite_du_contrat)}>
+                      Contrat: {safeFormatDate((supplier as any).validite_du_contrat)}
+                    </span>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        )
+      )}
 
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onOpenSupplier(supplier.id);
-                      }}
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                    </Button>
+      {/* Table View */}
+      {viewMode === 'table' && (
+        <Card>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <SortableTableHead sortKey="tiers" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort} className="w-[120px]">TIERS</SortableTableHead>
+                <SortableTableHead sortKey="nomfournisseur" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>Nom Fournisseur</SortableTableHead>
+                <SortableTableHead sortKey="entite" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>Entité</SortableTableHead>
+                <SortableTableHead sortKey="categorie" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>Catégorie</SortableTableHead>
+                <SortableTableHead sortKey="famille" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>Famille</SortableTableHead>
+                <SortableTableHead sortKey="segment" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>Segment</SortableTableHead>
+                <SortableTableHead sortKey="completeness_score" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort} className="w-[150px]">Complétude</SortableTableHead>
+                <SortableTableHead sortKey="validite_prix" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort} className="w-[140px]">Validité prix</SortableTableHead>
+                <SortableTableHead sortKey="validite_du_contrat" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort} className="w-[140px]">Validité contrat</SortableTableHead>
+                <SortableTableHead sortKey="updated_at" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>Mise à jour</SortableTableHead>
+                <TableHead className="w-[80px]"></TableHead>
+              </TableRow>
+            </TableHeader>
+
+            <TableBody>
+              {isLoading ? (
+                Array.from({ length: 8 }).map((_, i) => (
+                  <TableRow key={i}>
+                    {Array.from({ length: 11 }).map((_, j) => (
+                      <TableCell key={j}>
+                        <Skeleton className="h-4 w-full" />
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : suppliers.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                    Aucun fournisseur trouvé
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+              ) : (
+                suppliers.map((supplier) => (
+                  <TableRow
+                    key={supplier.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => onOpenSupplier(supplier.id)}
+                  >
+                    <TableCell className="font-mono font-medium">{supplier.tiers}</TableCell>
+                    <TableCell className="font-medium">{supplier.nomfournisseur || '—'}</TableCell>
+                    <TableCell>{supplier.entite || '—'}</TableCell>
+                    <TableCell>{supplier.categorie || '—'}</TableCell>
+                    <TableCell>{supplier.famille || '—'}</TableCell>
 
-        {/* Pagination */}
-        <div className="flex items-center justify-between gap-2 px-4 py-3 border-t">
-          <div className="text-sm text-muted-foreground">
-            {(total ?? 0)} lignes — page {page + 1} / {totalPages} — {pageSize} / page
+                    <TableCell>
+                      {supplier.segment ? (
+                        <span>
+                          {supplier.segment}
+                          {supplier.sous_segment && (
+                            <span className="text-muted-foreground"> / {supplier.sous_segment}</span>
+                          )}
+                        </span>
+                      ) : (
+                        '—'
+                      )}
+                    </TableCell>
+
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Progress value={supplier.completeness_score ?? 0} className="h-2 flex-1" />
+                        {supplier.status ? (
+                          <Badge className={statusConfig[supplier.status]?.color ?? 'bg-muted text-muted-foreground'}>
+                            {supplier.completeness_score ?? 0}%
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-muted text-muted-foreground">{supplier.completeness_score ?? 0}%</Badge>
+                        )}
+                      </div>
+                    </TableCell>
+
+                    <TableCell className={`text-sm ${dateClass((supplier as any).validite_prix)}`}>
+                      {safeFormatDate((supplier as any).validite_prix)}
+                    </TableCell>
+
+                    <TableCell className={`text-sm ${dateClass((supplier as any).validite_du_contrat)}`}>
+                      {safeFormatDate((supplier as any).validite_du_contrat)}
+                    </TableCell>
+
+                    <TableCell className="text-muted-foreground text-sm">
+                      {safeFormatDate(supplier.updated_at)}
+                    </TableCell>
+
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenSupplier(supplier.id);
+                        }}
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+
+          {/* Pagination */}
+          <div className="flex items-center justify-between gap-2 px-4 py-3 border-t">
+            <div className="text-sm text-muted-foreground">
+              {(total ?? 0)} lignes — page {page + 1} / {totalPages} — {pageSize} / page
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page === 0 || isLoading}
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                className="gap-2"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Précédent
+              </Button>
+
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page + 1 >= totalPages || isLoading}
+                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                className="gap-2"
+              >
+                Suivant
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
-
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page === 0 || isLoading}
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
-              className="gap-2"
-            >
-              <ChevronLeft className="h-4 w-4" />
-              Précédent
-            </Button>
-
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page + 1 >= totalPages || isLoading}
-              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-              className="gap-2"
-            >
-              Suivant
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </Card>
+        </Card>
+      )}
     </div>
   );
 }
