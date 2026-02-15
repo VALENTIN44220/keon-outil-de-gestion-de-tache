@@ -3,8 +3,11 @@ import { TaskView } from '@/components/tasks/TaskViewSelector';
 import { TaskStatus, TaskPriority } from '@/types/task';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { User, Users, Building2, LayoutGrid, Columns, Calendar, Filter, X } from 'lucide-react';
+import { User, Users, Building2, LayoutGrid, Columns, Calendar, Filter, X, Layers } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+export type KanbanGroupMode = 'status' | 'category' | 'priority' | 'assignee';
 
 interface ScopeOption {
   value: TaskScope;
@@ -28,6 +31,9 @@ interface DashboardToolbarProps {
   showAdvancedFilters: boolean;
   onToggleAdvancedFilters: () => void;
   hasActiveAdvancedFilters: boolean;
+  // Kanban grouping
+  kanbanGroupMode?: KanbanGroupMode;
+  onKanbanGroupModeChange?: (mode: KanbanGroupMode) => void;
 }
 
 const scopeIcons: Record<TaskScope, React.ElementType> = {
@@ -70,6 +76,8 @@ export function DashboardToolbar({
   showAdvancedFilters,
   onToggleAdvancedFilters,
   hasActiveAdvancedFilters,
+  kanbanGroupMode = 'status',
+  onKanbanGroupModeChange,
 }: DashboardToolbarProps) {
   return (
     <div className="flex flex-wrap items-center gap-3 p-3 bg-keon-50 rounded-sm border border-keon-300 mb-4">
@@ -128,6 +136,27 @@ export function DashboardToolbar({
           );
         })}
       </div>
+
+      {/* Kanban group mode selector */}
+      {currentView === 'kanban' && onKanbanGroupModeChange && (
+        <>
+          <div className="h-6 w-px bg-keon-300 hidden sm:block" />
+          <div className="flex items-center gap-1.5">
+            <Layers className="h-3.5 w-3.5 text-keon-700" />
+            <Select value={kanbanGroupMode} onValueChange={(v) => onKanbanGroupModeChange(v as KanbanGroupMode)}>
+              <SelectTrigger className="h-7 text-xs w-[140px] border-keon-300 bg-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="status">Par statut</SelectItem>
+                <SelectItem value="category">Par catégorie</SelectItem>
+                <SelectItem value="priority">Par priorité</SelectItem>
+                <SelectItem value="assignee">Par assigné</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </>
+      )}
 
       {/* Divider */}
       <div className="h-6 w-px bg-keon-300 hidden sm:block" />

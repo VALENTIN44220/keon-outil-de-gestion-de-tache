@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
-import { DashboardToolbar } from '@/components/dashboard/DashboardToolbar';
+import { DashboardToolbar, KanbanGroupMode } from '@/components/dashboard/DashboardToolbar';
 import { DashboardStats } from '@/components/dashboard/DashboardStats';
 import { ConfigurableDashboard } from '@/components/dashboard/ConfigurableDashboard';
 import { TaskList } from '@/components/tasks/TaskList';
@@ -42,6 +42,7 @@ const Index = () => {
   const [showFullStats, setShowFullStats] = useState(false);
   const [dashboardMode, setDashboardMode] = useState<'tasks' | 'analytics' | 'tracking' | 'planner'>('tasks');
   const [isBulkCategoryOpen, setIsBulkCategoryOpen] = useState(false);
+  const [kanbanGroupMode, setKanbanGroupMode] = useState<KanbanGroupMode>('status');
   
   // Request tracking state
   const [myRequests, setMyRequests] = useState<Task[]>([]);
@@ -195,6 +196,20 @@ const Index = () => {
     return labels;
   }, [profilesMap, categories]);
 
+  // Category map for kanban
+  const categoryMap = useMemo(() => {
+    const map = new Map<string, string>();
+    categories.forEach(cat => map.set(cat.id, cat.name));
+    return map;
+  }, [categories]);
+
+  // Assignee map for kanban
+  const assigneeMap = useMemo(() => {
+    const map = new Map<string, { display_name: string; avatar_url?: string }>();
+    profilesMap.forEach((name, id) => map.set(id, { display_name: name }));
+    return map;
+  }, [profilesMap]);
+
   const handleNotificationClick = (taskId: string) => {
     const task = allTasks.find(t => t.id === taskId);
     if (task) {
@@ -243,6 +258,9 @@ const Index = () => {
             groupLabels={groupLabels}
             progressMap={progressMap}
             onTaskUpdated={refetch}
+            kanbanGroupMode={kanbanGroupMode}
+            categoryMap={categoryMap}
+            assigneeMap={assigneeMap}
           />
         );
       case 'calendar':
@@ -365,6 +383,8 @@ const Index = () => {
             showAdvancedFilters={showAdvancedFilters}
             onToggleAdvancedFilters={() => setShowAdvancedFilters(!showAdvancedFilters)}
             hasActiveAdvancedFilters={hasActiveAdvancedFilters}
+            kanbanGroupMode={kanbanGroupMode}
+            onKanbanGroupModeChange={setKanbanGroupMode}
           />
 
           {/* Advanced Filters Panel */}

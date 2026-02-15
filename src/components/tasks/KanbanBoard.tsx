@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Task, TaskStatus } from '@/types/task';
+import { useState, useMemo } from 'react';
+import { Task, TaskStatus, TaskPriority } from '@/types/task';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -29,10 +29,21 @@ import {
   Eye,
   GripVertical,
   Plus,
+  Tag,
 } from 'lucide-react';
 import { TaskEditDialog } from './TaskEditDialog';
 import { format, isPast, isToday, isTomorrow } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import type { KanbanGroupMode } from '@/components/dashboard/DashboardToolbar';
+
+export interface KanbanColumn {
+  key: string;
+  label: string;
+  icon: React.ReactNode;
+  headerBg: string;
+  headerText: string;
+  dotColor: string;
+}
 
 interface KanbanBoardProps {
   tasks: Task[];
@@ -43,6 +54,8 @@ interface KanbanBoardProps {
   progressMap?: Record<string, { completed: number; total: number; progress: number }>;
   onTaskUpdated?: () => void;
   assigneeMap?: Map<string, { display_name: string; avatar_url?: string }>;
+  kanbanGroupMode?: KanbanGroupMode;
+  categoryMap?: Map<string, string>;
 }
 
 const statusColumns: { 
@@ -254,23 +267,91 @@ function KanbanTaskCard({ task, onStatusChange, onDelete, taskProgress, onTaskUp
   );
 }
 
-export function KanbanBoard({ tasks, onStatusChange, onDelete, groupBy, groupLabels, progressMap, onTaskUpdated, assigneeMap }: KanbanBoardProps) {
-  const [dragOverColumn, setDragOverColumn] = useState<TaskStatus | null>(null);
-  const handleDragOver = (e: React.DragEvent, status: TaskStatus) => {
+export function KanbanBoard({ tasks, onStatusChange, onDelete, groupBy, groupLabels, progressMap, onTaskUpdated, assigneeMap, kanbanGroupMode = 'status', categoryMap }: KanbanBoardProps) {
+  const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
+
+  // Build dynamic columns based on kanbanGroupMode
+  const dynamicColumns = useMemo((): KanbanColumn[] => {
+    if (kanbanGroupMode === 'status') {
+      return statusColumns.map(c => ({ ...c, key: c.status }));
+    }
+
+    if (kanbanGroupMode === 'category') {
+      const catKeys = new Set<string>();
+      tasks.forEach(t => catKeys.add(t.category_id || '__none__'));
+      const colors = ['bg-blue-500', 'bg-emerald-500', 'bg-violet-500', 'bg-amber-500', 'bg-rose-500', 'bg-cyan-500', 'bg-indigo-500', 'bg-teal-500'];
+      const cols: KanbanColumn[] = [];
+      let i = 0;
+      catKeys.forEach(key => {
+        const label = key === '__none__' ? 'Sans catégorie' : (categoryMap?.get(key) || groupLabels?.get(key) || key);
+        const color = colors[i % colors.length];
+        cols.push({ key, label, icon: <Tag className="h-4 w-4" />, headerBg: color, headerText: 'text-white', dotColor: color });
+        i++;
+      });
+      return cols;
+    }
+
+    if (kanbanGroupMode === 'priority') {
+      const priorities: { key: TaskPriority; label: string; color: string }[] = [
+        { key: 'urgent', label: 'Urgente', color: 'bg-red-500' },
+        { key: 'high', label: 'Haute', color: 'bg-orange-500' },
+        { key: 'medium', label: 'Moyenne', color: 'bg-amber-500' },
+        { key: 'low', label: 'Basse', color: 'bg-slate-500' },
+      ];
+      return priorities.map(p => ({
+        key: p.key,
+        label: p.label,
+        icon: <Flag className="h-4 w-4" />,
+        headerBg: p.color,
+        headerText: 'text-white',
+        dotColor: p.color,
+      }));
+    }
+
+    if (kanbanGroupMode === 'assignee') {
+      const assigneeKeys = new Set<string>();
+      tasks.forEach(t => assigneeKeys.add(t.assignee_id || '__unassigned__'));
+      const colors = ['bg-blue-500', 'bg-emerald-500', 'bg-violet-500', 'bg-amber-500', 'bg-rose-500', 'bg-cyan-500'];
+      const cols: KanbanColumn[] = [];
+      let i = 0;
+      assigneeKeys.forEach(key => {
+        const label = key === '__unassigned__' ? 'Non assigné' : (assigneeMap?.get(key)?.display_name || groupLabels?.get(key) || key);
+        const color = colors[i % colors.length];
+        cols.push({ key, label, icon: <UserPlus className="h-4 w-4" />, headerBg: color, headerText: 'text-white', dotColor: color });
+        i++;
+      });
+      return cols;
+    }
+
+    return statusColumns.map(c => ({ ...c, key: c.status }));
+  }, [kanbanGroupMode, tasks, categoryMap, assigneeMap, groupLabels]);
+
+  // Get task's column key based on group mode
+  const getTaskColumnKey = (task: Task): string => {
+    switch (kanbanGroupMode) {
+      case 'category': return task.category_id || '__none__';
+      case 'priority': return task.priority;
+      case 'assignee': return task.assignee_id || '__unassigned__';
+      default: return task.status;
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent, columnKey: string) => {
     e.preventDefault();
-    setDragOverColumn(status);
+    setDragOverColumn(columnKey);
   };
 
   const handleDragLeave = () => {
     setDragOverColumn(null);
   };
 
-  const handleDrop = (e: React.DragEvent, status: TaskStatus) => {
+  const handleDrop = (e: React.DragEvent, columnKey: string) => {
     e.preventDefault();
     setDragOverColumn(null);
     const taskId = e.dataTransfer.getData('taskId');
-    if (taskId) {
-      onStatusChange(taskId, status);
+    if (taskId && kanbanGroupMode === 'status') {
+      // Only allow drag-drop status changes in status mode
+      onStatusChange(taskId, columnKey as TaskStatus);
     }
   };
 
@@ -293,19 +374,20 @@ export function KanbanBoard({ tasks, onStatusChange, onDelete, groupBy, groupLab
     );
   }
 
-  const renderColumn = (column: typeof statusColumns[0], columnTasks: Task[]) => {
-    const isDropTarget = dragOverColumn === column.status;
+  const renderColumn = (column: KanbanColumn, columnTasks: Task[]) => {
+    const isDropTarget = dragOverColumn === column.key;
+    const canDrop = kanbanGroupMode === 'status';
     
     return (
       <div
-        key={column.status}
+        key={column.key}
         className={cn(
           "flex flex-col rounded-xl bg-muted/30 border border-border/50 min-h-[400px] transition-all duration-200",
-          isDropTarget && "ring-2 ring-primary/50 bg-primary/5"
+          isDropTarget && canDrop && "ring-2 ring-primary/50 bg-primary/5"
         )}
-        onDragOver={(e) => handleDragOver(e, column.status)}
+        onDragOver={(e) => handleDragOver(e, column.key)}
         onDragLeave={handleDragLeave}
-        onDrop={(e) => handleDrop(e, column.status)}
+        onDrop={(e) => handleDrop(e, column.key)}
       >
         {/* Column header */}
         <div className={cn(
@@ -314,7 +396,7 @@ export function KanbanBoard({ tasks, onStatusChange, onDelete, groupBy, groupLab
         )}>
           <div className="flex items-center gap-2">
             {column.icon}
-            <span className="font-semibold text-sm">{column.label}</span>
+            <span className="font-semibold text-sm truncate">{column.label}</span>
           </div>
           <Badge variant="secondary" className="bg-white/20 text-white border-0 text-xs font-bold px-2">
             {columnTasks.length}
@@ -340,13 +422,13 @@ export function KanbanBoard({ tasks, onStatusChange, onDelete, groupBy, groupLab
             {columnTasks.length === 0 && (
               <div className={cn(
                 "flex flex-col items-center justify-center py-8 text-center rounded-lg border-2 border-dashed",
-                isDropTarget ? "border-primary bg-primary/5" : "border-border/50"
+                isDropTarget && canDrop ? "border-primary bg-primary/5" : "border-border/50"
               )}>
                 <div className={cn("w-10 h-10 rounded-full flex items-center justify-center mb-2", column.headerBg + "/10")}>
                   {column.icon}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {isDropTarget ? "Déposer ici" : "Aucune tâche"}
+                  {isDropTarget && canDrop ? "Déposer ici" : "Aucune tâche"}
                 </p>
               </div>
             )}
@@ -356,68 +438,17 @@ export function KanbanBoard({ tasks, onStatusChange, onDelete, groupBy, groupLab
     );
   };
 
-  // Group tasks if groupBy is set
-  if (groupBy && groupBy !== 'none') {
-    const groups = new Map<string, Task[]>();
-    
-    tasks.forEach(task => {
-      let key = 'Non assigné';
-      switch (groupBy) {
-        case 'assignee':
-          key = task.assignee_id || 'Non assigné';
-          break;
-        case 'requester':
-          key = task.requester_id || 'Non défini';
-          break;
-        case 'reporter':
-          key = task.reporter_id || 'Non défini';
-          break;
-        case 'category':
-          key = task.category_id || 'Sans catégorie';
-          break;
-        case 'subcategory':
-          key = task.subcategory_id || 'Sans sous-catégorie';
-          break;
-        default:
-          key = 'Autre';
-      }
-      
-      if (!groups.has(key)) {
-        groups.set(key, []);
-      }
-      groups.get(key)!.push(task);
-    });
+  // Default: dynamic columns based on group mode
+  const gridCols = dynamicColumns.length <= 4 
+    ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4' 
+    : dynamicColumns.length <= 6 
+      ? 'grid-cols-1 md:grid-cols-3 lg:grid-cols-6'
+      : 'grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6';
 
-    return (
-      <div className="space-y-8">
-        {Array.from(groups.entries()).map(([groupKey, groupTasks]) => (
-          <div key={groupKey}>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-1 h-6 rounded-full bg-primary" />
-              <h3 className="text-lg font-semibold text-foreground">
-                {groupLabels?.get(groupKey) || groupKey}
-              </h3>
-              <Badge variant="outline" className="text-xs">
-                {groupTasks.length} tâches
-              </Badge>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {statusColumns.map((column) => {
-                const columnTasks = groupTasks.filter(t => t.status === column.status);
-                return renderColumn(column, columnTasks);
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  // Default: no grouping - 4 columns layout
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-      {statusColumns.map((column) => {
-        const columnTasks = tasks.filter(t => t.status === column.status);
+    <div className={cn("grid gap-4", gridCols)}>
+      {dynamicColumns.map((column) => {
+        const columnTasks = tasks.filter(t => getTaskColumnKey(t) === column.key);
         return renderColumn(column, columnTasks);
       })}
     </div>
