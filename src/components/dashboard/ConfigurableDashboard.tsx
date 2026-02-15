@@ -15,6 +15,7 @@ import { BarChartWidget } from './widgets/BarChartWidget';
 import { PieChartWidget } from './widgets/PieChartWidget';
 import { LineChartWidget } from './widgets/LineChartWidget';
 import { DataTableWidget } from './widgets/DataTableWidget';
+import { TaskTableWidget } from './widgets/TaskTableWidget';
 import { AddWidgetDialog } from './widgets/AddWidgetDialog';
 import { ProgressRing } from './ProgressRing';
 import { Button } from '@/components/ui/button';
@@ -404,6 +405,8 @@ export function ConfigurableDashboard({
         return <LineChartWidget data={getTimelineData()} />;
       case 'data-table':
         return <DataTableWidget tasks={filteredTasks} onTaskClick={onTaskClick} processId={processId} />;
+      case 'task-table':
+        return <TaskTableWidget tasks={filteredTasks} onTaskClick={onTaskClick} processId={processId} />;
       case 'progress-ring':
         return (
           <div className="flex items-center justify-center h-full">
@@ -421,6 +424,7 @@ export function ConfigurableDashboard({
       case 'stats-summary':
         return 'h-[200px]';
       case 'data-table':
+      case 'task-table':
         return 'h-[500px]';
       case 'line-chart':
         return 'h-[300px]';

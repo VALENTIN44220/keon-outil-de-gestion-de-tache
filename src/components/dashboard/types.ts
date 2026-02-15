@@ -6,6 +6,7 @@ export type WidgetType =
   | 'pie-chart' 
   | 'line-chart' 
   | 'data-table'
+  | 'task-table'
   | 'progress-ring';
 
 export interface WidgetConfig {
@@ -52,6 +53,7 @@ export const DEFAULT_WIDGETS: WidgetConfig[] = [
   { id: 'pie-1', type: 'pie-chart', title: 'Par priorité', dataKey: 'priority', size: { w: 2, h: 3 }, position: { x: 2, y: 2 } },
   { id: 'line-1', type: 'line-chart', title: 'Évolution temporelle', dataKey: 'timeline', size: { w: 4, h: 3 }, position: { x: 0, y: 5 } },
   { id: 'table-1', type: 'data-table', title: 'Liste des demandes', size: { w: 4, h: 4 }, position: { x: 0, y: 8 } },
+  { id: 'task-table-1', type: 'task-table', title: 'Liste des tâches', size: { w: 4, h: 4 }, position: { x: 0, y: 12 } },
 ];
 
 export interface ChartDataPoint {

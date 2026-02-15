@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { WidgetType, WidgetConfig } from '../types';
-import { BarChart2, PieChart, TrendingUp, Table, Activity, Hash } from 'lucide-react';
+import { BarChart2, PieChart, TrendingUp, Table, Activity, Hash, ListChecks } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface AddWidgetDialogProps {
@@ -41,10 +41,17 @@ const WIDGET_OPTIONS: { type: WidgetType; label: string; description: string; ic
   },
   { 
     type: 'data-table', 
-    label: 'Tableau de données', 
-    description: 'Liste détaillée des tâches', 
+    label: 'Liste des demandes', 
+    description: 'Demandes avec tâches enfants dépliables', 
     icon: Table,
     color: 'text-cyan-500 bg-cyan-500/10'
+  },
+  { 
+    type: 'task-table', 
+    label: 'Liste des tâches', 
+    description: 'Tâches directes + synchronisées Planner', 
+    icon: ListChecks,
+    color: 'text-keon-blue bg-keon-blue/10'
   },
   { 
     type: 'progress-ring', 
@@ -68,7 +75,7 @@ export function AddWidgetDialog({ open, onClose, onAdd }: AddWidgetDialogProps) 
   const handleAdd = (type: WidgetType) => {
     const defaultDataKey = type === 'line-chart' ? 'timeline' : type === 'bar-chart' ? 'status' : 'priority';
     const defaultSize = type === 'stats-summary' ? { w: 4, h: 2 } : 
-                        type === 'data-table' ? { w: 4, h: 4 } : 
+                        type === 'data-table' || type === 'task-table' ? { w: 4, h: 4 } : 
                         type === 'line-chart' ? { w: 4, h: 3 } : 
                         { w: 2, h: 3 };
     
