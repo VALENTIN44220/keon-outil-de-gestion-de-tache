@@ -164,32 +164,15 @@ export default function ProcessTracking() {
 
     const result: DepartmentGroup[] = Array.from(groups.values()).sort((a, b) => a.name.localeCompare(b.name));
 
-    // Add unassigned processes as individual "department" groups using process name
-    unassigned.forEach(p => {
-      // Try to find a matching department by name similarity
-      const matchingDept = departments.find(d =>
-        d.name.toUpperCase().includes(p.name.toUpperCase()) ||
-        p.name.toUpperCase().includes(d.name.toUpperCase())
-      );
-
-      if (matchingDept) {
-        let existing = result.find(g => g.id === matchingDept.id);
-        if (!existing) {
-          existing = { id: matchingDept.id, name: matchingDept.name, processes: [], totalTasks: 0 };
-          result.push(existing);
-        }
-        existing.processes.push(p);
-        existing.totalTasks += p.task_count || 0;
-      } else {
-        // Create a virtual department group from process name
-        result.push({
-          id: `process-${p.id}`,
-          name: p.name,
-          processes: [p],
-          totalTasks: p.task_count || 0,
-        });
-      }
-    });
+    // Processes without department go into "Non rattachés"
+    if (unassigned.length > 0) {
+      result.push({
+        id: 'unassigned',
+        name: 'Non rattachés',
+        processes: unassigned,
+        totalTasks: unassigned.reduce((sum, p) => sum + (p.task_count || 0), 0),
+      });
+    }
 
     return result.sort((a, b) => a.name.localeCompare(b.name));
   }, [processes, departments]);
