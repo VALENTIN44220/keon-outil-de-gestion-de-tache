@@ -1,31 +1,17 @@
 import { TaskView } from '@/components/tasks/TaskViewSelector';
-import { TaskStatus, TaskPriority } from '@/types/task';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { LayoutGrid, Columns, Calendar, Filter, X, Layers } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { LayoutGrid, Columns, Calendar, Layers } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export type KanbanGroupMode = 'status' | 'category' | 'priority' | 'assignee';
 
 interface DashboardToolbarProps {
-  // View
   currentView: TaskView;
   onViewChange: (view: TaskView) => void;
-  // Status & Priority filters
-  statusFilter: TaskStatus | 'all';
-  priorityFilter: TaskPriority | 'all';
-  onStatusChange: (status: TaskStatus | 'all') => void;
-  onPriorityChange: (priority: TaskPriority | 'all') => void;
-  // Toggle advanced filters
-  showAdvancedFilters: boolean;
-  onToggleAdvancedFilters: () => void;
-  hasActiveAdvancedFilters: boolean;
-  // Kanban grouping
   kanbanGroupMode?: KanbanGroupMode;
   onKanbanGroupModeChange?: (mode: KanbanGroupMode) => void;
 }
-
 
 const viewOptions: { value: TaskView; label: string; icon: React.ElementType }[] = [
   { value: 'grid', label: 'Grille', icon: LayoutGrid },
@@ -33,31 +19,9 @@ const viewOptions: { value: TaskView; label: string; icon: React.ElementType }[]
   { value: 'calendar', label: 'Calendrier', icon: Calendar },
 ];
 
-const statusOptions: { value: TaskStatus | 'all'; label: string; color?: string }[] = [
-  { value: 'all', label: 'Tous' },
-  { value: 'todo', label: 'À faire', color: 'bg-keon-orange' },
-  { value: 'in-progress', label: 'En cours', color: 'bg-keon-blue' },
-  { value: 'done', label: 'Terminé', color: 'bg-keon-green' },
-];
-
-const priorityOptions: { value: TaskPriority | 'all'; label: string; color?: string }[] = [
-  { value: 'all', label: 'Toutes' },
-  { value: 'urgent', label: 'Urgente', color: 'bg-red-500' },
-  { value: 'high', label: 'Haute', color: 'bg-keon-terose' },
-  { value: 'medium', label: 'Moyenne', color: 'bg-keon-orange' },
-  { value: 'low', label: 'Basse', color: 'bg-keon-500' },
-];
-
 export function DashboardToolbar({
   currentView,
   onViewChange,
-  statusFilter,
-  priorityFilter,
-  onStatusChange,
-  onPriorityChange,
-  showAdvancedFilters,
-  onToggleAdvancedFilters,
-  hasActiveAdvancedFilters,
   kanbanGroupMode = 'status',
   onKanbanGroupModeChange,
 }: DashboardToolbarProps) {
@@ -107,81 +71,6 @@ export function DashboardToolbar({
           </div>
         </>
       )}
-
-      {/* Divider */}
-      <div className="h-6 w-px bg-keon-300 hidden sm:block" />
-
-      {/* Status filter */}
-      <div className="flex items-center gap-1.5">
-        <span className="text-xs font-medium text-keon-700 hidden lg:inline">Statut:</span>
-        <div className="flex bg-white rounded-sm border border-keon-300 p-0.5">
-          {statusOptions.map((option) => (
-            <Button
-              key={option.value}
-              variant="ghost"
-              size="sm"
-              onClick={() => onStatusChange(option.value)}
-              className={cn(
-                "text-xs px-2 py-1 h-7 rounded-sm transition-all gap-1",
-                statusFilter === option.value 
-                  ? "bg-keon-900 text-white shadow-keon-sm" 
-                  : "text-keon-700 hover:text-keon-900 hover:bg-keon-100"
-              )}
-            >
-              {option.color && <span className={cn("w-2 h-2 rounded-full", option.color)} />}
-              <span className="hidden xl:inline">{option.label}</span>
-            </Button>
-          ))}
-        </div>
-      </div>
-
-      {/* Priority filter */}
-      <div className="flex items-center gap-1.5">
-        <span className="text-xs font-medium text-keon-700 hidden lg:inline">Priorité:</span>
-        <div className="flex bg-white rounded-sm border border-keon-300 p-0.5">
-          {priorityOptions.map((option) => (
-            <Button
-              key={option.value}
-              variant="ghost"
-              size="sm"
-              onClick={() => onPriorityChange(option.value)}
-              className={cn(
-                "text-xs px-2 py-1 h-7 rounded-sm transition-all gap-1",
-                priorityFilter === option.value 
-                  ? "bg-keon-900 text-white shadow-keon-sm" 
-                  : "text-keon-700 hover:text-keon-900 hover:bg-keon-100"
-              )}
-            >
-              {option.color && <span className={cn("w-2 h-2 rounded-full", option.color)} />}
-              <span className="hidden xl:inline">{option.label}</span>
-            </Button>
-          ))}
-        </div>
-      </div>
-
-      {/* Spacer */}
-      <div className="flex-1" />
-
-      {/* Advanced filters toggle */}
-      <Button
-        variant={showAdvancedFilters ? "default" : "outline"}
-        size="sm"
-        onClick={onToggleAdvancedFilters}
-        className={cn(
-          "h-7 text-xs gap-1.5",
-          showAdvancedFilters 
-            ? "bg-keon-blue text-white hover:bg-keon-blue/90" 
-            : "border-keon-300 text-keon-700 hover:bg-keon-100"
-        )}
-      >
-        {showAdvancedFilters ? <X className="h-3.5 w-3.5" /> : <Filter className="h-3.5 w-3.5" />}
-        Filtres
-        {hasActiveAdvancedFilters && !showAdvancedFilters && (
-          <Badge variant="secondary" className="h-4 px-1 text-[10px] bg-keon-orange text-white">
-            •
-          </Badge>
-        )}
-      </Button>
     </div>
   );
 }
