@@ -4,7 +4,7 @@ import { ProcessWithTasks, TaskTemplate, VISIBILITY_LABELS, TemplateVisibility }
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Building2, Briefcase, ListTodo, Eye, Lock, Users, Globe, Workflow, CheckCircle, Layers, ArrowRight } from 'lucide-react';
+import { Trash2, Building2, Briefcase, ListTodo, Eye, Lock, Users, Globe, Workflow, CheckCircle, Layers, ArrowRight, FolderKanban } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 
@@ -37,6 +37,7 @@ export function ProcessCard({ process, onDelete, onViewDetails, canManage = fals
   const [subProcessCount, setSubProcessCount] = useState(0);
   const [targetDepartments, setTargetDepartments] = useState<string[]>([]);
   const [workflowStatus, setWorkflowStatus] = useState<WorkflowStatus>({ status: 'none', nodeCount: 0, hasValidation: false });
+  const [serviceGroupName, setServiceGroupName] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -77,6 +78,16 @@ export function ProcessCard({ process, onDelete, onViewDetails, canManage = fals
           nodeCount: nodes.length,
           hasValidation
         });
+      }
+
+      // Fetch service group name
+      if ((process as any).service_group_id) {
+        const { data: sgData } = await (supabase as any)
+          .from('service_groups')
+          .select('name')
+          .eq('id', (process as any).service_group_id)
+          .maybeSingle();
+        if (sgData) setServiceGroupName(sgData.name);
       }
     };
     fetchData();
@@ -130,6 +141,12 @@ export function ProcessCard({ process, onDelete, onViewDetails, canManage = fals
             {getWorkflowIndicator()}
           </div>
           <div className="flex items-center gap-4 text-xs text-muted-foreground mt-1.5">
+            {serviceGroupName && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-accent/50 border-accent font-medium">
+                <FolderKanban className="h-3 w-3 mr-1" />
+                {serviceGroupName}
+              </Badge>
+            )}
             {process.company && (
               <span className="flex items-center gap-1">
                 <Building2 className="h-3 w-3" />
@@ -200,6 +217,17 @@ export function ProcessCard({ process, onDelete, onViewDetails, canManage = fals
             {getWorkflowIndicator()}
           </div>
         </div>
+
+        {/* Service group badge */}
+        {serviceGroupName && (
+          <Badge 
+            variant="outline" 
+            className="bg-accent/50 border-accent text-xs font-medium mb-2"
+          >
+            <FolderKanban className="h-3 w-3 mr-1" />
+            {serviceGroupName}
+          </Badge>
+        )}
 
         {/* Department badge if available */}
         {targetDepartments.length > 0 && (
