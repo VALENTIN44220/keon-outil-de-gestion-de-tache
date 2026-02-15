@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Save, Loader2, Eye, Lock, FormInput } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Save, Loader2, Eye, Lock, FormInput, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { RequestValidationConfigPanel } from '@/components/templates/RequestValidationConfigPanel';
 import { ProcessWithTasks } from '@/types/template';
@@ -39,7 +40,8 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
     DEFAULT_COMMON_FIELDS_CONFIG
   );
   const [isSavingFields, setIsSavingFields] = useState(false);
-
+  const [beProjects, setBeProjects] = useState<{ id: string; nom_projet: string; code_projet: string }[]>([]);
+  const [beProjectSearch, setBeProjectSearch] = useState('');
   // Sync formData when process prop changes
   useEffect(() => {
     setFormData({
@@ -58,6 +60,17 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
       setCommonFieldsConfig(DEFAULT_COMMON_FIELDS_CONFIG);
     }
   }, [process.id, process.name, process.description]);
+
+  // Fetch BE projects for imposed value selector
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from('be_projects')
+        .select('id, nom_projet, code_projet')
+        .order('nom_projet');
+      if (data) setBeProjects(data);
+    })();
+  }, []);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -210,6 +223,7 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
           {fieldKeys.map((key) => {
             const config = commonFieldsConfig[key];
             const showPriorityDefault = key === 'priority' && config.visible && !config.editable;
+            const showProjectDefault = key === 'be_project' && !config.editable;
             const showTitlePattern = key === 'title' && !config.editable;
 
             return (
@@ -233,7 +247,7 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
                       onCheckedChange={(checked) =>
                         updateFieldConfig(key, { editable: checked })
                       }
-                      disabled={!canManage || !config.visible}
+                      disabled={!canManage || (key !== 'be_project' && !config.visible)}
                     />
                   </div>
 
@@ -252,6 +266,52 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
                           <SelectItem value="medium">Moyenne</SelectItem>
                           <SelectItem value="high">Haute</SelectItem>
                           <SelectItem value="urgent">Urgente</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : showProjectDefault ? (
+                      <Select
+                        value={config.default_value || ''}
+                        onValueChange={(v) => updateFieldConfig(key, { default_value: v || null })}
+                        disabled={!canManage}
+                      >
+                        <SelectTrigger className="h-7 text-xs w-36">
+                          <SelectValue placeholder="Choisir...">
+                            {config.default_value
+                              ? (() => {
+                                  const p = beProjects.find(pr => pr.id === config.default_value);
+                                  return p ? p.code_projet : 'Projet';
+                                })()
+                              : 'Choisir...'}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <div className="p-1.5 border-b">
+                            <div className="relative">
+                              <Search className="absolute left-2 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
+                              <Input
+                                placeholder="Rechercher..."
+                                value={beProjectSearch}
+                                onChange={(e) => setBeProjectSearch(e.target.value)}
+                                className="h-7 pl-7 text-xs"
+                              />
+                            </div>
+                          </div>
+                          <div className="max-h-48 overflow-y-auto">
+                            {beProjects
+                              .filter(p =>
+                                !beProjectSearch ||
+                                p.nom_projet.toLowerCase().includes(beProjectSearch.toLowerCase()) ||
+                                p.code_projet.toLowerCase().includes(beProjectSearch.toLowerCase())
+                              )
+                              .map(p => (
+                                <SelectItem key={p.id} value={p.id}>
+                                  <div className="flex items-center gap-1.5">
+                                    <Badge variant="outline" className="font-mono text-[10px] px-1 py-0">{p.code_projet}</Badge>
+                                    <span className="text-xs truncate max-w-[120px]">{p.nom_projet}</span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                          </div>
                         </SelectContent>
                       </Select>
                     ) : (
