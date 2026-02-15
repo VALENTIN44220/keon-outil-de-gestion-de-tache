@@ -17,10 +17,9 @@ import {
   Building2,
   Timer,
   Eye,
-  
   Users,
-  
   Zap,
+  ListTodo,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { ProcessWithTasks } from '@/types/template';
@@ -34,6 +33,7 @@ import { ProcessCustomFieldsTab } from './ProcessCustomFieldsTab';
 import { ProcessNotificationsTab } from './ProcessNotificationsTab';
 import { ProcessGeneratedWorkflowTab } from './ProcessGeneratedWorkflowTab';
 import { ProcessSLATab } from './ProcessSLATab';
+import { ProcessTaskManagement } from '@/components/process-tracking/ProcessTaskManagement';
 
 interface UnifiedModelViewProps {
   process: ProcessWithTasks | null;
@@ -154,10 +154,10 @@ export function UnifiedModelView({
     { id: 'access', label: 'Accès', icon: Eye },
     { id: 'subprocesses', label: 'Sous-proc.', icon: GitBranch },
     { id: 'fields', label: 'Champs', icon: FormInput },
-    
     { id: 'assignment', label: 'Affectation', icon: Users },
     { id: 'notifications', label: 'Notifs', icon: Bell },
     { id: 'workflow', label: 'Workflow', icon: Zap },
+    { id: 'tasks', label: 'Tâches', icon: ListTodo },
   ];
 
   return (
@@ -276,6 +276,13 @@ export function UnifiedModelView({
                   processName={process.name}
                   canManage={canManage}
                   onUpdate={onUpdate}
+                />
+              </TabsContent>
+
+              <TabsContent value="tasks" className="mt-0">
+                <ProcessTaskManagement
+                  processId={process.id}
+                  canWrite={canManage}
                 />
               </TabsContent>
             </div>

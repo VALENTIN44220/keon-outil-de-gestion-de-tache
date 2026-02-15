@@ -17,10 +17,10 @@ import {
   Clock,
   Building2,
   Eye,
-  
   Users,
   Zap,
   ArrowLeft,
+  ListTodo,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { ProcessWithTasks } from '@/types/template';
@@ -33,6 +33,7 @@ import { ProcessCustomFieldsTab } from '@/components/templates/UnifiedModelView/
 
 import { ProcessNotificationsTab } from '@/components/templates/UnifiedModelView/ProcessNotificationsTab';
 import { ProcessGeneratedWorkflowTab } from '@/components/templates/UnifiedModelView/ProcessGeneratedWorkflowTab';
+import { ProcessTaskManagement } from '@/components/process-tracking/ProcessTaskManagement';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useTasks } from '@/hooks/useTasks';
@@ -162,10 +163,10 @@ export default function ProcessSettings() {
     { id: 'access', label: 'Accès', icon: Eye },
     { id: 'subprocesses', label: 'Sous-proc.', icon: GitBranch },
     { id: 'fields', label: 'Champs', icon: FormInput },
-    
     { id: 'assignment', label: 'Affectation', icon: Users },
     { id: 'notifications', label: 'Notifs', icon: Bell },
     { id: 'workflow', label: 'Workflow', icon: Zap },
+    { id: 'tasks', label: 'Gestion des tâches', icon: ListTodo },
   ];
 
   if (isLoading) {
@@ -313,6 +314,13 @@ export default function ProcessSettings() {
                     processName={process.name}
                     canManage={canManage}
                     onUpdate={handleUpdate}
+                  />
+                </TabsContent>
+
+                <TabsContent value="tasks" className="mt-0">
+                  <ProcessTaskManagement
+                    processId={process.id}
+                    canWrite={canManage}
                   />
                 </TabsContent>
               </div>
