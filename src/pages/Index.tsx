@@ -374,9 +374,6 @@ const Index = () => {
         <>
           {/* Unified Toolbar */}
           <DashboardToolbar
-            scope={scope}
-            availableScopes={availableScopes}
-            onScopeChange={handleScopeChange}
             currentView={taskView}
             onViewChange={setTaskView}
             statusFilter={statusFilter}
