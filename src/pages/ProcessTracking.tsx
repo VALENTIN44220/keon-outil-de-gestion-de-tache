@@ -11,7 +11,12 @@ import { Loader2, ShieldX } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const ProcessDashboard = lazy(() =>
-  import('@/components/process-tracking/ProcessDashboard').then(m => ({ default: m.ProcessDashboard }))
+  import('@/components/process-tracking/ProcessDashboard')
+    .then(m => ({ default: m.ProcessDashboard }))
+    .catch(() => {
+      window.location.reload();
+      return { default: () => null } as any;
+    })
 );
 
 const PROCESS_COLORS = [
