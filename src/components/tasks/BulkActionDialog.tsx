@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -62,15 +62,77 @@ const statusColors: Record<string, string> = {
   cancelled: 'bg-muted text-muted-foreground',
 };
 
+// ── Multi-select filter popover ──────────────────────────────────
+function MultiSelectFilter({
+  label,
+  options,
+  selected,
+  onChange,
+  icon,
+}: {
+  label: string;
+  options: { value: string; label: string }[];
+  selected: Set<string>;
+  onChange: (next: Set<string>) => void;
+  icon?: React.ReactNode;
+}) {
+  const toggle = (v: string) => {
+    const next = new Set(selected);
+    if (next.has(v)) next.delete(v);
+    else next.add(v);
+    onChange(next);
+  };
+
+  const summary =
+    selected.size === 0
+      ? label
+      : selected.size === 1
+        ? options.find(o => o.value === [...selected][0])?.label ?? label
+        : `${selected.size} sélectionnés`;
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="h-9 gap-1.5 text-xs font-normal min-w-[130px] justify-between">
+          {icon}
+          <span className="truncate">{summary}</span>
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-56 p-1 z-50 bg-popover" align="start">
+        <ScrollArea className="max-h-[260px]">
+          {options.map(opt => (
+            <button
+              key={opt.value}
+              onClick={() => toggle(opt.value)}
+              className="w-full flex items-center gap-2 px-2.5 py-1.5 text-sm hover:bg-accent rounded transition-colors text-left"
+            >
+              <Checkbox checked={selected.has(opt.value)} className="pointer-events-none" />
+              <span className="truncate">{opt.label}</span>
+            </button>
+          ))}
+        </ScrollArea>
+        {selected.size > 0 && (
+          <div className="border-t mt-1 pt-1 px-2 pb-1">
+            <Button variant="ghost" size="sm" className="w-full h-7 text-xs" onClick={() => onChange(new Set())}>
+              Réinitialiser
+            </Button>
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export function BulkActionDialog({ open, onOpenChange, tasks, onComplete, canReassign = false }: BulkActionDialogProps) {
   const { categories } = useCategories();
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [isProcessing, setIsProcessing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [filterCurrentAssignee, setFilterCurrentAssignee] = useState<string>('all');
-  const [filterSource, setFilterSource] = useState<'all' | 'planner' | 'no_category'>('all');
-  const [filterServiceGroup, setFilterServiceGroup] = useState<string>('all');
+  const [filterStatuses, setFilterStatuses] = useState<Set<string>>(new Set());
+  const [filterCurrentAssignees, setFilterCurrentAssignees] = useState<Set<string>>(new Set());
+  const [filterSources, setFilterSources] = useState<Set<string>>(new Set());
+  const [filterServiceGroups, setFilterServiceGroups] = useState<Set<string>>(new Set());
 
   // Category targets
   const [targetCategoryId, setTargetCategoryId] = useState<string>('');
@@ -153,22 +215,33 @@ export function BulkActionDialog({ open, onOpenChange, tasks, onComplete, canRea
           task.request_number?.toLowerCase().includes(q);
         if (!matches) return false;
       }
-      if (filterStatus !== 'all' && task.status !== filterStatus) return false;
-      if (filterCurrentAssignee === 'unassigned' && task.assignee_id) return false;
-      if (filterCurrentAssignee !== 'all' && filterCurrentAssignee !== 'unassigned' && task.assignee_id !== filterCurrentAssignee) return false;
-      if (filterSource === 'no_category' && task.category_id) return false;
-      if (filterSource === 'planner' && !plannerTaskIds.has(task.id)) return false;
-      if (filterServiceGroup !== 'all') {
+      if (filterStatuses.size > 0 && !filterStatuses.has(task.status)) return false;
+      if (filterCurrentAssignees.size > 0) {
+        if (filterCurrentAssignees.has('unassigned') && !task.assignee_id) {
+          // pass
+        } else if (task.assignee_id && filterCurrentAssignees.has(task.assignee_id)) {
+          // pass
+        } else {
+          return false;
+        }
+      }
+      if (filterSources.size > 0) {
+        let match = false;
+        if (filterSources.has('no_category') && !task.category_id) match = true;
+        if (filterSources.has('planner') && plannerTaskIds.has(task.id)) match = true;
+        if (!match) return false;
+      }
+      if (filterServiceGroups.size > 0) {
         const taskSg = taskServiceGroupMap.get(task.id);
-        if (taskSg !== filterServiceGroup) return false;
+        if (!taskSg || !filterServiceGroups.has(taskSg)) return false;
       }
       return true;
     });
-  }, [tasks, searchQuery, filterStatus, filterCurrentAssignee, filterSource, filterServiceGroup, taskServiceGroupMap, plannerTaskIds]);
+  }, [tasks, searchQuery, filterStatuses, filterCurrentAssignees, filterSources, filterServiceGroups, taskServiceGroupMap, plannerTaskIds]);
 
   useEffect(() => {
     setSelectedTaskIds(new Set());
-  }, [searchQuery, filterStatus, filterCurrentAssignee, filterSource, filterServiceGroup]);
+  }, [searchQuery, filterStatuses, filterCurrentAssignees, filterSources, filterServiceGroups]);
 
   const toggleTask = (taskId: string) => {
     setSelectedTaskIds(prev => {
@@ -232,7 +305,6 @@ export function BulkActionDialog({ open, onOpenChange, tasks, onComplete, canRea
         const { error } = await supabase.from('tasks').update(updates).in('id', batch);
         if (error) throw error;
 
-        // Move to_assign → todo when assigning a user
         if (targetUserId) {
           await supabase
             .from('tasks')
@@ -262,10 +334,10 @@ export function BulkActionDialog({ open, onOpenChange, tasks, onComplete, canRea
     setTargetSubcategoryId('');
     setTargetUserId('');
     setSearchQuery('');
-    setFilterStatus('all');
-    setFilterCurrentAssignee('all');
-    setFilterSource('all');
-    setFilterServiceGroup('all');
+    setFilterStatuses(new Set());
+    setFilterCurrentAssignees(new Set());
+    setFilterSources(new Set());
+    setFilterServiceGroups(new Set());
     setTargetSearchQuery('');
   };
 
@@ -282,7 +354,7 @@ export function BulkActionDialog({ open, onOpenChange, tasks, onComplete, canRea
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 min-h-0 flex flex-col space-y-4 overflow-y-auto">
+        <div className="flex-1 min-h-0 flex flex-col space-y-4 overflow-hidden">
           {/* Action panels */}
           <div className={`grid ${canReassign ? 'grid-cols-2' : 'grid-cols-1'} gap-3 shrink-0`}>
             {/* Category assignment */}
@@ -400,52 +472,38 @@ export function BulkActionDialog({ open, onOpenChange, tasks, onComplete, canRea
               <Input placeholder="Rechercher..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 h-9" />
             </div>
             {canReassign && (
-              <Select value={filterCurrentAssignee} onValueChange={setFilterCurrentAssignee}>
-                <SelectTrigger className="w-[160px] h-9">
-                  <Filter className="h-3.5 w-3.5 mr-1.5" />
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="z-50 bg-popover">
-                  <SelectItem value="all">Tous les assignés</SelectItem>
-                  <SelectItem value="unassigned">Non assignées</SelectItem>
-                  {currentAssignees.map(a => (
-                    <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <MultiSelectFilter
+                label="Tous les assignés"
+                icon={<Filter className="h-3.5 w-3.5" />}
+                selected={filterCurrentAssignees}
+                onChange={setFilterCurrentAssignees}
+                options={[
+                  { value: 'unassigned', label: 'Non assignées' },
+                  ...currentAssignees.map(a => ({ value: a.id, label: a.name })),
+                ]}
+              />
             )}
-            <Select value={filterSource} onValueChange={(v) => setFilterSource(v as any)}>
-              <SelectTrigger className="w-[150px] h-9">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="z-50 bg-popover">
-                <SelectItem value="all">Toutes</SelectItem>
-                <SelectItem value="no_category">Sans catégorie</SelectItem>
-                <SelectItem value="planner">Import Planner</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-[140px] h-9">
-                <SelectValue placeholder="Statut" />
-              </SelectTrigger>
-              <SelectContent className="z-50 bg-popover">
-                <SelectItem value="all">Tous les statuts</SelectItem>
-                {Object.entries(statusLabels).map(([s, label]) => (
-                  <SelectItem key={s} value={s}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={filterServiceGroup} onValueChange={setFilterServiceGroup}>
-              <SelectTrigger className="w-[170px] h-9">
-                <SelectValue placeholder="Groupe de services" />
-              </SelectTrigger>
-              <SelectContent className="z-50 bg-popover">
-                <SelectItem value="all">Tous les groupes</SelectItem>
-                {serviceGroups.map(sg => (
-                  <SelectItem key={sg.id} value={sg.id}>{sg.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <MultiSelectFilter
+              label="Import Planner"
+              selected={filterSources}
+              onChange={setFilterSources}
+              options={[
+                { value: 'no_category', label: 'Sans catégorie' },
+                { value: 'planner', label: 'Import Planner' },
+              ]}
+            />
+            <MultiSelectFilter
+              label="Tous les statuts"
+              selected={filterStatuses}
+              onChange={setFilterStatuses}
+              options={Object.entries(statusLabels).map(([s, label]) => ({ value: s, label }))}
+            />
+            <MultiSelectFilter
+              label="Tous les groupes"
+              selected={filterServiceGroups}
+              onChange={setFilterServiceGroups}
+              options={serviceGroups.map(sg => ({ value: sg.id, label: sg.name }))}
+            />
           </div>
 
           {/* Selection summary */}
@@ -469,8 +527,8 @@ export function BulkActionDialog({ open, onOpenChange, tasks, onComplete, canRea
             )}
           </div>
 
-          {/* Task list */}
-          <ScrollArea className="flex-1 border rounded-lg min-h-0">
+          {/* Task list — scrollable */}
+          <ScrollArea className="flex-1 border rounded-lg" style={{ maxHeight: '40vh' }}>
             <div className="divide-y">
               {filteredTasks.length === 0 ? (
                 <div className="p-8 text-center text-muted-foreground text-sm">
