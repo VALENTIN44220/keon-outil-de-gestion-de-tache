@@ -247,9 +247,8 @@ export function BulkActionDialog({ open, onOpenChange, tasks, onComplete, canRea
       if (targetUserId) actions.push(`réaffectée(s) à ${selectedMember?.display_name}`);
       toast.success(`${ids.length} tâche(s) ${actions.join(' et ')}`);
 
-      handleReset();
+      setSelectedTaskIds(new Set());
       onComplete();
-      onOpenChange(false);
     } catch (error: any) {
       toast.error(`Erreur: ${error.message}`);
     } finally {
