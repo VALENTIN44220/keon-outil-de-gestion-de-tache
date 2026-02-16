@@ -5511,6 +5511,7 @@ export type Database = {
         Args: { p_process_id: string }
         Returns: Json
       }
+      generate_standard_process_access: { Args: never; Returns: Json }
       get_active_workflow: {
         Args: {
           _process_template_id?: string

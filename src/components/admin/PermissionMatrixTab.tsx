@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Grid3X3, Monitor, Workflow, User, Plus, Minus, RotateCcw, Check, X, AlertCircle, ChevronDown, Building2, Eye, Pencil, ClipboardList } from 'lucide-react';
+import { Grid3X3, Monitor, Workflow, User, Plus, Minus, RotateCcw, Check, X, AlertCircle, ChevronDown, Building2, Eye, Pencil, ClipboardList, Wand2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { RefreshButton } from './RefreshButton';
 import { supabase } from '@/integrations/supabase/client';
@@ -51,6 +51,7 @@ export function PermissionMatrixTab({
   const [isEditingScreens, setIsEditingScreens] = useState(false);
   const [pendingScreenChanges, setPendingScreenChanges] = useState<Record<string, Record<string, boolean>>>({});
   const [isSavingScreens, setIsSavingScreens] = useState(false);
+  const [isGeneratingAccess, setIsGeneratingAccess] = useState(false);
   
   const {
     isLoading,
@@ -512,14 +513,49 @@ export function PermissionMatrixTab({
 
           {/* Process Tracking Access Card */}
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ClipboardList className="h-5 w-5" />
-                Accès au suivi des processus
-              </CardTitle>
-              <CardDescription>
-                Paramétrez l'accès en masse par profil, société ou service, ou individuellement par utilisateur
-              </CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <ClipboardList className="h-5 w-5" />
+                  Accès au suivi des processus
+                </CardTitle>
+                <CardDescription>
+                  Paramétrez l'accès en masse par profil, société ou service, ou individuellement par utilisateur
+                </CardDescription>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isGeneratingAccess}
+                onClick={async () => {
+                  setIsGeneratingAccess(true);
+                  try {
+                    const { data, error } = await (supabase as any).rpc('generate_standard_process_access');
+                    if (error) throw error;
+                    const result = data as { inserted: number; skipped: number };
+                    toast.success(`Accès standard générés : ${result.inserted} créés, ${result.skipped} déjà existants`);
+                    // Refresh tracking access if a user is selected
+                    if (selectedTrackingUserId) {
+                      const { data: refreshed } = await (supabase as any)
+                        .from('process_tracking_access')
+                        .select('process_template_id, can_read, can_write')
+                        .eq('profile_id', selectedTrackingUserId);
+                      const map: Record<string, { can_read: boolean; can_write: boolean }> = {};
+                      (refreshed || []).forEach((row: any) => {
+                        map[row.process_template_id] = { can_read: row.can_read, can_write: row.can_write };
+                      });
+                      setTrackingAccess(map);
+                    }
+                  } catch (error: any) {
+                    toast.error(error.message || 'Erreur lors de la génération');
+                  } finally {
+                    setIsGeneratingAccess(false);
+                  }
+                }}
+              >
+                <Wand2 className="h-4 w-4 mr-1" />
+                {isGeneratingAccess ? 'Génération...' : 'Générer accès standard'}
+              </Button>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Mode selector */}
