@@ -48,6 +48,9 @@ export function PermissionMatrixTab({
   const [trackingMode, setTrackingMode] = useState<'user' | 'profile' | 'company' | 'department'>('user');
   const [trackingFilterId, setTrackingFilterId] = useState<string | null>(null);
   const [isBulkSaving, setIsBulkSaving] = useState(false);
+  const [isEditingScreens, setIsEditingScreens] = useState(false);
+  const [pendingScreenChanges, setPendingScreenChanges] = useState<Record<string, Record<string, boolean>>>({});
+  const [isSavingScreens, setIsSavingScreens] = useState(false);
   
   const {
     isLoading,
@@ -144,21 +147,58 @@ export function PermissionMatrixTab({
   const selectedProfileProcesses = selectedProfileId ? getProfileProcessTemplates(selectedProfileId) : [];
   const selectedUserProcessOverrides = selectedUserId ? getUserProcessOverrides(selectedUserId) : [];
 
-  // Handle profile screen permission update (via the existing permission profile update)
-  const handleProfileScreenUpdate = async (profileId: string, key: ScreenPermissionKey, value: boolean) => {
-    try {
-      const { error } = await supabase
-        .from('permission_profiles')
-        .update({ [key]: value })
-        .eq('id', profileId);
+  // Handle profile screen permission update - now batched
+  const handleProfileScreenToggle = (profileId: string, key: ScreenPermissionKey, currentValue: boolean) => {
+    setPendingScreenChanges(prev => {
+      const profileChanges = prev[profileId] || {};
+      const newValue = profileChanges[key] !== undefined ? !profileChanges[key] : !currentValue;
+      // If the new value equals the original, remove the pending change
+      if (newValue === currentValue) {
+        const { [key]: _, ...rest } = profileChanges;
+        if (Object.keys(rest).length === 0) {
+          const { [profileId]: __, ...restProfiles } = prev;
+          return restProfiles;
+        }
+        return { ...prev, [profileId]: rest };
+      }
+      return { ...prev, [profileId]: { ...profileChanges, [key]: newValue } };
+    });
+  };
 
-      if (error) throw error;
-      toast.success('Permission mise à jour');
+  const handleSaveScreenChanges = async () => {
+    setIsSavingScreens(true);
+    try {
+      const entries = Object.entries(pendingScreenChanges);
+      for (const [profileId, changes] of entries) {
+        const { error } = await supabase
+          .from('permission_profiles')
+          .update(changes)
+          .eq('id', profileId);
+        if (error) throw error;
+      }
+      toast.success(`${entries.length} profil(s) mis à jour`);
+      setPendingScreenChanges({});
+      setIsEditingScreens(false);
       onRefresh();
     } catch (error: any) {
-      toast.error(error.message || 'Erreur');
+      toast.error(error.message || 'Erreur lors de la sauvegarde');
+    } finally {
+      setIsSavingScreens(false);
     }
   };
+
+  const handleCancelScreenChanges = () => {
+    setPendingScreenChanges({});
+    setIsEditingScreens(false);
+  };
+
+  const getScreenValue = (profile: PermissionProfile, key: ScreenPermissionKey): boolean => {
+    const original = (profile as any)[key] ?? true;
+    const pending = pendingScreenChanges[profile.id]?.[key];
+    return pending !== undefined ? pending : original;
+  };
+
+  const hasPendingChanges = Object.keys(pendingScreenChanges).length > 0;
 
   // Handle profile process template toggle
   const handleProfileProcessToggle = async (processTemplateId: string, isCurrentlyEnabled: boolean) => {
@@ -344,7 +384,25 @@ export function PermissionMatrixTab({
                   Définissez quels écrans sont accessibles pour chaque profil de droits
                 </CardDescription>
               </div>
-              <RefreshButton onRefresh={() => { refetch(); onRefresh(); }} />
+              <div className="flex items-center gap-2">
+                {!isEditingScreens ? (
+                  <Button variant="outline" size="sm" onClick={() => setIsEditingScreens(true)}>
+                    <Pencil className="h-4 w-4 mr-1" />
+                    Modifier
+                  </Button>
+                ) : (
+                  <>
+                    <Button variant="ghost" size="sm" onClick={handleCancelScreenChanges} disabled={isSavingScreens}>
+                      Annuler
+                    </Button>
+                    <Button size="sm" onClick={handleSaveScreenChanges} disabled={!hasPendingChanges || isSavingScreens}>
+                      <Check className="h-4 w-4 mr-1" />
+                      {isSavingScreens ? 'Enregistrement...' : 'Enregistrer'}
+                    </Button>
+                  </>
+                )}
+                <RefreshButton onRefresh={() => { refetch(); onRefresh(); }} />
+              </div>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -364,13 +422,18 @@ export function PermissionMatrixTab({
                       <TableRow key={profile.id}>
                         <TableCell className="font-medium">{profile.name}</TableCell>
                         {SCREEN_PERMISSIONS.map(key => {
-                          const value = (profile as any)[key] ?? true;
+                          const value = getScreenValue(profile, key);
+                          const isPending = pendingScreenChanges[profile.id]?.[key] !== undefined;
                           return (
                             <TableCell key={key} className="text-center">
                               <PermissionCell
                                 value={value}
-                                onChange={() => handleProfileScreenUpdate(profile.id, key, !value)}
+                                onChange={() => handleProfileScreenToggle(profile.id, key, (profile as any)[key] ?? true)}
+                                disabled={!isEditingScreens}
                               />
+                              {isPending && (
+                                <div className="w-1.5 h-1.5 rounded-full bg-primary mx-auto mt-1" />
+                              )}
                             </TableCell>
                           );
                         })}
