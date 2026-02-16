@@ -7,9 +7,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, ArrowRight, Plus, Check, X } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Loader2, ArrowRight, Plus, Check, X, Users } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useCategories } from '@/hooks/useCategories';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import type { PlanMapping } from '@/hooks/usePlannerSync';
 
 interface PlannerBucket {
@@ -48,6 +50,11 @@ export function PlannerMappingDialog({ open, onOpenChange, mapping, onSave }: Pl
   const [newSubName, setNewSubName] = useState<Record<string, string>>({});
   const [creatingForBucket, setCreatingForBucket] = useState<string | null>(null);
 
+  // New: requester & assignee resolution
+  const [defaultRequesterId, setDefaultRequesterId] = useState<string>((mapping as any).default_requester_id || 'none');
+  const [resolveAssignees, setResolveAssignees] = useState<boolean>((mapping as any).resolve_assignees !== false);
+  const [profiles, setProfiles] = useState<{ id: string; display_name: string }[]>([]);
+
   // Get subcategories for the mapped category
   const selectedCategory = categories.find(c => c.id === mapping.mapped_category_id);
   const subcategories = selectedCategory?.subcategories || [];
@@ -85,6 +92,13 @@ export function PlannerMappingDialog({ open, onOpenChange, mapping, onSave }: Pl
     if (open) {
       fetchBuckets();
       setImportStates(mapping.import_states || ['notStarted', 'inProgress', 'completed']);
+      setDefaultRequesterId((mapping as any).default_requester_id || 'none');
+      setResolveAssignees((mapping as any).resolve_assignees !== false);
+      
+      // Fetch profiles
+      supabase.from('profiles').select('id, display_name').order('display_name').then(({ data }) => {
+        setProfiles(data || []);
+      });
     }
   }, [open, fetchBuckets, mapping.import_states]);
 
@@ -118,13 +132,22 @@ export function PlannerMappingDialog({ open, onOpenChange, mapping, onSave }: Pl
     );
   };
 
+  const profileOptions = profiles.map(p => ({
+    value: p.id,
+    label: p.display_name || p.id,
+  }));
+
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // Save import states
-      await supabase
+      // Save import states + requester + resolve_assignees
+      await (supabase as any)
         .from('planner_plan_mappings')
-        .update({ import_states: importStates } as any)
+        .update({
+          import_states: importStates,
+          default_requester_id: defaultRequesterId === 'none' ? null : defaultRequesterId,
+          resolve_assignees: resolveAssignees,
+        })
         .eq('id', mapping.id);
 
       // Upsert bucket mappings
@@ -163,6 +186,48 @@ export function PlannerMappingDialog({ open, onOpenChange, mapping, onSave }: Pl
             </div>
           ) : (
             <div className="space-y-6 pr-1">
+              {/* Assignee & Requester Mapping */}
+              <div className="space-y-4">
+                <Label className="font-medium flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Affectation des personnes
+                </Label>
+                
+                <div className="space-y-3 pl-1">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm">Résoudre les assignés Planner</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Faire correspondre automatiquement les personnes assignées dans Planner aux profils locaux (par email)
+                      </p>
+                    </div>
+                    <Switch
+                      checked={resolveAssignees}
+                      onCheckedChange={setResolveAssignees}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">Demandeur par défaut</Label>
+                    <SearchableSelect
+                      value={defaultRequesterId}
+                      onValueChange={setDefaultRequesterId}
+                      options={[
+                        { value: 'none', label: 'Aucun (non défini)' },
+                        ...profileOptions,
+                      ]}
+                      placeholder="Sélectionner un demandeur..."
+                      searchPlaceholder="Rechercher un collaborateur..."
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Ce profil sera affecté comme demandeur (requester) pour toutes les tâches importées de ce plan
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
               {/* State Filter */}
               <div className="space-y-3">
                 <Label className="font-medium">États des tâches à importer</Label>
