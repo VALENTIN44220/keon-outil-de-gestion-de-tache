@@ -70,6 +70,8 @@ export function ProcessDashboard({ processId, departmentId, departmentIds, proce
     const { data, error } = await query.order('created_at', { ascending: false });
 
     if (!error && data) {
+      let allTasks = data as any[];
+
       if (isDeptMode && departmentIds && departmentIds.length > 0) {
         // Also fetch tasks where assignee belongs to any department in this group
         const { data: deptProfiles } = await supabase
@@ -79,7 +81,7 @@ export function ProcessDashboard({ processId, departmentId, departmentIds, proce
 
         if (deptProfiles && deptProfiles.length > 0) {
           const deptProfileIds = new Set(deptProfiles.map(p => p.id));
-          const existingIds = new Set((data as any[]).map(t => t.id));
+          const existingIds = new Set(allTasks.map(t => t.id));
           const { data: assigneeTasks } = await (supabase as any)
             .from('tasks')
             .select('*')
@@ -88,16 +90,32 @@ export function ProcessDashboard({ processId, departmentId, departmentIds, proce
 
           if (assigneeTasks) {
             const extra = (assigneeTasks as any[]).filter(t => !existingIds.has(t.id));
-            setTasks([...data, ...extra] as Task[]);
-          } else {
-            setTasks(data as Task[]);
+            allTasks = [...allTasks, ...extra];
           }
-        } else {
-          setTasks(data as Task[]);
         }
-      } else {
-        setTasks(data as Task[]);
       }
+
+      // Cross-service visibility: fetch parent requests of child tasks in this view
+      const parentIds = new Set<string>();
+      const existingIds = new Set(allTasks.map(t => t.id));
+      allTasks.forEach(t => {
+        if (t.parent_request_id && !existingIds.has(t.parent_request_id)) {
+          parentIds.add(t.parent_request_id);
+        }
+      });
+
+      if (parentIds.size > 0) {
+        const { data: parentRequests } = await (supabase as any)
+          .from('tasks')
+          .select('*')
+          .in('id', Array.from(parentIds));
+
+        if (parentRequests) {
+          allTasks = [...allTasks, ...parentRequests];
+        }
+      }
+
+      setTasks(allTasks as Task[]);
     }
     setIsLoading(false);
   }, [user, processId, departmentId, departmentIds, isDeptMode, processIds]);
