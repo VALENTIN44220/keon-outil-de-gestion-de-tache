@@ -99,13 +99,15 @@ export function BulkCategoryAssignDialog({ open, onOpenChange, tasks, onComplete
 
       return true;
     });
-  }, [tasks, searchQuery, filterSource, filterStatus]);
+  }, [tasks, searchQuery, filterSource, filterStatus, plannerTaskIds]);
 
-  // Unique statuses from tasks
-  const availableStatuses = useMemo(() => {
-    const statuses = new Set(tasks.map(t => t.status));
-    return Array.from(statuses);
-  }, [tasks]);
+  // All possible statuses - always show all
+  const allStatuses = Object.keys(statusLabels);
+
+  // Reset selection when filters change
+  useEffect(() => {
+    setSelectedTaskIds(new Set());
+  }, [searchQuery, filterSource, filterStatus]);
 
   const toggleTask = (taskId: string) => {
     setSelectedTaskIds(prev => {
@@ -253,7 +255,7 @@ export function BulkCategoryAssignDialog({ open, onOpenChange, tasks, onComplete
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tous les statuts</SelectItem>
-                {availableStatuses.map(s => (
+                {allStatuses.map(s => (
                   <SelectItem key={s} value={s}>{statusLabels[s] || s}</SelectItem>
                 ))}
               </SelectContent>
