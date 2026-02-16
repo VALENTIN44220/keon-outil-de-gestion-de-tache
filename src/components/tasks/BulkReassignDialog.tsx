@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -8,7 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Loader2, UserRoundPlus, Search, CheckCircle2, Filter, Users } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Loader2, UserRoundPlus, Search, CheckCircle2, Filter, Users, ChevronDown, X } from 'lucide-react';
 import { Task } from '@/types/task';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -26,6 +27,11 @@ interface TeamMember {
   avatar_url?: string;
   job_title?: string;
   department?: string;
+}
+
+interface ServiceGroup {
+  id: string;
+  name: string;
 }
 
 const statusLabels: Record<string, string> = {
@@ -61,23 +67,49 @@ export function BulkReassignDialog({ open, onOpenChange, tasks, onComplete }: Bu
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterCurrentAssignee, setFilterCurrentAssignee] = useState<string>('all');
+  const [filterServiceGroup, setFilterServiceGroup] = useState<string>('all');
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
+  const [serviceGroups, setServiceGroups] = useState<ServiceGroup[]>([]);
+  const [processServiceGroupMap, setProcessServiceGroupMap] = useState<Map<string, string>>(new Map());
+  const [taskCategoryMap, setTaskCategoryMap] = useState<Map<string, string>>(new Map());
 
-  // Fetch all active profiles
+  // Target user search
+  const [targetSearchOpen, setTargetSearchOpen] = useState(false);
+  const [targetSearchQuery, setTargetSearchQuery] = useState('');
+  const targetSearchRef = useRef<HTMLInputElement>(null);
+
+  // Fetch all active profiles + service groups
   useEffect(() => {
     if (!open) return;
-    const fetchMembers = async () => {
+    const fetchData = async () => {
       setLoadingMembers(true);
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, display_name, avatar_url, job_title, department')
-        .eq('status', 'active')
-        .order('display_name');
-      setTeamMembers(data || []);
+      
+      const [membersRes, sgRes, ptRes] = await Promise.all([
+        supabase.from('profiles').select('id, display_name, avatar_url, job_title, department').eq('status', 'active').order('display_name'),
+        (supabase as any).from('service_groups').select('id, name').order('name'),
+        (supabase as any).from('process_templates').select('id, service_group_id, category_id'),
+      ]);
+      
+      setTeamMembers(membersRes.data || []);
+      setServiceGroups(sgRes.data || []);
+      
+      // Build process_template -> service_group_id map
+      const ptSgMap = new Map<string, string>();
+      const ptCatMap = new Map<string, string>();
+      (ptRes.data || []).forEach((pt: any) => {
+        if (pt.service_group_id) ptSgMap.set(pt.id, pt.service_group_id);
+        if (pt.category_id) ptCatMap.set(pt.id, pt.category_id);
+      });
+      setProcessServiceGroupMap(ptSgMap);
+      
+      // Build task category_id -> service_group via process template
+      // We need to map tasks to service groups through their process_template_id
+      setTaskCategoryMap(ptCatMap);
+      
       setLoadingMembers(false);
     };
-    fetchMembers();
+    fetchData();
   }, [open]);
 
   // Build a map of assignee names for display
@@ -97,10 +129,21 @@ export function BulkReassignDialog({ open, onOpenChange, tasks, onComplete }: Bu
     })).sort((a, b) => a.name.localeCompare(b.name));
   }, [tasks, assigneeMap]);
 
+  // Build task -> service_group_id mapping via process_template_id
+  const taskServiceGroupMap = useMemo(() => {
+    const map = new Map<string, string>();
+    tasks.forEach(t => {
+      const ptId = (t as any).process_template_id;
+      if (ptId && processServiceGroupMap.has(ptId)) {
+        map.set(t.id, processServiceGroupMap.get(ptId)!);
+      }
+    });
+    return map;
+  }, [tasks, processServiceGroupMap]);
+
   // Filter tasks
   const filteredTasks = useMemo(() => {
     return tasks.filter(task => {
-      // Exclude done/validated/cancelled
       if (['done', 'validated', 'cancelled'].includes(task.status)) return false;
 
       if (searchQuery) {
@@ -116,14 +159,20 @@ export function BulkReassignDialog({ open, onOpenChange, tasks, onComplete }: Bu
       if (filterCurrentAssignee === 'unassigned' && task.assignee_id) return false;
       if (filterCurrentAssignee !== 'all' && filterCurrentAssignee !== 'unassigned' && task.assignee_id !== filterCurrentAssignee) return false;
 
+      // Service group filter
+      if (filterServiceGroup !== 'all') {
+        const taskSg = taskServiceGroupMap.get(task.id);
+        if (taskSg !== filterServiceGroup) return false;
+      }
+
       return true;
     });
-  }, [tasks, searchQuery, filterStatus, filterCurrentAssignee]);
+  }, [tasks, searchQuery, filterStatus, filterCurrentAssignee, filterServiceGroup, taskServiceGroupMap]);
 
   // Reset selection when filters change
   useEffect(() => {
     setSelectedTaskIds(new Set());
-  }, [searchQuery, filterStatus, filterCurrentAssignee]);
+  }, [searchQuery, filterStatus, filterCurrentAssignee, filterServiceGroup]);
 
   const toggleTask = (taskId: string) => {
     setSelectedTaskIds(prev => {
@@ -149,6 +198,17 @@ export function BulkReassignDialog({ open, onOpenChange, tasks, onComplete }: Bu
 
   const selectedMember = teamMembers.find(m => m.id === targetUserId);
 
+  // Filtered team members for target search
+  const filteredMembers = useMemo(() => {
+    if (!targetSearchQuery) return teamMembers;
+    const q = targetSearchQuery.toLowerCase();
+    return teamMembers.filter(m => 
+      m.display_name?.toLowerCase().includes(q) ||
+      m.department?.toLowerCase().includes(q) ||
+      m.job_title?.toLowerCase().includes(q)
+    );
+  }, [teamMembers, targetSearchQuery]);
+
   const handleApply = async () => {
     if (selectedTaskIds.size === 0 || !targetUserId) return;
 
@@ -156,7 +216,6 @@ export function BulkReassignDialog({ open, onOpenChange, tasks, onComplete }: Bu
     try {
       const ids = Array.from(selectedTaskIds);
 
-      // Update in batches of 50
       for (let i = 0; i < ids.length; i += 50) {
         const batch = ids.slice(i, i + 50);
         const { error } = await supabase
@@ -166,7 +225,6 @@ export function BulkReassignDialog({ open, onOpenChange, tasks, onComplete }: Bu
 
         if (error) throw error;
 
-        // Also move to_assign → todo
         await supabase
           .from('tasks')
           .update({ assignee_id: targetUserId, status: 'todo' })
@@ -192,6 +250,8 @@ export function BulkReassignDialog({ open, onOpenChange, tasks, onComplete }: Bu
     setSearchQuery('');
     setFilterStatus('all');
     setFilterCurrentAssignee('all');
+    setFilterServiceGroup('all');
+    setTargetSearchQuery('');
   };
 
   return (
@@ -207,9 +267,9 @@ export function BulkReassignDialog({ open, onOpenChange, tasks, onComplete }: Bu
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 min-h-0 space-y-4">
-          {/* Target user selection */}
-          <div className="p-3 rounded-lg border bg-muted/30 space-y-2">
+        <div className="flex-1 min-h-0 flex flex-col space-y-4 overflow-hidden">
+          {/* Target user selection with search */}
+          <div className="p-3 rounded-lg border bg-muted/30 space-y-2 shrink-0">
             <Label className="text-xs font-medium">Nouveau responsable</Label>
             {loadingMembers ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -217,10 +277,14 @@ export function BulkReassignDialog({ open, onOpenChange, tasks, onComplete }: Bu
                 Chargement...
               </div>
             ) : (
-              <Select value={targetUserId} onValueChange={setTargetUserId}>
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="Sélectionner un collaborateur...">
-                    {selectedMember && (
+              <Popover open={targetSearchOpen} onOpenChange={setTargetSearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between h-9 font-normal"
+                  >
+                    {selectedMember ? (
                       <div className="flex items-center gap-2">
                         <Avatar className="h-5 w-5">
                           <AvatarImage src={selectedMember.avatar_url} />
@@ -231,30 +295,73 @@ export function BulkReassignDialog({ open, onOpenChange, tasks, onComplete }: Bu
                           <span className="text-muted-foreground text-xs">— {selectedMember.department}</span>
                         )}
                       </div>
+                    ) : (
+                      <span className="text-muted-foreground">Sélectionner un collaborateur...</span>
                     )}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {teamMembers.map(m => (
-                    <SelectItem key={m.id} value={m.id}>
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-5 w-5">
-                          <AvatarImage src={m.avatar_url} />
-                          <AvatarFallback className="text-[8px]">{getInitials(m.display_name)}</AvatarFallback>
-                        </Avatar>
-                        <span>{m.display_name}</span>
-                        {m.department && <span className="text-muted-foreground text-xs">— {m.department}</span>}
+                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-50 bg-popover" align="start">
+                  <div className="p-2 border-b">
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        ref={targetSearchRef}
+                        placeholder="Rechercher un collaborateur..."
+                        value={targetSearchQuery}
+                        onChange={(e) => setTargetSearchQuery(e.target.value)}
+                        className="pl-9 h-9"
+                        autoFocus
+                      />
+                      {targetSearchQuery && (
+                        <button
+                          onClick={() => setTargetSearchQuery('')}
+                          className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <ScrollArea className="max-h-[250px]">
+                    {filteredMembers.length === 0 ? (
+                      <div className="p-4 text-sm text-muted-foreground text-center">
+                        Aucun résultat
                       </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    ) : (
+                      filteredMembers.map(m => (
+                        <button
+                          key={m.id}
+                          onClick={() => {
+                            setTargetUserId(m.id);
+                            setTargetSearchOpen(false);
+                            setTargetSearchQuery('');
+                          }}
+                          className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-accent transition-colors text-sm ${
+                            targetUserId === m.id ? 'bg-primary/10' : ''
+                          }`}
+                        >
+                          <Avatar className="h-6 w-6 shrink-0">
+                            <AvatarImage src={m.avatar_url} />
+                            <AvatarFallback className="text-[8px]">{getInitials(m.display_name)}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <span className="font-medium">{m.display_name}</span>
+                            {m.department && <span className="text-muted-foreground text-xs ml-2">— {m.department}</span>}
+                          </div>
+                          {targetUserId === m.id && <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />}
+                        </button>
+                      ))
+                    )}
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
             )}
           </div>
 
           {/* Filters */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="relative flex-1 min-w-[200px]">
+          <div className="flex items-center gap-2 flex-wrap shrink-0">
+            <div className="relative flex-1 min-w-[180px]">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Rechercher..."
@@ -264,11 +371,11 @@ export function BulkReassignDialog({ open, onOpenChange, tasks, onComplete }: Bu
               />
             </div>
             <Select value={filterCurrentAssignee} onValueChange={setFilterCurrentAssignee}>
-              <SelectTrigger className="w-[200px] h-9">
+              <SelectTrigger className="w-[180px] h-9">
                 <Filter className="h-3.5 w-3.5 mr-1.5" />
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="z-50 bg-popover">
                 <SelectItem value="all">Tous les assignés</SelectItem>
                 <SelectItem value="unassigned">Non assignées</SelectItem>
                 {currentAssignees.map(a => (
@@ -277,20 +384,31 @@ export function BulkReassignDialog({ open, onOpenChange, tasks, onComplete }: Bu
               </SelectContent>
             </Select>
             <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-[160px] h-9">
+              <SelectTrigger className="w-[150px] h-9">
                 <SelectValue placeholder="Statut" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="z-50 bg-popover">
                 <SelectItem value="all">Tous les statuts</SelectItem>
                 {Object.entries(statusLabels).map(([s, label]) => (
                   <SelectItem key={s} value={s}>{label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            <Select value={filterServiceGroup} onValueChange={setFilterServiceGroup}>
+              <SelectTrigger className="w-[180px] h-9">
+                <SelectValue placeholder="Groupe de services" />
+              </SelectTrigger>
+              <SelectContent className="z-50 bg-popover">
+                <SelectItem value="all">Tous les groupes</SelectItem>
+                {serviceGroups.map(sg => (
+                  <SelectItem key={sg.id} value={sg.id}>{sg.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Selection summary */}
-          <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center justify-between text-sm shrink-0">
             <div className="flex items-center gap-2">
               <Checkbox
                 checked={filteredTasks.length > 0 && selectedTaskIds.size === filteredTasks.length}
@@ -310,8 +428,8 @@ export function BulkReassignDialog({ open, onOpenChange, tasks, onComplete }: Bu
             )}
           </div>
 
-          {/* Task list */}
-          <ScrollArea className="flex-1 border rounded-lg max-h-[340px]">
+          {/* Task list - scrollable */}
+          <ScrollArea className="flex-1 border rounded-lg min-h-0">
             <div className="divide-y">
               {filteredTasks.length === 0 ? (
                 <div className="p-8 text-center text-muted-foreground text-sm">
@@ -361,7 +479,7 @@ export function BulkReassignDialog({ open, onOpenChange, tasks, onComplete }: Bu
           </ScrollArea>
         </div>
 
-        <DialogFooter className="flex items-center justify-between gap-2 pt-2 border-t">
+        <DialogFooter className="flex items-center justify-between gap-2 pt-2 border-t shrink-0">
           <Button variant="ghost" size="sm" onClick={handleReset}>
             Réinitialiser
           </Button>
