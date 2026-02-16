@@ -29,13 +29,12 @@ import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Workflow, ChevronDown, ChevronUp, Eye, Zap, Tags, Users } from 'lucide-react';
+import { Loader2, Workflow, ChevronDown, ChevronUp, Eye, Zap, Settings2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useCategories } from '@/hooks/useCategories';
 import { Task, TaskStats } from '@/types/task';
-import { BulkCategoryAssignDialog } from '@/components/tasks/BulkCategoryAssignDialog';
-import { BulkReassignDialog } from '@/components/tasks/BulkReassignDialog';
+import { BulkActionDialog } from '@/components/tasks/BulkActionDialog';
 
 const Index = () => {
   const { profile } = useAuth();
@@ -45,8 +44,7 @@ const Index = () => {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [showFullStats, setShowFullStats] = useState(false);
   const [dashboardMode, setDashboardMode] = useState<'tasks' | 'analytics' | 'tracking' | 'planner'>('tasks');
-  const [isBulkCategoryOpen, setIsBulkCategoryOpen] = useState(false);
-  const [isBulkReassignOpen, setIsBulkReassignOpen] = useState(false);
+  const [isBulkActionOpen, setIsBulkActionOpen] = useState(false);
   const [kanbanGroupMode, setKanbanGroupMode] = useState<KanbanGroupMode>('status');
   const [crossFilters, setCrossFilters] = useState<CrossFilters>(DEFAULT_CROSS_FILTERS);
   
@@ -440,23 +438,13 @@ const Index = () => {
 
           {/* Action buttons */}
           <div className="flex justify-end gap-2 mb-4">
-            {canAssignToTeam && (
-              <Button 
-                variant="outline" 
-                onClick={() => setIsBulkReassignOpen(true)}
-                className="gap-2 border-keon-300 text-keon-700 hover:bg-keon-100"
-              >
-                <Users className="h-4 w-4" />
-                Réaffecter en masse
-              </Button>
-            )}
             <Button 
               variant="outline" 
-              onClick={() => setIsBulkCategoryOpen(true)}
+              onClick={() => setIsBulkActionOpen(true)}
               className="gap-2 border-keon-300 text-keon-700 hover:bg-keon-100"
             >
-              <Tags className="h-4 w-4" />
-              Catégoriser en masse
+              <Settings2 className="h-4 w-4" />
+              Actions en masse
             </Button>
             <Button 
               variant="outline" 
@@ -552,18 +540,12 @@ const Index = () => {
         />
       )}
 
-      <BulkCategoryAssignDialog
-        open={isBulkCategoryOpen}
-        onOpenChange={setIsBulkCategoryOpen}
+      <BulkActionDialog
+        open={isBulkActionOpen}
+        onOpenChange={setIsBulkActionOpen}
         tasks={allTasks}
         onComplete={refetch}
-      />
-
-      <BulkReassignDialog
-        open={isBulkReassignOpen}
-        onOpenChange={setIsBulkReassignOpen}
-        tasks={allTasks}
-        onComplete={refetch}
+        canReassign={canAssignToTeam}
       />
     </div>
   );
