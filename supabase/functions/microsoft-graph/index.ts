@@ -287,6 +287,62 @@ async function getPlannerTasks(accessToken: string, planId: string): Promise<any
   return allTasks;
 }
 
+// Resolve Microsoft Graph user IDs to display name and email
+async function resolveGraphUsers(accessToken: string, userIds: string[]): Promise<Map<string, { displayName: string; email: string }>> {
+  const results = new Map<string, { displayName: string; email: string }>();
+  const uniqueIds = [...new Set(userIds)];
+  
+  for (const uid of uniqueIds) {
+    try {
+      const resp = await fetch(`${MICROSOFT_GRAPH_URL}/users/${uid}?$select=displayName,mail,userPrincipalName`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (resp.ok) {
+        const user = await resp.json();
+        results.set(uid, {
+          displayName: user.displayName || '',
+          email: (user.mail || user.userPrincipalName || '').toLowerCase(),
+        });
+      }
+    } catch (e) {
+      console.error(`Failed to resolve user ${uid}:`, e);
+    }
+  }
+  
+  return results;
+}
+
+// Match a Microsoft user email to a local profile
+async function matchEmailToProfile(supabase: any, email: string): Promise<string | null> {
+  if (!email) return null;
+  
+  // Try matching via microsoft connection email first
+  const { data: msConn } = await supabase
+    .from('user_microsoft_connections')
+    .select('profile_id')
+    .ilike('email', email)
+    .single();
+  
+  if (msConn?.profile_id) return msConn.profile_id;
+
+  // Fallback: match via auth user email -> profile
+  const { data: authUsers } = await supabase.auth.admin.listUsers();
+  const matchedUser = (authUsers?.users || []).find(
+    (u: any) => u.email?.toLowerCase() === email.toLowerCase()
+  );
+  
+  if (matchedUser) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('user_id', matchedUser.id)
+      .single();
+    return profile?.id || null;
+  }
+  
+  return null;
+}
+
 // Get task details (description, checklist)
 async function getPlannerTaskDetails(accessToken: string, taskId: string): Promise<any> {
   const resp = await fetch(`${MICROSOFT_GRAPH_URL}/planner/tasks/${taskId}/details`, {
@@ -663,6 +719,53 @@ Deno.serve(async (req) => {
         .eq('user_id', userId)
         .single();
 
+      // Resolve Planner assignees if enabled
+      const resolveAssignees = mapping.resolve_assignees !== false;
+      const graphUserCache = new Map<string, { displayName: string; email: string }>();
+      const profileCache = new Map<string, string | null>(); // email -> profile_id
+
+      if (resolveAssignees) {
+        // Collect all unique assignee IDs from planner tasks
+        const allAssigneeIds: string[] = [];
+        for (const pt of plannerTasks) {
+          if (pt.assignments) {
+            allAssigneeIds.push(...Object.keys(pt.assignments));
+          }
+        }
+        
+        if (allAssigneeIds.length > 0) {
+          const resolved = await resolveGraphUsers(accessToken, allAssigneeIds);
+          resolved.forEach((v, k) => graphUserCache.set(k, v));
+        }
+      }
+
+      // Helper to get local profile_id from a Planner assignee
+      async function resolveAssigneeToProfile(plannerTask: any): Promise<{ profileId: string | null; email: string; displayName: string }> {
+        if (!resolveAssignees || !plannerTask.assignments) {
+          return { profileId: null, email: '', displayName: '' };
+        }
+        
+        const assigneeIds = Object.keys(plannerTask.assignments);
+        if (assigneeIds.length === 0) return { profileId: null, email: '', displayName: '' };
+        
+        // Take the first assignee
+        const graphUserId = assigneeIds[0];
+        const graphUser = graphUserCache.get(graphUserId);
+        if (!graphUser) return { profileId: null, email: '', displayName: '' };
+        
+        // Check cache
+        if (!profileCache.has(graphUser.email)) {
+          const pid = await matchEmailToProfile(supabase, graphUser.email);
+          profileCache.set(graphUser.email, pid);
+        }
+        
+        return {
+          profileId: profileCache.get(graphUser.email) || null,
+          email: graphUser.email,
+          displayName: graphUser.displayName,
+        };
+      }
+
       // PULL: Import new planner tasks
       if (mapping.sync_direction === 'from_planner' || mapping.sync_direction === 'both') {
         for (const pt of plannerTasks) {
@@ -682,6 +785,10 @@ Deno.serve(async (req) => {
             // Resolve Planner labels
             const plannerLabels = resolveLabels(pt.appliedCategories || null, categoryDescriptions);
 
+            // Resolve assignee from Planner
+            const assigneeInfo = await resolveAssigneeToProfile(pt);
+            const assigneeId = assigneeInfo.profileId || userProfile?.id;
+
             const { data: newTask, error: insertErr } = await supabase
               .from('tasks')
               .insert({
@@ -692,7 +799,8 @@ Deno.serve(async (req) => {
                 due_date: pt.dueDateTime ? pt.dueDateTime.substring(0, 10) : null,
                 type: 'task',
                 user_id: userId,
-                assignee_id: userProfile?.id,
+                assignee_id: assigneeId,
+                requester_id: mapping.default_requester_id || null,
                 category_id: mapping.mapped_category_id,
                 subcategory_id: subcategoryId || null,
                 source_process_template_id: mapping.mapped_process_template_id,
@@ -709,6 +817,8 @@ Deno.serve(async (req) => {
               local_task_id: newTask.id,
               planner_etag: pt['@odata.etag'],
               sync_status: 'synced',
+              planner_assignee_email: assigneeInfo.email || null,
+              planner_assignee_name: assigneeInfo.displayName || null,
             });
 
             tasksPulled++;

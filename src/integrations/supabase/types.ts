@@ -1620,6 +1620,7 @@ export type Database = {
       planner_plan_mappings: {
         Row: {
           created_at: string
+          default_requester_id: string | null
           id: string
           import_states: string[] | null
           last_sync_at: string | null
@@ -1629,6 +1630,7 @@ export type Database = {
           planner_group_name: string | null
           planner_plan_id: string
           planner_plan_title: string
+          resolve_assignees: boolean
           sync_direction: string
           sync_enabled: boolean
           updated_at: string
@@ -1636,6 +1638,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          default_requester_id?: string | null
           id?: string
           import_states?: string[] | null
           last_sync_at?: string | null
@@ -1645,6 +1648,7 @@ export type Database = {
           planner_group_name?: string | null
           planner_plan_id: string
           planner_plan_title: string
+          resolve_assignees?: boolean
           sync_direction?: string
           sync_enabled?: boolean
           updated_at?: string
@@ -1652,6 +1656,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          default_requester_id?: string | null
           id?: string
           import_states?: string[] | null
           last_sync_at?: string | null
@@ -1661,12 +1666,20 @@ export type Database = {
           planner_group_name?: string | null
           planner_plan_id?: string
           planner_plan_title?: string
+          resolve_assignees?: boolean
           sync_direction?: string
           sync_enabled?: boolean
           updated_at?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "planner_plan_mappings_default_requester_id_fkey"
+            columns: ["default_requester_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "planner_plan_mappings_mapped_category_id_fkey"
             columns: ["mapped_category_id"]
@@ -1737,6 +1750,8 @@ export type Database = {
           last_synced_at: string
           local_task_id: string
           plan_mapping_id: string
+          planner_assignee_email: string | null
+          planner_assignee_name: string | null
           planner_etag: string | null
           planner_task_id: string
           sync_status: string
@@ -1748,6 +1763,8 @@ export type Database = {
           last_synced_at?: string
           local_task_id: string
           plan_mapping_id: string
+          planner_assignee_email?: string | null
+          planner_assignee_name?: string | null
           planner_etag?: string | null
           planner_task_id: string
           sync_status?: string
@@ -1759,6 +1776,8 @@ export type Database = {
           last_synced_at?: string
           local_task_id?: string
           plan_mapping_id?: string
+          planner_assignee_email?: string | null
+          planner_assignee_name?: string | null
           planner_etag?: string | null
           planner_task_id?: string
           sync_status?: string
