@@ -17,7 +17,6 @@ export function useMaterialValidation() {
         body: {
           request_id: requestId,
           action: 'validate',
-          validator_id: profile.id,
         },
       });
 
@@ -42,7 +41,6 @@ export function useMaterialValidation() {
         body: {
           request_id: requestId,
           action: 'refuse',
-          validator_id: profile.id,
         },
       });
 
