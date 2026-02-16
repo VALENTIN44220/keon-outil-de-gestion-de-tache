@@ -20,73 +20,43 @@ interface SidebarProps {
   onViewChange: (view: string) => void;
 }
 
-const allMenuItems = [{
-  id: 'dashboard',
-  label: 'Tableau de bord',
-  icon: LayoutDashboard,
-  path: '/',
-  permissionKey: 'can_access_dashboard' as ScreenPermissionKey
-}, {
-  id: 'requests',
-  label: 'Demandes',
-  icon: FileText,
-  path: '/requests',
-  permissionKey: 'can_access_requests' as ScreenPermissionKey
-}, {
-  id: 'chat',
-  label: 'Messages',
-  icon: MessageCircle,
-  path: '/chat',
-  permissionKey: 'can_access_dashboard' as ScreenPermissionKey // Chat accessible to all authenticated users
-}, {
-  id: 'templates',
-  label: 'Modèles',
-  icon: Workflow,
-  path: '/templates',
-  permissionKey: 'can_access_templates' as ScreenPermissionKey
-}, {
-  id: 'workload',
-  label: 'Plan de charge',
-  icon: CalendarClock,
-  path: '/workload',
-  permissionKey: 'can_access_workload' as ScreenPermissionKey
-}, {
-  id: 'calendar',
-  label: 'Calendrier',
-  icon: Calendar,
-  path: '/calendar',
-  permissionKey: 'can_access_calendar' as ScreenPermissionKey
-}, {
-  id: 'projects',
-  label: 'Projets',
-  icon: FolderOpen,
-  path: '/projects',
-  permissionKey: 'can_access_projects' as ScreenPermissionKey
-}, {
-  id: 'team',
-  label: 'Équipe',
-  icon: Users,
-  path: '/',
-  permissionKey: 'can_access_team' as ScreenPermissionKey
-}, {
-  id: 'suppliers',
-  label: 'Fournisseurs',
-  icon: Building2,
-  path: '/suppliers',
-  permissionKey: 'can_access_suppliers' as ScreenPermissionKey
-}, {
-  id: 'process-tracking',
-  label: 'Suivi des processus',
-  icon: ClipboardList,
-  path: '/process-tracking',
-  permissionKey: 'can_access_process_tracking' as ScreenPermissionKey
-}];
+const menuGroups = [
+  // Group 1
+  [
+    { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard, path: '/', permissionKey: 'can_access_dashboard' as ScreenPermissionKey },
+    { id: 'requests', label: 'Demandes', icon: FileText, path: '/requests', permissionKey: 'can_access_requests' as ScreenPermissionKey },
+  ],
+  // Group 2
+  [
+    { id: 'process-tracking', label: 'Suivi des processus', icon: ClipboardList, path: '/process-tracking', permissionKey: 'can_access_process_tracking' as ScreenPermissionKey },
+    { id: 'workload', label: 'Plan de charge', icon: CalendarClock, path: '/workload', permissionKey: 'can_access_workload' as ScreenPermissionKey },
+    { id: 'team', label: 'Équipe', icon: Users, path: '/', permissionKey: 'can_access_team' as ScreenPermissionKey },
+  ],
+  // Group 3
+  [
+    { id: 'projects', label: 'Projets', icon: FolderOpen, path: '/projects', permissionKey: 'can_access_projects' as ScreenPermissionKey },
+    { id: 'suppliers', label: 'Fournisseurs', icon: Building2, path: '/suppliers', permissionKey: 'can_access_suppliers' as ScreenPermissionKey },
+    { id: 'templates', label: 'Modèles', icon: Workflow, path: '/templates', permissionKey: 'can_access_templates' as ScreenPermissionKey },
+  ],
+  // Group 4
+  [
+    { id: 'calendar', label: 'Calendrier', icon: Calendar, path: '/calendar', permissionKey: 'can_access_calendar' as ScreenPermissionKey },
+  ],
+];
 
 const adminMenuItem = {
   id: 'admin',
   label: 'Administration',
   icon: ShieldCheck,
   path: '/admin'
+};
+
+const chatMenuItem = {
+  id: 'chat',
+  label: 'Messages',
+  icon: MessageCircle,
+  path: '/chat',
+  permissionKey: 'can_access_dashboard' as ScreenPermissionKey
 };
 
 // Color assignments for menu items - using new premium palette
@@ -181,12 +151,22 @@ export function Sidebar({
   
   const profile = isSimulating && simulatedProfile ? simulatedProfile : authProfile;
 
-  const menuItems = useMemo(() => {
-    const filtered = allMenuItems.filter(item => canAccessScreen(item.permissionKey));
+  const filteredGroups = useMemo(() => {
+    const groups = menuGroups
+      .map(group => group.filter(item => canAccessScreen(item.permissionKey)))
+      .filter(group => group.length > 0);
+    
+    // Add admin group
     if (isAdmin) {
-      return [...filtered, adminMenuItem];
+      groups.push([adminMenuItem as any]);
     }
-    return filtered;
+    
+    // Add chat group (always last)
+    if (canAccessScreen('can_access_dashboard')) {
+      groups.push([chatMenuItem as any]);
+    }
+    
+    return groups;
   }, [effectivePermissions, isAdmin, canAccessScreen]);
 
   const collapsed = isMobile || manualCollapsed;
@@ -309,66 +289,64 @@ export function Sidebar({
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 space-y-1 overflow-y-auto">
-        {menuItems.map((item, index) => {
-          const Icon = item.icon;
-          const isActive = activeView === item.id;
-          const colors = menuColors[item.id] || menuColors.dashboard;
-          
-          // Add separator before admin
-          const showSeparator = item.id === 'admin' && index > 0;
-          
-          return (
-            <React.Fragment key={item.id}>
-              {showSeparator && (
-                <div className="py-2">
-                  <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
-                </div>
-              )}
-              <button 
-                onClick={() => handleMenuClick(item.id, item.path)} 
-                className={cn(
-                  "w-full flex items-center gap-3 transition-all duration-200 font-body group relative",
-                  collapsed ? "justify-center p-2" : "px-3 py-2.5 rounded-xl",
-                  isActive && !collapsed && [colors.bg, "border-l-4", colors.border],
-                  !isActive && !collapsed && "hover:bg-muted border-l-4 border-transparent",
-                )}
-                title={collapsed ? item.label : undefined}
-              >
-                {/* Icon container */}
-                <div className={cn(
-                  "flex items-center justify-center rounded-xl transition-all duration-200 relative",
-                  collapsed ? "p-3" : "p-2",
-                  isActive 
-                    ? [colors.iconBg, "text-white shadow-md"]
-                    : "bg-muted text-muted-foreground group-hover:bg-muted group-hover:text-foreground",
-                )}>
-                  <Icon className={cn("relative z-10", collapsed ? "w-5 h-5" : "w-4 h-4")} />
-                  {/* Glow effect on active */}
-                  {isActive && (
-                    <div className={cn("absolute inset-0 rounded-xl blur-sm opacity-50", colors.iconBg)} />
-                  )}
-                </div>
+      <nav className="flex-1 px-3 overflow-y-auto">
+        {filteredGroups.map((group, groupIndex) => (
+          <div key={groupIndex}>
+            {groupIndex > 0 && (
+              <div className="py-2">
+                <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+              </div>
+            )}
+            <div className="space-y-1">
+              {group.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeView === item.id;
+                const colors = menuColors[item.id] || menuColors.dashboard;
                 
-                {!collapsed && (
-                  <>
-                    <span className={cn(
-                      "font-medium text-sm transition-colors flex-1 text-left",
-                      isActive ? [colors.text, "font-semibold"] : "text-muted-foreground group-hover:text-foreground"
-                    )}>
-                      {item.label}
-                    </span>
-
-                    {/* Active indicator dot */}
-                    {isActive && (
-                      <div className={cn("w-2 h-2 rounded-full", colors.iconBg)} />
+                return (
+                  <button 
+                    key={item.id}
+                    onClick={() => handleMenuClick(item.id, item.path)} 
+                    className={cn(
+                      "w-full flex items-center gap-3 transition-all duration-200 font-body group relative",
+                      collapsed ? "justify-center p-2" : "px-3 py-2.5 rounded-xl",
+                      isActive && !collapsed && [colors.bg, "border-l-4", colors.border],
+                      !isActive && !collapsed && "hover:bg-muted border-l-4 border-transparent",
                     )}
-                  </>
-                )}
-              </button>
-            </React.Fragment>
-          );
-        })}
+                    title={collapsed ? item.label : undefined}
+                  >
+                    <div className={cn(
+                      "flex items-center justify-center rounded-xl transition-all duration-200 relative",
+                      collapsed ? "p-3" : "p-2",
+                      isActive 
+                        ? [colors.iconBg, "text-white shadow-md"]
+                        : "bg-muted text-muted-foreground group-hover:bg-muted group-hover:text-foreground",
+                    )}>
+                      <Icon className={cn("relative z-10", collapsed ? "w-5 h-5" : "w-4 h-4")} />
+                      {isActive && (
+                        <div className={cn("absolute inset-0 rounded-xl blur-sm opacity-50", colors.iconBg)} />
+                      )}
+                    </div>
+                    
+                    {!collapsed && (
+                      <>
+                        <span className={cn(
+                          "font-medium text-sm transition-colors flex-1 text-left",
+                          isActive ? [colors.text, "font-semibold"] : "text-muted-foreground group-hover:text-foreground"
+                        )}>
+                          {item.label}
+                        </span>
+                        {isActive && (
+                          <div className={cn("w-2 h-2 rounded-full", colors.iconBg)} />
+                        )}
+                      </>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
 
       {/* Separator */}
