@@ -94,8 +94,15 @@ function MultiSelectDropdown({
   colorKey?: string;
   colorDotKey?: string;
 }) {
+  const [searchQuery, setSearchQuery] = useState('');
   const allSelected = items.length > 0 && selectedIds.length === items.length;
   const noneSelected = selectedIds.length === 0;
+
+  const filteredItems = useMemo(() => {
+    if (!searchQuery.trim()) return items;
+    const q = searchQuery.toLowerCase();
+    return items.filter(item => (item[labelKey] || '').toLowerCase().includes(q));
+  }, [items, searchQuery, labelKey]);
 
   const handleToggleAll = (checked: boolean) => {
     if (checked) {
@@ -129,6 +136,17 @@ function MultiSelectDropdown({
         </PopoverTrigger>
         <PopoverContent className="w-64 p-2" align="start">
           <div className="space-y-2">
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Rechercher..."
+                className="h-8 pl-8 text-sm"
+                autoFocus
+              />
+            </div>
             {/* Select All / None */}
             <div className="flex items-center gap-2 pb-2 border-b">
               <Checkbox
@@ -142,7 +160,7 @@ function MultiSelectDropdown({
             </div>
             <ScrollArea className="h-48">
               <div className="space-y-2">
-                {items.map(item => (
+                {filteredItems.map(item => (
                   <div key={item[idKey]} className="flex items-center gap-2">
                     <Checkbox
                       id={`${label}-${item[idKey]}`}
@@ -157,6 +175,9 @@ function MultiSelectDropdown({
                     </Label>
                   </div>
                 ))}
+                {filteredItems.length === 0 && (
+                  <p className="text-xs text-muted-foreground text-center py-2">Aucun résultat</p>
+                )}
               </div>
             </ScrollArea>
           </div>
