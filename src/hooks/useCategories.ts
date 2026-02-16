@@ -117,6 +117,70 @@ export function useCategories() {
     }
   };
 
+  const updateCategory = async (id: string, name: string, description?: string) => {
+    try {
+      const { error } = await supabase
+        .from('categories')
+        .update({ name, description: description || null })
+        .eq('id', id);
+      if (error) throw error;
+      setCategories(prev => prev.map(c => c.id === id ? { ...c, name, description: description || null } : c));
+      toast.success('Catégorie modifiée');
+    } catch (error: any) {
+      console.error('Error updating category:', error);
+      toast.error('Erreur lors de la modification');
+    }
+  };
+
+  const deleteCategory = async (id: string) => {
+    try {
+      const { error } = await supabase.from('categories').delete().eq('id', id);
+      if (error) throw error;
+      setCategories(prev => prev.filter(c => c.id !== id));
+      toast.success('Catégorie supprimée');
+    } catch (error: any) {
+      console.error('Error deleting category:', error);
+      toast.error(error.message?.includes('foreign') ? 'Impossible de supprimer : catégorie utilisée' : 'Erreur lors de la suppression');
+    }
+  };
+
+  const updateSubcategory = async (id: string, categoryId: string, name: string, description?: string) => {
+    try {
+      const { error } = await supabase
+        .from('subcategories')
+        .update({ name, description: description || null })
+        .eq('id', id);
+      if (error) throw error;
+      setCategories(prev => prev.map(cat => {
+        if (cat.id === categoryId) {
+          return { ...cat, subcategories: cat.subcategories.map(s => s.id === id ? { ...s, name, description: description || null } : s) };
+        }
+        return cat;
+      }));
+      toast.success('Sous-catégorie modifiée');
+    } catch (error: any) {
+      console.error('Error updating subcategory:', error);
+      toast.error('Erreur lors de la modification');
+    }
+  };
+
+  const deleteSubcategory = async (id: string, categoryId: string) => {
+    try {
+      const { error } = await supabase.from('subcategories').delete().eq('id', id);
+      if (error) throw error;
+      setCategories(prev => prev.map(cat => {
+        if (cat.id === categoryId) {
+          return { ...cat, subcategories: cat.subcategories.filter(s => s.id !== id) };
+        }
+        return cat;
+      }));
+      toast.success('Sous-catégorie supprimée');
+    } catch (error: any) {
+      console.error('Error deleting subcategory:', error);
+      toast.error(error.message?.includes('foreign') ? 'Impossible de supprimer : sous-catégorie utilisée' : 'Erreur lors de la suppression');
+    }
+  };
+
   const getSubcategoriesByCategoryId = (categoryId: string): Subcategory[] => {
     const category = categories.find(c => c.id === categoryId);
     return category?.subcategories || [];
@@ -126,7 +190,11 @@ export function useCategories() {
     categories,
     isLoading,
     addCategory,
+    updateCategory,
+    deleteCategory,
     addSubcategory,
+    updateSubcategory,
+    deleteSubcategory,
     getSubcategoriesByCategoryId,
     refetch: fetchCategories,
   };
