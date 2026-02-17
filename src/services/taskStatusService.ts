@@ -246,7 +246,7 @@ export async function transitionTaskStatus(
     // Récupérer l'état actuel de la tâche
     const { data: task, error: fetchError } = await supabase
       .from('tasks')
-      .select('id, status, assignee_id, requester_id, type, parent_request_id, workflow_run_id, validator_level_1_id, validator_level_2_id, title')
+      .select('id, status, assignee_id, requester_id, type, parent_request_id, workflow_run_id, validator_level_1_id, validator_level_2_id, title, source_sub_process_template_id')
       .eq('id', taskId)
       .single();
 
@@ -255,6 +255,47 @@ export async function transitionTaskStatus(
     }
 
     const currentStatus = task.status as TaskStatus;
+
+    // Intercepter la transition in-progress → done si une validation "before_close" est configurée
+    if (newStatus === 'done' && currentStatus === 'in-progress' && task.source_sub_process_template_id) {
+      const { data: spTemplate } = await supabase
+        .from('sub_process_templates')
+        .select('validation_config')
+        .eq('id', task.source_sub_process_template_id)
+        .single();
+
+      const validationConfig = spTemplate?.validation_config as Array<{ level: number; timing: string; type: string; userId?: string }> | null;
+      if (validationConfig && validationConfig.length > 0) {
+        const beforeCloseValidations = validationConfig.filter(v => v.timing === 'before_close');
+        if (beforeCloseValidations.length > 0) {
+          // Rediriger vers pending_validation_1 au lieu de done
+          console.log('[TaskStatus] Validation before_close détectée, redirection vers pending_validation_1');
+          
+          // Déterminer le validateur N1
+          const level1Config = beforeCloseValidations.find(v => v.level === 1);
+          let validatorId = level1Config?.userId || undefined;
+          
+          // Si type=requester, le validateur est le demandeur de la tâche
+          if (level1Config?.type === 'requester') {
+            validatorId = task.requester_id || undefined;
+          }
+          // Si type=manager, le validateur est le manager de l'assigné
+          if (level1Config?.type === 'manager' && task.assignee_id) {
+            const { data: assigneeProfile } = await supabase
+              .from('profiles')
+              .select('manager_id')
+              .eq('id', task.assignee_id)
+              .single();
+            validatorId = assigneeProfile?.manager_id || undefined;
+          }
+          
+          return transitionTaskStatus(taskId, 'pending_validation_1', { 
+            ...options, 
+            validatorId: validatorId || options.validatorId 
+          });
+        }
+      }
+    }
 
     // Vérifier si la transition est valide
     if (!isValidTransition(currentStatus, newStatus)) {
