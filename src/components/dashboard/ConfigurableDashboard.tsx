@@ -333,13 +333,15 @@ export function ConfigurableDashboard({
       result = result.filter(t => t.category_id && activeFilters.categoryIds.includes(t.category_id));
     }
 
-    // Status filter
-    if (activeFilters.statuses.length > 0) {
+    // Status filter (ignore if all 10 statuses are selected = no real filter)
+    const ALL_STATUS_COUNT = 10;
+    if (activeFilters.statuses.length > 0 && activeFilters.statuses.length < ALL_STATUS_COUNT) {
       result = result.filter(t => activeFilters.statuses.includes(t.status));
     }
 
-    // Priority filter
-    if (activeFilters.priorities.length > 0) {
+    // Priority filter (ignore if all 4 priorities are selected)
+    const ALL_PRIORITY_COUNT = 4;
+    if (activeFilters.priorities.length > 0 && activeFilters.priorities.length < ALL_PRIORITY_COUNT) {
       result = result.filter(t => activeFilters.priorities.includes(t.priority));
     }
 
