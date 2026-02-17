@@ -103,11 +103,15 @@ export function useStandardSubProcessExecution() {
 
       const createdTasks: TaskCreationResult[] = [];
       const today = new Date();
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
       // Créer les tâches
       for (const template of taskTemplates) {
         const dueDate = template.default_duration_days
-          ? new Date(today.getTime() + template.default_duration_days * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+          ? (() => {
+              const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + template.default_duration_days);
+              return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            })()
           : null;
 
         const { data: newTask, error: taskError } = await supabase
@@ -118,6 +122,7 @@ export function useStandardSubProcessExecution() {
             priority: template.priority || 'medium',
             status: initialStatus,
             type: 'task',
+            start_date: todayStr,
             due_date: dueDate,
             user_id: user.id,
             assignee_id: assigneeId,

@@ -112,24 +112,32 @@ export function CreateFromTemplateDialog({ open, onClose, onTasksCreated }: Crea
         });
       });
 
-      const tasksToCreate = selectedProcess.task_templates.map((template, index) => ({
-        title: template.title,
-        description: template.description,
-        priority: template.priority,
-        status: 'todo' as const,
-        type: 'task' as const,
-        category: template.category,
-        category_id: template.category_id,
-        subcategory_id: template.subcategory_id,
-        due_date: calculateDueDate(index, selectedProcess.task_templates),
-        user_id: user.id,
-        assignee_id: null,
-        requester_id: null,
-        reporter_id: null,
-        target_department_id: null,
-        requires_validation: (template as any).requires_validation || false,
-        current_validation_level: 0,
-      }));
+      const tasksToCreate = selectedProcess.task_templates.map((template, index) => {
+        // Calculate start date based on previous tasks' durations
+        const startDays = selectedProcess.task_templates
+          .slice(0, index)
+          .reduce((sum, t) => sum + t.default_duration_days, 0);
+        
+        return {
+          title: template.title,
+          description: template.description,
+          priority: template.priority,
+          status: 'todo' as const,
+          type: 'task' as const,
+          category: template.category,
+          category_id: template.category_id,
+          subcategory_id: template.subcategory_id,
+          start_date: format(addDays(startDate, startDays), 'yyyy-MM-dd'),
+          due_date: calculateDueDate(index, selectedProcess.task_templates),
+          user_id: user.id,
+          assignee_id: null,
+          requester_id: null,
+          reporter_id: null,
+          target_department_id: null,
+          requires_validation: (template as any).requires_validation || false,
+          current_validation_level: 0,
+        };
+      });
 
       const { data: createdTasks, error } = await supabase
         .from('tasks')
