@@ -40,7 +40,8 @@ import {
   ArrowLeft,
   MessageSquare,
   ListTodo,
-  Info
+  Info,
+  FileText
 } from 'lucide-react';
 import { RequestValidationButton } from './RequestValidationButton';
 import { format } from 'date-fns';
@@ -50,6 +51,7 @@ import { toast } from 'sonner';
 import { TaskCommentsSection } from './TaskCommentsSection';
 import { useTasksProgress } from '@/hooks/useChecklists';
 import { useDueDatePermissionWithManager } from '@/hooks/useDueDatePermission';
+import { RequestInfoTab } from './RequestInfoTab';
 
 interface Profile {
   id: string;
@@ -97,7 +99,7 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
   const [selectedChildTask, setSelectedChildTask] = useState<Task | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'tasks' | 'chat'>('tasks');
+  const [activeTab, setActiveTab] = useState<'tasks' | 'chat' | 'request-info'>('tasks');
   const [editForm, setEditForm] = useState({
     title: '',
     description: '',
@@ -290,9 +292,9 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4 mt-4 flex-1 overflow-y-auto">
+          <div className="mt-4 flex-1 overflow-y-auto">
             {isEditing ? (
-              <>
+              <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="title">Titre</Label>
                   <Input
@@ -410,66 +412,101 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
                     Enregistrer
                   </Button>
                 </div>
-              </>
+              </div>
             ) : (
-              <>
-                {selectedChildTask.description && (
-                  <div>
-                    <h4 className="text-sm font-medium text-muted-foreground mb-2">Description</h4>
-                    <p className="text-sm whitespace-pre-wrap">{selectedChildTask.description}</p>
+              <Tabs defaultValue="details" className="w-full">
+                <TabsList className="w-full">
+                  <TabsTrigger value="details" className="flex-1 gap-2">
+                    <ListTodo className="h-4 w-4" />
+                    Détails
+                  </TabsTrigger>
+                  {selectedChildTask.parent_request_id && (
+                    <TabsTrigger value="request-info" className="flex-1 gap-2">
+                      <FileText className="h-4 w-4" />
+                      Détail demande
+                    </TabsTrigger>
+                  )}
+                  <TabsTrigger value="chat" className="flex-1 gap-2">
+                    <MessageSquare className="h-4 w-4" />
+                    Échanges
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="details" className="mt-4 space-y-4">
+                  {selectedChildTask.description && (
+                    <div>
+                      <h4 className="text-sm font-medium text-muted-foreground mb-2">Description</h4>
+                      <p className="text-sm whitespace-pre-wrap">{selectedChildTask.description}</p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    {selectedChildTask.due_date && (
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <span>Échéance: {format(new Date(selectedChildTask.due_date), 'dd MMMM yyyy', { locale: fr })}</span>
+                      </div>
+                    )}
+                    {selectedChildTask.assignee_id && (
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        <span>Assigné à: {profiles.get(selectedChildTask.assignee_id) || 'N/A'}</span>
+                      </div>
+                    )}
+                    {!selectedChildTask.assignee_id && (
+                      <div className="flex items-center gap-2 text-warning">
+                        <User className="h-4 w-4" />
+                        <span>Non assigné</span>
+                      </div>
+                    )}
                   </div>
+
+                  {/* Chat section for child task */}
+                  <Separator />
+                  <TaskCommentsSection taskId={selectedChildTask.id} className="min-h-[200px]" />
+                </TabsContent>
+
+                {selectedChildTask.parent_request_id && (
+                  <TabsContent value="request-info" className="mt-4">
+                    <RequestInfoTab
+                      task={selectedChildTask}
+                      profiles={profiles}
+                      departments={departments}
+                    />
+                  </TabsContent>
                 )}
 
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  {selectedChildTask.due_date && (
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span>Échéance: {format(new Date(selectedChildTask.due_date), 'dd MMMM yyyy', { locale: fr })}</span>
-                    </div>
-                  )}
-                  {selectedChildTask.assignee_id && (
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-muted-foreground" />
-                      <span>Assigné à: {profiles.get(selectedChildTask.assignee_id) || 'N/A'}</span>
-                    </div>
-                  )}
-                  {!selectedChildTask.assignee_id && (
-                    <div className="flex items-center gap-2 text-warning">
-                      <User className="h-4 w-4" />
-                      <span>Non assigné</span>
-                    </div>
-                  )}
-                </div>
+                <TabsContent value="chat" className="mt-4">
+                  <TaskCommentsSection taskId={selectedChildTask.id} className="min-h-[300px]" />
+                </TabsContent>
+              </Tabs>
+            )}
 
-                {/* Chat section for child task */}
-                <Separator />
-                <TaskCommentsSection taskId={selectedChildTask.id} className="min-h-[200px]" />
-
-                <div className="flex justify-between items-center gap-2 pt-4 border-t">
-                  <RequestValidationButton 
-                    taskId={selectedChildTask.id} 
-                    taskStatus={selectedChildTask.status}
-                    onValidationTriggered={() => {
-                      // Update local state
-                      setChildTasks(prev => prev.map(t => 
-                        t.id === selectedChildTask.id 
-                          ? { ...t, status: 'pending-validation' as TaskStatus }
-                          : t
-                      ));
-                      setSelectedChildTask(prev => prev ? { ...prev, status: 'pending-validation' as TaskStatus } : null);
-                    }}
-                  />
-                  <div className="flex gap-2">
-                    <Button variant="outline" onClick={handleCloseChildTask}>
-                      Retour à la demande
-                    </Button>
-                    <Button onClick={() => { onStatusChange(selectedChildTask.id, 'done'); handleCloseChildTask(); }}>
-                      <CheckCircle2 className="h-4 w-4 mr-2" />
-                      Marquer terminé
-                    </Button>
-                  </div>
+            {/* Actions footer */}
+            {!isEditing && (
+              <div className="flex justify-between items-center gap-2 pt-4 border-t mt-4">
+                <RequestValidationButton 
+                  taskId={selectedChildTask.id} 
+                  taskStatus={selectedChildTask.status}
+                  onValidationTriggered={() => {
+                    setChildTasks(prev => prev.map(t => 
+                      t.id === selectedChildTask.id 
+                        ? { ...t, status: 'pending-validation' as TaskStatus }
+                        : t
+                    ));
+                    setSelectedChildTask(prev => prev ? { ...prev, status: 'pending-validation' as TaskStatus } : null);
+                  }}
+                />
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={handleCloseChildTask}>
+                    Retour à la demande
+                  </Button>
+                  <Button onClick={() => { onStatusChange(selectedChildTask.id, 'done'); handleCloseChildTask(); }}>
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    Marquer terminé
+                  </Button>
                 </div>
-              </>
+              </div>
             )}
           </div>
         </DialogContent>
@@ -556,7 +593,7 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
             <>
               <Separator />
               
-              <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'tasks' | 'chat')} className="w-full">
+              <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'tasks' | 'chat' | 'request-info')} className="w-full">
                 <TabsList className="w-full">
                   <TabsTrigger value="tasks" className="flex-1 gap-2">
                     <ListTodo className="h-4 w-4" />
@@ -565,6 +602,12 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
                       <Badge variant="secondary" className="ml-1">{completedTasks}/{childTasks.length}</Badge>
                     )}
                   </TabsTrigger>
+                  {task.parent_request_id && task.type !== 'request' && (
+                    <TabsTrigger value="request-info" className="flex-1 gap-2">
+                      <FileText className="h-4 w-4" />
+                      Détail demande
+                    </TabsTrigger>
+                  )}
                   <TabsTrigger value="chat" className="flex-1 gap-2">
                     <MessageSquare className="h-4 w-4" />
                     Échanges
@@ -684,6 +727,16 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
                   </div>
                 </TabsContent>
 
+                {task.parent_request_id && task.type !== 'request' && (
+                  <TabsContent value="request-info" className="mt-4">
+                    <RequestInfoTab
+                      task={task}
+                      profiles={profiles}
+                      departments={departments}
+                    />
+                  </TabsContent>
+                )}
+
                 <TabsContent value="chat" className="mt-4">
                   <TaskCommentsSection taskId={task.id} className="min-h-[300px]" />
                 </TabsContent>
@@ -691,11 +744,36 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
             </>
           )}
 
-          {/* Chat section for non-request tasks (simple tasks) */}
+          {/* Chat/Request info section for non-request tasks without child tasks */}
           {task.type !== 'request' && childTasks.length === 0 && (
             <>
               <Separator />
-              <TaskCommentsSection taskId={task.id} className="min-h-[200px]" />
+              {task.parent_request_id ? (
+                <Tabs defaultValue="details" className="w-full">
+                  <TabsList className="w-full">
+                    <TabsTrigger value="details" className="flex-1 gap-2">
+                      <MessageSquare className="h-4 w-4" />
+                      Échanges
+                    </TabsTrigger>
+                    <TabsTrigger value="request-info" className="flex-1 gap-2">
+                      <FileText className="h-4 w-4" />
+                      Détail demande
+                    </TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="details" className="mt-4">
+                    <TaskCommentsSection taskId={task.id} className="min-h-[200px]" />
+                  </TabsContent>
+                  <TabsContent value="request-info" className="mt-4">
+                    <RequestInfoTab
+                      task={task}
+                      profiles={profiles}
+                      departments={departments}
+                    />
+                  </TabsContent>
+                </Tabs>
+              ) : (
+                <TaskCommentsSection taskId={task.id} className="min-h-[200px]" />
+              )}
             </>
           )}
 
