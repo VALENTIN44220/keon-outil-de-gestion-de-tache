@@ -9,7 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Loader2, Search, CheckCircle2, Filter, Settings2, ChevronDown, X, UserRoundPlus, Tags } from 'lucide-react';
+import { Loader2, Search, CheckCircle2, Filter, Settings2, ChevronDown, X, UserRoundPlus, Tags, UserCheck } from 'lucide-react';
 import { Task } from '@/types/task';
 import { useCategories } from '@/hooks/useCategories';
 import { supabase } from '@/integrations/supabase/client';
@@ -143,6 +143,11 @@ export function BulkActionDialog({ open, onOpenChange, tasks, onComplete, canRea
   const [targetSearchOpen, setTargetSearchOpen] = useState(false);
   const [targetSearchQuery, setTargetSearchQuery] = useState('');
 
+  // Requester target
+  const [targetRequesterId, setTargetRequesterId] = useState<string>('');
+  const [requesterSearchOpen, setRequesterSearchOpen] = useState(false);
+  const [requesterSearchQuery, setRequesterSearchQuery] = useState('');
+
   // Data
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loadingData, setLoadingData] = useState(false);
@@ -266,6 +271,7 @@ export function BulkActionDialog({ open, onOpenChange, tasks, onComplete, canRea
   };
 
   const selectedMember = teamMembers.find(m => m.id === targetUserId);
+  const selectedRequester = teamMembers.find(m => m.id === targetRequesterId);
 
   const filteredMembers = useMemo(() => {
     if (!targetSearchQuery) return teamMembers;
@@ -277,12 +283,22 @@ export function BulkActionDialog({ open, onOpenChange, tasks, onComplete, canRea
     );
   }, [teamMembers, targetSearchQuery]);
 
+  const filteredRequesterMembers = useMemo(() => {
+    if (!requesterSearchQuery) return teamMembers;
+    const q = requesterSearchQuery.toLowerCase();
+    return teamMembers.filter(m =>
+      m.display_name?.toLowerCase().includes(q) ||
+      m.department?.toLowerCase().includes(q) ||
+      m.job_title?.toLowerCase().includes(q)
+    );
+  }, [teamMembers, requesterSearchQuery]);
+
   const getCategoryName = (categoryId: string | null) => {
     if (!categoryId) return null;
     return categories.find(c => c.id === categoryId)?.name;
   };
 
-  const hasAnyAction = targetCategoryId || targetUserId;
+  const hasAnyAction = targetCategoryId || targetUserId || targetRequesterId;
 
   const handleApply = async () => {
     if (selectedTaskIds.size === 0 || !hasAnyAction) return;
@@ -298,6 +314,9 @@ export function BulkActionDialog({ open, onOpenChange, tasks, onComplete, canRea
       }
       if (targetUserId) {
         updates.assignee_id = targetUserId;
+      }
+      if (targetRequesterId) {
+        updates.requester_id = targetRequesterId;
       }
 
       for (let i = 0; i < ids.length; i += 50) {
@@ -317,6 +336,7 @@ export function BulkActionDialog({ open, onOpenChange, tasks, onComplete, canRea
       const actions: string[] = [];
       if (targetCategoryId) actions.push('catégorisée(s)');
       if (targetUserId) actions.push(`réaffectée(s) à ${selectedMember?.display_name}`);
+      if (targetRequesterId) actions.push(`demandeur → ${selectedRequester?.display_name}`);
       toast.success(`${ids.length} tâche(s) ${actions.join(' et ')}`);
 
       setSelectedTaskIds(new Set());
@@ -333,12 +353,14 @@ export function BulkActionDialog({ open, onOpenChange, tasks, onComplete, canRea
     setTargetCategoryId('');
     setTargetSubcategoryId('');
     setTargetUserId('');
+    setTargetRequesterId('');
     setSearchQuery('');
     setFilterStatuses(new Set());
     setFilterCurrentAssignees(new Set());
     setFilterSources(new Set());
     setFilterServiceGroups(new Set());
     setTargetSearchQuery('');
+    setRequesterSearchQuery('');
   };
 
   return (
@@ -356,7 +378,7 @@ export function BulkActionDialog({ open, onOpenChange, tasks, onComplete, canRea
 
         <div className="flex-1 min-h-0 flex flex-col space-y-4 overflow-hidden">
           {/* Action panels */}
-          <div className={`grid ${canReassign ? 'grid-cols-2' : 'grid-cols-1'} gap-3 shrink-0`}>
+          <div className={`grid ${canReassign ? 'grid-cols-3' : 'grid-cols-1'} gap-3 shrink-0`}>
             {/* Category assignment */}
             <div className="p-3 rounded-lg border bg-muted/30 space-y-2">
               <Label className="text-xs font-semibold flex items-center gap-1.5">
@@ -454,6 +476,81 @@ export function BulkActionDialog({ open, onOpenChange, tasks, onComplete, canRea
                               <span className="flex-1 truncate">{m.display_name}</span>
                               {m.department && <span className="text-muted-foreground text-xs shrink-0">— {m.department}</span>}
                               {targetUserId === m.id && <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />}
+                            </button>
+                          ))
+                        )}
+                      </ScrollArea>
+                    </PopoverContent>
+                  </Popover>
+                )}
+              </div>
+            )}
+
+            {/* Requester assignment */}
+            {canReassign && (
+              <div className="p-3 rounded-lg border bg-muted/30 space-y-2">
+                <Label className="text-xs font-semibold flex items-center gap-1.5">
+                  <UserCheck className="h-3.5 w-3.5" />
+                  Nouveau demandeur
+                </Label>
+                {loadingData ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Chargement...
+                  </div>
+                ) : (
+                  <Popover open={requesterSearchOpen} onOpenChange={setRequesterSearchOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" role="combobox" className="w-full justify-between h-9 font-normal">
+                        {selectedRequester ? (
+                          <div className="flex items-center gap-2 truncate">
+                            <Avatar className="h-5 w-5 shrink-0">
+                              <AvatarImage src={selectedRequester.avatar_url} />
+                              <AvatarFallback className="text-[8px]">{getInitials(selectedRequester.display_name)}</AvatarFallback>
+                            </Avatar>
+                            <span className="truncate">{selectedRequester.display_name}</span>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">Sélectionner...</span>
+                        )}
+                        <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-50 bg-popover" align="start">
+                      <div className="p-2 border-b">
+                        <div className="relative">
+                          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            placeholder="Rechercher un collaborateur..."
+                            value={requesterSearchQuery}
+                            onChange={(e) => setRequesterSearchQuery(e.target.value)}
+                            className="pl-9 h-9"
+                            autoFocus
+                          />
+                          {requesterSearchQuery && (
+                            <button onClick={() => setRequesterSearchQuery('')} className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground">
+                              <X className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <ScrollArea className="max-h-[220px]">
+                        {filteredRequesterMembers.length === 0 ? (
+                          <div className="p-4 text-sm text-muted-foreground text-center">Aucun résultat</div>
+                        ) : (
+                          filteredRequesterMembers.map(m => (
+                            <button
+                              key={m.id}
+                              onClick={() => { setTargetRequesterId(m.id); setRequesterSearchOpen(false); setRequesterSearchQuery(''); }}
+                              className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-accent transition-colors text-sm ${targetRequesterId === m.id ? 'bg-primary/10' : ''}`}
+                            >
+                              <Avatar className="h-5 w-5 shrink-0">
+                                <AvatarImage src={m.avatar_url} />
+                                <AvatarFallback className="text-[8px]">{getInitials(m.display_name)}</AvatarFallback>
+                              </Avatar>
+                              <span className="flex-1 truncate">{m.display_name}</span>
+                              {m.department && <span className="text-muted-foreground text-xs shrink-0">— {m.department}</span>}
+                              {targetRequesterId === m.id && <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />}
                             </button>
                           ))
                         )}
