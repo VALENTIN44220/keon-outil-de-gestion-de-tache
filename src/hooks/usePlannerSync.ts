@@ -24,6 +24,11 @@ export interface PlanMapping {
   sync_enabled: boolean;
   sync_direction: 'to_planner' | 'from_planner' | 'both';
   import_states: string[];
+  default_requester_id: string | null;
+  default_reporter_id: string | null;
+  default_priority: string | null;
+  default_status: string | null;
+  resolve_assignees: boolean;
   last_sync_at: string | null;
   created_at: string;
   updated_at: string;

@@ -776,8 +776,8 @@ Deno.serve(async (req) => {
           if (!importStates.includes(taskState)) continue;
 
           try {
-            const status = plannerPercentToStatus(pt.percentComplete || 0);
-            const priority = plannerPriorityToApp(pt.priority || 5);
+            const status = mapping.default_status || plannerPercentToStatus(pt.percentComplete || 0);
+            const priority = mapping.default_priority || plannerPriorityToApp(pt.priority || 5);
 
             // Resolve subcategory from bucket mapping
             const subcategoryId = pt.bucketId ? bucketToSubcategory.get(pt.bucketId) : null;
@@ -801,6 +801,7 @@ Deno.serve(async (req) => {
                 user_id: userId,
                 assignee_id: assigneeId,
                 requester_id: mapping.default_requester_id || null,
+                reporter_id: mapping.default_reporter_id || null,
                 category_id: mapping.mapped_category_id,
                 subcategory_id: subcategoryId || null,
                 source_process_template_id: mapping.mapped_process_template_id,

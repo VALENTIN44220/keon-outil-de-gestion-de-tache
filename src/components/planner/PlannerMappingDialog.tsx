@@ -50,9 +50,15 @@ export function PlannerMappingDialog({ open, onOpenChange, mapping, onSave }: Pl
   const [newSubName, setNewSubName] = useState<Record<string, string>>({});
   const [creatingForBucket, setCreatingForBucket] = useState<string | null>(null);
 
-  // New: requester & assignee resolution
-  const [defaultRequesterId, setDefaultRequesterId] = useState<string>((mapping as any).default_requester_id || 'none');
-  const [resolveAssignees, setResolveAssignees] = useState<boolean>((mapping as any).resolve_assignees !== false);
+  // Person mapping
+  const [defaultRequesterId, setDefaultRequesterId] = useState<string>(mapping.default_requester_id || 'none');
+  const [defaultReporterId, setDefaultReporterId] = useState<string>(mapping.default_reporter_id || 'none');
+  const [resolveAssignees, setResolveAssignees] = useState<boolean>(mapping.resolve_assignees !== false);
+  
+  // Default values for imported tasks
+  const [defaultPriority, setDefaultPriority] = useState<string>(mapping.default_priority || 'none');
+  const [defaultStatus, setDefaultStatus] = useState<string>(mapping.default_status || 'none');
+  
   const [profiles, setProfiles] = useState<{ id: string; display_name: string }[]>([]);
 
   // Get subcategories for the mapped category
@@ -92,15 +98,18 @@ export function PlannerMappingDialog({ open, onOpenChange, mapping, onSave }: Pl
     if (open) {
       fetchBuckets();
       setImportStates(mapping.import_states || ['notStarted', 'inProgress', 'completed']);
-      setDefaultRequesterId((mapping as any).default_requester_id || 'none');
-      setResolveAssignees((mapping as any).resolve_assignees !== false);
+      setDefaultRequesterId(mapping.default_requester_id || 'none');
+      setDefaultReporterId(mapping.default_reporter_id || 'none');
+      setResolveAssignees(mapping.resolve_assignees !== false);
+      setDefaultPriority(mapping.default_priority || 'none');
+      setDefaultStatus(mapping.default_status || 'none');
       
       // Fetch profiles
-      supabase.from('profiles').select('id, display_name').order('display_name').then(({ data }) => {
+      supabase.from('profiles').select('id, display_name').eq('status', 'active').order('display_name').then(({ data }) => {
         setProfiles(data || []);
       });
     }
-  }, [open, fetchBuckets, mapping.import_states]);
+  }, [open, fetchBuckets, mapping]);
 
   const updateBucketMapping = (bucketId: string, subcategoryId: string | null) => {
     setBucketMappings(prev => prev.map(bm =>
@@ -140,12 +149,15 @@ export function PlannerMappingDialog({ open, onOpenChange, mapping, onSave }: Pl
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      // Save import states + requester + resolve_assignees
+      // Save all mapping defaults
       await (supabase as any)
         .from('planner_plan_mappings')
         .update({
           import_states: importStates,
           default_requester_id: defaultRequesterId === 'none' ? null : defaultRequesterId,
+          default_reporter_id: defaultReporterId === 'none' ? null : defaultReporterId,
+          default_priority: defaultPriority === 'none' ? null : defaultPriority,
+          default_status: defaultStatus === 'none' ? null : defaultStatus,
           resolve_assignees: resolveAssignees,
         })
         .eq('id', mapping.id);
@@ -220,7 +232,63 @@ export function PlannerMappingDialog({ open, onOpenChange, mapping, onSave }: Pl
                       searchPlaceholder="Rechercher un collaborateur..."
                     />
                     <p className="text-xs text-muted-foreground">
-                      Ce profil sera affecté comme demandeur (requester) pour toutes les tâches importées de ce plan
+                      Profil affecté comme demandeur pour toutes les tâches importées
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">Rapporteur par défaut</Label>
+                    <SearchableSelect
+                      value={defaultReporterId}
+                      onValueChange={setDefaultReporterId}
+                      options={[
+                        { value: 'none', label: 'Aucun (non défini)' },
+                        ...profileOptions,
+                      ]}
+                      placeholder="Sélectionner un rapporteur..."
+                      searchPlaceholder="Rechercher un collaborateur..."
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Profil affecté comme rapporteur pour toutes les tâches importées
+                    </p>
+                  </div>
+
+                  <Separator className="my-2" />
+
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">Priorité par défaut</Label>
+                    <Select value={defaultPriority} onValueChange={setDefaultPriority}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Automatique (depuis Planner)</SelectItem>
+                        <SelectItem value="urgent">Urgente</SelectItem>
+                        <SelectItem value="high">Haute</SelectItem>
+                        <SelectItem value="medium">Moyenne</SelectItem>
+                        <SelectItem value="low">Basse</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Si définie, remplace la priorité issue de Planner
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">Statut par défaut</Label>
+                    <Select value={defaultStatus} onValueChange={setDefaultStatus}>
+                      <SelectTrigger className="h-9">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Automatique (depuis Planner)</SelectItem>
+                        <SelectItem value="to_assign">À affecter</SelectItem>
+                        <SelectItem value="todo">À faire</SelectItem>
+                        <SelectItem value="in-progress">En cours</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Si défini, remplace le statut issu de Planner
                     </p>
                   </div>
                 </div>
