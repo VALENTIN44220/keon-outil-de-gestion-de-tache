@@ -42,6 +42,8 @@ import {
   GitBranch,
   ExternalLink,
   Package,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { SubProcessTemplate, TaskTemplate, ASSIGNMENT_TYPE_LABELS } from '@/types/template';
@@ -51,6 +53,7 @@ import { AddTaskTemplateDialog } from './AddTaskTemplateDialog';
 import { EditTaskTemplateDialog } from './EditTaskTemplateDialog';
 import { SubProcessNotificationsPanel } from './SubProcessNotificationsPanel';
 import { addTaskToWorkflow, removeTaskFromWorkflow } from '@/hooks/useAutoWorkflowGeneration';
+import { cn } from '@/lib/utils';
 
 interface SubProcessConfigViewProps {
   subProcessId: string;
@@ -132,6 +135,10 @@ export function SubProcessConfigView({
     exclude_des: '',
   });
 
+  // Hidden request fields config (stored in form_schema)
+  const [hiddenRequestFields, setHiddenRequestFields] = useState<string[]>([]);
+  const [customFields, setCustomFields] = useState<{ id: string; label: string; name: string }[]>([]);
+
   useEffect(() => {
     if (open && subProcessId) {
       fetchData();
@@ -162,7 +169,7 @@ export function SubProcessConfigView({
           modifiable_at_request: false,
         });
 
-        // Load article filter from form_schema
+        // Load article filter and hidden request fields from form_schema
         const formSchema = (spData as any).form_schema;
         if (formSchema && typeof formSchema === 'object') {
           const af = (formSchema as any).article_filter;
@@ -171,6 +178,12 @@ export function SubProcessConfigView({
               ref_prefix: af.ref_prefix || '',
               exclude_des: af.exclude_des || '',
             });
+          }
+          const hrf = (formSchema as any).hidden_request_fields;
+          if (Array.isArray(hrf)) {
+            setHiddenRequestFields(hrf);
+          } else {
+            setHiddenRequestFields([]);
           }
         }
         
@@ -203,15 +216,19 @@ export function SubProcessConfigView({
       }
 
       // Fetch reference data
-      const [profileRes, deptRes, groupRes] = await Promise.all([
+      const [profileRes, deptRes, groupRes, customFieldsRes] = await Promise.all([
         supabase.from('profiles').select('id, display_name').order('display_name'),
         supabase.from('departments').select('id, name').order('name'),
         supabase.from('collaborator_groups').select('id, name').order('name'),
+        spData?.process_template_id
+          ? supabase.from('template_custom_fields').select('id, label, name').eq('process_template_id', spData.process_template_id).order('order_index')
+          : Promise.resolve({ data: [] }),
       ]);
 
       if (profileRes.data) setProfiles(profileRes.data);
       if (deptRes.data) setDepartments(deptRes.data);
       if (groupRes.data) setGroups(groupRes.data);
+      if (customFieldsRes.data) setCustomFields(customFieldsRes.data);
 
     } catch (error) {
       console.error('Error fetching sub-process data:', error);
@@ -234,6 +251,7 @@ export function SubProcessConfigView({
           ref_prefix: articleFilter.ref_prefix || null,
           exclude_des: articleFilter.exclude_des || null,
         },
+        hidden_request_fields: hiddenRequestFields,
       };
 
       const { error } = await supabase
@@ -409,6 +427,7 @@ export function SubProcessConfigView({
     { id: 'tasks', label: 'Tâches', icon: ListTodo },
     { id: 'assignment', label: 'Affectation', icon: Users },
     { id: 'validations', label: 'Validations', icon: CheckSquare },
+    { id: 'visibility', label: 'Visibilité', icon: Eye },
     { id: 'notifications', label: 'Notifications', icon: Bell },
   ];
 
@@ -447,7 +466,7 @@ export function SubProcessConfigView({
           className="flex-1 flex flex-col min-h-0"
         >
           <div className="px-6 pt-4 shrink-0">
-            <TabsList className="w-full grid grid-cols-5">
+            <TabsList className="w-full grid grid-cols-6">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 return (
@@ -873,6 +892,130 @@ export function SubProcessConfigView({
                           Enregistrer les validations
                         </Button>
                       </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Visibility Tab - Request detail fields */}
+              <TabsContent value="visibility" className="mt-0 space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Eye className="h-4 w-4" />
+                      Visibilité des champs de la demande
+                    </CardTitle>
+                    <CardDescription>
+                      Sélectionnez les champs de la demande parent qui seront visibles dans l'onglet "Détail demande" des tâches créées par ce sous-processus
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-3">
+                      <h4 className="text-sm font-semibold">Champs standards</h4>
+                      <div className="space-y-2">
+                        {[
+                          { key: 'standard:title', label: 'Titre de la demande' },
+                          { key: 'standard:request_number', label: 'Numéro de la demande' },
+                          { key: 'standard:description', label: 'Description' },
+                          { key: 'standard:priority', label: 'Priorité' },
+                          { key: 'standard:due_date', label: 'Date d\'échéance' },
+                          { key: 'standard:requester', label: 'Demandeur' },
+                          { key: 'standard:department', label: 'Service cible' },
+                          { key: 'standard:category', label: 'Catégorie' },
+                          { key: 'standard:process', label: 'Processus' },
+                        ].map((field) => {
+                          const isHidden = hiddenRequestFields.includes(field.key);
+                          return (
+                            <div
+                              key={field.key}
+                              className="flex items-center justify-between p-2.5 border rounded-lg hover:bg-muted/50 transition-colors"
+                            >
+                              <span className="text-sm">{field.label}</span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  if (isHidden) {
+                                    setHiddenRequestFields(prev => prev.filter(f => f !== field.key));
+                                  } else {
+                                    setHiddenRequestFields(prev => [...prev, field.key]);
+                                  }
+                                }}
+                                disabled={!canManage}
+                                className={cn("gap-1.5", isHidden ? "text-muted-foreground" : "text-primary")}
+                              >
+                                {isHidden ? (
+                                  <>
+                                    <EyeOff className="h-4 w-4" />
+                                    <span className="text-xs">Masqué</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Eye className="h-4 w-4" />
+                                    <span className="text-xs">Visible</span>
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {customFields.length > 0 && (
+                      <>
+                        <Separator />
+                        <div className="space-y-3">
+                          <h4 className="text-sm font-semibold">Champs personnalisés</h4>
+                          <div className="space-y-2">
+                            {customFields.map((field) => {
+                              const key = `custom:${field.id}`;
+                              const isHidden = hiddenRequestFields.includes(key);
+                              return (
+                                <div
+                                  key={field.id}
+                                  className="flex items-center justify-between p-2.5 border rounded-lg hover:bg-muted/50 transition-colors"
+                                >
+                                  <span className="text-sm">{field.label}</span>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      if (isHidden) {
+                                        setHiddenRequestFields(prev => prev.filter(f => f !== key));
+                                      } else {
+                                        setHiddenRequestFields(prev => [...prev, key]);
+                                      }
+                                    }}
+                                    disabled={!canManage}
+                                    className={cn("gap-1.5", isHidden ? "text-muted-foreground" : "text-primary")}
+                                  >
+                                    {isHidden ? (
+                                      <>
+                                        <EyeOff className="h-4 w-4" />
+                                        <span className="text-xs">Masqué</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Eye className="h-4 w-4" />
+                                        <span className="text-xs">Visible</span>
+                                      </>
+                                    )}
+                                  </Button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {canManage && (
+                      <Button onClick={handleSaveGeneral} disabled={isSaving}>
+                        {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                        <Save className="h-4 w-4 mr-2" />
+                        Enregistrer
+                      </Button>
                     )}
                   </CardContent>
                 </Card>
