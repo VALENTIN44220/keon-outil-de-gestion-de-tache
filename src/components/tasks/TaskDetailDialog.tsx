@@ -259,7 +259,7 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
     const ChildStatusIcon = statusConfig[selectedChildTask.status]?.icon || AlertCircle;
     return (
       <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-full w-full h-full max-h-full rounded-none sm:rounded-none flex flex-col overflow-hidden">
           <DialogHeader>
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="icon" onClick={handleCloseChildTask}>
@@ -290,7 +290,7 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4 mt-4">
+          <div className="space-y-4 mt-4 flex-1 overflow-y-auto">
             {isEditing ? (
               <>
                 <div className="space-y-2">
@@ -479,7 +479,7 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-full w-full h-full max-h-full rounded-none sm:rounded-none flex flex-col overflow-hidden">
         <DialogHeader>
           <div className="flex items-center gap-2">
             {task.type === 'request' && <Building2 className="h-5 w-5 text-primary" />}
@@ -498,7 +498,7 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
           <DialogTitle className="text-xl mt-2">{task.title}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6 mt-4">
+        <div className="space-y-6 mt-4 flex-1 overflow-y-auto px-1">
           {/* Description */}
           {task.description && (
             <div>
