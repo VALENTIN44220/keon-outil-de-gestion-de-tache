@@ -23,6 +23,7 @@ import {
   Save,
   FolderOpen,
   Trash2,
+  Star,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -71,6 +72,7 @@ interface FilterPreset {
   id: string;
   name: string;
   filters: any;
+  is_default?: boolean;
 }
 
 function MultiSelectDropdown({
@@ -215,13 +217,13 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
     fetchData();
   }, []);
 
-  // Load presets
+  // Load presets + apply default
   useEffect(() => {
     if (!user?.id) return;
     (async () => {
       const query = (supabase as any)
         .from('user_filter_presets')
-        .select('id, name, filters')
+        .select('id, name, filters, is_default')
         .eq('user_id', user.id);
       if (processId) {
         query.eq('process_template_id', processId);
@@ -229,8 +231,24 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
         query.is('process_template_id', null);
       }
       const { data } = await query.order('created_at', { ascending: false });
-      if (data) setPresets(data);
+      if (data) {
+        setPresets(data);
+        // Auto-apply default preset on first load
+        const defaultPreset = data.find((p: FilterPreset) => p.is_default);
+        if (defaultPreset) {
+          const restored: CrossFilters = {
+            ...DEFAULT_CROSS_FILTERS,
+            ...defaultPreset.filters,
+            dateRange: {
+              start: defaultPreset.filters.dateRange?.start ? new Date(defaultPreset.filters.dateRange.start) : null,
+              end: defaultPreset.filters.dateRange?.end ? new Date(defaultPreset.filters.dateRange.end) : null,
+            },
+          };
+          onFiltersChange(restored);
+        }
+      }
     })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, processId]);
 
   const handleReset = () => {
@@ -285,6 +303,38 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
     toast.success('Contexte supprimé');
   };
 
+  const handleSetDefault = async (presetId: string) => {
+    if (!user?.id) return;
+    // Remove current default for this context
+    const clearQuery = (supabase as any)
+      .from('user_filter_presets')
+      .update({ is_default: false })
+      .eq('user_id', user.id)
+      .eq('is_default', true);
+    if (processId) {
+      clearQuery.eq('process_template_id', processId);
+    } else {
+      clearQuery.is('process_template_id', null);
+    }
+    await clearQuery;
+
+    const clickedPreset = presets.find(p => p.id === presetId);
+    const wasDefault = clickedPreset?.is_default;
+
+    if (!wasDefault) {
+      await (supabase as any)
+        .from('user_filter_presets')
+        .update({ is_default: true })
+        .eq('id', presetId);
+    }
+
+    setPresets(prev => prev.map(p => ({
+      ...p,
+      is_default: wasDefault ? false : p.id === presetId,
+    })));
+    toast.success(wasDefault ? 'Contexte par défaut retiré' : 'Contexte défini par défaut');
+  };
+
   const activeFiltersCount = 
     (filters.searchQuery ? 1 : 0) +
     filters.assigneeIds.length + 
@@ -336,6 +386,15 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
                       >
                         {p.name}
                       </button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 shrink-0"
+                        onClick={() => handleSetDefault(p.id)}
+                        title={p.is_default ? 'Retirer comme défaut' : 'Définir par défaut'}
+                      >
+                        <Star className={cn('h-3 w-3', p.is_default ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground')} />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
