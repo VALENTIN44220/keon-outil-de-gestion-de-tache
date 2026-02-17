@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -14,6 +14,19 @@ import { BEProjectSelect } from '@/components/be/BEProjectSelect';
 import { RequestWizardData, RequestType } from './types';
 import { CommonFieldsConfig, DEFAULT_COMMON_FIELDS_CONFIG, resolveTitlePattern } from '@/types/commonFieldsConfig';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+
+function BEProjectReadOnly({ projectId }: { projectId: string }) {
+  const [name, setName] = useState<string>('...');
+  useEffect(() => {
+    supabase.from('be_projects').select('nom_projet, code_projet').eq('id', projectId).single()
+      .then(({ data }) => {
+        if (data) setName(`${data.code_projet} — ${data.nom_projet}`);
+        else setName('Projet inconnu');
+      });
+  }, [projectId]);
+  return <span>{name}</span>;
+}
 
 const PRIORITY_LABELS: Record<string, string> = {
   low: 'Basse',
@@ -165,11 +178,20 @@ export function StepDetailsForm({ data, requestType, onDataChange, commonFieldsC
           </div>
 
           {/* BE Project selection for process requests */}
-          {requestType === 'process' && cfg.be_project.visible && cfg.be_project.editable && (
-            <BEProjectSelect
-              value={data.beProjectId}
-              onChange={(value) => onDataChange({ beProjectId: value })}
-            />
+          {requestType === 'process' && cfg.be_project.visible && (
+            cfg.be_project.editable ? (
+              <BEProjectSelect
+                value={data.beProjectId}
+                onChange={(value) => onDataChange({ beProjectId: value })}
+              />
+            ) : (
+              <div className="space-y-2">
+                <Label>Projet associé <span className="text-xs text-muted-foreground ml-1">(imposé)</span></Label>
+                <div className="flex items-center h-10 px-3 rounded-md border bg-muted/50 text-sm">
+                  {data.beProjectId ? <BEProjectReadOnly projectId={data.beProjectId} /> : '—'}
+                </div>
+              </div>
+            )
           )}
         </div>
       </ScrollArea>

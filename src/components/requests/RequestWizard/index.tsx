@@ -123,10 +123,14 @@ export function RequestWizardDialog({ open, onClose, onSuccess, initialProcessId
           const settings = (ptData as any)?.settings;
           if (settings?.common_fields_config) {
             setCommonFieldsConfig(settings.common_fields_config);
-            // Apply default priority if priority is imposed
+            // Apply default values for non-editable fields
             const priorityCfg = settings.common_fields_config.priority;
             if (priorityCfg && !priorityCfg.editable && priorityCfg.default_value) {
               setData((prev) => ({ ...prev, priority: priorityCfg.default_value }));
+            }
+            const beProjectCfg = settings.common_fields_config.be_project;
+            if (beProjectCfg && !beProjectCfg.editable && beProjectCfg.default_value) {
+              setData((prev) => ({ ...prev, beProjectId: beProjectCfg.default_value }));
             }
           } else {
             setCommonFieldsConfig(undefined);
