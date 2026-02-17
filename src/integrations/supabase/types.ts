@@ -4141,6 +4141,7 @@ export type Database = {
           created_at: string
           filters: Json
           id: string
+          is_default: boolean
           name: string
           process_template_id: string | null
           updated_at: string
@@ -4150,6 +4151,7 @@ export type Database = {
           created_at?: string
           filters?: Json
           id?: string
+          is_default?: boolean
           name: string
           process_template_id?: string | null
           updated_at?: string
@@ -4159,6 +4161,7 @@ export type Database = {
           created_at?: string
           filters?: Json
           id?: string
+          is_default?: boolean
           name?: string
           process_template_id?: string | null
           updated_at?: string
