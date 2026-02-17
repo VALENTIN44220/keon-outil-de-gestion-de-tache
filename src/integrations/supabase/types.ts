@@ -3563,6 +3563,7 @@ export type Database = {
           requires_validation: boolean | null
           source_process_template_id: string | null
           source_sub_process_template_id: string | null
+          start_date: string | null
           status: string
           subcategory_id: string | null
           target_department_id: string | null
@@ -3637,6 +3638,7 @@ export type Database = {
           requires_validation?: boolean | null
           source_process_template_id?: string | null
           source_sub_process_template_id?: string | null
+          start_date?: string | null
           status?: string
           subcategory_id?: string | null
           target_department_id?: string | null
@@ -3711,6 +3713,7 @@ export type Database = {
           requires_validation?: boolean | null
           source_process_template_id?: string | null
           source_sub_process_template_id?: string | null
+          start_date?: string | null
           status?: string
           subcategory_id?: string | null
           target_department_id?: string | null

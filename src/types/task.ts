@@ -15,6 +15,7 @@ export interface Task {
   category: string | null;
   category_id: string | null;
   subcategory_id: string | null;
+  start_date: string | null;
   due_date: string | null;
   assignee_id: string | null;
   requester_id: string | null;

@@ -51,11 +51,12 @@ export function WorkloadCalendarNew({
       
       const member = workloadData.find(m => m.memberId === task.assignee_id);
       const dueDate = parseISO(task.due_date);
+      const startDate = task.start_date ? parseISO(task.start_date) : dueDate;
       
       result.push({
         id: task.id,
         title: task.title,
-        startDate: dueDate,
+        startDate: startDate,
         endDate: dueDate,
         assigneeId: task.assignee_id || undefined,
         assigneeName: member?.memberName,

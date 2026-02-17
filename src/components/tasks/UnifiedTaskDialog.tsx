@@ -146,6 +146,7 @@ export function UnifiedTaskDialog({ open, onClose, onAdd }: UnifiedTaskDialogPro
       category: selectedCategory?.name || null,
       category_id: categoryId,
       subcategory_id: subcategoryId,
+      start_date: null,
       due_date: dueDate || null,
       assignee_id: assigneeId,
       requester_id: requesterId,
