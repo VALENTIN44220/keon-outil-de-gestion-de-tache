@@ -545,29 +545,46 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
           )}
 
           {/* Metadata */}
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            {task.due_date && (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+            {(task.task_number || task.request_number) && (
               <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span>Échéance: {format(new Date(task.due_date), 'dd MMMM yyyy', { locale: fr })}</span>
-              </div>
-            )}
-            {task.target_department_id && (
-              <div className="flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-muted-foreground" />
-                <span>Service: {departments.get(task.target_department_id) || 'N/A'}</span>
+                <Info className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">N°:</span>
+                <span className="font-medium">{task.task_number || task.request_number}</span>
               </div>
             )}
             {task.assignee_id && (
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4 text-muted-foreground" />
-                <span>Assigné à: {profiles.get(task.assignee_id) || 'N/A'}</span>
+                <span className="text-muted-foreground">Assigné à:</span>
+                <span>{profiles.get(task.assignee_id) || 'N/A'}</span>
+              </div>
+            )}
+            {!task.assignee_id && (
+              <div className="flex items-center gap-2 text-warning">
+                <User className="h-4 w-4" />
+                <span>Non assigné</span>
               </div>
             )}
             {task.requester_id && (
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4 text-muted-foreground" />
-                <span>Demandeur: {profiles.get(task.requester_id) || 'N/A'}</span>
+                <span className="text-muted-foreground">Demandeur:</span>
+                <span>{profiles.get(task.requester_id) || 'N/A'}</span>
+              </div>
+            )}
+            {task.reporter_id && (
+              <div className="flex items-center gap-2">
+                <User className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Rapporteur:</span>
+                <span>{profiles.get(task.reporter_id) || 'N/A'}</span>
+              </div>
+            )}
+            {task.target_department_id && (
+              <div className="flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Service:</span>
+                <span>{departments.get(task.target_department_id) || 'N/A'}</span>
               </div>
             )}
             {task.category && (
@@ -576,6 +593,25 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
                 <Badge variant="outline">{task.category}</Badge>
               </div>
             )}
+            {task.start_date && (
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Début:</span>
+                <span>{format(new Date(task.start_date), 'dd MMMM yyyy', { locale: fr })}</span>
+              </div>
+            )}
+            {task.due_date && (
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Échéance:</span>
+                <span>{format(new Date(task.due_date), 'dd MMMM yyyy', { locale: fr })}</span>
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Créée le:</span>
+              <span>{format(new Date(task.created_at), 'dd MMMM yyyy', { locale: fr })}</span>
+            </div>
           </div>
 
           {/* Process info */}
