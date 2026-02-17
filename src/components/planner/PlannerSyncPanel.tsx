@@ -11,6 +11,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, RefreshCw, Plus, Trash2, ArrowLeftRight, ArrowRight, ArrowLeft, CheckCircle2, AlertCircle, Calendar, Clock, Zap, Settings2 } from 'lucide-react';
 import { usePlannerSync, PlannerPlan, PlanMapping } from '@/hooks/usePlannerSync';
 import { PlannerMappingDialog } from './PlannerMappingDialog';
+import { PlannerImportedTasksList } from './PlannerImportedTasksList';
 import { useCategories } from '@/hooks/useCategories';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -343,6 +344,9 @@ export function PlannerSyncPanel() {
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {/* Imported tasks list with inline bulk edit */}
+                  <PlannerImportedTasksList mappingId={mapping.id} />
                 </CardContent>
               </Card>
             );
