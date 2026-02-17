@@ -553,60 +553,40 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
                 <span className="font-medium">{task.task_number || task.request_number}</span>
               </div>
             )}
-            {task.assignee_id && (
-              <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">Assigné à:</span>
-                <span>{profiles.get(task.assignee_id) || 'N/A'}</span>
-              </div>
-            )}
-            {!task.assignee_id && (
-              <div className="flex items-center gap-2 text-warning">
-                <User className="h-4 w-4" />
-                <span>Non assigné</span>
-              </div>
-            )}
-            {task.requester_id && (
-              <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">Demandeur:</span>
-                <span>{profiles.get(task.requester_id) || 'N/A'}</span>
-              </div>
-            )}
-            {task.reporter_id && (
-              <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">Rapporteur:</span>
-                <span>{profiles.get(task.reporter_id) || 'N/A'}</span>
-              </div>
-            )}
-            {task.target_department_id && (
-              <div className="flex items-center gap-2">
-                <Building2 className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">Service:</span>
-                <span>{departments.get(task.target_department_id) || 'N/A'}</span>
-              </div>
-            )}
-            {task.category && (
-              <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">Catégorie:</span>
-                <Badge variant="outline">{task.category}</Badge>
-              </div>
-            )}
-            {task.start_date && (
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">Début:</span>
-                <span>{format(new Date(task.start_date), 'dd MMMM yyyy', { locale: fr })}</span>
-              </div>
-            )}
-            {task.due_date && (
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span className="text-muted-foreground">Échéance:</span>
-                <span>{format(new Date(task.due_date), 'dd MMMM yyyy', { locale: fr })}</span>
-              </div>
-            )}
+            <div className="flex items-center gap-2">
+              <User className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Assigné à:</span>
+              <span>{task.assignee_id ? profiles.get(task.assignee_id) || 'N/A' : <span className="italic text-muted-foreground">Non assigné</span>}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <User className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Demandeur:</span>
+              <span>{task.requester_id ? profiles.get(task.requester_id) || 'N/A' : <span className="italic text-muted-foreground">—</span>}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <User className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Rapporteur:</span>
+              <span>{task.reporter_id ? profiles.get(task.reporter_id) || 'N/A' : <span className="italic text-muted-foreground">—</span>}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Service:</span>
+              <span>{task.target_department_id ? departments.get(task.target_department_id) || 'N/A' : <span className="italic text-muted-foreground">—</span>}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground">Catégorie:</span>
+              {task.category ? <Badge variant="outline">{task.category}</Badge> : <span className="italic text-muted-foreground">—</span>}
+            </div>
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Début:</span>
+              <span>{task.start_date ? format(new Date(task.start_date), 'dd MMMM yyyy', { locale: fr }) : <span className="italic text-muted-foreground">—</span>}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Échéance:</span>
+              <span>{task.due_date ? format(new Date(task.due_date), 'dd MMMM yyyy', { locale: fr }) : <span className="italic text-muted-foreground">—</span>}</span>
+            </div>
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground">Créée le:</span>
