@@ -1620,7 +1620,10 @@ export type Database = {
       planner_plan_mappings: {
         Row: {
           created_at: string
+          default_priority: string | null
+          default_reporter_id: string | null
           default_requester_id: string | null
+          default_status: string | null
           id: string
           import_states: string[] | null
           last_sync_at: string | null
@@ -1638,7 +1641,10 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          default_priority?: string | null
+          default_reporter_id?: string | null
           default_requester_id?: string | null
+          default_status?: string | null
           id?: string
           import_states?: string[] | null
           last_sync_at?: string | null
@@ -1656,7 +1662,10 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          default_priority?: string | null
+          default_reporter_id?: string | null
           default_requester_id?: string | null
+          default_status?: string | null
           id?: string
           import_states?: string[] | null
           last_sync_at?: string | null
@@ -1673,6 +1682,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "planner_plan_mappings_default_reporter_id_fkey"
+            columns: ["default_reporter_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "planner_plan_mappings_default_requester_id_fkey"
             columns: ["default_requester_id"]
