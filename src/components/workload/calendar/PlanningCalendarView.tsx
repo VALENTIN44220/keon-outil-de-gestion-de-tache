@@ -24,6 +24,7 @@ import { PlanningKPIs } from './PlanningKPIs';
 import { BacklogSidebar } from './BacklogSidebar';
 import { PlanningCalendarGrid } from './PlanningCalendarGrid';
 import { UnifiedTaskDrawer, DrawerItem } from '../UnifiedTaskDrawer';
+import { TaskDetailDialog } from '@/components/tasks/TaskDetailDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
  
@@ -91,6 +92,10 @@ export function PlanningCalendarView({
   // Drawer state
   const [drawerItem, setDrawerItem] = useState<DrawerItem | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  // Task detail dialog state
+  const [detailTask, setDetailTask] = useState<Task | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
  
    // Calculate conflict count
    const conflictCount = useMemo(() => {
@@ -190,18 +195,24 @@ export function PlanningCalendarView({
     await handleStatusChange(taskId, 'done');
   }, [handleStatusChange]);
 
-  // View task details handler
+  // View task details handler - open detail dialog directly
   const handleViewDetails = useCallback((taskId: string, taskType?: string) => {
     setIsDrawerOpen(false);
     setDrawerItem(null);
     
-    // Navigate to appropriate page based on task type
-    if (taskType === 'request') {
-      navigate(`/requests?task=${taskId}`);
+    const task = tasks.find(t => t.id === taskId);
+    if (task) {
+      setDetailTask(task);
+      setIsDetailOpen(true);
     } else {
-      navigate(`/?task=${taskId}`);
+      // Fallback: navigate
+      if (taskType === 'request') {
+        navigate(`/requests?task=${taskId}`);
+      } else {
+        navigate(`/?task=${taskId}`);
+      }
     }
-  }, [navigate]);
+  }, [navigate, tasks]);
 
   // Selection handlers
   const handleTaskSelect = useCallback((taskId: string, selected: boolean) => {
@@ -365,6 +376,18 @@ export function PlanningCalendarView({
           onStatusChange={handleStatusChange}
           onMarkDone={handleMarkDone}
           onViewDetails={handleViewDetails}
+        />
+
+        {/* Task Detail Dialog */}
+        <TaskDetailDialog
+          task={detailTask}
+          open={isDetailOpen}
+          onClose={() => {
+            setIsDetailOpen(false);
+            setDetailTask(null);
+            onTaskUpdated?.();
+          }}
+          onStatusChange={handleStatusChange}
         />
        </div>
      </TooltipProvider>
