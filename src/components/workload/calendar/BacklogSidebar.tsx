@@ -29,6 +29,7 @@
    User,
    CheckSquare,
  } from 'lucide-react';
+ import { TaskDetailDialog } from '@/components/tasks/TaskDetailDialog';
  
  interface BacklogSidebarProps {
    tasks: Task[];
@@ -71,6 +72,7 @@
    const [searchQuery, setSearchQuery] = useState('');
    const [sortBy, setSortBy] = useState<SortOption>('priority');
    const [filterBy, setFilterBy] = useState<FilterOption>('all');
+   const [detailTask, setDetailTask] = useState<Task | null>(null);
  
    const availableTasks = useMemo(() => {
     return (tasks || []).filter(t => 
@@ -302,7 +304,10 @@
                            "w-2 h-2 rounded-full shrink-0",
                            getPriorityColor(task.priority)
                          )} />
-                         <span className="text-sm font-medium truncate">{task.title}</span>
+                        <span 
+                          className="text-sm font-medium truncate cursor-pointer hover:underline"
+                          onClick={(e) => { e.stopPropagation(); setDetailTask(task); }}
+                        >{task.title}</span>
                        </div>
                        
                        <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
@@ -354,6 +359,14 @@
            </div>
          </ScrollArea>
        </CardContent>
+
+       {/* Task detail dialog */}
+       <TaskDetailDialog
+         task={detailTask}
+         open={!!detailTask}
+         onClose={() => setDetailTask(null)}
+         onStatusChange={() => {}}
+       />
      </Card>
    );
  }
