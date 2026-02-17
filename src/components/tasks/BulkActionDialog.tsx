@@ -528,7 +528,7 @@ export function BulkActionDialog({ open, onOpenChange, tasks, onComplete, canRea
           </div>
 
           {/* Task list — scrollable */}
-          <ScrollArea className="flex-1 border rounded-lg" style={{ maxHeight: '40vh' }}>
+          <ScrollArea className="border rounded-lg" style={{ height: '40vh' }}>
             <div className="divide-y">
               {filteredTasks.length === 0 ? (
                 <div className="p-8 text-center text-muted-foreground text-sm">
