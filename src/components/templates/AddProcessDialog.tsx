@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { RecurrenceConfig, RecurrenceData } from './RecurrenceConfig';
 
 // Department interface removed - target_department_id is now set at sub-process level
 
@@ -29,6 +30,12 @@ interface AddProcessDialogProps {
       subcategory_id?: string | null;
       target_department_id?: string | null;
       service_group_id?: string | null;
+      recurrence_enabled?: boolean;
+      recurrence_interval?: number | null;
+      recurrence_unit?: string | null;
+      recurrence_delay_days?: number | null;
+      recurrence_start_date?: string | null;
+      recurrence_next_run_at?: string | null;
     },
     visibilityCompanyIds: string[],
     visibilityDepartmentIds: string[]
@@ -49,6 +56,13 @@ export function AddProcessDialog({ open, onClose, onAdd }: AddProcessDialogProps
   const [subcategoryId, setSubcategoryId] = useState<string | null>(null);
   const [serviceGroupId, setServiceGroupId] = useState<string | null>(null);
   const [serviceGroups, setServiceGroups] = useState<{ id: string; name: string }[]>([]);
+  const [recurrence, setRecurrence] = useState<RecurrenceData>({
+    enabled: false,
+    interval: 1,
+    unit: 'months',
+    delayDays: 7,
+    startDate: new Date().toISOString().split('T')[0],
+  });
 
   useEffect(() => {
     (async () => {
@@ -100,6 +114,12 @@ export function AddProcessDialog({ open, onClose, onAdd }: AddProcessDialogProps
         target_company_id: null,
         target_department_id: null,
         service_group_id: serviceGroupId,
+        recurrence_enabled: recurrence.enabled,
+        recurrence_interval: recurrence.enabled ? recurrence.interval : null,
+        recurrence_unit: recurrence.enabled ? recurrence.unit : null,
+        recurrence_delay_days: recurrence.enabled ? recurrence.delayDays : null,
+        recurrence_start_date: recurrence.enabled ? recurrence.startDate : null,
+        recurrence_next_run_at: recurrence.enabled ? new Date(recurrence.startDate + 'T00:00:00').toISOString() : null,
       },
       visibilityCompanyIds,
       visibilityDepartmentIds
@@ -120,6 +140,7 @@ export function AddProcessDialog({ open, onClose, onAdd }: AddProcessDialogProps
     setCategoryId(null);
     setSubcategoryId(null);
     setServiceGroupId(null);
+    setRecurrence({ enabled: false, interval: 1, unit: 'months', delayDays: 7, startDate: new Date().toISOString().split('T')[0] });
   };
 
   return (
@@ -208,6 +229,8 @@ export function AddProcessDialog({ open, onClose, onAdd }: AddProcessDialogProps
               />
             </div>
           </div>
+
+          <RecurrenceConfig value={recurrence} onChange={setRecurrence} />
 
           <VisibilitySelectExtended
             value={visibilityLevel}
