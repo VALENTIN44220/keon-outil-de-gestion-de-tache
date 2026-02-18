@@ -287,8 +287,13 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
                 </Button>
               )}
             </div>
-            <DialogTitle className="text-xl mt-2">
+            <DialogTitle className="text-xl mt-2 flex items-center gap-2 flex-wrap">
               {isEditing ? 'Modifier la tâche' : selectedChildTask.title}
+              {task?.request_number && (
+                <Badge variant="outline" className="text-xs font-mono bg-primary/10 text-primary border-primary/30">
+                  Demande : {task.request_number}
+                </Badge>
+              )}
             </DialogTitle>
           </DialogHeader>
 
