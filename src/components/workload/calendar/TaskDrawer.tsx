@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Task } from '@/types/task';
+import { useParentRequestNumber } from '@/hooks/useParentRequestNumber';
 import { WorkloadSlot } from '@/types/workload';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -100,6 +101,7 @@ export function TaskDrawer({
   onSegment,
 }: TaskDrawerProps) {
   const [comment, setComment] = useState('');
+  const parentRequestNumber = useParentRequestNumber(task?.parent_request_id || null);
 
   if (!task) return null;
 
@@ -139,7 +141,7 @@ export function TaskDrawer({
         <SheetHeader className="p-6 pb-4 border-b bg-gradient-to-r from-card to-muted/20">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <Badge className={cn("text-xs", statusConfig.bg, statusConfig.text)}>
                   {statusConfig.label}
                 </Badge>
@@ -147,6 +149,16 @@ export function TaskDrawer({
                   <PriorityIcon className="h-3 w-3" />
                   {priorityConfig.label}
                 </Badge>
+                {task.task_number && (
+                  <Badge variant="outline" className="text-[10px] font-mono bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600">
+                    {task.task_number}
+                  </Badge>
+                )}
+                {parentRequestNumber && (
+                  <Badge variant="outline" className="text-[10px] font-mono bg-primary/10 text-primary border-primary/30">
+                    {parentRequestNumber}
+                  </Badge>
+                )}
               </div>
               <SheetTitle className="text-lg font-semibold line-clamp-2 text-left">
                 {task.title}
