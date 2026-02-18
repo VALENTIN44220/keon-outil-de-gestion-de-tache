@@ -1941,6 +1941,12 @@ export type Database = {
           id: string
           is_shared: boolean
           name: string
+          recurrence_delay_days: number | null
+          recurrence_enabled: boolean
+          recurrence_interval: number | null
+          recurrence_next_run_at: string | null
+          recurrence_start_date: string | null
+          recurrence_unit: string | null
           service_group_id: string | null
           settings: Json | null
           subcategory_id: string | null
@@ -1962,6 +1968,12 @@ export type Database = {
           id?: string
           is_shared?: boolean
           name: string
+          recurrence_delay_days?: number | null
+          recurrence_enabled?: boolean
+          recurrence_interval?: number | null
+          recurrence_next_run_at?: string | null
+          recurrence_start_date?: string | null
+          recurrence_unit?: string | null
           service_group_id?: string | null
           settings?: Json | null
           subcategory_id?: string | null
@@ -1983,6 +1995,12 @@ export type Database = {
           id?: string
           is_shared?: boolean
           name?: string
+          recurrence_delay_days?: number | null
+          recurrence_enabled?: boolean
+          recurrence_interval?: number | null
+          recurrence_next_run_at?: string | null
+          recurrence_start_date?: string | null
+          recurrence_unit?: string | null
           service_group_id?: string | null
           settings?: Json | null
           subcategory_id?: string | null
@@ -2242,6 +2260,61 @@ export type Database = {
           visible_columns?: string[]
         }
         Relationships: []
+      }
+      recurrence_runs: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          executed_at: string | null
+          id: string
+          process_template_id: string
+          request_id: string | null
+          scheduled_at: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          executed_at?: string | null
+          id?: string
+          process_template_id: string
+          request_id?: string | null
+          scheduled_at: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          executed_at?: string | null
+          id?: string
+          process_template_id?: string
+          request_id?: string | null
+          scheduled_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurrence_runs_process_template_id_fkey"
+            columns: ["process_template_id"]
+            isOneToOne: false
+            referencedRelation: "process_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurrence_runs_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "recurrence_runs_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       request_field_values: {
         Row: {
@@ -5504,6 +5577,10 @@ export type Database = {
         Returns: boolean
       }
       cancel_request: { Args: { p_request_id: string }; Returns: undefined }
+      compute_next_recurrence: {
+        Args: { p_current: string; p_interval: number; p_unit: string }
+        Returns: string
+      }
       create_group_conversation: {
         Args: { _created_by: string; _member_ids: string[]; _title: string }
         Returns: string
