@@ -165,11 +165,16 @@ function KanbanTaskCard({ task, onStatusChange, onDelete, taskProgress, onTaskUp
       >
         {/* Header row with priority and actions */}
         <div className="flex items-center justify-between gap-2 mb-2">
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <div className={cn("w-2 h-2 rounded-full shrink-0", priority.dot)} />
             <Badge variant="secondary" className={cn("text-[10px] px-1.5 py-0 h-5 font-medium", priority.color)}>
               {priority.label}
             </Badge>
+            {task.task_number && (
+              <Badge variant="outline" className="text-[9px] font-mono px-1 py-0 h-4 bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600">
+                {task.task_number}
+              </Badge>
+            )}
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

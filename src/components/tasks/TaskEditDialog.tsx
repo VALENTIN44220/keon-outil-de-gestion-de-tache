@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Task, TaskStatus, TaskPriority } from '@/types/task';
+import { useParentRequestNumber } from '@/hooks/useParentRequestNumber';
 import {
   Dialog,
   DialogContent,
@@ -62,6 +63,7 @@ const priorityOptions: { value: TaskPriority; label: string }[] = [
 export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditDialogProps) {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const parentRequestNumber = useParentRequestNumber(task?.parent_request_id || null);
   
   // Form state
   const [title, setTitle] = useState('');
@@ -212,7 +214,7 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 flex-wrap">
             {isRequest ? (
               <>
                 <Ticket className="h-5 w-5" />
@@ -224,6 +226,16 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
                 <CheckSquare className="h-5 w-5" />
                 Modifier la tâche
               </>
+            )}
+            {task.task_number && (
+              <Badge variant="outline" className="text-xs font-mono bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600">
+                {task.task_number}
+              </Badge>
+            )}
+            {parentRequestNumber && (
+              <Badge variant="outline" className="text-xs font-mono bg-primary/10 text-primary border-primary/30">
+                Demande : {parentRequestNumber}
+              </Badge>
             )}
           </DialogTitle>
         </DialogHeader>

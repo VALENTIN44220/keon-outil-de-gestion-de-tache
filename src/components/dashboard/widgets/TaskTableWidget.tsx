@@ -12,6 +12,7 @@ import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Columns3 } from 'lucide-react';
 import { TASK_STATUS_LABELS, TASK_STATUS_COLORS } from '@/services/taskStatusService';
+import { supabase } from '@/integrations/supabase/client';
 
 interface TaskTableWidgetProps {
   tasks: Task[];
@@ -57,6 +58,9 @@ function renderDate(dateStr: string | null) {
 
 const ALL_COLUMNS: ColumnDef[] = [
   { key: 'task_number', label: 'N° Tâche', defaultVisible: true, render: (t) => t.task_number || '-' },
+  { key: 'parent_request_number', label: 'Réf. Demande', defaultVisible: true, render: (t) => t._parentRequestNumber ? (
+    <Badge variant="outline" className="text-[10px] font-mono bg-primary/10 text-primary border-primary/30">{t._parentRequestNumber}</Badge>
+  ) : '-' },
   { key: 'title', label: 'Titre', defaultVisible: true, render: (t) => <span className="font-medium max-w-[250px] truncate block">{t.title}</span>, width: 'max-w-[250px]' },
   { key: 'status', label: 'Statut', defaultVisible: true, render: (t) => renderStatus(t.status) },
   { key: 'priority', label: 'Priorité', defaultVisible: true, render: (t) => renderPriority(t.priority) },
@@ -82,7 +86,35 @@ export function TaskTableWidget({ tasks, onTaskClick, processId }: TaskTableWidg
   // Show only tasks (not requests)
   const taskItems = useMemo(() => tasks.filter(t => t.type === 'task' || (t.type !== 'request')), [tasks]);
 
-  const { sortedData, sortConfig, handleSort } = useTableSort(taskItems, 'created_at', 'desc');
+  // Fetch parent request numbers for tasks with parent_request_id
+  const [parentRequestNumbers, setParentRequestNumbers] = useState<Record<string, string>>({});
+  
+  useEffect(() => {
+    const parentIds = [...new Set(taskItems.filter(t => t.parent_request_id).map(t => t.parent_request_id!))];
+    if (parentIds.length === 0) {
+      setParentRequestNumbers({});
+      return;
+    }
+    supabase
+      .from('tasks')
+      .select('id, request_number')
+      .in('id', parentIds)
+      .then(({ data }) => {
+        if (data) {
+          const map: Record<string, string> = {};
+          data.forEach(r => { if (r.request_number) map[r.id] = r.request_number; });
+          setParentRequestNumbers(map);
+        }
+      });
+  }, [taskItems]);
+
+  // Enrich tasks with parent request number
+  const enrichedTasks = useMemo(() => taskItems.map(t => ({
+    ...t,
+    _parentRequestNumber: t.parent_request_id ? parentRequestNumbers[t.parent_request_id] || null : null,
+  })), [taskItems, parentRequestNumbers]);
+
+  const { sortedData, sortConfig, handleSort } = useTableSort(enrichedTasks, 'created_at', 'desc');
   const displayTasks = sortedData.slice(0, 100);
 
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {

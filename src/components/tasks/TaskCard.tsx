@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { UserPlus } from 'lucide-react';
 import { Clock, User, MoreVertical, Trash2, ChevronDown, ChevronRight, ListChecks, FileText, Eye, Building2, Pencil } from 'lucide-react';
 import { Task, TaskStatus } from '@/types/task';
+import { useParentRequestNumber } from '@/hooks/useParentRequestNumber';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -65,6 +66,7 @@ export function TaskCard({ task, onStatusChange, onDelete, compact = false, task
   const isOverdue = dueDate && dueDate < new Date() && task.status !== 'done';
   const isRequest = task.type === 'request';
   const isAssignmentTask = task.is_assignment_task;
+  const parentRequestNumber = useParentRequestNumber(task.parent_request_id);
 
   const handleCardClick = (e: React.MouseEvent) => {
     // Don't open edit if clicking on interactive elements
@@ -98,6 +100,12 @@ export function TaskCard({ task, onStatusChange, onDelete, compact = false, task
             {!task.task_number && task.request_number && (
               <Badge variant="outline" className="text-[10px] font-mono bg-blue-100 dark:bg-blue-900 border-blue-300 dark:border-blue-600">
                 {task.request_number}
+              </Badge>
+            )}
+            {/* Display parent request reference for child tasks */}
+            {parentRequestNumber && (
+              <Badge variant="outline" className="text-[10px] font-mono bg-primary/10 text-primary border-primary/30">
+                {parentRequestNumber}
               </Badge>
             )}
             {isAssignmentTask && (
