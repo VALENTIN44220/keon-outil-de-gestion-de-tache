@@ -52,6 +52,7 @@ import { AddTaskTemplateDialog } from '@/components/templates/AddTaskTemplateDia
 import { EditTaskTemplateDialog } from '@/components/templates/EditTaskTemplateDialog';
 import { addTaskToWorkflow, removeTaskFromWorkflow } from '@/hooks/useAutoWorkflowGeneration';
 import { SubProcessCustomFieldsEditor } from '@/components/templates/SubProcessCustomFieldsEditor';
+import { RecurrenceConfig, RecurrenceData } from '@/components/templates/RecurrenceConfig';
 
 interface TaskTemplateWithChecklist extends TaskTemplate {
   checklist_count: number;
@@ -104,6 +105,12 @@ export default function SubProcessSettings() {
   const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<TaskTemplateWithChecklist | null>(null);
 
+  // Recurrence state
+  const [recurrence, setRecurrence] = useState<RecurrenceData>({
+    enabled: false, interval: 1, unit: 'months', delayDays: 7, startDate: '',
+  });
+  const [isSavingRecurrence, setIsSavingRecurrence] = useState(false);
+
   // Form state
   const [formData, setFormData] = useState({
     name: '',
@@ -152,6 +159,13 @@ export default function SubProcessSettings() {
         target_department_id: spData.target_department_id,
         target_group_id: spData.target_group_id,
         modifiable_at_request: false,
+      });
+      setRecurrence({
+        enabled: (spData as any).recurrence_enabled || false,
+        interval: (spData as any).recurrence_interval || 1,
+        unit: ((spData as any).recurrence_unit || 'months') as RecurrenceData['unit'],
+        delayDays: (spData as any).recurrence_delay_days || 7,
+        startDate: (spData as any).recurrence_start_date || '',
       });
 
       // Fetch tasks with checklist count
@@ -265,6 +279,33 @@ export default function SubProcessSettings() {
     }
   };
 
+
+  const handleSaveRecurrence = async () => {
+    if (!subProcess) return;
+    setIsSavingRecurrence(true);
+    try {
+      const { error } = await supabase
+        .from('sub_process_templates')
+        .update({
+          recurrence_enabled: recurrence.enabled,
+          recurrence_interval: recurrence.interval,
+          recurrence_unit: recurrence.unit,
+          recurrence_delay_days: recurrence.delayDays,
+          recurrence_start_date: recurrence.startDate || null,
+          recurrence_next_run_at: recurrence.enabled && recurrence.startDate ? recurrence.startDate : null,
+        } as any)
+        .eq('id', subProcessId);
+
+      if (error) throw error;
+      toast.success('Configuration de récurrence enregistrée');
+      fetchData();
+    } catch (error) {
+      console.error('Error saving recurrence:', error);
+      toast.error('Erreur lors de la sauvegarde');
+    } finally {
+      setIsSavingRecurrence(false);
+    }
+  };
 
   const addValidationLevel = () => {
     if (validationLevels.length >= 5) {
@@ -472,6 +513,26 @@ export default function SubProcessSettings() {
                           {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                           <Save className="h-4 w-4 mr-2" />
                           Enregistrer
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Récurrence automatique */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base">Récurrence automatique</CardTitle>
+                      <CardDescription className="text-xs">
+                        Configurez la génération automatique de ce sous-processus à intervalle régulier
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <RecurrenceConfig value={recurrence} onChange={setRecurrence} />
+                      {canManage && (
+                        <Button size="sm" onClick={handleSaveRecurrence} disabled={isSavingRecurrence}>
+                          {isSavingRecurrence && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                          <Save className="h-3 w-3 mr-1" />
+                          Enregistrer la récurrence
                         </Button>
                       )}
                     </CardContent>

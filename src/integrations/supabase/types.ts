@@ -2271,6 +2271,7 @@ export type Database = {
           request_id: string | null
           scheduled_at: string
           status: string
+          sub_process_template_id: string | null
         }
         Insert: {
           created_at?: string
@@ -2281,6 +2282,7 @@ export type Database = {
           request_id?: string | null
           scheduled_at: string
           status?: string
+          sub_process_template_id?: string | null
         }
         Update: {
           created_at?: string
@@ -2291,6 +2293,7 @@ export type Database = {
           request_id?: string | null
           scheduled_at?: string
           status?: string
+          sub_process_template_id?: string | null
         }
         Relationships: [
           {
@@ -2312,6 +2315,20 @@ export type Database = {
             columns: ["request_id"]
             isOneToOne: false
             referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurrence_runs_sub_process_template_id_fkey"
+            columns: ["sub_process_template_id"]
+            isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["sub_process_template_id"]
+          },
+          {
+            foreignKeyName: "recurrence_runs_sub_process_template_id_fkey"
+            columns: ["sub_process_template_id"]
+            isOneToOne: false
+            referencedRelation: "sub_process_templates"
             referencedColumns: ["id"]
           },
         ]
@@ -2685,6 +2702,12 @@ export type Database = {
           name: string
           order_index: number
           process_template_id: string
+          recurrence_delay_days: number | null
+          recurrence_enabled: boolean
+          recurrence_interval: number | null
+          recurrence_next_run_at: string | null
+          recurrence_start_date: string | null
+          recurrence_unit: string | null
           target_assignee_id: string | null
           target_department_id: string | null
           target_group_id: string | null
@@ -2708,6 +2731,12 @@ export type Database = {
           name: string
           order_index?: number
           process_template_id: string
+          recurrence_delay_days?: number | null
+          recurrence_enabled?: boolean
+          recurrence_interval?: number | null
+          recurrence_next_run_at?: string | null
+          recurrence_start_date?: string | null
+          recurrence_unit?: string | null
           target_assignee_id?: string | null
           target_department_id?: string | null
           target_group_id?: string | null
@@ -2731,6 +2760,12 @@ export type Database = {
           name?: string
           order_index?: number
           process_template_id?: string
+          recurrence_delay_days?: number | null
+          recurrence_enabled?: boolean
+          recurrence_interval?: number | null
+          recurrence_next_run_at?: string | null
+          recurrence_start_date?: string | null
+          recurrence_unit?: string | null
           target_assignee_id?: string | null
           target_department_id?: string | null
           target_group_id?: string | null
