@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Save, Loader2, Eye, Lock, FormInput, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { RequestValidationConfigPanel } from '@/components/templates/RequestValidationConfigPanel';
+import { RecurrenceConfig, RecurrenceData } from '@/components/templates/RecurrenceConfig';
 import { ProcessWithTasks } from '@/types/template';
 import { toast } from 'sonner';
 import {
@@ -44,6 +45,16 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
   const [isSavingFields, setIsSavingFields] = useState(false);
   const [beProjects, setBeProjects] = useState<{ id: string; nom_projet: string; code_projet: string }[]>([]);
   const [beProjectSearch, setBeProjectSearch] = useState('');
+
+  // Recurrence config state
+  const [recurrence, setRecurrence] = useState<RecurrenceData>({
+    enabled: (process as any).recurrence_enabled || false,
+    interval: (process as any).recurrence_interval || 1,
+    unit: ((process as any).recurrence_unit || 'months') as RecurrenceData['unit'],
+    delayDays: (process as any).recurrence_delay_days || 7,
+    startDate: (process as any).recurrence_start_date || '',
+  });
+  const [isSavingRecurrence, setIsSavingRecurrence] = useState(false);
   // Fetch service groups
   useEffect(() => {
     (async () => {
@@ -70,6 +81,15 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
     } else {
       setCommonFieldsConfig(DEFAULT_COMMON_FIELDS_CONFIG);
     }
+
+    // Sync recurrence
+    setRecurrence({
+      enabled: (process as any).recurrence_enabled || false,
+      interval: (process as any).recurrence_interval || 1,
+      unit: ((process as any).recurrence_unit || 'months') as RecurrenceData['unit'],
+      delayDays: (process as any).recurrence_delay_days || 7,
+      startDate: (process as any).recurrence_start_date || '',
+    });
   }, [process.id, process.name, process.description]);
 
   // Fetch BE projects for imposed value selector
@@ -141,6 +161,35 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
       toast.error('Erreur lors de la sauvegarde');
     } finally {
       setIsSavingFields(false);
+    }
+  };
+
+  const handleSaveRecurrence = async () => {
+    setIsSavingRecurrence(true);
+    try {
+      const updateData: Record<string, any> = {
+        recurrence_enabled: recurrence.enabled,
+        recurrence_interval: recurrence.interval,
+        recurrence_unit: recurrence.unit,
+        recurrence_delay_days: recurrence.delayDays,
+        recurrence_start_date: recurrence.startDate || null,
+        recurrence_next_run_at: recurrence.enabled && recurrence.startDate ? recurrence.startDate : null,
+      };
+
+      const { error } = await supabase
+        .from('process_templates')
+        .update(updateData)
+        .eq('id', process.id);
+
+      if (error) throw error;
+
+      toast.success('Configuration de récurrence enregistrée');
+      onUpdate();
+    } catch (error) {
+      console.error('Error saving recurrence:', error);
+      toast.error('Erreur lors de la sauvegarde');
+    } finally {
+      setIsSavingRecurrence(false);
     }
   };
 
@@ -423,6 +472,26 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
         canManage={canManage}
         onUpdate={onUpdate}
       />
+
+      {/* Récurrence automatique */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Récurrence automatique</CardTitle>
+          <CardDescription className="text-xs">
+            Configurez la génération automatique de demandes à intervalle régulier
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <RecurrenceConfig value={recurrence} onChange={setRecurrence} />
+          {canManage && (
+            <Button size="sm" onClick={handleSaveRecurrence} disabled={isSavingRecurrence}>
+              {isSavingRecurrence && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+              <Save className="h-3 w-3 mr-1" />
+              Enregistrer la récurrence
+            </Button>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
