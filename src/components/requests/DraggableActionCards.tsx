@@ -14,6 +14,11 @@ const PROCESS_DOT_COLORS = [
   'bg-pink-500', 'bg-cyan-500', 'bg-amber-500', 'bg-teal-500',
 ];
 
+const PROCESS_BORDER_COLORS = [
+  'border-blue-500/40', 'border-violet-500/40', 'border-emerald-500/40', 'border-orange-500/40',
+  'border-pink-500/40', 'border-cyan-500/40', 'border-amber-500/40', 'border-teal-500/40',
+];
+
 export interface QuickLaunchItem {
   subProcess: { id: string; name: string };
   processId: string;
@@ -246,19 +251,25 @@ export function DraggableActionCards({
                 </div>
               </CardHeader>
               <CardContent className="flex-1 flex flex-col gap-1.5 pt-0">
-                {quickLaunchItems.map(({ subProcess, processId, colorIndex }) => (
-                  <Button
-                    key={subProcess.id}
-                    variant="ghost"
-                    size="sm"
-                    className="w-full justify-start text-xs h-8 gap-2 hover:bg-primary/10 hover:text-primary px-2"
-                    onClick={() => !isEditing && onQuickLaunch(subProcess.id, processId)}
-                    disabled={isEditing}
-                  >
-                    <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", PROCESS_DOT_COLORS[colorIndex % PROCESS_DOT_COLORS.length])} />
-                    <span className="truncate">{subProcess.name}</span>
-                  </Button>
-                ))}
+                {quickLaunchItems.map(({ subProcess, processId, colorIndex }) => {
+                  const borderColor = PROCESS_BORDER_COLORS[colorIndex % PROCESS_BORDER_COLORS.length];
+                  return (
+                    <Button
+                      key={subProcess.id}
+                      variant="ghost"
+                      size="sm"
+                      className={cn(
+                        "w-full justify-start text-xs h-8 gap-2 hover:bg-primary/10 hover:text-primary px-2 rounded-lg border",
+                        borderColor,
+                      )}
+                      onClick={() => !isEditing && onQuickLaunch(subProcess.id, processId)}
+                      disabled={isEditing}
+                    >
+                      <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", PROCESS_DOT_COLORS[colorIndex % PROCESS_DOT_COLORS.length])} />
+                      <span className="truncate">{subProcess.name}</span>
+                    </Button>
+                  );
+                })}
               </CardContent>
             </Card>
           </div>
