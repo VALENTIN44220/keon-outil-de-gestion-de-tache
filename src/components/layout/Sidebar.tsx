@@ -14,6 +14,7 @@ import keonLogo from '@/assets/keon-logo.jpg';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { UserProfilePopover } from './UserProfilePopover';
 import type { ScreenPermissionKey } from '@/types/permissions';
+import { usePendingValidationRequests } from '@/hooks/usePendingValidationRequests';
 
 interface SidebarProps {
   activeView: string;
@@ -148,6 +149,7 @@ export function Sidebar({
   const { effectivePermissions, canAccessScreen } = useEffectivePermissions();
   const { profile: authProfile } = useAuth();
   const { isSimulating, simulatedProfile } = useSimulation();
+  const { count: pendingValidationCount } = usePendingValidationRequests();
   
   const profile = isSimulating && simulatedProfile ? simulatedProfile : authProfile;
 
@@ -326,6 +328,11 @@ export function Sidebar({
                       {isActive && (
                         <div className={cn("absolute inset-0 rounded-xl blur-sm opacity-50", colors.iconBg)} />
                       )}
+                      {collapsed && item.id === 'dashboard' && pendingValidationCount > 0 && (
+                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-destructive text-destructive-foreground rounded-full text-[9px] flex items-center justify-center font-bold z-20">
+                          {pendingValidationCount}
+                        </div>
+                      )}
                     </div>
                     
                     {!collapsed && (
@@ -336,6 +343,11 @@ export function Sidebar({
                         )}>
                           {item.label}
                         </span>
+                        {item.id === 'dashboard' && pendingValidationCount > 0 && (
+                          <Badge variant="destructive" className="text-[10px] px-1.5 py-0 min-w-[20px] justify-center">
+                            {pendingValidationCount}
+                          </Badge>
+                        )}
                         {isActive && (
                           <div className={cn("w-2 h-2 rounded-full", colors.iconBg)} />
                         )}
