@@ -139,6 +139,7 @@ export function Sidebar({
     const saved = localStorage.getItem('sidebar-collapsed');
     return saved === 'true';
   });
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [permissionProfileName, setPermissionProfileName] = useState<string | null>(null);
   const [isRightSide, setIsRightSide] = useState(() => {
     const saved = localStorage.getItem('sidebar-position');
@@ -171,7 +172,7 @@ export function Sidebar({
     return groups;
   }, [effectivePermissions, isAdmin, canAccessScreen]);
 
-  const collapsed = isMobile || manualCollapsed;
+  const collapsed = !isMobile && manualCollapsed;
 
   useEffect(() => {
     if (!isMobile) {
@@ -224,8 +225,155 @@ export function Sidebar({
     } else if (currentPath !== path) {
       navigate(path);
     }
+    if (isMobile) {
+      setMobileOpen(false);
+    }
   };
 
+  // Mobile: floating logo button + overlay sidebar
+  if (isMobile) {
+    return (
+      <>
+        {/* Floating KEON logo button */}
+        {!mobileOpen && (
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="fixed top-3 left-3 z-50 p-1.5 rounded-xl bg-white shadow-premium-lg border border-border"
+            aria-label="Ouvrir le menu"
+          >
+            <img src={keonLogo} alt="KEON" className="h-10 w-10 object-cover rounded-lg" />
+            {pendingValidationCount > 0 && (
+              <div className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground rounded-full text-[10px] flex items-center justify-center font-bold">
+                {pendingValidationCount}
+              </div>
+            )}
+          </button>
+        )}
+
+        {/* Backdrop */}
+        {mobileOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={() => setMobileOpen(false)}
+          />
+        )}
+
+        {/* Slide-in sidebar */}
+        <aside
+          className={cn(
+            "fixed top-0 left-0 h-screen w-64 z-50 bg-white shadow-premium-xl border-r border-border flex flex-col transition-transform duration-300 ease-in-out",
+            mobileOpen ? "translate-x-0" : "-translate-x-full"
+          )}
+        >
+          {/* Logo header */}
+          <div className="p-4 flex items-center justify-between relative">
+            <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-primary via-accent to-success opacity-80" />
+            <button onClick={() => setMobileOpen(false)} className="flex items-center gap-3">
+              <div className="relative">
+                <img src={keonLogo} alt="KEON Group" className="h-10 w-auto rounded-lg shadow-sm" />
+                <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-success rounded-full border-2 border-white" />
+              </div>
+              <div className="flex flex-col">
+                <span className="font-display text-sm font-semibold text-foreground tracking-wide">KEON</span>
+                <span className="text-[10px] text-muted-foreground">Task Manager</span>
+              </div>
+            </button>
+            <button
+              onClick={() => setMobileOpen(false)}
+              className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all duration-200"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="px-3 my-2">
+            <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+          </div>
+
+          {/* Navigation */}
+          <nav className="flex-1 px-3 overflow-y-auto">
+            {filteredGroups.map((group, groupIndex) => (
+              <div key={groupIndex}>
+                {groupIndex > 0 && (
+                  <div className="py-2">
+                    <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+                  </div>
+                )}
+                <div className="space-y-1">
+                  {group.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = activeView === item.id;
+                    const colors = menuColors[item.id] || menuColors.dashboard;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => handleMenuClick(item.id, item.path)}
+                        className={cn(
+                          "w-full flex items-center gap-3 transition-all duration-200 font-body group relative px-3 py-2.5 rounded-xl",
+                          isActive && [colors.bg, "border-l-4", colors.border],
+                          !isActive && "hover:bg-muted border-l-4 border-transparent",
+                        )}
+                      >
+                        <div className={cn(
+                          "flex items-center justify-center rounded-xl transition-all duration-200 relative p-2",
+                          isActive
+                            ? [colors.iconBg, "text-white shadow-md"]
+                            : "bg-muted text-muted-foreground group-hover:text-foreground",
+                        )}>
+                          <Icon className="w-4 h-4 relative z-10" />
+                          {isActive && <div className={cn("absolute inset-0 rounded-xl blur-sm opacity-50", colors.iconBg)} />}
+                        </div>
+                        <span className={cn(
+                          "font-medium text-sm transition-colors flex-1 text-left",
+                          isActive ? [colors.text, "font-semibold"] : "text-muted-foreground group-hover:text-foreground"
+                        )}>
+                          {item.label}
+                        </span>
+                        {item.id === 'dashboard' && pendingValidationCount > 0 && (
+                          <Badge variant="destructive" className="text-[10px] px-1.5 py-0 min-w-[20px] justify-center">
+                            {pendingValidationCount}
+                          </Badge>
+                        )}
+                        {isActive && <div className={cn("w-2 h-2 rounded-full", colors.iconBg)} />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </nav>
+
+          <div className="px-3 my-2">
+            <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+          </div>
+
+          {/* User section */}
+          <div className="p-3">
+            <UserProfilePopover>
+              <button className="w-full flex items-center gap-3 rounded-xl transition-all duration-200 cursor-pointer group px-3 py-3 hover:bg-muted">
+                <Avatar className="flex-shrink-0 ring-2 ring-primary/20 group-hover:ring-primary/40 transition-all h-10 w-10">
+                  <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || 'Utilisateur'} />
+                  <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-white text-sm font-semibold">
+                    {getInitials(profile?.display_name)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0 text-left">
+                  <p className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition-colors">
+                    {profile?.display_name || 'Utilisateur'}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {permissionProfileName || profile?.job_title || 'Non défini'}
+                  </p>
+                </div>
+              </button>
+            </UserProfilePopover>
+          </div>
+        </aside>
+      </>
+    );
+  }
+
+  // Desktop/Tablet: standard sidebar
   return (
     <aside 
       data-sidebar-position={isRightSide ? 'right' : 'left'} 
@@ -240,7 +388,6 @@ export function Sidebar({
     >
       {/* Logo with gradient accent */}
       <div className="p-4 flex items-center justify-between relative">
-        {/* Gradient accent line at bottom */}
         <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-primary via-accent to-success opacity-80" />
         
         {!collapsed && (
@@ -256,36 +403,33 @@ export function Sidebar({
           </div>
         )}
         
-        {!isMobile && (
-          <div className="flex items-center gap-1">
-            {!collapsed && (
-              <button 
-                onClick={toggleSidebarPosition} 
-                className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all duration-200"
-                title={isRightSide ? "Déplacer à gauche" : "Déplacer à droite"}
-              >
-                <ArrowLeftRight className="w-4 h-4" />
-              </button>
-            )}
+        <div className="flex items-center gap-1">
+          {!collapsed && (
             <button 
-              onClick={() => setManualCollapsed(!manualCollapsed)} 
+              onClick={toggleSidebarPosition} 
               className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all duration-200"
-              title={collapsed ? "Étendre" : "Replier"}
+              title={isRightSide ? "Déplacer à gauche" : "Déplacer à droite"}
             >
-              {collapsed 
-                ? (isRightSide ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />) 
-                : (isRightSide ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />)
-              }
+              <ArrowLeftRight className="w-4 h-4" />
             </button>
-          </div>
-        )}
+          )}
+          <button 
+            onClick={() => setManualCollapsed(!manualCollapsed)} 
+            className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all duration-200"
+            title={collapsed ? "Étendre" : "Replier"}
+          >
+            {collapsed 
+              ? (isRightSide ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />) 
+              : (isRightSide ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />)
+            }
+          </button>
+        </div>
         
-        {isMobile && collapsed && (
+        {collapsed && (
           <img src={keonLogo} alt="KEON" className="h-10 w-10 object-cover rounded-lg mx-auto" />
         )}
       </div>
 
-      {/* Separator with subtle gradient */}
       <div className="px-3 my-2">
         <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
       </div>
@@ -361,7 +505,6 @@ export function Sidebar({
         ))}
       </nav>
 
-      {/* Separator */}
       <div className="px-3 my-2">
         <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
       </div>
@@ -373,10 +516,7 @@ export function Sidebar({
             "w-full flex items-center gap-3 rounded-xl transition-all duration-200 cursor-pointer group",
             collapsed ? "justify-center p-2" : "px-3 py-3 hover:bg-muted"
           )}>
-            <Avatar className={cn(
-              "flex-shrink-0 ring-2 ring-primary/20 group-hover:ring-primary/40 transition-all",
-              collapsed ? "h-10 w-10" : "h-10 w-10"
-            )}>
+            <Avatar className="flex-shrink-0 ring-2 ring-primary/20 group-hover:ring-primary/40 transition-all h-10 w-10">
               <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || 'Utilisateur'} />
               <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-white text-sm font-semibold">
                 {getInitials(profile?.display_name)}
