@@ -25,6 +25,8 @@ import {
   Building2,
   User,
   Eye,
+  Zap,
+  ChevronRight,
 } from 'lucide-react';
 import { ServiceProcessCard } from '@/components/tasks/ServiceProcessCard';
 import { supabase } from '@/integrations/supabase/client';
@@ -204,13 +206,26 @@ const Requests = () => {
     setIsDetailOpen(true);
   };
 
+  // Collect all quick launch sub-processes
+  const quickLaunchItems = useMemo(() => {
+    const items: { subProcess: SubProcessTemplate; processId: string; processName: string }[] = [];
+    for (const process of processes) {
+      for (const sp of process.sub_processes) {
+        if (sp.show_quick_launch) {
+          items.push({ subProcess: sp, processId: process.id, processName: process.name });
+        }
+      }
+    }
+    return items;
+  }, [processes]);
+
   const renderCreateTab = () => (
     <div className="space-y-6">
       {/* Quick action cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className={`grid grid-cols-1 md:grid-cols-2 ${quickLaunchItems.length > 0 ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-4`}>
         {/* Personal task */}
         <Card 
-          className="cursor-pointer hover:shadow-md transition-shadow border-2 hover:border-primary/50"
+          className="cursor-pointer hover:shadow-md transition-shadow border-2 hover:border-primary/50 flex flex-col"
           onClick={() => setIsAddTaskOpen(true)}
         >
           <CardHeader className="pb-3">
@@ -221,14 +236,14 @@ const Requests = () => {
               <CardTitle className="text-base">Tâche personnelle</CardTitle>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex-1">
             <CardDescription>Créer une tâche pour moi-même</CardDescription>
           </CardContent>
         </Card>
 
         {/* Team task */}
         <Card 
-          className={`cursor-pointer hover:shadow-md transition-shadow border-2 hover:border-primary/50 ${!isManager ? 'opacity-50' : ''}`}
+          className={`cursor-pointer hover:shadow-md transition-shadow border-2 hover:border-primary/50 flex flex-col ${!isManager ? 'opacity-50' : ''}`}
           onClick={() => isManager && setIsNewTaskOpen(true)}
         >
           <CardHeader className="pb-3">
@@ -239,7 +254,7 @@ const Requests = () => {
               <CardTitle className="text-base">Affecter à mon équipe</CardTitle>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex-1">
             <CardDescription>
               {isManager ? "Affecter une tâche à un membre de votre équipe" : "Réservé aux managers"}
             </CardDescription>
@@ -248,7 +263,7 @@ const Requests = () => {
 
         {/* Custom request */}
         <Card 
-          className="cursor-pointer hover:shadow-md transition-shadow border-2 hover:border-accent/50"
+          className="cursor-pointer hover:shadow-md transition-shadow border-2 hover:border-accent/50 flex flex-col"
           onClick={() => setIsNewRequestOpen(true)}
         >
           <CardHeader className="pb-3">
@@ -259,10 +274,38 @@ const Requests = () => {
               <CardTitle className="text-base">Demande personnalisée</CardTitle>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex-1">
             <CardDescription>Créer une demande libre à un service</CardDescription>
           </CardContent>
         </Card>
+
+        {/* Express request card with quick launch buttons */}
+        {quickLaunchItems.length > 0 && (
+          <Card className="border-2 border-dashed border-primary/30 bg-primary/5 flex flex-col">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/15">
+                  <Zap className="h-5 w-5 text-primary" />
+                </div>
+                <CardTitle className="text-base">Demande express</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="flex-1 flex flex-col gap-1.5 pt-0">
+              {quickLaunchItems.map(({ subProcess, processId }) => (
+                <Button
+                  key={subProcess.id}
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start text-xs h-8 gap-2 hover:bg-primary/10 hover:text-primary px-2"
+                  onClick={() => handleOpenRequest(null as any, subProcess.id, processId)}
+                >
+                  <ChevronRight className="h-3 w-3 shrink-0 text-primary" />
+                  <span className="truncate">{subProcess.name}</span>
+                </Button>
+              ))}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Service requests by process */}
