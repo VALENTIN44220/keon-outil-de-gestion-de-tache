@@ -2708,6 +2708,7 @@ export type Database = {
           recurrence_next_run_at: string | null
           recurrence_start_date: string | null
           recurrence_unit: string | null
+          show_quick_launch: boolean
           target_assignee_id: string | null
           target_department_id: string | null
           target_group_id: string | null
@@ -2737,6 +2738,7 @@ export type Database = {
           recurrence_next_run_at?: string | null
           recurrence_start_date?: string | null
           recurrence_unit?: string | null
+          show_quick_launch?: boolean
           target_assignee_id?: string | null
           target_department_id?: string | null
           target_group_id?: string | null
@@ -2766,6 +2768,7 @@ export type Database = {
           recurrence_next_run_at?: string | null
           recurrence_start_date?: string | null
           recurrence_unit?: string | null
+          show_quick_launch?: boolean
           target_assignee_id?: string | null
           target_department_id?: string | null
           target_group_id?: string | null
