@@ -127,6 +127,7 @@ export function SubProcessConfigView({
     target_department_id: null as string | null,
     target_group_id: null as string | null,
     modifiable_at_request: false,
+    show_quick_launch: false,
   });
 
   // Article filter config (stored in form_schema)
@@ -167,6 +168,7 @@ export function SubProcessConfigView({
           target_department_id: spData.target_department_id,
           target_group_id: spData.target_group_id,
           modifiable_at_request: false,
+          show_quick_launch: (spData as any).show_quick_launch ?? false,
         });
 
         // Load article filter and hidden request fields from form_schema
@@ -260,8 +262,9 @@ export function SubProcessConfigView({
           name: formData.name,
           description: formData.description || null,
           is_mandatory: formData.is_mandatory,
+          show_quick_launch: formData.show_quick_launch,
           form_schema: updatedSchema,
-        })
+        } as any)
         .eq('id', subProcessId);
 
       if (error) throw error;
@@ -515,6 +518,19 @@ export function SubProcessConfigView({
                       <Switch
                         checked={formData.is_mandatory}
                         onCheckedChange={(checked) => setFormData({ ...formData, is_mandatory: checked })}
+                        disabled={!canManage}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                      <div>
+                        <Label>Afficher en lancement rapide</Label>
+                        <p className="text-xs text-muted-foreground">
+                          Ajoute un bouton raccourci sur la carte du processus dans la page Demandes
+                        </p>
+                      </div>
+                      <Switch
+                        checked={formData.show_quick_launch}
+                        onCheckedChange={(checked) => setFormData({ ...formData, show_quick_launch: checked })}
                         disabled={!canManage}
                       />
                     </div>
