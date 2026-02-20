@@ -561,13 +561,53 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
 
       const selectedCategory = categories.find(c => c.id === categoryId);
 
-      const { data: requestData, error: requestError } = await supabase
+      // Check if process has request validation enabled
+      let hasRequestValidation = false;
+      let requestValidationConfig: any = null;
+      let validatorType1: string | null = null;
+      let validatorId1: string | null = null;
+      let validatorType2: string | null = null;
+      let validatorId2: string | null = null;
+
+      if (linkedProcessId) {
+        const { data: processTemplate } = await (supabase as any)
+          .from('process_templates')
+          .select('settings')
+          .eq('id', linkedProcessId)
+          .single();
+
+        requestValidationConfig = processTemplate?.settings?.request_validation;
+        hasRequestValidation = requestValidationConfig?.enabled === true;
+
+        if (hasRequestValidation) {
+          validatorType1 = requestValidationConfig.level_1?.type || null;
+          if (validatorType1 === 'manager') {
+            validatorId1 = currentUser?.manager_id || null;
+          } else {
+            validatorId1 = requestValidationConfig.level_1?.target_id || null;
+          }
+
+          if (requestValidationConfig.level_2?.enabled) {
+            validatorType2 = requestValidationConfig.level_2.type || null;
+            if (validatorType2 === 'manager') {
+              validatorId2 = currentUser?.manager_id || null;
+            } else {
+              validatorId2 = requestValidationConfig.level_2.target_id || null;
+            }
+          }
+        }
+      }
+
+      const initialStatus = hasRequestValidation ? 'todo' : 'todo';
+      const requestValidationStatus = hasRequestValidation ? 'pending_level_1' : 'none';
+
+      const { data: requestData, error: requestError } = await (supabase as any)
         .from('tasks')
         .insert({
           title: title.trim(),
           description: description.trim() || null,
           priority,
-          status: 'todo',
+          status: initialStatus,
           type: 'request',
           category: selectedCategory?.name || null,
           category_id: categoryId,
@@ -587,6 +627,14 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
           source_process_template_id: linkedProcessId,
           source_sub_process_template_id: linkedSubProcessId,
           be_project_id: beProjectId,
+          // Request validation fields
+          request_validation_enabled: hasRequestValidation,
+          request_validation_status: requestValidationStatus,
+          request_validator_type_1: validatorType1,
+          request_validator_id_1: validatorId1,
+          request_validator_type_2: validatorType2,
+          request_validator_id_2: validatorId2,
+          process_template_id: linkedProcessId,
         })
         .select()
         .single();
@@ -644,7 +692,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
               request_id: requestData.id,
               sub_process_template_id: subProcessId,
               order_index: i,
-              status: 'pending',
+              status: hasRequestValidation ? 'waiting_validation' : 'pending',
             });
 
           if (linkErr) throw linkErr;
@@ -653,7 +701,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
           const subProcessDeptId = subProcess?.target_department_id || targetDepartmentId;
           const targetManagerId = subProcess?.target_manager_id || undefined;
 
-          if (linkedProcessId && subProcessDeptId) {
+          if (!hasRequestValidation && linkedProcessId && subProcessDeptId) {
             const count = await generatePendingAssignments({
               parentRequestId: requestData.id,
               processTemplateId: linkedProcessId,
@@ -665,34 +713,44 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
           }
         }
 
-        toast.success(
-          `Demande créée avec ${selectedSubProcessIds.length} sous-processus sélectionné(s)`
-        );
+        if (hasRequestValidation) {
+          toast.success(
+            `Demande créée — en attente de validation (${selectedSubProcessIds.length} sous-processus)`
+          );
+        } else {
+          toast.success(
+            `Demande créée avec ${selectedSubProcessIds.length} sous-processus sélectionné(s)`
+          );
+        }
       } else if (linkedSubProcessId && targetDepartmentId) {
-        const { data: subProcess } = await supabase
-          .from('sub_process_templates')
-          .select('target_manager_id, target_department_id')
-          .eq('id', linkedSubProcessId)
-          .single();
+        if (!hasRequestValidation) {
+          const { data: subProcess } = await supabase
+            .from('sub_process_templates')
+            .select('target_manager_id, target_department_id')
+            .eq('id', linkedSubProcessId)
+            .single();
 
-        const subProcessDeptId = subProcess?.target_department_id || targetDepartmentId;
-        const targetManagerId = subProcess?.target_manager_id || undefined;
+          const subProcessDeptId = subProcess?.target_department_id || targetDepartmentId;
+          const targetManagerId = subProcess?.target_manager_id || undefined;
 
-        await generatePendingAssignments({
-          parentRequestId: requestData.id,
-          processTemplateId: linkedProcessId || '',
-          targetDepartmentId: subProcessDeptId,
-          subProcessTemplateId: linkedSubProcessId,
-          targetManagerId,
-        });
-        toast.success('Demande créée avec succès');
+          await generatePendingAssignments({
+            parentRequestId: requestData.id,
+            processTemplateId: linkedProcessId || '',
+            targetDepartmentId: subProcessDeptId,
+            subProcessTemplateId: linkedSubProcessId,
+            targetManagerId,
+          });
+        }
+        toast.success(hasRequestValidation ? 'Demande créée — en attente de validation' : 'Demande créée avec succès');
       } else if (linkedProcessId && targetDepartmentId) {
-        await generatePendingAssignments({
-          parentRequestId: requestData.id,
-          processTemplateId: linkedProcessId,
-          targetDepartmentId,
-        });
-        toast.success('Demande créée avec succès');
+        if (!hasRequestValidation) {
+          await generatePendingAssignments({
+            parentRequestId: requestData.id,
+            processTemplateId: linkedProcessId,
+            targetDepartmentId,
+          });
+        }
+        toast.success(hasRequestValidation ? 'Demande créée — en attente de validation' : 'Demande créée avec succès');
       } else {
         toast.success('Demande créée avec succès');
       }
