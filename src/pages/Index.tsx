@@ -29,12 +29,14 @@ import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Workflow, ChevronDown, ChevronUp, Eye, Zap, Settings2 } from 'lucide-react';
+import { Loader2, Workflow, ChevronDown, ChevronUp, Eye, Zap, Settings2, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useCategories } from '@/hooks/useCategories';
 import { Task, TaskStats } from '@/types/task';
 import { BulkActionDialog } from '@/components/tasks/BulkActionDialog';
+import { PendingValidationsPanel } from '@/components/dashboard/PendingValidationsPanel';
+import { usePendingValidationRequests } from '@/hooks/usePendingValidationRequests';
 
 const Index = () => {
   const { profile } = useAuth();
@@ -43,7 +45,7 @@ const Index = () => {
   const [taskView, setTaskView] = useState<TaskView>('grid');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [showFullStats, setShowFullStats] = useState(false);
-  const [dashboardMode, setDashboardMode] = useState<'tasks' | 'analytics' | 'tracking' | 'planner'>('tasks');
+  const [dashboardMode, setDashboardMode] = useState<'tasks' | 'analytics' | 'tracking' | 'planner' | 'validations'>('tasks');
   const [isBulkActionOpen, setIsBulkActionOpen] = useState(false);
   const [kanbanGroupMode, setKanbanGroupMode] = useState<KanbanGroupMode>('status');
   const [crossFilters, setCrossFilters] = useState<CrossFilters>(DEFAULT_CROSS_FILTERS);
@@ -91,6 +93,7 @@ const Index = () => {
   const { getPendingCount, refetch: refetchPending } = usePendingAssignments();
   const { canAssignToTeam } = useUserPermissions();
   const pendingCount = getPendingCount();
+  const { requests: pendingValidations, count: pendingValidationCount, isLoading: isLoadingValidations, refetch: refetchValidations } = usePendingValidationRequests();
   
   // State for comment notification task detail
   const [selectedTaskForComment, setSelectedTaskForComment] = useState<Task | null>(null);
@@ -367,10 +370,34 @@ const Index = () => {
             <Zap className="h-3.5 w-3.5" />
             Planner
           </Button>
+          <Button
+            variant={dashboardMode === 'validations' ? 'default' : 'ghost'}
+            size="sm"
+            onClick={() => setDashboardMode('validations')}
+            className="text-xs gap-1"
+          >
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Validations
+            {pendingValidationCount > 0 && (
+              <Badge variant="destructive" className="ml-1 text-[10px] px-1.5 py-0">
+                {pendingValidationCount}
+              </Badge>
+            )}
+          </Button>
         </div>
       </div>
 
-      {dashboardMode === 'planner' ? (
+      {dashboardMode === 'validations' ? (
+        <PendingValidationsPanel
+          requests={pendingValidations}
+          isLoading={isLoadingValidations}
+          onRefresh={refetchValidations}
+          onRequestClick={(request) => {
+            setSelectedRequest(request);
+            setIsRequestDetailOpen(true);
+          }}
+        />
+      ) : dashboardMode === 'planner' ? (
         <PlannerSyncPanel />
       ) : dashboardMode === 'tracking' ? (
         /* Request tracking dashboard */
