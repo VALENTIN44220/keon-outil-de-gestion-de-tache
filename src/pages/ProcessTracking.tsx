@@ -6,9 +6,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Loader2, ShieldX, ChevronRight } from 'lucide-react';
+import { Loader2, ShieldX, ChevronRight, ChevronLeft } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const ProcessDashboard = lazy(() =>
   import('@/components/process-tracking/ProcessDashboard')
@@ -65,6 +66,8 @@ export default function ProcessTracking() {
   const [serviceGroups, setServiceGroups] = useState<ServiceGroupInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const isMobile = useIsMobile();
   const { user } = useAuth();
 
   const loadData = useCallback(async () => {
@@ -254,94 +257,153 @@ export default function ProcessTracking() {
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header title="Suivi des processus" searchQuery="" onSearchChange={() => {}} />
         <div className="flex-1 flex overflow-hidden">
-          {/* Sidebar */}
-          <aside className="w-64 flex-shrink-0 border-r border-border bg-muted/30 overflow-y-auto">
-            <div className="p-3 space-y-1">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 py-2">Groupes de services</p>
-              {sidebarGroups.length === 0 ? (
-                <p className="text-sm text-muted-foreground px-3 py-4">Aucun processus accessible</p>
-              ) : (
-                <TooltipProvider delayDuration={300}>
+          {/* Service group sidebar */}
+          {isMobile || sidebarCollapsed ? (
+            <>
+              {/* Collapsed: show only active group icon or generic toggle */}
+              <aside className="flex-shrink-0 border-r border-border bg-muted/30 flex flex-col items-center py-3 gap-1 w-16">
+                <TooltipProvider delayDuration={200}>
                   {sidebarGroups.map((group, idx) => {
                     const color = DEPT_COLORS[idx % DEPT_COLORS.length];
-                    const isOpen = openGroups.has(group.id);
                     const isGroupActive = (activeMode === 'group' || activeMode === 'dept') && activeId === group.id;
-
+                    const hasActiveProcess = activeMode === 'process' && group.processes.some(p => p.id === activeId);
                     return (
-                      <Collapsible key={group.id} open={isOpen} onOpenChange={() => toggleGroup(group.id)}>
-                        <div className="flex items-center gap-1">
+                      <Tooltip key={group.id}>
+                        <TooltipTrigger asChild>
                           <button
-                            onClick={() => handleSelectGroup(group.id)}
+                            onClick={() => {
+                              if (isGroupActive || hasActiveProcess) {
+                                setSidebarCollapsed(false);
+                              } else {
+                                handleSelectGroup(group.id);
+                              }
+                            }}
                             className={cn(
-                              "flex-1 flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all text-left",
-                              isGroupActive
-                                ? `bg-card shadow-md ring-2 ${color.ring} ring-offset-1 ring-offset-background`
-                                : "hover:bg-muted/80"
+                              "w-10 h-10 rounded-lg flex items-center justify-center text-xs font-bold text-white transition-all",
+                              color.bg,
+                              (isGroupActive || hasActiveProcess) && "scale-110 ring-2 ring-offset-1 ring-offset-background " + color.ring,
                             )}
                           >
-                            <div className={cn(
-                              "flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white shadow-sm",
-                              color.bg,
-                              isGroupActive && "scale-110"
-                            )}>
-                              {getInitials(group.name)}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <span className={cn(
-                                "block truncate text-sm",
-                                isGroupActive ? "text-foreground font-semibold" : "text-muted-foreground"
-                              )}>
-                                {group.name}
-                              </span>
-                              <span className="text-xs text-muted-foreground">
-                                {group.totalTasks} tâche{group.totalTasks !== 1 ? 's' : ''}
-                              </span>
-                            </div>
+                            {getInitials(group.name)}
                           </button>
-                          {group.processes.length > 0 && (
-                            <CollapsibleTrigger asChild>
-                              <button className="p-1 rounded hover:bg-muted/60 text-muted-foreground">
-                                <ChevronRight className={cn("h-3.5 w-3.5 transition-transform", isOpen && "rotate-90")} />
-                              </button>
-                            </CollapsibleTrigger>
-                          )}
-                        </div>
-
-                        <CollapsibleContent>
-                          <div className="ml-6 pl-3 border-l border-border/50 space-y-0.5 py-1">
-                            {group.processes.map(p => {
-                              const isProcessActive = activeMode === 'process' && activeId === p.id;
-                              return (
-                                <Tooltip key={p.id}>
-                                  <TooltipTrigger asChild>
-                                    <button
-                                      onClick={() => handleSelectProcess(p.id)}
-                                      className={cn(
-                                        "w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-colors",
-                                        isProcessActive
-                                          ? "bg-primary/10 text-primary font-semibold"
-                                          : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                                      )}
-                                    >
-                                      <span className="block truncate">{p.name}</span>
-                                      {typeof p.task_count === 'number' && (
-                                        <span className="text-[10px] opacity-70">{p.task_count} tâche{p.task_count !== 1 ? 's' : ''}</span>
-                                      )}
-                                    </button>
-                                  </TooltipTrigger>
-                                  <TooltipContent side="right" className="text-xs">{p.name}</TooltipContent>
-                                </Tooltip>
-                              );
-                            })}
-                          </div>
-                        </CollapsibleContent>
-                      </Collapsible>
+                        </TooltipTrigger>
+                        <TooltipContent side="right" className="text-xs">{group.name}</TooltipContent>
+                      </Tooltip>
                     );
                   })}
+                  {/* Expand button */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => setSidebarCollapsed(false)}
+                        className="mt-2 p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="text-xs">Développer</TooltipContent>
+                  </Tooltip>
                 </TooltipProvider>
-              )}
-            </div>
-          </aside>
+              </aside>
+            </>
+          ) : (
+            <aside className="w-64 flex-shrink-0 border-r border-border bg-muted/30 overflow-y-auto">
+              <div className="p-3 space-y-1">
+                <div className="flex items-center justify-between px-3 py-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Groupes de services</p>
+                  <button
+                    onClick={() => setSidebarCollapsed(true)}
+                    className="p-1 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all"
+                    title="Replier"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                </div>
+                {sidebarGroups.length === 0 ? (
+                  <p className="text-sm text-muted-foreground px-3 py-4">Aucun processus accessible</p>
+                ) : (
+                  <TooltipProvider delayDuration={300}>
+                    {sidebarGroups.map((group, idx) => {
+                      const color = DEPT_COLORS[idx % DEPT_COLORS.length];
+                      const isOpen = openGroups.has(group.id);
+                      const isGroupActive = (activeMode === 'group' || activeMode === 'dept') && activeId === group.id;
+
+                      return (
+                        <Collapsible key={group.id} open={isOpen} onOpenChange={() => toggleGroup(group.id)}>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleSelectGroup(group.id)}
+                              className={cn(
+                                "flex-1 flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all text-left",
+                                isGroupActive
+                                  ? `bg-card shadow-md ring-2 ${color.ring} ring-offset-1 ring-offset-background`
+                                  : "hover:bg-muted/80"
+                              )}
+                            >
+                              <div className={cn(
+                                "flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white shadow-sm",
+                                color.bg,
+                                isGroupActive && "scale-110"
+                              )}>
+                                {getInitials(group.name)}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <span className={cn(
+                                  "block truncate text-sm",
+                                  isGroupActive ? "text-foreground font-semibold" : "text-muted-foreground"
+                                )}>
+                                  {group.name}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                  {group.totalTasks} tâche{group.totalTasks !== 1 ? 's' : ''}
+                                </span>
+                              </div>
+                            </button>
+                            {group.processes.length > 0 && (
+                              <CollapsibleTrigger asChild>
+                                <button className="p-1 rounded hover:bg-muted/60 text-muted-foreground">
+                                  <ChevronRight className={cn("h-3.5 w-3.5 transition-transform", isOpen && "rotate-90")} />
+                                </button>
+                              </CollapsibleTrigger>
+                            )}
+                          </div>
+
+                          <CollapsibleContent>
+                            <div className="ml-6 pl-3 border-l border-border/50 space-y-0.5 py-1">
+                              {group.processes.map(p => {
+                                const isProcessActive = activeMode === 'process' && activeId === p.id;
+                                return (
+                                  <Tooltip key={p.id}>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        onClick={() => handleSelectProcess(p.id)}
+                                        className={cn(
+                                          "w-full text-left px-2.5 py-1.5 rounded-md text-xs transition-colors",
+                                          isProcessActive
+                                            ? "bg-primary/10 text-primary font-semibold"
+                                            : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                                        )}
+                                      >
+                                        <span className="block truncate">{p.name}</span>
+                                        {typeof p.task_count === 'number' && (
+                                          <span className="text-[10px] opacity-70">{p.task_count} tâche{p.task_count !== 1 ? 's' : ''}</span>
+                                        )}
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="right" className="text-xs">{p.name}</TooltipContent>
+                                  </Tooltip>
+                                );
+                              })}
+                            </div>
+                          </CollapsibleContent>
+                        </Collapsible>
+                      );
+                    })}
+                  </TooltipProvider>
+                )}
+              </div>
+            </aside>
+          )}
 
           {/* Main content */}
           <main className="flex-1 overflow-y-auto p-6">
