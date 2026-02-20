@@ -200,13 +200,14 @@ const Requests = () => {
     setIsDetailOpen(true);
   };
 
-  // Collect all quick launch sub-processes
+  // Collect all quick launch sub-processes with color index
   const quickLaunchItems = useMemo(() => {
-    const items: { subProcess: SubProcessTemplate; processId: string; processName: string }[] = [];
-    for (const process of processes) {
+    const items: { subProcess: SubProcessTemplate; processId: string; processName: string; colorIndex: number }[] = [];
+    for (let i = 0; i < processes.length; i++) {
+      const process = processes[i];
       for (const sp of process.sub_processes) {
         if (sp.show_quick_launch) {
-          items.push({ subProcess: sp, processId: process.id, processName: process.name });
+          items.push({ subProcess: sp, processId: process.id, processName: process.name, colorIndex: i });
         }
       }
     }

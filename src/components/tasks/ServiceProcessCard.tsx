@@ -98,7 +98,7 @@ export function ServiceProcessCard({
 }: ServiceProcessCardProps) {
   const colors = cardColors[colorIndex % cardColors.length];
   const hasSubProcesses = subProcesses.length > 0;
-  const quickLaunchSubs = subProcesses.filter(sp => sp.show_quick_launch);
+  
 
   return (
     <Card 
@@ -138,36 +138,14 @@ export function ServiceProcessCard({
           </div>
         </div>
 
-        {/* Sub-processes preview */}
+        {/* Sub-processes count */}
         {hasSubProcesses && (
           <div className="mb-3">
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2">
               <Layers className={cn("h-3.5 w-3.5", colors.icon)} />
               <span className="text-xs font-medium text-muted-foreground">
                 {subProcesses.length} sous-processus
               </span>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {subProcesses.slice(0, 3).map((sp) => (
-                <Badge 
-                  key={sp.id} 
-                  variant="secondary"
-                  className={cn(
-                    "text-[10px] px-2 py-0.5 font-medium",
-                    colors.badge
-                  )}
-                >
-                  {sp.name}
-                </Badge>
-              ))}
-              {subProcesses.length > 3 && (
-                <Badge 
-                  variant="outline" 
-                  className="text-[10px] px-2 py-0.5 text-muted-foreground"
-                >
-                  +{subProcesses.length - 3} autres
-                </Badge>
-              )}
             </div>
           </div>
         )}
@@ -185,24 +163,6 @@ export function ServiceProcessCard({
           Créer une demande
           <ChevronRight className="h-4 w-4 ml-auto" />
         </Button>
-
-        {/* Quick launch sub-process buttons */}
-        {quickLaunchSubs.length > 0 && (
-          <div className="mt-2 space-y-1.5">
-            {quickLaunchSubs.map((sp) => (
-              <Button
-                key={sp.id}
-                variant="outline"
-                size="sm"
-                className="w-full justify-start text-xs h-8 gap-2"
-                onClick={() => onQuickLaunch?.(id, sp.id)}
-              >
-                <ChevronRight className="h-3 w-3 shrink-0" />
-                <span className="truncate">{sp.name}</span>
-              </Button>
-            ))}
-          </div>
-        )}
       </CardContent>
 
       {/* Decorative corner element */}
