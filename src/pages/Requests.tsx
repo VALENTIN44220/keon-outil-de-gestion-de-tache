@@ -13,22 +13,16 @@ import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { usePendingAssignments } from '@/hooks/usePendingAssignments';
 import { useTasks } from '@/hooks/useTasks';
 import { Task, TaskStats } from '@/types/task';
-import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { 
   Loader2, 
   Plus, 
-  FileText, 
-  Users,
   Building2,
-  User,
   Eye,
-  Zap,
-  ChevronRight,
 } from 'lucide-react';
 import { ServiceProcessCard } from '@/components/tasks/ServiceProcessCard';
+import { DraggableActionCards } from '@/components/requests/DraggableActionCards';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -221,92 +215,15 @@ const Requests = () => {
 
   const renderCreateTab = () => (
     <div className="space-y-6">
-      {/* Quick action cards */}
-      <div className={`grid grid-cols-1 md:grid-cols-2 ${quickLaunchItems.length > 0 ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-4`}>
-        {/* Personal task */}
-        <Card 
-          className="cursor-pointer hover:shadow-md transition-shadow border-2 hover:border-primary/50 flex flex-col"
-          onClick={() => setIsAddTaskOpen(true)}
-        >
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <User className="h-5 w-5 text-primary" />
-              </div>
-              <CardTitle className="text-base">Tâche personnelle</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="flex-1">
-            <CardDescription>Créer une tâche pour moi-même</CardDescription>
-          </CardContent>
-        </Card>
-
-        {/* Team task */}
-        <Card 
-          className={`cursor-pointer hover:shadow-md transition-shadow border-2 hover:border-primary/50 flex flex-col ${!isManager ? 'opacity-50' : ''}`}
-          onClick={() => isManager && setIsNewTaskOpen(true)}
-        >
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-blue-500/10">
-                <Users className="h-5 w-5 text-blue-500" />
-              </div>
-              <CardTitle className="text-base">Affecter à mon équipe</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="flex-1">
-            <CardDescription>
-              {isManager ? "Affecter une tâche à un membre de votre équipe" : "Réservé aux managers"}
-            </CardDescription>
-          </CardContent>
-        </Card>
-
-        {/* Custom request */}
-        <Card 
-          className="cursor-pointer hover:shadow-md transition-shadow border-2 hover:border-accent/50 flex flex-col"
-          onClick={() => setIsNewRequestOpen(true)}
-        >
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-accent/10">
-                <FileText className="h-5 w-5 text-accent-foreground" />
-              </div>
-              <CardTitle className="text-base">Demande personnalisée</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="flex-1">
-            <CardDescription>Créer une demande libre à un service</CardDescription>
-          </CardContent>
-        </Card>
-
-        {/* Express request card with quick launch buttons */}
-        {quickLaunchItems.length > 0 && (
-          <Card className="border-2 border-dashed border-primary/30 bg-primary/5 flex flex-col">
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-primary/15">
-                  <Zap className="h-5 w-5 text-primary" />
-                </div>
-                <CardTitle className="text-base">Demande express</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent className="flex-1 flex flex-col gap-1.5 pt-0">
-              {quickLaunchItems.map(({ subProcess, processId }) => (
-                <Button
-                  key={subProcess.id}
-                  variant="ghost"
-                  size="sm"
-                  className="w-full justify-start text-xs h-8 gap-2 hover:bg-primary/10 hover:text-primary px-2"
-                  onClick={() => handleOpenRequest(null as any, subProcess.id, processId)}
-                >
-                  <ChevronRight className="h-3 w-3 shrink-0 text-primary" />
-                  <span className="truncate">{subProcess.name}</span>
-                </Button>
-              ))}
-            </CardContent>
-          </Card>
-        )}
-      </div>
+      {/* Draggable quick action cards */}
+      <DraggableActionCards
+        isManager={isManager}
+        quickLaunchItems={quickLaunchItems}
+        onPersonalTask={() => setIsAddTaskOpen(true)}
+        onTeamTask={() => setIsNewTaskOpen(true)}
+        onCustomRequest={() => setIsNewRequestOpen(true)}
+        onQuickLaunch={(subProcessId, processId) => handleOpenRequest(null as any, subProcessId, processId)}
+      />
 
       {/* Service requests by process */}
       {processes.length > 0 && (
