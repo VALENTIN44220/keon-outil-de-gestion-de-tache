@@ -1,0 +1,1 @@
+ALTER TABLE public.sub_process_templates ADD COLUMN show_quick_launch boolean NOT NULL DEFAULT false;

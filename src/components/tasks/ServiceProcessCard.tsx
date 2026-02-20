@@ -14,6 +14,7 @@ interface SubProcess {
   id: string;
   name: string;
   description: string | null;
+  show_quick_launch?: boolean;
 }
 
 interface ServiceProcessCardProps {
@@ -22,6 +23,7 @@ interface ServiceProcessCardProps {
   department: string | null;
   subProcesses: SubProcess[];
   onCreateRequest: (processId: string) => void;
+  onQuickLaunch?: (processId: string, subProcessId: string) => void;
   colorIndex?: number;
 }
 
@@ -91,10 +93,12 @@ export function ServiceProcessCard({
   department, 
   subProcesses, 
   onCreateRequest,
+  onQuickLaunch,
   colorIndex = 0 
 }: ServiceProcessCardProps) {
   const colors = cardColors[colorIndex % cardColors.length];
   const hasSubProcesses = subProcesses.length > 0;
+  const quickLaunchSubs = subProcesses.filter(sp => sp.show_quick_launch);
 
   return (
     <Card 
@@ -181,6 +185,24 @@ export function ServiceProcessCard({
           Créer une demande
           <ChevronRight className="h-4 w-4 ml-auto" />
         </Button>
+
+        {/* Quick launch sub-process buttons */}
+        {quickLaunchSubs.length > 0 && (
+          <div className="mt-2 space-y-1.5">
+            {quickLaunchSubs.map((sp) => (
+              <Button
+                key={sp.id}
+                variant="outline"
+                size="sm"
+                className="w-full justify-start text-xs h-8 gap-2"
+                onClick={() => onQuickLaunch?.(id, sp.id)}
+              >
+                <ChevronRight className="h-3 w-3 shrink-0" />
+                <span className="truncate">{sp.name}</span>
+              </Button>
+            ))}
+          </div>
+        )}
       </CardContent>
 
       {/* Decorative corner element */}

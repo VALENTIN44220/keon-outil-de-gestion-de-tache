@@ -43,6 +43,7 @@ interface SubProcessTemplate {
   name: string;
   description: string | null;
   assignment_type: string;
+  show_quick_launch?: boolean;
 }
 
 interface ProcessWithSubProcesses extends ProcessTemplate {
@@ -98,7 +99,7 @@ const Requests = () => {
 
     const { data: subProcessData } = await supabase
       .from('sub_process_templates')
-      .select('id, process_template_id, name, description, assignment_type')
+      .select('id, process_template_id, name, description, assignment_type, show_quick_launch')
       .eq('is_shared', true)
       .order('order_index');
 
@@ -287,6 +288,7 @@ const Requests = () => {
                 department={process.department}
                 subProcesses={process.sub_processes}
                 onCreateRequest={(processId) => handleOpenRequest(null as any, undefined, processId)}
+                onQuickLaunch={(processId, subProcessId) => handleOpenRequest(null as any, subProcessId, processId)}
                 colorIndex={index}
               />
             ))}
