@@ -34,6 +34,8 @@ import {
 import { BEProjectSelect } from '@/components/be/BEProjectSelect';
 import { toast } from 'sonner';
 import { TemplateCustomField } from '@/types/customField';
+import { CommonFieldsConfig, DEFAULT_COMMON_FIELDS_CONFIG, resolveTitlePattern } from '@/types/commonFieldsConfig';
+import { ArticleFilterConfig } from '@/components/maintenance/ArticleSearchSelect';
 
 import {
   RequestDialogHeader,
@@ -117,6 +119,8 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [subProcessCustomFields, setSubProcessCustomFields] = useState<Record<string, TemplateCustomField[]>>({});
   const [materialLines, setMaterialLines] = useState<MaterialLine[]>([]);
+  const [commonFieldsConfig, setCommonFieldsConfig] = useState<CommonFieldsConfig | null>(null);
+  const [articleFilterConfig, setArticleFilterConfig] = useState<ArticleFilterConfig | undefined>();
 
   // Fetch custom fields for the process
   const { fields: processFields, isLoading: loadingProcessFields } = useCustomFields({
@@ -362,6 +366,63 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
     }
   }, [open, initialProcessTemplateId, initialSubProcessTemplateId]);
 
+  // Load common_fields_config when process is linked
+  useEffect(() => {
+    if (!linkedProcessId) {
+      setCommonFieldsConfig(null);
+      return;
+    }
+    supabase
+      .from('process_templates')
+      .select('settings')
+      .eq('id', linkedProcessId)
+      .single()
+      .then(({ data: ptData }) => {
+        const settings = (ptData as any)?.settings;
+        if (settings?.common_fields_config) {
+          const cfg = { ...DEFAULT_COMMON_FIELDS_CONFIG, ...settings.common_fields_config } as CommonFieldsConfig;
+          setCommonFieldsConfig(cfg);
+          if (cfg.priority && !cfg.priority.editable && cfg.priority.default_value) {
+            setPriority(cfg.priority.default_value as TaskPriority);
+          }
+          if (cfg.be_project && !cfg.be_project.editable && cfg.be_project.default_value) {
+            setBeProjectId(cfg.be_project.default_value);
+          }
+          if (cfg.title && !cfg.title.editable && cfg.title.title_pattern) {
+            const resolvedTitle = resolveTitlePattern(cfg.title.title_pattern, {
+              processName: linkedProcessName || '',
+              userName: currentUser?.display_name || '',
+            });
+            setTitle(resolvedTitle);
+          }
+        } else {
+          setCommonFieldsConfig(null);
+        }
+      });
+  }, [linkedProcessId]);
+
+  // Load article filter config from sub-process form_schema
+  useEffect(() => {
+    const spId = linkedSubProcessId || (selectedSubProcessIds.length === 1 ? selectedSubProcessIds[0] : null);
+    if (!spId) {
+      setArticleFilterConfig(undefined);
+      return;
+    }
+    supabase
+      .from('sub_process_templates')
+      .select('form_schema')
+      .eq('id', spId)
+      .single()
+      .then(({ data: spData }) => {
+        const schema = (spData as any)?.form_schema;
+        if (schema?.article_filter) {
+          setArticleFilterConfig(schema.article_filter);
+        } else {
+          setArticleFilterConfig(undefined);
+        }
+      });
+  }, [linkedSubProcessId, selectedSubProcessIds]);
+
   // Auto-apply assignment rule
   useEffect(() => {
     const deptId =
@@ -475,7 +536,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
       return;
     }
 
-    if (!dueDate) {
+    if (!dueDate && (!commonFieldsConfig || commonFieldsConfig.due_date?.visible !== false)) {
       toast.error("L'échéance est obligatoire");
       return;
     }
@@ -698,6 +759,8 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
     setFieldErrors({});
     setSubProcessCustomFields({});
     setMaterialLines([]);
+    setCommonFieldsConfig(null);
+    setArticleFilterConfig(undefined);
   };
 
   const handleAddCategory = async (name: string) => {
@@ -731,7 +794,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
   const isFormDisabled =
     !title.trim() ||
     !targetDepartmentId ||
-    !dueDate ||
+    (!dueDate && (!commonFieldsConfig || commonFieldsConfig.due_date?.visible !== false)) ||
     isSubmitting ||
     !materialValid ||
     (hasMultipleSubProcesses && selectedSubProcessIds.length === 0);
@@ -833,38 +896,58 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                   />
 
                   {/* Title Field */}
-                  <div className="space-y-2.5">
-                    <Label htmlFor="title" className="text-sm font-semibold flex items-center gap-1.5 text-foreground">
-                      Titre de la demande
-                      <span className="text-destructive text-lg leading-none">*</span>
-                    </Label>
-                    <Input
-                      id="title"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      placeholder="Décrivez brièvement votre demande..."
-                      className="h-12 text-base rounded-xl border-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all"
-                      required
-                    />
-                    <p className="text-xs text-muted-foreground pl-1">
-                      Un titre clair aide à identifier rapidement votre demande
-                    </p>
-                  </div>
+                  {(!commonFieldsConfig || commonFieldsConfig.title?.visible !== false) && (
+                    <div className="space-y-2.5">
+                      <Label htmlFor="title" className="text-sm font-semibold flex items-center gap-1.5 text-foreground">
+                        Titre de la demande
+                        <span className="text-destructive text-lg leading-none">*</span>
+                        {commonFieldsConfig?.title && !commonFieldsConfig.title.editable && (
+                          <span className="text-xs text-muted-foreground ml-1">(imposé)</span>
+                        )}
+                      </Label>
+                      <Input
+                        id="title"
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        placeholder="Décrivez brièvement votre demande..."
+                        className="h-12 text-base rounded-xl border-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all"
+                        required
+                        readOnly={commonFieldsConfig?.title?.editable === false}
+                        disabled={commonFieldsConfig?.title?.editable === false}
+                      />
+                      {commonFieldsConfig?.title?.editable === false && commonFieldsConfig.title.title_pattern ? (
+                        <p className="text-xs text-muted-foreground pl-1">
+                          Le titre sera géré automatiquement à la création de la demande
+                        </p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground pl-1">
+                          Un titre clair aide à identifier rapidement votre demande
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {/* Description Field */}
-                  <div className="space-y-2.5">
-                    <Label htmlFor="description" className="text-sm font-semibold text-foreground">
-                      Description
-                    </Label>
-                    <Textarea
-                      id="description"
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      placeholder="Donnez plus de détails sur votre demande..."
-                      rows={3}
-                      className="resize-none rounded-xl border-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all"
-                    />
-                  </div>
+                  {(!commonFieldsConfig || commonFieldsConfig.description?.visible !== false) && (
+                    <div className="space-y-2.5">
+                      <Label htmlFor="description" className="text-sm font-semibold text-foreground">
+                        Description
+                        {commonFieldsConfig?.description && !commonFieldsConfig.description.editable && (
+                          <span className="text-xs text-muted-foreground ml-1">(imposé)</span>
+                        )}
+                      </Label>
+                      <Textarea
+                        id="description"
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        placeholder="Donnez plus de détails sur votre demande..."
+                        rows={3}
+                        className="resize-none rounded-xl border-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all"
+                        readOnly={commonFieldsConfig?.description?.editable === false}
+                        disabled={commonFieldsConfig?.description?.editable === false}
+                      />
+                    </div>
+                  )}
 
                   {/* Category Selection (when no process) */}
                   {!linkedProcessId && (
@@ -881,18 +964,24 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                   )}
 
                   {/* BE Project Selection */}
-                  <div className="space-y-2.5">
-                    <Label className="text-sm font-semibold flex items-center gap-2 text-foreground">
-                      <div className="p-1.5 rounded-lg bg-accent/10">
-                        <Folder className="h-4 w-4 text-accent" />
-                      </div>
-                      Projet associé
-                    </Label>
-                    <BEProjectSelect
-                      value={beProjectId}
-                      onChange={setBeProjectId}
-                    />
-                  </div>
+                  {(!commonFieldsConfig || commonFieldsConfig.be_project?.visible !== false) && (
+                    <div className="space-y-2.5">
+                      <Label className="text-sm font-semibold flex items-center gap-2 text-foreground">
+                        <div className="p-1.5 rounded-lg bg-accent/10">
+                          <Folder className="h-4 w-4 text-accent" />
+                        </div>
+                        Projet associé
+                        {commonFieldsConfig?.be_project && !commonFieldsConfig.be_project.editable && (
+                          <span className="text-xs text-muted-foreground">(imposé)</span>
+                        )}
+                      </Label>
+                      <BEProjectSelect
+                        value={beProjectId}
+                        onChange={setBeProjectId}
+                        disabled={commonFieldsConfig?.be_project?.editable === false}
+                      />
+                    </div>
+                  )}
 
                   {/* Process Info Banner */}
                   {(linkedProcessId || linkedSubProcessId) && !hasMultipleSubProcesses && (
@@ -977,12 +1066,20 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                       </div>
                     )}
 
+                    {(!commonFieldsConfig || commonFieldsConfig.priority?.visible !== false) && (
                     <div className="space-y-2.5">
                       <Label className="text-sm font-semibold flex items-center gap-1.5 text-foreground">
                         Priorité
                         <span className="text-destructive text-lg leading-none">*</span>
+                        {commonFieldsConfig?.priority && !commonFieldsConfig.priority.editable && (
+                          <span className="text-xs text-muted-foreground ml-1">(imposé)</span>
+                        )}
                       </Label>
-                      <Select value={priority} onValueChange={(v) => setPriority(v as TaskPriority)}>
+                      <Select 
+                        value={priority} 
+                        onValueChange={(v) => setPriority(v as TaskPriority)}
+                        disabled={commonFieldsConfig?.priority?.editable === false}
+                      >
                         <SelectTrigger className="h-12 rounded-xl border-2 focus:ring-primary/20 focus:border-primary transition-all">
                           <div className="flex items-center gap-2">
                             <PriorityBadge priority={priority} size="sm" />
@@ -1012,9 +1109,11 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                         </SelectContent>
                       </Select>
                     </div>
+                    )}
                   </div>
 
                   {/* Due Date */}
+                  {(!commonFieldsConfig || commonFieldsConfig.due_date?.visible !== false) && (
                   <div className="space-y-2.5">
                     <Label htmlFor="dueDate" className="text-sm font-semibold flex items-center gap-2 text-foreground">
                       <div className="p-1.5 rounded-lg bg-warning/10">
@@ -1030,6 +1129,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                         value={dueDate}
                         onChange={(e) => setDueDate(e.target.value)}
                         required
+                        disabled={commonFieldsConfig?.due_date?.editable === false}
                         className={cn(
                           "h-12 rounded-xl border-2 transition-all",
                           !dueDate 
@@ -1048,6 +1148,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                       Format : JJ/MM/AAAA • Date limite pour la réalisation
                     </p>
                   </div>
+                  )}
                 </TabsContent>
 
                 {/* Sub-processes/Tasks Tab */}
@@ -1166,6 +1267,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                         lines={materialLines}
                         onChange={setMaterialLines}
                         disabled={isSubmitting}
+                        articleFilterConfig={articleFilterConfig}
                       />
                     </div>
                   </TabsContent>

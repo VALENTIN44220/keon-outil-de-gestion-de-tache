@@ -26,9 +26,10 @@ interface BEProjectSelectProps {
   value: string | null;
   onChange: (projectId: string | null) => void;
   onProjectCreated?: (project: BEProject) => void;
+  disabled?: boolean;
 }
 
-export function BEProjectSelect({ value, onChange, onProjectCreated }: BEProjectSelectProps) {
+export function BEProjectSelect({ value, onChange, onProjectCreated, disabled }: BEProjectSelectProps) {
   const [projects, setProjects] = useState<BEProject[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -114,7 +115,7 @@ export function BEProjectSelect({ value, onChange, onProjectCreated }: BEProject
       </Label>
       
       <div className="flex gap-2">
-        <Select value={value || ''} onValueChange={(v) => onChange(v || null)}>
+        <Select value={value || ''} onValueChange={(v) => onChange(v || null)} disabled={disabled}>
           <SelectTrigger className="flex-1">
             <SelectValue placeholder="Sélectionner un projet">
               {selectedProject && (
