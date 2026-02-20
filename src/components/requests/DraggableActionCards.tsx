@@ -8,10 +8,17 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 
+// Must match ServiceProcessCard color order
+const PROCESS_DOT_COLORS = [
+  'bg-blue-500', 'bg-violet-500', 'bg-emerald-500', 'bg-orange-500',
+  'bg-pink-500', 'bg-cyan-500', 'bg-amber-500', 'bg-teal-500',
+];
+
 export interface QuickLaunchItem {
   subProcess: { id: string; name: string };
   processId: string;
   processName: string;
+  colorIndex: number;
 }
 
 interface DraggableActionCardsProps {
@@ -239,7 +246,7 @@ export function DraggableActionCards({
                 </div>
               </CardHeader>
               <CardContent className="flex-1 flex flex-col gap-1.5 pt-0">
-                {quickLaunchItems.map(({ subProcess, processId }) => (
+                {quickLaunchItems.map(({ subProcess, processId, colorIndex }) => (
                   <Button
                     key={subProcess.id}
                     variant="ghost"
@@ -248,7 +255,7 @@ export function DraggableActionCards({
                     onClick={() => !isEditing && onQuickLaunch(subProcess.id, processId)}
                     disabled={isEditing}
                   >
-                    <ChevronRight className="h-3 w-3 shrink-0 text-primary" />
+                    <span className={cn("h-2.5 w-2.5 rounded-full shrink-0", PROCESS_DOT_COLORS[colorIndex % PROCESS_DOT_COLORS.length])} />
                     <span className="truncate">{subProcess.name}</span>
                   </Button>
                 ))}
