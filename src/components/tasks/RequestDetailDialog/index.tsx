@@ -68,6 +68,7 @@ import { SubProcessGroup, priorityConfig, statusConfig, RequestDetailDialogProps
 import { SynthesisTab } from './SynthesisTab';
 import { SubProcessTab } from './SubProcessTab';
 import { WorkflowProgressTab } from './WorkflowProgressTab';
+import { RequestCustomFieldsDisplay } from './RequestCustomFieldsDisplay';
 
 export function RequestDetailDialog({ task, open, onClose, onStatusChange }: RequestDetailDialogProps) {
   const [childTasks, setChildTasks] = useState<Task[]>([]);
@@ -766,6 +767,9 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange }: Req
                 </div>
               </div>
             )}
+
+            {/* Custom Fields */}
+            <RequestCustomFieldsDisplay taskId={task.id} />
 
             <Separator />
             <TaskCommentsSection taskId={task.id} className="min-h-[200px]" />
