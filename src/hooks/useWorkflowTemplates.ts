@@ -212,7 +212,7 @@ export function useWorkflowTemplates({
           description: description || null,
           created_by: user.id,
           is_default: true,
-          status: 'draft' as const,
+          status: 'active' as const,
           process_template_id: processTemplateId || null,
           sub_process_template_id: subProcessTemplateId || null,
         })
