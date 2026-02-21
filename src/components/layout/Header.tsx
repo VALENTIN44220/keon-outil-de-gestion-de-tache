@@ -12,8 +12,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { ValidationNotificationBell } from '@/components/notifications/ValidationNotificationBell';
 import { TaskNotification } from '@/hooks/useNotifications';
 import { CommentNotification } from '@/hooks/useCommentNotifications';
+import { Task } from '@/types/task';
 import keonTaskLogo from '@/assets/keon-task-logo.png';
 
 interface HeaderProps {
@@ -28,6 +30,9 @@ interface HeaderProps {
   hasUrgent?: boolean;
   onNotificationClick?: (taskId: string) => void;
   onCommentNotificationClick?: (taskId: string, notificationId: string) => void;
+  pendingValidations?: Task[];
+  pendingValidationCount?: number;
+  onValidationClick?: (taskId: string) => void;
 }
 
 export function Header({
@@ -42,6 +47,9 @@ export function Header({
   hasUrgent = false,
   onNotificationClick,
   onCommentNotificationClick,
+  pendingValidations = [],
+  pendingValidationCount = 0,
+  onValidationClick,
 }: HeaderProps) {
   const { user, profile, signOut } = useAuth();
   const navigate = useNavigate();
@@ -81,6 +89,13 @@ export function Header({
               className="pl-10 w-64 bg-white"
             />
           </div>
+
+          {/* Validation Notifications */}
+          <ValidationNotificationBell
+            pendingValidations={pendingValidations}
+            count={pendingValidationCount}
+            onValidationClick={onValidationClick}
+          />
 
           {/* Notifications */}
           <NotificationBell

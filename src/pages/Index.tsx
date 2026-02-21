@@ -529,6 +529,11 @@ const Index = () => {
           hasUrgent={hasUrgent}
           onNotificationClick={handleNotificationClick}
           onCommentNotificationClick={handleCommentNotificationClick}
+          pendingValidations={pendingValidations}
+          pendingValidationCount={pendingValidationCount}
+          onValidationClick={(taskId) => {
+            setDashboardMode('validations');
+          }}
         />
         
         <main className="flex-1 overflow-y-auto p-6">
