@@ -58,7 +58,7 @@ export async function generateStandardProcessWorkflow(
           `Contient ${subProcesses.length} sous-processus avec blocs standards.`,
         created_by: userId,
         is_default: true,
-        status: 'draft' as const,
+        status: 'active' as const,
         process_template_id: processId,
         sub_process_template_id: null,
       })
@@ -446,7 +446,7 @@ export async function generateStandardSubProcessWorkflow(
           `Validation: ${validationLevels} niveau(x).`,
         created_by: userId,
         is_default: true,
-        status: 'draft' as const,
+        status: 'active' as const,
         sub_process_template_id: subProcessId,
         process_template_id: null,
       })

@@ -52,7 +52,7 @@ export async function createSubProcessWorkflow(
           `Statut initial: ${initialTaskStatus === 'todo' ? 'À faire' : 'À affecter'}.`,
         created_by: userId,
         is_default: true,
-        status: 'draft' as const,
+        status: 'active' as const,
         sub_process_template_id: subProcessId,
         process_template_id: null,
       })
@@ -358,7 +358,7 @@ export async function createProcessWorkflow(
         description: `Workflow automatique pour le processus ${processName}`,
         created_by: userId,
         is_default: true,
-        status: 'draft' as const,
+        status: 'active' as const,
         process_template_id: processId,
         sub_process_template_id: null,
       })

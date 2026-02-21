@@ -96,7 +96,7 @@ export function useWorkflowMigration() {
           description: `Workflow généré automatiquement pour le processus "${process.name}"`,
           created_by: user.id,
           is_default: true,
-          status: 'draft' as const,
+          status: 'active' as const,
         }])
         .select()
         .single();
