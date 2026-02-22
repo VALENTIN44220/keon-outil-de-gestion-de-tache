@@ -535,7 +535,12 @@ export const ValidatedCustomFieldsRenderer = memo(function ValidatedCustomFields
           </div>
         );
 
-      case 'select':
+      case 'select': {
+        // Normalize options: handle both {value,label} objects and plain strings
+        const selectOptions = (field.options || []).map((opt: any) => {
+          if (typeof opt === 'string') return { value: opt, label: opt };
+          return { value: opt.value || opt, label: opt.label || opt.value || opt };
+        });
         return (
           <Select
             value={value}
@@ -551,7 +556,7 @@ export const ValidatedCustomFieldsRenderer = memo(function ValidatedCustomFields
               />
             </SelectTrigger>
             <SelectContent>
-              {(field.options || []).map((opt) => (
+              {selectOptions.map((opt) => (
                 <SelectItem key={opt.value} value={opt.value}>
                   {opt.label}
                 </SelectItem>
@@ -559,8 +564,14 @@ export const ValidatedCustomFieldsRenderer = memo(function ValidatedCustomFields
             </SelectContent>
           </Select>
         );
+      }
 
-      case 'multiselect':
+      case 'multiselect': {
+        // Normalize options: handle both {value,label} objects and plain strings
+        const multiOptions = (field.options || []).map((opt: any) => {
+          if (typeof opt === 'string') return { value: opt, label: opt };
+          return { value: opt.value || opt, label: opt.label || opt.value || opt };
+        });
         const selectedValues: string[] = value
           ? typeof value === 'string'
             ? value.split(',').filter(Boolean)
@@ -580,7 +591,7 @@ export const ValidatedCustomFieldsRenderer = memo(function ValidatedCustomFields
                 </span>
               ) : (
                 selectedValues.map((val) => {
-                  const opt = (field.options || []).find((o) => o.value === val);
+                  const opt = multiOptions.find((o) => o.value === val);
                   return (
                     <Badge
                       key={val}
@@ -601,7 +612,7 @@ export const ValidatedCustomFieldsRenderer = memo(function ValidatedCustomFields
               )}
             </div>
             <div className="flex flex-wrap gap-1">
-              {(field.options || [])
+              {multiOptions
                 .filter((opt) => !selectedValues.includes(opt.value))
                 .map((opt) => (
                   <Badge
@@ -620,6 +631,7 @@ export const ValidatedCustomFieldsRenderer = memo(function ValidatedCustomFields
             </div>
           </div>
         );
+      }
 
       case 'user_search':
         return (
