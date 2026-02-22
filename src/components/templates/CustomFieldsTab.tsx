@@ -107,6 +107,8 @@ export function CustomFieldsTab() {
   const { subProcesses } = useAllSubProcessTemplates();
   
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterProcessId, setFilterProcessId] = useState<string>('__all__');
+  const [filterSubProcessId, setFilterSubProcessId] = useState<string>('__all__');
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
   const [editingField, setEditingField] = useState<TemplateCustomField | null>(null);
@@ -120,11 +122,34 @@ export function CustomFieldsTab() {
   const [bulkProcessId, setBulkProcessId] = useState<string>('__none__');
   const [bulkSubProcessId, setBulkSubProcessId] = useState<string>('__none__');
 
-  const filteredFields = fields.filter(
-    (field) =>
+  // Sub-processes filtered by selected process filter
+  const filteredSubProcessesForFilter = filterProcessId !== '__all__'
+    ? subProcesses.filter((sp: any) => sp.process_template_id === filterProcessId)
+    : subProcesses;
+
+  const filteredFields = fields.filter((field) => {
+    // Text search
+    const matchesSearch =
       field.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      field.label.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+      field.label.toLowerCase().includes(searchQuery.toLowerCase());
+    if (!matchesSearch) return false;
+
+    // Process filter
+    if (filterProcessId !== '__all__') {
+      const fieldProcessId = field.process_template_id ||
+        (field.sub_process_template_id
+          ? (subProcesses.find((sp: any) => sp.id === field.sub_process_template_id) as any)?.process_template_id
+          : null);
+      if (fieldProcessId !== filterProcessId) return false;
+    }
+
+    // Sub-process filter
+    if (filterSubProcessId !== '__all__') {
+      if (field.sub_process_template_id !== filterSubProcessId) return false;
+    }
+
+    return true;
+  });
 
   const { sortedData: sortedFields, sortConfig, handleSort } = useTableSort(filteredFields, 'label', 'asc');
 
@@ -280,8 +305,8 @@ export function CustomFieldsTab() {
         </div>
       </div>
 
-      {/* Header Actions */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+      {/* Filters Row */}
+      <div className="flex flex-wrap gap-3 items-center">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -291,7 +316,34 @@ export function CustomFieldsTab() {
             className="pl-9 h-11 rounded-lg border-muted-foreground/20 focus:border-primary"
           />
         </div>
-        <div className="flex flex-wrap gap-2">
+        <Select value={filterProcessId} onValueChange={(v) => { setFilterProcessId(v); setFilterSubProcessId('__all__'); }}>
+          <SelectTrigger className="w-[200px] h-11">
+            <Workflow className="h-4 w-4 mr-2 text-muted-foreground" />
+            <SelectValue placeholder="Processus" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">Tous les processus</SelectItem>
+            {processes.map((p: any) => (
+              <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={filterSubProcessId} onValueChange={setFilterSubProcessId}>
+          <SelectTrigger className="w-[220px] h-11">
+            <GitBranch className="h-4 w-4 mr-2 text-muted-foreground" />
+            <SelectValue placeholder="Sous-processus" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">Tous les sous-processus</SelectItem>
+            {filteredSubProcessesForFilter.map((sp: any) => (
+              <SelectItem key={sp.id} value={sp.id}>{sp.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Header Actions */}
+      <div className="flex flex-wrap gap-2 justify-end">
           {selectedIds.size > 0 && (
             <>
               <Button
@@ -333,7 +385,6 @@ export function CustomFieldsTab() {
             <Plus className="h-4 w-4" />
             Nouveau champ
           </Button>
-        </div>
       </div>
 
       {/* Fields Table */}
