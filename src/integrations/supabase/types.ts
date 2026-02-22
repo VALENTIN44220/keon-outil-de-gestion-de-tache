@@ -1961,6 +1961,78 @@ export type Database = {
           },
         ]
       }
+      process_template_visible_groups: {
+        Row: {
+          created_at: string
+          group_id: string
+          id: string
+          process_template_id: string
+        }
+        Insert: {
+          created_at?: string
+          group_id: string
+          id?: string
+          process_template_id: string
+        }
+        Update: {
+          created_at?: string
+          group_id?: string
+          id?: string
+          process_template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "process_template_visible_groups_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "collaborator_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "process_template_visible_groups_process_template_id_fkey"
+            columns: ["process_template_id"]
+            isOneToOne: false
+            referencedRelation: "process_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      process_template_visible_users: {
+        Row: {
+          created_at: string
+          id: string
+          process_template_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          process_template_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          process_template_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "process_template_visible_users_process_template_id_fkey"
+            columns: ["process_template_id"]
+            isOneToOne: false
+            referencedRelation: "process_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "process_template_visible_users_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       process_templates: {
         Row: {
           category_id: string | null
@@ -2721,6 +2793,92 @@ export type Database = {
           },
         ]
       }
+      sub_process_template_visible_groups: {
+        Row: {
+          created_at: string
+          group_id: string
+          id: string
+          sub_process_template_id: string
+        }
+        Insert: {
+          created_at?: string
+          group_id: string
+          id?: string
+          sub_process_template_id: string
+        }
+        Update: {
+          created_at?: string
+          group_id?: string
+          id?: string
+          sub_process_template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sub_process_template_visible_group_sub_process_template_id_fkey"
+            columns: ["sub_process_template_id"]
+            isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["sub_process_template_id"]
+          },
+          {
+            foreignKeyName: "sub_process_template_visible_group_sub_process_template_id_fkey"
+            columns: ["sub_process_template_id"]
+            isOneToOne: false
+            referencedRelation: "sub_process_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sub_process_template_visible_groups_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "collaborator_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sub_process_template_visible_users: {
+        Row: {
+          created_at: string
+          id: string
+          sub_process_template_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          sub_process_template_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          sub_process_template_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sub_process_template_visible_users_sub_process_template_id_fkey"
+            columns: ["sub_process_template_id"]
+            isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["sub_process_template_id"]
+          },
+          {
+            foreignKeyName: "sub_process_template_visible_users_sub_process_template_id_fkey"
+            columns: ["sub_process_template_id"]
+            isOneToOne: false
+            referencedRelation: "sub_process_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sub_process_template_visible_users_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sub_process_templates: {
         Row: {
           assignment_type: string
@@ -3424,6 +3582,78 @@ export type Database = {
             columns: ["task_template_id"]
             isOneToOne: false
             referencedRelation: "task_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_template_visible_groups: {
+        Row: {
+          created_at: string
+          group_id: string
+          id: string
+          task_template_id: string
+        }
+        Insert: {
+          created_at?: string
+          group_id: string
+          id?: string
+          task_template_id: string
+        }
+        Update: {
+          created_at?: string
+          group_id?: string
+          id?: string
+          task_template_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_template_visible_groups_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "collaborator_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_template_visible_groups_task_template_id_fkey"
+            columns: ["task_template_id"]
+            isOneToOne: false
+            referencedRelation: "task_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_template_visible_users: {
+        Row: {
+          created_at: string
+          id: string
+          task_template_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          task_template_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          task_template_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_template_visible_users_task_template_id_fkey"
+            columns: ["task_template_id"]
+            isOneToOne: false
+            referencedRelation: "task_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_template_visible_users_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -5776,6 +6006,8 @@ export type Database = {
         | "internal_department"
         | "internal_company"
         | "public"
+        | "internal_group"
+        | "internal_users"
       validation_instance_status:
         | "pending"
         | "approved"
@@ -5970,6 +6202,8 @@ export const Constants = {
         "internal_department",
         "internal_company",
         "public",
+        "internal_group",
+        "internal_users",
       ],
       validation_instance_status: [
         "pending",

@@ -1,16 +1,20 @@
-export type TemplateVisibility = 'private' | 'internal_department' | 'internal_company' | 'public';
+export type TemplateVisibility = 'private' | 'internal_department' | 'internal_company' | 'internal_group' | 'internal_users' | 'public';
 
 export const VISIBILITY_LABELS: Record<TemplateVisibility, string> = {
   private: 'Privé',
   internal_department: 'Service',
   internal_company: 'Société',
+  internal_group: 'Réservé Groupe',
+  internal_users: 'Liste d\'utilisateurs',
   public: 'Public',
 };
 
 export const VISIBILITY_DESCRIPTIONS: Record<TemplateVisibility, string> = {
   private: 'Visible uniquement par vous et les administrateurs',
-  internal_department: 'Visible par les membres de votre service',
-  internal_company: 'Visible par les membres de votre société',
+  internal_department: 'Visible par les membres des services sélectionnés',
+  internal_company: 'Visible par les membres des sociétés sélectionnées',
+  internal_group: 'Visible par les membres des groupes de collaborateurs sélectionnés',
+  internal_users: 'Visible uniquement par les utilisateurs sélectionnés',
   public: 'Visible par tous les utilisateurs',
 };
 

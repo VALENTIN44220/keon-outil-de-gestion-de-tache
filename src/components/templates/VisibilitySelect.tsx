@@ -1,7 +1,7 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { TemplateVisibility, VISIBILITY_LABELS, VISIBILITY_DESCRIPTIONS } from '@/types/template';
-import { Lock, Users, Building2, Globe } from 'lucide-react';
+import { Lock, Users, Building2, Globe, UsersRound, UserCheck } from 'lucide-react';
 
 interface VisibilitySelectProps {
   value: TemplateVisibility;
@@ -13,6 +13,8 @@ const VISIBILITY_ICONS: Record<TemplateVisibility, typeof Lock> = {
   private: Lock,
   internal_department: Users,
   internal_company: Building2,
+  internal_group: UsersRound,
+  internal_users: UserCheck,
   public: Globe,
 };
 

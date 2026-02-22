@@ -5,154 +5,57 @@ export type TemplateType = 'process' | 'sub_process' | 'task';
 interface VisibilityData {
   companyIds: string[];
   departmentIds: string[];
+  groupIds: string[];
+  userIds: string[];
 }
 
 export async function saveTemplateVisibility(
   templateType: TemplateType,
   templateId: string,
   companyIds: string[],
-  departmentIds: string[]
+  departmentIds: string[],
+  groupIds: string[] = [],
+  userIds: string[] = []
 ): Promise<void> {
-  // Delete existing visibility entries using RPC or direct SQL-like queries
-  // Since the types aren't synced yet, we use raw queries
-  
-  if (templateType === 'process') {
-    // Delete existing
-    await supabase
-      .from('process_template_visible_companies' as any)
-      .delete()
-      .eq('process_template_id', templateId);
-    await supabase
-      .from('process_template_visible_departments' as any)
-      .delete()
-      .eq('process_template_id', templateId);
-    
-    // Insert new company visibility
-    if (companyIds.length > 0) {
-      await supabase
-        .from('process_template_visible_companies' as any)
-        .insert(companyIds.map(companyId => ({
-          process_template_id: templateId,
-          company_id: companyId,
-        })));
+  const prefix = templateType === 'process' ? 'process_template' : templateType === 'sub_process' ? 'sub_process_template' : 'task_template';
+  const fkCol = `${prefix}_id`;
+
+  // Helper to clear + re-insert a junction table
+  const sync = async (tableSuffix: string, ids: string[], idCol: string) => {
+    await supabase.from(`${prefix}_visible_${tableSuffix}` as any).delete().eq(fkCol, templateId);
+    if (ids.length > 0) {
+      await supabase.from(`${prefix}_visible_${tableSuffix}` as any).insert(
+        ids.map(id => ({ [fkCol]: templateId, [idCol]: id }))
+      );
     }
-    
-    // Insert new department visibility
-    if (departmentIds.length > 0) {
-      await supabase
-        .from('process_template_visible_departments' as any)
-        .insert(departmentIds.map(departmentId => ({
-          process_template_id: templateId,
-          department_id: departmentId,
-        })));
-    }
-  } else if (templateType === 'sub_process') {
-    await supabase
-      .from('sub_process_template_visible_companies' as any)
-      .delete()
-      .eq('sub_process_template_id', templateId);
-    await supabase
-      .from('sub_process_template_visible_departments' as any)
-      .delete()
-      .eq('sub_process_template_id', templateId);
-    
-    if (companyIds.length > 0) {
-      await supabase
-        .from('sub_process_template_visible_companies' as any)
-        .insert(companyIds.map(companyId => ({
-          sub_process_template_id: templateId,
-          company_id: companyId,
-        })));
-    }
-    
-    if (departmentIds.length > 0) {
-      await supabase
-        .from('sub_process_template_visible_departments' as any)
-        .insert(departmentIds.map(departmentId => ({
-          sub_process_template_id: templateId,
-          department_id: departmentId,
-        })));
-    }
-  } else if (templateType === 'task') {
-    await supabase
-      .from('task_template_visible_companies' as any)
-      .delete()
-      .eq('task_template_id', templateId);
-    await supabase
-      .from('task_template_visible_departments' as any)
-      .delete()
-      .eq('task_template_id', templateId);
-    
-    if (companyIds.length > 0) {
-      await supabase
-        .from('task_template_visible_companies' as any)
-        .insert(companyIds.map(companyId => ({
-          task_template_id: templateId,
-          company_id: companyId,
-        })));
-    }
-    
-    if (departmentIds.length > 0) {
-      await supabase
-        .from('task_template_visible_departments' as any)
-        .insert(departmentIds.map(departmentId => ({
-          task_template_id: templateId,
-          department_id: departmentId,
-        })));
-    }
-  }
+  };
+
+  await Promise.all([
+    sync('companies', companyIds, 'company_id'),
+    sync('departments', departmentIds, 'department_id'),
+    sync('groups', groupIds, 'group_id'),
+    sync('users', userIds, 'user_id'),
+  ]);
 }
 
 export async function getTemplateVisibility(
   templateType: TemplateType,
   templateId: string
 ): Promise<VisibilityData> {
-  let companyIds: string[] = [];
-  let departmentIds: string[] = [];
+  const prefix = templateType === 'process' ? 'process_template' : templateType === 'sub_process' ? 'sub_process_template' : 'task_template';
+  const fkCol = `${prefix}_id`;
 
-  if (templateType === 'process') {
-    const [companiesRes, departmentsRes] = await Promise.all([
-      supabase
-        .from('process_template_visible_companies' as any)
-        .select('company_id')
-        .eq('process_template_id', templateId),
-      supabase
-        .from('process_template_visible_departments' as any)
-        .select('department_id')
-        .eq('process_template_id', templateId),
-    ]);
-    
-    companyIds = (companiesRes.data as any[] || []).map((r: any) => r.company_id);
-    departmentIds = (departmentsRes.data as any[] || []).map((r: any) => r.department_id);
-  } else if (templateType === 'sub_process') {
-    const [companiesRes, departmentsRes] = await Promise.all([
-      supabase
-        .from('sub_process_template_visible_companies' as any)
-        .select('company_id')
-        .eq('sub_process_template_id', templateId),
-      supabase
-        .from('sub_process_template_visible_departments' as any)
-        .select('department_id')
-        .eq('sub_process_template_id', templateId),
-    ]);
-    
-    companyIds = (companiesRes.data as any[] || []).map((r: any) => r.company_id);
-    departmentIds = (departmentsRes.data as any[] || []).map((r: any) => r.department_id);
-  } else if (templateType === 'task') {
-    const [companiesRes, departmentsRes] = await Promise.all([
-      supabase
-        .from('task_template_visible_companies' as any)
-        .select('company_id')
-        .eq('task_template_id', templateId),
-      supabase
-        .from('task_template_visible_departments' as any)
-        .select('department_id')
-        .eq('task_template_id', templateId),
-    ]);
-    
-    companyIds = (companiesRes.data as any[] || []).map((r: any) => r.company_id);
-    departmentIds = (departmentsRes.data as any[] || []).map((r: any) => r.department_id);
-  }
+  const [companiesRes, departmentsRes, groupsRes, usersRes] = await Promise.all([
+    supabase.from(`${prefix}_visible_companies` as any).select('company_id').eq(fkCol, templateId),
+    supabase.from(`${prefix}_visible_departments` as any).select('department_id').eq(fkCol, templateId),
+    supabase.from(`${prefix}_visible_groups` as any).select('group_id').eq(fkCol, templateId),
+    supabase.from(`${prefix}_visible_users` as any).select('user_id').eq(fkCol, templateId),
+  ]);
 
-  return { companyIds, departmentIds };
+  return {
+    companyIds: (companiesRes.data as any[] || []).map((r: any) => r.company_id),
+    departmentIds: (departmentsRes.data as any[] || []).map((r: any) => r.department_id),
+    groupIds: (groupsRes.data as any[] || []).map((r: any) => r.group_id),
+    userIds: (usersRes.data as any[] || []).map((r: any) => r.user_id),
+  };
 }

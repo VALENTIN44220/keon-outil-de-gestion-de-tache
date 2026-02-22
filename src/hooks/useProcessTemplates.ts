@@ -76,7 +76,9 @@ export function useProcessTemplates() {
       target_department_id?: string | null;
     },
     visibilityCompanyIds?: string[],
-    visibilityDepartmentIds?: string[]
+    visibilityDepartmentIds?: string[],
+    visibilityGroupIds?: string[],
+    visibilityUserIds?: string[]
   ) => {
     if (!user) return;
 
@@ -97,9 +99,9 @@ export function useProcessTemplates() {
       if (error) throw error;
 
       // Save visibility associations if provided
-      if (data && (visibilityCompanyIds?.length || visibilityDepartmentIds?.length)) {
+      if (data && (visibilityCompanyIds?.length || visibilityDepartmentIds?.length || visibilityGroupIds?.length || visibilityUserIds?.length)) {
         const { saveTemplateVisibility } = await import('./useTemplateVisibility');
-        await saveTemplateVisibility('process', data.id, visibilityCompanyIds || [], visibilityDepartmentIds || []);
+        await saveTemplateVisibility('process', data.id, visibilityCompanyIds || [], visibilityDepartmentIds || [], visibilityGroupIds || [], visibilityUserIds || []);
       }
 
       setProcesses(prev => [{ ...data, task_templates: [], can_manage: true }, ...prev]);
