@@ -31,6 +31,7 @@ import { useTableLookupConfigs } from '@/hooks/useTableLookupConfigs';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Trash2 } from 'lucide-react';
 import { RepeatableTableColumnsEditor } from './RepeatableTableColumnsEditor';
+import { TableLookupSourcePicker, TableLookupSourceValue } from './TableLookupSourcePicker';
 
 interface AddCustomFieldDialogProps {
   open: boolean;
@@ -61,8 +62,8 @@ export function AddCustomFieldDialog({
   const [defaultValue, setDefaultValue] = useState('');
   const [options, setOptions] = useState<FieldOption[]>([]);
   
-  // Table lookup configuration - now uses config ID
-  const [lookupConfigId, setLookupConfigId] = useState<string | null>(null);
+  // Table lookup configuration
+  const [lookupSource, setLookupSource] = useState<TableLookupSourceValue>({ mode: 'config' });
 
   // Scope
   const [scope, setScope] = useState<FieldScope>(
@@ -117,7 +118,7 @@ export function AddCustomFieldDialog({
     setScope(defaultSubProcessId ? 'sub_process' : defaultProcessId ? 'process' : 'common');
     setProcessId(defaultProcessId || null);
     setSubProcessId(defaultSubProcessId || null);
-    setLookupConfigId(null);
+    setLookupSource({ mode: 'config' });
   };
 
   const handleClose = () => {
@@ -173,10 +174,22 @@ export function AddCustomFieldDialog({
         sub_process_template_id: scope === 'sub_process' ? subProcessId : null,
         created_by: profile?.id || null,
         order_index: 0,
-        // Table lookup configuration - get from selected config
-        lookup_table: fieldType === 'table_lookup' && lookupConfigId ? activeConfigs.find(c => c.id === lookupConfigId)?.table_name : null,
-        lookup_value_column: fieldType === 'table_lookup' && lookupConfigId ? activeConfigs.find(c => c.id === lookupConfigId)?.value_column : null,
-        lookup_label_column: fieldType === 'table_lookup' && lookupConfigId ? activeConfigs.find(c => c.id === lookupConfigId)?.display_column : null,
+        // Table lookup configuration
+        lookup_table: fieldType === 'table_lookup' ? (
+          lookupSource.mode === 'config' && lookupSource.configId
+            ? activeConfigs.find(c => c.id === lookupSource.configId)?.table_name
+            : lookupSource.mode === 'direct' ? lookupSource.tableName : null
+        ) : null,
+        lookup_value_column: fieldType === 'table_lookup' ? (
+          lookupSource.mode === 'config' && lookupSource.configId
+            ? activeConfigs.find(c => c.id === lookupSource.configId)?.value_column
+            : lookupSource.mode === 'direct' ? lookupSource.valueColumn : null
+        ) : null,
+        lookup_label_column: fieldType === 'table_lookup' ? (
+          lookupSource.mode === 'config' && lookupSource.configId
+            ? activeConfigs.find(c => c.id === lookupSource.configId)?.display_column
+            : lookupSource.mode === 'direct' ? lookupSource.labelColumn : null
+        ) : null,
       };
 
       const { error } = await supabase.from('template_custom_fields').insert(insertData);
@@ -314,50 +327,11 @@ export function AddCustomFieldDialog({
 
           {/* Table lookup configuration */}
           {fieldType === 'table_lookup' && (
-            <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
-              <Label className="text-base font-medium">Configuration de la table source</Label>
-              
-              <div className="space-y-2">
-                <Label>Source de données *</Label>
-                <Select value={lookupConfigId || '__none__'} onValueChange={(v) => setLookupConfigId(v === '__none__' ? null : v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner une source" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-popover">
-                    <SelectItem value="__none__">Sélectionner une source</SelectItem>
-                    {activeConfigs.map((config) => (
-                      <SelectItem key={config.id} value={config.id}>
-                        {config.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {activeConfigs.length === 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    Aucune configuration disponible. Configurez les sources dans Administration &gt; Champs table.
-                  </p>
-                )}
-              </div>
-
-              {lookupConfigId && (
-                <div className="text-sm text-muted-foreground p-3 bg-background rounded border">
-                  {(() => {
-                    const config = activeConfigs.find(c => c.id === lookupConfigId);
-                    if (!config) return null;
-                    return (
-                      <>
-                        <p><strong>Table :</strong> {config.table_name}</p>
-                        <p><strong>Affichage :</strong> {config.display_column}</p>
-                        <p><strong>Valeur :</strong> {config.value_column}</p>
-                        {config.filter_column && (
-                          <p><strong>Filtre :</strong> {config.filter_column} = {config.filter_value}</p>
-                        )}
-                      </>
-                    );
-                  })()}
-                </div>
-              )}
-            </div>
+            <TableLookupSourcePicker
+              value={lookupSource}
+              onChange={setLookupSource}
+              activeConfigs={activeConfigs}
+            />
           )}
 
           {/* Placeholder & Default */}

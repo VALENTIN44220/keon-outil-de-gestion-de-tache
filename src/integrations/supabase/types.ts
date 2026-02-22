@@ -5952,6 +5952,21 @@ export type Database = {
         Args: { p_be_project_id?: string; p_parent_request_id?: string }
         Returns: string
       }
+      get_public_tables_info: {
+        Args: never
+        Returns: {
+          row_count: number
+          table_name: string
+        }[]
+      }
+      get_table_columns_info: {
+        Args: { p_table_name: string }
+        Returns: {
+          column_name: string
+          data_type: string
+          is_nullable: string
+        }[]
+      }
       get_total_unread_count: { Args: { _user_id: string }; Returns: number }
       get_unread_count: {
         Args: { _conversation_id: string; _user_id: string }
