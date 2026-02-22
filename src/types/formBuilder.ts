@@ -383,7 +383,7 @@ export function validateFieldValue(
 ): { valid: boolean; message?: string } {
   // Required check
   if (field.is_required && (!value || value === '')) {
-    return { valid: false, message: 'Ce champ est obligatoire' };
+    return { valid: false, message: 'Merci de remplir tous les champs obligatoires' };
   }
   
   // Skip further validation if empty and not required
