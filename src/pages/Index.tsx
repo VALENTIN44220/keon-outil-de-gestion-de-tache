@@ -36,7 +36,10 @@ import { useCategories } from '@/hooks/useCategories';
 import { Task, TaskStats } from '@/types/task';
 import { BulkActionDialog } from '@/components/tasks/BulkActionDialog';
 import { PendingValidationsPanel } from '@/components/dashboard/PendingValidationsPanel';
+import { PendingTaskValidationsPanel } from '@/components/dashboard/PendingTaskValidationsPanel';
 import { usePendingValidationRequests } from '@/hooks/usePendingValidationRequests';
+import { usePendingTaskValidations } from '@/hooks/usePendingTaskValidations';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 const Index = () => {
   const { profile } = useAuth();
@@ -94,6 +97,8 @@ const Index = () => {
   const { canAssignToTeam } = useUserPermissions();
   const pendingCount = getPendingCount();
   const { requests: pendingValidations, count: pendingValidationCount, isLoading: isLoadingValidations, refetch: refetchValidations } = usePendingValidationRequests();
+  const { tasks: pendingTaskValidations, count: pendingTaskValidationCount, isLoading: isLoadingTaskValidations, refetch: refetchTaskValidations } = usePendingTaskValidations();
+  const totalValidationCount = pendingValidationCount + pendingTaskValidationCount;
   
   // State for comment notification task detail
   const [selectedTaskForComment, setSelectedTaskForComment] = useState<Task | null>(null);
@@ -378,9 +383,9 @@ const Index = () => {
           >
             <ShieldCheck className="h-3.5 w-3.5" />
             Validations
-            {pendingValidationCount > 0 && (
+            {totalValidationCount > 0 && (
               <Badge variant="destructive" className="ml-1 text-[10px] px-1.5 py-0">
-                {pendingValidationCount}
+                {totalValidationCount}
               </Badge>
             )}
           </Button>
@@ -388,15 +393,48 @@ const Index = () => {
       </div>
 
       {dashboardMode === 'validations' ? (
-        <PendingValidationsPanel
-          requests={pendingValidations}
-          isLoading={isLoadingValidations}
-          onRefresh={refetchValidations}
-          onRequestClick={(request) => {
-            setSelectedRequest(request);
-            setIsRequestDetailOpen(true);
-          }}
-        />
+        <Tabs defaultValue="requests" className="w-full">
+          <TabsList className="mb-4">
+            <TabsTrigger value="requests" className="gap-1.5">
+              Validation demandes
+              {pendingValidationCount > 0 && (
+                <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                  {pendingValidationCount}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="tasks" className="gap-1.5">
+              Validation tâches
+              {pendingTaskValidationCount > 0 && (
+                <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                  {pendingTaskValidationCount}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="requests">
+            <PendingValidationsPanel
+              requests={pendingValidations}
+              isLoading={isLoadingValidations}
+              onRefresh={refetchValidations}
+              onRequestClick={(request) => {
+                setSelectedRequest(request);
+                setIsRequestDetailOpen(true);
+              }}
+            />
+          </TabsContent>
+          <TabsContent value="tasks">
+            <PendingTaskValidationsPanel
+              tasks={pendingTaskValidations}
+              isLoading={isLoadingTaskValidations}
+              onRefresh={refetchTaskValidations}
+              onTaskClick={(task) => {
+                setSelectedTaskForComment(task);
+                setIsCommentDetailOpen(true);
+              }}
+            />
+          </TabsContent>
+        </Tabs>
       ) : dashboardMode === 'planner' ? (
         <PlannerSyncPanel />
       ) : dashboardMode === 'tracking' ? (
@@ -530,7 +568,7 @@ const Index = () => {
           onNotificationClick={handleNotificationClick}
           onCommentNotificationClick={handleCommentNotificationClick}
           pendingValidations={pendingValidations}
-          pendingValidationCount={pendingValidationCount}
+          pendingValidationCount={totalValidationCount}
           onValidationClick={(taskId) => {
             setDashboardMode('validations');
           }}
