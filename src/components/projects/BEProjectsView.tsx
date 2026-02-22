@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useBEProjects } from '@/hooks/useBEProjects';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { useProjectViewConfig } from '@/hooks/useProjectViewConfig';
+import { useProjectFilters } from '@/hooks/useProjectFilters';
 import { BEProject } from '@/types/beProject';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +18,7 @@ import { ProjectKanbanView, GroupByField } from './ProjectKanbanView';
 import { ProjectViewConfigPanel } from './ProjectViewConfigPanel';
 import { useFilteredProjects } from './ProjectFilters';
 import { BEProjectCardsView } from './BEProjectCardsView';
+import { ProjectMultiFiltersPanel } from './ProjectMultiFiltersPanel';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { toast } from '@/hooks/use-toast';
@@ -28,6 +30,18 @@ export function BEProjectsView() {
   const navigate = useNavigate();
   const { projects, isLoading, searchQuery, setSearchQuery, addProject, updateProject, deleteProject } = useBEProjects();
   const { permissionProfile } = useUserPermissions();
+  const {
+    filters: multiFilters,
+    setFilters: setMultiFilters,
+    presets,
+    savePreset,
+    deletePreset,
+    toggleDefault,
+    loadPreset,
+    clearFilters: clearMultiFilters,
+    activeFiltersCount: multiFiltersCount,
+    applyFilters: applyMultiFilters,
+  } = useProjectFilters();
   const { 
     activeViewType,
     isAdmin,
@@ -51,8 +65,9 @@ export function BEProjectsView() {
   const columnOrder = activeConfig.column_order;
   const columnFilters = activeConfig.column_filters;
 
-  // Apply filters to projects
-  const filteredProjects = useFilteredProjects(projects, columnFilters);
+  // Apply multi-criteria filters first, then column filters
+  const multiFilteredProjects = useMemo(() => applyMultiFilters(projects), [projects, applyMultiFilters]);
+  const filteredProjects = useFilteredProjects(multiFilteredProjects, columnFilters);
 
   // Get ordered columns based on config
   const orderedVisibleColumns = useMemo(() => {
@@ -62,7 +77,7 @@ export function BEProjectsView() {
       .filter(Boolean) as ColumnDefinition[];
   }, [columnOrder, visibleColumns]);
 
-  const activeFiltersCount = Object.keys(columnFilters).filter(k => columnFilters[k]?.value).length;
+  const activeFiltersCount = Object.keys(columnFilters).filter(k => columnFilters[k]?.value).length + multiFiltersCount;
 
   const canCreate = permissionProfile?.can_create_be_projects ?? false;
   const canEdit = permissionProfile?.can_edit_be_projects ?? false;
@@ -283,12 +298,22 @@ export function BEProjectsView() {
                 onSwitchView={switchView}
               />
             )}
-            {activeFiltersCount > 0 && (
-              <Badge variant="secondary" className="gap-1 px-3 py-1">
-                <Filter className="h-3 w-3" />
-                {activeFiltersCount} filtre{activeFiltersCount > 1 ? 's' : ''} actif{activeFiltersCount > 1 ? 's' : ''}
-              </Badge>
-            )}
+          </div>
+
+          {/* Multi-criteria filters */}
+          <div className="mt-3">
+            <ProjectMultiFiltersPanel
+              filters={multiFilters}
+              onFiltersChange={setMultiFilters}
+              projects={projects}
+              activeFiltersCount={multiFiltersCount}
+              presets={presets}
+              onSavePreset={savePreset}
+              onDeletePreset={deletePreset}
+              onLoadPreset={loadPreset}
+              onToggleDefault={toggleDefault}
+              onClear={clearMultiFilters}
+            />
           </div>
         </CardContent>
       </Card>

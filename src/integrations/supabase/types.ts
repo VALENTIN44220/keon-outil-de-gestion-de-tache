@@ -4301,6 +4301,7 @@ export type Database = {
       }
       user_filter_presets: {
         Row: {
+          context_type: string
           created_at: string
           filters: Json
           id: string
@@ -4311,6 +4312,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          context_type?: string
           created_at?: string
           filters?: Json
           id?: string
@@ -4321,6 +4323,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          context_type?: string
           created_at?: string
           filters?: Json
           id?: string
