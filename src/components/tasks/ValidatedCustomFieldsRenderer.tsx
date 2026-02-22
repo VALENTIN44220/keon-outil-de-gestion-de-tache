@@ -246,9 +246,9 @@ export const ValidatedCustomFieldsRenderer = memo(function ValidatedCustomFields
     }
   };
 
-  // Scroll to first error
-  const scrollToFirstError = useCallback(() => {
-    const firstErrorId = Object.entries(validationState).find(
+  // Scroll to first error - only called explicitly after submit
+  const scrollToFirstError = useCallback((errorState: Record<string, { valid: boolean; message?: string }>) => {
+    const firstErrorId = Object.entries(errorState).find(
       ([_, state]) => !state.valid
     )?.[0];
     
@@ -258,7 +258,7 @@ export const ValidatedCustomFieldsRenderer = memo(function ValidatedCustomFields
         block: 'center',
       });
     }
-  }, [validationState]);
+  }, []);
 
   // Validate all fields
   const validateAllFields = useCallback((): { valid: boolean; errors: Record<string, string> } => {
@@ -267,7 +267,9 @@ export const ValidatedCustomFieldsRenderer = memo(function ValidatedCustomFields
 
     fields.forEach((field) => {
       if (isFieldVisible(field)) {
-        const result = validateSingleField(values[field.id], field);
+        // Use default_value as fallback, matching what the UI renders
+        const fieldValue = values[field.id] ?? field.default_value ?? '';
+        const result = validateSingleField(fieldValue, field);
         if (!result.valid && result.message) {
           errors[field.id] = result.message;
           valid = false;
@@ -279,13 +281,8 @@ export const ValidatedCustomFieldsRenderer = memo(function ValidatedCustomFields
     // Mark all as touched
     setTouchedFields(new Set(fields.map((f) => f.id)));
 
-    // Scroll to first error
-    if (!valid) {
-      setTimeout(scrollToFirstError, 100);
-    }
-
     return { valid, errors };
-  }, [fields, values, isFieldVisible, scrollToFirstError]);
+  }, [fields, values]);
 
   // Expose validateAllFields via a custom event
   useEffect(() => {
@@ -314,13 +311,14 @@ export const ValidatedCustomFieldsRenderer = memo(function ValidatedCustomFields
     const handleChange = (newValue: any) => {
       onChange(field.id, newValue);
       if (validateOnChange) {
-        handleValidation(field.id, newValue);
+        // Validate the actual new value being set
+        handleValidation(field.id, newValue ?? field.default_value ?? '');
       }
     };
 
     const handleBlur = () => {
       setTouchedFields((prev) => new Set(prev).add(field.id));
-      handleValidation(field.id, value);
+      handleValidation(field.id, values[field.id] ?? field.default_value ?? '');
     };
 
     return (
@@ -361,7 +359,9 @@ export const ValidatedCustomFieldsRenderer = memo(function ValidatedCustomFields
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <AlertCircle className="h-4 w-4 text-destructive" />
+                    <span className="inline-flex">
+                      <AlertCircle className="h-4 w-4 text-destructive" />
+                    </span>
                   </TooltipTrigger>
                   <TooltipContent side="left">
                     <p>{validationResult.message}</p>
