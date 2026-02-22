@@ -582,7 +582,7 @@ export function validateCustomFields(
     // Check required fields
     if (field.is_required) {
       if (value === undefined || value === null || value === '') {
-        errors[field.id] = 'Ce champ est obligatoire';
+        errors[field.id] = 'Merci de remplir tous les champs obligatoires';
         continue;
       }
     }

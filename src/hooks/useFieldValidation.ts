@@ -33,7 +33,7 @@ const VALIDATION_MESSAGES: Record<string, string> = {
   date_min: 'Date trop ancienne',
   date_max: 'Date trop récente',
   regex: 'Format invalide',
-  required: 'Ce champ est obligatoire',
+  required: 'Merci de remplir tous les champs obligatoires',
 };
 
 // =====================
