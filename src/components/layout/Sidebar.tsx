@@ -154,13 +154,20 @@ export function Sidebar({
   const { count: pendingValidationCount } = usePendingValidationRequests();
   const { isPageVisibleOnDevice, isLoading: isVisibilityLoading } = usePageDeviceVisibility();
 
-  // Determine current device type
-  const currentDevice = useMemo(() => {
-    if (isMobile) return 'mobile' as const;
-    // Detect tablet: width between 768 and 1024
-    if (typeof window !== 'undefined' && window.innerWidth < 1024) return 'tablet' as const;
-    return 'desktop' as const;
-  }, [isMobile]);
+  // Determine current device type based on actual viewport width
+  const [currentDevice, setCurrentDevice] = useState<'mobile' | 'tablet' | 'desktop'>('desktop');
+
+  useEffect(() => {
+    const updateDevice = () => {
+      const w = window.innerWidth;
+      if (w < 640) setCurrentDevice('mobile');
+      else if (w < 1024) setCurrentDevice('tablet');
+      else setCurrentDevice('desktop');
+    };
+    updateDevice();
+    window.addEventListener('resize', updateDevice);
+    return () => window.removeEventListener('resize', updateDevice);
+  }, []);
   
   const profile = isSimulating && simulatedProfile ? simulatedProfile : authProfile;
 
