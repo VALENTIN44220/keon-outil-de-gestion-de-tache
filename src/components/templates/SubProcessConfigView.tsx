@@ -42,6 +42,8 @@ import {
   GitBranch,
   ExternalLink,
   Package,
+  Database,
+  Filter,
   Eye,
   EyeOff,
 } from 'lucide-react';
@@ -130,11 +132,10 @@ export function SubProcessConfigView({
     show_quick_launch: false,
   });
 
-  // Article filter config (stored in form_schema)
-  const [articleFilter, setArticleFilter] = useState({
-    ref_prefix: '',
-    exclude_des: '',
-  });
+  // Table filters config (stored in form_schema.table_filters, keyed by table_name)
+  const [tableFilters, setTableFilters] = useState<Record<string, { ref_prefix: string; exclude_des: string }>>({});
+  // Tables actually used by this sub-process's custom fields
+  const [usedTables, setUsedTables] = useState<{ table_name: string; label: string }[]>([]);
 
   // Hidden request fields config (stored in form_schema)
   const [hiddenRequestFields, setHiddenRequestFields] = useState<string[]>([]);
@@ -171,15 +172,19 @@ export function SubProcessConfigView({
           show_quick_launch: (spData as any).show_quick_launch ?? false,
         });
 
-        // Load article filter and hidden request fields from form_schema
+        // Load table filters and hidden request fields from form_schema
         const formSchema = (spData as any).form_schema;
         if (formSchema && typeof formSchema === 'object') {
+          // Support both legacy article_filter and new table_filters
+          const tf = (formSchema as any).table_filters;
           const af = (formSchema as any).article_filter;
-          if (af) {
-            setArticleFilter({
-              ref_prefix: af.ref_prefix || '',
-              exclude_des: af.exclude_des || '',
-            });
+          if (tf && typeof tf === 'object') {
+            setTableFilters(tf);
+          } else if (af) {
+            // Migrate legacy article_filter to table_filters format
+            setTableFilters({ articles: { ref_prefix: af.ref_prefix || '', exclude_des: af.exclude_des || '' } });
+          } else {
+            setTableFilters({});
           }
           const hrf = (formSchema as any).hidden_request_fields;
           if (Array.isArray(hrf)) {
@@ -218,19 +223,43 @@ export function SubProcessConfigView({
       }
 
       // Fetch reference data
-      const [profileRes, deptRes, groupRes, customFieldsRes] = await Promise.all([
+      const [profileRes, deptRes, groupRes, customFieldsRes, spFieldsRes, lookupConfigsRes] = await Promise.all([
         supabase.from('profiles').select('id, display_name').order('display_name'),
         supabase.from('departments').select('id, name').order('name'),
         supabase.from('collaborator_groups').select('id, name').order('name'),
         spData?.process_template_id
           ? supabase.from('template_custom_fields').select('id, label, name').eq('process_template_id', spData.process_template_id).order('order_index')
           : Promise.resolve({ data: [] }),
+        // Fetch custom fields for THIS sub-process + process-level ones to find table_lookup usage
+        supabase.from('template_custom_fields')
+          .select('id, field_type, lookup_table')
+          .or(`sub_process_template_id.eq.${subProcessId},process_template_id.eq.${spData?.process_template_id}`)
+          .eq('field_type', 'table_lookup')
+          .not('lookup_table', 'is', null),
+        supabase.from('admin_table_lookup_configs')
+          .select('table_name, label')
+          .eq('is_active', true),
       ]);
 
       if (profileRes.data) setProfiles(profileRes.data);
       if (deptRes.data) setDepartments(deptRes.data);
       if (groupRes.data) setGroups(groupRes.data);
       if (customFieldsRes.data) setCustomFields(customFieldsRes.data);
+      
+      // Determine which tables are used by this sub-process
+      if (spFieldsRes.data && lookupConfigsRes.data) {
+        const usedTableNames = new Set(spFieldsRes.data.map((f: any) => f.lookup_table).filter(Boolean));
+        // Also check if the process uses material lines (articles table)
+        // by checking if there's a demande_materiel reference or articles in form_schema
+        const formSchema = (spData as any)?.form_schema;
+        if (formSchema?.article_filter) {
+          usedTableNames.add('articles');
+        }
+        const tables = lookupConfigsRes.data
+          .filter((c: any) => usedTableNames.has(c.table_name))
+          .map((c: any) => ({ table_name: c.table_name, label: c.label }));
+        setUsedTables(tables);
+      }
 
     } catch (error) {
       console.error('Error fetching sub-process data:', error);
@@ -245,14 +274,17 @@ export function SubProcessConfigView({
     setIsSaving(true);
 
     try {
-      // Build form_schema with article filter
+      // Build form_schema with table filters (and keep legacy article_filter for backward compat)
       const existingSchema = (subProcess as any).form_schema || {};
+      const articleFilterFromTable = tableFilters['articles'];
       const updatedSchema = {
         ...existingSchema,
-        article_filter: {
-          ref_prefix: articleFilter.ref_prefix || null,
-          exclude_des: articleFilter.exclude_des || null,
-        },
+        table_filters: tableFilters,
+        // Keep article_filter for backward compatibility with existing consumers
+        article_filter: articleFilterFromTable ? {
+          ref_prefix: articleFilterFromTable.ref_prefix || null,
+          exclude_des: articleFilterFromTable.exclude_des || null,
+        } : (existingSchema.article_filter || null),
         hidden_request_fields: hiddenRequestFields,
       };
 
@@ -537,42 +569,58 @@ export function SubProcessConfigView({
 
                     <Separator />
 
-                    <Card className="border-warning/30 bg-warning/5">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm flex items-center gap-2">
-                          <Package className="h-4 w-4 text-warning" />
-                          Filtre des articles
-                        </CardTitle>
-                        <CardDescription className="text-xs">
-                          Restreindre les articles disponibles dans le sélecteur de ce sous-processus
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-3">
-                        <div className="space-y-2">
-                          <Label className="text-xs">Préfixe de référence</Label>
-                          <Input
-                            value={articleFilter.ref_prefix}
-                            onChange={(e) => setArticleFilter({ ...articleFilter, ref_prefix: e.target.value })}
-                            placeholder="Ex: ASM, AD0, AS0... (vide = tous)"
-                            className="h-8 text-sm"
-                            disabled={!canManage}
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Seuls les articles dont la référence commence par ce préfixe seront affichés
-                          </p>
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="text-xs">Exclure les désignations contenant</Label>
-                          <Input
-                            value={articleFilter.exclude_des}
-                            onChange={(e) => setArticleFilter({ ...articleFilter, exclude_des: e.target.value })}
-                            placeholder="Ex: NON DEFINI (vide = aucune exclusion)"
-                            className="h-8 text-sm"
-                            disabled={!canManage}
-                          />
-                        </div>
-                      </CardContent>
-                    </Card>
+                    {usedTables.length > 0 && (
+                      <Card className="border-primary/30 bg-primary/5">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm flex items-center gap-2">
+                            <Filter className="h-4 w-4 text-primary" />
+                            Filtre des tables
+                          </CardTitle>
+                          <CardDescription className="text-xs">
+                            Paramétrer les filtres pour les tables utilisées dans ce sous-processus
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          {usedTables.map((table) => {
+                            const filter = tableFilters[table.table_name] || { ref_prefix: '', exclude_des: '' };
+                            return (
+                              <div key={table.table_name} className="space-y-2 p-3 bg-muted/50 rounded-lg">
+                                <Label className="text-xs font-semibold flex items-center gap-2">
+                                  <Database className="h-3.5 w-3.5" />
+                                  {table.label}
+                                </Label>
+                                <div className="space-y-2">
+                                  <Label className="text-xs">Préfixe de référence</Label>
+                                  <Input
+                                    value={filter.ref_prefix}
+                                    onChange={(e) => setTableFilters(prev => ({
+                                      ...prev,
+                                      [table.table_name]: { ...filter, ref_prefix: e.target.value }
+                                    }))}
+                                    placeholder="Ex: ASM, AD0... (vide = tous)"
+                                    className="h-8 text-sm"
+                                    disabled={!canManage}
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label className="text-xs">Exclure les désignations contenant</Label>
+                                  <Input
+                                    value={filter.exclude_des}
+                                    onChange={(e) => setTableFilters(prev => ({
+                                      ...prev,
+                                      [table.table_name]: { ...filter, exclude_des: e.target.value }
+                                    }))}
+                                    placeholder="Ex: NON DEFINI (vide = aucune exclusion)"
+                                    className="h-8 text-sm"
+                                    disabled={!canManage}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </CardContent>
+                      </Card>
+                    )}
                     {canManage && (
                       <Button onClick={handleSaveGeneral} disabled={isSaving}>
                         {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
