@@ -137,6 +137,9 @@ export function SubProcessConfigView({
   // Tables actually used by this sub-process's custom fields
   const [usedTables, setUsedTables] = useState<{ table_name: string; label: string }[]>([]);
 
+  // Built-in component flags
+  const [hasMaterialLines, setHasMaterialLines] = useState(false);
+
   // Hidden request fields config (stored in form_schema)
   const [hiddenRequestFields, setHiddenRequestFields] = useState<string[]>([]);
   const [customFields, setCustomFields] = useState<{ id: string; label: string; name: string }[]>([]);
@@ -192,6 +195,8 @@ export function SubProcessConfigView({
           } else {
             setHiddenRequestFields([]);
           }
+          // Load material lines flag
+          setHasMaterialLines(!!(formSchema as any).has_material_lines);
         }
         
         // Load validation levels from validation_config JSONB column
@@ -286,6 +291,7 @@ export function SubProcessConfigView({
           exclude_des: articleFilterFromTable.exclude_des || null,
         } : (existingSchema.article_filter || null),
         hidden_request_fields: hiddenRequestFields,
+        has_material_lines: hasMaterialLines,
       };
 
       const { error } = await supabase
@@ -566,6 +572,41 @@ export function SubProcessConfigView({
                         disabled={!canManage}
                       />
                     </div>
+
+                    <Separator />
+
+                    {/* Built-in components */}
+                    <Card className="border-warning/30 bg-warning/5">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm flex items-center gap-2">
+                          <Package className="h-4 w-4 text-warning" />
+                          Composants intégrés
+                        </CardTitle>
+                        <CardDescription className="text-xs">
+                          Composants spéciaux ajoutés automatiquement au formulaire de demande
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <div className="h-8 w-8 rounded bg-warning/10 flex items-center justify-center">
+                              <Package className="h-4 w-4 text-warning" />
+                            </div>
+                            <div>
+                              <Label className="text-sm">Lignes de matériel (articles)</Label>
+                              <p className="text-xs text-muted-foreground">
+                                Ajoute un sélecteur d'articles avec quantités au formulaire
+                              </p>
+                            </div>
+                          </div>
+                          <Switch
+                            checked={hasMaterialLines}
+                            onCheckedChange={(checked) => setHasMaterialLines(checked)}
+                            disabled={!canManage}
+                          />
+                        </div>
+                      </CardContent>
+                    </Card>
 
                     <Separator />
 

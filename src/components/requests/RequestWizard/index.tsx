@@ -15,7 +15,7 @@ import { StepDetailsForm } from "./StepDetailsForm";
 import { StepCustomFields } from "./StepCustomFields";
 import { StepMaterialLines } from "./StepMaterialLines";
 import { StepSummary } from "./StepSummary";
-import { RequestType, RequestWizardData, defaultWizardData, WIZARD_STEPS, SubProcessSelection, DEMANDE_MATERIEL_SP_ID } from "./types";
+import { RequestType, RequestWizardData, defaultWizardData, WIZARD_STEPS, SubProcessSelection } from "./types";
 
 interface RequestWizardDialogProps {
   open: boolean;
@@ -33,29 +33,31 @@ export function RequestWizardDialog({ open, onClose, onSuccess, initialProcessId
   const [articleFilterConfig, setArticleFilterConfig] = useState<{ ref_prefix?: string | null; exclude_des?: string | null } | undefined>();
   const [commonFieldsConfig, setCommonFieldsConfig] = useState<any>(undefined);
 
-  // Check if material sub-process is selected
-  const hasMaterialSubProcess = data.selectedSubProcesses.includes(DEMANDE_MATERIEL_SP_ID);
+  // Check if any selected sub-process has material lines enabled
+  const hasMaterialSubProcess = useMemo(() => {
+    return data.availableSubProcesses.some(sp => 
+      data.selectedSubProcesses.includes(sp.id) && (sp as any).form_schema?.has_material_lines
+    );
+  }, [data.selectedSubProcesses, data.availableSubProcesses]);
 
   // Fetch article filter config when material sub-process is selected
   useEffect(() => {
     if (hasMaterialSubProcess) {
-      supabase
-        .from('sub_process_templates')
-        .select('form_schema')
-        .eq('id', DEMANDE_MATERIEL_SP_ID)
-        .single()
-        .then(({ data: spData }) => {
-          const schema = (spData as any)?.form_schema;
-          if (schema?.article_filter) {
-            setArticleFilterConfig(schema.article_filter);
-          } else {
-            setArticleFilterConfig(undefined);
-          }
-        });
+      const materialSp = data.availableSubProcesses.find(sp => 
+        data.selectedSubProcesses.includes(sp.id) && (sp as any).form_schema?.has_material_lines
+      );
+      if (materialSp) {
+        const schema = (materialSp as any).form_schema;
+        if (schema?.article_filter) {
+          setArticleFilterConfig(schema.article_filter);
+        } else {
+          setArticleFilterConfig(undefined);
+        }
+      }
     } else {
       setArticleFilterConfig(undefined);
     }
-  }, [hasMaterialSubProcess]);
+  }, [hasMaterialSubProcess, data.availableSubProcesses, data.selectedSubProcesses]);
 
   // Get current steps based on request type, inject material step if needed
   const steps = useMemo(() => {

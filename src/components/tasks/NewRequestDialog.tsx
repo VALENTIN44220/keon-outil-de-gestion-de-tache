@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Task, TaskStatus, TaskPriority, AssignmentRule } from '@/types/task';
 import { cn } from '@/lib/utils';
-import { DEMANDE_MATERIEL_SP_ID } from '@/components/requests/RequestWizard/types';
+// Material lines detection now uses form_schema.has_material_lines flag
 import { MaterialRequestLines, MaterialLine } from '@/components/maintenance/MaterialRequestLines';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -259,7 +259,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
       if (initialSubProcessTemplateId) {
         const { data: subProcess } = await supabase
           .from('sub_process_templates')
-          .select('id, name, process_template_id, target_department_id, target_manager_id, assignment_type')
+          .select('id, name, process_template_id, target_department_id, target_manager_id, assignment_type, form_schema')
           .eq('id', initialSubProcessTemplateId)
           .single();
         
@@ -348,7 +348,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
 
           const { data: subProcessData } = await supabase
             .from('sub_process_templates')
-            .select('id, name, process_template_id, description, target_manager_id, target_department_id, assignment_type')
+            .select('id, name, process_template_id, description, target_manager_id, target_department_id, assignment_type, form_schema')
             .eq('process_template_id', data.id)
             .order('order_index', { ascending: true });
           
@@ -403,25 +403,21 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
 
   // Load article filter config from sub-process form_schema
   useEffect(() => {
-    const spId = linkedSubProcessId || (selectedSubProcessIds.length === 1 ? selectedSubProcessIds[0] : null);
-    if (!spId) {
+    const allSelectedIds = linkedSubProcessId ? [linkedSubProcessId] : selectedSubProcessIds;
+    const materialSp = availableSubProcesses.find(sp => 
+      allSelectedIds.includes(sp.id) && (sp as any).form_schema?.has_material_lines
+    );
+    if (materialSp) {
+      const schema = (materialSp as any).form_schema;
+      if (schema?.article_filter) {
+        setArticleFilterConfig(schema.article_filter);
+      } else {
+        setArticleFilterConfig(undefined);
+      }
+    } else {
       setArticleFilterConfig(undefined);
-      return;
     }
-    supabase
-      .from('sub_process_templates')
-      .select('form_schema')
-      .eq('id', spId)
-      .single()
-      .then(({ data: spData }) => {
-        const schema = (spData as any)?.form_schema;
-        if (schema?.article_filter) {
-          setArticleFilterConfig(schema.article_filter);
-        } else {
-          setArticleFilterConfig(undefined);
-        }
-      });
-  }, [linkedSubProcessId, selectedSubProcessIds]);
+  }, [availableSubProcesses, selectedSubProcessIds, linkedSubProcessId]);
 
   // Auto-apply assignment rule
   useEffect(() => {
@@ -842,7 +838,12 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
 
   const showSubProcessTab = hasMultipleSubProcesses && availableSubProcesses.length > 0;
   const showCustomFieldsTab = customFieldsCount > 0;
-  const hasMaterialSubProcess = selectedSubProcessIds.includes(DEMANDE_MATERIEL_SP_ID) || linkedSubProcessId === DEMANDE_MATERIEL_SP_ID;
+  const hasMaterialSubProcess = (() => {
+    const allSelectedIds = linkedSubProcessId ? [linkedSubProcessId] : selectedSubProcessIds;
+    return availableSubProcesses.some(sp => 
+      allSelectedIds.includes(sp.id) && (sp as any).form_schema?.has_material_lines
+    );
+  })();
   const showMaterialTab = hasMaterialSubProcess;
 
   const materialValid = !hasMaterialSubProcess || (

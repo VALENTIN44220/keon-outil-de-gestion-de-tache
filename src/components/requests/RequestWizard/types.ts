@@ -23,6 +23,7 @@ export interface SubProcessSelection {
   assignment_type?: string;
   target_manager_id?: string | null;
   target_department_id?: string | null;
+  form_schema?: Record<string, any> | null;
 }
 
 export interface MaterialLineData {

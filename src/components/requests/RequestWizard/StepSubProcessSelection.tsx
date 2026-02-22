@@ -55,7 +55,8 @@ export function StepSubProcessSelection({
             assignment_type,
             target_manager_id,
             target_department_id,
-            is_mandatory
+            is_mandatory,
+            form_schema
           `,
           )
           .eq("process_template_id", processId)
@@ -71,6 +72,7 @@ export function StepSubProcessSelection({
             assignment_type: sp.assignment_type,
             target_manager_id: sp.target_manager_id,
             target_department_id: sp.target_department_id,
+            form_schema: sp.form_schema,
           }));
 
           setSubProcesses(subProcessData);
