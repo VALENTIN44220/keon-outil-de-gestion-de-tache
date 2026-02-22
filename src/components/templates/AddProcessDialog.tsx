@@ -38,7 +38,9 @@ interface AddProcessDialogProps {
       recurrence_next_run_at?: string | null;
     },
     visibilityCompanyIds: string[],
-    visibilityDepartmentIds: string[]
+    visibilityDepartmentIds: string[],
+    visibilityGroupIds: string[],
+    visibilityUserIds: string[]
   ) => void;
 }
 
@@ -52,6 +54,8 @@ export function AddProcessDialog({ open, onClose, onAdd }: AddProcessDialogProps
   const [visibilityLevel, setVisibilityLevel] = useState<TemplateVisibility>('public');
   const [visibilityCompanyIds, setVisibilityCompanyIds] = useState<string[]>([]);
   const [visibilityDepartmentIds, setVisibilityDepartmentIds] = useState<string[]>([]);
+  const [visibilityGroupIds, setVisibilityGroupIds] = useState<string[]>([]);
+  const [visibilityUserIds, setVisibilityUserIds] = useState<string[]>([]);
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [subcategoryId, setSubcategoryId] = useState<string | null>(null);
   const [serviceGroupId, setServiceGroupId] = useState<string | null>(null);
@@ -72,12 +76,10 @@ export function AddProcessDialog({ open, onClose, onAdd }: AddProcessDialogProps
   }, []);
 
   const isValidVisibility = () => {
-    if (visibilityLevel === 'internal_company' && visibilityCompanyIds.length === 0) {
-      return false;
-    }
-    if (visibilityLevel === 'internal_department' && visibilityDepartmentIds.length === 0) {
-      return false;
-    }
+    if (visibilityLevel === 'internal_company' && visibilityCompanyIds.length === 0) return false;
+    if (visibilityLevel === 'internal_department' && visibilityDepartmentIds.length === 0) return false;
+    if (visibilityLevel === 'internal_group' && visibilityGroupIds.length === 0) return false;
+    if (visibilityLevel === 'internal_users' && visibilityUserIds.length === 0) return false;
     return true;
   };
 
@@ -122,7 +124,9 @@ export function AddProcessDialog({ open, onClose, onAdd }: AddProcessDialogProps
         recurrence_next_run_at: recurrence.enabled ? new Date(recurrence.startDate + 'T00:00:00').toISOString() : null,
       },
       visibilityCompanyIds,
-      visibilityDepartmentIds
+      visibilityDepartmentIds,
+      visibilityGroupIds,
+      visibilityUserIds
     );
 
     resetForm();
@@ -137,6 +141,8 @@ export function AddProcessDialog({ open, onClose, onAdd }: AddProcessDialogProps
     setVisibilityLevel('public');
     setVisibilityCompanyIds([]);
     setVisibilityDepartmentIds([]);
+    setVisibilityGroupIds([]);
+    setVisibilityUserIds([]);
     setCategoryId(null);
     setSubcategoryId(null);
     setServiceGroupId(null);
@@ -239,6 +245,10 @@ export function AddProcessDialog({ open, onClose, onAdd }: AddProcessDialogProps
             onCompanyIdsChange={setVisibilityCompanyIds}
             selectedDepartmentIds={visibilityDepartmentIds}
             onDepartmentIdsChange={setVisibilityDepartmentIds}
+            selectedGroupIds={visibilityGroupIds}
+            onGroupIdsChange={setVisibilityGroupIds}
+            selectedUserIds={visibilityUserIds}
+            onUserIdsChange={setVisibilityUserIds}
           />
 
           <DialogFooter>

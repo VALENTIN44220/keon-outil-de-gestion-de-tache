@@ -54,6 +54,8 @@ export function AddIndependentSubProcessDialog({
   const [visibilityLevel, setVisibilityLevel] = useState<TemplateVisibility>('public');
   const [visibilityCompanyIds, setVisibilityCompanyIds] = useState<string[]>([]);
   const [visibilityDepartmentIds, setVisibilityDepartmentIds] = useState<string[]>([]);
+  const [visibilityGroupIds, setVisibilityGroupIds] = useState<string[]>([]);
+  const [visibilityUserIds, setVisibilityUserIds] = useState<string[]>([]);
 
   const [processes, setProcesses] = useState<ProcessTemplate[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -140,7 +142,9 @@ export function AddIndependentSubProcessDialog({
           'sub_process',
           data.id,
           visibilityCompanyIds,
-          visibilityDepartmentIds
+          visibilityDepartmentIds,
+          visibilityGroupIds,
+          visibilityUserIds
         );
       }
 
@@ -215,6 +219,10 @@ export function AddIndependentSubProcessDialog({
             onCompanyIdsChange={setVisibilityCompanyIds}
             selectedDepartmentIds={visibilityDepartmentIds}
             onDepartmentIdsChange={setVisibilityDepartmentIds}
+            selectedGroupIds={visibilityGroupIds}
+            onGroupIdsChange={setVisibilityGroupIds}
+            selectedUserIds={visibilityUserIds}
+            onUserIdsChange={setVisibilityUserIds}
           />
 
           <div className="space-y-2">
