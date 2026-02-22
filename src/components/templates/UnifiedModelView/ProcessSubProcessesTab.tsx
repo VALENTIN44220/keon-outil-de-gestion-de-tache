@@ -123,6 +123,46 @@ export function ProcessSubProcessesTab({
     }
   };
 
+  const handleCreate = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('Vous devez être connecté');
+        return;
+      }
+
+      const nextOrder = subProcesses.length > 0 
+        ? Math.max(...subProcesses.map(sp => sp.order_index)) + 1 
+        : 0;
+
+      const { data, error } = await supabase
+        .from('sub_process_templates')
+        .insert({
+          process_template_id: processId,
+          name: `Sous-processus ${nextOrder + 1}`,
+          assignment_type: 'user',
+          order_index: nextOrder,
+          is_mandatory: false,
+          user_id: user.id,
+        })
+        .select('id')
+        .single();
+
+      if (error) throw error;
+
+      toast.success('Sous-processus créé');
+      await fetchSubProcesses();
+      onUpdate();
+
+      if (data) {
+        setSelectedSubProcessId(data.id);
+      }
+    } catch (error) {
+      console.error('Error creating sub-process:', error);
+      toast.error('Erreur lors de la création');
+    }
+  };
+
   const getAssignmentLabel = (type: string) => {
     switch (type) {
       case 'user':
@@ -154,7 +194,7 @@ export function ProcessSubProcessesTab({
           </p>
         </div>
         {canManage && (
-          <Button size="sm">
+          <Button size="sm" onClick={handleCreate}>
             <Plus className="h-4 w-4 mr-2" />
             Ajouter
           </Button>
@@ -169,7 +209,7 @@ export function ProcessSubProcessesTab({
               Aucun sous-processus configuré
             </p>
             {canManage && (
-              <Button>
+              <Button onClick={handleCreate}>
                 <Plus className="h-4 w-4 mr-2" />
                 Créer un sous-processus
               </Button>
