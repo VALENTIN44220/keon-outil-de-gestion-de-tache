@@ -1318,6 +1318,39 @@ export type Database = {
         }
         Relationships: []
       }
+      page_device_visibility: {
+        Row: {
+          created_at: string
+          id: string
+          page_id: string
+          page_label: string
+          updated_at: string
+          visible_on_desktop: boolean
+          visible_on_mobile: boolean
+          visible_on_tablet: boolean
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          page_id: string
+          page_label: string
+          updated_at?: string
+          visible_on_desktop?: boolean
+          visible_on_mobile?: boolean
+          visible_on_tablet?: boolean
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          page_id?: string
+          page_label?: string
+          updated_at?: string
+          visible_on_desktop?: boolean
+          visible_on_mobile?: boolean
+          visible_on_tablet?: boolean
+        }
+        Relationships: []
+      }
       pending_task_assignments: {
         Row: {
           assigned_at: string | null

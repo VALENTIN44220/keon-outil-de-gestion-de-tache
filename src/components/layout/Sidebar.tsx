@@ -8,6 +8,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { usePageDeviceVisibility } from '@/hooks/usePageDeviceVisibility';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import keonLogo from '@/assets/keon-logo.jpg';
@@ -151,26 +152,37 @@ export function Sidebar({
   const { profile: authProfile } = useAuth();
   const { isSimulating, simulatedProfile } = useSimulation();
   const { count: pendingValidationCount } = usePendingValidationRequests();
+  const { isPageVisibleOnDevice, isLoading: isVisibilityLoading } = usePageDeviceVisibility();
+
+  // Determine current device type
+  const currentDevice = useMemo(() => {
+    if (isMobile) return 'mobile' as const;
+    // Detect tablet: width between 768 and 1024
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) return 'tablet' as const;
+    return 'desktop' as const;
+  }, [isMobile]);
   
   const profile = isSimulating && simulatedProfile ? simulatedProfile : authProfile;
 
   const filteredGroups = useMemo(() => {
     const groups = menuGroups
-      .map(group => group.filter(item => canAccessScreen(item.permissionKey)))
+      .map(group => group.filter(item => 
+        canAccessScreen(item.permissionKey) && isPageVisibleOnDevice(item.id, currentDevice)
+      ))
       .filter(group => group.length > 0);
     
     // Add admin group
-    if (isAdmin) {
+    if (isAdmin && isPageVisibleOnDevice('admin', currentDevice)) {
       groups.push([adminMenuItem as any]);
     }
     
     // Add chat group (always last)
-    if (canAccessScreen('can_access_dashboard')) {
+    if (canAccessScreen('can_access_dashboard') && isPageVisibleOnDevice('chat', currentDevice)) {
       groups.push([chatMenuItem as any]);
     }
     
     return groups;
-  }, [effectivePermissions, isAdmin, canAccessScreen]);
+  }, [effectivePermissions, isAdmin, canAccessScreen, isPageVisibleOnDevice, currentDevice]);
 
   const collapsed = !isMobile && manualCollapsed;
 
