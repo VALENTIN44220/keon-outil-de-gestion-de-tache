@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSupplierCategories, useSupplierFamillesByCategorie } from "@/hooks/useSupplierCategorisation";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -9,6 +9,13 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 import {
   Select,
@@ -34,6 +41,7 @@ import {
   User,
   MessageSquare,
   Lock,
+  Plus,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
@@ -89,7 +97,7 @@ type SupplierRow = {
 };
 
 const SEGMENTS = ["Production", "Services", "IT", "Maintenance", "Transport", "Énergie", "Autre"];
-const ENTITES = ["NASKEO", "PRODEVAL", "KEON", "Autre"];
+// ENTITES now fetched dynamically from companies table
 const TYPES_CONTRAT = ["Contrat cadre", "Commande ponctuelle", "Appel d'offres", "Marché", "Convention"];
 const DELAIS_PAIEMENT = ["Comptant", "30 jours", "45 jours", "60 jours", "90 jours"];
 const INCOTERMS = ["EXW", "FCA", "CPT", "CIP", "DAP", "DPU", "DDP", "FAS", "FOB", "CFR", "CIF"];
@@ -105,6 +113,40 @@ export function SupplierDetailDrawer({ supplierId, open, onClose, canEdit = true
   const { data: familles = [], isLoading: famLoading } = useSupplierFamillesByCategorie(formData.categorie as string | null);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [pendingSave, setPendingSave] = useState<Partial<SupplierRow> | null>(null);
+
+  // Companies (entités) from database
+  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
+  const [showAddCompany, setShowAddCompany] = useState(false);
+  const [newCompanyName, setNewCompanyName] = useState("");
+  const [addingCompany, setAddingCompany] = useState(false);
+
+  const fetchCompanies = useCallback(async () => {
+    const { data } = await supabase.from("companies").select("id, name").order("name");
+    if (data) setCompanies(data);
+  }, []);
+
+  useEffect(() => {
+    if (open) fetchCompanies();
+  }, [open, fetchCompanies]);
+
+  const handleAddCompany = async () => {
+    const trimmed = newCompanyName.trim();
+    if (!trimmed) return;
+    setAddingCompany(true);
+    try {
+      const { data, error } = await supabase.from("companies").insert({ name: trimmed }).select("id, name").single();
+      if (error) throw error;
+      setCompanies((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+      handleFieldChange("entite", data.name);
+      setShowAddCompany(false);
+      setNewCompanyName("");
+      toast({ title: "Société ajoutée", description: `"${data.name}" a été créée.` });
+    } catch (e: any) {
+      toast({ title: "Erreur", description: e.message || "Impossible de créer la société.", variant: "destructive" });
+    } finally {
+      setAddingCompany(false);
+    }
+  };
 
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     segmentation: true,
@@ -255,6 +297,7 @@ export function SupplierDetailDrawer({ supplierId, open, onClose, canEdit = true
   const currentStatus = (formData.status ?? "a_completer") as "a_completer" | "en_cours" | "complet";
 
   return (
+    <>
     <Sheet open={open} onOpenChange={onClose}>
       <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
         {isLoading ? (
@@ -410,18 +453,25 @@ export function SupplierDetailDrawer({ supplierId, open, onClose, canEdit = true
                 </FormField>
 
                 <FormField label="Entité *" className="col-span-2">
-                  <Select value={formData.entite || ""} onValueChange={(v) => handleFieldChange("entite", v)} disabled={!canEdit}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ENTITES.map((e) => (
-                        <SelectItem key={e} value={e}>
-                          {e}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex gap-2">
+                    <Select value={formData.entite || ""} onValueChange={(v) => handleFieldChange("entite", v)} disabled={!canEdit}>
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Sélectionner..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {companies.map((c) => (
+                          <SelectItem key={c.id} value={c.name}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {canEdit && (
+                      <Button type="button" variant="outline" size="icon" onClick={() => setShowAddCompany(true)} title="Ajouter une société">
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </FormField>
               </div>
             </CollapsibleSection>
@@ -693,6 +743,32 @@ export function SupplierDetailDrawer({ supplierId, open, onClose, canEdit = true
         )}
       </SheetContent>
     </Sheet>
+
+    {/* Add Company Dialog */}
+    <Dialog open={showAddCompany} onOpenChange={setShowAddCompany}>
+      <DialogContent className="sm:max-w-[400px]">
+        <DialogHeader>
+          <DialogTitle>Ajouter une société</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <Label>Nom de la société</Label>
+          <Input
+            value={newCompanyName}
+            onChange={(e) => setNewCompanyName(e.target.value)}
+            placeholder="Ex: NASKEO, PRODEVAL..."
+            onKeyDown={(e) => e.key === "Enter" && handleAddCompany()}
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setShowAddCompany(false)}>Annuler</Button>
+          <Button onClick={handleAddCompany} disabled={!newCompanyName.trim() || addingCompany}>
+            {addingCompany && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Créer
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
 
