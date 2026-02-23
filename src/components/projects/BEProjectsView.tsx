@@ -58,6 +58,7 @@ export function BEProjectsView() {
   // View state - default to cards
   const [currentView, setCurrentView] = useState<ViewType>('cards');
   const [kanbanGroupBy, setKanbanGroupBy] = useState<GroupByField>('status');
+  const [localSearch, setLocalSearch] = useState(searchQuery);
 
   // Get active config
   const activeConfig = getActiveConfig();
@@ -248,11 +249,19 @@ export function BEProjectsView() {
         <CardContent className="p-4">
           <div className="flex items-center gap-4 flex-wrap">
             <div className="relative flex-1 min-w-[280px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search
+                className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground cursor-pointer"
+                onClick={() => setSearchQuery(localSearch)}
+              />
               <Input
-                placeholder="Rechercher par code ou nom de projet..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Rechercher par code ou nom de projet... (Entrée pour lancer)"
+                value={localSearch}
+                onChange={(e) => setLocalSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    setSearchQuery(localSearch);
+                  }
+                }}
                 className="pl-10"
               />
             </div>
