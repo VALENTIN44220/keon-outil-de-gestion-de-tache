@@ -198,6 +198,7 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [processes, setProcesses] = useState<{ id: string; name: string }[]>([]);
   const [presets, setPresets] = useState<FilterPreset[]>([]);
+  const [defaultApplied, setDefaultApplied] = useState(false);
   const [presetName, setPresetName] = useState('');
   const [showSavePreset, setShowSavePreset] = useState(false);
   const [overwritePresetId, setOverwritePresetId] = useState<string | null>(null);
@@ -219,7 +220,7 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
     fetchData();
   }, []);
 
-  // Load presets + apply default
+  // Load presets + apply default only on first load
   useEffect(() => {
     if (!user?.id) return;
     (async () => {
@@ -235,18 +236,21 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
       const { data } = await query.order('created_at', { ascending: false });
       if (data) {
         setPresets(data);
-        // Auto-apply default preset on first load
-        const defaultPreset = data.find((p: FilterPreset) => p.is_default);
-        if (defaultPreset) {
-          const restored: CrossFilters = {
-            ...DEFAULT_CROSS_FILTERS,
-            ...defaultPreset.filters,
-            dateRange: {
-              start: defaultPreset.filters.dateRange?.start ? new Date(defaultPreset.filters.dateRange.start) : null,
-              end: defaultPreset.filters.dateRange?.end ? new Date(defaultPreset.filters.dateRange.end) : null,
-            },
-          };
-          onFiltersChange(restored);
+        // Auto-apply default preset ONLY on first load
+        if (!defaultApplied) {
+          const defaultPreset = data.find((p: FilterPreset) => p.is_default);
+          if (defaultPreset) {
+            const restored: CrossFilters = {
+              ...DEFAULT_CROSS_FILTERS,
+              ...defaultPreset.filters,
+              dateRange: {
+                start: defaultPreset.filters.dateRange?.start ? new Date(defaultPreset.filters.dateRange.start) : null,
+                end: defaultPreset.filters.dateRange?.end ? new Date(defaultPreset.filters.dateRange.end) : null,
+              },
+            };
+            onFiltersChange(restored);
+          }
+          setDefaultApplied(true);
         }
       }
     })();
