@@ -280,8 +280,6 @@ export function TableOutputMappingPanel({
 
         toast.success('Sortie vers table enregistrée');
       }
-
-      onUpdate?.();
     } catch (error) {
       console.error('Error saving output mapping:', error);
       toast.error('Erreur lors de la sauvegarde');
