@@ -5,13 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { useSupplierCategories, useSupplierFamillesByCategorie } from "@/hooks/useSupplierCategorisation";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import {
   Table,
   TableBody,
@@ -230,32 +224,32 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
           <div className="flex items-center gap-2 flex-wrap">
             <Filter className="h-4 w-4 text-muted-foreground" />
 
-            <Select value={filters.status} onValueChange={(value) => updateFilters({ status: value })}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les status</SelectItem>
-                <SelectItem value="a_completer">À compléter</SelectItem>
-                <SelectItem value="en_cours">En cours</SelectItem>
-                <SelectItem value="complet">Complet</SelectItem>
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={filters.status}
+              onValueChange={(value) => updateFilters({ status: value })}
+              options={[
+                { value: 'all', label: 'Tous les status' },
+                { value: 'a_completer', label: 'À compléter' },
+                { value: 'en_cours', label: 'En cours' },
+                { value: 'complet', label: 'Complet' },
+              ]}
+              placeholder="Status"
+              triggerClassName="w-[150px]"
+            />
 
-            <Select value={filters.entite} onValueChange={(value) => updateFilters({ entite: value })}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Entité" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Toutes entités</SelectItem>
-                {filterOptions.entites.map((e) => (
-                  <SelectItem key={e} value={e}>{e}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={filters.entite}
+              onValueChange={(value) => updateFilters({ entite: value })}
+              options={[
+                { value: 'all', label: 'Toutes entités' },
+                ...filterOptions.entites.map((e) => ({ value: e, label: e })),
+              ]}
+              placeholder="Entité"
+              triggerClassName="w-[150px]"
+            />
 
             {/* ✅ Catégorie -> reset Famille + Segment + Sous-segment (cascade) */}
-            <Select
+            <SearchableSelect
               value={filters.categorie}
               onValueChange={(value) =>
                 updateFilters({
@@ -265,20 +259,16 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
                   sous_segment: 'all',
                 })
               }
-            >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Catégorie" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Toutes catégories</SelectItem>
-                {categories.map((c) => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              options={[
+                { value: 'all', label: 'Toutes catégories' },
+                ...categories.map((c) => ({ value: c, label: c })),
+              ]}
+              placeholder="Catégorie"
+              triggerClassName="w-[180px]"
+            />
 
             {/* ✅ Famille dépend de Catégorie -> reset Segment + Sous-segment */}
-            <Select
+            <SearchableSelect
               value={filters.famille}
               onValueChange={(value) =>
                 updateFilters({
@@ -288,42 +278,36 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
                 })
               }
               disabled={filters.categorie !== 'all' && famillesList.length === 0}
-            >
-              <SelectTrigger className="w-[220px]">
-                <SelectValue placeholder="Famille" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Toutes familles</SelectItem>
-                {famillesList.map((f) => (
-                  <SelectItem key={f} value={f}>{f}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              options={[
+                { value: 'all', label: 'Toutes familles' },
+                ...famillesList.map((f) => ({ value: f, label: f })),
+              ]}
+              placeholder="Famille"
+              triggerClassName="w-[220px]"
+            />
 
-            {/* Segments / sous-segments (Option A) restent issus des données, mais cascades via hook */}
-            <Select value={filters.segment} onValueChange={(value) => updateFilters({ segment: value, sous_segment: 'all' })}>
-              <SelectTrigger className="w-[170px]">
-                <SelectValue placeholder="Segment" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous segments</SelectItem>
-                {filterOptions.segments.map((s) => (
-                  <SelectItem key={s} value={s}>{s}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Segments / sous-segments */}
+            <SearchableSelect
+              value={filters.segment}
+              onValueChange={(value) => updateFilters({ segment: value, sous_segment: 'all' })}
+              options={[
+                { value: 'all', label: 'Tous segments' },
+                ...filterOptions.segments.map((s) => ({ value: s, label: s })),
+              ]}
+              placeholder="Segment"
+              triggerClassName="w-[170px]"
+            />
 
-            <Select value={filters.sous_segment ?? 'all'} onValueChange={(value) => updateFilters({ sous_segment: value })}>
-              <SelectTrigger className="w-[190px]">
-                <SelectValue placeholder="Sous-segment" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous sous-segments</SelectItem>
-                {filterOptions.sous_segments.map((s) => (
-                  <SelectItem key={s} value={s}>{s}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={filters.sous_segment ?? 'all'}
+              onValueChange={(value) => updateFilters({ sous_segment: value })}
+              options={[
+                { value: 'all', label: 'Tous sous-segments' },
+                ...filterOptions.sous_segments.map((s) => ({ value: s, label: s })),
+              ]}
+              placeholder="Sous-segment"
+              triggerClassName="w-[190px]"
+            />
           </div>
         </div>
 
