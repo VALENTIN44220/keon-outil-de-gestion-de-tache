@@ -99,7 +99,7 @@ const SearchableSelect = React.forwardRef<HTMLButtonElement, SearchableSelectPro
               className="h-8 border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
             />
           </div>
-          <ScrollArea className="max-h-60">
+          <ScrollArea style={{ maxHeight: '240px' }} className="overflow-auto">
             <div className="p-1">
               {filteredOptions.length === 0 ? (
                 <div className="py-6 text-center text-sm text-muted-foreground">
