@@ -309,7 +309,7 @@ export function SubProcessConfigView({
       if (error) throw error;
 
       toast.success('Paramètres enregistrés');
-      onUpdate();
+      // onUpdate() removed to prevent tab reset
     } catch (error) {
       console.error('Error saving:', error);
       toast.error('Erreur lors de la sauvegarde');
@@ -337,7 +337,7 @@ export function SubProcessConfigView({
       if (error) throw error;
 
       toast.success('Affectation enregistrée');
-      onUpdate();
+      // onUpdate() removed to prevent tab reset
     } catch (error) {
       console.error('Error saving assignment:', error);
       toast.error('Erreur lors de la sauvegarde');
@@ -388,7 +388,7 @@ export function SubProcessConfigView({
 
       setValidationLevels(renumberedLevels);
       toast.success('Validations enregistrées');
-      onUpdate();
+      // onUpdate() removed to prevent tab reset
     } catch (error) {
       console.error('Error saving validation:', error);
       toast.error('Erreur lors de la sauvegarde');
@@ -422,7 +422,7 @@ export function SubProcessConfigView({
       setTasks(prev => [...prev, { ...data, checklist_count: 0 } as TaskTemplateWithChecklist]);
       toast.success('Tâche ajoutée au workflow');
       setIsAddTaskOpen(false);
-      onUpdate();
+      // onUpdate() removed to prevent tab reset
     } catch (error) {
       console.error('Error adding task:', error);
       toast.error("Erreur lors de l'ajout de la tâche");
@@ -443,7 +443,7 @@ export function SubProcessConfigView({
 
       setTasks(prev => prev.filter(t => t.id !== taskId));
       toast.success('Tâche supprimée du workflow');
-      onUpdate();
+      // onUpdate() removed to prevent tab reset
     } catch (error) {
       console.error('Error deleting task:', error);
       toast.error('Erreur lors de la suppression');
@@ -1169,7 +1169,6 @@ export function SubProcessConfigView({
         onSave={() => { 
           setEditingTask(null); 
           fetchData(); 
-          onUpdate(); 
         }}
       />
     </>
