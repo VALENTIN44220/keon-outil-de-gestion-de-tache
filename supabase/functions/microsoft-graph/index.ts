@@ -24,7 +24,7 @@ function getAzureCredentials() {
   const clientSecret = Deno.env.get('AZURE_CLIENT_SECRET');
 
   if (!clientId || !tenantId || !clientSecret) {
-    throw new Error('Azure AD credentials not configured (AZURE_CLIENT_ID, AZURE_TENANT_ID, and AZURE_CLIENT_SECRET required)');
+    throw new Error('Required Azure credentials are not configured');
   }
 
   return { clientId, clientSecret, tenantId };
@@ -965,7 +965,7 @@ Deno.serve(async (req) => {
 
   } catch (error: any) {
     console.error('Microsoft Graph error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: 'An internal error occurred' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

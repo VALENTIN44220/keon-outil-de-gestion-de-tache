@@ -87,8 +87,9 @@ Deno.serve(async (req) => {
     while (true) {
       const { data: listData, error: listError } = await supabaseAdmin.auth.admin.listUsers({ page, perPage });
       if (listError) {
+        console.error('List users error:', listError);
         return new Response(
-          JSON.stringify({ error: listError.message }),
+          JSON.stringify({ error: 'Failed to look up existing users' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -153,8 +154,9 @@ Deno.serve(async (req) => {
             .eq('id', existingProfile.id);
 
           if (updateError) {
+            console.error('Profile update error:', updateError);
             return new Response(
-              JSON.stringify({ error: updateError.message }),
+              JSON.stringify({ error: 'Failed to update profile' }),
               { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
           }
@@ -214,8 +216,9 @@ Deno.serve(async (req) => {
     });
 
     if (createError) {
+      console.error('User creation error:', createError);
       return new Response(
-        JSON.stringify({ error: createError.message }),
+        JSON.stringify({ error: 'Failed to create user account' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.process-recurrence]
 verify_jwt = false
+
+[functions.get-table-schema]
+verify_jwt = false

@@ -12,8 +12,43 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    // Authenticate via SYNC_SECRET or admin JWT
+    const syncSecret = req.headers.get("x-sync-secret") ?? "";
+    const expectedSecret = Deno.env.get("SYNC_SECRET") ?? "";
+    
+    let isAuthorized = false;
+    
+    // Method 1: SYNC_SECRET header (for cron/scheduler)
+    if (expectedSecret && syncSecret === expectedSecret) {
+      isAuthorized = true;
+    }
+    
+    // Method 2: Admin JWT (for manual trigger)
+    if (!isAuthorized) {
+      const authHeader = req.headers.get("Authorization");
+      if (authHeader?.startsWith("Bearer ")) {
+        const token = authHeader.replace("Bearer ", "");
+        const anonClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!);
+        const { data: { user }, error: authError } = await anonClient.auth.getUser(token);
+        if (!authError && user) {
+          const { data: roleData } = await supabase
+            .from("user_roles")
+            .select("role")
+            .eq("user_id", user.id)
+            .eq("role", "admin")
+            .maybeSingle();
+          if (roleData) isAuthorized = true;
+        }
+      }
+    }
+    
+    if (!isAuthorized) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     // Find all process templates with recurrence due

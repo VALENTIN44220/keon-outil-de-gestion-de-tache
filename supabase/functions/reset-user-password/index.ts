@@ -105,8 +105,9 @@ Deno.serve(async (req) => {
       while (!found) {
         const { data: listData, error: listError } = await supabaseAdmin.auth.admin.listUsers({ page, perPage });
         if (listError) {
+          console.error('List users error:', listError);
           return new Response(
-            JSON.stringify({ error: listError.message }),
+            JSON.stringify({ error: 'Failed to look up users' }),
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
@@ -145,7 +146,7 @@ Deno.serve(async (req) => {
     if (updateError) {
       console.error('Error updating password:', updateError);
       return new Response(
-        JSON.stringify({ error: updateError.message }),
+        JSON.stringify({ error: 'Failed to reset password' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
