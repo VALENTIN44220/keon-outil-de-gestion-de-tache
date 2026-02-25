@@ -670,7 +670,21 @@ Deno.serve(async (req) => {
 
       if (mappingError || !mapping) throw new Error('Plan mapping not found');
 
-      const plannerTasks = await getPlannerTasks(accessToken, mapping.planner_plan_id);
+      const rawPlannerTasks = await getPlannerTasks(accessToken, mapping.planner_plan_id);
+      
+      // Enrich tasks with details (description/notes)
+      const plannerTasks: any[] = [];
+      for (const task of rawPlannerTasks) {
+        try {
+          const details = await getPlannerTaskDetails(accessToken, task.id);
+          plannerTasks.push({
+            ...task,
+            _description: details.description || '',
+          });
+        } catch {
+          plannerTasks.push({ ...task, _description: '' });
+        }
+      }
 
       // Get bucket mappings for subcategory resolution
       const { data: bucketMappings } = await supabase
@@ -793,7 +807,7 @@ Deno.serve(async (req) => {
               .from('tasks')
               .insert({
                 title: pt.title,
-                description: pt.hasDescription ? 'Importé depuis Planner' : null,
+                description: pt._description || null,
                 status,
                 priority,
                 due_date: pt.dueDateTime ? pt.dueDateTime.substring(0, 10) : null,
@@ -898,6 +912,11 @@ Deno.serve(async (req) => {
             const currentLabels = localTask.planner_labels || [];
             if (JSON.stringify(newLabels.sort()) !== JSON.stringify([...currentLabels].sort())) {
               updates.planner_labels = newLabels.length > 0 ? newLabels : null;
+            }
+
+            // Update description from Planner notes
+            if (plannerTask._description && plannerTask._description !== (localTask.description || '')) {
+              updates.description = plannerTask._description;
             }
 
             if (Object.keys(updates).length > 0) {
