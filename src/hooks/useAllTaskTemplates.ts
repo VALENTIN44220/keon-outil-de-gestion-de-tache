@@ -46,6 +46,7 @@ export function useAllTaskTemplates() {
             ...task,
             priority: task.priority as 'low' | 'medium' | 'high' | 'urgent',
             visibility_level: task.visibility_level as TaskTemplate['visibility_level'],
+            default_duration_unit: (task.default_duration_unit || 'days') as 'days' | 'hours',
             validation_level_1: (task.validation_level_1 || 'none') as ValidationLevelType,
             validation_level_2: (task.validation_level_2 || 'none') as ValidationLevelType,
             process_name: (task as any).process_templates?.name || null,

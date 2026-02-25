@@ -597,7 +597,7 @@ export default function SubProcessSettings() {
                                 </div>
                                 <div className="flex gap-2 mt-1">
                                   <Badge variant="secondary" className="text-xs">
-                                    {task.default_duration_days} jour(s)
+                                    {task.default_duration_days} {(task as any).default_duration_unit === 'hours' ? 'heure(s)' : 'jour(s)'}
                                   </Badge>
                                   {task.checklist_count > 0 && (
                                     <Badge variant="outline" className="text-xs">

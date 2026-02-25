@@ -87,6 +87,7 @@ export function LinkExistingTaskDialog({
           ...t,
           priority: t.priority as 'low' | 'medium' | 'high' | 'urgent',
           visibility_level: t.visibility_level as TaskTemplate['visibility_level'],
+          default_duration_unit: (t.default_duration_unit || 'days') as 'days' | 'hours',
           validation_level_1: (t.validation_level_1 || 'none') as TaskTemplate['validation_level_1'],
           validation_level_2: (t.validation_level_2 || 'none') as TaskTemplate['validation_level_2'],
           process_name: (t as any).process_templates?.name || null,

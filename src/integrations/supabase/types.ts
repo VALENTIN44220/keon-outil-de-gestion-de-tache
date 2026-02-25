@@ -3727,6 +3727,7 @@ export type Database = {
           creator_company_id: string | null
           creator_department_id: string | null
           default_duration_days: number | null
+          default_duration_unit: string
           depends_on_task_template_id: string | null
           description: string | null
           id: string
@@ -3755,6 +3756,7 @@ export type Database = {
           creator_company_id?: string | null
           creator_department_id?: string | null
           default_duration_days?: number | null
+          default_duration_unit?: string
           depends_on_task_template_id?: string | null
           description?: string | null
           id?: string
@@ -3783,6 +3785,7 @@ export type Database = {
           creator_company_id?: string | null
           creator_department_id?: string | null
           default_duration_days?: number | null
+          default_duration_unit?: string
           depends_on_task_template_id?: string | null
           description?: string | null
           id?: string
@@ -3961,6 +3964,7 @@ export type Database = {
           depends_on_task_id: string | null
           description: string | null
           due_date: string | null
+          duration_hours: number | null
           group_assignee_ids: string[] | null
           id: string
           is_assignment_task: boolean
@@ -4036,6 +4040,7 @@ export type Database = {
           depends_on_task_id?: string | null
           description?: string | null
           due_date?: string | null
+          duration_hours?: number | null
           group_assignee_ids?: string[] | null
           id?: string
           is_assignment_task?: boolean
@@ -4111,6 +4116,7 @@ export type Database = {
           depends_on_task_id?: string | null
           description?: string | null
           due_date?: string | null
+          duration_hours?: number | null
           group_assignee_ids?: string[] | null
           id?: string
           is_assignment_task?: boolean
@@ -5772,6 +5778,7 @@ export type Database = {
         Row: {
           created_at: string
           date: string
+          duration_hours: number
           half_day: string
           id: string
           notes: string | null
@@ -5782,6 +5789,7 @@ export type Database = {
         Insert: {
           created_at?: string
           date: string
+          duration_hours?: number
           half_day: string
           id?: string
           notes?: string | null
@@ -5792,6 +5800,7 @@ export type Database = {
         Update: {
           created_at?: string
           date?: string
+          duration_hours?: number
           half_day?: string
           id?: string
           notes?: string | null

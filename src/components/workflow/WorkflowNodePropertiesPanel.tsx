@@ -381,7 +381,7 @@ export function WorkflowNodePropertiesPanel({
                         {task.title}
                         {task.default_duration_days && (
                           <span className="text-muted-foreground ml-1">
-                            ({task.default_duration_days}j)
+                            ({task.default_duration_days}{(task as any).default_duration_unit === 'hours' ? 'h' : 'j'})
                           </span>
                         )}
                       </label>

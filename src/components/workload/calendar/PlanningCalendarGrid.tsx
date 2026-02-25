@@ -101,6 +101,18 @@ import { YearPlanningGrid } from './YearPlanningGrid';
      return map;
    }, [workloadData]);
  
+   // All slots flattened from workload data
+   const allSlots = useMemo(() => {
+     const result: WorkloadSlot[] = [];
+     workloadData.forEach(member => {
+       (member.days || []).forEach(day => {
+         if (day.morning.slot) result.push(day.morning.slot);
+         if (day.afternoon.slot) result.push(day.afternoon.slot);
+       });
+     });
+     return result;
+   }, [workloadData]);
+
    // Slots grouped by user
    const slotsByUser = useMemo(() => {
      const map = new Map<string, WorkloadSlot[]>();
@@ -352,6 +364,7 @@ import { YearPlanningGrid } from './YearPlanningGrid';
           tasks={tasks}
           holidays={holidays}
           leaves={leaves}
+          slots={allSlots}
           outlookEvents={outlookEvents}
           showOutlookEvents={showOutlookEvents}
           onTaskClick={onTaskClick}

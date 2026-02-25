@@ -178,7 +178,13 @@ export function NewTaskDialog({ open, onClose, mode, onAdd, onTasksCreated }: Ne
         setSubcategoryId(template.subcategory_id);
         if (template.default_duration_days) {
           const date = new Date();
-          date.setDate(date.getDate() + template.default_duration_days);
+          const unit = (template as any).default_duration_unit || 'days';
+          if (unit === 'hours') {
+            // Hours: 8h = 1 day, round up
+            date.setDate(date.getDate() + Math.max(1, Math.ceil(template.default_duration_days / 8)));
+          } else {
+            date.setDate(date.getDate() + template.default_duration_days);
+          }
           setDueDate(date.toISOString().split('T')[0]);
         }
       }
@@ -266,7 +272,12 @@ export function NewTaskDialog({ open, onClose, mode, onAdd, onTasksCreated }: Ne
     for (const template of process.task_templates) {
       const dueDate = new Date();
       if (template.default_duration_days) {
-        dueDate.setDate(dueDate.getDate() + template.default_duration_days);
+        const unit = (template as any).default_duration_unit || 'days';
+        if (unit === 'hours') {
+          dueDate.setDate(dueDate.getDate() + Math.max(1, Math.ceil(template.default_duration_days / 8)));
+        } else {
+          dueDate.setDate(dueDate.getDate() + template.default_duration_days);
+        }
       }
 
       await onAdd({

@@ -5,6 +5,7 @@
  import { Task } from '@/types/task';
  import { OutlookEvent } from '@/hooks/useOutlookCalendar';
  import { cn } from '@/lib/utils';
+ import { DailyCapacityBar } from '../DailyCapacityBar';
  import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
  import { Badge } from '@/components/ui/badge';
  import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -58,6 +59,7 @@
    tasks: Task[];
    holidays: Holiday[];
    leaves: UserLeave[];
+   slots?: WorkloadSlot[];
    outlookEvents?: OutlookEvent[];
    showOutlookEvents?: boolean;
    onTaskClick: (task: Task, slots: WorkloadSlot[]) => void;
@@ -85,6 +87,7 @@
    tasks = [],
    holidays = [],
    leaves = [],
+   slots: allSlots = [],
    outlookEvents = [],
    showOutlookEvents = true,
    onTaskClick,
@@ -97,7 +100,23 @@
  }: WeekPlanningGridProps) {
    const [hoveredTask, setHoveredTask] = useState<string | null>(null);
    const [draggingTask, setDraggingTask] = useState<string | null>(null);
- 
+
+   // Compute daily capacity per user
+   const dailyCapacityMap = useMemo(() => {
+     const map = new Map<string, Map<string, number>>(); // userId -> date -> totalHours
+     allSlots.forEach(slot => {
+       if (!map.has(slot.user_id)) map.set(slot.user_id, new Map());
+       const userMap = map.get(slot.user_id)!;
+       const current = userMap.get(slot.date) || 0;
+       userMap.set(slot.date, current + (slot.duration_hours || 4));
+     });
+     return map;
+   }, [allSlots]);
+
+   const getDailyHours = useCallback((userId: string, date: string) => {
+     return dailyCapacityMap.get(userId)?.get(date) || 0;
+   }, [dailyCapacityMap]);
+
    // Dimensions
    const columnWidth = isCompact ? 120 : 160;
    const rowHeight = isCompact ? 72 : 96;
@@ -516,8 +535,18 @@
                                  </div>
                                </TooltipContent>
                              </Tooltip>
-                           )}
-                         </div>
+                            )}
+                            
+                            {/* Daily capacity bar */}
+                            {!unit.isWeekend && !holiday && !leave && (
+                              <div className="absolute bottom-1 left-1 right-1">
+                                <DailyCapacityBar
+                                  totalHours={getDailyHours(member.memberId, dateStr)}
+                                  compact
+                                />
+                              </div>
+                            )}
+                          </div>
                        );
                      })}
  
