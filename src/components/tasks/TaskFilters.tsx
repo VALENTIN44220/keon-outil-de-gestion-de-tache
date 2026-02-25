@@ -28,26 +28,24 @@ export function TaskFilters({
   onPriorityChange 
 }: TaskFiltersProps) {
   return (
-    <div className="flex flex-wrap items-center gap-4 mb-6">
+    <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-2 sm:gap-4 mb-4 sm:mb-6">
       {/* Status filter */}
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-muted-foreground">Statut:</span>
-        <div className="flex bg-muted rounded-lg p-1">
+      <div className="flex items-center gap-2 w-full sm:w-auto">
+        <span className="text-xs sm:text-sm font-medium text-muted-foreground shrink-0">Statut:</span>
+        <div className="flex flex-wrap bg-muted rounded-lg p-1 gap-0.5">
           {statusOptions.map((option) => (
             <Button
               key={option.value}
               variant="ghost"
               size="sm"
               onClick={() => {
-                // Map filter values to TaskStatus | 'all'
                 const filterValue = option.value === 'pending_validation' 
                   ? 'pending_validation_1' as TaskStatus 
                   : option.value as TaskStatus | 'all';
                 onStatusChange(filterValue);
               }}
               className={cn(
-                "text-xs px-3 py-1 h-auto rounded-md transition-all",
-                // Check if current filter matches this option
+                "text-[10px] sm:text-xs px-2 sm:px-3 py-0.5 sm:py-1 h-auto rounded-md transition-all",
                 (statusFilter === option.value || 
                  (option.value === 'pending_validation' && 
                   (statusFilter === 'pending_validation_1' || statusFilter === 'pending_validation_2')))
@@ -62,9 +60,9 @@ export function TaskFilters({
       </div>
 
       {/* Priority filter */}
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-muted-foreground">Priorité:</span>
-        <div className="flex bg-muted rounded-lg p-1">
+      <div className="flex items-center gap-2 w-full sm:w-auto">
+        <span className="text-xs sm:text-sm font-medium text-muted-foreground shrink-0">Priorité:</span>
+        <div className="flex flex-wrap bg-muted rounded-lg p-1 gap-0.5">
           {priorityOptions.map((option) => (
             <Button
               key={option.value}
@@ -72,7 +70,7 @@ export function TaskFilters({
               size="sm"
               onClick={() => onPriorityChange(option.value)}
               className={cn(
-                "text-xs px-3 py-1 h-auto rounded-md transition-all",
+                "text-[10px] sm:text-xs px-2 sm:px-3 py-0.5 sm:py-1 h-auto rounded-md transition-all",
                 priorityFilter === option.value 
                   ? "bg-card shadow-sm text-foreground" 
                   : "text-muted-foreground hover:text-foreground"

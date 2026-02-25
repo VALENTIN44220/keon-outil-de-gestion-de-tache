@@ -406,7 +406,7 @@ export default function ProcessTracking() {
           )}
 
           {/* Main content */}
-          <main className="flex-1 overflow-y-auto p-6">
+          <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-6">
             {sidebarGroups.length === 0 ? (
               <div className="flex flex-col items-center justify-center min-h-[400px] border-2 border-dashed border-border rounded-xl gap-4">
                 <div className="p-3 rounded-full bg-muted">

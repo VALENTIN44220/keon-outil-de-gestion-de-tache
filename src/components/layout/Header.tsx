@@ -63,30 +63,30 @@ export function Header({
     .slice(0, 2);
 
   return (
-    <header className="bg-muted/50 border-b border-border px-6 py-4 sticky top-0 z-30">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
+    <header className="bg-muted/50 border-b border-border px-3 sm:px-6 py-3 sm:py-4 sticky top-0 z-30">
+      <div className="flex items-center justify-between gap-2 sm:gap-4">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <img 
             src={keonTaskLogo} 
             alt="KEON Task Manager" 
-            className="h-10 w-10 object-contain" 
+            className="h-8 w-8 sm:h-10 sm:w-10 object-contain" 
           />
-          <div className="flex flex-col leading-tight">
+          <div className="flex flex-col leading-tight hidden sm:flex">
             <span className="text-base font-body font-bold tracking-wide text-foreground">KEON</span>
             <span className="text-xs font-display font-semibold tracking-wider text-muted-foreground uppercase">Task Manager</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3 flex-1 justify-end min-w-0">
           {/* Search with icon integrated */}
-          <div className="relative group">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+          <div className="relative group flex-1 max-w-[200px] sm:max-w-[260px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
             <Input
               type="text"
               placeholder="Rechercher..."
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="pl-10 w-64 bg-white"
+              className="pl-9 w-full bg-white text-sm h-8 sm:h-9"
             />
           </div>
 
@@ -109,9 +109,14 @@ export function Header({
 
           {/* Add Task Button */}
           {onAddTask && (
-            <Button onClick={onAddTask} className="gap-2">
+            <Button onClick={onAddTask} size="sm" className="gap-1.5 hidden sm:flex">
               <Plus className="w-4 h-4" />
-              {addButtonLabel}
+              <span className="hidden md:inline">{addButtonLabel}</span>
+            </Button>
+          )}
+          {onAddTask && (
+            <Button onClick={onAddTask} size="icon" className="sm:hidden h-8 w-8">
+              <Plus className="w-4 h-4" />
             </Button>
           )}
 

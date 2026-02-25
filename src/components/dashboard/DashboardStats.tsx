@@ -33,7 +33,7 @@ export function DashboardStats({
   if (collapsed) {
     // Compact horizontal stats bar
     return (
-      <div className="flex flex-wrap items-center gap-3 p-3 bg-white rounded-sm border border-keon-300 mb-4">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-white rounded-sm border border-keon-300 mb-4">
         {/* Progress ring mini */}
         <div className="flex items-center gap-2 shrink-0">
           <CompletionRing progress={stats.completionRate} size={36} strokeWidth={4} />

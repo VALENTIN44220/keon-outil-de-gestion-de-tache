@@ -19,7 +19,7 @@ export function TemplateFilters({
   departments,
 }: TemplateFiltersProps) {
   return (
-    <div className="flex flex-wrap gap-4 mb-6 p-4 bg-card rounded-xl shadow-sm">
+    <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 mb-4 sm:mb-6 p-3 sm:p-4 bg-card rounded-xl shadow-sm">
       <div className="flex flex-col gap-1.5">
         <Label className="text-sm text-muted-foreground">Société</Label>
         <SearchableSelect
@@ -27,7 +27,7 @@ export function TemplateFilters({
           onValueChange={onCompanyChange}
           placeholder="Toutes les sociétés"
           searchPlaceholder="Rechercher une société..."
-          triggerClassName="w-48"
+          triggerClassName="w-full sm:w-48"
           options={[
             { value: 'all', label: 'Toutes les sociétés' },
             ...companies.map(company => ({
@@ -45,7 +45,7 @@ export function TemplateFilters({
           onValueChange={onDepartmentChange}
           placeholder="Tous les services"
           searchPlaceholder="Rechercher un service..."
-          triggerClassName="w-48"
+          triggerClassName="w-full sm:w-48"
           options={[
             { value: 'all', label: 'Tous les services' },
             ...departments.map(dept => ({

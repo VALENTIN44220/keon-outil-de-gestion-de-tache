@@ -119,21 +119,21 @@ export function GanttFilterBar({
   return (
     <div 
       className={cn(
-        "flex items-center gap-3 p-3 bg-card rounded-xl border border-border/50 shadow-sm",
+        "flex flex-wrap items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-card rounded-xl border border-border/50 shadow-sm",
         className
       )}
       role="toolbar"
       aria-label="Filtres et contrôles du Gantt"
     >
       {/* Search Input */}
-      <div className="relative flex-1 max-w-xs">
+      <div className="relative flex-1 min-w-[120px] max-w-xs">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           type="search"
-          placeholder="Rechercher tâches, collaborateurs..."
+          placeholder="Rechercher..."
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
-          className="pl-9 h-9 text-sm bg-background/50 focus-visible:ring-primary"
+          className="pl-9 h-8 sm:h-9 text-xs sm:text-sm bg-background/50 focus-visible:ring-primary"
           aria-label="Recherche"
         />
         {searchQuery && (

@@ -34,7 +34,7 @@ export default function Admin() {
           subtitle="Gérez la structure organisationnelle"
         />
         
-        <main className="flex-1 overflow-auto p-6">
+        <main className="flex-1 overflow-auto overflow-x-hidden p-3 sm:p-6">
           <AdminTabs {...adminData} />
         </main>
       </div>
