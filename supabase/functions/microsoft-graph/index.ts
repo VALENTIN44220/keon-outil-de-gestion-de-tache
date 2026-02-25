@@ -812,6 +812,40 @@ Deno.serve(async (req) => {
 
             if (insertErr) throw insertErr;
 
+            // Sync planner labels to service_group_labels via task_labels junction
+            if (plannerLabels.length > 0 && mapping.mapped_process_template_id) {
+              try {
+                // Get service_group_id from process template
+                const { data: ptData } = await supabase
+                  .from('process_templates')
+                  .select('service_group_id')
+                  .eq('id', mapping.mapped_process_template_id)
+                  .single();
+                
+                if (ptData?.service_group_id) {
+                  // Find matching service_group_labels by name
+                  const { data: sgLabels } = await supabase
+                    .from('service_group_labels')
+                    .select('id, name')
+                    .eq('service_group_id', ptData.service_group_id)
+                    .eq('is_active', true);
+                  
+                  if (sgLabels && sgLabels.length > 0) {
+                    const labelInserts = plannerLabels
+                      .map(plName => sgLabels.find(sgl => sgl.name.toLowerCase() === plName.toLowerCase()))
+                      .filter(Boolean)
+                      .map(sgl => ({ task_id: newTask.id, label_id: sgl!.id }));
+                    
+                    if (labelInserts.length > 0) {
+                      await supabase.from('task_labels').upsert(labelInserts, { onConflict: 'task_id,label_id' });
+                    }
+                  }
+                }
+              } catch (labelErr) {
+                console.error('Failed to sync task labels:', labelErr);
+              }
+            }
+
             await supabase.from('planner_task_links').insert({
               plan_mapping_id: planMappingId,
               planner_task_id: pt.id,
@@ -867,6 +901,41 @@ Deno.serve(async (req) => {
             if (Object.keys(updates).length > 0) {
               await supabase.from('tasks').update(updates).eq('id', link.local_task_id);
               tasksUpdated++;
+            }
+
+            // Sync planner labels to task_labels junction table
+            if (newLabels.length > 0 && mapping.mapped_process_template_id) {
+              try {
+                const { data: ptData } = await supabase
+                  .from('process_templates')
+                  .select('service_group_id')
+                  .eq('id', mapping.mapped_process_template_id)
+                  .single();
+
+                if (ptData?.service_group_id) {
+                  const { data: sgLabels } = await supabase
+                    .from('service_group_labels')
+                    .select('id, name')
+                    .eq('service_group_id', ptData.service_group_id)
+                    .eq('is_active', true);
+
+                  if (sgLabels && sgLabels.length > 0) {
+                    // Remove existing task_labels for this task
+                    await supabase.from('task_labels').delete().eq('task_id', link.local_task_id);
+
+                    const labelInserts = newLabels
+                      .map(plName => sgLabels.find(sgl => sgl.name.toLowerCase() === plName.toLowerCase()))
+                      .filter(Boolean)
+                      .map(sgl => ({ task_id: link.local_task_id, label_id: sgl!.id }));
+
+                    if (labelInserts.length > 0) {
+                      await supabase.from('task_labels').insert(labelInserts);
+                    }
+                  }
+                }
+              } catch (labelErr) {
+                console.error('Failed to sync task labels on update:', labelErr);
+              }
             }
           }
 

@@ -277,6 +277,22 @@ export function ConfigurableDashboard({
     }
   }, [widgets]);
 
+  // Fetch task -> label mappings for label filtering
+  const [taskLabelMap, setTaskLabelMap] = useState<Map<string, string[]>>(new Map());
+  useEffect(() => {
+    (async () => {
+      const { data } = await (supabase as any).from('task_labels').select('task_id, label_id');
+      if (data) {
+        const map = new Map<string, string[]>();
+        for (const row of data) {
+          if (!map.has(row.task_id)) map.set(row.task_id, []);
+          map.get(row.task_id)!.push(row.label_id);
+        }
+        setTaskLabelMap(map);
+      }
+    })();
+  }, [tasks]);
+
   // Filter tasks based on cross-filters
   const filteredTasks = useMemo(() => {
     let result = tasks;
@@ -345,8 +361,16 @@ export function ConfigurableDashboard({
       result = result.filter(t => activeFilters.priorities.includes(t.priority));
     }
 
+    // Label filter
+    if (activeFilters.labelIds && activeFilters.labelIds.length > 0) {
+      result = result.filter(t => {
+        const taskLabels = taskLabelMap.get(t.id);
+        return taskLabels && taskLabels.some(lid => activeFilters.labelIds.includes(lid));
+      });
+    }
+
     return result;
-  }, [tasks, pendingFilters]);
+  }, [tasks, pendingFilters, taskLabelMap]);
 
   // Calculate filtered stats
   const filteredStats = useMemo((): TaskStats => {

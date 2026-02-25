@@ -15,6 +15,7 @@ import {
   Users, 
   Building2, 
   Tags, 
+  Tag,
   Filter, 
   X, 
   RotateCcw,
@@ -201,6 +202,7 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [processes, setProcesses] = useState<{ id: string; name: string }[]>([]);
+  const [sgLabels, setSgLabels] = useState<{ id: string; name: string; color: string }[]>([]);
   const [presets, setPresets] = useState<FilterPreset[]>([]);
   const [presetName, setPresetName] = useState('');
   const [showSavePreset, setShowSavePreset] = useState(false);
@@ -208,17 +210,19 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
 
   useEffect(() => {
     const fetchData = async () => {
-      const [profilesRes, depsRes, catsRes, procsRes] = await Promise.all([
+      const [profilesRes, depsRes, catsRes, procsRes, labelsRes] = await Promise.all([
         supabase.from('profiles').select('id, display_name').eq('status', 'active'),
         supabase.from('departments').select('id, name'),
         supabase.from('categories').select('id, name'),
         supabase.from('process_templates').select('id, name'),
+        (supabase as any).from('service_group_labels').select('id, name, color').eq('is_active', true).order('name'),
       ]);
       
       if (profilesRes.data) setProfiles(profilesRes.data);
       if (depsRes.data) setDepartments(depsRes.data);
       if (catsRes.data) setCategories(catsRes.data);
       if (procsRes.data) setProcesses(procsRes.data);
+      if (labelsRes.data) setSgLabels(labelsRes.data);
     };
     fetchData();
   }, []);
@@ -372,6 +376,7 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
     filters.processIds.length + 
     filters.statuses.length + 
     filters.priorities.length +
+    (filters.labelIds?.length || 0) +
     (filters.dateRange.start ? 1 : 0);
 
   // Status/Priority items formatted for MultiSelectDropdown
@@ -509,7 +514,7 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
 
       {/* Filters grid - collapsible */}
       {!collapsed && (
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3 items-end mt-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-9 gap-3 items-end mt-3">
         {/* Search */}
         <div className="space-y-1.5 col-span-2 md:col-span-1">
           <Label className="text-xs text-keon-600 flex items-center gap-1">
@@ -627,6 +632,18 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
           onChange={(ids) => onFiltersChange({ ...filters, priorities: ids as any })}
           colorDotKey="color"
         />
+
+        {/* Labels / Étiquettes */}
+        {sgLabels.length > 0 && (
+          <MultiSelectDropdown
+            label="Étiquettes"
+            icon={<Tag className="h-3 w-3" />}
+            items={sgLabels}
+            selectedIds={filters.labelIds || []}
+            onChange={(ids) => onFiltersChange({ ...filters, labelIds: ids })}
+            colorDotKey="color"
+          />
+        )}
       </div>
       )}
     </div>

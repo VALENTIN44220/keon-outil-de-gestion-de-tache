@@ -5,23 +5,38 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Plus, Pencil, Trash2, Loader2, AlertTriangle, Search, Filter } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, AlertTriangle, Search, Filter, Tag, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import type { Department } from '@/types/admin';
 
+interface ServiceGroupLabel {
+  id: string;
+  name: string;
+  color: string;
+  order_index: number;
+  is_active: boolean;
+}
+
 interface ServiceGroup {
   id: string;
   name: string;
   description: string | null;
   department_ids: string[];
+  labels: ServiceGroupLabel[];
 }
 
 interface ServiceGroupsTabProps {
   departments: Department[];
 }
+
+const LABEL_COLORS = [
+  '#6366f1', '#8b5cf6', '#ec4899', '#ef4444', '#f97316',
+  '#eab308', '#22c55e', '#14b8a6', '#06b6d4', '#3b82f6',
+  '#64748b', '#78716c',
+];
 
 export function ServiceGroupsTab({ departments }: ServiceGroupsTabProps) {
   const [groups, setGroups] = useState<ServiceGroup[]>([]);
@@ -35,14 +50,26 @@ export function ServiceGroupsTab({ departments }: ServiceGroupsTabProps) {
   const [deptSearch, setDeptSearch] = useState('');
   const [showUnassignedOnly, setShowUnassignedOnly] = useState(false);
 
+  // Label management state
+  const [labels, setLabels] = useState<ServiceGroupLabel[]>([]);
+  const [newLabelName, setNewLabelName] = useState('');
+  const [newLabelColor, setNewLabelColor] = useState(LABEL_COLORS[0]);
+  const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
+  const [editLabelName, setEditLabelName] = useState('');
+  const [editLabelColor, setEditLabelColor] = useState('');
+
   const fetchGroups = useCallback(async () => {
     setIsLoading(true);
-    const { data: sgData } = await (supabase as any).from('service_groups').select('*').order('name');
-    const { data: linkData } = await (supabase as any).from('service_group_departments').select('service_group_id, department_id');
+    const [sgRes, linkRes, labelRes] = await Promise.all([
+      (supabase as any).from('service_groups').select('*').order('name'),
+      (supabase as any).from('service_group_departments').select('service_group_id, department_id'),
+      (supabase as any).from('service_group_labels').select('*').order('order_index'),
+    ]);
 
-    const result: ServiceGroup[] = (sgData || []).map((sg: any) => ({
+    const result: ServiceGroup[] = (sgRes.data || []).map((sg: any) => ({
       ...sg,
-      department_ids: (linkData || []).filter((l: any) => l.service_group_id === sg.id).map((l: any) => l.department_id),
+      department_ids: (linkRes.data || []).filter((l: any) => l.service_group_id === sg.id).map((l: any) => l.department_id),
+      labels: (labelRes.data || []).filter((l: any) => l.service_group_id === sg.id),
     }));
     setGroups(result);
     setIsLoading(false);
@@ -57,6 +84,7 @@ export function ServiceGroupsTab({ departments }: ServiceGroupsTabProps) {
     setSelectedDeptIds(new Set());
     setDeptSearch('');
     setShowUnassignedOnly(false);
+    setLabels([]);
     setDialogOpen(true);
   };
 
@@ -67,6 +95,7 @@ export function ServiceGroupsTab({ departments }: ServiceGroupsTabProps) {
     setSelectedDeptIds(new Set(g.department_ids));
     setDeptSearch('');
     setShowUnassignedOnly(false);
+    setLabels([...g.labels]);
     setDialogOpen(true);
   };
 
@@ -106,6 +135,51 @@ export function ServiceGroupsTab({ departments }: ServiceGroupsTabProps) {
         if (error) throw error;
       }
 
+      // Sync labels
+      if (editingGroup) {
+        // Delete labels removed by user
+        const existingLabelIds = editingGroup.labels.map(l => l.id);
+        const keptLabelIds = labels.filter(l => l.id && existingLabelIds.includes(l.id)).map(l => l.id);
+        const toDelete = existingLabelIds.filter(id => !keptLabelIds.includes(id));
+        if (toDelete.length > 0) {
+          await (supabase as any).from('service_group_labels').delete().in('id', toDelete);
+        }
+
+        // Update existing labels
+        for (const label of labels.filter(l => l.id && existingLabelIds.includes(l.id))) {
+          await (supabase as any).from('service_group_labels')
+            .update({ name: label.name, color: label.color, order_index: label.order_index, is_active: label.is_active })
+            .eq('id', label.id);
+        }
+
+        // Insert new labels (those without a real id or not in existing)
+        const newLabels = labels.filter(l => !l.id || !existingLabelIds.includes(l.id));
+        if (newLabels.length > 0) {
+          await (supabase as any).from('service_group_labels').insert(
+            newLabels.map((l, i) => ({
+              service_group_id: groupId,
+              name: l.name,
+              color: l.color,
+              order_index: l.order_index || (existingLabelIds.length + i),
+              is_active: l.is_active,
+            }))
+          );
+        }
+      } else {
+        // New group: insert all labels
+        if (labels.length > 0) {
+          await (supabase as any).from('service_group_labels').insert(
+            labels.map((l, i) => ({
+              service_group_id: groupId,
+              name: l.name,
+              color: l.color,
+              order_index: i,
+              is_active: true,
+            }))
+          );
+        }
+      }
+
       toast.success(editingGroup ? 'Groupe mis à jour' : 'Groupe créé');
       setDialogOpen(false);
       fetchGroups();
@@ -134,6 +208,40 @@ export function ServiceGroupsTab({ departments }: ServiceGroupsTabProps) {
       else next.add(id);
       return next;
     });
+  };
+
+  const addLabel = () => {
+    if (!newLabelName.trim()) return;
+    if (labels.some(l => l.name.toLowerCase() === newLabelName.trim().toLowerCase())) {
+      toast.error('Cette étiquette existe déjà');
+      return;
+    }
+    setLabels(prev => [...prev, {
+      id: '', // will be generated on save
+      name: newLabelName.trim(),
+      color: newLabelColor,
+      order_index: prev.length,
+      is_active: true,
+    }]);
+    setNewLabelName('');
+    setNewLabelColor(LABEL_COLORS[(labels.length + 1) % LABEL_COLORS.length]);
+  };
+
+  const removeLabel = (index: number) => {
+    setLabels(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const startEditLabel = (index: number) => {
+    const label = labels[index];
+    setEditingLabelId(label.id || `idx-${index}`);
+    setEditLabelName(label.name);
+    setEditLabelColor(label.color);
+  };
+
+  const saveEditLabel = (index: number) => {
+    if (!editLabelName.trim()) return;
+    setLabels(prev => prev.map((l, i) => i === index ? { ...l, name: editLabelName.trim(), color: editLabelColor } : l));
+    setEditingLabelId(null);
   };
 
   if (isLoading) {
@@ -172,7 +280,7 @@ export function ServiceGroupsTab({ departments }: ServiceGroupsTabProps) {
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="pt-0 pb-3">
+            <CardContent className="pt-0 pb-3 space-y-2">
               {g.description && <p className="text-xs text-muted-foreground mb-2">{g.description}</p>}
               <div className="flex flex-wrap gap-1">
                 {g.department_ids.length === 0 ? (
@@ -186,6 +294,22 @@ export function ServiceGroupsTab({ departments }: ServiceGroupsTabProps) {
                   );
                 })}
               </div>
+              {/* Labels */}
+              {g.labels.length > 0 && (
+                <div className="flex flex-wrap gap-1 pt-1 border-t">
+                  {g.labels.filter(l => l.is_active).map(label => (
+                    <Badge
+                      key={label.id}
+                      variant="outline"
+                      className="text-[10px] gap-1"
+                      style={{ borderColor: label.color, color: label.color }}
+                    >
+                      <Tag className="h-2.5 w-2.5" />
+                      {label.name}
+                    </Badge>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         ))}
@@ -219,7 +343,7 @@ export function ServiceGroupsTab({ departments }: ServiceGroupsTabProps) {
       })()}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingGroup ? 'Modifier le groupe' : 'Nouveau groupe de services'}</DialogTitle>
           </DialogHeader>
@@ -256,7 +380,6 @@ export function ServiceGroupsTab({ departments }: ServiceGroupsTabProps) {
               <div className="max-h-48 overflow-y-auto border rounded-md p-2 space-y-1">
                 {(() => {
                   const assignedIds = new Set(groups.flatMap(g => g.department_ids));
-                  // When editing, don't count current group's departments as "assigned"
                   if (editingGroup) {
                     editingGroup.department_ids.forEach(id => assignedIds.delete(id));
                   }
@@ -282,6 +405,87 @@ export function ServiceGroupsTab({ departments }: ServiceGroupsTabProps) {
                     </label>
                   ));
                 })()}
+              </div>
+            </div>
+
+            {/* Labels section */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1.5">
+                <Tag className="h-3.5 w-3.5" />
+                Étiquettes
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Définissez les étiquettes propres à ce groupe. Elles seront utilisables dans les filtres et synchronisées avec Planner.
+              </p>
+              
+              {/* Existing labels */}
+              <div className="space-y-1">
+                {labels.map((label, idx) => {
+                  const isEditing = editingLabelId === (label.id || `idx-${idx}`);
+                  return (
+                    <div key={label.id || idx} className="flex items-center gap-2 py-1 px-2 rounded border bg-muted/30">
+                      {isEditing ? (
+                        <>
+                          <Input
+                            value={editLabelName}
+                            onChange={e => setEditLabelName(e.target.value)}
+                            className="h-7 text-sm flex-1"
+                            onKeyDown={e => e.key === 'Enter' && saveEditLabel(idx)}
+                          />
+                          <div className="flex gap-0.5">
+                            {LABEL_COLORS.slice(0, 6).map(c => (
+                              <button
+                                key={c}
+                                className={`w-4 h-4 rounded-full border-2 ${editLabelColor === c ? 'border-foreground' : 'border-transparent'}`}
+                                style={{ backgroundColor: c }}
+                                onClick={() => setEditLabelColor(c)}
+                              />
+                            ))}
+                          </div>
+                          <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => saveEditLabel(idx)}>OK</Button>
+                          <Button variant="ghost" size="sm" className="h-6 px-1" onClick={() => setEditingLabelId(null)}>
+                            <X className="h-3 w-3" />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: label.color }} />
+                          <span className="text-sm flex-1">{label.name}</span>
+                          <Button variant="ghost" size="sm" className="h-6 px-1" onClick={() => startEditLabel(idx)}>
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-6 px-1" onClick={() => removeLabel(idx)}>
+                            <Trash2 className="h-3 w-3 text-destructive" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Add new label */}
+              <div className="flex items-center gap-2">
+                <div className="flex gap-0.5">
+                  {LABEL_COLORS.slice(0, 6).map(c => (
+                    <button
+                      key={c}
+                      className={`w-4 h-4 rounded-full border-2 ${newLabelColor === c ? 'border-foreground' : 'border-transparent'}`}
+                      style={{ backgroundColor: c }}
+                      onClick={() => setNewLabelColor(c)}
+                    />
+                  ))}
+                </div>
+                <Input
+                  value={newLabelName}
+                  onChange={e => setNewLabelName(e.target.value)}
+                  placeholder="Nouvelle étiquette..."
+                  className="h-8 text-sm flex-1"
+                  onKeyDown={e => e.key === 'Enter' && addLabel()}
+                />
+                <Button variant="outline" size="sm" className="h-8" onClick={addLabel} disabled={!newLabelName.trim()}>
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
               </div>
             </div>
           </div>
