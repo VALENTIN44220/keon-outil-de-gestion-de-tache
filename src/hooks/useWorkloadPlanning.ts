@@ -335,10 +335,10 @@ export function useWorkloadPlanning({
   }, [isHalfDayAvailable]);
 
   // CRUD operations
-  const addSlot = async (taskId: string, userId: string, date: string, halfDay: 'morning' | 'afternoon') => {
+  const addSlot = async (taskId: string, userId: string, date: string, halfDay: 'morning' | 'afternoon', durationHours: number = 4) => {
     const { data, error } = await supabase
       .from('workload_slots')
-      .insert({ task_id: taskId, user_id: userId, date, half_day: halfDay })
+      .insert({ task_id: taskId, user_id: userId, date, half_day: halfDay, duration_hours: durationHours })
       .select()
       .single();
     
@@ -617,6 +617,19 @@ export function useWorkloadPlanning({
     return { hasConflict: false };
   }, [leaves]);
 
+  // Get daily capacity for a user on a specific date
+  const getDailyCapacity = useCallback((userId: string, date: string): { totalHours: number; maxHours: number; remainingHours: number; isOverloaded: boolean } => {
+    const daySlots = slots.filter(s => s.user_id === userId && s.date === date);
+    const totalHours = daySlots.reduce((sum, s) => sum + (s.duration_hours || 4), 0); // default 4h per half-day slot
+    const maxHours = 8;
+    return {
+      totalHours,
+      maxHours,
+      remainingHours: Math.max(0, maxHours - totalHours),
+      isOverloaded: totalHours > maxHours,
+    };
+  }, [slots]);
+
   return {
     workloadData,
     slots,
@@ -637,6 +650,7 @@ export function useWorkloadPlanning({
     findNextAvailableSlots,
     getTaskSlotsCount,
     checkSlotLeaveConflict,
+    getDailyCapacity,
     refetch: fetchData,
   };
 }

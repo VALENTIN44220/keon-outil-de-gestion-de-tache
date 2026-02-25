@@ -139,7 +139,7 @@ export function TaskTemplatesList({
                   )}
                   <span className="flex items-center gap-1">
                     <Clock className="h-3 w-3" />
-                    {task.default_duration_days}j
+                    {task.default_duration_days}{(task as any).default_duration_unit === 'hours' ? 'h' : 'j'}
                   </span>
                 </div>
               </div>
@@ -223,7 +223,7 @@ export function TaskTemplatesList({
                 )}
                 <Badge variant="secondary" className="text-xs">
                   <Clock className="h-3 w-3 mr-1" />
-                  {task.default_duration_days}j
+                  {task.default_duration_days}{(task as any).default_duration_unit === 'hours' ? 'h' : 'j'}
                 </Badge>
                 <Badge variant="outline" className="text-xs">
                   <VisibilityIcon className="h-3 w-3 mr-1" />

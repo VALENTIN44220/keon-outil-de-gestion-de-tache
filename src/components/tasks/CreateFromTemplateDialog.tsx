@@ -82,7 +82,13 @@ export function CreateFromTemplateDialog({ open, onClose, onTasksCreated }: Crea
   const calculateDueDate = (taskIndex: number, templates: TaskTemplate[]): string => {
     let totalDays = 0;
     for (let i = 0; i <= taskIndex; i++) {
-      totalDays += templates[i].default_duration_days;
+      const t = templates[i];
+      const unit = (t as any).default_duration_unit || 'days';
+      if (unit === 'hours') {
+        totalDays += Math.max(1, Math.ceil(t.default_duration_days / 8));
+      } else {
+        totalDays += t.default_duration_days;
+      }
     }
     return format(addDays(startDate, totalDays), 'yyyy-MM-dd');
   };
@@ -114,9 +120,13 @@ export function CreateFromTemplateDialog({ open, onClose, onTasksCreated }: Crea
 
       const tasksToCreate = selectedProcess.task_templates.map((template, index) => {
         // Calculate start date based on previous tasks' durations
+        const unit = (template as any).default_duration_unit || 'days';
         const startDays = selectedProcess.task_templates
           .slice(0, index)
-          .reduce((sum, t) => sum + t.default_duration_days, 0);
+          .reduce((sum, t) => {
+            const u = (t as any).default_duration_unit || 'days';
+            return sum + (u === 'hours' ? Math.max(1, Math.ceil(t.default_duration_days / 8)) : t.default_duration_days);
+          }, 0);
         
         return {
           title: template.title,
@@ -285,7 +295,10 @@ export function CreateFromTemplateDialog({ open, onClose, onTasksCreated }: Crea
                         <Clock className="h-3 w-3" />
                         {format(addDays(startDate, selectedProcess.task_templates
                           .slice(0, index + 1)
-                          .reduce((sum, t) => sum + t.default_duration_days, 0)), "dd/MM", { locale: fr })}
+                          .reduce((sum, t) => {
+                            const u = (t as any).default_duration_unit || 'days';
+                            return sum + (u === 'hours' ? Math.max(1, Math.ceil(t.default_duration_days / 8)) : t.default_duration_days);
+                          }, 0)), "dd/MM", { locale: fr })}
                       </div>
                     </div>
                   </div>

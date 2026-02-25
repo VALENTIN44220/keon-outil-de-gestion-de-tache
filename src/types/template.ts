@@ -88,6 +88,7 @@ export interface TaskTemplate {
   category_id: string | null;
   subcategory_id: string | null;
   default_duration_days: number;
+  default_duration_unit: 'days' | 'hours';
   order_index: number;
   visibility_level: TemplateVisibility;
   creator_company_id: string | null;

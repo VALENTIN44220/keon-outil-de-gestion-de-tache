@@ -29,6 +29,7 @@ export interface WorkloadSlot {
   user_id: string;
   date: string;
   half_day: 'morning' | 'afternoon';
+  duration_hours: number;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -41,6 +42,7 @@ export interface WorkloadSlot {
     due_date: string | null;
     category_id: string | null;
     source_process_template_id: string | null;
+    duration_hours: number | null;
   };
 }
 
@@ -74,4 +76,13 @@ export interface TeamMemberWorkload {
   usedSlots: number;
   leaveSlots: number;
   holidaySlots: number;
+}
+
+/** Daily capacity info for a user */
+export interface DailyCapacity {
+  date: string;
+  totalHours: number; // sum of duration_hours of slots on this day
+  maxHours: number; // 8h by default
+  isOverloaded: boolean;
+  remainingHours: number;
 }

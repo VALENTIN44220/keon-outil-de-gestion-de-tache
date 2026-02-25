@@ -32,6 +32,7 @@ export function EditTaskTemplateDialog({ task, open, onClose, onSave }: EditTask
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [subcategoryId, setSubcategoryId] = useState<string | null>(null);
   const [defaultDurationDays, setDefaultDurationDays] = useState(1);
+  const [defaultDurationUnit, setDefaultDurationUnit] = useState<'days' | 'hours'>('days');
   const [visibilityLevel, setVisibilityLevel] = useState<TemplateVisibility>('public');
   
   const [validationLevel1, setValidationLevel1] = useState<ValidationLevelType>('none');
@@ -59,6 +60,7 @@ export function EditTaskTemplateDialog({ task, open, onClose, onSave }: EditTask
       setCategoryId(task.category_id);
       setSubcategoryId(task.subcategory_id);
       setDefaultDurationDays(task.default_duration_days);
+      setDefaultDurationUnit(task.default_duration_unit || 'days');
       setVisibilityLevel(task.visibility_level);
       setValidationLevel1(task.validation_level_1);
       setValidationLevel2(task.validation_level_2);
@@ -93,6 +95,7 @@ export function EditTaskTemplateDialog({ task, open, onClose, onSave }: EditTask
         category_id: categoryId,
         subcategory_id: subcategoryId,
         default_duration_days: defaultDurationDays,
+        default_duration_unit: defaultDurationUnit,
         visibility_level: visibilityLevel,
         validation_level_1: validationLevel1,
         validation_level_2: validationLevel2,
@@ -181,15 +184,33 @@ export function EditTaskTemplateDialog({ task, open, onClose, onSave }: EditTask
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="duration">Durée par défaut (jours)</Label>
-              <Input
-                id="duration"
-                type="number"
-                min={1}
-                max={365}
-                value={defaultDurationDays}
-                onChange={(e) => setDefaultDurationDays(Number(e.target.value))}
-              />
+              <Label htmlFor="duration">Durée par défaut</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="duration"
+                  type="number"
+                  min={0}
+                  max={defaultDurationUnit === 'days' ? 365 : 2920}
+                  value={defaultDurationDays}
+                  onChange={(e) => setDefaultDurationDays(Number(e.target.value))}
+                  className="flex-1"
+                />
+                <Select value={defaultDurationUnit} onValueChange={(v) => setDefaultDurationUnit(v as 'days' | 'hours')}>
+                  <SelectTrigger className="w-[100px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="days">Jours</SelectItem>
+                    <SelectItem value="hours">Heures</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {defaultDurationDays === 0 && (
+                <p className="text-xs text-muted-foreground">⚡ Durée 0 : la tâche n'impacte pas la charge</p>
+              )}
+              {defaultDurationUnit === 'hours' && defaultDurationDays > 0 && (
+                <p className="text-xs text-muted-foreground">💡 Plusieurs tâches en heures par jour (max 8h/jour)</p>
+              )}
             </div>
           </div>
 

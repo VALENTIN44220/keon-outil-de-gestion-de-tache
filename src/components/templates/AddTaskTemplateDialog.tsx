@@ -44,6 +44,7 @@ export function AddTaskTemplateDialog({
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [subcategoryId, setSubcategoryId] = useState<string | null>(null);
   const [defaultDurationDays, setDefaultDurationDays] = useState(1);
+  const [defaultDurationUnit, setDefaultDurationUnit] = useState<'days' | 'hours'>('days');
   const [visibilityLevel, setVisibilityLevel] = useState<TemplateVisibility>('public');
   
   // Validation fields
@@ -93,6 +94,7 @@ export function AddTaskTemplateDialog({
       subcategory_id: subcategoryId,
       sub_process_template_id: null,
       default_duration_days: defaultDurationDays,
+      default_duration_unit: defaultDurationUnit,
       order_index: orderIndex,
       visibility_level: visibilityLevel,
       creator_company_id: profile?.company_id || null,
@@ -113,7 +115,8 @@ export function AddTaskTemplateDialog({
     setPriority('medium');
     setCategoryId(null);
     setSubcategoryId(null);
-    setDefaultDurationDays(7);
+    setDefaultDurationDays(1);
+    setDefaultDurationUnit('days');
     setVisibilityLevel('public');
     setValidationLevel1('none');
     setValidationLevel2('none');
@@ -184,15 +187,33 @@ export function AddTaskTemplateDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="duration">Durée par défaut (jours)</Label>
-              <Input
-                id="duration"
-                type="number"
-                min={1}
-                max={365}
-                value={defaultDurationDays}
-                onChange={(e) => setDefaultDurationDays(Number(e.target.value))}
-              />
+              <Label htmlFor="duration">Durée par défaut</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="duration"
+                  type="number"
+                  min={0}
+                  max={defaultDurationUnit === 'days' ? 365 : 2920}
+                  value={defaultDurationDays}
+                  onChange={(e) => setDefaultDurationDays(Number(e.target.value))}
+                  className="flex-1"
+                />
+                <Select value={defaultDurationUnit} onValueChange={(v) => setDefaultDurationUnit(v as 'days' | 'hours')}>
+                  <SelectTrigger className="w-[100px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="days">Jours</SelectItem>
+                    <SelectItem value="hours">Heures</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {defaultDurationDays === 0 && (
+                <p className="text-xs text-muted-foreground">⚡ Durée 0 : la tâche n'impacte pas la charge</p>
+              )}
+              {defaultDurationUnit === 'hours' && defaultDurationDays > 0 && (
+                <p className="text-xs text-muted-foreground">💡 Plusieurs tâches en heures par jour (max 8h/jour)</p>
+              )}
             </div>
           </div>
 
