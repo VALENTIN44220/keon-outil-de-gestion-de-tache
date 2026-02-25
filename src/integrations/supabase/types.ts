@@ -4045,6 +4045,8 @@ export type Database = {
           category_id: string | null
           created_at: string
           current_validation_level: number | null
+          date_demande: string | null
+          date_lancement: string | null
           depends_on_task_id: string | null
           description: string | null
           due_date: string | null
@@ -4121,6 +4123,8 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           current_validation_level?: number | null
+          date_demande?: string | null
+          date_lancement?: string | null
           depends_on_task_id?: string | null
           description?: string | null
           due_date?: string | null
@@ -4197,6 +4201,8 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           current_validation_level?: number | null
+          date_demande?: string | null
+          date_lancement?: string | null
           depends_on_task_id?: string | null
           description?: string | null
           due_date?: string | null
