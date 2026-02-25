@@ -406,6 +406,18 @@ export const EnhancedPropertiesPanel = memo(function EnhancedPropertiesPanel({
             {/* General Tab */}
             <TabsContent value="general" className="p-4 space-y-4 mt-0">
               <div className="space-y-3">
+                {/* Field ID */}
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">ID du champ</Label>
+                  <div className="flex items-center gap-2">
+                    <code className="text-xs font-mono bg-muted px-2 py-1 rounded select-all flex-1 break-all">
+                      {localField.id}
+                    </code>
+                  </div>
+                </div>
+
+                <Separator />
+
                 <div className="space-y-2">
                   <Label htmlFor="field-label">Libellé</Label>
                   <Input

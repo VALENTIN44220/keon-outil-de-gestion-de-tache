@@ -263,6 +263,9 @@ export const EnhancedFormBuilderCanvas = memo(function EnhancedFormBuilderCanvas
               )}
             </div>
             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-mono text-muted-foreground">
+                {field.id.slice(0, 8)}…
+              </Badge>
               <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
                 {FIELD_TYPE_LABELS[field.field_type]}
               </Badge>
