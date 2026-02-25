@@ -279,16 +279,28 @@ export function ConfigurableDashboard({
 
   // Fetch task -> label mappings for label filtering
   const [taskLabelMap, setTaskLabelMap] = useState<Map<string, string[]>>(new Map());
+  // Fetch process_template -> service_group mappings
+  const [processServiceGroupMap, setProcessServiceGroupMap] = useState<Map<string, string>>(new Map());
   useEffect(() => {
     (async () => {
-      const { data } = await (supabase as any).from('task_labels').select('task_id, label_id');
-      if (data) {
+      const [labelsData, ptData] = await Promise.all([
+        (supabase as any).from('task_labels').select('task_id, label_id'),
+        supabase.from('process_templates').select('id, service_group_id'),
+      ]);
+      if (labelsData.data) {
         const map = new Map<string, string[]>();
-        for (const row of data) {
+        for (const row of labelsData.data) {
           if (!map.has(row.task_id)) map.set(row.task_id, []);
           map.get(row.task_id)!.push(row.label_id);
         }
         setTaskLabelMap(map);
+      }
+      if (ptData.data) {
+        const map = new Map<string, string>();
+        for (const row of ptData.data) {
+          if (row.service_group_id) map.set(row.id, row.service_group_id);
+        }
+        setProcessServiceGroupMap(map);
       }
     })();
   }, [tasks]);
@@ -339,9 +351,12 @@ export function ConfigurableDashboard({
       result = result.filter(t => t.assignee_id && activeFilters.assigneeIds.includes(t.assignee_id));
     }
 
-    // Department filter
-    if (activeFilters.departmentIds.length > 0) {
-      result = result.filter(t => t.target_department_id && activeFilters.departmentIds.includes(t.target_department_id));
+    // Service Group filter
+    if (activeFilters.serviceGroupIds.length > 0) {
+      result = result.filter(t => {
+        const sgId = t.source_process_template_id ? processServiceGroupMap.get(t.source_process_template_id) : null;
+        return sgId ? activeFilters.serviceGroupIds.includes(sgId) : false;
+      });
     }
 
     // Category filter

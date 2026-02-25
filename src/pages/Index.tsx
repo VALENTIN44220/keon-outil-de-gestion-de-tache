@@ -158,20 +158,27 @@ const Index = () => {
 
   const requestGlobalProgress = requestStats.completionRate;
 
-  // Fetch profiles for group labels
+  // Fetch profiles for group labels + process→service_group mapping
+  const [processServiceGroupMap, setProcessServiceGroupMap] = useState<Map<string, string>>(new Map());
   useEffect(() => {
-    const fetchProfiles = async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, display_name');
+    const fetchData = async () => {
+      const [profilesRes, ptRes] = await Promise.all([
+        supabase.from('profiles').select('id, display_name'),
+        supabase.from('process_templates').select('id, service_group_id'),
+      ]);
       
-      if (data) {
+      if (profilesRes.data) {
         const map = new Map<string, string>();
-        data.forEach(p => map.set(p.id, p.display_name || 'Sans nom'));
+        profilesRes.data.forEach(p => map.set(p.id, p.display_name || 'Sans nom'));
         setProfilesMap(map);
       }
+      if (ptRes.data) {
+        const map = new Map<string, string>();
+        ptRes.data.forEach(pt => { if (pt.service_group_id) map.set(pt.id, pt.service_group_id); });
+        setProcessServiceGroupMap(map);
+      }
     };
-    fetchProfiles();
+    fetchData();
   }, []);
 
   // Apply advanced filters
@@ -190,7 +197,10 @@ const Index = () => {
       if (crossFilters.priorities.length > 0 && task.priority && !crossFilters.priorities.includes(task.priority)) return false;
       if (crossFilters.assigneeIds.length > 0 && !crossFilters.assigneeIds.includes(task.assignee_id || '')) return false;
       if (crossFilters.categoryIds.length > 0 && !crossFilters.categoryIds.includes(task.category_id || '')) return false;
-      if (crossFilters.departmentIds.length > 0 && !crossFilters.departmentIds.includes(task.target_department_id || '')) return false;
+      if (crossFilters.serviceGroupIds.length > 0) {
+        const sgId = task.source_process_template_id ? processServiceGroupMap.get(task.source_process_template_id) : null;
+        if (!sgId || !crossFilters.serviceGroupIds.includes(sgId)) return false;
+      }
       if (crossFilters.dateRange.start && task.created_at) {
         const taskDate = new Date(task.created_at);
         if (taskDate < crossFilters.dateRange.start) return false;

@@ -28,7 +28,7 @@ export interface CrossFilters {
   dateRange: { start: Date | null; end: Date | null };
   period: 'day' | 'week' | 'month' | 'quarter' | 'year' | 'all';
   assigneeIds: string[];
-  departmentIds: string[];
+  serviceGroupIds: string[];
   categoryIds: string[];
   processIds: string[];
   statuses: TaskStatus[];
@@ -41,7 +41,7 @@ export const DEFAULT_CROSS_FILTERS: CrossFilters = {
   dateRange: { start: null, end: null },
   period: 'all',
   assigneeIds: [],
-  departmentIds: [],
+  serviceGroupIds: [],
   categoryIds: [],
   processIds: [],
   statuses: [],

@@ -199,7 +199,7 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
   const { user } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [profiles, setProfiles] = useState<{ id: string; display_name: string }[]>([]);
-  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
+  const [serviceGroups, setServiceGroups] = useState<{ id: string; name: string }[]>([]);
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [processes, setProcesses] = useState<{ id: string; name: string }[]>([]);
   const [sgLabels, setSgLabels] = useState<{ id: string; name: string; color: string }[]>([]);
@@ -210,16 +210,16 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
 
   useEffect(() => {
     const fetchData = async () => {
-      const [profilesRes, depsRes, catsRes, procsRes, labelsRes] = await Promise.all([
+      const [profilesRes, sgRes, catsRes, procsRes, labelsRes] = await Promise.all([
         supabase.from('profiles').select('id, display_name').eq('status', 'active'),
-        supabase.from('departments').select('id, name'),
+        supabase.from('service_groups').select('id, name').order('name'),
         supabase.from('categories').select('id, name'),
         supabase.from('process_templates').select('id, name'),
         (supabase as any).from('service_group_labels').select('id, name, color').eq('is_active', true).order('name'),
       ]);
       
       if (profilesRes.data) setProfiles(profilesRes.data);
-      if (depsRes.data) setDepartments(depsRes.data);
+      if (sgRes.data) setServiceGroups(sgRes.data);
       if (catsRes.data) setCategories(catsRes.data);
       if (procsRes.data) setProcesses(procsRes.data);
       if (labelsRes.data) setSgLabels(labelsRes.data);
@@ -371,7 +371,7 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
   const activeFiltersCount = 
     (filters.searchQuery ? 1 : 0) +
     filters.assigneeIds.length + 
-    filters.departmentIds.length + 
+    filters.serviceGroupIds.length + 
     filters.categoryIds.length + 
     filters.processIds.length + 
     filters.statuses.length + 
@@ -597,13 +597,13 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
           labelKey="display_name"
         />
 
-        {/* Departments */}
+        {/* Service Groups */}
         <MultiSelectDropdown
-          label="Départements"
+          label="Groupes de services"
           icon={<Building2 className="h-3 w-3" />}
-          items={departments}
-          selectedIds={filters.departmentIds}
-          onChange={(ids) => onFiltersChange({ ...filters, departmentIds: ids })}
+          items={serviceGroups}
+          selectedIds={filters.serviceGroupIds}
+          onChange={(ids) => onFiltersChange({ ...filters, serviceGroupIds: ids })}
         />
 
         {/* Categories */}
