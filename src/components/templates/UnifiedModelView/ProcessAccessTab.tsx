@@ -62,7 +62,7 @@ export function ProcessAccessTab({ process, onUpdate, canManage }: ProcessAccess
     const [companyRes, deptRes, profileRes] = await Promise.all([
       supabase.from('companies').select('id, name').order('name'),
       supabase.from('departments').select('id, name, company_id').order('name'),
-      supabase.from('profiles').select('id, display_name').order('display_name'),
+      supabase.from('profiles').select('id, display_name').eq('status', 'active').order('display_name'),
     ]);
     
     if (companyRes.data) setCompanies(companyRes.data);

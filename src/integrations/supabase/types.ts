@@ -6007,6 +6007,7 @@ export type Database = {
           job_title_id: string
           manager_id: string
           permission_profile_id: string
+          status: string
           user_id: string
         }[]
       }

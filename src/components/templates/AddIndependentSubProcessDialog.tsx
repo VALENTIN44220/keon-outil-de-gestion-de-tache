@@ -74,7 +74,7 @@ export function AddIndependentSubProcessDialog({
       supabase.from('process_templates').select('id, name').order('name'),
       supabase.from('departments').select('id, name').order('name'),
       supabase.from('job_titles').select('id, name').order('name'),
-      supabase.from('profiles').select('id, display_name').order('display_name'),
+      supabase.from('profiles').select('id, display_name').eq('status', 'active').order('display_name'),
     ]);
 
     if (processRes.data) setProcesses(processRes.data);

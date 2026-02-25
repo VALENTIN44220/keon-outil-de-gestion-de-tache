@@ -39,6 +39,7 @@ export function StepPersonSelection({ selectedPersonId, onSelect }: StepPersonSe
             manager_id,
             departments:department_id (name)
           `)
+          .eq('status', 'active')
           .neq('id', currentUser.id)
           .order('display_name');
 

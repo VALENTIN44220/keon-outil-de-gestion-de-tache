@@ -71,7 +71,7 @@ export function TemplateAdvancedFilters({
       const [compRes, deptRes, profileRes, processRes, subProcessRes] = await Promise.all([
         supabase.from('companies').select('id, name').order('name'),
         supabase.from('departments').select('id, name').order('name'),
-        supabase.from('profiles').select('id, display_name').order('display_name'),
+        supabase.from('profiles').select('id, display_name').eq('status', 'active').order('display_name'),
         supabase.from('process_templates').select('id, name').order('name'),
         supabase.from('sub_process_templates').select('id, name, process_template_id').order('name'),
       ]);

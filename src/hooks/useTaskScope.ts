@@ -72,7 +72,7 @@ export function useTaskScope(): TaskScopeContext {
       setIsLoading(true);
       
       const [profilesRes, companiesRes, departmentsRes] = await Promise.all([
-        supabase.from('profiles').select('id, display_name, department_id, department, company_id, company'),
+        supabase.from('profiles').select('id, display_name, department_id, department, company_id, company').eq('status', 'active'),
         supabase.from('companies').select('id, name'),
         supabase.from('departments').select('id, name, company_id'),
       ]);

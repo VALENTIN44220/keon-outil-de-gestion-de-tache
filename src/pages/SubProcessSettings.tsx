@@ -191,7 +191,7 @@ export default function SubProcessSettings() {
 
       // Fetch reference data
       const [profileRes, deptRes, groupRes] = await Promise.all([
-        supabase.from('profiles').select('id, display_name').order('display_name'),
+        supabase.from('profiles').select('id, display_name').eq('status', 'active').order('display_name'),
         supabase.from('departments').select('id, name').order('name'),
         supabase.from('collaborator_groups').select('id, name').order('name'),
       ]);

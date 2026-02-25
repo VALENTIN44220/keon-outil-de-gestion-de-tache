@@ -112,7 +112,7 @@ export function ProcessTaskManagement({ processId, departmentId, processIds, can
   // Fetch profiles
   useEffect(() => {
     const fetchProfiles = async () => {
-      const { data } = await supabase.from('profiles').select('id, display_name');
+      const { data } = await supabase.from('profiles').select('id, display_name').eq('status', 'active');
       if (data) {
         const map = new Map<string, string>();
         data.forEach(p => map.set(p.id, p.display_name || 'Sans nom'));

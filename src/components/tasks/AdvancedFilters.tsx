@@ -87,7 +87,7 @@ export function AdvancedFilters({ filters, onFiltersChange }: AdvancedFiltersPro
   useEffect(() => {
     const fetchData = async () => {
       const [profilesRes, companiesRes, departmentsRes] = await Promise.all([
-        supabase.from('profiles').select('id, display_name, job_title, company, department, department_id, company_id'),
+        supabase.from('profiles').select('id, display_name, job_title, company, department, department_id, company_id').eq('status', 'active'),
         supabase.from('companies').select('id, name'),
         supabase.from('departments').select('id, name, company_id'),
       ]);

@@ -88,7 +88,7 @@ export function EditSubProcessDialog({ subProcess, open, onClose, onSave }: Edit
     const [deptRes, jobRes, profileRes, groupRes] = await Promise.all([
       supabase.from('departments').select('id, name, company_id, companies(name)').order('name'),
       supabase.from('job_titles').select('id, name').order('name'),
-      supabase.from('profiles').select('id, display_name').order('display_name'),
+      supabase.from('profiles').select('id, display_name').eq('status', 'active').order('display_name'),
       supabase.from('collaborator_groups').select('id, name').order('name'),
     ]);
     

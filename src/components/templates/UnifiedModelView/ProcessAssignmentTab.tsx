@@ -67,7 +67,7 @@ export function ProcessAssignmentTab({ process, onUpdate, canManage }: ProcessAs
 
   const fetchReferenceData = async () => {
     const [profileRes, groupRes] = await Promise.all([
-      supabase.from('profiles').select('id, display_name').order('display_name'),
+      supabase.from('profiles').select('id, display_name').eq('status', 'active').order('display_name'),
       supabase.from('collaborator_groups').select('id, name').order('name'),
     ]);
     
