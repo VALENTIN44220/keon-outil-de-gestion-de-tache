@@ -503,6 +503,7 @@ const Index = () => {
           <CrossFiltersPanel
             filters={crossFilters}
             onFiltersChange={setCrossFilters}
+            contextId="tasks"
           />
 
           {/* Collapsible Stats */}

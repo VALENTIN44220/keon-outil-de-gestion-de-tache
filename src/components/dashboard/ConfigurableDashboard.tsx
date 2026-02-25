@@ -680,6 +680,7 @@ export function ConfigurableDashboard({
       <CrossFiltersPanel
         filters={pendingFilters}
         onFiltersChange={handlePendingFiltersChange}
+        contextId="analytics"
       />
 
       {/* Widget Grid */}

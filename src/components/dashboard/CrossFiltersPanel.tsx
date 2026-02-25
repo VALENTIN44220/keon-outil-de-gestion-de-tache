@@ -39,6 +39,8 @@ interface CrossFiltersPanelProps {
   onFiltersChange: (filters: CrossFilters) => void;
   onClose?: () => void;
   processId?: string;
+  /** Disambiguate context key when multiple panels share the same processId */
+  contextId?: string;
 }
 
 const PERIODS = [
@@ -195,7 +197,7 @@ function MultiSelectDropdown({
   );
 }
 
-export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId }: CrossFiltersPanelProps) {
+export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId, contextId }: CrossFiltersPanelProps) {
   const { user } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [profiles, setProfiles] = useState<{ id: string; display_name: string }[]>([]);
@@ -244,7 +246,7 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
       if (data) {
         setPresets(data);
         // Auto-apply default preset ONLY on first load per context
-        const contextKey = `${user.id}_${processId ?? '__global__'}`;
+        const contextKey = `${user.id}_${processId ?? '__global__'}${contextId ? `_${contextId}` : ''}`;
         if (!appliedDefaultContexts.has(contextKey)) {
           const defaultPreset = data.find((p: FilterPreset) => p.is_default);
           if (defaultPreset) {
@@ -263,7 +265,7 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
       }
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, processId]);
+  }, [user?.id, processId, contextId]);
 
   const handleReset = () => {
     onFiltersChange(DEFAULT_CROSS_FILTERS);
