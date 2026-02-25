@@ -597,6 +597,16 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
               <span className="text-muted-foreground">Créée le:</span>
               <span>{format(new Date(task.created_at), 'dd MMMM yyyy', { locale: fr })}</span>
             </div>
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Date de demande:</span>
+              <span>{task.date_demande ? format(new Date(task.date_demande), 'dd MMMM yyyy', { locale: fr }) : <span className="italic text-muted-foreground">—</span>}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Date de lancement:</span>
+              <span>{task.date_lancement ? format(new Date(task.date_lancement), 'dd MMMM yyyy', { locale: fr }) : <span className="italic text-muted-foreground">—</span>}</span>
+            </div>
           </div>
 
           {/* Process info */}
