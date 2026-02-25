@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo, lazy, Suspense, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { TaskDetailDialog } from '@/components/tasks/TaskDetailDialog';
+import { RequestDetailDialog } from '@/components/tasks/RequestDetailDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { Task, TaskStats } from '@/types/task';
 import { ConfigurableDashboard } from '@/components/dashboard/ConfigurableDashboard';
@@ -31,6 +33,7 @@ export function ProcessDashboard({ processId, departmentId, departmentIds, proce
   const [isLoading, setIsLoading] = useState(true);
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
   const [supplierDrawerOpen, setSupplierDrawerOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const { role: supplierRole } = useSupplierAccess();
 
   const hasMaterialSection = processName?.toUpperCase().includes('MAINTENANCE') ?? false;
@@ -183,6 +186,7 @@ export function ProcessDashboard({ processId, departmentId, departmentIds, proce
   };
 
   return (
+    <>
     <Tabs defaultValue="dashboard" className="space-y-4">
       <TabsList>
         {tabs.map(tab => (
@@ -196,6 +200,9 @@ export function ProcessDashboard({ processId, departmentId, departmentIds, proce
           globalProgress={globalProgress}
           processId={effectiveProcessId}
           canEdit={canWrite}
+          onTaskClick={(task) => {
+            setSelectedTask(task);
+          }}
         />
       </TabsContent>
       <TabsContent value="tasks">
@@ -225,5 +232,23 @@ export function ProcessDashboard({ processId, departmentId, departmentIds, proce
         </TabsContent>
       )}
     </Tabs>
+
+    {/* Task/Request detail dialogs */}
+    {selectedTask && selectedTask.type === 'request' ? (
+      <RequestDetailDialog
+        task={selectedTask}
+        open={!!selectedTask}
+        onClose={() => setSelectedTask(null)}
+        onStatusChange={() => {}}
+      />
+    ) : (
+      <TaskDetailDialog
+        task={selectedTask}
+        open={!!selectedTask}
+        onClose={() => setSelectedTask(null)}
+        onStatusChange={() => {}}
+      />
+    )}
+  </>
   );
 }

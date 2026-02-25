@@ -461,7 +461,13 @@ const Index = () => {
           stats={stats}
           globalProgress={globalProgress}
           onTaskClick={(task) => {
-            setSearchQuery(task.title);
+            if (task.type === 'request') {
+              setSelectedRequest(task);
+              setIsRequestDetailOpen(true);
+            } else {
+              setSelectedTaskForComment(task);
+              setIsCommentDetailOpen(true);
+            }
           }}
         />
       ) : (
