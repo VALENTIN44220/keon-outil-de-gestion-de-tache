@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Task, TaskStatus, TaskPriority } from '@/types/task';
 import { useParentRequestNumber } from '@/hooks/useParentRequestNumber';
 import {
@@ -23,14 +23,17 @@ import { useCategories } from '@/hooks/useCategories';
 import { supabase } from '@/integrations/supabase/client';
 import { TaskChecklist } from './TaskChecklist';
 import { TaskLinksEditor } from './TaskLinksEditor';
+import { TaskCommentsSection } from './TaskCommentsSection';
+import { RequestValidationButton } from './RequestValidationButton';
 import { Badge } from '@/components/ui/badge';
-import { Ticket, CheckSquare, Save, Loader2, Info } from 'lucide-react';
+import { Ticket, CheckSquare, Save, Loader2, Info, MessageSquare, Lock } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useTaskAttachments } from '@/hooks/useTaskAttachments';
 import { useDueDatePermissionWithManager } from '@/hooks/useDueDatePermission';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { getStatusSelectOptions } from '@/services/taskStatusService';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Department {
   id: string;
@@ -62,6 +65,7 @@ const priorityOptions: { value: TaskPriority; label: string }[] = [
 
 export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditDialogProps) {
   const { toast } = useToast();
+  const { profile } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const parentRequestNumber = useParentRequestNumber(task?.parent_request_id || null);
   
@@ -90,6 +94,18 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
   
   // Due date permission check
   const { canEditDueDate, reason: dueDateReason } = useDueDatePermissionWithManager(task, assigneeManagerId);
+
+  // Check if current user is assignee on a subprocess task with validation → read-only mode
+  const isAssigneeReadOnly = useMemo(() => {
+    if (!task || !profile) return false;
+    // Must be a task from a subprocess (has parent_request_id)
+    if (!task.parent_request_id) return false;
+    // Current user must be the assignee
+    if (task.assignee_id !== profile.id) return false;
+    // Task must require validation (has validation levels configured or requires_validation flag)
+    if (task.requires_validation || task.validation_level_1 !== 'none' || task.validation_level_2 !== 'none') return true;
+    return false;
+  }, [task, profile]);
 
   // Initialize form when task changes
   useEffect(() => {
@@ -241,6 +257,13 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+          {isAssigneeReadOnly && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-muted border border-border text-sm text-muted-foreground">
+              <Lock className="h-4 w-4 shrink-0" />
+              <span>Cette tâche fait partie d'un processus avec validation. Les champs sont verrouillés. Vous pouvez ajouter des liens/PJ, échanger des messages et demander la validation.</span>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="title">Titre *</Label>
             <Input
@@ -249,6 +272,8 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Titre de la tâche"
               required
+              disabled={isAssigneeReadOnly}
+              className={isAssigneeReadOnly ? 'opacity-60 cursor-not-allowed' : ''}
             />
           </div>
 
@@ -260,14 +285,16 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Description détaillée..."
               rows={3}
+              disabled={isAssigneeReadOnly}
+              className={isAssigneeReadOnly ? 'opacity-60 cursor-not-allowed' : ''}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Statut</Label>
-              <Select value={status} onValueChange={(v) => setStatus(v as TaskStatus)}>
-                <SelectTrigger>
+              <Select value={status} onValueChange={(v) => setStatus(v as TaskStatus)} disabled={isAssigneeReadOnly}>
+                <SelectTrigger className={isAssigneeReadOnly ? 'opacity-60 cursor-not-allowed' : ''}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -282,8 +309,8 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
 
             <div className="space-y-2">
               <Label>Priorité</Label>
-              <Select value={priority} onValueChange={(v) => setPriority(v as TaskPriority)}>
-                <SelectTrigger>
+              <Select value={priority} onValueChange={(v) => setPriority(v as TaskPriority)} disabled={isAssigneeReadOnly}>
+                <SelectTrigger className={isAssigneeReadOnly ? 'opacity-60 cursor-not-allowed' : ''}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -300,14 +327,14 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <Label htmlFor="dueDate">Date d'échéance</Label>
-              {!canEditDueDate && (
+              {(!canEditDueDate || isAssigneeReadOnly) && (
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Info className="h-4 w-4 text-muted-foreground cursor-help" />
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p className="max-w-xs">{dueDateReason}</p>
+                      <p className="max-w-xs">{isAssigneeReadOnly ? 'Champ verrouillé pour les tâches avec validation' : dueDateReason}</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -318,20 +345,22 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
-              disabled={!canEditDueDate}
-              className={!canEditDueDate ? 'opacity-50 cursor-not-allowed' : ''}
+              disabled={!canEditDueDate || isAssigneeReadOnly}
+              className={(!canEditDueDate || isAssigneeReadOnly) ? 'opacity-60 cursor-not-allowed' : ''}
             />
           </div>
 
-          <CategorySelect
-            categories={categories}
-            selectedCategoryId={categoryId}
-            selectedSubcategoryId={subcategoryId}
-            onCategoryChange={setCategoryId}
-            onSubcategoryChange={setSubcategoryId}
-            onAddCategory={handleAddCategory}
-            onAddSubcategory={handleAddSubcategory}
-          />
+          <div className={isAssigneeReadOnly ? 'pointer-events-none opacity-60' : ''}>
+            <CategorySelect
+              categories={categories}
+              selectedCategoryId={categoryId}
+              selectedSubcategoryId={subcategoryId}
+              onCategoryChange={setCategoryId}
+              onSubcategoryChange={setSubcategoryId}
+              onAddCategory={handleAddCategory}
+              onAddSubcategory={handleAddSubcategory}
+            />
+          </div>
 
           {/* Assignment section */}
           <div className="border-t pt-4 mt-4">
@@ -343,8 +372,9 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
                 <Select 
                   value={targetDepartmentId || 'none'} 
                   onValueChange={(v) => setTargetDepartmentId(v === 'none' ? null : v)}
+                  disabled={isAssigneeReadOnly}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className={isAssigneeReadOnly ? 'opacity-60 cursor-not-allowed' : ''}>
                     <SelectValue placeholder="Sélectionner un service" />
                   </SelectTrigger>
                   <SelectContent>
@@ -363,8 +393,9 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
                 <Select 
                   value={assigneeId || 'none'} 
                   onValueChange={(v) => setAssigneeId(v === 'none' ? null : v)}
+                  disabled={isAssigneeReadOnly}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className={isAssigneeReadOnly ? 'opacity-60 cursor-not-allowed' : ''}>
                     <SelectValue placeholder="Sélectionner l'exécutant" />
                   </SelectTrigger>
                   <SelectContent>
@@ -382,11 +413,15 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
           </div>
 
           {/* Tabs for additional features */}
-          <Tabs defaultValue="checklist" className="border-t pt-4 mt-4">
-            <TabsList className="grid grid-cols-3 w-full">
+          <Tabs defaultValue={isAssigneeReadOnly ? "links" : "checklist"} className="border-t pt-4 mt-4">
+            <TabsList className={`grid w-full ${isAssigneeReadOnly ? 'grid-cols-4' : 'grid-cols-4'}`}>
               <TabsTrigger value="checklist">Sous-actions</TabsTrigger>
               <TabsTrigger value="links">Liens & PJ</TabsTrigger>
               <TabsTrigger value="roles">Responsabilités</TabsTrigger>
+              <TabsTrigger value="exchanges" className="gap-1">
+                <MessageSquare className="h-3 w-3" />
+                Échanges
+              </TabsTrigger>
             </TabsList>
             
             <TabsContent value="checklist" className="mt-4">
@@ -445,67 +480,93 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
             </TabsContent>
 
             <TabsContent value="roles" className="mt-4 space-y-4">
-              <div className="space-y-2">
-                <Label>Demandeur</Label>
-                <Select 
-                  value={requesterId || 'none'} 
-                  onValueChange={(v) => setRequesterId(v === 'none' ? null : v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner le demandeur" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Non défini</SelectItem>
-                    {profiles.map(profile => (
-                      <SelectItem key={profile.id} value={profile.id}>
-                        {profile.display_name || 'Sans nom'} 
-                        {profile.job_title && ` - ${profile.job_title}`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <div className={isAssigneeReadOnly ? 'pointer-events-none opacity-60' : ''}>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Demandeur</Label>
+                    <Select 
+                      value={requesterId || 'none'} 
+                      onValueChange={(v) => setRequesterId(v === 'none' ? null : v)}
+                      disabled={isAssigneeReadOnly}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner le demandeur" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Non défini</SelectItem>
+                        {profiles.map(profile => (
+                          <SelectItem key={profile.id} value={profile.id}>
+                            {profile.display_name || 'Sans nom'} 
+                            {profile.job_title && ` - ${profile.job_title}`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-              <div className="space-y-2">
-                <Label>Rapporteur</Label>
-                <Select 
-                  value={reporterId || 'none'} 
-                  onValueChange={(v) => setReporterId(v === 'none' ? null : v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner le rapporteur" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Non défini</SelectItem>
-                    {profiles.map(profile => (
-                      <SelectItem key={profile.id} value={profile.id}>
-                        {profile.display_name || 'Sans nom'} 
-                        {profile.job_title && ` - ${profile.job_title}`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <div className="space-y-2">
+                    <Label>Rapporteur</Label>
+                    <Select 
+                      value={reporterId || 'none'} 
+                      onValueChange={(v) => setReporterId(v === 'none' ? null : v)}
+                      disabled={isAssigneeReadOnly}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner le rapporteur" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Non défini</SelectItem>
+                        {profiles.map(profile => (
+                          <SelectItem key={profile.id} value={profile.id}>
+                            {profile.display_name || 'Sans nom'} 
+                            {profile.job_title && ` - ${profile.job_title}`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </div>
+            </TabsContent>
+
+            <TabsContent value="exchanges" className="mt-4">
+              <TaskCommentsSection taskId={task.id} className="min-h-[250px]" />
             </TabsContent>
           </Tabs>
 
-          <div className="flex justify-end gap-3 pt-4 border-t">
-            <Button type="button" variant="outline" onClick={onClose}>
-              Annuler
-            </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Enregistrement...
-                </>
-              ) : (
-                <>
-                  <Save className="h-4 w-4 mr-2" />
-                  Enregistrer
-                </>
+          <div className="flex justify-between items-center gap-3 pt-4 border-t">
+            {isAssigneeReadOnly && task ? (
+              <RequestValidationButton 
+                taskId={task.id} 
+                taskStatus={task.status}
+                onValidationTriggered={() => {
+                  onTaskUpdated();
+                  onClose();
+                }}
+              />
+            ) : (
+              <div />
+            )}
+            <div className="flex gap-3">
+              <Button type="button" variant="outline" onClick={onClose}>
+                {isAssigneeReadOnly ? 'Fermer' : 'Annuler'}
+              </Button>
+              {!isAssigneeReadOnly && (
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Enregistrement...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Enregistrer
+                    </>
+                  )}
+                </Button>
               )}
-            </Button>
+            </div>
           </div>
         </form>
       </DialogContent>
