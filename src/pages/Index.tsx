@@ -190,9 +190,7 @@ const Index = () => {
       if (crossFilters.priorities.length > 0 && task.priority && !crossFilters.priorities.includes(task.priority)) return false;
       if (crossFilters.assigneeIds.length > 0 && !crossFilters.assigneeIds.includes(task.assignee_id || '')) return false;
       if (crossFilters.categoryIds.length > 0 && !crossFilters.categoryIds.includes(task.category_id || '')) return false;
-      if (crossFilters.departmentIds.length > 0) {
-        // Department filter requires profile lookup - skip if no match possible
-      }
+      if (crossFilters.departmentIds.length > 0 && !crossFilters.departmentIds.includes(task.target_department_id || '')) return false;
       if (crossFilters.dateRange.start && task.created_at) {
         const taskDate = new Date(task.created_at);
         if (taskDate < crossFilters.dateRange.start) return false;
