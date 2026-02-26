@@ -46,13 +46,53 @@ serve(async (req) => {
       );
     }
 
+    // Validate table name: only allow tables registered in datalake_table_catalog
+    const { data: allowedTable, error: catalogError } = await admin
+      .from("datalake_table_catalog")
+      .select("table_name")
+      .eq("table_name", table)
+      .eq("sync_enabled", true)
+      .maybeSingle();
+
+    if (catalogError || !allowedTable) {
+      return new Response(
+        JSON.stringify({ error: "Table not allowed for sync" }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Validate conflict_key: only allow simple alphanumeric column names
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(conflictKey)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid conflict_key format" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Limit batch size to prevent abuse
+    if (records.length > 5000) {
+      return new Response(
+        JSON.stringify({ error: "Batch size exceeds limit of 5000 records" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
     // upsert
     const { error } = await admin
       .from(table)
       .upsert(records, { onConflict: conflictKey });
 
     if (error) {
-      return new Response(JSON.stringify({ error }), {
+      return new Response(JSON.stringify({ error: "Upsert failed" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -63,7 +103,7 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), {
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
