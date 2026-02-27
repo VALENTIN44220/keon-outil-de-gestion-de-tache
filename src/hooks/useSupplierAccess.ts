@@ -33,7 +33,31 @@ export function useSupplierAccess() {
           return;
         }
 
-        // Check supplier permissions
+        // Check permission profile / user overrides for can_access_suppliers
+        const { data: profileAccess } = await supabase
+          .from('profiles')
+          .select(`
+            permission_profile_id,
+            permission_profiles!inner(can_access_suppliers),
+            user_permission_overrides(can_access_suppliers)
+          `)
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        const profileCanAccess = profileAccess
+          ? (profileAccess as any).user_permission_overrides?.[0]?.can_access_suppliers
+            ?? (profileAccess as any).permission_profiles?.can_access_suppliers
+            ?? false
+          : false;
+
+        if (profileCanAccess) {
+          setHasAccess(true);
+          setRole('achat'); // Users with profile access get edit rights
+          setIsLoading(false);
+          return;
+        }
+
+        // Check direct supplier permissions (supplier_purchase_permissions table)
         const { data, error } = await supabase
           .from('supplier_purchase_permissions')
           .select('role, is_active')
