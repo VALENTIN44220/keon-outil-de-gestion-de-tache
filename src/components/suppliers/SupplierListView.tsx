@@ -1,4 +1,4 @@
-// SupplierListView.tsx (remplacer le composant complet par celui-ci)
+// SupplierListView.tsx
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -16,12 +16,18 @@ import {
 } from '@/components/ui/table';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { useSupplierEnrichment, SupplierFilters, SupplierSortConfig } from '@/hooks/useSupplierEnrichment';
-import { Search, Building2, Filter, ExternalLink, ChevronLeft, ChevronRight, LayoutGrid, List } from 'lucide-react';
+import { useSupplierFilterPresets, SupplierFilterPreset } from '@/hooks/useSupplierFilterPresets';
+import { Search, Building2, Filter, ExternalLink, ChevronLeft, ChevronRight, LayoutGrid, List, Save, Star, Trash2, FolderOpen } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 
 type SupplierViewMode = 'table' | 'grid';
 
@@ -63,30 +69,46 @@ function safeFormatDate(iso?: string | null) {
   return format(d, 'dd/MM/yyyy', { locale: fr });
 }
 
+const DEFAULT_SUPPLIER_FILTERS: SupplierFilters = {
+  search: '',
+  status: 'all',
+  entite: 'all',
+  categorie: 'all',
+  famille: 'all',
+  segment: 'all',
+  sous_segment: 'all',
+  validite_prix_from: '',
+  validite_prix_to: '',
+  validite_contrat_from: '',
+  validite_contrat_to: '',
+};
+
 export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
   const pageSize = 200;
   const [viewMode, setViewMode] = useState<SupplierViewMode>('table');
 
   const [page, setPage] = useState(0);
 
-  const [filters, setFilters] = useState<SupplierFilters>({
-    search: '',
-    status: 'all',
-    entite: 'all',
-    categorie: 'all',
-    famille: 'all',     // ✅ ajouté
-    segment: 'all',
-    sous_segment: 'all',
-    validite_prix_from: '',
-    validite_prix_to: '',
-    validite_contrat_from: '',
-    validite_contrat_to: '',
-  });
+  const [filters, setFilters] = useState<SupplierFilters>(DEFAULT_SUPPLIER_FILTERS);
 
   const updateFilters = (patch: Partial<SupplierFilters>) => {
     setFilters(prev => ({ ...prev, ...patch }));
     setPage(0);
   };
+
+  // Preset management
+  const {
+    presets,
+    loaded: presetsLoaded,
+    savePreset,
+    overwritePreset,
+    deletePreset,
+    toggleDefault,
+    loadPreset,
+  } = useSupplierFilterPresets(filters, setFilters, DEFAULT_SUPPLIER_FILTERS);
+  const [showPresetPopover, setShowPresetPopover] = useState(false);
+  const [newPresetName, setNewPresetName] = useState('');
+  const [overwritePresetId, setOverwritePresetId] = useState<string | null>(null);
 
   // Server-side sort config
   const [sortConfig, setSortConfig] = useState<SupplierSortConfig>({ key: 'updated_at', direction: 'desc' });
@@ -345,6 +367,111 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
               onChange={(e) => updateFilters({ validite_contrat_to: e.target.value })}
             />
           </div>
+        </div>
+
+        {/* Preset Controls */}
+        <div className="flex items-center gap-2 mt-4 pt-3 border-t">
+          <FolderOpen className="h-4 w-4 text-muted-foreground" />
+          <span className="text-xs text-muted-foreground font-medium">Contextes :</span>
+
+          {/* Existing presets as chips */}
+          {presets.map((preset) => (
+            <div key={preset.id} className="flex items-center gap-0.5">
+              <Button
+                variant={preset.is_default ? "default" : "outline"}
+                size="sm"
+                className="h-7 text-xs px-2 gap-1"
+                onClick={() => loadPreset(preset)}
+              >
+                {preset.is_default && <Star className="h-3 w-3 fill-current" />}
+                {preset.name}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0"
+                onClick={() => toggleDefault(preset.id)}
+                title={preset.is_default ? "Retirer par défaut" : "Définir par défaut"}
+              >
+                <Star className={cn("h-3 w-3", preset.is_default ? "fill-warning text-warning" : "text-muted-foreground")} />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0"
+                onClick={() => deletePreset(preset.id)}
+                title="Supprimer"
+              >
+                <Trash2 className="h-3 w-3 text-destructive" />
+              </Button>
+            </div>
+          ))}
+
+          {/* Save Popover */}
+          <Popover open={showPresetPopover} onOpenChange={setShowPresetPopover}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-7 text-xs gap-1">
+                <Save className="h-3 w-3" />
+                Enregistrer
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-72" align="start">
+              <div className="space-y-3">
+                <div className="text-sm font-medium">Enregistrer le contexte</div>
+                <div className="space-y-2">
+                  <Input
+                    placeholder="Nom du contexte..."
+                    value={newPresetName}
+                    onChange={(e) => setNewPresetName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && newPresetName.trim()) {
+                        savePreset(newPresetName.trim());
+                        setNewPresetName('');
+                        setShowPresetPopover(false);
+                      }
+                    }}
+                    className="h-8 text-sm"
+                  />
+                  <Button
+                    size="sm"
+                    className="w-full h-7 text-xs"
+                    disabled={!newPresetName.trim()}
+                    onClick={() => {
+                      savePreset(newPresetName.trim());
+                      setNewPresetName('');
+                      setShowPresetPopover(false);
+                    }}
+                  >
+                    Nouveau contexte
+                  </Button>
+                </div>
+
+                {presets.length > 0 && (
+                  <>
+                    <div className="border-t pt-2">
+                      <div className="text-xs text-muted-foreground mb-2">Écraser un contexte existant :</div>
+                      <div className="space-y-1">
+                        {presets.map((p) => (
+                          <Button
+                            key={p.id}
+                            variant="ghost"
+                            size="sm"
+                            className="w-full justify-start h-7 text-xs"
+                            onClick={() => {
+                              overwritePreset(p.id);
+                              setShowPresetPopover(false);
+                            }}
+                          >
+                            {p.name}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </Card>
 
