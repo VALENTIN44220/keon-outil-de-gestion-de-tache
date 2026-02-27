@@ -621,10 +621,10 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
 
       {/* Table View */}
       {viewMode === 'table' && (
-        <Card>
+        <Card className="overflow-hidden">
           <ScrollArea className="w-full">
             <div className="min-w-max">
-              <Table>
+              <table className="w-full caption-bottom text-sm">
                 <TableHeader>
                   <TableRow>
                     {activeColumns.map(col => (
@@ -671,7 +671,7 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
                     ))
                   )}
                 </TableBody>
-              </Table>
+              </table>
             </div>
             <ScrollBar orientation="horizontal" />
           </ScrollArea>
