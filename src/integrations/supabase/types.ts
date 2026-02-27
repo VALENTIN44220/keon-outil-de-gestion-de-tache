@@ -3262,6 +3262,7 @@ export type Database = {
           created_at: string | null
           date_premiere_signature: string | null
           delai_de_paiement: string | null
+          detail_par_entite: string | null
           echeances_de_paiement: string | null
           entite: string | null
           evolution_tarif_2026: string | null
@@ -3299,6 +3300,7 @@ export type Database = {
           created_at?: string | null
           date_premiere_signature?: string | null
           delai_de_paiement?: string | null
+          detail_par_entite?: string | null
           echeances_de_paiement?: string | null
           entite?: string | null
           evolution_tarif_2026?: string | null
@@ -3336,6 +3338,7 @@ export type Database = {
           created_at?: string | null
           date_premiere_signature?: string | null
           delai_de_paiement?: string | null
+          detail_par_entite?: string | null
           echeances_de_paiement?: string | null
           entite?: string | null
           evolution_tarif_2026?: string | null
