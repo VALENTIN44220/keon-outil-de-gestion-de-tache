@@ -56,18 +56,15 @@ export function useSupplierFilterPresets(
     })();
   }, [user]);
 
-  const buildPayload = useCallback(() => {
-    return { filters, visible_columns: visibleColumns };
-  }, [filters, visibleColumns]);
-
   const savePreset = useCallback(async (name: string) => {
     if (!user) return;
+    const payload = { filters, visible_columns: visibleColumns };
     const { data, error } = await (supabase as any)
       .from('user_filter_presets')
       .insert({
         user_id: user.id,
         name,
-        filters: buildPayload(),
+        filters: payload,
         context_type: CONTEXT_TYPE,
       })
       .select()
@@ -81,18 +78,19 @@ export function useSupplierFilterPresets(
       is_default: false,
     }]);
     toast.success('Contexte sauvegardé');
-  }, [user, buildPayload]);
+  }, [user, filters, visibleColumns]);
 
   const overwritePreset = useCallback(async (presetId: string) => {
+    const payload = { filters, visible_columns: visibleColumns };
     const { error } = await (supabase as any)
       .from('user_filter_presets')
-      .update({ filters: buildPayload() })
+      .update({ filters: payload })
       .eq('id', presetId);
 
     if (error) { toast.error('Erreur lors de la mise à jour'); return; }
     setPresets(prev => prev.map(p => p.id === presetId ? { ...p, filters, visible_columns: visibleColumns } : p));
     toast.success('Contexte mis à jour');
-  }, [buildPayload, filters, visibleColumns]);
+  }, [filters, visibleColumns]);
 
   const deletePreset = useCallback(async (presetId: string) => {
     await (supabase as any).from('user_filter_presets').delete().eq('id', presetId);
