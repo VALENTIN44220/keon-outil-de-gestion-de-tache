@@ -8,6 +8,7 @@ export interface SupplierFilterPreset {
   id: string;
   name: string;
   filters: SupplierFilters;
+  visible_columns?: string[];
   is_default: boolean;
 }
 
@@ -17,12 +18,13 @@ export function useSupplierFilterPresets(
   filters: SupplierFilters,
   setFilters: (filters: SupplierFilters) => void,
   defaultFilters: SupplierFilters,
+  visibleColumns?: string[],
+  setVisibleColumns?: (cols: string[]) => void,
 ) {
   const { user } = useAuth();
   const [presets, setPresets] = useState<SupplierFilterPreset[]>([]);
   const [loaded, setLoaded] = useState(false);
 
-  // Load presets and apply default
   useEffect(() => {
     if (!user) return;
     (async () => {
@@ -37,18 +39,26 @@ export function useSupplierFilterPresets(
         const loaded = data.map((p: any) => ({
           id: p.id,
           name: p.name,
-          filters: p.filters as SupplierFilters,
+          filters: (p.filters?.filters ?? p.filters) as SupplierFilters,
+          visible_columns: p.filters?.visible_columns as string[] | undefined,
           is_default: p.is_default,
         }));
         setPresets(loaded);
         const defaultPreset = loaded.find((p: SupplierFilterPreset) => p.is_default);
         if (defaultPreset) {
           setFilters({ ...defaultFilters, ...defaultPreset.filters });
+          if (defaultPreset.visible_columns && setVisibleColumns) {
+            setVisibleColumns(defaultPreset.visible_columns);
+          }
         }
       }
       setLoaded(true);
     })();
   }, [user]);
+
+  const buildPayload = useCallback(() => {
+    return { filters, visible_columns: visibleColumns };
+  }, [filters, visibleColumns]);
 
   const savePreset = useCallback(async (name: string) => {
     if (!user) return;
@@ -57,33 +67,32 @@ export function useSupplierFilterPresets(
       .insert({
         user_id: user.id,
         name,
-        filters: filters,
+        filters: buildPayload(),
         context_type: CONTEXT_TYPE,
       })
       .select()
       .single();
 
-    if (error) {
-      toast.error('Erreur lors de la sauvegarde');
-      return;
-    }
-    setPresets(prev => [...prev, { id: data.id, name: data.name, filters: data.filters, is_default: false }]);
+    if (error) { toast.error('Erreur lors de la sauvegarde'); return; }
+    setPresets(prev => [...prev, {
+      id: data.id, name: data.name,
+      filters: data.filters?.filters ?? data.filters,
+      visible_columns: data.filters?.visible_columns,
+      is_default: false,
+    }]);
     toast.success('Contexte sauvegardé');
-  }, [user, filters]);
+  }, [user, buildPayload]);
 
   const overwritePreset = useCallback(async (presetId: string) => {
     const { error } = await (supabase as any)
       .from('user_filter_presets')
-      .update({ filters })
+      .update({ filters: buildPayload() })
       .eq('id', presetId);
 
-    if (error) {
-      toast.error('Erreur lors de la mise à jour');
-      return;
-    }
-    setPresets(prev => prev.map(p => p.id === presetId ? { ...p, filters } : p));
+    if (error) { toast.error('Erreur lors de la mise à jour'); return; }
+    setPresets(prev => prev.map(p => p.id === presetId ? { ...p, filters, visible_columns: visibleColumns } : p));
     toast.success('Contexte mis à jour');
-  }, [filters]);
+  }, [buildPayload, filters, visibleColumns]);
 
   const deletePreset = useCallback(async (presetId: string) => {
     await (supabase as any).from('user_filter_presets').delete().eq('id', presetId);
@@ -96,37 +105,21 @@ export function useSupplierFilterPresets(
     const preset = presets.find(p => p.id === presetId);
     const wasDefault = preset?.is_default;
 
-    await (supabase as any)
-      .from('user_filter_presets')
-      .update({ is_default: false })
-      .eq('user_id', user.id)
-      .eq('context_type', CONTEXT_TYPE);
-
+    await (supabase as any).from('user_filter_presets').update({ is_default: false }).eq('user_id', user.id).eq('context_type', CONTEXT_TYPE);
     if (!wasDefault) {
-      await (supabase as any)
-        .from('user_filter_presets')
-        .update({ is_default: true })
-        .eq('id', presetId);
+      await (supabase as any).from('user_filter_presets').update({ is_default: true }).eq('id', presetId);
     }
 
-    setPresets(prev => prev.map(p => ({
-      ...p,
-      is_default: p.id === presetId ? !wasDefault : false,
-    })));
+    setPresets(prev => prev.map(p => ({ ...p, is_default: p.id === presetId ? !wasDefault : false })));
     toast.success(wasDefault ? 'Contexte par défaut retiré' : 'Contexte défini par défaut');
   }, [user, presets]);
 
   const loadPreset = useCallback((preset: SupplierFilterPreset) => {
     setFilters({ ...defaultFilters, ...preset.filters });
-  }, [defaultFilters, setFilters]);
+    if (preset.visible_columns && setVisibleColumns) {
+      setVisibleColumns(preset.visible_columns);
+    }
+  }, [defaultFilters, setFilters, setVisibleColumns]);
 
-  return {
-    presets,
-    loaded,
-    savePreset,
-    overwritePreset,
-    deletePreset,
-    toggleDefault,
-    loadPreset,
-  };
+  return { presets, loaded, savePreset, overwritePreset, deletePreset, toggleDefault, loadPreset };
 }
