@@ -74,6 +74,7 @@ export const EnhancedPropertiesPanel = memo(function EnhancedPropertiesPanel({
   const [localField, setLocalField] = useState<FormField | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [lookupSourceMode, setLookupSourceMode] = useState<'config' | 'direct'>('config');
   const { activeConfigs } = useTableLookupConfigs();
 
   // Sync with selected items
@@ -85,6 +86,20 @@ export const EnhancedPropertiesPanel = memo(function EnhancedPropertiesPanel({
   useEffect(() => {
     setLocalField(selectedField);
     setHasChanges(false);
+    // Initialize lookup source mode from field data
+    if (selectedField) {
+      const lt = (selectedField as any).lookup_table;
+      if (lt) {
+        const matchingConfig = activeConfigs.find(
+          c => c.table_name === lt &&
+               c.display_column === (selectedField as any).lookup_label_column &&
+               c.value_column === (selectedField as any).lookup_value_column
+        );
+        setLookupSourceMode(matchingConfig ? 'config' : 'direct');
+      } else {
+        setLookupSourceMode('config');
+      }
+    }
   }, [selectedField]);
 
   // Handle section changes
@@ -546,17 +561,7 @@ export const EnhancedPropertiesPanel = memo(function EnhancedPropertiesPanel({
                   <Separator />
                   <TableLookupSourcePicker
                     value={{
-                      mode: (() => {
-                        // Determine mode from existing field data
-                        const lt = (localField as any).lookup_table;
-                        if (!lt) return 'config';
-                        const matchingConfig = activeConfigs.find(
-                          c => c.table_name === lt &&
-                               c.display_column === (localField as any).lookup_label_column &&
-                               c.value_column === (localField as any).lookup_value_column
-                        );
-                        return matchingConfig ? 'config' : 'direct';
-                      })(),
+                      mode: lookupSourceMode,
                       configId: (() => {
                         const lt = (localField as any).lookup_table;
                         if (!lt) return null;
@@ -574,6 +579,7 @@ export const EnhancedPropertiesPanel = memo(function EnhancedPropertiesPanel({
                       filterValue: (localField as any).lookup_filter_value || null,
                     }}
                     onChange={(source) => {
+                      setLookupSourceMode(source.mode);
                       if (source.mode === 'config' && source.configId) {
                         const config = activeConfigs.find(c => c.id === source.configId);
                         if (config) {
@@ -585,6 +591,8 @@ export const EnhancedPropertiesPanel = memo(function EnhancedPropertiesPanel({
                         handleFieldChange('lookup_table' as any, source.tableName || null);
                         handleFieldChange('lookup_value_column' as any, source.valueColumn || null);
                         handleFieldChange('lookup_label_column' as any, source.labelColumn || null);
+                        handleFieldChange('lookup_filter_column' as any, source.filterColumn || null);
+                        handleFieldChange('lookup_filter_value' as any, source.filterValue || null);
                       } else {
                         handleFieldChange('lookup_table' as any, null);
                         handleFieldChange('lookup_value_column' as any, null);
