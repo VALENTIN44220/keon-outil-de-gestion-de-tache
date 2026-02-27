@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Plus, Pencil, Trash2, Loader2, AlertTriangle, Search, Filter, Tag, X } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Plus, Pencil, Trash2, Loader2, AlertTriangle, Search, Filter, Tag, X, Shield } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -24,8 +25,14 @@ interface ServiceGroup {
   id: string;
   name: string;
   description: string | null;
+  permission_profile_id: string | null;
   department_ids: string[];
   labels: ServiceGroupLabel[];
+}
+
+interface PermissionProfileOption {
+  id: string;
+  name: string;
 }
 
 interface ServiceGroupsTabProps {
@@ -46,6 +53,8 @@ export function ServiceGroupsTab({ departments }: ServiceGroupsTabProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [selectedDeptIds, setSelectedDeptIds] = useState<Set<string>>(new Set());
+  const [selectedPermProfileId, setSelectedPermProfileId] = useState<string | null>(null);
+  const [permProfiles, setPermProfiles] = useState<PermissionProfileOption[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [deptSearch, setDeptSearch] = useState('');
   const [showUnassignedOnly, setShowUnassignedOnly] = useState(false);
@@ -60,11 +69,14 @@ export function ServiceGroupsTab({ departments }: ServiceGroupsTabProps) {
 
   const fetchGroups = useCallback(async () => {
     setIsLoading(true);
-    const [sgRes, linkRes, labelRes] = await Promise.all([
+    const [sgRes, linkRes, labelRes, ppRes] = await Promise.all([
       (supabase as any).from('service_groups').select('*').order('name'),
       (supabase as any).from('service_group_departments').select('service_group_id, department_id'),
       (supabase as any).from('service_group_labels').select('*').order('order_index'),
+      supabase.from('permission_profiles').select('id, name').order('name'),
     ]);
+
+    setPermProfiles((ppRes.data || []) as PermissionProfileOption[]);
 
     const result: ServiceGroup[] = (sgRes.data || []).map((sg: any) => ({
       ...sg,
@@ -82,6 +94,7 @@ export function ServiceGroupsTab({ departments }: ServiceGroupsTabProps) {
     setName('');
     setDescription('');
     setSelectedDeptIds(new Set());
+    setSelectedPermProfileId(null);
     setDeptSearch('');
     setShowUnassignedOnly(false);
     setLabels([]);
@@ -93,6 +106,7 @@ export function ServiceGroupsTab({ departments }: ServiceGroupsTabProps) {
     setName(g.name);
     setDescription(g.description || '');
     setSelectedDeptIds(new Set(g.department_ids));
+    setSelectedPermProfileId(g.permission_profile_id);
     setDeptSearch('');
     setShowUnassignedOnly(false);
     setLabels([...g.labels]);
@@ -108,7 +122,7 @@ export function ServiceGroupsTab({ departments }: ServiceGroupsTabProps) {
       if (editingGroup) {
         const { error } = await (supabase as any)
           .from('service_groups')
-          .update({ name: name.trim(), description: description.trim() || null })
+          .update({ name: name.trim(), description: description.trim() || null, permission_profile_id: selectedPermProfileId })
           .eq('id', editingGroup.id);
         if (error) throw error;
         groupId = editingGroup.id;
@@ -118,7 +132,7 @@ export function ServiceGroupsTab({ departments }: ServiceGroupsTabProps) {
       } else {
         const { data, error } = await (supabase as any)
           .from('service_groups')
-          .insert({ name: name.trim(), description: description.trim() || null })
+          .insert({ name: name.trim(), description: description.trim() || null, permission_profile_id: selectedPermProfileId })
           .select('id')
           .single();
         if (error) throw error;
@@ -281,6 +295,12 @@ export function ServiceGroupsTab({ departments }: ServiceGroupsTabProps) {
               </div>
             </CardHeader>
             <CardContent className="pt-0 pb-3 space-y-2">
+              {g.permission_profile_id && (
+                <Badge variant="outline" className="text-[10px] gap-1 border-primary/40 text-primary">
+                  <Shield className="h-2.5 w-2.5" />
+                  {permProfiles.find(p => p.id === g.permission_profile_id)?.name || 'Profil inconnu'}
+                </Badge>
+              )}
               {g.description && <p className="text-xs text-muted-foreground mb-2">{g.description}</p>}
               <div className="flex flex-wrap gap-1">
                 {g.department_ids.length === 0 ? (
@@ -355,6 +375,26 @@ export function ServiceGroupsTab({ departments }: ServiceGroupsTabProps) {
             <div className="space-y-2">
               <Label>Description</Label>
               <Input value={description} onChange={e => setDescription(e.target.value)} placeholder="Description optionnelle" />
+            </div>
+            <div className="space-y-2">
+              <Label className="flex items-center gap-1.5">
+                <Shield className="h-3.5 w-3.5" />
+                Profil de droits
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Les membres de ce groupe hériteront de ce profil de permissions par défaut.
+              </p>
+              <Select value={selectedPermProfileId || '__none__'} onValueChange={v => setSelectedPermProfileId(v === '__none__' ? null : v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Aucun profil" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Aucun profil</SelectItem>
+                  {permProfiles.map(p => (
+                    <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Services inclus</Label>
