@@ -2791,6 +2791,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          permission_profile_id: string | null
           updated_at: string
         }
         Insert: {
@@ -2798,6 +2799,7 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          permission_profile_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -2805,9 +2807,18 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          permission_profile_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "service_groups_permission_profile_id_fkey"
+            columns: ["permission_profile_id"]
+            isOneToOne: false
+            referencedRelation: "permission_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sub_process_template_visible_companies: {
         Row: {
