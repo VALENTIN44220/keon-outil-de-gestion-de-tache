@@ -1,0 +1,2 @@
+ALTER TABLE public.supplier_purchase_enrichment
+ADD COLUMN commentaires_type_de_contrat text DEFAULT NULL;
