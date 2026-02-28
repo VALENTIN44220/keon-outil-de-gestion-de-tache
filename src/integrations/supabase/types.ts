@@ -3258,6 +3258,7 @@ export type Database = {
           avenants: string | null
           categorie: string | null
           commentaires: string | null
+          commentaires_date_contrat: string | null
           completeness_score: number | null
           created_at: string | null
           date_premiere_signature: string | null
@@ -3296,6 +3297,7 @@ export type Database = {
           avenants?: string | null
           categorie?: string | null
           commentaires?: string | null
+          commentaires_date_contrat?: string | null
           completeness_score?: number | null
           created_at?: string | null
           date_premiere_signature?: string | null
@@ -3334,6 +3336,7 @@ export type Database = {
           avenants?: string | null
           categorie?: string | null
           commentaires?: string | null
+          commentaires_date_contrat?: string | null
           completeness_score?: number | null
           created_at?: string | null
           date_premiere_signature?: string | null
