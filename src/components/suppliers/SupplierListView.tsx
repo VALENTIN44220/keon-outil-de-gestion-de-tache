@@ -116,6 +116,8 @@ const ALL_COLUMNS: SupplierColumnDef[] = [
   { key: 'commentaires', label: 'Commentaires', defaultVisible: false, render: (s) => <span className="max-w-[200px] truncate block">{s.commentaires || '—'}</span> },
   { key: 'detail_par_entite', label: 'Détail par entité', defaultVisible: false, render: (s) => <span className="max-w-[200px] truncate block">{s.detail_par_entite || '—'}</span> },
   { key: 'site_web', label: 'Site web', defaultVisible: false, render: (s) => s.site_web || '—' },
+  { key: 'status', label: 'Statut', defaultVisible: false, render: (s) => s.status || '—' },
+  { key: 'created_at', label: 'Date création', defaultVisible: false, render: (s) => <span className="text-muted-foreground text-sm">{safeFormatDate(s.created_at)}</span> },
   { key: 'completeness_score', label: 'Complétude', defaultVisible: true, className: 'w-[150px]', render: () => null /* special */ },
   { key: 'updated_at', label: 'Mise à jour', defaultVisible: true, render: (s) => <span className="text-muted-foreground text-sm">{safeFormatDate(s.updated_at)}</span> },
 ];
