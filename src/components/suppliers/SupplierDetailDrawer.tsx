@@ -63,6 +63,7 @@ type SupplierRow = {
   date_premiere_signature: string | null;
   avenants: string | null;
   delai_de_paiement: string | null;
+  delais_de_paiement_commentaires: string | null;
   echeances_de_paiement: string | null;
   penalites: string | null;
   exclusivite_non_sollicitation: string | null;
@@ -579,11 +580,17 @@ export function SupplierDetailDrawer({ supplierId, open, onClose, canEdit = true
                           placeholder="Sélectionner..."
                           searchPlaceholder="Rechercher..."
                           options={DELAIS_PAIEMENT.map((d) => ({ value: d, label: d }))}
+                          allowCustom
+                          customPlaceholder="Ajouter une valeur..."
                         />
                       </FormField>
 
                       <FormField label="Échéances de paiement">
                         <Input value={formData.echeances_de_paiement || ""} onChange={(e) => handleFieldChange("echeances_de_paiement", e.target.value)} placeholder="Ex: fin de mois" disabled={!canEdit} />
+                      </FormField>
+
+                      <FormField label="Commentaires délai de paiement" className="col-span-2">
+                        <Textarea value={formData.delais_de_paiement_commentaires || ""} onChange={(e) => handleFieldChange("delais_de_paiement_commentaires", e.target.value)} placeholder="Commentaires sur le délai de paiement..." rows={2} disabled={!canEdit} />
                       </FormField>
 
                       <FormField label="Pénalités" className="col-span-2">

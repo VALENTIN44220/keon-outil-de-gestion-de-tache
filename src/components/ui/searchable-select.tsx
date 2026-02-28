@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Check, ChevronDown, Search } from "lucide-react";
+import { Check, ChevronDown, Plus, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Popover,
@@ -26,6 +26,8 @@ interface SearchableSelectProps {
   className?: string;
   triggerClassName?: string;
   emptyMessage?: string;
+  allowCustom?: boolean;
+  customPlaceholder?: string;
 }
 
 const SearchableSelect = React.forwardRef<HTMLButtonElement, SearchableSelectProps>(
@@ -40,6 +42,8 @@ const SearchableSelect = React.forwardRef<HTMLButtonElement, SearchableSelectPro
       className,
       triggerClassName,
       emptyMessage = "Aucun résultat",
+      allowCustom = false,
+      customPlaceholder = "Ajouter...",
     },
     ref
   ) => {
@@ -55,11 +59,25 @@ const SearchableSelect = React.forwardRef<HTMLButtonElement, SearchableSelectPro
     }, [options, search]);
 
     const selectedOption = options.find((opt) => opt.value === value);
+    const isCustomValue = value && !selectedOption;
+
+    const showAddCustom = allowCustom && search.trim() && !filteredOptions.some(
+      (o) => o.label.toLowerCase() === search.trim().toLowerCase()
+    );
 
     const handleSelect = (optionValue: string) => {
       onValueChange?.(optionValue);
       setOpen(false);
       setSearch("");
+    };
+
+    const handleAddCustom = () => {
+      const customValue = search.trim();
+      if (customValue) {
+        onValueChange?.(customValue);
+        setOpen(false);
+        setSearch("");
+      }
     };
 
     return (
@@ -81,7 +99,7 @@ const SearchableSelect = React.forwardRef<HTMLButtonElement, SearchableSelectPro
             )}
           >
             <span className="truncate">
-              {selectedOption?.label || placeholder}
+              {selectedOption?.label || (isCustomValue ? value : placeholder)}
             </span>
             <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
@@ -101,30 +119,43 @@ const SearchableSelect = React.forwardRef<HTMLButtonElement, SearchableSelectPro
           </div>
           <ScrollArea style={{ maxHeight: '240px' }} className="overflow-auto">
             <div className="p-1">
-              {filteredOptions.length === 0 ? (
+              {filteredOptions.length === 0 && !showAddCustom ? (
                 <div className="py-6 text-center text-sm text-muted-foreground">
-                  {emptyMessage}
+                  {allowCustom ? customPlaceholder : emptyMessage}
                 </div>
               ) : (
-                filteredOptions.map((option) => (
-                  <div
-                    key={option.value}
-                    onClick={() => !option.disabled && handleSelect(option.value)}
-                    className={cn(
-                      "relative flex cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none",
-                      "hover:bg-accent hover:text-accent-foreground",
-                      option.disabled && "pointer-events-none opacity-50",
-                      value === option.value && "bg-accent"
-                    )}
-                  >
-                    <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
-                      {value === option.value && (
-                        <Check className="h-4 w-4" />
+                <>
+                  {filteredOptions.map((option) => (
+                    <div
+                      key={option.value}
+                      onClick={() => !option.disabled && handleSelect(option.value)}
+                      className={cn(
+                        "relative flex cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none",
+                        "hover:bg-accent hover:text-accent-foreground",
+                        option.disabled && "pointer-events-none opacity-50",
+                        value === option.value && "bg-accent"
                       )}
-                    </span>
-                    <span className="truncate">{option.label}</span>
-                  </div>
-                ))
+                    >
+                      <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+                        {value === option.value && (
+                          <Check className="h-4 w-4" />
+                        )}
+                      </span>
+                      <span className="truncate">{option.label}</span>
+                    </div>
+                  ))}
+                  {showAddCustom && (
+                    <div
+                      onClick={handleAddCustom}
+                      className="relative flex cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground border-t mt-1 pt-2"
+                    >
+                      <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+                        <Plus className="h-4 w-4" />
+                      </span>
+                      <span className="truncate">Ajouter "{search.trim()}"</span>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </ScrollArea>

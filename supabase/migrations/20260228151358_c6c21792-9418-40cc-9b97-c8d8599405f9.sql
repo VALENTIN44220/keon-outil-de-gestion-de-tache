@@ -1,0 +1,2 @@
+ALTER TABLE public.supplier_purchase_enrichment
+ADD COLUMN delais_de_paiement_commentaires text DEFAULT NULL;

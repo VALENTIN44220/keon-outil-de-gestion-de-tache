@@ -3264,6 +3264,7 @@ export type Database = {
           created_at: string | null
           date_premiere_signature: string | null
           delai_de_paiement: string | null
+          delais_de_paiement_commentaires: string | null
           detail_par_entite: string | null
           echeances_de_paiement: string | null
           entite: string | null
@@ -3304,6 +3305,7 @@ export type Database = {
           created_at?: string | null
           date_premiere_signature?: string | null
           delai_de_paiement?: string | null
+          delais_de_paiement_commentaires?: string | null
           detail_par_entite?: string | null
           echeances_de_paiement?: string | null
           entite?: string | null
@@ -3344,6 +3346,7 @@ export type Database = {
           created_at?: string | null
           date_premiere_signature?: string | null
           delai_de_paiement?: string | null
+          delais_de_paiement_commentaires?: string | null
           detail_par_entite?: string | null
           echeances_de_paiement?: string | null
           entite?: string | null

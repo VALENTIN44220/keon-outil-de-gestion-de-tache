@@ -25,6 +25,7 @@ export interface SupplierEnrichment {
   evolution_tarif_2026: string | null;
   echeances_de_paiement: string | null;
   delai_de_paiement: string | null;
+  delais_de_paiement_commentaires: string | null;
   penalites: string | null;
   exclusivite_non_sollicitation: string | null;
   remise: string | null;
