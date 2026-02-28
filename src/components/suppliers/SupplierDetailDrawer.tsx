@@ -94,7 +94,7 @@ interface SupplierAttachment {
 
 const SEGMENTS = ["Production", "Services", "IT", "Maintenance", "Transport", "Énergie", "Autre"];
 const TYPES_CONTRAT = ["Contrat cadre", "Commande ponctuelle", "Appel d'offres", "Marché", "Convention"];
-const DELAIS_PAIEMENT = ["Comptant", "30 jours", "45 jours", "60 jours", "90 jours"];
+const DELAIS_PAIEMENT = ["30 jours date de facture", "30 jours fdm", "45 jours fdm", "60 jours", "variable"];
 const INCOTERMS = ["EXW", "FCA", "CPT", "CIP", "DAP", "DPU", "DDP", "FAS", "FOB", "CFR", "CIF"];
 
 export function SupplierDetailDrawer({ supplierId, open, onClose, canEdit = true }: SupplierDetailDrawerProps) {
