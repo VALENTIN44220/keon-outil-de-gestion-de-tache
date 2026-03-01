@@ -14,6 +14,79 @@ interface Employee {
   company?: string;
 }
 
+// Cache pour éviter des requêtes répétées dans le même batch
+interface LookupCache {
+  companies: Map<string, string>;    // name → id
+  departments: Map<string, string>;  // name → id
+  jobTitles: Map<string, string>;    // name → id
+}
+
+async function resolveFK(
+  supabaseAdmin: any,
+  cache: LookupCache,
+  emp: Employee
+): Promise<{ company_id: string | null; department_id: string | null; job_title_id: string | null }> {
+  let company_id: string | null = null;
+  let department_id: string | null = null;
+  let job_title_id: string | null = null;
+
+  // ── Résoudre company ──
+  if (emp.company?.trim()) {
+    const key = emp.company.trim().toLowerCase();
+    if (cache.companies.has(key)) {
+      company_id = cache.companies.get(key)!;
+    } else {
+      const { data } = await supabaseAdmin
+        .from('companies')
+        .select('id')
+        .ilike('name', emp.company.trim())
+        .maybeSingle();
+      if (data) {
+        company_id = data.id;
+        cache.companies.set(key, data.id);
+      }
+    }
+  }
+
+  // ── Résoudre department ──
+  if (emp.department?.trim()) {
+    const key = emp.department.trim().toLowerCase();
+    if (cache.departments.has(key)) {
+      department_id = cache.departments.get(key)!;
+    } else {
+      const { data } = await supabaseAdmin
+        .from('departments')
+        .select('id')
+        .ilike('name', emp.department.trim())
+        .maybeSingle();
+      if (data) {
+        department_id = data.id;
+        cache.departments.set(key, data.id);
+      }
+    }
+  }
+
+  // ── Résoudre job_title ──
+  if (emp.job_title?.trim()) {
+    const key = emp.job_title.trim().toLowerCase();
+    if (cache.jobTitles.has(key)) {
+      job_title_id = cache.jobTitles.get(key)!;
+    } else {
+      const { data } = await supabaseAdmin
+        .from('job_titles')
+        .select('id')
+        .ilike('name', emp.job_title.trim())
+        .maybeSingle();
+      if (data) {
+        job_title_id = data.id;
+        cache.jobTitles.set(key, data.id);
+      }
+    }
+  }
+
+  return { company_id, department_id, job_title_id };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
@@ -43,6 +116,13 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Cache initialisé une fois pour tout le batch
+    const cache: LookupCache = {
+      companies: new Map(),
+      departments: new Map(),
+      jobTitles: new Map(),
+    };
+
     const results = {
       created: 0,
       updated: 0,
@@ -62,6 +142,21 @@ Deno.serve(async (req) => {
       const idLuccaStr = String(id_lucca);
 
       try {
+        // ── Résoudre les FK ──
+        const { company_id, department_id, job_title_id } = await resolveFK(supabaseAdmin, cache, emp);
+
+        // ── Données communes à update / create ──
+        const profileData = {
+          display_name,
+          job_title: job_title ?? null,
+          department: department ?? null,
+          company: company ?? null,
+          company_id,
+          department_id,
+          job_title_id,
+          updated_at: new Date().toISOString(),
+        };
+
         // ── Vérifier si le profil existe déjà par id_lucca ──
         const { data: existing } = await supabaseAdmin
           .from('profiles')
@@ -71,25 +166,15 @@ Deno.serve(async (req) => {
 
         if (existing) {
           // ── SALARIÉ EXISTANT : mise à jour RH uniquement ──
-          // On ne touche JAMAIS lovable_status (géré manuellement par l'admin)
           await supabaseAdmin
             .from('profiles')
-            .update({
-              display_name,
-              job_title: job_title ?? null,
-              department: department ?? null,
-              company: company ?? null,
-              updated_at: new Date().toISOString(),
-            })
+            .update(profileData)
             .eq('id', existing.id);
 
           results.updated++;
         } else {
           // ── NOUVEAU SALARIÉ : créer un auth.user + profil avec lovable_status = NOK ──
 
-          // Email à utiliser pour le compte Auth
-          // Si email Lucca disponible → on l'utilise
-          // Sinon → email fictif non-connectable (format noreply)
           const authEmail = email?.trim()
             ? email.trim().toLowerCase()
             : `lucca-${idLuccaStr}@noreply.keon-group.com`;
@@ -102,32 +187,25 @@ Deno.serve(async (req) => {
             .maybeSingle();
 
           if (emailConflict) {
-            // Email déjà utilisé → lier l'id_lucca au profil existant si pas encore fait
             await supabaseAdmin
               .from('profiles')
               .update({
                 id_lucca: idLuccaStr,
-                display_name,
-                job_title: job_title ?? null,
-                department: department ?? null,
-                company: company ?? null,
-                updated_at: new Date().toISOString(),
+                ...profileData,
               })
               .eq('id', emailConflict.id)
-              .is('id_lucca', null); // seulement si id_lucca pas encore renseigné
+              .is('id_lucca', null);
 
             results.updated++;
             continue;
           }
 
-          // Mot de passe temporaire aléatoire (le salarié ne peut pas se connecter tant que lovable_status = NOK)
           const tempPassword = `Lucca${idLuccaStr}_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}!`;
 
-          // Créer l'utilisateur Auth
           const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
             email: authEmail,
             password: tempPassword,
-            email_confirm: true, // confirmé d'emblée (pas d'email envoyé)
+            email_confirm: true,
             user_metadata: {
               display_name,
               lucca_id: idLuccaStr,
@@ -140,21 +218,15 @@ Deno.serve(async (req) => {
             continue;
           }
 
-          // Le trigger handle_new_user() crée automatiquement un profil vide lié à auth.user
-          // On le met à jour avec les données Lucca
           const { error: updateError } = await supabaseAdmin
             .from('profiles')
             .update({
               id_lucca: idLuccaStr,
-              display_name,
-              job_title: job_title ?? null,
-              department: department ?? null,
-              company: company ?? null,
+              ...profileData,
               lovable_email: authEmail,
-              lovable_status: 'NOK',   // ← à passer OK manuellement par l'admin
+              lovable_status: 'NOK',
               status: 'active',
               must_change_password: true,
-              updated_at: new Date().toISOString(),
             })
             .eq('user_id', authUser.user.id);
 
