@@ -1,18 +1,22 @@
 import { useCallback, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building2, Briefcase, Users, Layers, Shield, UserCog, Download, UsersRound, Grid3X3, UserRoundCog, Workflow, Database, FolderKanban, Tags, MonitorSmartphone, Eye } from 'lucide-react';
+import {
+  Building2, Briefcase, Users, Layers, Shield, UserCog, Download,
+  UsersRound, CloudUpload, UserRoundCog, Workflow, Database,
+  FolderKanban, Tags, MonitorSmartphone
+} from 'lucide-react';
 import { CompaniesTab } from './CompaniesTab';
 import { DepartmentsTab } from './DepartmentsTab';
 import { JobTitlesTab } from './JobTitlesTab';
 import { HierarchyLevelsTab } from './HierarchyLevelsTab';
-import { PermissionProfilesTab } from './PermissionProfilesTab';
-import { PermissionMatrixTab } from './PermissionMatrixTab';
+import { AccessRightsTab } from './AccessRightsTab'; // ← NOUVEAU (remplace les 3 ci-dessous)
+// import { PermissionProfilesTab } from './PermissionProfilesTab'; // ← SUPPRIMÉ
+// import { PermissionMatrixTab } from './PermissionMatrixTab';     // ← SUPPRIMÉ
+// import { UserPermissionViewerTab } from './UserPermissionViewerTab'; // ← SUPPRIMÉ
 import { UsersTab } from './UsersTab';
-
 import { DataExportTab } from './DataExportTab';
-
 import { CollaboratorGroupsTab } from './CollaboratorGroupsTab';
-
+import { FabricLakehouseSyncTab } from './FabricLakehouseSyncTab';
 import { DatabaseResetDialog } from './DatabaseResetDialog';
 import { UserSimulationSelector } from './UserSimulationSelector';
 import { WorkflowMigrationTab } from './WorkflowMigrationTab';
@@ -20,7 +24,6 @@ import { TableLookupConfigTab } from './TableLookupConfigTab';
 import { ServiceGroupsTab } from './ServiceGroupsTab';
 import { CategoriesManagementTab } from './CategoriesManagementTab';
 import { PageDeviceVisibilityTab } from './PageDeviceVisibilityTab';
-import { UserPermissionViewerTab } from './UserPermissionViewerTab';
 import type { Company, Department, JobTitle, HierarchyLevel, PermissionProfile, UserProfile } from '@/types/admin';
 
 interface AdminTabsProps {
@@ -63,6 +66,8 @@ export function AdminTabs(props: AdminTabsProps) {
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
         <TabsList className="h-auto p-1 flex flex-wrap justify-start">
+
+          {/* ── Organisation ── */}
           <TabsTrigger value="users" className="px-2 py-1.5" title="Utilisateurs">
             <UserCog className="h-4 w-4" />
           </TabsTrigger>
@@ -84,17 +89,18 @@ export function AdminTabs(props: AdminTabsProps) {
           <TabsTrigger value="hierarchy" className="px-2 py-1.5" title="Hiérarchie">
             <Layers className="h-4 w-4" />
           </TabsTrigger>
-          <TabsTrigger value="permissions" className="px-2 py-1.5" title="Profils de permissions">
+
+          {/* ── Droits (1 seul onglet au lieu de 3) ── */}
+          <TabsTrigger value="access-rights" className="px-2 py-1.5" title="Droits & Accès">
             <Shield className="h-4 w-4" />
           </TabsTrigger>
-          <TabsTrigger value="matrix" className="px-2 py-1.5" title="Matrice des permissions">
-            <Grid3X3 className="h-4 w-4" />
-          </TabsTrigger>
-          <TabsTrigger value="perm-viewer" className="px-2 py-1.5" title="Visualiseur droits utilisateur">
-            <Eye className="h-4 w-4" />
-          </TabsTrigger>
+
+          {/* ── Outils ── */}
           <TabsTrigger value="export" className="px-2 py-1.5" title="Export de données">
             <Download className="h-4 w-4" />
+          </TabsTrigger>
+          <TabsTrigger value="fabric" className="px-2 py-1.5" title="Synchronisation Fabric">
+            <CloudUpload className="h-4 w-4" />
           </TabsTrigger>
           <TabsTrigger value="simulation" className="px-2 py-1.5" title="Simulation utilisateur">
             <UserRoundCog className="h-4 w-4" />
@@ -111,7 +117,10 @@ export function AdminTabs(props: AdminTabsProps) {
           <TabsTrigger value="device-visibility" className="px-2 py-1.5" title="Visibilité par appareil">
             <MonitorSmartphone className="h-4 w-4" />
           </TabsTrigger>
+
         </TabsList>
+
+        {/* ── Contenu des onglets ── */}
 
         <TabsContent value="users">
           <UsersTab
@@ -123,7 +132,6 @@ export function AdminTabs(props: AdminTabsProps) {
             permissionProfiles={props.permissionProfiles}
             onUserCreated={props.refetch}
             onUserUpdated={props.refetch}
-            onRefresh={props.refetch}
           />
         </TabsContent>
 
@@ -183,9 +191,11 @@ export function AdminTabs(props: AdminTabsProps) {
           />
         </TabsContent>
 
-        <TabsContent value="permissions">
-          <PermissionProfilesTab
+        {/* ── Onglet unifié Droits & Accès ── */}
+        <TabsContent value="access-rights">
+          <AccessRightsTab
             permissionProfiles={props.permissionProfiles}
+            users={props.users}
             onAdd={props.addPermissionProfile}
             onUpdate={props.updatePermissionProfile}
             onDelete={props.deletePermissionProfile}
@@ -193,27 +203,13 @@ export function AdminTabs(props: AdminTabsProps) {
           />
         </TabsContent>
 
-        <TabsContent value="matrix">
-          <PermissionMatrixTab
-            permissionProfiles={props.permissionProfiles}
-            users={props.users}
-            companies={props.companies}
-            departments={props.departments}
-            onRefresh={props.refetch}
-          />
-        </TabsContent>
-
-        <TabsContent value="perm-viewer">
-          <UserPermissionViewerTab
-            users={props.users}
-            permissionProfiles={props.permissionProfiles}
-          />
-        </TabsContent>
-
         <TabsContent value="export">
           <DataExportTab />
         </TabsContent>
 
+        <TabsContent value="fabric">
+          <FabricLakehouseSyncTab />
+        </TabsContent>
 
         <TabsContent value="simulation">
           <div className="max-w-lg">
@@ -236,6 +232,7 @@ export function AdminTabs(props: AdminTabsProps) {
         <TabsContent value="device-visibility">
           <PageDeviceVisibilityTab />
         </TabsContent>
+
       </Tabs>
     </div>
   );
