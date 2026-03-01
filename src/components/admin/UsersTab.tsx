@@ -968,70 +968,112 @@ export function UsersTab({
                 className="pl-9"
               />
             </div>
-            {/* Status Filter */}
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setSelectedStatusFilter('all')}
-                className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all
-                  ${selectedStatusFilter === 'all' 
-                    ? 'bg-primary text-primary-foreground' 
-                    : 'bg-muted hover:bg-muted/80 text-muted-foreground'
-                  }`}
-              >
-                Tous
-              </button>
-              {(['active', 'suspended', 'deleted', 'external'] as UserStatus[]).map((status) => {
-                const statusInfo = USER_STATUS_LABELS[status];
-                const count = users.filter(u => u.status === status).length;
-                return (
+            {/* Filters Row */}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Company filter */}
+              <Select value={selectedCompanyFilter || 'all'} onValueChange={(v) => setSelectedCompanyFilter(v === 'all' ? null : v)}>
+                <SelectTrigger className="w-[170px] h-8 text-xs">
+                  <SelectValue placeholder="Société" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Toutes les sociétés</SelectItem>
+                  {companies.map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.name} ({users.filter(u => u.company_id === c.id).length})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Department filter */}
+              <Select value={selectedDepartmentFilter || 'all'} onValueChange={(v) => setSelectedDepartmentFilter(v === 'all' ? null : v)}>
+                <SelectTrigger className="w-[170px] h-8 text-xs">
+                  <SelectValue placeholder="Service" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les services</SelectItem>
+                  {departments.map(d => (
+                    <SelectItem key={d.id} value={d.id}>{d.name} ({users.filter(u => u.department_id === d.id).length})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Hierarchy Level filter */}
+              <Select value={selectedHierarchyFilter || 'all'} onValueChange={(v) => setSelectedHierarchyFilter(v === 'all' ? null : v)}>
+                <SelectTrigger className="w-[180px] h-8 text-xs">
+                  <SelectValue placeholder="Niveau hiérarchique" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les niveaux</SelectItem>
+                  {hierarchyLevels.sort((a, b) => a.level - b.level).map(h => (
+                    <SelectItem key={h.id} value={h.id}>{h.name} ({users.filter(u => u.hierarchy_level_id === h.id).length})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Permission Profile filter */}
+              <Select value={selectedPermissionFilter || 'all'} onValueChange={(v) => setSelectedPermissionFilter(v === 'all' ? null : v)}>
+                <SelectTrigger className="w-[170px] h-8 text-xs">
+                  <SelectValue placeholder="Profil de droits" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les profils</SelectItem>
+                  {permissionProfiles.map(p => (
+                    <SelectItem key={p.id} value={p.id}>{p.name} ({users.filter(u => u.permission_profile_id === p.id).length})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Status filter */}
+              <Select value={selectedStatusFilter} onValueChange={(v) => setSelectedStatusFilter(v as UserStatus | 'all')}>
+                <SelectTrigger className="w-[160px] h-8 text-xs">
+                  <SelectValue placeholder="Statut" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les statuts</SelectItem>
+                  {(['active', 'suspended', 'deleted', 'external'] as UserStatus[]).map((status) => (
+                    <SelectItem key={status} value={status}>
+                      {USER_STATUS_LABELS[status].label} ({users.filter(u => u.status === status).length})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Lovable Status filter */}
+              <Select value={selectedLovableStatusFilter} onValueChange={(v) => setSelectedLovableStatusFilter(v as LovableStatus | 'all')}>
+                <SelectTrigger className="w-[150px] h-8 text-xs">
+                  <SelectValue placeholder="Inscription" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous</SelectItem>
+                  <SelectItem value="OK">Inscrit ({users.filter(u => (u.lovable_status || 'NOK') === 'OK').length})</SelectItem>
+                  <SelectItem value="NOK">Non inscrit ({users.filter(u => (u.lovable_status || 'NOK') === 'NOK').length})</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {/* Reset */}
+              {(() => {
+                const activeFilterCount = [selectedDepartmentFilter, selectedHierarchyFilter, selectedPermissionFilter, selectedCompanyFilter].filter(Boolean).length
+                  + (selectedStatusFilter !== 'all' ? 1 : 0)
+                  + (selectedLovableStatusFilter !== 'all' ? 1 : 0);
+                return activeFilterCount > 0 ? (
                   <button
-                    key={status}
-                    onClick={() => setSelectedStatusFilter(selectedStatusFilter === status ? 'all' : status)}
-                    className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all border
-                      ${selectedStatusFilter === status 
-                        ? 'ring-2 ring-primary ring-offset-1' 
-                        : 'hover:opacity-80'
-                      }
-                      ${statusInfo.color}
-                    `}
+                    onClick={() => {
+                      setSelectedCompanyFilter(null);
+                      setSelectedDepartmentFilter(null);
+                      setSelectedHierarchyFilter(null);
+                      setSelectedPermissionFilter(null);
+                      setSelectedStatusFilter('all');
+                      setSelectedLovableStatusFilter('all');
+                      setSearchQuery('');
+                    }}
+                    className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-destructive hover:bg-destructive/10 transition-all"
                   >
-                    {status === 'active' && <UserCheck className="h-3 w-3" />}
-                    {status === 'suspended' && <Pause className="h-3 w-3" />}
-                    {status === 'deleted' && <UserX className="h-3 w-3" />}
-                    {status === 'external' && <UserMinus className="h-3 w-3" />}
-                    {statusInfo.label} ({count})
+                    <XCircle className="h-3 w-3" />
+                    Réinitialiser ({activeFilterCount})
                   </button>
-                );
-              })}
-              {/* Lovable Status Filter */}
-              <div className="w-px h-5 bg-border mx-1" />
-              <button
-                onClick={() => setSelectedLovableStatusFilter(selectedLovableStatusFilter === 'OK' ? 'all' : 'OK')}
-                className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all border
-                  ${selectedLovableStatusFilter === 'OK' 
-                    ? 'ring-2 ring-primary ring-offset-1' 
-                    : 'hover:opacity-80'
-                  }
-                  bg-green-100 text-green-800 border-green-300
-                `}
-              >
-                <CheckCircle2 className="h-3 w-3" />
-                Inscrit ({users.filter(u => (u.lovable_status || 'NOK') === 'OK').length})
-              </button>
-              <button
-                onClick={() => setSelectedLovableStatusFilter(selectedLovableStatusFilter === 'NOK' ? 'all' : 'NOK')}
-                className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all border
-                  ${selectedLovableStatusFilter === 'NOK' 
-                    ? 'ring-2 ring-primary ring-offset-1' 
-                    : 'hover:opacity-80'
-                  }
-                  bg-red-100 text-red-800 border-red-300
-                `}
-              >
-                <XCircle className="h-3 w-3" />
-                NOK ({users.filter(u => (u.lovable_status || 'NOK') === 'NOK').length})
-              </button>
+                ) : null;
+              })()}
             </div>
+
             <div className="flex items-center gap-2">
               <Checkbox
                 id="select-all"
@@ -1058,104 +1100,6 @@ export function UsersTab({
                 <Table2 className="h-4 w-4" />
               </ToggleGroupItem>
             </ToggleGroup>
-          </div>
-
-          {/* Company Color Legend - Clickable Filters */}
-          <div className="flex flex-wrap gap-2 p-3 rounded-lg bg-muted/30">
-            <button
-              onClick={() => setSelectedCompanyFilter(null)}
-              className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition-all
-                ${!selectedCompanyFilter 
-                  ? 'bg-primary text-primary-foreground ring-2 ring-primary ring-offset-1' 
-                  : 'bg-muted hover:bg-muted/80 text-muted-foreground'
-                }`}
-            >
-              Tous ({users.length})
-            </button>
-            {companies.map(company => {
-              const colors = companyColorMap.get(company.id);
-              const isActive = selectedCompanyFilter === company.id;
-              const count = users.filter(u => u.company_id === company.id).length;
-              return (
-                <button 
-                  key={company.id}
-                  onClick={() => setSelectedCompanyFilter(isActive ? null : company.id)}
-                  className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium transition-all cursor-pointer
-                    ${colors?.bg} ${colors?.text} border ${colors?.border}
-                    ${isActive ? 'ring-2 ring-offset-1 ring-primary shadow-md scale-105' : 'hover:scale-105 hover:shadow-sm'}
-                  `}
-                >
-                  <Building2 className="h-3 w-3" />
-                  {company.name} ({count})
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Advanced Filters Row */}
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Department filter */}
-            <Select value={selectedDepartmentFilter || 'all'} onValueChange={(v) => setSelectedDepartmentFilter(v === 'all' ? null : v)}>
-              <SelectTrigger className="w-[180px] h-8 text-xs">
-                <SelectValue placeholder="Service" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les services</SelectItem>
-                {departments.map(d => (
-                  <SelectItem key={d.id} value={d.id}>{d.name} ({users.filter(u => u.department_id === d.id).length})</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {/* Hierarchy Level filter */}
-            <Select value={selectedHierarchyFilter || 'all'} onValueChange={(v) => setSelectedHierarchyFilter(v === 'all' ? null : v)}>
-              <SelectTrigger className="w-[180px] h-8 text-xs">
-                <SelectValue placeholder="Niveau hiérarchique" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les niveaux</SelectItem>
-                {hierarchyLevels.sort((a, b) => a.level - b.level).map(h => (
-                  <SelectItem key={h.id} value={h.id}>{h.name} ({users.filter(u => u.hierarchy_level_id === h.id).length})</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {/* Permission Profile filter */}
-            <Select value={selectedPermissionFilter || 'all'} onValueChange={(v) => setSelectedPermissionFilter(v === 'all' ? null : v)}>
-              <SelectTrigger className="w-[180px] h-8 text-xs">
-                <SelectValue placeholder="Profil de droits" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous les profils</SelectItem>
-                {permissionProfiles.map(p => (
-                  <SelectItem key={p.id} value={p.id}>{p.name} ({users.filter(u => u.permission_profile_id === p.id).length})</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {/* Active filter count + reset */}
-            {(() => {
-              const activeFilterCount = [selectedDepartmentFilter, selectedHierarchyFilter, selectedPermissionFilter, selectedCompanyFilter].filter(Boolean).length
-                + (selectedStatusFilter !== 'all' ? 1 : 0)
-                + (selectedLovableStatusFilter !== 'all' ? 1 : 0);
-              return activeFilterCount > 0 ? (
-                <button
-                  onClick={() => {
-                    setSelectedCompanyFilter(null);
-                    setSelectedDepartmentFilter(null);
-                    setSelectedHierarchyFilter(null);
-                    setSelectedPermissionFilter(null);
-                    setSelectedStatusFilter('all');
-                    setSelectedLovableStatusFilter('all');
-                    setSearchQuery('');
-                  }}
-                  className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-destructive hover:bg-destructive/10 transition-all"
-                >
-                  <XCircle className="h-3 w-3" />
-                  Réinitialiser ({activeFilterCount})
-                </button>
-              ) : null;
-            })()}
           </div>
 
           {/* User Display */}
