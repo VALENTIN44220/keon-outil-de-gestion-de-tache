@@ -68,8 +68,12 @@ export function UsersTab({
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCompanyFilter, setSelectedCompanyFilter] = useState<string | null>(null);
+  const [selectedDepartmentFilter, setSelectedDepartmentFilter] = useState<string | null>(null);
+  const [selectedHierarchyFilter, setSelectedHierarchyFilter] = useState<string | null>(null);
+  const [selectedPermissionFilter, setSelectedPermissionFilter] = useState<string | null>(null);
   const [selectedLovableStatusFilter, setSelectedLovableStatusFilter] = useState<LovableStatus | 'all'>('all');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<UserStatus | 'all'>('all');
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [isResettingPassword, setIsResettingPassword] = useState<string | null>(null);
   const [isInviting, setIsInviting] = useState<string | null>(null);
   const [isBulkInviting, setIsBulkInviting] = useState(false);
@@ -105,6 +109,21 @@ export function UsersTab({
     if (selectedCompanyFilter) {
       result = result.filter(u => u.company_id === selectedCompanyFilter);
     }
+
+    // Apply department filter
+    if (selectedDepartmentFilter) {
+      result = result.filter(u => u.department_id === selectedDepartmentFilter);
+    }
+
+    // Apply hierarchy level filter
+    if (selectedHierarchyFilter) {
+      result = result.filter(u => u.hierarchy_level_id === selectedHierarchyFilter);
+    }
+
+    // Apply permission profile filter
+    if (selectedPermissionFilter) {
+      result = result.filter(u => u.permission_profile_id === selectedPermissionFilter);
+    }
     
     // Apply search filter
     if (searchQuery.trim()) {
@@ -118,7 +137,7 @@ export function UsersTab({
     }
     
     return result;
-  }, [users, searchQuery, selectedCompanyFilter, selectedStatusFilter, selectedLovableStatusFilter]);
+  }, [users, searchQuery, selectedCompanyFilter, selectedDepartmentFilter, selectedHierarchyFilter, selectedPermissionFilter, selectedStatusFilter, selectedLovableStatusFilter]);
 
   // Sort hook for grid view
   const { sortedData, sortConfig, handleSort } = useTableSort(filteredUsers, 'display_name', 'asc');
@@ -1071,6 +1090,72 @@ export function UsersTab({
                 </button>
               );
             })}
+          </div>
+
+          {/* Advanced Filters Row */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Department filter */}
+            <Select value={selectedDepartmentFilter || 'all'} onValueChange={(v) => setSelectedDepartmentFilter(v === 'all' ? null : v)}>
+              <SelectTrigger className="w-[180px] h-8 text-xs">
+                <SelectValue placeholder="Service" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les services</SelectItem>
+                {departments.map(d => (
+                  <SelectItem key={d.id} value={d.id}>{d.name} ({users.filter(u => u.department_id === d.id).length})</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Hierarchy Level filter */}
+            <Select value={selectedHierarchyFilter || 'all'} onValueChange={(v) => setSelectedHierarchyFilter(v === 'all' ? null : v)}>
+              <SelectTrigger className="w-[180px] h-8 text-xs">
+                <SelectValue placeholder="Niveau hiérarchique" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les niveaux</SelectItem>
+                {hierarchyLevels.sort((a, b) => a.level - b.level).map(h => (
+                  <SelectItem key={h.id} value={h.id}>{h.name} ({users.filter(u => u.hierarchy_level_id === h.id).length})</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Permission Profile filter */}
+            <Select value={selectedPermissionFilter || 'all'} onValueChange={(v) => setSelectedPermissionFilter(v === 'all' ? null : v)}>
+              <SelectTrigger className="w-[180px] h-8 text-xs">
+                <SelectValue placeholder="Profil de droits" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les profils</SelectItem>
+                {permissionProfiles.map(p => (
+                  <SelectItem key={p.id} value={p.id}>{p.name} ({users.filter(u => u.permission_profile_id === p.id).length})</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Active filter count + reset */}
+            {(() => {
+              const activeFilterCount = [selectedDepartmentFilter, selectedHierarchyFilter, selectedPermissionFilter, selectedCompanyFilter].filter(Boolean).length
+                + (selectedStatusFilter !== 'all' ? 1 : 0)
+                + (selectedLovableStatusFilter !== 'all' ? 1 : 0);
+              return activeFilterCount > 0 ? (
+                <button
+                  onClick={() => {
+                    setSelectedCompanyFilter(null);
+                    setSelectedDepartmentFilter(null);
+                    setSelectedHierarchyFilter(null);
+                    setSelectedPermissionFilter(null);
+                    setSelectedStatusFilter('all');
+                    setSelectedLovableStatusFilter('all');
+                    setSearchQuery('');
+                  }}
+                  className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-destructive hover:bg-destructive/10 transition-all"
+                >
+                  <XCircle className="h-3 w-3" />
+                  Réinitialiser ({activeFilterCount})
+                </button>
+              ) : null;
+            })()}
           </div>
 
           {/* User Display */}
