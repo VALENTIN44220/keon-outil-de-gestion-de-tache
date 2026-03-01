@@ -12,7 +12,7 @@ import { UsersTab } from './UsersTab';
 import { DataExportTab } from './DataExportTab';
 
 import { CollaboratorGroupsTab } from './CollaboratorGroupsTab';
-import { FabricLakehouseSyncTab } from './FabricLakehouseSyncTab';
+
 import { DatabaseResetDialog } from './DatabaseResetDialog';
 import { UserSimulationSelector } from './UserSimulationSelector';
 import { WorkflowMigrationTab } from './WorkflowMigrationTab';
@@ -95,9 +95,6 @@ export function AdminTabs(props: AdminTabsProps) {
           </TabsTrigger>
           <TabsTrigger value="export" className="px-2 py-1.5" title="Export de données">
             <Download className="h-4 w-4" />
-          </TabsTrigger>
-          <TabsTrigger value="fabric" className="px-2 py-1.5" title="Synchronisation Fabric">
-            <CloudUpload className="h-4 w-4" />
           </TabsTrigger>
           <TabsTrigger value="simulation" className="px-2 py-1.5" title="Simulation utilisateur">
             <UserRoundCog className="h-4 w-4" />
@@ -217,9 +214,6 @@ export function AdminTabs(props: AdminTabsProps) {
           <DataExportTab />
         </TabsContent>
 
-        <TabsContent value="fabric">
-          <FabricLakehouseSyncTab />
-        </TabsContent>
 
         <TabsContent value="simulation">
           <div className="max-w-lg">
