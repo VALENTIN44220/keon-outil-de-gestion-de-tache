@@ -400,9 +400,9 @@ export function AccessRightsTab({
     PROFILE_COLORS[permissionProfiles.findIndex((p) => p.id === profileId) % PROFILE_COLORS.length] ?? "#64748b";
 
   const getEffectiveValue = (key: string): { value: boolean; isOverride: boolean } => {
-    const profileVal = userProfileDef ? !!(userProfileDef as Record<string, unknown>)[key] : false;
+    const profileVal = userProfileDef ? !!(userProfileDef as unknown as Record<string, unknown>)[key] : false;
     if (!userOverrides) return { value: profileVal, isOverride: false };
-    const overrideVal = (userOverrides as Record<string, unknown>)[key];
+    const overrideVal = (userOverrides as unknown as Record<string, unknown>)[key];
     if (overrideVal !== null && overrideVal !== undefined) {
       return { value: overrideVal as boolean, isOverride: true };
     }
@@ -419,7 +419,7 @@ export function AccessRightsTab({
   const hasAnyOverride = (): boolean => {
     const hasPermOverride =
       userOverrides !== null &&
-      Object.values(userOverrides as Record<string, unknown>).some((v) => typeof v === "boolean");
+      Object.values(userOverrides as unknown as Record<string, unknown>).some((v) => typeof v === "boolean");
     return hasPermOverride || Object.keys(userProcessOverrides).length > 0;
   };
 
@@ -427,7 +427,7 @@ export function AccessRightsTab({
   const handleToggleUserPermission = async (key: AllPermissionKeys) => {
     if (!selectedUserId) return;
     const { value: current } = getEffectiveValue(key);
-    const profileVal = userProfileDef ? !!(userProfileDef as Record<string, unknown>)[key] : false;
+    const profileVal = userProfileDef ? !!(userProfileDef as unknown as Record<string, unknown>)[key] : false;
     const newValue = !current;
     const dbValue = newValue === profileVal ? null : newValue;
     try {
@@ -567,7 +567,7 @@ export function AccessRightsTab({
         ops.push(
           supabase
             .from("permission_profile_process_templates")
-            .insert(toAdd.map((pid) => ({ permission_profile_id: selectedProfileId, process_template_id: pid }))),
+            .insert(toAdd.map((pid) => ({ permission_profile_id: selectedProfileId, process_template_id: pid }))) as unknown as Promise<unknown>,
         );
       }
       toRemove.forEach((pid) => {
@@ -576,7 +576,7 @@ export function AccessRightsTab({
             .from("permission_profile_process_templates")
             .delete()
             .eq("permission_profile_id", selectedProfileId)
-            .eq("process_template_id", pid),
+            .eq("process_template_id", pid) as unknown as Promise<unknown>,
         );
       });
       await Promise.all(ops);
@@ -611,7 +611,7 @@ export function AccessRightsTab({
       description: selectedProfile.description ?? "",
       _processes: profileProcessIds[selectedProfile.id] ?? [],
       ...Object.fromEntries(
-        Object.keys(DEFAULT_PERMISSIONS).map((k) => [k, !!(selectedProfile as Record<string, unknown>)[k]]),
+        Object.keys(DEFAULT_PERMISSIONS).map((k) => [k, !!(selectedProfile as unknown as Record<string, unknown>)[k]]),
       ),
     });
     setShowEditDialog(true);
@@ -723,7 +723,7 @@ export function AccessRightsTab({
                       </p>
                       <div className="space-y-1.5">
                         {group.items.map(({ key, label }) => {
-                          const val = !!(selectedProfile as Record<string, unknown>)[key];
+                          const val = !!(selectedProfile as unknown as Record<string, unknown>)[key];
                           return (
                             <div key={key} className="flex items-center gap-2.5 text-sm">
                               <Pill on={val} small />
@@ -742,7 +742,7 @@ export function AccessRightsTab({
                 <SectionHead icon="🖥️" label="Accès aux écrans" />
                 <div className="flex flex-wrap gap-2">
                   {SCREEN_PERMISSIONS.map((key) => {
-                    const active = !!(selectedProfile as Record<string, unknown>)[key];
+                    const active = !!(selectedProfile as unknown as Record<string, unknown>)[key];
                     return <ScreenChip key={key} label={SCREEN_LABELS[key]} active={active} />;
                   })}
                 </div>
@@ -980,7 +980,7 @@ export function AccessRightsTab({
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-amber-700">
                         {userOverrides &&
                           SCREEN_PERMISSIONS.map((key) => {
-                            const val = (userOverrides as Record<string, unknown>)[key];
+                            const val = (userOverrides as unknown as Record<string, unknown>)[key];
                             if (val === null || val === undefined) return null;
                             return (
                               <span key={key}>
