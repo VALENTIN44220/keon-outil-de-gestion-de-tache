@@ -642,29 +642,36 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
               <table className="caption-bottom text-sm" style={{ width: `${tableWidthPx}px` }}>
                 <TableHeader>
                   <TableRow>
+                    {canEdit && <TableHead className="w-[50px]"></TableHead>}
                     {activeColumns.map(col => (
                       <SortableTableHead key={col.key} sortKey={col.key} currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort} className={col.className}>
                         {col.label}
                       </SortableTableHead>
                     ))}
-                    <TableHead className="w-[80px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
-                    Array.from({ length: 8 }).map((_, i) => (
+                     Array.from({ length: 8 }).map((_, i) => (
                       <TableRow key={i}>
+                        {canEdit && <TableCell><Skeleton className="h-4 w-8" /></TableCell>}
                         {activeColumns.map((_, j) => <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>)}
-                        <TableCell><Skeleton className="h-4 w-8" /></TableCell>
                       </TableRow>
                     ))
                   ) : filteredSuppliers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={activeColumns.length + 1} className="text-center py-8 text-muted-foreground">Aucun fournisseur trouvé</TableCell>
+                      <TableCell colSpan={activeColumns.length + (canEdit ? 1 : 0)} className="text-center py-8 text-muted-foreground">Aucun fournisseur trouvé</TableCell>
                     </TableRow>
                   ) : (
                     filteredSuppliers.map((supplier) => (
                       <TableRow key={supplier.id} className="cursor-pointer hover:bg-muted/50" onClick={() => onViewSupplier(supplier.id)}>
+                        {canEdit && (
+                          <TableCell>
+                            <Button variant="ghost" size="icon" title="Modifier" onClick={(e) => { e.stopPropagation(); onOpenSupplier(supplier.id); }}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        )}
                         {activeColumns.map(col => (
                           <TableCell key={col.key}>
                             {col.key === 'completeness_score' ? (
@@ -677,13 +684,6 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
                             ) : col.render(supplier)}
                           </TableCell>
                         ))}
-                        <TableCell>
-                          {canEdit && (
-                            <Button variant="ghost" size="icon" title="Modifier" onClick={(e) => { e.stopPropagation(); onOpenSupplier(supplier.id); }}>
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </TableCell>
                       </TableRow>
                     ))
                   )}
