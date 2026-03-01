@@ -12,6 +12,7 @@ interface Employee {
   job_title?: string;
   department?: string;
   company?: string;
+  manager_id_lucca?: string | number;
 }
 
 // Cache pour éviter des requêtes répétées dans le même batch
@@ -258,7 +259,45 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`Sync terminé: créés=${results.created}, mis à jour=${results.updated}, ignorés=${results.skipped}, erreurs=${results.errors.length}, FK non résolues=${results.unresolved_fk.length}`);
+    // ── PASSE 2 : Résoudre les managers par id_lucca ──
+    let managersResolved = 0;
+    const employeesWithManager = employees.filter(e => e.manager_id_lucca);
+
+    for (const emp of employeesWithManager) {
+      const managerIdLucca = String(emp.manager_id_lucca);
+      const empIdLucca = String(emp.id_lucca);
+
+      try {
+        // Trouver le profil du manager via son id_lucca
+        const { data: managerProfile } = await supabaseAdmin
+          .from('profiles')
+          .select('id')
+          .eq('id_lucca', managerIdLucca)
+          .maybeSingle();
+
+        if (!managerProfile) {
+          results.unresolved_fk.push(`${emp.display_name} (id_lucca=${empIdLucca}): manager_id_lucca="${managerIdLucca}" non trouvé`);
+          continue;
+        }
+
+        // Mettre à jour le manager_id du profil
+        const { error: mgrError } = await supabaseAdmin
+          .from('profiles')
+          .update({ manager_id: managerProfile.id, updated_at: new Date().toISOString() })
+          .eq('id_lucca', empIdLucca);
+
+        if (mgrError) {
+          results.errors.push(`${emp.display_name}: erreur MAJ manager: ${mgrError.message}`);
+        } else {
+          managersResolved++;
+        }
+      } catch (mgrErr: unknown) {
+        const msg = mgrErr instanceof Error ? mgrErr.message : String(mgrErr);
+        results.errors.push(`${emp.display_name}: erreur manager: ${msg}`);
+      }
+    }
+
+    console.log(`Sync terminé: créés=${results.created}, mis à jour=${results.updated}, ignorés=${results.skipped}, managers=${managersResolved}, erreurs=${results.errors.length}, FK non résolues=${results.unresolved_fk.length}`);
 
     return new Response(
       JSON.stringify({
@@ -266,6 +305,7 @@ Deno.serve(async (req) => {
         created: results.created,
         updated: results.updated,
         skipped: results.skipped,
+        managers_resolved: managersResolved,
         error_count: results.errors.length,
         errors: results.errors,
         unresolved_fk_count: results.unresolved_fk.length,
