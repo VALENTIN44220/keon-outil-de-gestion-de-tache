@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building2, Briefcase, Users, Layers, Shield, UserCog, Download, UsersRound, CloudUpload, Grid3X3, UserRoundCog, Workflow, Database, FolderKanban, Tags, MonitorSmartphone, Eye } from 'lucide-react';
+import { Building2, Briefcase, Users, Layers, Shield, UserCog, Download, UsersRound, Grid3X3, UserRoundCog, Workflow, Database, FolderKanban, Tags, MonitorSmartphone, Eye } from 'lucide-react';
 import { CompaniesTab } from './CompaniesTab';
 import { DepartmentsTab } from './DepartmentsTab';
 import { JobTitlesTab } from './JobTitlesTab';
