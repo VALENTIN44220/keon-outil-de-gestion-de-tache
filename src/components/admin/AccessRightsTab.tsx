@@ -775,6 +775,43 @@ export function AccessRightsTab({
                   </div>
                 )}
               </div>
+
+              {/* Users assigned to this profile */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+                <SectionHead icon="👥" label="Utilisateurs avec ce profil" />
+                {(() => {
+                  const profileUsers = users.filter((u) => u.permission_profile_id === selectedProfile.id);
+                  if (profileUsers.length === 0) {
+                    return <p className="text-sm text-slate-400 italic">Aucun utilisateur assigné à ce profil</p>;
+                  }
+                  return (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                      {profileUsers.map((u) => (
+                        <div
+                          key={u.id}
+                          className="flex items-center gap-3 px-3 py-2 rounded-xl bg-slate-50 border border-slate-100"
+                        >
+                          <div
+                            className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                            style={{
+                              background: getProfileColor(selectedProfile.id) + "20",
+                              color: getProfileColor(selectedProfile.id),
+                            }}
+                          >
+                            {(u.display_name ?? "?").slice(0, 2).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-slate-700 truncate">{u.display_name ?? "Sans nom"}</p>
+                            {u.department?.name && (
+                              <p className="text-[11px] text-slate-400 truncate">{u.department.name}</p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center gap-3 text-slate-400 p-16">
