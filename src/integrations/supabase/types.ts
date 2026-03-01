@@ -1124,6 +1124,7 @@ export type Database = {
           ca_facture: number | null
           dos: string
           ecart_cmd_fac: number | null
+          fou_key: string
           id: number
           mois_cmd: string | null
           mois_fac: string | null
@@ -1138,6 +1139,7 @@ export type Database = {
           ca_facture?: number | null
           dos: string
           ecart_cmd_fac?: number | null
+          fou_key: string
           id?: number
           mois_cmd?: string | null
           mois_fac?: string | null
@@ -1152,6 +1154,7 @@ export type Database = {
           ca_facture?: number | null
           dos?: string
           ecart_cmd_fac?: number | null
+          fou_key?: string
           id?: number
           mois_cmd?: string | null
           mois_fac?: string | null
