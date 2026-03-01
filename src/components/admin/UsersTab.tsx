@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Plus, UserPlus, Users, Building2, Briefcase, Layers, Shield, ChevronUp, ChevronDown, AlertCircle, RefreshCw, Upload, Trash2, Search, UserX, UserCheck, Pause, Key, Copy, LayoutGrid, Table2, Mail, CheckCircle2, XCircle, Send } from 'lucide-react';
+import { Plus, UserPlus, Users, Building2, Briefcase, Layers, Shield, ChevronUp, ChevronDown, AlertCircle, RefreshCw, Upload, Trash2, Search, UserX, UserCheck, Pause, Key, Copy, LayoutGrid, Table2, Mail, CheckCircle2, XCircle, Send, UserMinus } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { useTableSort } from '@/hooks/useTableSort';
@@ -880,7 +880,7 @@ export function UsersTab({
                         Statut de l'utilisateur
                       </h4>
                       <div className="grid gap-2">
-                        {(['active', 'suspended', 'deleted'] as UserStatus[]).map((status) => {
+                        {(['active', 'suspended', 'deleted', 'external'] as UserStatus[]).map((status) => {
                           const statusInfo = USER_STATUS_LABELS[status];
                           const isSelected = userStatus === status;
                           return (
@@ -899,6 +899,7 @@ export function UsersTab({
                                 {status === 'active' && <UserCheck className="h-4 w-4" />}
                                 {status === 'suspended' && <Pause className="h-4 w-4" />}
                                 {status === 'deleted' && <UserX className="h-4 w-4" />}
+                                {status === 'external' && <UserMinus className="h-4 w-4" />}
                               </div>
                               <div>
                                 <p className="font-medium">{statusInfo.label}</p>
@@ -960,7 +961,7 @@ export function UsersTab({
               >
                 Tous
               </button>
-              {(['active', 'suspended', 'deleted'] as UserStatus[]).map((status) => {
+              {(['active', 'suspended', 'deleted', 'external'] as UserStatus[]).map((status) => {
                 const statusInfo = USER_STATUS_LABELS[status];
                 const count = users.filter(u => u.status === status).length;
                 return (
@@ -978,6 +979,7 @@ export function UsersTab({
                     {status === 'active' && <UserCheck className="h-3 w-3" />}
                     {status === 'suspended' && <Pause className="h-3 w-3" />}
                     {status === 'deleted' && <UserX className="h-3 w-3" />}
+                    {status === 'external' && <UserMinus className="h-3 w-3" />}
                     {statusInfo.label} ({count})
                   </button>
                 );
@@ -1209,6 +1211,7 @@ export function UsersTab({
                             >
                               {user.status === 'suspended' && <Pause className="h-3 w-3 mr-1" />}
                               {user.status === 'deleted' && <UserX className="h-3 w-3 mr-1" />}
+                              {user.status === 'external' && <UserMinus className="h-3 w-3 mr-1" />}
                               {USER_STATUS_LABELS[user.status]?.label}
                             </Badge>
                           ) : (
@@ -1300,6 +1303,7 @@ export function UsersTab({
                                   >
                                     {user.status === 'suspended' && <Pause className="h-2.5 w-2.5 mr-0.5" />}
                                     {user.status === 'deleted' && <UserX className="h-2.5 w-2.5 mr-0.5" />}
+                                    {user.status === 'external' && <UserMinus className="h-2.5 w-2.5 mr-0.5" />}
                                     {USER_STATUS_LABELS[user.status]?.label}
                                   </Badge>
                                 )}

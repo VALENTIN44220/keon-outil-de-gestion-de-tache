@@ -68,7 +68,7 @@ export interface PermissionProfile {
 
 export type AppRole = 'admin' | 'moderator' | 'user';
 
-export type UserStatus = 'active' | 'suspended' | 'deleted';
+export type UserStatus = 'active' | 'suspended' | 'deleted' | 'external';
 
 export interface UserRole {
   id: string;
@@ -123,5 +123,10 @@ export const USER_STATUS_LABELS: Record<UserStatus, { label: string; description
     label: 'Parti', 
     description: 'Salarié parti, aucune nouvelle affectation possible',
     color: 'bg-red-100 text-red-800 border-red-300'
+  },
+  external: { 
+    label: 'Hors organisation', 
+    description: 'Utilisateur externe à l\'organisation',
+    color: 'bg-slate-100 text-slate-800 border-slate-300'
   },
 };
