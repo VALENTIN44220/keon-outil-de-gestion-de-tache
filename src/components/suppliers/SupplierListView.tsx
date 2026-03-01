@@ -8,14 +8,12 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useSupplierCategories, useSupplierFamillesByCategorie } from "@/hooks/useSupplierCategorisation";
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { useSupplierEnrichment, SupplierFilters, SupplierSortConfig, SupplierEnrichment } from '@/hooks/useSupplierEnrichment';
 import { useSupplierFilterPresets, SupplierFilterPreset } from '@/hooks/useSupplierFilterPresets';
@@ -269,6 +267,7 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
     ALL_COLUMNS.filter(c => visibleColumns.includes(c.key)),
     [visibleColumns]
   );
+  const tableWidthPx = useMemo(() => Math.max((activeColumns.length + 1) * 180, 2200), [activeColumns.length]);
 
   const toggleColumn = (key: string) => {
     setVisibleColumns(prev =>
@@ -629,9 +628,9 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
       {/* Table View */}
       {viewMode === 'table' && (
         <Card>
-          <ScrollArea className="w-full" type="always">
-            <div className="min-w-full">
-              <table className="w-max min-w-[1800px] caption-bottom text-sm">
+          <div className="w-full max-h-[65vh] overflow-auto pb-2 [scrollbar-width:auto] [&::-webkit-scrollbar]:h-3 [&::-webkit-scrollbar]:w-3 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/50 [&::-webkit-scrollbar-track]:bg-muted/30">
+            <div className="min-w-max">
+              <table className="caption-bottom text-sm" style={{ width: `${tableWidthPx}px` }}>
                 <TableHeader>
                   <TableRow>
                     {activeColumns.map(col => (
@@ -680,8 +679,7 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
                 </TableBody>
               </table>
             </div>
-            <ScrollBar orientation="horizontal" />
-          </ScrollArea>
+          </div>
 
           {/* Bottom Pagination */}
           <div className="px-4 py-3 border-t">
