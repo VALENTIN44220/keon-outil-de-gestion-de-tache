@@ -12,6 +12,9 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
     // Authenticate via SYNC_SECRET or admin JWT
     const syncSecret = req.headers.get("x-sync-secret") ?? "";
     const expectedSecret = Deno.env.get("SYNC_SECRET") ?? "";
@@ -31,7 +34,8 @@ Deno.serve(async (req) => {
         const anonClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!);
         const { data: { user }, error: authError } = await anonClient.auth.getUser(token);
         if (!authError && user) {
-          const { data: roleData } = await supabase
+          const adminClient = createClient(supabaseUrl, serviceRoleKey);
+          const { data: roleData } = await adminClient
             .from("user_roles")
             .select("role")
             .eq("user_id", user.id)
