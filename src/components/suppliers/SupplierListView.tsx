@@ -17,7 +17,7 @@ import {
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { useSupplierEnrichment, SupplierFilters, SupplierSortConfig, SupplierEnrichment } from '@/hooks/useSupplierEnrichment';
 import { useSupplierFilterPresets, SupplierFilterPreset } from '@/hooks/useSupplierFilterPresets';
-import { Search, Building2, Filter, ExternalLink, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LayoutGrid, List, Save, Star, Trash2, FolderOpen, RotateCcw, Columns3 } from 'lucide-react';
+import { Search, Building2, Filter, ExternalLink, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LayoutGrid, List, Save, Star, Trash2, FolderOpen, RotateCcw, Columns3, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -33,6 +33,8 @@ type SupplierViewMode = 'table' | 'grid';
 
 interface SupplierListViewProps {
   onOpenSupplier: (id: string) => void;
+  onViewSupplier: (id: string) => void;
+  canEdit?: boolean;
 }
 
 type DateTone = 'past' | 'soon' | 'future' | 'none';
@@ -163,7 +165,7 @@ function isFilterActive(value: string | undefined, defaultValue = 'all'): boolea
   return !!value && value !== defaultValue;
 }
 
-export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
+export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = false }: SupplierListViewProps) {
   const pageSize = 200;
   const [viewMode, setViewMode] = useState<SupplierViewMode>('table');
   const [page, setPage] = useState(0);
@@ -599,7 +601,7 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
               const score = supplier.completeness_score ?? 0;
               const st = supplier.status ? statusConfig[supplier.status] : null;
               return (
-                <Card key={supplier.id} className="p-4 cursor-pointer hover:shadow-md transition-shadow border-l-4" style={{ borderLeftColor: score >= 80 ? 'hsl(var(--success))' : score >= 40 ? 'hsl(var(--warning))' : 'hsl(var(--destructive))' }} onClick={() => onOpenSupplier(supplier.id)}>
+                <Card key={supplier.id} className="p-4 cursor-pointer hover:shadow-md transition-shadow border-l-4" style={{ borderLeftColor: score >= 80 ? 'hsl(var(--success))' : score >= 40 ? 'hsl(var(--warning))' : 'hsl(var(--destructive))' }} onClick={() => onViewSupplier(supplier.id)}>
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="min-w-0 flex-1">
                       <p className="font-medium text-sm truncate">{supplier.nomfournisseur || '—'}</p>
@@ -616,7 +618,14 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
                   </div>
                   <div className="flex items-center justify-between mt-3 pt-2 border-t text-[10px] text-muted-foreground">
                     <span className={dateClass(supplier.validite_prix)}>Prix: {safeFormatDate(supplier.validite_prix)}</span>
-                    <span className={dateClass(supplier.validite_du_contrat)}>Contrat: {safeFormatDate(supplier.validite_du_contrat)}</span>
+                    <div className="flex items-center gap-1">
+                      <span className={dateClass(supplier.validite_du_contrat)}>Contrat: {safeFormatDate(supplier.validite_du_contrat)}</span>
+                      {canEdit && (
+                        <Button variant="ghost" size="icon" className="h-6 w-6 ml-1" title="Modifier" onClick={(e) => { e.stopPropagation(); onOpenSupplier(supplier.id); }}>
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </Card>
               );
@@ -655,7 +664,7 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
                     </TableRow>
                   ) : (
                     filteredSuppliers.map((supplier) => (
-                      <TableRow key={supplier.id} className="cursor-pointer hover:bg-muted/50" onClick={() => onOpenSupplier(supplier.id)}>
+                      <TableRow key={supplier.id} className="cursor-pointer hover:bg-muted/50" onClick={() => onViewSupplier(supplier.id)}>
                         {activeColumns.map(col => (
                           <TableCell key={col.key}>
                             {col.key === 'completeness_score' ? (
@@ -669,9 +678,11 @@ export function SupplierListView({ onOpenSupplier }: SupplierListViewProps) {
                           </TableCell>
                         ))}
                         <TableCell>
-                          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); onOpenSupplier(supplier.id); }}>
-                            <ExternalLink className="h-4 w-4" />
-                          </Button>
+                          {canEdit && (
+                            <Button variant="ghost" size="icon" title="Modifier" onClick={(e) => { e.stopPropagation(); onOpenSupplier(supplier.id); }}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))

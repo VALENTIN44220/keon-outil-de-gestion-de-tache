@@ -222,7 +222,7 @@ export function ProcessDashboard({ processId, departmentId, departmentIds, proce
       )}
       {hasSupplierSection && (
         <TabsContent value="suppliers">
-          <SupplierListView onOpenSupplier={handleOpenSupplier} />
+          <SupplierListView onOpenSupplier={handleOpenSupplier} onViewSupplier={handleOpenSupplier} canEdit={supplierRole === 'achat'} />
           <SupplierDetailDrawer
             supplierId={selectedSupplierId}
             open={supplierDrawerOpen}

@@ -1116,6 +1116,51 @@ export type Database = {
           },
         ]
       }
+      fou_resultat: {
+        Row: {
+          annee_cmd: string | null
+          annee_fac: string | null
+          ca_commande: number | null
+          ca_facture: number | null
+          dos: string
+          ecart_cmd_fac: number | null
+          id: number
+          mois_cmd: string | null
+          mois_fac: string | null
+          ref: string
+          synced_at: string | null
+          tiers: string
+        }
+        Insert: {
+          annee_cmd?: string | null
+          annee_fac?: string | null
+          ca_commande?: number | null
+          ca_facture?: number | null
+          dos: string
+          ecart_cmd_fac?: number | null
+          id?: number
+          mois_cmd?: string | null
+          mois_fac?: string | null
+          ref: string
+          synced_at?: string | null
+          tiers: string
+        }
+        Update: {
+          annee_cmd?: string | null
+          annee_fac?: string | null
+          ca_commande?: number | null
+          ca_facture?: number | null
+          dos?: string
+          ecart_cmd_fac?: number | null
+          id?: number
+          mois_cmd?: string | null
+          mois_fac?: string | null
+          ref?: string
+          synced_at?: string | null
+          tiers?: string
+        }
+        Relationships: []
+      }
       hierarchy_levels: {
         Row: {
           created_at: string
