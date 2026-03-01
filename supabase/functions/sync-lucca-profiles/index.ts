@@ -25,10 +25,11 @@ async function resolveFK(
   supabaseAdmin: any,
   cache: LookupCache,
   emp: Employee
-): Promise<{ company_id: string | null; department_id: string | null; job_title_id: string | null }> {
+): Promise<{ company_id: string | null; department_id: string | null; job_title_id: string | null; unresolved: string[] }> {
   let company_id: string | null = null;
   let department_id: string | null = null;
   let job_title_id: string | null = null;
+  const unresolved: string[] = [];
 
   // ── Résoudre company ──
   if (emp.company?.trim()) {
@@ -44,6 +45,8 @@ async function resolveFK(
       if (data) {
         company_id = data.id;
         cache.companies.set(key, data.id);
+      } else {
+        unresolved.push(`company="${emp.company.trim()}"`);
       }
     }
   }
@@ -62,6 +65,8 @@ async function resolveFK(
       if (data) {
         department_id = data.id;
         cache.departments.set(key, data.id);
+      } else {
+        unresolved.push(`department="${emp.department.trim()}"`);
       }
     }
   }
@@ -80,11 +85,13 @@ async function resolveFK(
       if (data) {
         job_title_id = data.id;
         cache.jobTitles.set(key, data.id);
+      } else {
+        unresolved.push(`job_title="${emp.job_title.trim()}"`);
       }
     }
   }
 
-  return { company_id, department_id, job_title_id };
+  return { company_id, department_id, job_title_id, unresolved };
 }
 
 Deno.serve(async (req) => {
@@ -128,6 +135,7 @@ Deno.serve(async (req) => {
       updated: 0,
       skipped: 0,
       errors: [] as string[],
+      unresolved_fk: [] as string[],
     };
 
     for (const emp of employees) {
@@ -143,7 +151,12 @@ Deno.serve(async (req) => {
 
       try {
         // ── Résoudre les FK ──
-        const { company_id, department_id, job_title_id } = await resolveFK(supabaseAdmin, cache, emp);
+        const { company_id, department_id, job_title_id, unresolved } = await resolveFK(supabaseAdmin, cache, emp);
+
+        if (unresolved.length > 0) {
+          results.unresolved_fk.push(`${display_name} (id_lucca=${idLuccaStr}): ${unresolved.join(', ')}`);
+          console.warn(`⚠️ FK non résolues pour ${display_name}: ${unresolved.join(', ')}`);
+        }
 
         // ── Données communes à update / create ──
         const profileData = {
@@ -245,7 +258,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`Sync terminé: créés=${results.created}, mis à jour=${results.updated}, ignorés=${results.skipped}, erreurs=${results.errors.length}`);
+    console.log(`Sync terminé: créés=${results.created}, mis à jour=${results.updated}, ignorés=${results.skipped}, erreurs=${results.errors.length}, FK non résolues=${results.unresolved_fk.length}`);
 
     return new Response(
       JSON.stringify({
@@ -255,6 +268,8 @@ Deno.serve(async (req) => {
         skipped: results.skipped,
         error_count: results.errors.length,
         errors: results.errors,
+        unresolved_fk_count: results.unresolved_fk.length,
+        unresolved_fk: results.unresolved_fk,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
