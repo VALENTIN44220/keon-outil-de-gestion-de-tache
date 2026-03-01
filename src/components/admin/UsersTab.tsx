@@ -68,6 +68,7 @@ export function UsersTab({
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCompanyFilter, setSelectedCompanyFilter] = useState<string | null>(null);
+  const [selectedLovableStatusFilter, setSelectedLovableStatusFilter] = useState<LovableStatus | 'all'>('all');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<UserStatus | 'all'>('all');
   const [isResettingPassword, setIsResettingPassword] = useState<string | null>(null);
   const [isInviting, setIsInviting] = useState<string | null>(null);
@@ -94,6 +95,11 @@ export function UsersTab({
     if (selectedStatusFilter !== 'all') {
       result = result.filter(u => u.status === selectedStatusFilter);
     }
+
+    // Apply lovable status filter
+    if (selectedLovableStatusFilter !== 'all') {
+      result = result.filter(u => (u.lovable_status || 'NOK') === selectedLovableStatusFilter);
+    }
     
     // Apply company filter
     if (selectedCompanyFilter) {
@@ -112,7 +118,7 @@ export function UsersTab({
     }
     
     return result;
-  }, [users, searchQuery, selectedCompanyFilter, selectedStatusFilter]);
+  }, [users, searchQuery, selectedCompanyFilter, selectedStatusFilter, selectedLovableStatusFilter]);
 
   // Sort hook for grid view
   const { sortedData, sortConfig, handleSort } = useTableSort(filteredUsers, 'display_name', 'asc');
@@ -976,6 +982,34 @@ export function UsersTab({
                   </button>
                 );
               })}
+              {/* Lovable Status Filter */}
+              <div className="w-px h-5 bg-border mx-1" />
+              <button
+                onClick={() => setSelectedLovableStatusFilter(selectedLovableStatusFilter === 'OK' ? 'all' : 'OK')}
+                className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all border
+                  ${selectedLovableStatusFilter === 'OK' 
+                    ? 'ring-2 ring-primary ring-offset-1' 
+                    : 'hover:opacity-80'
+                  }
+                  bg-green-100 text-green-800 border-green-300
+                `}
+              >
+                <CheckCircle2 className="h-3 w-3" />
+                Inscrit ({users.filter(u => (u.lovable_status || 'NOK') === 'OK').length})
+              </button>
+              <button
+                onClick={() => setSelectedLovableStatusFilter(selectedLovableStatusFilter === 'NOK' ? 'all' : 'NOK')}
+                className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all border
+                  ${selectedLovableStatusFilter === 'NOK' 
+                    ? 'ring-2 ring-primary ring-offset-1' 
+                    : 'hover:opacity-80'
+                  }
+                  bg-red-100 text-red-800 border-red-300
+                `}
+              >
+                <XCircle className="h-3 w-3" />
+                NOK ({users.filter(u => (u.lovable_status || 'NOK') === 'NOK').length})
+              </button>
             </div>
             <div className="flex items-center gap-2">
               <Checkbox
@@ -1269,6 +1303,21 @@ export function UsersTab({
                                     {USER_STATUS_LABELS[user.status]?.label}
                                   </Badge>
                                 )}
+                                {/* Lovable Status Badge - always visible on card */}
+                                <Badge 
+                                  variant="outline" 
+                                  className={`text-[10px] h-4 px-1.5 ${
+                                    (user.lovable_status || 'NOK') === 'OK' 
+                                      ? 'bg-green-100 text-green-800 border-green-300' 
+                                      : 'bg-red-100 text-red-800 border-red-300'
+                                  }`}
+                                >
+                                  {(user.lovable_status || 'NOK') === 'OK' ? (
+                                    <><CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />Inscrit</>
+                                  ) : (
+                                    <><XCircle className="h-2.5 w-2.5 mr-0.5" />NOK</>
+                                  )}
+                                </Badge>
                               </div>
                               <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
                                 <Building2 className="h-3 w-3 flex-shrink-0" />
