@@ -107,22 +107,22 @@ export function UsersTab({
     
     // Apply company filter
     if (selectedCompanyFilter) {
-      result = result.filter(u => u.company_id === selectedCompanyFilter);
+      result = result.filter(u => selectedCompanyFilter === '__none__' ? !u.company_id : u.company_id === selectedCompanyFilter);
     }
 
     // Apply department filter
     if (selectedDepartmentFilter) {
-      result = result.filter(u => u.department_id === selectedDepartmentFilter);
+      result = result.filter(u => selectedDepartmentFilter === '__none__' ? !u.department_id : u.department_id === selectedDepartmentFilter);
     }
 
     // Apply hierarchy level filter
     if (selectedHierarchyFilter) {
-      result = result.filter(u => u.hierarchy_level_id === selectedHierarchyFilter);
+      result = result.filter(u => selectedHierarchyFilter === '__none__' ? !u.hierarchy_level_id : u.hierarchy_level_id === selectedHierarchyFilter);
     }
 
     // Apply permission profile filter
     if (selectedPermissionFilter) {
-      result = result.filter(u => u.permission_profile_id === selectedPermissionFilter);
+      result = result.filter(u => selectedPermissionFilter === '__none__' ? !u.permission_profile_id : u.permission_profile_id === selectedPermissionFilter);
     }
     
     // Apply search filter
@@ -977,6 +977,7 @@ export function UsersTab({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Toutes les sociétés</SelectItem>
+                  <SelectItem value="__none__">Aucune société ({users.filter(u => !u.company_id).length})</SelectItem>
                   {companies.map(c => (
                     <SelectItem key={c.id} value={c.id}>{c.name} ({users.filter(u => u.company_id === c.id).length})</SelectItem>
                   ))}
@@ -990,6 +991,7 @@ export function UsersTab({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tous les services</SelectItem>
+                  <SelectItem value="__none__">Aucun service ({users.filter(u => !u.department_id).length})</SelectItem>
                   {departments.map(d => (
                     <SelectItem key={d.id} value={d.id}>{d.name} ({users.filter(u => u.department_id === d.id).length})</SelectItem>
                   ))}
@@ -1003,6 +1005,7 @@ export function UsersTab({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tous les niveaux</SelectItem>
+                  <SelectItem value="__none__">Aucun niveau ({users.filter(u => !u.hierarchy_level_id).length})</SelectItem>
                   {hierarchyLevels.sort((a, b) => a.level - b.level).map(h => (
                     <SelectItem key={h.id} value={h.id}>{h.name} ({users.filter(u => u.hierarchy_level_id === h.id).length})</SelectItem>
                   ))}
@@ -1016,6 +1019,7 @@ export function UsersTab({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tous les profils</SelectItem>
+                  <SelectItem value="__none__">Aucun profil ({users.filter(u => !u.permission_profile_id).length})</SelectItem>
                   {permissionProfiles.map(p => (
                     <SelectItem key={p.id} value={p.id}>{p.name} ({users.filter(u => u.permission_profile_id === p.id).length})</SelectItem>
                   ))}
