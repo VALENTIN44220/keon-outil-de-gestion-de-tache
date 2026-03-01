@@ -130,7 +130,7 @@ async function fetchCalendarEvents(accessToken: string, startDate: string, endDa
   let url: string | null = `${MICROSOFT_GRAPH_URL}/me/calendarView?startDateTime=${startDate}&endDateTime=${endDate}&$orderby=start/dateTime&$top=500`;
 
   while (url) {
-    const response = await fetch(url, {
+    const response: Response = await fetch(url, {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
@@ -138,7 +138,7 @@ async function fetchCalendarEvents(accessToken: string, startDate: string, endDa
       },
     });
     if (!response.ok) throw new Error(`Failed to fetch calendar: ${response.status}`);
-    const data = await response.json();
+    const data: any = await response.json();
     allEvents.push(...(data.value || []));
     url = data['@odata.nextLink'] || null;
   }
@@ -185,14 +185,14 @@ async function getPlannerPlans(accessToken: string): Promise<any[]> {
 
   const groups: any[] = [];
   while (groupUrl) {
-    const resp = await fetch(groupUrl, {
+    const resp: Response = await fetch(groupUrl, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     if (!resp.ok) {
       console.error('Failed to fetch groups:', resp.status);
       break;
     }
-    const data = await resp.json();
+    const data: any = await resp.json();
     groups.push(...(data.value || []));
     groupUrl = data['@odata.nextLink'] || null;
   }
@@ -275,11 +275,11 @@ async function getPlannerTasks(accessToken: string, planId: string): Promise<any
   let url: string | null = `${MICROSOFT_GRAPH_URL}/planner/plans/${planId}/tasks?$top=500`;
 
   while (url) {
-    const resp = await fetch(url, {
+    const resp: Response = await fetch(url, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     if (!resp.ok) throw new Error(`Failed to fetch planner tasks: ${resp.status}`);
-    const data = await resp.json();
+    const data: any = await resp.json();
     allTasks.push(...(data.value || []));
     url = data['@odata.nextLink'] || null;
   }

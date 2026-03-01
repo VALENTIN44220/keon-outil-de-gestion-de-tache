@@ -18,6 +18,9 @@ verify_jwt = false
 [functions.validate-material-request]
 verify_jwt = false
 
+[functions.sync-lucca-profiles]
+verify_jwt = false
+
 [functions.process-recurrence]
 verify_jwt = false
 
