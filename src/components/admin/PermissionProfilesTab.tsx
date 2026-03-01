@@ -10,7 +10,7 @@ import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { useTableSort } from '@/hooks/useTableSort';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Trash2, Shield, Check, X, User, Users, Crown, Pencil, FolderOpen } from 'lucide-react';
+import { Plus, Trash2, Shield, Check, X, User, Users, Crown, Pencil, FolderOpen, Building2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { RefreshButton } from './RefreshButton';
 import type { PermissionProfile } from '@/types/admin';
@@ -38,6 +38,10 @@ const defaultPermissions = {
   can_create_be_projects: false,
   can_edit_be_projects: false,
   can_delete_be_projects: false,
+  can_view_suppliers: true,
+  can_create_suppliers: false,
+  can_edit_suppliers: false,
+  can_delete_suppliers: false,
 };
 
 export function PermissionProfilesTab({ permissionProfiles, onAdd, onUpdate, onDelete, onRefresh }: PermissionProfilesTabProps) {
@@ -98,6 +102,10 @@ export function PermissionProfilesTab({ permissionProfiles, onAdd, onUpdate, onD
       can_create_be_projects: profile.can_create_be_projects,
       can_edit_be_projects: profile.can_edit_be_projects,
       can_delete_be_projects: profile.can_delete_be_projects,
+      can_view_suppliers: profile.can_view_suppliers,
+      can_create_suppliers: profile.can_create_suppliers,
+      can_edit_suppliers: profile.can_edit_suppliers,
+      can_delete_suppliers: profile.can_delete_suppliers,
     });
   };
 
@@ -317,6 +325,48 @@ export function PermissionProfilesTab({ permissionProfiles, onAdd, onUpdate, onD
               onCheckedChange={() => onToggle('can_delete_be_projects')}
             />
             <Label htmlFor={`${idPrefix}can_delete_be_projects`}>Supprimer</Label>
+          </div>
+        </div>
+      </div>
+
+      {/* Section: Fournisseurs */}
+      <div className="space-y-3 p-4 rounded-lg bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200/50 dark:border-purple-800/50">
+        <div className="flex items-center gap-2">
+          <Building2 className="h-4 w-4 text-purple-600" />
+          <h4 className="text-sm font-medium text-purple-700 dark:text-purple-400">Fournisseurs</h4>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-4">
+          <div className="flex items-center space-x-2">
+            <Checkbox 
+              id={`${idPrefix}can_view_suppliers`}
+              checked={perms.can_view_suppliers}
+              onCheckedChange={() => onToggle('can_view_suppliers')}
+            />
+            <Label htmlFor={`${idPrefix}can_view_suppliers`}>Voir</Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox 
+              id={`${idPrefix}can_create_suppliers`}
+              checked={perms.can_create_suppliers}
+              onCheckedChange={() => onToggle('can_create_suppliers')}
+            />
+            <Label htmlFor={`${idPrefix}can_create_suppliers`}>Créer</Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox 
+              id={`${idPrefix}can_edit_suppliers`}
+              checked={perms.can_edit_suppliers}
+              onCheckedChange={() => onToggle('can_edit_suppliers')}
+            />
+            <Label htmlFor={`${idPrefix}can_edit_suppliers`}>Modifier</Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox 
+              id={`${idPrefix}can_delete_suppliers`}
+              checked={perms.can_delete_suppliers}
+              onCheckedChange={() => onToggle('can_delete_suppliers')}
+            />
+            <Label htmlFor={`${idPrefix}can_delete_suppliers`}>Supprimer</Label>
           </div>
         </div>
       </div>

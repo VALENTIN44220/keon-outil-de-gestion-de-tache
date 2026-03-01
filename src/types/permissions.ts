@@ -29,6 +29,10 @@ export const FEATURE_PERMISSIONS = [
   'can_create_be_projects',
   'can_edit_be_projects',
   'can_delete_be_projects',
+  'can_view_suppliers',
+  'can_create_suppliers',
+  'can_edit_suppliers',
+  'can_delete_suppliers',
 ] as const;
 
 export type FeaturePermissionKey = typeof FEATURE_PERMISSIONS[number];
@@ -78,6 +82,11 @@ export interface UserPermissionOverride {
   can_create_be_projects: boolean | null;
   can_edit_be_projects: boolean | null;
   can_delete_be_projects: boolean | null;
+  // Suppliers
+  can_view_suppliers: boolean | null;
+  can_create_suppliers: boolean | null;
+  can_edit_suppliers: boolean | null;
+  can_delete_suppliers: boolean | null;
   created_at: string;
   updated_at: string;
 }
@@ -127,6 +136,11 @@ export interface EffectivePermissions {
   can_create_be_projects: boolean;
   can_edit_be_projects: boolean;
   can_delete_be_projects: boolean;
+  // Suppliers
+  can_view_suppliers: boolean;
+  can_create_suppliers: boolean;
+  can_edit_suppliers: boolean;
+  can_delete_suppliers: boolean;
   // Visible process templates
   visibleProcessTemplateIds: string[];
 }

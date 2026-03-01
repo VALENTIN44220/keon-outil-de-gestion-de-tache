@@ -57,6 +57,11 @@ export interface PermissionProfile {
   can_create_be_projects: boolean;
   can_edit_be_projects: boolean;
   can_delete_be_projects: boolean;
+  // Permissions fournisseurs
+  can_view_suppliers: boolean;
+  can_create_suppliers: boolean;
+  can_edit_suppliers: boolean;
+  can_delete_suppliers: boolean;
   created_at: string;
   updated_at: string;
 }

@@ -1520,8 +1520,11 @@ export type Database = {
           can_assign_to_all: boolean
           can_assign_to_subordinates: boolean
           can_create_be_projects: boolean | null
+          can_create_suppliers: boolean
           can_delete_be_projects: boolean | null
+          can_delete_suppliers: boolean
           can_edit_be_projects: boolean | null
+          can_edit_suppliers: boolean
           can_manage_all_tasks: boolean
           can_manage_own_tasks: boolean
           can_manage_subordinates_tasks: boolean
@@ -1531,6 +1534,7 @@ export type Database = {
           can_view_be_projects: boolean | null
           can_view_own_tasks: boolean
           can_view_subordinates_tasks: boolean
+          can_view_suppliers: boolean
           created_at: string
           description: string | null
           id: string
@@ -1553,8 +1557,11 @@ export type Database = {
           can_assign_to_all?: boolean
           can_assign_to_subordinates?: boolean
           can_create_be_projects?: boolean | null
+          can_create_suppliers?: boolean
           can_delete_be_projects?: boolean | null
+          can_delete_suppliers?: boolean
           can_edit_be_projects?: boolean | null
+          can_edit_suppliers?: boolean
           can_manage_all_tasks?: boolean
           can_manage_own_tasks?: boolean
           can_manage_subordinates_tasks?: boolean
@@ -1564,6 +1571,7 @@ export type Database = {
           can_view_be_projects?: boolean | null
           can_view_own_tasks?: boolean
           can_view_subordinates_tasks?: boolean
+          can_view_suppliers?: boolean
           created_at?: string
           description?: string | null
           id?: string
@@ -1586,8 +1594,11 @@ export type Database = {
           can_assign_to_all?: boolean
           can_assign_to_subordinates?: boolean
           can_create_be_projects?: boolean | null
+          can_create_suppliers?: boolean
           can_delete_be_projects?: boolean | null
+          can_delete_suppliers?: boolean
           can_edit_be_projects?: boolean | null
+          can_edit_suppliers?: boolean
           can_manage_all_tasks?: boolean
           can_manage_own_tasks?: boolean
           can_manage_subordinates_tasks?: boolean
@@ -1597,6 +1608,7 @@ export type Database = {
           can_view_be_projects?: boolean | null
           can_view_own_tasks?: boolean
           can_view_subordinates_tasks?: boolean
+          can_view_suppliers?: boolean
           created_at?: string
           description?: string | null
           id?: string
@@ -4912,8 +4924,11 @@ export type Database = {
           can_assign_to_all: boolean | null
           can_assign_to_subordinates: boolean | null
           can_create_be_projects: boolean | null
+          can_create_suppliers: boolean | null
           can_delete_be_projects: boolean | null
+          can_delete_suppliers: boolean | null
           can_edit_be_projects: boolean | null
+          can_edit_suppliers: boolean | null
           can_manage_all_tasks: boolean | null
           can_manage_own_tasks: boolean | null
           can_manage_subordinates_tasks: boolean | null
@@ -4923,6 +4938,7 @@ export type Database = {
           can_view_be_projects: boolean | null
           can_view_own_tasks: boolean | null
           can_view_subordinates_tasks: boolean | null
+          can_view_suppliers: boolean | null
           created_at: string
           id: string
           updated_at: string
@@ -4944,8 +4960,11 @@ export type Database = {
           can_assign_to_all?: boolean | null
           can_assign_to_subordinates?: boolean | null
           can_create_be_projects?: boolean | null
+          can_create_suppliers?: boolean | null
           can_delete_be_projects?: boolean | null
+          can_delete_suppliers?: boolean | null
           can_edit_be_projects?: boolean | null
+          can_edit_suppliers?: boolean | null
           can_manage_all_tasks?: boolean | null
           can_manage_own_tasks?: boolean | null
           can_manage_subordinates_tasks?: boolean | null
@@ -4955,6 +4974,7 @@ export type Database = {
           can_view_be_projects?: boolean | null
           can_view_own_tasks?: boolean | null
           can_view_subordinates_tasks?: boolean | null
+          can_view_suppliers?: boolean | null
           created_at?: string
           id?: string
           updated_at?: string
@@ -4976,8 +4996,11 @@ export type Database = {
           can_assign_to_all?: boolean | null
           can_assign_to_subordinates?: boolean | null
           can_create_be_projects?: boolean | null
+          can_create_suppliers?: boolean | null
           can_delete_be_projects?: boolean | null
+          can_delete_suppliers?: boolean | null
           can_edit_be_projects?: boolean | null
+          can_edit_suppliers?: boolean | null
           can_manage_all_tasks?: boolean | null
           can_manage_own_tasks?: boolean | null
           can_manage_subordinates_tasks?: boolean | null
@@ -4987,6 +5010,7 @@ export type Database = {
           can_view_be_projects?: boolean | null
           can_view_own_tasks?: boolean | null
           can_view_subordinates_tasks?: boolean | null
+          can_view_suppliers?: boolean | null
           created_at?: string
           id?: string
           updated_at?: string

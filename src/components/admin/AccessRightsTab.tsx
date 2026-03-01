@@ -101,6 +101,15 @@ const FEATURE_GROUPS: Array<{
       { key: "can_delete_be_projects", label: "Supprimer" },
     ],
   },
+  {
+    label: "Fournisseurs",
+    items: [
+      { key: "can_view_suppliers", label: "Voir" },
+      { key: "can_create_suppliers", label: "Créer" },
+      { key: "can_edit_suppliers", label: "Modifier" },
+      { key: "can_delete_suppliers", label: "Supprimer" },
+    ],
+  },
 ];
 
 const DEFAULT_PERMISSIONS: Record<string, boolean> = {
@@ -118,6 +127,10 @@ const DEFAULT_PERMISSIONS: Record<string, boolean> = {
   can_create_be_projects: false,
   can_edit_be_projects: false,
   can_delete_be_projects: false,
+  can_view_suppliers: true,
+  can_create_suppliers: false,
+  can_edit_suppliers: false,
+  can_delete_suppliers: false,
   can_access_dashboard: true,
   can_access_requests: true,
   can_access_templates: false,

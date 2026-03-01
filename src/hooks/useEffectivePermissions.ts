@@ -35,6 +35,10 @@ const defaultPermissions: EffectivePermissions = {
   can_create_be_projects: false,
   can_edit_be_projects: false,
   can_delete_be_projects: false,
+  can_view_suppliers: false,
+  can_create_suppliers: false,
+  can_edit_suppliers: false,
+  can_delete_suppliers: false,
   visibleProcessTemplateIds: [],
 };
 
@@ -130,7 +134,8 @@ export function useEffectivePermissions() {
         'can_manage_own_tasks', 'can_view_subordinates_tasks', 'can_manage_subordinates_tasks',
         'can_assign_to_subordinates', 'can_view_all_tasks', 'can_manage_all_tasks',
         'can_assign_to_all', 'can_view_be_projects', 'can_create_be_projects',
-        'can_edit_be_projects', 'can_delete_be_projects'
+        'can_edit_be_projects', 'can_delete_be_projects',
+        'can_view_suppliers', 'can_create_suppliers', 'can_edit_suppliers', 'can_delete_suppliers'
       ];
 
       // Apply screen permissions from profile
@@ -160,7 +165,8 @@ export function useEffectivePermissions() {
         'can_manage_own_tasks', 'can_view_subordinates_tasks', 'can_manage_subordinates_tasks',
         'can_assign_to_subordinates', 'can_view_all_tasks', 'can_manage_all_tasks',
         'can_assign_to_all', 'can_view_be_projects', 'can_create_be_projects',
-        'can_edit_be_projects', 'can_delete_be_projects'
+        'can_edit_be_projects', 'can_delete_be_projects',
+        'can_view_suppliers', 'can_create_suppliers', 'can_edit_suppliers', 'can_delete_suppliers'
       ];
 
       allKeys.forEach(key => {

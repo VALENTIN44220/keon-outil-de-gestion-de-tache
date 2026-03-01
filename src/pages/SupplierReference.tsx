@@ -9,7 +9,7 @@ import { Sidebar } from '@/components/layout/Sidebar';
 
 export default function SupplierReference() {
   const { effectivePermissions, isLoading: permLoading } = useEffectivePermissions();
-  const { role, isLoading: accessLoading } = useSupplierAccess();
+  const { supplierPermissions, isLoading: accessLoading } = useSupplierAccess();
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [activeView, setActiveView] = useState('suppliers');
@@ -32,7 +32,7 @@ export default function SupplierReference() {
     );
   }
 
-  if (!effectivePermissions.can_access_suppliers) {
+  if (!effectivePermissions.can_access_suppliers && !supplierPermissions.canView) {
     return <Navigate to="/" replace />;
   }
 
@@ -47,7 +47,7 @@ export default function SupplierReference() {
         supplierId={selectedSupplierId}
         open={drawerOpen}
         onClose={handleCloseDrawer}
-        canEdit={role === 'achat'}
+        canEdit={supplierPermissions.canEdit}
       />
     </div>
   );
