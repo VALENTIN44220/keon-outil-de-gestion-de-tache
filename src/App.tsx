@@ -33,6 +33,7 @@ import BEProjectHubOverview from "./pages/be/BEProjectHubOverview";
 import BEProjectHubTimeline from "./pages/be/BEProjectHubTimeline";
 import BEProjectHubDiscussions from "./pages/be/BEProjectHubDiscussions";
 import BEProjectHubFiles from "./pages/be/BEProjectHubFiles";
+import BEProjectHubQuestionnaire from "./pages/be/BEProjectHubQuestionnaire";
 
 const queryClient = new QueryClient();
 
@@ -160,6 +161,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <BEProjectHubOverview />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/be/projects/:code/questionnaire"
+              element={
+                <ProtectedRoute>
+                  <BEProjectHubQuestionnaire />
                 </ProtectedRoute>
               }
             />

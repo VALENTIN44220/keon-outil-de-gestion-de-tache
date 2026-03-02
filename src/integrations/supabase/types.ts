@@ -1584,6 +1584,18 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          qst_pilier_00_read: boolean | null
+          qst_pilier_00_write: boolean | null
+          qst_pilier_02_read: boolean | null
+          qst_pilier_02_write: boolean | null
+          qst_pilier_04_read: boolean | null
+          qst_pilier_04_write: boolean | null
+          qst_pilier_05_read: boolean | null
+          qst_pilier_05_write: boolean | null
+          qst_pilier_06_read: boolean | null
+          qst_pilier_06_write: boolean | null
+          qst_pilier_07_read: boolean | null
+          qst_pilier_07_write: boolean | null
           updated_at: string
         }
         Insert: {
@@ -1621,6 +1633,18 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          qst_pilier_00_read?: boolean | null
+          qst_pilier_00_write?: boolean | null
+          qst_pilier_02_read?: boolean | null
+          qst_pilier_02_write?: boolean | null
+          qst_pilier_04_read?: boolean | null
+          qst_pilier_04_write?: boolean | null
+          qst_pilier_05_read?: boolean | null
+          qst_pilier_05_write?: boolean | null
+          qst_pilier_06_read?: boolean | null
+          qst_pilier_06_write?: boolean | null
+          qst_pilier_07_read?: boolean | null
+          qst_pilier_07_write?: boolean | null
           updated_at?: string
         }
         Update: {
@@ -1658,6 +1682,18 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          qst_pilier_00_read?: boolean | null
+          qst_pilier_00_write?: boolean | null
+          qst_pilier_02_read?: boolean | null
+          qst_pilier_02_write?: boolean | null
+          qst_pilier_04_read?: boolean | null
+          qst_pilier_04_write?: boolean | null
+          qst_pilier_05_read?: boolean | null
+          qst_pilier_05_write?: boolean | null
+          qst_pilier_06_read?: boolean | null
+          qst_pilier_06_write?: boolean | null
+          qst_pilier_07_read?: boolean | null
+          qst_pilier_07_write?: boolean | null
           updated_at?: string
         }
         Relationships: []
@@ -2444,6 +2480,78 @@ export type Database = {
             columns: ["permission_profile_id"]
             isOneToOne: false
             referencedRelation: "permission_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_questionnaire: {
+        Row: {
+          champ_id: string
+          code_divalto: string
+          created_at: string | null
+          id: string
+          note: string | null
+          pilier_code: string
+          project_id: string
+          question: string
+          section: string
+          sous_section: string | null
+          type_champ: string | null
+          updated_at: string | null
+          updated_by: string | null
+          valeur: string | null
+          valeur_evaluation: string | null
+          valeurs_possibles: string | null
+        }
+        Insert: {
+          champ_id: string
+          code_divalto: string
+          created_at?: string | null
+          id?: string
+          note?: string | null
+          pilier_code: string
+          project_id: string
+          question: string
+          section: string
+          sous_section?: string | null
+          type_champ?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+          valeur?: string | null
+          valeur_evaluation?: string | null
+          valeurs_possibles?: string | null
+        }
+        Update: {
+          champ_id?: string
+          code_divalto?: string
+          created_at?: string | null
+          id?: string
+          note?: string | null
+          pilier_code?: string
+          project_id?: string
+          question?: string
+          section?: string
+          sous_section?: string | null
+          type_champ?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+          valeur?: string | null
+          valeur_evaluation?: string | null
+          valeurs_possibles?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_questionnaire_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "be_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_questionnaire_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]

@@ -10,7 +10,7 @@ import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { useTableSort } from '@/hooks/useTableSort';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Trash2, Shield, Check, X, User, Users, Crown, Pencil, FolderOpen, Building2 } from 'lucide-react';
+import { Plus, Trash2, Shield, Check, X, User, Users, Crown, Pencil, FolderOpen, Building2, ClipboardList } from 'lucide-react';
 import { toast } from 'sonner';
 import { RefreshButton } from './RefreshButton';
 import type { PermissionProfile } from '@/types/admin';
@@ -42,6 +42,18 @@ const defaultPermissions = {
   can_create_suppliers: false,
   can_edit_suppliers: false,
   can_delete_suppliers: false,
+  qst_pilier_00_read: true,
+  qst_pilier_00_write: false,
+  qst_pilier_02_read: true,
+  qst_pilier_02_write: false,
+  qst_pilier_04_read: true,
+  qst_pilier_04_write: false,
+  qst_pilier_05_read: true,
+  qst_pilier_05_write: false,
+  qst_pilier_06_read: true,
+  qst_pilier_06_write: false,
+  qst_pilier_07_read: true,
+  qst_pilier_07_write: false,
 };
 
 export function PermissionProfilesTab({ permissionProfiles, onAdd, onUpdate, onDelete, onRefresh }: PermissionProfilesTabProps) {
@@ -106,6 +118,18 @@ export function PermissionProfilesTab({ permissionProfiles, onAdd, onUpdate, onD
       can_create_suppliers: profile.can_create_suppliers,
       can_edit_suppliers: profile.can_edit_suppliers,
       can_delete_suppliers: profile.can_delete_suppliers,
+      qst_pilier_00_read: (profile as any).qst_pilier_00_read ?? true,
+      qst_pilier_00_write: (profile as any).qst_pilier_00_write ?? false,
+      qst_pilier_02_read: (profile as any).qst_pilier_02_read ?? true,
+      qst_pilier_02_write: (profile as any).qst_pilier_02_write ?? false,
+      qst_pilier_04_read: (profile as any).qst_pilier_04_read ?? true,
+      qst_pilier_04_write: (profile as any).qst_pilier_04_write ?? false,
+      qst_pilier_05_read: (profile as any).qst_pilier_05_read ?? true,
+      qst_pilier_05_write: (profile as any).qst_pilier_05_write ?? false,
+      qst_pilier_06_read: (profile as any).qst_pilier_06_read ?? true,
+      qst_pilier_06_write: (profile as any).qst_pilier_06_write ?? false,
+      qst_pilier_07_read: (profile as any).qst_pilier_07_read ?? true,
+      qst_pilier_07_write: (profile as any).qst_pilier_07_write ?? false,
     });
   };
 
@@ -368,6 +392,52 @@ export function PermissionProfilesTab({ permissionProfiles, onAdd, onUpdate, onD
             />
             <Label htmlFor={`${idPrefix}can_delete_suppliers`}>Supprimer</Label>
           </div>
+        </div>
+      </div>
+
+      {/* Section: Questionnaire Projet — Droits par pilier */}
+      <div className="space-y-3 p-4 rounded-lg bg-teal-50/50 dark:bg-teal-950/20 border border-teal-200/50 dark:border-teal-800/50">
+        <div className="flex items-center gap-2">
+          <ClipboardList className="h-4 w-4 text-teal-600" />
+          <h4 className="text-sm font-medium text-teal-700 dark:text-teal-400">Questionnaire Projet — Droits par pilier</h4>
+        </div>
+        <div className="space-y-2">
+          {[
+            { code: '00', label: '00 · Process Interne' },
+            { code: '02', label: '02 · SPV' },
+            { code: '04', label: '04 · Foncier' },
+            { code: '05', label: '05 · Gaz' },
+            { code: '06', label: '06 · Gisement' },
+            { code: '07', label: '07 · Digestat' },
+          ].map(pilier => (
+            <div key={pilier.code} className="flex items-center gap-4 py-1">
+              <span className="text-sm w-40 font-medium">{pilier.label}</span>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id={`${idPrefix}qst_pilier_${pilier.code}_read`}
+                  checked={(perms as any)[`qst_pilier_${pilier.code}_read`] ?? true}
+                  onCheckedChange={() => onToggle(`qst_pilier_${pilier.code}_read` as any)}
+                />
+                <Label htmlFor={`${idPrefix}qst_pilier_${pilier.code}_read`} className="text-xs">Lecture</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id={`${idPrefix}qst_pilier_${pilier.code}_write`}
+                  checked={(perms as any)[`qst_pilier_${pilier.code}_write`] ?? false}
+                  onCheckedChange={() => {
+                    onToggle(`qst_pilier_${pilier.code}_write` as any);
+                    // Auto-enable read when write is enabled
+                    if (!(perms as any)[`qst_pilier_${pilier.code}_write`]) {
+                      if (!(perms as any)[`qst_pilier_${pilier.code}_read`]) {
+                        onToggle(`qst_pilier_${pilier.code}_read` as any);
+                      }
+                    }
+                  }}
+                />
+                <Label htmlFor={`${idPrefix}qst_pilier_${pilier.code}_write`} className="text-xs">Écriture</Label>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </>

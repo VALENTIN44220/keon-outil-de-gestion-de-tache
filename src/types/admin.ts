@@ -62,6 +62,19 @@ export interface PermissionProfile {
   can_create_suppliers: boolean;
   can_edit_suppliers: boolean;
   can_delete_suppliers: boolean;
+  // Questionnaire par pilier
+  qst_pilier_00_read: boolean;
+  qst_pilier_00_write: boolean;
+  qst_pilier_02_read: boolean;
+  qst_pilier_02_write: boolean;
+  qst_pilier_04_read: boolean;
+  qst_pilier_04_write: boolean;
+  qst_pilier_05_read: boolean;
+  qst_pilier_05_write: boolean;
+  qst_pilier_06_read: boolean;
+  qst_pilier_06_write: boolean;
+  qst_pilier_07_read: boolean;
+  qst_pilier_07_write: boolean;
   created_at: string;
   updated_at: string;
 }

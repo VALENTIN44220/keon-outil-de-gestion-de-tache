@@ -16,7 +16,8 @@ import {
   CheckCircle2,
   AlertTriangle,
   TrendingUp,
-  Pencil
+  Pencil,
+  ClipboardList
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -40,6 +41,7 @@ const statusLabels: Record<string, { label: string; className: string }> = {
 
 const navItems = [
   { value: 'overview', label: 'Fiche', icon: LayoutDashboard },
+  { value: 'questionnaire', label: 'Questionnaire', icon: ClipboardList },
   { value: 'timeline', label: 'Timeline', icon: Calendar },
   { value: 'discussions', label: 'Discussions', icon: MessageSquare },
   { value: 'files', label: 'Fichiers', icon: Paperclip },
