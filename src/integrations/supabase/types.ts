@@ -1118,49 +1118,46 @@ export type Database = {
       }
       fou_resultat: {
         Row: {
-          annee_cmd: string | null
-          annee_fac: string | null
+          annee: string | null
           ca_commande: number | null
           ca_facture: number | null
           dos: string
           ecart_cmd_fac: number | null
           fou_key: string
           id: number
-          mois_cmd: string | null
-          mois_fac: string | null
+          mois: string | null
           ref: string
           synced_at: string | null
           tiers: string
+          type_date: string | null
         }
         Insert: {
-          annee_cmd?: string | null
-          annee_fac?: string | null
+          annee?: string | null
           ca_commande?: number | null
           ca_facture?: number | null
           dos: string
           ecart_cmd_fac?: number | null
           fou_key: string
           id?: number
-          mois_cmd?: string | null
-          mois_fac?: string | null
+          mois?: string | null
           ref: string
           synced_at?: string | null
           tiers: string
+          type_date?: string | null
         }
         Update: {
-          annee_cmd?: string | null
-          annee_fac?: string | null
+          annee?: string | null
           ca_commande?: number | null
           ca_facture?: number | null
           dos?: string
           ecart_cmd_fac?: number | null
           fou_key?: string
           id?: number
-          mois_cmd?: string | null
-          mois_fac?: string | null
+          mois?: string | null
           ref?: string
           synced_at?: string | null
           tiers?: string
+          type_date?: string | null
         }
         Relationships: []
       }
