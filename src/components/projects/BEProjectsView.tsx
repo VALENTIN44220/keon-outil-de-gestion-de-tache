@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 import { useBEProjects } from '@/hooks/useBEProjects';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { useProjectViewConfig } from '@/hooks/useProjectViewConfig';
@@ -11,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Plus, Search, Pencil, Trash2, Building2, FolderOpen, Loader2, FileDown, Filter, LayoutDashboard, LayoutGrid, List, Kanban } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Building2, FolderOpen, Loader2, FileDown, Filter, LayoutDashboard, LayoutGrid, List, Kanban, ClipboardList } from 'lucide-react';
 import { BEProjectDialog } from './BEProjectDialog';
 import { ALL_PROJECT_COLUMNS, ColumnDefinition } from './ProjectColumnSelector';
 import { ProjectKanbanView, GroupByField } from './ProjectKanbanView';
@@ -55,10 +56,28 @@ export function BEProjectsView() {
   const [editingProject, setEditingProject] = useState<BEProject | null>(null);
   const [deletingProject, setDeletingProject] = useState<BEProject | null>(null);
   
-  // View state - default to cards
+  // View state
   const [currentView, setCurrentView] = useState<ViewType>('cards');
   const [kanbanGroupBy, setKanbanGroupBy] = useState<GroupByField>('status');
   const [localSearch, setLocalSearch] = useState(searchQuery);
+  
+  // KEON filter: only projects with questionnaire data
+  const [showKeonOnly, setShowKeonOnly] = useState(false);
+  const [keonProjectIds, setKeonProjectIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    async function fetchKeonProjectIds() {
+      const { data } = await supabase
+        .from('project_questionnaire')
+        .select('project_id')
+        .not('valeur', 'is', null)
+        .neq('valeur', '');
+      if (data) {
+        setKeonProjectIds(new Set(data.map(r => r.project_id)));
+      }
+    }
+    fetchKeonProjectIds();
+  }, [projects]);
 
   // Get active config
   const activeConfig = getActiveConfig();
@@ -68,7 +87,11 @@ export function BEProjectsView() {
 
   // Apply multi-criteria filters first, then column filters
   const multiFilteredProjects = useMemo(() => applyMultiFilters(projects), [projects, applyMultiFilters]);
-  const filteredProjects = useFilteredProjects(multiFilteredProjects, columnFilters);
+  const columnFilteredProjects = useFilteredProjects(multiFilteredProjects, columnFilters);
+  const filteredProjects = useMemo(() => {
+    if (!showKeonOnly) return columnFilteredProjects;
+    return columnFilteredProjects.filter(p => keonProjectIds.has(p.id));
+  }, [columnFilteredProjects, showKeonOnly, keonProjectIds]);
 
   // Get ordered columns based on config
   const orderedVisibleColumns = useMemo(() => {
@@ -265,6 +288,22 @@ export function BEProjectsView() {
                 className="pl-10"
               />
             </div>
+
+            {/* KEON Filter Toggle */}
+            <Button
+              variant={showKeonOnly ? 'default' : 'outline'}
+              size="sm"
+              className={cn('h-8 px-3 gap-2', showKeonOnly && 'shadow-sm')}
+              onClick={() => setShowKeonOnly(!showKeonOnly)}
+            >
+              <ClipboardList className="h-4 w-4" />
+              <span className="hidden sm:inline">Projets KEON</span>
+              {showKeonOnly && keonProjectIds.size > 0 && (
+                <Badge variant="secondary" className="ml-1 text-xs h-5 px-1.5">
+                  {keonProjectIds.size}
+                </Badge>
+              )}
+            </Button>
             
             {/* View Toggle */}
             <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-lg">
