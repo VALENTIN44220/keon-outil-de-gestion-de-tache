@@ -83,25 +83,13 @@ function useFinancialData(filters: {
   return useQuery({
     queryKey: ['supplier-financial-dashboard', filters],
     queryFn: async () => {
-      let query = (supabase as any).from('fou_resultat').select('tiers,dos,annee,mois,type_date,ca_commande,ca_facture,ecart_cmd_fac');
-
-      if (filters.tiers) {
-        query = query.eq('tiers', filters.tiers);
-      }
-      if (filters.years.length > 0) {
-        query = query.in('annee', filters.years);
-      }
-      if (filters.months.length > 0) {
-        query = query.in('mois', filters.months);
-      }
-      if (filters.dosList.length > 0) {
-        query = query.in('dos', filters.dosList);
-      }
-      if (filters.typeDates.length > 0) {
-        query = query.in('type_date', filters.typeDates);
-      }
-
-      const { data, error } = await query.order('annee').order('mois').limit(5000);
+      const { data, error } = await (supabase as any).rpc('get_fou_resultat_aggregated', {
+        p_tiers: filters.tiers || null,
+        p_years: filters.years.length > 0 ? filters.years : null,
+        p_months: filters.months.length > 0 ? filters.months : null,
+        p_dos: filters.dosList.length > 0 ? filters.dosList : null,
+        p_type_dates: filters.typeDates.length > 0 ? filters.typeDates : null,
+      });
       if (error) throw error;
       return (data || []) as FouResultat[];
     },
@@ -113,20 +101,18 @@ function useDistinctValues(tiers: string | null) {
   return useQuery({
     queryKey: ['fou-resultat-distinct', tiers],
     queryFn: async () => {
-      // Query years - filter out nulls server-side
-      let yearQuery = (supabase as any).from('fou_resultat').select('annee').not('annee', 'is', null);
-      if (tiers) yearQuery = yearQuery.eq('tiers', tiers);
-      const { data: yearData, error: yearError } = await yearQuery.limit(5000);
-      if (yearError) throw yearError;
-      const years = [...new Set((yearData || []).map((r: any) => r.annee).filter(Boolean) as string[])].sort();
-
-      // Query dos codes
-      let dosQuery = (supabase as any).from('fou_resultat').select('dos');
-      if (tiers) dosQuery = dosQuery.eq('tiers', tiers);
-      const { data: dosData, error: dosError } = await dosQuery.limit(5000);
-      if (dosError) throw dosError;
-      const dosCodes = [...new Set((dosData || []).map((r: any) => String(r.dos)).filter(Boolean))].sort();
-
+      // Use RPC with no year/month filter to get all distinct values
+      const { data, error } = await (supabase as any).rpc('get_fou_resultat_aggregated', {
+        p_tiers: tiers || null,
+        p_years: null,
+        p_months: null,
+        p_dos: null,
+        p_type_dates: null,
+      });
+      if (error) throw error;
+      const rows = (data || []) as FouResultat[];
+      const years = [...new Set(rows.map(r => r.annee).filter(Boolean) as string[])].sort();
+      const dosCodes = [...new Set(rows.map(r => String(r.dos)).filter(Boolean))].sort();
       return { years, dosCodes };
     },
   });
