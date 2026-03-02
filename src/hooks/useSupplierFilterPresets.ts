@@ -47,7 +47,7 @@ export function useSupplierFilterPresets(
         const defaultPreset = loaded.find((p: SupplierFilterPreset) => p.is_default);
         if (defaultPreset) {
           setFilters({ ...defaultFilters, ...defaultPreset.filters });
-          if (defaultPreset.visible_columns && setVisibleColumns) {
+          if (defaultPreset.visible_columns?.length && setVisibleColumns) {
             setVisibleColumns(defaultPreset.visible_columns);
           }
         }
@@ -105,17 +105,30 @@ export function useSupplierFilterPresets(
 
     await (supabase as any).from('user_filter_presets').update({ is_default: false }).eq('user_id', user.id).eq('context_type', CONTEXT_TYPE);
     if (!wasDefault) {
-      await (supabase as any).from('user_filter_presets').update({ is_default: true }).eq('id', presetId);
+      // Also update the preset's filters with current visible_columns when setting as default
+      const updatedPayload = {
+        filters: preset?.filters ?? filters,
+        visible_columns: visibleColumns,
+      };
+      await (supabase as any).from('user_filter_presets')
+        .update({ is_default: true, filters: updatedPayload })
+        .eq('id', presetId);
     }
 
-    setPresets(prev => prev.map(p => ({ ...p, is_default: p.id === presetId ? !wasDefault : false })));
+    setPresets(prev => prev.map(p => ({
+      ...p,
+      is_default: p.id === presetId ? !wasDefault : false,
+      visible_columns: p.id === presetId && !wasDefault ? visibleColumns : p.visible_columns,
+    })));
     toast.success(wasDefault ? 'Contexte par défaut retiré' : 'Contexte défini par défaut');
-  }, [user, presets]);
+  }, [user, presets, filters, visibleColumns]);
 
   const loadPreset = useCallback((preset: SupplierFilterPreset) => {
     setFilters({ ...defaultFilters, ...preset.filters });
-    if (preset.visible_columns && setVisibleColumns) {
-      setVisibleColumns(preset.visible_columns);
+    if (setVisibleColumns) {
+      if (preset.visible_columns && preset.visible_columns.length > 0) {
+        setVisibleColumns(preset.visible_columns);
+      }
     }
   }, [defaultFilters, setFilters, setVisibleColumns]);
 
