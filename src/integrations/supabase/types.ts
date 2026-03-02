@@ -6234,6 +6234,25 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_fou_resultat_aggregated: {
+        Args: {
+          p_dos?: string[]
+          p_months?: string[]
+          p_tiers?: string
+          p_type_dates?: string[]
+          p_years?: string[]
+        }
+        Returns: {
+          annee: string
+          ca_commande: number
+          ca_facture: number
+          dos: string
+          ecart_cmd_fac: number
+          mois: string
+          tiers: string
+          type_date: string
+        }[]
+      }
       get_my_company_id: { Args: never; Returns: string }
       get_my_department_id: { Args: never; Returns: string }
       get_my_manager_profile_id: { Args: never; Returns: string }
