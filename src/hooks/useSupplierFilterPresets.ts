@@ -103,16 +103,35 @@ export function useSupplierFilterPresets(
     const preset = presets.find(p => p.id === presetId);
     const wasDefault = preset?.is_default;
 
-    await (supabase as any).from('user_filter_presets').update({ is_default: false }).eq('user_id', user.id).eq('context_type', CONTEXT_TYPE);
+    // Step 1: Clear all defaults for this user/context
+    const { error: clearError } = await (supabase as any)
+      .from('user_filter_presets')
+      .update({ is_default: false })
+      .eq('user_id', user.id)
+      .eq('context_type', CONTEXT_TYPE);
+
+    if (clearError) {
+      console.error('Error clearing defaults:', clearError);
+      toast.error('Erreur lors de la mise à jour');
+      return;
+    }
+
     if (!wasDefault) {
-      // Also update the preset's filters with current visible_columns when setting as default
+      // Step 2: Set the selected preset as default with current visible_columns
       const updatedPayload = {
         filters: preset?.filters ?? filters,
         visible_columns: visibleColumns,
       };
-      await (supabase as any).from('user_filter_presets')
+      const { error: setError } = await (supabase as any)
+        .from('user_filter_presets')
         .update({ is_default: true, filters: updatedPayload })
         .eq('id', presetId);
+
+      if (setError) {
+        console.error('Error setting default:', setError);
+        toast.error('Erreur lors de la mise à jour');
+        return;
+      }
     }
 
     setPresets(prev => prev.map(p => ({
