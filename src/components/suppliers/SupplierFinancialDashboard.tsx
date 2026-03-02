@@ -1,17 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, TrendingUp, TrendingDown, BarChart3, Users, Filter } from 'lucide-react';
+import { Loader2, TrendingUp, TrendingDown, BarChart3, Filter, FileText } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { MultiSearchableSelect } from '@/components/ui/multi-searchable-select';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   LineChart, Line, ResponsiveContainer, Tooltip, Legend,
@@ -35,10 +28,28 @@ const MONTH_LABELS: Record<string, string> = {
   '09': 'Septembre', '10': 'Octobre', '11': 'Novembre', '12': 'Décembre',
 };
 
+const SHORT_MONTH_LABELS: Record<string, string> = {
+  '01': 'Jan', '02': 'Fév', '03': 'Mar', '04': 'Avr',
+  '05': 'Mai', '06': 'Juin', '07': 'Juil', '08': 'Août',
+  '09': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Déc',
+};
+
 const YEAR_COLORS = [
   '#4DBEC8', '#FF9432', '#78C050', '#ef4444', '#8b5cf6',
   '#ec4899', '#14b8a6', '#f59e0b',
 ];
+
+const CMD_COLORS: Record<number, string> = {
+  0: 'hsl(210, 80%, 55%)',
+  1: 'hsl(210, 70%, 70%)',
+  2: 'hsl(210, 60%, 80%)',
+};
+
+const FAC_COLORS: Record<number, string> = {
+  0: 'hsl(150, 60%, 40%)',
+  1: 'hsl(150, 50%, 55%)',
+  2: 'hsl(150, 40%, 70%)',
+};
 
 const formatCurrency = (v: number) =>
   new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v);
@@ -112,12 +123,30 @@ interface SupplierFinancialDashboardProps {
 
 export function SupplierFinancialDashboard({ tiers }: SupplierFinancialDashboardProps) {
   const currentYear = String(new Date().getFullYear());
+  const prevYear = String(new Date().getFullYear() - 1);
 
   const { data: distinctValues, isLoading: distinctLoading } = useDistinctValues(tiers);
 
-  const [selectedYears, setSelectedYears] = useState<string[]>([currentYear]);
+  // Default: current year + previous year for comparison
+  const [selectedYears, setSelectedYears] = useState<string[]>([currentYear, prevYear]);
   const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
   const [selectedDos, setSelectedDos] = useState<string[]>([]);
+
+  // Auto-adjust selected years when distinct values load (only keep years that exist)
+  const [initialized, setInitialized] = useState(false);
+  useEffect(() => {
+    if (distinctValues?.years && !initialized) {
+      const available = distinctValues.years;
+      const defaults = [currentYear, prevYear].filter(y => available.includes(y));
+      if (defaults.length === 0 && available.length > 0) {
+        // If neither current nor previous year exist, pick the latest available
+        setSelectedYears([available[available.length - 1]]);
+      } else {
+        setSelectedYears(defaults);
+      }
+      setInitialized(true);
+    }
+  }, [distinctValues, initialized, currentYear, prevYear]);
 
   const { data: rawData, isLoading } = useFinancialData({
     tiers,
@@ -126,22 +155,51 @@ export function SupplierFinancialDashboard({ tiers }: SupplierFinancialDashboard
     dosList: selectedDos,
   });
 
-  // --- KPIs ---
+  // --- KPIs per year for comparison ---
+  const kpisByYear = useMemo(() => {
+    if (!rawData?.length) return new Map<string, { caCmd: number; caFac: number; ecart: number; nbRefs: number }>();
+    const map = new Map<string, { caCmd: number; caFac: number; ecart: number; refs: Set<string> }>();
+    
+    rawData.forEach(r => {
+      const y = r.annee || '??';
+      if (!map.has(y)) map.set(y, { caCmd: 0, caFac: 0, ecart: 0, refs: new Set() });
+      const entry = map.get(y)!;
+      if (r.type_date === 'CMD') entry.caCmd += Number(r.ca_commande || 0);
+      if (r.type_date === 'FAC') entry.caFac += Number(r.ca_facture || 0);
+      entry.ecart = entry.caCmd - entry.caFac;
+    });
+
+    const result = new Map<string, { caCmd: number; caFac: number; ecart: number; nbRefs: number }>();
+    map.forEach((v, k) => result.set(k, { ...v, nbRefs: v.refs.size }));
+    return result;
+  }, [rawData]);
+
+  // Global KPIs (all selected years combined)
   const kpis = useMemo(() => {
-    if (!rawData?.length) return { caCmd: 0, caFac: 0, ecart: 0, nbFournisseurs: 0 };
+    if (!rawData?.length) return { caCmd: 0, caFac: 0, ecart: 0 };
     const cmdRows = rawData.filter(r => r.type_date === 'CMD');
     const facRows = rawData.filter(r => r.type_date === 'FAC');
     const caCmd = cmdRows.reduce((s, r) => s + Number(r.ca_commande || 0), 0);
     const caFac = facRows.reduce((s, r) => s + Number(r.ca_facture || 0), 0);
-    return {
-      caCmd,
-      caFac,
-      ecart: caCmd - caFac,
-      nbFournisseurs: new Set(rawData.map(r => r.tiers)).size,
-    };
+    return { caCmd, caFac, ecart: caCmd - caFac };
   }, [rawData]);
 
-  // --- Chart 1: Grouped bars by month ---
+  // Variation vs previous year
+  const variation = useMemo(() => {
+    const sortedYears = [...kpisByYear.keys()].sort();
+    if (sortedYears.length < 2) return null;
+    const latest = kpisByYear.get(sortedYears[sortedYears.length - 1]);
+    const previous = kpisByYear.get(sortedYears[sortedYears.length - 2]);
+    if (!latest || !previous || previous.caFac === 0) return null;
+    return {
+      latestYear: sortedYears[sortedYears.length - 1],
+      previousYear: sortedYears[sortedYears.length - 2],
+      pctCmd: previous.caCmd ? ((latest.caCmd - previous.caCmd) / Math.abs(previous.caCmd)) * 100 : null,
+      pctFac: previous.caFac ? ((latest.caFac - previous.caFac) / Math.abs(previous.caFac)) * 100 : null,
+    };
+  }, [kpisByYear]);
+
+  // --- Chart 1: Grouped bars by month (multi-year comparison) ---
   const monthlyBarData = useMemo(() => {
     if (!rawData?.length) return [];
     const map = new Map<string, Record<string, number>>();
@@ -149,9 +207,8 @@ export function SupplierFinancialDashboard({ tiers }: SupplierFinancialDashboard
     rawData.forEach(r => {
       const m = r.mois || '??';
       const y = r.annee || '??';
-      const key = `${m}`;
-      if (!map.has(key)) map.set(key, {});
-      const entry = map.get(key)!;
+      if (!map.has(m)) map.set(m, {});
+      const entry = map.get(m)!;
       if (r.type_date === 'CMD') {
         entry[`cmd_${y}`] = (entry[`cmd_${y}`] || 0) + Number(r.ca_commande || 0);
       }
@@ -161,7 +218,7 @@ export function SupplierFinancialDashboard({ tiers }: SupplierFinancialDashboard
     });
 
     return Array.from(map.entries())
-      .map(([month, vals]) => ({ month, label: MONTH_LABELS[month] || month, ...vals }))
+      .map(([month, vals]) => ({ month, label: SHORT_MONTH_LABELS[month] || month, ...vals }))
       .sort((a, b) => a.month.localeCompare(b.month));
   }, [rawData]);
 
@@ -182,7 +239,6 @@ export function SupplierFinancialDashboard({ tiers }: SupplierFinancialDashboard
     const activeYears = [...new Set(rawData.map(r => r.annee).filter(Boolean) as string[])].sort();
     const allMonths = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
 
-    // Aggregate monthly facturé per year
     const yearMonthMap = new Map<string, Map<string, number>>();
     rawData.filter(r => r.type_date === 'FAC').forEach(r => {
       const y = r.annee || '??';
@@ -193,7 +249,7 @@ export function SupplierFinancialDashboard({ tiers }: SupplierFinancialDashboard
     });
 
     return allMonths.map(month => {
-      const point: Record<string, any> = { month, label: MONTH_LABELS[month] || month };
+      const point: Record<string, any> = { month, label: SHORT_MONTH_LABELS[month] || month };
       activeYears.forEach(y => {
         const ym = yearMonthMap.get(y);
         let cumul = 0;
@@ -211,44 +267,6 @@ export function SupplierFinancialDashboard({ tiers }: SupplierFinancialDashboard
     if (!cumulativeData.length) return [];
     return Object.keys(cumulativeData[0]).filter(k => k.startsWith('cumul_')).sort();
   }, [cumulativeData]);
-
-  // --- Chart 3: Top 10 suppliers ---
-  const top10Data = useMemo(() => {
-    if (!rawData?.length) return [];
-    const map = new Map<string, number>();
-    rawData.filter(r => r.type_date === 'FAC').forEach(r => {
-      map.set(r.tiers, (map.get(r.tiers) || 0) + Number(r.ca_facture || 0));
-    });
-    return Array.from(map.entries())
-      .map(([tiers, value]) => ({ tiers, value }))
-      .sort((a, b) => b.value - a.value)
-      .slice(0, 10);
-  }, [rawData]);
-
-  // Enrich top10 with supplier names
-  const top10Tiers = top10Data.map(d => d.tiers);
-  const { data: supplierNames } = useQuery({
-    queryKey: ['supplier-names-top10', top10Tiers],
-    queryFn: async () => {
-      if (!top10Tiers.length) return {};
-      const { data } = await supabase
-        .from('supplier_purchase_enrichment')
-        .select('tiers,nomfournisseur')
-        .in('tiers', top10Tiers);
-      const map: Record<string, string> = {};
-      (data || []).forEach((r: any) => { map[r.tiers] = r.nomfournisseur || r.tiers; });
-      return map;
-    },
-    enabled: top10Tiers.length > 0,
-  });
-
-  const top10Enriched = useMemo(() =>
-    top10Data.map(d => ({
-      ...d,
-      label: supplierNames?.[d.tiers] ? `${d.tiers} — ${supplierNames[d.tiers]}` : d.tiers,
-    })),
-    [top10Data, supplierNames]
-  );
 
   // --- Filter options ---
   const yearOptions = useMemo(() =>
@@ -273,6 +291,8 @@ export function SupplierFinancialDashboard({ tiers }: SupplierFinancialDashboard
 
   const customTooltipFormatter = (value: number) => formatCurrency(value);
 
+  const sortedSelectedYears = [...selectedYears].sort();
+
   return (
     <div className="space-y-5">
       {/* Filters */}
@@ -282,7 +302,7 @@ export function SupplierFinancialDashboard({ tiers }: SupplierFinancialDashboard
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
-            <label className="text-xs text-muted-foreground mb-1 block">Année</label>
+            <label className="text-xs text-muted-foreground mb-1 block">Année (sélectionner plusieurs pour comparer)</label>
             <MultiSearchableSelect
               values={selectedYears}
               onValuesChange={setSelectedYears}
@@ -334,18 +354,57 @@ export function SupplierFinancialDashboard({ tiers }: SupplierFinancialDashboard
         </div>
       ) : (
         <>
-          {/* KPI Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <KPICard label="CA Commandé" value={formatCurrency(kpis.caCmd)} icon={<TrendingUp className="h-4 w-4 text-primary" />} />
-            <KPICard label="CA Facturé" value={formatCurrency(kpis.caFac)} icon={<BarChart3 className="h-4 w-4 text-green-600" />} />
-            <KPICard label="Écart CMD vs FAC" value={formatCurrency(kpis.ecart)} icon={<TrendingDown className="h-4 w-4 text-orange-600" />} tone={kpis.ecart > 0 ? 'warning' : kpis.ecart < 0 ? 'danger' : 'neutral'} />
-            <KPICard label="Fournisseurs actifs" value={String(kpis.nbFournisseurs)} icon={<Users className="h-4 w-4 text-muted-foreground" />} />
+          {/* KPI Cards — with year comparison */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+            <KPICard
+              label="CA Commandé"
+              value={formatCurrency(kpis.caCmd)}
+              icon={<TrendingUp className="h-4 w-4 text-primary" />}
+              variation={variation?.pctCmd}
+              variationLabel={variation ? `vs ${variation.previousYear}` : undefined}
+            />
+            <KPICard
+              label="CA Facturé"
+              value={formatCurrency(kpis.caFac)}
+              icon={<BarChart3 className="h-4 w-4 text-success" />}
+              variation={variation?.pctFac}
+              variationLabel={variation ? `vs ${variation.previousYear}` : undefined}
+            />
+            <KPICard
+              label="Écart CMD vs FAC"
+              value={formatCurrency(kpis.ecart)}
+              icon={<TrendingDown className="h-4 w-4 text-warning" />}
+              tone={kpis.ecart > 0 ? 'warning' : kpis.ecart < 0 ? 'danger' : 'neutral'}
+            />
           </div>
 
-          {/* Chart 1 — Monthly grouped bars */}
+          {/* Per-year breakdown if multiple years selected */}
+          {sortedSelectedYears.length > 1 && kpisByYear.size > 0 && (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+              {sortedSelectedYears.map(y => {
+                const d = kpisByYear.get(y);
+                if (!d) return null;
+                return (
+                  <Card key={y} className="p-3 border-l-4" style={{ borderLeftColor: YEAR_COLORS[sortedSelectedYears.indexOf(y) % YEAR_COLORS.length] }}>
+                    <div className="text-xs font-semibold mb-1">{y}</div>
+                    <div className="space-y-0.5 text-xs">
+                      <div className="flex justify-between"><span className="text-muted-foreground">Commandé</span><span className="font-mono font-medium">{formatCurrency(d.caCmd)}</span></div>
+                      <div className="flex justify-between"><span className="text-muted-foreground">Facturé</span><span className="font-mono font-medium">{formatCurrency(d.caFac)}</span></div>
+                      <div className="flex justify-between"><span className="text-muted-foreground">Écart</span><span className="font-mono font-medium">{formatCurrency(d.ecart)}</span></div>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Chart 1 — Monthly grouped bars (multi-year) */}
           {monthlyBarData.length > 0 && (
             <Card className="p-4">
-              <div className="text-sm font-semibold mb-3">CA Commandé vs Facturé par mois</div>
+              <div className="text-sm font-semibold mb-3">
+                CA Commandé vs Facturé par mois
+                {sortedSelectedYears.length > 1 && <span className="text-muted-foreground font-normal ml-2">— Comparaison {sortedSelectedYears.join(' / ')}</span>}
+              </div>
               <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={monthlyBarData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
@@ -355,14 +414,20 @@ export function SupplierFinancialDashboard({ tiers }: SupplierFinancialDashboard
                     <Tooltip formatter={customTooltipFormatter} />
                     <Legend />
                     {barSeriesKeys.map((key, i) => {
-                      const [type, year] = key.split('_');
+                      const parts = key.split('_');
+                      const type = parts[0];
+                      const year = parts.slice(1).join('_');
                       const isCmd = type === 'cmd';
+                      const yearIndex = sortedSelectedYears.indexOf(year);
                       return (
                         <Bar
                           key={key}
                           dataKey={key}
-                          name={`${isCmd ? 'Commandé' : 'Facturé'} ${year}`}
-                          fill={isCmd ? `hsl(210, 80%, ${55 + i * 5}%)` : `hsl(150, 60%, ${40 + i * 5}%)`}
+                          name={`${isCmd ? 'CMD' : 'FAC'} ${year}`}
+                          fill={isCmd
+                            ? (CMD_COLORS[yearIndex] || `hsl(210, 80%, ${55 + yearIndex * 10}%)`)
+                            : (FAC_COLORS[yearIndex] || `hsl(150, 60%, ${40 + yearIndex * 10}%)`)
+                          }
                           radius={[3, 3, 0, 0]}
                         />
                       );
@@ -373,10 +438,13 @@ export function SupplierFinancialDashboard({ tiers }: SupplierFinancialDashboard
             </Card>
           )}
 
-          {/* Chart 2 — Cumulative annual */}
+          {/* Chart 2 — Cumulative annual comparison */}
           {cumulativeData.length > 0 && cumulYears.length > 0 && (
             <Card className="p-4">
-              <div className="text-sm font-semibold mb-3">Cumul CA Facturé par année</div>
+              <div className="text-sm font-semibold mb-3">
+                Cumul CA Facturé
+                {sortedSelectedYears.length > 1 && <span className="text-muted-foreground font-normal ml-2">— Comparaison annuelle</span>}
+              </div>
               <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={cumulativeData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
@@ -403,24 +471,6 @@ export function SupplierFinancialDashboard({ tiers }: SupplierFinancialDashboard
             </Card>
           )}
 
-          {/* Chart 3 — Top 10 suppliers */}
-          {top10Enriched.length > 0 && (
-            <Card className="p-4">
-              <div className="text-sm font-semibold mb-3">Top 10 Fournisseurs — CA Facturé</div>
-              <div className="h-[350px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={top10Enriched} layout="vertical" margin={{ top: 5, right: 20, left: 150, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k€`} />
-                    <YAxis type="category" dataKey="label" tick={{ fontSize: 10 }} width={140} />
-                    <Tooltip formatter={customTooltipFormatter} />
-                    <Bar dataKey="value" name="CA Facturé" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
-          )}
-
           {!rawData?.length && (
             <Card className="p-8 text-center text-muted-foreground">
               <BarChart3 className="h-8 w-8 mx-auto mb-2 opacity-40" />
@@ -433,15 +483,31 @@ export function SupplierFinancialDashboard({ tiers }: SupplierFinancialDashboard
   );
 }
 
-function KPICard({ label, value, icon, tone }: { label: string; value: string; icon: React.ReactNode; tone?: 'warning' | 'danger' | 'neutral' }) {
+function KPICard({ label, value, icon, tone, variation, variationLabel }: {
+  label: string;
+  value: string;
+  icon: React.ReactNode;
+  tone?: 'warning' | 'danger' | 'neutral';
+  variation?: number | null;
+  variationLabel?: string;
+}) {
+  const variationColor = variation != null
+    ? variation > 0 ? 'text-success' : variation < 0 ? 'text-destructive' : 'text-muted-foreground'
+    : '';
+
   return (
     <Card className="p-3">
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
         {icon} {label}
       </div>
-      <div className={`text-lg font-bold ${tone === 'warning' ? 'text-orange-600' : tone === 'danger' ? 'text-red-600' : ''}`}>
+      <div className={`text-lg font-bold ${tone === 'warning' ? 'text-warning' : tone === 'danger' ? 'text-destructive' : ''}`}>
         {value}
       </div>
+      {variation != null && (
+        <div className={`text-xs mt-0.5 ${variationColor}`}>
+          {variation > 0 ? '+' : ''}{variation.toFixed(1)}% {variationLabel}
+        </div>
+      )}
     </Card>
   );
 }
