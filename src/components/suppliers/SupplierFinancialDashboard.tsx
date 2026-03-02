@@ -35,20 +35,26 @@ const SHORT_MONTH_LABELS: Record<string, string> = {
 };
 
 const YEAR_COLORS = [
-  '#4DBEC8', '#FF9432', '#78C050', '#ef4444', '#8b5cf6',
-  '#ec4899', '#14b8a6', '#f59e0b',
+  '#2563eb', '#e11d48', '#16a34a', '#d97706', '#7c3aed',
+  '#0891b2', '#c026d3', '#059669',
 ];
 
 const CMD_COLORS: Record<number, string> = {
-  0: 'hsl(210, 80%, 55%)',
-  1: 'hsl(210, 70%, 70%)',
-  2: 'hsl(210, 60%, 80%)',
+  0: 'hsl(220, 70%, 50%)',
+  1: 'hsl(340, 70%, 50%)',
+  2: 'hsl(150, 60%, 40%)',
+  3: 'hsl(35, 80%, 50%)',
+  4: 'hsl(270, 60%, 50%)',
+  5: 'hsl(190, 70%, 40%)',
 };
 
 const FAC_COLORS: Record<number, string> = {
-  0: 'hsl(150, 60%, 40%)',
-  1: 'hsl(150, 50%, 55%)',
-  2: 'hsl(150, 40%, 70%)',
+  0: 'hsl(220, 50%, 70%)',
+  1: 'hsl(340, 50%, 70%)',
+  2: 'hsl(150, 40%, 65%)',
+  3: 'hsl(35, 60%, 70%)',
+  4: 'hsl(270, 40%, 70%)',
+  5: 'hsl(190, 50%, 65%)',
 };
 
 const formatCurrency = (v: number) =>
@@ -409,13 +415,12 @@ export function SupplierFinancialDashboard({ tiers }: SupplierFinancialDashboard
           </div>
 
           {/* Per-year breakdown if multiple years selected */}
-          {sortedSelectedYears.length > 1 && kpisByYear.size > 0 && (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-              {sortedSelectedYears.map(y => {
-                const d = kpisByYear.get(y);
-                if (!d) return null;
+          {sortedSelectedYears.length > 1 && (
+            <div className="grid grid-cols-2 lg:grid-cols-6 gap-2">
+              {sortedSelectedYears.map((y, idx) => {
+                const d = kpisByYear.get(y) || { caCmd: 0, caFac: 0, ecart: 0, nbRefs: 0 };
                 return (
-                  <Card key={y} className="p-3 border-l-4" style={{ borderLeftColor: YEAR_COLORS[sortedSelectedYears.indexOf(y) % YEAR_COLORS.length] }}>
+                  <Card key={y} className="p-3 border-l-4" style={{ borderLeftColor: YEAR_COLORS[idx % YEAR_COLORS.length] }}>
                     <div className="text-xs font-semibold mb-1">{y}</div>
                     <div className="space-y-0.5 text-xs">
                       <div className="flex justify-between"><span className="text-muted-foreground">Commandé</span><span className="font-mono font-medium">{formatCurrency(d.caCmd)}</span></div>
