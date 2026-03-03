@@ -92,7 +92,8 @@ serve(async (req) => {
       .upsert(records, { onConflict: conflictKey });
 
     if (error) {
-      return new Response(JSON.stringify({ error: "Upsert failed" }), {
+      console.error("Upsert error:", JSON.stringify(error));
+      return new Response(JSON.stringify({ error: "Upsert failed", details: error.message, code: error.code, hint: error.hint }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
