@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, BarChart3, Users, ChevronLeft, ChevronRight, Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText, ArrowLeftRight, Calendar, MessageCircle, Building2, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, BarChart3, Users, ChevronLeft, ChevronRight, Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText, ArrowLeftRight, Calendar, MessageCircle, Building2, ClipboardList, Lightbulb } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
 import { useAuth } from '@/contexts/AuthContext';
@@ -37,6 +37,7 @@ const menuGroups = [
   // Group 3
   [
     { id: 'projects', label: 'Projets', icon: FolderOpen, path: '/projects', permissionKey: 'can_access_projects' as ScreenPermissionKey },
+    { id: 'innovation', label: 'Innovation', icon: Lightbulb, path: '/innovation', permissionKey: 'can_access_dashboard' as ScreenPermissionKey },
     { id: 'suppliers', label: 'Fournisseurs', icon: Building2, path: '/suppliers', permissionKey: 'can_access_suppliers' as ScreenPermissionKey },
     { id: 'templates', label: 'Modèles', icon: Workflow, path: '/templates', permissionKey: 'can_access_templates' as ScreenPermissionKey },
   ],
@@ -128,6 +129,12 @@ const menuColors: Record<string, { bg: string; text: string; border: string; ico
     text: 'text-destructive', 
     border: 'border-destructive',
     iconBg: 'bg-gradient-to-br from-destructive to-destructive/80'
+  },
+  innovation: {
+    bg: 'bg-[#F59E0B]/10',
+    text: 'text-[#F59E0B]',
+    border: 'border-[#F59E0B]',
+    iconBg: 'bg-gradient-to-br from-[#F59E0B] to-[#F59E0B]/80'
   },
 };
 

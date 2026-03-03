@@ -1226,6 +1226,178 @@ export type Database = {
           },
         ]
       }
+      inno_code_projet_options: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          is_active: boolean
+          label: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label?: string
+        }
+        Relationships: []
+      }
+      inno_demandes: {
+        Row: {
+          audit_log: Json | null
+          challenge_inno: string | null
+          code_projet: string
+          commentaire_demande: string | null
+          created_at: string
+          date_debut: string | null
+          date_fin_previsionnelle: string | null
+          demandeur_id: string
+          descriptif: string
+          difficulte_complexite: number | null
+          entite_concernee: string
+          etat_projet: string | null
+          etiquettes: string[] | null
+          id: string
+          livrable_final: string | null
+          niveau_strategique: number | null
+          nom_projet: string
+          priorisation_urgence: string | null
+          responsable_projet_id: string | null
+          service_porteur_id: string | null
+          sponsor: string | null
+          statut_demande: string
+          updated_at: string
+          usage: string
+        }
+        Insert: {
+          audit_log?: Json | null
+          challenge_inno?: string | null
+          code_projet: string
+          commentaire_demande?: string | null
+          created_at?: string
+          date_debut?: string | null
+          date_fin_previsionnelle?: string | null
+          demandeur_id: string
+          descriptif: string
+          difficulte_complexite?: number | null
+          entite_concernee: string
+          etat_projet?: string | null
+          etiquettes?: string[] | null
+          id?: string
+          livrable_final?: string | null
+          niveau_strategique?: number | null
+          nom_projet: string
+          priorisation_urgence?: string | null
+          responsable_projet_id?: string | null
+          service_porteur_id?: string | null
+          sponsor?: string | null
+          statut_demande?: string
+          updated_at?: string
+          usage: string
+        }
+        Update: {
+          audit_log?: Json | null
+          challenge_inno?: string | null
+          code_projet?: string
+          commentaire_demande?: string | null
+          created_at?: string
+          date_debut?: string | null
+          date_fin_previsionnelle?: string | null
+          demandeur_id?: string
+          descriptif?: string
+          difficulte_complexite?: number | null
+          entite_concernee?: string
+          etat_projet?: string | null
+          etiquettes?: string[] | null
+          id?: string
+          livrable_final?: string | null
+          niveau_strategique?: number | null
+          nom_projet?: string
+          priorisation_urgence?: string | null
+          responsable_projet_id?: string | null
+          service_porteur_id?: string | null
+          sponsor?: string | null
+          statut_demande?: string
+          updated_at?: string
+          usage?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inno_demandes_demandeur_id_fkey"
+            columns: ["demandeur_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inno_demandes_responsable_projet_id_fkey"
+            columns: ["responsable_projet_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inno_demandes_service_porteur_id_fkey"
+            columns: ["service_porteur_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inno_etiquette_suggestions: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          label: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label?: string
+        }
+        Relationships: []
+      }
+      inno_usage_options: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          is_active: boolean
+          label: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label?: string
+        }
+        Relationships: []
+      }
       job_titles: {
         Row: {
           created_at: string
@@ -2493,7 +2665,8 @@ export type Database = {
           note: string | null
           pilier_code: string
           project_id: string
-          question: string
+          question: string | null
+          row_id: string | null
           section: string
           sous_section: string | null
           type_champ: string | null
@@ -2511,7 +2684,8 @@ export type Database = {
           note?: string | null
           pilier_code: string
           project_id: string
-          question: string
+          question?: string | null
+          row_id?: string | null
           section: string
           sous_section?: string | null
           type_champ?: string | null
@@ -2529,7 +2703,8 @@ export type Database = {
           note?: string | null
           pilier_code?: string
           project_id?: string
-          question?: string
+          question?: string | null
+          row_id?: string | null
           section?: string
           sous_section?: string | null
           type_champ?: string | null
@@ -6409,13 +6584,14 @@ export type Database = {
         Args: { _conversation_id: string; _user_id: string }
         Returns: boolean
       }
+      is_inno_admin: { Args: never; Returns: boolean }
       next_entity_number: {
         Args: { p_entity_type: string; p_project_code: string }
         Returns: string
       }
     }
     Enums: {
-      app_role: "admin" | "moderator" | "user"
+      app_role: "admin" | "moderator" | "user" | "inno_admin" | "codir"
       custom_field_type:
         | "text"
         | "textarea"
@@ -6610,7 +6786,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "moderator", "user"],
+      app_role: ["admin", "moderator", "user", "inno_admin", "codir"],
       custom_field_type: [
         "text",
         "textarea",

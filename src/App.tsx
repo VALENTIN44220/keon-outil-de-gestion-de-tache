@@ -27,6 +27,8 @@ import NotFound from "./pages/NotFound";
 import SupplierReference from "./pages/SupplierReference";
 // MaterialRequests is now embedded in ProcessTracking
 import ProcessTracking from "./pages/ProcessTracking";
+import Innovation from "./pages/Innovation";
+import InnovationNew from "./pages/InnovationNew";
 
 // BE Project Hub pages
 import BEProjectHubOverview from "./pages/be/BEProjectHubOverview";
@@ -211,6 +213,23 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <ProcessTracking />
+                </ProtectedRoute>
+              }
+            />
+            {/* Innovation */}
+            <Route
+              path="/innovation"
+              element={
+                <ProtectedRoute>
+                  <Innovation />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/innovation/new"
+              element={
+                <ProtectedRoute>
+                  <InnovationNew />
                 </ProtectedRoute>
               }
             />
