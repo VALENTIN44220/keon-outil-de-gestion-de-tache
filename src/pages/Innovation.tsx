@@ -11,7 +11,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Lightbulb, Plus, Eye } from 'lucide-react';
+import { Lightbulb, Plus, Eye, GitBranchPlus } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -88,10 +88,16 @@ export default function Innovation() {
       <main className="flex-1 p-6">
         <div className="flex items-center justify-between mb-6">
           <PageHeader title={isInnoAdmin ? 'Demandes Innovation' : 'Mes demandes Innovation'} />
-          <Button onClick={() => navigate('/requests')}>
-            <Plus className="w-4 h-4 mr-2" />
-            Nouvelle demande
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => navigate('/innovation/requests')}>
+              <GitBranchPlus className="w-4 h-4 mr-2" />
+              Cartographie
+            </Button>
+            <Button onClick={() => navigate('/requests')}>
+              <Plus className="w-4 h-4 mr-2" />
+              Nouvelle demande
+            </Button>
+          </div>
         </div>
 
         <Card>

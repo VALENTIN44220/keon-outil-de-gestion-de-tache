@@ -28,7 +28,7 @@ import SupplierReference from "./pages/SupplierReference";
 // MaterialRequests is now embedded in ProcessTracking
 import ProcessTracking from "./pages/ProcessTracking";
 import Innovation from "./pages/Innovation";
-// InnovationNew removed — innovation requests use the standard process flow
+import InnovationRequests from "./pages/InnovationRequests";
 
 // BE Project Hub pages
 import BEProjectHubOverview from "./pages/be/BEProjectHubOverview";
@@ -225,7 +225,22 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            {/* /innovation/new removed — uses standard process flow via /requests */}
+            <Route
+              path="/innovation/requests"
+              element={
+                <ProtectedRoute>
+                  <InnovationRequests />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/innovation/requests/:id"
+              element={
+                <ProtectedRoute>
+                  <InnovationRequests />
+                </ProtectedRoute>
+              }
+            />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
