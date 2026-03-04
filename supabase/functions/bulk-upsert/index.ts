@@ -65,7 +65,7 @@ serve(async (req) => {
     }
 
     // Validate conflict_key: only allow simple alphanumeric column names
-    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(conflictKey)) {
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*(,[a-zA-Z_][a-zA-Z0-9_]*)*$/.test(conflictKey)) {
       return new Response(
         JSON.stringify({ error: "Invalid conflict_key format" }),
         {
