@@ -51,6 +51,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { AddTaskTemplateDialog } from '@/components/templates/AddTaskTemplateDialog';
 import { EditTaskTemplateDialog } from '@/components/templates/EditTaskTemplateDialog';
 import { addTaskToWorkflow, removeTaskFromWorkflow } from '@/hooks/useAutoWorkflowGeneration';
+import { WorkflowConfigTab } from '@/components/workflow-config/WorkflowConfigTab';
 import { SubProcessCustomFieldsEditor } from '@/components/templates/SubProcessCustomFieldsEditor';
 import { RecurrenceConfig, RecurrenceData } from '@/components/templates/RecurrenceConfig';
 
@@ -386,7 +387,8 @@ export default function SubProcessSettings() {
     { id: 'tasks', label: 'Tâches', icon: ListTodo },
     { id: 'assignment', label: 'Affectation', icon: Users },
     { id: 'validations', label: 'Validations', icon: CheckSquare },
-    { id: 'custom-fields', label: 'Champs personnalisés', icon: FileText },
+    { id: 'workflow', label: 'Workflow', icon: GitBranch },
+    { id: 'custom-fields', label: 'Champs', icon: FileText },
   ];
 
   if (isLoading) {
@@ -440,15 +442,6 @@ export default function SubProcessSettings() {
                 {ASSIGNMENT_TYPE_LABELS[subProcess.assignment_type] || 'Standard'}
               </Badge>
               <Badge variant="outline">{tasks.length} tâche(s)</Badge>
-              <Button
-                variant="outline"
-                size="sm"
-                className="ml-auto gap-2"
-                onClick={() => navigate(`/templates/workflow/subprocess/${subProcessId}`)}
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-                Éditeur Workflow
-              </Button>
             </div>
           </div>
 
@@ -459,7 +452,7 @@ export default function SubProcessSettings() {
             className="flex-1 flex flex-col min-h-0"
           >
             <div className="px-6 pt-4 shrink-0 border-b bg-background">
-              <TabsList className="w-full grid grid-cols-5">
+              <TabsList className="w-full grid grid-cols-6">
                 {tabs.map((tab) => {
                   const Icon = tab.icon;
                   return (
@@ -902,6 +895,15 @@ export default function SubProcessSettings() {
                       )}
                     </CardContent>
                   </Card>
+                </TabsContent>
+
+                {/* Workflow Tab */}
+                <TabsContent value="workflow" className="mt-0 space-y-4">
+                  <WorkflowConfigTab
+                    subProcessId={subProcessId!}
+                    subProcessName={subProcess.name}
+                    canManage={canManage}
+                  />
                 </TabsContent>
 
                 {/* Custom Fields Tab */}

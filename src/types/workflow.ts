@@ -454,3 +454,88 @@ export interface PendingManualValidation {
   can_trigger: boolean;
   reason?: string;
 }
+
+// ==========================================
+// NEW wf_* TABLE TYPES (tabular workflow engine)
+// ==========================================
+import type { Tables, TablesInsert, TablesUpdate, Enums } from '@/integrations/supabase/types';
+
+// Row types from DB
+export type WfWorkflow = Tables<'wf_workflows'>;
+export type WfStep = Tables<'wf_steps'>;
+export type WfTransition = Tables<'wf_transitions'>;
+export type WfNotification = Tables<'wf_notifications'>;
+export type WfAction = Tables<'wf_actions'>;
+export type WfAssignmentRule = Tables<'wf_assignment_rules'>;
+export type WfModelTask = Tables<'wf_model_tasks'>;
+export type WfRuntimeInstance = Tables<'wf_runtime_instances'>;
+export type WfRuntimeLog = Tables<'wf_runtime_logs'>;
+export type WfStepPoolValidator = Tables<'wf_step_pool_validators'>;
+export type WfStepSequenceValidator = Tables<'wf_step_sequence_validators'>;
+
+// Insert types
+export type WfWorkflowInsert = TablesInsert<'wf_workflows'>;
+export type WfStepInsert = TablesInsert<'wf_steps'>;
+export type WfTransitionInsert = TablesInsert<'wf_transitions'>;
+export type WfNotificationInsert = TablesInsert<'wf_notifications'>;
+export type WfActionInsert = TablesInsert<'wf_actions'>;
+export type WfAssignmentRuleInsert = TablesInsert<'wf_assignment_rules'>;
+
+// Update types
+export type WfWorkflowUpdate = TablesUpdate<'wf_workflows'>;
+export type WfStepUpdate = TablesUpdate<'wf_steps'>;
+export type WfTransitionUpdate = TablesUpdate<'wf_transitions'>;
+export type WfNotificationUpdate = TablesUpdate<'wf_notifications'>;
+export type WfActionUpdate = TablesUpdate<'wf_actions'>;
+
+// Enum types
+export type WfStepType = Enums<'wf_step_type'>;
+export type WfValidationMode = Enums<'wf_validation_mode'>;
+export type WfAssignmentType = Enums<'wf_assignment_type'>;
+export type WfActionType = Enums<'wf_action_type'>;
+export type WfInstanceStatus = Enums<'wf_instance_status'>;
+
+// Labels
+export const WF_STEP_TYPE_LABELS: Record<WfStepType, string> = {
+  start: 'Début',
+  end: 'Fin',
+  validation: 'Validation',
+  execution: 'Exécution',
+  assignment: 'Affectation',
+  automatic: 'Automatique',
+  subprocess: 'Sous-processus',
+  notification: 'Notification',
+};
+
+export const WF_VALIDATION_MODE_LABELS: Record<WfValidationMode, string> = {
+  none: 'Aucune',
+  simple: 'Simple',
+  n_of_m: 'N sur M',
+  sequence: 'Séquence',
+};
+
+export const WF_ASSIGNMENT_TYPE_LABELS: Record<WfAssignmentType, string> = {
+  user: 'Utilisateur',
+  manager: 'Manager',
+  requester: 'Demandeur',
+  group: 'Groupe',
+  department: 'Service',
+  job_title: 'Poste',
+};
+
+export const WF_ACTION_TYPE_LABELS: Record<WfActionType, string> = {
+  db_insert: 'Insertion BDD',
+  db_update: 'Mise à jour BDD',
+  create_task: 'Créer tâche',
+  set_field: 'Modifier champ',
+};
+
+export const WF_EVENT_LABELS: Record<string, string> = {
+  approved: 'Approuvé',
+  rejected: 'Rejeté',
+  done: 'Terminé',
+  cancelled: 'Annulé',
+  info: 'Information',
+  started: 'Démarré',
+  assigned: 'Affecté',
+};
