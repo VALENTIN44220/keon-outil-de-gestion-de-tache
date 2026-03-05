@@ -125,7 +125,7 @@ export function SubProcessConfigView({
     description: '',
     is_mandatory: true,
     apply_request_validation: true,
-    assignment_type: 'manager' as 'manager' | 'user' | 'role' | 'group',
+    assignment_type: 'manager' as 'manager' | 'user' | 'role' | 'group' | 'requester',
     target_assignee_id: null as string | null,
     target_manager_id: null as string | null,
     target_department_id: null as string | null,

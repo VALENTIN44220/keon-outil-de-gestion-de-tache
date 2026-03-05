@@ -137,7 +137,11 @@ export function NewActionMenu({ collapsed, onAction }: NewActionMenuProps) {
               <div className="flex flex-col min-w-0">
                 <span className="font-medium truncate">{subProcess.name}</span>
                 <span className="text-xs text-muted-foreground">
-                  {subProcess.assignment_type === 'manager' ? 'Affectation par manager' : 'Affectation directe'}
+                  {subProcess.assignment_type === 'manager' ? 'Affectation par manager' : 
+                   subProcess.assignment_type === 'requester' ? 'Affectation au demandeur' :
+                   subProcess.assignment_type === 'group' ? 'Affectation par groupe' :
+                   subProcess.assignment_type === 'role' ? 'Affectation par poste' :
+                   'Affectation directe'}
                 </span>
               </div>
             </DropdownMenuItem>

@@ -3339,6 +3339,11 @@ export type Database = {
           creator_company_id: string | null
           creator_department_id: string | null
           description: string | null
+          fallback_assignment_type: string | null
+          fallback_target_assignee_id: string | null
+          fallback_target_department_id: string | null
+          fallback_target_group_id: string | null
+          fallback_target_job_title_id: string | null
           form_schema: Json | null
           id: string
           is_mandatory: boolean
@@ -3362,6 +3367,7 @@ export type Database = {
           user_id: string
           validation_config: Json | null
           visibility_level: Database["public"]["Enums"]["template_visibility"]
+          watcher_config: Json | null
         }
         Insert: {
           assignment_type?: string
@@ -3369,6 +3375,11 @@ export type Database = {
           creator_company_id?: string | null
           creator_department_id?: string | null
           description?: string | null
+          fallback_assignment_type?: string | null
+          fallback_target_assignee_id?: string | null
+          fallback_target_department_id?: string | null
+          fallback_target_group_id?: string | null
+          fallback_target_job_title_id?: string | null
           form_schema?: Json | null
           id?: string
           is_mandatory?: boolean
@@ -3392,6 +3403,7 @@ export type Database = {
           user_id: string
           validation_config?: Json | null
           visibility_level?: Database["public"]["Enums"]["template_visibility"]
+          watcher_config?: Json | null
         }
         Update: {
           assignment_type?: string
@@ -3399,6 +3411,11 @@ export type Database = {
           creator_company_id?: string | null
           creator_department_id?: string | null
           description?: string | null
+          fallback_assignment_type?: string | null
+          fallback_target_assignee_id?: string | null
+          fallback_target_department_id?: string | null
+          fallback_target_group_id?: string | null
+          fallback_target_job_title_id?: string | null
           form_schema?: Json | null
           id?: string
           is_mandatory?: boolean
@@ -3422,6 +3439,7 @@ export type Database = {
           user_id?: string
           validation_config?: Json | null
           visibility_level?: Database["public"]["Enums"]["template_visibility"]
+          watcher_config?: Json | null
         }
         Relationships: [
           {
@@ -3436,6 +3454,34 @@ export type Database = {
             columns: ["creator_department_id"]
             isOneToOne: false
             referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sub_process_templates_fallback_target_assignee_id_fkey"
+            columns: ["fallback_target_assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sub_process_templates_fallback_target_department_id_fkey"
+            columns: ["fallback_target_department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sub_process_templates_fallback_target_group_id_fkey"
+            columns: ["fallback_target_group_id"]
+            isOneToOne: false
+            referencedRelation: "collaborator_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sub_process_templates_fallback_target_job_title_id_fkey"
+            columns: ["fallback_target_job_title_id"]
+            isOneToOne: false
+            referencedRelation: "job_titles"
             referencedColumns: ["id"]
           },
           {
