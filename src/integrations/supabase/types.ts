@@ -5281,10 +5281,12 @@ export type Database = {
           filters: Json
           id: string
           is_default: boolean
+          is_global: boolean
           name: string
           process_template_id: string | null
           updated_at: string
           user_id: string
+          visible_columns: Json | null
         }
         Insert: {
           context_type?: string
@@ -5292,10 +5294,12 @@ export type Database = {
           filters?: Json
           id?: string
           is_default?: boolean
+          is_global?: boolean
           name: string
           process_template_id?: string | null
           updated_at?: string
           user_id: string
+          visible_columns?: Json | null
         }
         Update: {
           context_type?: string
@@ -5303,10 +5307,12 @@ export type Database = {
           filters?: Json
           id?: string
           is_default?: boolean
+          is_global?: boolean
           name?: string
           process_template_id?: string | null
           updated_at?: string
           user_id?: string
+          visible_columns?: Json | null
         }
         Relationships: []
       }

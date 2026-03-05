@@ -17,7 +17,7 @@ import {
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { useSupplierEnrichment, SupplierFilters, SupplierSortConfig, SupplierEnrichment } from '@/hooks/useSupplierEnrichment';
 import { useSupplierFilterPresets, SupplierFilterPreset } from '@/hooks/useSupplierFilterPresets';
-import { Search, Building2, Filter, ExternalLink, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LayoutGrid, List, Save, Star, Trash2, FolderOpen, RotateCcw, Columns3, Pencil } from 'lucide-react';
+import { Search, Building2, Filter, ExternalLink, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LayoutGrid, List, Save, Star, Trash2, FolderOpen, RotateCcw, Columns3, Pencil, Globe } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -35,6 +35,7 @@ interface SupplierListViewProps {
   onOpenSupplier: (id: string) => void;
   onViewSupplier: (id: string) => void;
   canEdit?: boolean;
+  isAdmin?: boolean;
 }
 
 type DateTone = 'past' | 'soon' | 'future' | 'none';
@@ -165,7 +166,7 @@ function isFilterActive(value: string | undefined, defaultValue = 'all'): boolea
   return !!value && value !== defaultValue;
 }
 
-export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = false }: SupplierListViewProps) {
+export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = false, isAdmin = false }: SupplierListViewProps) {
   const pageSize = 200;
   const [viewMode, setViewMode] = useState<SupplierViewMode>('table');
   const [page, setPage] = useState(0);
@@ -192,6 +193,7 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
     overwritePreset,
     deletePreset,
     toggleDefault,
+    toggleGlobal,
     loadPreset,
   } = useSupplierFilterPresets(filters, setFilters, DEFAULT_SUPPLIER_FILTERS, visibleColumns, setVisibleColumns);
   const [showPresetPopover, setShowPresetPopover] = useState(false);
@@ -465,12 +467,18 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
           {presets.map((preset) => (
             <div key={preset.id} className="flex items-center gap-0.5">
               <Button variant={preset.is_default ? "default" : "outline"} size="sm" className="h-7 text-xs px-2 gap-1" onClick={() => loadPreset(preset)}>
+                {preset.is_global && <Globe className="h-3 w-3" />}
                 {preset.is_default && <Star className="h-3 w-3 fill-current" />}
                 {preset.name}
               </Button>
               <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => toggleDefault(preset.id)} title={preset.is_default ? "Retirer par défaut" : "Définir par défaut"}>
                 <Star className={cn("h-3 w-3", preset.is_default ? "fill-warning text-warning" : "text-muted-foreground")} />
               </Button>
+              {isAdmin && (
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => toggleGlobal(preset.id)} title={preset.is_global ? "Retirer standard global" : "Standard pour tous"}>
+                  <Globe className={cn("h-3 w-3", preset.is_global ? "fill-primary text-primary" : "text-muted-foreground")} />
+                </Button>
+              )}
               <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => deletePreset(preset.id)} title="Supprimer">
                 <Trash2 className="h-3 w-3 text-destructive" />
               </Button>

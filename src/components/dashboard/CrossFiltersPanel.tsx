@@ -26,6 +26,7 @@ import {
   FolderOpen,
   Trash2,
   Star,
+  Globe,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -41,6 +42,12 @@ interface CrossFiltersPanelProps {
   processId?: string;
   /** Disambiguate context key when multiple panels share the same processId */
   contextId?: string;
+  /** Current visible columns for persistence */
+  visibleColumns?: string[];
+  /** Callback to restore visible columns from a preset */
+  onVisibleColumnsChange?: (cols: string[]) => void;
+  /** Whether the current user is admin (can set global presets) */
+  isAdmin?: boolean;
 }
 
 const PERIODS = [
@@ -76,7 +83,10 @@ interface FilterPreset {
   id: string;
   name: string;
   filters: any;
+  visible_columns?: string[];
   is_default?: boolean;
+  is_global?: boolean;
+  user_id?: string;
 }
 
 // Module-level set to track which contexts have already had their default applied
@@ -197,7 +207,7 @@ function MultiSelectDropdown({
   );
 }
 
-export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId, contextId }: CrossFiltersPanelProps) {
+export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId, contextId, visibleColumns, onVisibleColumnsChange, isAdmin }: CrossFiltersPanelProps) {
   const { user } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [profiles, setProfiles] = useState<{ id: string; display_name: string }[]>([]);
@@ -233,22 +243,41 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
   useEffect(() => {
     if (!user?.id) return;
     (async () => {
-      const query = (supabase as any)
+      // Fetch user's own presets
+      const ownQuery = (supabase as any)
         .from('user_filter_presets')
-        .select('id, name, filters, is_default')
+        .select('id, name, filters, is_default, is_global, user_id, visible_columns')
         .eq('user_id', user.id);
       if (processId) {
-        query.eq('process_template_id', processId);
+        ownQuery.eq('process_template_id', processId);
       } else {
-        query.is('process_template_id', null);
+        ownQuery.is('process_template_id', null);
       }
-      const { data } = await query.order('created_at', { ascending: false });
-      if (data) {
-        setPresets(data);
+      const { data: ownData } = await ownQuery.order('created_at', { ascending: false });
+
+      // Fetch global presets from other users
+      const globalQuery = (supabase as any)
+        .from('user_filter_presets')
+        .select('id, name, filters, is_default, is_global, user_id, visible_columns')
+        .eq('is_global', true)
+        .neq('user_id', user.id);
+      if (processId) {
+        globalQuery.eq('process_template_id', processId);
+      } else {
+        globalQuery.is('process_template_id', null);
+      }
+      const { data: globalData } = await globalQuery.order('created_at', { ascending: false });
+
+      const allPresets = [...(ownData || []), ...(globalData || [])];
+      if (allPresets.length) {
+        setPresets(allPresets);
         // Auto-apply default preset ONLY on first load per context
         const contextKey = `${user.id}_${processId ?? '__global__'}${contextId ? `_${contextId}` : ''}`;
         if (!appliedDefaultContexts.has(contextKey)) {
-          const defaultPreset = data.find((p: FilterPreset) => p.is_default);
+          // Priority: user's own default > global standard
+          const userDefault = allPresets.find((p: FilterPreset) => p.is_default && p.user_id === user.id);
+          const globalDefault = allPresets.find((p: FilterPreset) => p.is_global);
+          const defaultPreset = userDefault || globalDefault;
           if (defaultPreset) {
             const restored: CrossFilters = {
               ...DEFAULT_CROSS_FILTERS,
@@ -259,6 +288,10 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
               },
             };
             onFiltersChange(restored);
+            if (defaultPreset.visible_columns && onVisibleColumnsChange) {
+              const cols = Array.isArray(defaultPreset.visible_columns) ? defaultPreset.visible_columns : [];
+              if (cols.length > 0) onVisibleColumnsChange(cols);
+            }
           }
           appliedDefaultContexts.add(contextKey);
         }
@@ -280,18 +313,18 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
         end: filters.dateRange.end?.toISOString() ?? null,
       },
     };
+    const colsPayload = visibleColumns ? JSON.parse(JSON.stringify(visibleColumns)) : null;
 
     if (overwritePresetId) {
-      // Overwrite existing preset
       const { error } = await (supabase as any)
         .from('user_filter_presets')
-        .update({ filters: serialized })
+        .update({ filters: serialized, visible_columns: colsPayload })
         .eq('id', overwritePresetId);
       if (error) {
         toast.error('Erreur lors de la sauvegarde');
         return;
       }
-      setPresets(prev => prev.map(p => p.id === overwritePresetId ? { ...p, filters: serialized } : p));
+      setPresets(prev => prev.map(p => p.id === overwritePresetId ? { ...p, filters: serialized, visible_columns: visibleColumns } : p));
       const name = presets.find(p => p.id === overwritePresetId)?.name;
       setOverwritePresetId(null);
       setShowSavePreset(false);
@@ -304,9 +337,10 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
           user_id: user.id,
           name: presetName.trim(),
           filters: serialized,
+          visible_columns: colsPayload,
           process_template_id: processId ?? null,
         })
-        .select('id, name, filters')
+        .select('id, name, filters, visible_columns')
         .single();
       if (error) {
         toast.error('Erreur lors de la sauvegarde');
@@ -329,6 +363,10 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
       },
     };
     onFiltersChange(restored);
+    // Restore visible columns if available
+    if (preset.visible_columns && Array.isArray(preset.visible_columns) && preset.visible_columns.length > 0 && onVisibleColumnsChange) {
+      onVisibleColumnsChange(preset.visible_columns);
+    }
     toast.success(`Contexte "${preset.name}" appliqué`);
   };
 
@@ -340,7 +378,6 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
 
   const handleSetDefault = async (presetId: string) => {
     if (!user?.id) return;
-    // Remove current default for this context
     const clearQuery = (supabase as any)
       .from('user_filter_presets')
       .update({ is_default: false })
@@ -368,6 +405,37 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
       is_default: wasDefault ? false : p.id === presetId,
     })));
     toast.success(wasDefault ? 'Contexte par défaut retiré' : 'Contexte défini par défaut');
+  };
+
+  const handleSetGlobal = async (presetId: string) => {
+    if (!user?.id) return;
+    const preset = presets.find(p => p.id === presetId);
+    const wasGlobal = preset?.is_global;
+
+    // If setting as global, clear other globals for this context
+    if (!wasGlobal) {
+      const clearQuery = (supabase as any)
+        .from('user_filter_presets')
+        .update({ is_global: false })
+        .eq('is_global', true);
+      if (processId) {
+        clearQuery.eq('process_template_id', processId);
+      } else {
+        clearQuery.is('process_template_id', null);
+      }
+      await clearQuery;
+    }
+
+    await (supabase as any)
+      .from('user_filter_presets')
+      .update({ is_global: !wasGlobal })
+      .eq('id', presetId);
+
+    setPresets(prev => prev.map(p => ({
+      ...p,
+      is_global: p.id === presetId ? !wasGlobal : (!wasGlobal ? false : p.is_global),
+    })));
+    toast.success(wasGlobal ? 'Standard global retiré' : 'Contexte défini comme standard global');
   };
 
   const activeFiltersCount = 
@@ -417,9 +485,10 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
                   {presets.map(p => (
                     <div key={p.id} className="flex items-center justify-between gap-1 p-1.5 rounded hover:bg-muted">
                       <button
-                        className="text-sm text-left flex-1 truncate"
+                        className={cn("text-sm text-left flex-1 truncate", p.is_global && "font-medium")}
                         onClick={() => handleLoadPreset(p)}
                       >
+                        {p.is_global && <Globe className="h-3 w-3 inline mr-1 text-primary" />}
                         {p.name}
                       </button>
                       <Button
@@ -427,10 +496,21 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
                         size="icon"
                         className="h-6 w-6 shrink-0"
                         onClick={() => handleSetDefault(p.id)}
-                        title={p.is_default ? 'Retirer comme défaut' : 'Définir par défaut'}
+                        title={p.is_default ? 'Retirer comme défaut personnel' : 'Définir comme défaut personnel'}
                       >
                         <Star className={cn('h-3 w-3', p.is_default ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground')} />
                       </Button>
+                      {isAdmin && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 shrink-0"
+                          onClick={() => handleSetGlobal(p.id)}
+                          title={p.is_global ? 'Retirer comme standard global' : 'Définir comme standard pour tous'}
+                        >
+                          <Globe className={cn('h-3 w-3', p.is_global ? 'fill-primary text-primary' : 'text-muted-foreground')} />
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="icon"

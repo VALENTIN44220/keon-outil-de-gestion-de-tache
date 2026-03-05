@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
 import { useSupplierAccess } from '@/hooks/useSupplierAccess';
+import { useUserRole } from '@/hooks/useUserRole';
 import { SupplierListView } from '@/components/suppliers/SupplierListView';
 import { SupplierDetailDrawer } from '@/components/suppliers/SupplierDetailDrawer';
 import { SupplierSynthesisModal } from '@/components/suppliers/SupplierSynthesisModal';
@@ -11,6 +12,7 @@ import { Sidebar } from '@/components/layout/Sidebar';
 export default function SupplierReference() {
   const { effectivePermissions, isLoading: permLoading } = useEffectivePermissions();
   const { supplierPermissions, isLoading: accessLoading } = useSupplierAccess();
+  const { isAdmin } = useUserRole();
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [synthesisOpen, setSynthesisOpen] = useState(false);
@@ -56,6 +58,7 @@ export default function SupplierReference() {
           onOpenSupplier={handleOpenSupplier}
           onViewSupplier={handleViewSupplier}
           canEdit={supplierPermissions.canEdit}
+          isAdmin={isAdmin}
         />
       </main>
 
