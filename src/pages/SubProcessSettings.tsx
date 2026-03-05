@@ -45,7 +45,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { SubProcessTemplate, TaskTemplate, ASSIGNMENT_TYPE_LABELS } from '@/types/template';
+import { SubProcessTemplate, TaskTemplate, AssignmentType, ASSIGNMENT_TYPE_LABELS, ASSIGNMENT_TYPE_DESCRIPTIONS, WatcherRule } from '@/types/template';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { AddTaskTemplateDialog } from '@/components/templates/AddTaskTemplateDialog';
@@ -116,18 +116,30 @@ export default function SubProcessSettings() {
   });
   const [isSavingRecurrence, setIsSavingRecurrence] = useState(false);
 
+  // Job titles for role-based assignment
+  const [jobTitles, setJobTitles] = useState<{ id: string; name: string }[]>([]);
+
   // Form state
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     is_mandatory: true,
-    assignment_type: 'manager' as 'manager' | 'user' | 'role' | 'group',
+    assignment_type: 'manager' as AssignmentType,
     target_assignee_id: null as string | null,
     target_manager_id: null as string | null,
     target_department_id: null as string | null,
     target_group_id: null as string | null,
+    target_job_title_id: null as string | null,
     modifiable_at_request: false,
     show_quick_launch: false,
+    // Fallback
+    fallback_assignment_type: null as AssignmentType | null,
+    fallback_target_assignee_id: null as string | null,
+    fallback_target_group_id: null as string | null,
+    fallback_target_department_id: null as string | null,
+    fallback_target_job_title_id: null as string | null,
+    // Watchers
+    watcher_config: [] as WatcherRule[],
   });
 
   const fetchData = useCallback(async () => {
@@ -159,13 +171,20 @@ export default function SubProcessSettings() {
         name: spData.name,
         description: spData.description || '',
         is_mandatory: spData.is_mandatory ?? true,
-        assignment_type: spData.assignment_type as any,
+        assignment_type: (spData.assignment_type || 'manager') as AssignmentType,
         target_assignee_id: spData.target_assignee_id,
         target_manager_id: spData.target_manager_id,
         target_department_id: spData.target_department_id,
         target_group_id: spData.target_group_id,
+        target_job_title_id: spData.target_job_title_id,
         modifiable_at_request: false,
         show_quick_launch: (spData as any).show_quick_launch ?? false,
+        fallback_assignment_type: (spData as any).fallback_assignment_type || null,
+        fallback_target_assignee_id: (spData as any).fallback_target_assignee_id || null,
+        fallback_target_group_id: (spData as any).fallback_target_group_id || null,
+        fallback_target_department_id: (spData as any).fallback_target_department_id || null,
+        fallback_target_job_title_id: (spData as any).fallback_target_job_title_id || null,
+        watcher_config: ((spData as any).watcher_config as WatcherRule[]) || [],
       });
       setRecurrence({
         enabled: (spData as any).recurrence_enabled || false,
@@ -195,15 +214,17 @@ export default function SubProcessSettings() {
       }
 
       // Fetch reference data
-      const [profileRes, deptRes, groupRes] = await Promise.all([
+      const [profileRes, deptRes, groupRes, jobTitleRes] = await Promise.all([
         supabase.from('profiles').select('id, display_name').eq('status', 'active').order('display_name'),
         supabase.from('departments').select('id, name').order('name'),
         supabase.from('collaborator_groups').select('id, name').order('name'),
+        supabase.from('job_titles').select('id, name').order('name'),
       ]);
 
       if (profileRes.data) setProfiles(profileRes.data);
       if (deptRes.data) setDepartments(deptRes.data);
       if (groupRes.data) setGroups(groupRes.data);
+      if (jobTitleRes.data) setJobTitles(jobTitleRes.data);
 
     } catch (error) {
       console.error('Error fetching sub-process data:', error);
@@ -257,7 +278,14 @@ export default function SubProcessSettings() {
           target_manager_id: formData.assignment_type === 'manager' ? formData.target_manager_id : null,
           target_department_id: formData.target_department_id,
           target_group_id: formData.assignment_type === 'group' ? formData.target_group_id : null,
-        })
+          target_job_title_id: formData.assignment_type === 'role' ? (formData.target_job_title_id || null) : null,
+          fallback_assignment_type: formData.fallback_assignment_type || null,
+          fallback_target_assignee_id: formData.fallback_assignment_type === 'user' ? formData.fallback_target_assignee_id : null,
+          fallback_target_group_id: formData.fallback_assignment_type === 'group' ? formData.fallback_target_group_id : null,
+          fallback_target_department_id: formData.fallback_target_department_id || null,
+          fallback_target_job_title_id: formData.fallback_assignment_type === 'role' ? formData.fallback_target_job_title_id : null,
+          watcher_config: formData.watcher_config.length > 0 ? formData.watcher_config : null,
+        } as any)
         .eq('id', subProcessId);
 
       if (error) throw error;
@@ -640,32 +668,35 @@ export default function SubProcessSettings() {
 
                 {/* Assignment Tab */}
                 <TabsContent value="assignment" className="mt-0 space-y-4">
+                  {/* Primary Assignment */}
                   <Card>
                     <CardHeader>
-                      <CardTitle className="text-base">Mode d'affectation</CardTitle>
+                      <CardTitle className="text-base">Mode d'affectation principal</CardTitle>
                       <CardDescription>
-                        Définit comment les tâches sont affectées
+                        Définit comment les tâches sont affectées à leur création
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
                         {Object.entries(ASSIGNMENT_TYPE_LABELS).map(([value, label]) => {
                           const isSelected = formData.assignment_type === value;
+                          const desc = ASSIGNMENT_TYPE_DESCRIPTIONS[value as AssignmentType];
                           return (
                             <button
                               key={value}
                               type="button"
-                              onClick={() => canManage && setFormData({ ...formData, assignment_type: value as any })}
+                              onClick={() => canManage && setFormData({ ...formData, assignment_type: value as AssignmentType })}
                               disabled={!canManage}
-                              className={`p-4 rounded-lg border text-left transition-all ${
+                              className={`p-3 rounded-lg border text-left transition-all ${
                                 isSelected
                                   ? 'border-primary bg-primary/5 ring-1 ring-primary'
                                   : 'border-border hover:border-primary/50'
                               } ${!canManage ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                             >
-                              <span className={`font-medium ${isSelected ? 'text-primary' : ''}`}>
+                              <span className={`font-medium text-sm ${isSelected ? 'text-primary' : ''}`}>
                                 {label}
                               </span>
+                              <p className="text-xs text-muted-foreground mt-1">{desc}</p>
                             </button>
                           );
                         })}
@@ -673,27 +704,30 @@ export default function SubProcessSettings() {
 
                       <Separator />
 
+                      {/* Contextual options per type */}
                       {formData.assignment_type === 'user' && (
-                        <div className="space-y-2">
-                          <Label>Utilisateur cible</Label>
-                          <Select
-                            value={formData.target_assignee_id || '__none__'}
-                            onValueChange={(v) => setFormData({ ...formData, target_assignee_id: v === '__none__' ? null : v })}
-                            disabled={!canManage}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Sélectionner..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="__none__">Sélectionner...</SelectItem>
-                              {profiles.map((p) => (
-                                <SelectItem key={p.id} value={p.id}>
-                                  {p.display_name || 'Sans nom'}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg mt-3">
+                        <div className="space-y-3">
+                          <div className="space-y-2">
+                            <Label>Utilisateur cible</Label>
+                            <Select
+                              value={formData.target_assignee_id || '__none__'}
+                              onValueChange={(v) => setFormData({ ...formData, target_assignee_id: v === '__none__' ? null : v })}
+                              disabled={!canManage}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Sélectionner..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__none__">Sélectionner...</SelectItem>
+                                {profiles.map((p) => (
+                                  <SelectItem key={p.id} value={p.id}>
+                                    {p.display_name || 'Sans nom'}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                             <div>
                               <Label>Modifiable à la demande</Label>
                               <p className="text-xs text-muted-foreground">
@@ -711,17 +745,20 @@ export default function SubProcessSettings() {
 
                       {formData.assignment_type === 'manager' && (
                         <div className="space-y-2">
-                          <Label>Manager du service cible</Label>
+                          <Label>Manager spécifique (optionnel)</Label>
+                          <p className="text-xs text-muted-foreground">
+                            Si vide, le manager du demandeur sera utilisé automatiquement
+                          </p>
                           <Select
                             value={formData.target_manager_id || '__none__'}
                             onValueChange={(v) => setFormData({ ...formData, target_manager_id: v === '__none__' ? null : v })}
                             disabled={!canManage}
                           >
                             <SelectTrigger>
-                              <SelectValue placeholder="Premier manager du service" />
+                              <SelectValue placeholder="Manager du demandeur (par défaut)" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="__none__">Premier manager du service</SelectItem>
+                              <SelectItem value="__none__">Manager du demandeur (par défaut)</SelectItem>
                               {profiles.map((p) => (
                                 <SelectItem key={p.id} value={p.id}>
                                   {p.display_name || 'Sans nom'}
@@ -755,15 +792,385 @@ export default function SubProcessSettings() {
                         </div>
                       )}
 
-                      {canManage && (
-                        <Button onClick={handleSaveAssignment} disabled={isSaving}>
-                          {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                          <Save className="h-4 w-4 mr-2" />
-                          Enregistrer
-                        </Button>
+                      {formData.assignment_type === 'role' && (
+                        <div className="space-y-2">
+                          <Label>Poste / Fonction</Label>
+                          <Select
+                            value={formData.target_job_title_id || '__none__'}
+                            onValueChange={(v) => setFormData({ ...formData, target_job_title_id: v === '__none__' ? null : v })}
+                            disabled={!canManage}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Sélectionner un poste..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__">Sélectionner...</SelectItem>
+                              {jobTitles.map((jt) => (
+                                <SelectItem key={jt.id} value={jt.id}>
+                                  {jt.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <div className="space-y-2">
+                            <Label>Service cible (optionnel)</Label>
+                            <Select
+                              value={formData.target_department_id || '__none__'}
+                              onValueChange={(v) => setFormData({ ...formData, target_department_id: v === '__none__' ? null : v })}
+                              disabled={!canManage}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Tous les services" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__none__">Tous les services</SelectItem>
+                                {departments.map((d) => (
+                                  <SelectItem key={d.id} value={d.id}>
+                                    {d.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      )}
+
+                      {formData.assignment_type === 'requester' && (
+                        <div className="p-3 bg-muted/50 rounded-lg">
+                          <p className="text-sm text-muted-foreground">
+                            La tâche sera automatiquement affectée au demandeur qui crée la demande.
+                            Utile pour les actions de validation ou de confirmation.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Service cible (for non-role types) */}
+                      {formData.assignment_type !== 'role' && formData.assignment_type !== 'requester' && (
+                        <div className="space-y-2">
+                          <Label>Service cible (optionnel)</Label>
+                          <Select
+                            value={formData.target_department_id || '__none__'}
+                            onValueChange={(v) => setFormData({ ...formData, target_department_id: v === '__none__' ? null : v })}
+                            disabled={!canManage}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Aucun filtre par service" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__">Aucun filtre par service</SelectItem>
+                              {departments.map((d) => (
+                                <SelectItem key={d.id} value={d.id}>
+                                  {d.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       )}
                     </CardContent>
                   </Card>
+
+                  {/* Fallback Assignment */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Affectation de repli (fallback)</CardTitle>
+                      <CardDescription>
+                        Utilisée si l'affectation principale ne peut pas être résolue (ex: manager absent)
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                        <div>
+                          <Label>Activer le fallback</Label>
+                          <p className="text-xs text-muted-foreground">
+                            Définir une règle de secours
+                          </p>
+                        </div>
+                        <Switch
+                          checked={!!formData.fallback_assignment_type}
+                          onCheckedChange={(checked) => {
+                            if (!checked) {
+                              setFormData({
+                                ...formData,
+                                fallback_assignment_type: null,
+                                fallback_target_assignee_id: null,
+                                fallback_target_group_id: null,
+                                fallback_target_department_id: null,
+                                fallback_target_job_title_id: null,
+                              });
+                            } else {
+                              setFormData({ ...formData, fallback_assignment_type: 'group' });
+                            }
+                          }}
+                          disabled={!canManage}
+                        />
+                      </div>
+
+                      {formData.fallback_assignment_type && (
+                        <>
+                          <div className="space-y-2">
+                            <Label>Type de repli</Label>
+                            <Select
+                              value={formData.fallback_assignment_type}
+                              onValueChange={(v) => setFormData({ ...formData, fallback_assignment_type: v as AssignmentType })}
+                              disabled={!canManage}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {Object.entries(ASSIGNMENT_TYPE_LABELS)
+                                  .filter(([k]) => k !== formData.assignment_type)
+                                  .map(([value, label]) => (
+                                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                                  ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {formData.fallback_assignment_type === 'user' && (
+                            <div className="space-y-2">
+                              <Label>Utilisateur de repli</Label>
+                              <Select
+                                value={formData.fallback_target_assignee_id || '__none__'}
+                                onValueChange={(v) => setFormData({ ...formData, fallback_target_assignee_id: v === '__none__' ? null : v })}
+                                disabled={!canManage}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Sélectionner..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="__none__">Sélectionner...</SelectItem>
+                                  {profiles.map((p) => (
+                                    <SelectItem key={p.id} value={p.id}>
+                                      {p.display_name || 'Sans nom'}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+
+                          {formData.fallback_assignment_type === 'group' && (
+                            <div className="space-y-2">
+                              <Label>Groupe de repli</Label>
+                              <Select
+                                value={formData.fallback_target_group_id || '__none__'}
+                                onValueChange={(v) => setFormData({ ...formData, fallback_target_group_id: v === '__none__' ? null : v })}
+                                disabled={!canManage}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Sélectionner..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="__none__">Sélectionner...</SelectItem>
+                                  {groups.map((g) => (
+                                    <SelectItem key={g.id} value={g.id}>
+                                      {g.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+
+                          {formData.fallback_assignment_type === 'role' && (
+                            <div className="space-y-2">
+                              <Label>Poste de repli</Label>
+                              <Select
+                                value={formData.fallback_target_job_title_id || '__none__'}
+                                onValueChange={(v) => setFormData({ ...formData, fallback_target_job_title_id: v === '__none__' ? null : v })}
+                                disabled={!canManage}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Sélectionner..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="__none__">Sélectionner...</SelectItem>
+                                  {jobTitles.map((jt) => (
+                                    <SelectItem key={jt.id} value={jt.id}>
+                                      {jt.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Watchers / Multi-assignment */}
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                      <div>
+                        <CardTitle className="text-base">Observateurs (watchers)</CardTitle>
+                        <CardDescription>
+                          Utilisateurs ou groupes notifiés en plus de l'affectataire principal
+                        </CardDescription>
+                      </div>
+                      {canManage && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setFormData({
+                            ...formData,
+                            watcher_config: [...formData.watcher_config, { type: 'requester', target_id: null }],
+                          })}
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Ajouter
+                        </Button>
+                      )}
+                    </CardHeader>
+                    <CardContent>
+                      {formData.watcher_config.length === 0 ? (
+                        <div className="text-center py-6 text-muted-foreground">
+                          <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                          <p className="text-sm">Aucun observateur configuré</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {formData.watcher_config.map((watcher, idx) => (
+                            <div key={idx} className="flex items-center gap-3 p-3 border rounded-lg">
+                              <div className="flex-1 grid grid-cols-2 gap-3">
+                                <div>
+                                  <Label className="text-xs">Type</Label>
+                                  <Select
+                                    value={watcher.type}
+                                    onValueChange={(v) => {
+                                      const updated = [...formData.watcher_config];
+                                      updated[idx] = { ...updated[idx], type: v as WatcherRule['type'], target_id: null };
+                                      setFormData({ ...formData, watcher_config: updated });
+                                    }}
+                                    disabled={!canManage}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="requester">Demandeur</SelectItem>
+                                      <SelectItem value="group">Groupe</SelectItem>
+                                      <SelectItem value="user">Utilisateur</SelectItem>
+                                      <SelectItem value="department">Service</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+
+                                {watcher.type === 'group' && (
+                                  <div>
+                                    <Label className="text-xs">Groupe</Label>
+                                    <Select
+                                      value={watcher.target_id || '__none__'}
+                                      onValueChange={(v) => {
+                                        const updated = [...formData.watcher_config];
+                                        updated[idx] = { ...updated[idx], target_id: v === '__none__' ? null : v };
+                                        setFormData({ ...formData, watcher_config: updated });
+                                      }}
+                                      disabled={!canManage}
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Sélectionner..." />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="__none__">Sélectionner...</SelectItem>
+                                        {groups.map((g) => (
+                                          <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                )}
+
+                                {watcher.type === 'user' && (
+                                  <div>
+                                    <Label className="text-xs">Utilisateur</Label>
+                                    <Select
+                                      value={watcher.target_id || '__none__'}
+                                      onValueChange={(v) => {
+                                        const updated = [...formData.watcher_config];
+                                        updated[idx] = { ...updated[idx], target_id: v === '__none__' ? null : v };
+                                        setFormData({ ...formData, watcher_config: updated });
+                                      }}
+                                      disabled={!canManage}
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Sélectionner..." />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="__none__">Sélectionner...</SelectItem>
+                                        {profiles.map((p) => (
+                                          <SelectItem key={p.id} value={p.id}>{p.display_name || 'Sans nom'}</SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                )}
+
+                                {watcher.type === 'department' && (
+                                  <div>
+                                    <Label className="text-xs">Service</Label>
+                                    <Select
+                                      value={watcher.target_id || '__none__'}
+                                      onValueChange={(v) => {
+                                        const updated = [...formData.watcher_config];
+                                        updated[idx] = { ...updated[idx], target_id: v === '__none__' ? null : v };
+                                        setFormData({ ...formData, watcher_config: updated });
+                                      }}
+                                      disabled={!canManage}
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Sélectionner..." />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="__none__">Sélectionner...</SelectItem>
+                                        {departments.map((d) => (
+                                          <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                )}
+
+                                {watcher.type === 'requester' && (
+                                  <div className="flex items-end">
+                                    <p className="text-xs text-muted-foreground pb-2">
+                                      Le demandeur sera automatiquement ajouté en observateur
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+
+                              {canManage && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-destructive shrink-0"
+                                  onClick={() => {
+                                    const updated = formData.watcher_config.filter((_, i) => i !== idx);
+                                    setFormData({ ...formData, watcher_config: updated });
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {canManage && (
+                    <div className="flex justify-end">
+                      <Button onClick={handleSaveAssignment} disabled={isSaving}>
+                        {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                        <Save className="h-4 w-4 mr-2" />
+                        Enregistrer l'affectation
+                      </Button>
+                    </div>
+                  )}
                 </TabsContent>
 
                 {/* Validations Tab */}

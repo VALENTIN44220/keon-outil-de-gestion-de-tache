@@ -46,14 +46,29 @@ export const VALIDATION_TYPE_LABELS: Record<ValidationLevelType, string> = {
   free: 'Libre',
 };
 
-export type AssignmentType = 'manager' | 'user' | 'role' | 'group';
+export type AssignmentType = 'manager' | 'user' | 'role' | 'group' | 'requester';
 
 export const ASSIGNMENT_TYPE_LABELS: Record<AssignmentType, string> = {
   manager: 'Par manager',
   user: 'Utilisateur spécifique',
-  role: 'Par poste',
+  role: 'Par poste / fonction',
   group: 'Groupe de collaborateurs',
+  requester: 'Demandeur',
 };
+
+export const ASSIGNMENT_TYPE_DESCRIPTIONS: Record<AssignmentType, string> = {
+  manager: 'Affecté au manager du demandeur ou d\'un profil/entité cible',
+  user: 'Affecté à un utilisateur spécifique prédéfini',
+  role: 'Affecté selon le poste/fonction via la table des postes',
+  group: 'Affecté à un groupe de collaborateurs',
+  requester: 'Affecté au demandeur lui-même (utile pour validation/action)',
+};
+
+export interface WatcherRule {
+  type: 'group' | 'user' | 'requester' | 'department';
+  target_id: string | null;
+  label?: string;
+}
 
 export interface SubProcessTemplate {
   id: string;
