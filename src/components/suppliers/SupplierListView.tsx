@@ -195,7 +195,7 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
     toggleDefault,
     toggleGlobal,
     loadPreset,
-  } = useSupplierFilterPresets(filters, setFilters, DEFAULT_SUPPLIER_FILTERS, visibleColumns, setVisibleColumns);
+  } = useSupplierFilterPresets(filters, setFilters, DEFAULT_SUPPLIER_FILTERS, visibleColumns, setVisibleColumns, prefixFilter, setPrefixFilter);
   const [showPresetPopover, setShowPresetPopover] = useState(false);
   const [newPresetName, setNewPresetName] = useState('');
 
