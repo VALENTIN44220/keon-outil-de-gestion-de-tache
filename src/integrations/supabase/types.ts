@@ -3160,6 +3160,144 @@ export type Database = {
           },
         ]
       }
+      standard_workflow_config: {
+        Row: {
+          assignment_group_id: string | null
+          assignment_job_title_id: string | null
+          assignment_target_id: string | null
+          assignment_type: string
+          config_key: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          fallback_assignment_type: string | null
+          fallback_enabled: boolean
+          fallback_group_id: string | null
+          fallback_job_title_id: string | null
+          fallback_target_id: string | null
+          id: string
+          initial_status: string
+          name: string
+          notify_assignee_on_create: boolean
+          notify_channels_complete: string[]
+          notify_channels_create: string[]
+          notify_channels_status: string[]
+          notify_requester_on_complete: boolean
+          notify_requester_on_create: boolean
+          notify_requester_on_status_change: boolean
+          updated_at: string
+          validation_1_target_id: string | null
+          validation_1_type: string | null
+          validation_2_target_id: string | null
+          validation_2_type: string | null
+          validation_levels: number
+          validation_timing: string
+          watcher_config: Json | null
+        }
+        Insert: {
+          assignment_group_id?: string | null
+          assignment_job_title_id?: string | null
+          assignment_target_id?: string | null
+          assignment_type?: string
+          config_key?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          fallback_assignment_type?: string | null
+          fallback_enabled?: boolean
+          fallback_group_id?: string | null
+          fallback_job_title_id?: string | null
+          fallback_target_id?: string | null
+          id?: string
+          initial_status?: string
+          name?: string
+          notify_assignee_on_create?: boolean
+          notify_channels_complete?: string[]
+          notify_channels_create?: string[]
+          notify_channels_status?: string[]
+          notify_requester_on_complete?: boolean
+          notify_requester_on_create?: boolean
+          notify_requester_on_status_change?: boolean
+          updated_at?: string
+          validation_1_target_id?: string | null
+          validation_1_type?: string | null
+          validation_2_target_id?: string | null
+          validation_2_type?: string | null
+          validation_levels?: number
+          validation_timing?: string
+          watcher_config?: Json | null
+        }
+        Update: {
+          assignment_group_id?: string | null
+          assignment_job_title_id?: string | null
+          assignment_target_id?: string | null
+          assignment_type?: string
+          config_key?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          fallback_assignment_type?: string | null
+          fallback_enabled?: boolean
+          fallback_group_id?: string | null
+          fallback_job_title_id?: string | null
+          fallback_target_id?: string | null
+          id?: string
+          initial_status?: string
+          name?: string
+          notify_assignee_on_create?: boolean
+          notify_channels_complete?: string[]
+          notify_channels_create?: string[]
+          notify_channels_status?: string[]
+          notify_requester_on_complete?: boolean
+          notify_requester_on_create?: boolean
+          notify_requester_on_status_change?: boolean
+          updated_at?: string
+          validation_1_target_id?: string | null
+          validation_1_type?: string | null
+          validation_2_target_id?: string | null
+          validation_2_type?: string | null
+          validation_levels?: number
+          validation_timing?: string
+          watcher_config?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "standard_workflow_config_assignment_group_id_fkey"
+            columns: ["assignment_group_id"]
+            isOneToOne: false
+            referencedRelation: "collaborator_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "standard_workflow_config_assignment_job_title_id_fkey"
+            columns: ["assignment_job_title_id"]
+            isOneToOne: false
+            referencedRelation: "job_titles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "standard_workflow_config_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "standard_workflow_config_fallback_group_id_fkey"
+            columns: ["fallback_group_id"]
+            isOneToOne: false
+            referencedRelation: "collaborator_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "standard_workflow_config_fallback_job_title_id_fkey"
+            columns: ["fallback_job_title_id"]
+            isOneToOne: false
+            referencedRelation: "job_titles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sub_process_template_visible_companies: {
         Row: {
           company_id: string

@@ -19,7 +19,7 @@ import { CollaboratorGroupsTab } from './CollaboratorGroupsTab';
 
 import { DatabaseResetDialog } from './DatabaseResetDialog';
 import { UserSimulationSelector } from './UserSimulationSelector';
-import { WorkflowMigrationTab } from './WorkflowMigrationTab';
+import { StandardWorkflowConfigTab } from './StandardWorkflowConfigTab';
 import { TableLookupConfigTab } from './TableLookupConfigTab';
 import { ServiceGroupsTab } from './ServiceGroupsTab';
 import { CategoriesManagementTab } from './CategoriesManagementTab';
@@ -102,7 +102,7 @@ export function AdminTabs(props: AdminTabsProps) {
           <TabsTrigger value="simulation" className="px-2 py-1.5" title="Simulation utilisateur">
             <UserRoundCog className="h-4 w-4" />
           </TabsTrigger>
-          <TabsTrigger value="workflow-migration" className="px-2 py-1.5" title="Migration Workflows">
+          <TabsTrigger value="workflow-migration" className="px-2 py-1.5" title="Workflow Standard">
             <Workflow className="h-4 w-4" />
           </TabsTrigger>
           <TabsTrigger value="table-lookup" className="px-2 py-1.5" title="Champs table">
@@ -213,7 +213,7 @@ export function AdminTabs(props: AdminTabsProps) {
         </TabsContent>
 
         <TabsContent value="workflow-migration">
-          <WorkflowMigrationTab />
+          <StandardWorkflowConfigTab />
         </TabsContent>
 
         <TabsContent value="table-lookup">
