@@ -144,7 +144,7 @@ export function ViewSubProcessDialog({ subProcess, open, onClose }: ViewSubProce
 
   const handleOpenWorkflow = () => {
     if (subProcess) {
-      navigate(`/templates/sub-process/${subProcess.id}?tab=workflow`);
+      navigate(`/templates/subprocess/${subProcess.id}?tab=workflow`);
       onClose();
     }
   };

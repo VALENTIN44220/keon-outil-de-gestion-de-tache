@@ -202,7 +202,7 @@ export function SubProcessCard({
               variant="outline" 
               size="sm" 
               className="h-9 w-9 p-0 bg-success/10 border-success/30 text-success hover:bg-success/20 hover:border-success/50"
-              onClick={(e) => { e.stopPropagation(); navigate(`/templates/sub-process/${subProcess.id}?tab=workflow`); }}
+              onClick={(e) => { e.stopPropagation(); navigate(`/templates/subprocess/${subProcess.id}?tab=workflow`); }}
               title="Modifier le workflow"
             >
               <Workflow className="h-4 w-4" />

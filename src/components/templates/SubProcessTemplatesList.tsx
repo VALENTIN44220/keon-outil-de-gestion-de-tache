@@ -166,7 +166,7 @@ export function SubProcessTemplatesList({
                     variant="outline" 
                     size="sm" 
                     className="h-7 px-2.5 text-xs bg-success/10 border-success/30 text-success hover:bg-success/20"
-                    onClick={(e) => { e.stopPropagation(); navigate(`/templates/sub-process/${sp.id}?tab=workflow`); }}
+                    onClick={(e) => { e.stopPropagation(); navigate(`/templates/subprocess/${sp.id}?tab=workflow`); }}
                   >
                     <Workflow className="h-3 w-3 mr-1" />
                     Workflow
