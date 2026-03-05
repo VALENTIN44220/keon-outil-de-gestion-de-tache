@@ -6146,6 +6146,7 @@ export type Database = {
           id: string
           is_active: boolean
           is_draft: boolean
+          is_standard_template: boolean
           legacy_workflow_id: string | null
           name: string
           published_at: string | null
@@ -6160,6 +6161,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           is_draft?: boolean
+          is_standard_template?: boolean
           legacy_workflow_id?: string | null
           name: string
           published_at?: string | null
@@ -6174,6 +6176,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           is_draft?: boolean
+          is_standard_template?: boolean
           legacy_workflow_id?: string | null
           name?: string
           published_at?: string | null

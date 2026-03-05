@@ -1,0 +1,1 @@
+ALTER TABLE public.wf_workflows ADD COLUMN IF NOT EXISTS is_standard_template BOOLEAN NOT NULL DEFAULT false;
