@@ -58,7 +58,9 @@ export function useSupplierAccess() {
 
         if (profileAccess) {
           const pp = (profileAccess as any).permission_profiles;
-          const uo = (profileAccess as any).user_permission_overrides?.[0];
+          const uo = Array.isArray((profileAccess as any).user_permission_overrides)
+            ? (profileAccess as any).user_permission_overrides?.[0]
+            : (profileAccess as any).user_permission_overrides;
 
           const canView = uo?.can_view_suppliers ?? pp?.can_view_suppliers ?? false;
           const canCreate = uo?.can_create_suppliers ?? pp?.can_create_suppliers ?? false;
