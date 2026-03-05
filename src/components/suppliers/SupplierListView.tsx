@@ -645,8 +645,8 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
       {/* Table View */}
       {viewMode === 'table' && (
         <Card>
-          <div className="w-full max-h-[65vh] overflow-scroll pb-2 [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/40 [&::-webkit-scrollbar-track]:bg-muted/20 [&::-webkit-scrollbar-thumb]:min-h-[40px]">
-            <div className="min-w-max">
+          <div className="w-full overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)] pb-2 [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/40 [&::-webkit-scrollbar-track]:bg-muted/20 [&::-webkit-scrollbar-thumb]:min-h-[40px]" style={{ overscrollBehavior: 'contain' }}>
+            <div className="min-w-max" style={{ position: 'relative' }}>
               <table className="caption-bottom text-sm" style={{ width: `${tableWidthPx}px` }}>
                 <TableHeader>
                   <TableRow>
