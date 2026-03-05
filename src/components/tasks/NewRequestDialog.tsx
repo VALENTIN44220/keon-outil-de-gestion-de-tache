@@ -388,13 +388,13 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
           if (cfg.be_project && !cfg.be_project.editable && cfg.be_project.default_value) {
             setBeProjectId(cfg.be_project.default_value);
           }
-          if (cfg.title && !cfg.title.editable && cfg.title.title_pattern) {
-            const resolvedTitle = resolveTitlePattern(cfg.title.title_pattern, {
-              processName: linkedProcessName || '',
-              userName: currentUser?.display_name || '',
-            });
-            setTitle(resolvedTitle);
-          }
+          // Title is always auto-generated
+          const titlePattern = cfg.title?.title_pattern || '{process} - {date}';
+          const resolvedTitle = resolveTitlePattern(titlePattern, {
+            processName: linkedProcessName || '',
+            userName: currentUser?.display_name || '',
+          });
+          setTitle(resolvedTitle);
         } else {
           setCommonFieldsConfig(null);
         }
@@ -959,30 +959,14 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                     <div className="space-y-2.5">
                       <Label htmlFor="title" className="text-sm font-semibold flex items-center gap-1.5 text-foreground">
                         Titre de la demande
-                        <span className="text-destructive text-lg leading-none">*</span>
-                        {commonFieldsConfig?.title && !commonFieldsConfig.title.editable && (
-                          <span className="text-xs text-muted-foreground ml-1">(imposé)</span>
-                        )}
+                        <span className="text-xs text-muted-foreground ml-1">(automatique)</span>
                       </Label>
-                      <Input
-                        id="title"
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                        placeholder="Décrivez brièvement votre demande..."
-                        className="h-12 text-base rounded-xl border-2 focus-visible:ring-primary/20 focus-visible:border-primary transition-all"
-                        required
-                        readOnly={commonFieldsConfig?.title?.editable === false}
-                        disabled={commonFieldsConfig?.title?.editable === false}
-                      />
-                      {commonFieldsConfig?.title?.editable === false && commonFieldsConfig.title.title_pattern ? (
-                        <p className="text-xs text-muted-foreground pl-1">
-                          Le titre sera géré automatiquement à la création de la demande
-                        </p>
-                      ) : (
-                        <p className="text-xs text-muted-foreground pl-1">
-                          Un titre clair aide à identifier rapidement votre demande
-                        </p>
-                      )}
+                      <div className="flex items-center h-12 px-4 rounded-xl border-2 bg-muted/50 text-base text-foreground">
+                        {title || 'Titre auto-généré à la création'}
+                      </div>
+                      <p className="text-xs text-muted-foreground pl-1">
+                        Le titre est généré automatiquement à la création de la demande
+                      </p>
                     </div>
                   )}
 

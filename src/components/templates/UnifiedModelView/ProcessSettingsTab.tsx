@@ -19,7 +19,6 @@ import {
   CommonFieldConfig,
   DEFAULT_COMMON_FIELDS_CONFIG,
   COMMON_FIELD_LABELS,
-  TITLE_PATTERN_VARIABLES,
 } from '@/types/commonFieldsConfig';
 
 interface ProcessSettingsTabProps {
@@ -310,7 +309,29 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
             const config = commonFieldsConfig[key];
             const showPriorityDefault = key === 'priority' && config.visible && !config.editable;
             const showProjectDefault = key === 'be_project' && !config.editable;
-            const showTitlePattern = key === 'title' && !config.editable;
+
+            // Title is always auto-generated — skip config row
+            if (key === 'title') {
+              return (
+                <div key={key} className="space-y-2">
+                  <div className="grid grid-cols-[1fr_80px_80px_140px] gap-2 items-center px-2 py-2 rounded bg-muted/30">
+                    <span className="text-sm font-medium">{COMMON_FIELD_LABELS[key]}</span>
+                    <div className="flex justify-center">
+                      <Switch checked={true} disabled />
+                    </div>
+                    <div className="flex justify-center">
+                      <Switch checked={false} disabled />
+                    </div>
+                    <span className="text-xs text-muted-foreground text-center">Automatique</span>
+                  </div>
+                  <div className="ml-4 pl-4 border-l-2 border-primary/30 pb-2">
+                    <p className="text-xs text-muted-foreground">
+                      Le titre est toujours généré automatiquement : <code className="bg-muted px-1 rounded">{'Nom du processus - Date'}</code>
+                    </p>
+                  </div>
+                </div>
+              );
+            }
 
             return (
               <div key={key} className="space-y-2">
@@ -323,7 +344,7 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
                       onCheckedChange={(checked) =>
                         updateFieldConfig(key, { visible: checked })
                       }
-                      disabled={!canManage || key === 'title'}
+                      disabled={!canManage}
                     />
                   </div>
 
@@ -405,49 +426,6 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
                     )}
                   </div>
                 </div>
-
-                {/* Title pattern config when title is imposed */}
-                {showTitlePattern && (
-                  <div className="ml-4 pl-4 border-l-2 border-primary/30 space-y-2 pb-2">
-                    <Label className="text-xs font-medium">Modèle de titre automatique</Label>
-                    <Input
-                      value={(commonFieldsConfig.title as any).title_pattern || ''}
-                      onChange={(e) =>
-                        setCommonFieldsConfig((prev) => ({
-                          ...prev,
-                          title: { ...prev.title, title_pattern: e.target.value },
-                        }))
-                      }
-                      placeholder="Ex: {process} - {user} - {date}"
-                      className="h-8 text-sm"
-                      disabled={!canManage}
-                    />
-                    <div className="flex flex-wrap gap-1">
-                      {TITLE_PATTERN_VARIABLES.map((v) => (
-                        <Button
-                          key={v.key}
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-6 text-xs px-2"
-                          disabled={!canManage}
-                          onClick={() => {
-                            const current = (commonFieldsConfig.title as any).title_pattern || '';
-                            setCommonFieldsConfig((prev) => ({
-                              ...prev,
-                              title: { ...prev.title, title_pattern: current + v.key },
-                            }));
-                          }}
-                        >
-                          {v.key} <span className="text-muted-foreground ml-1">{v.label}</span>
-                        </Button>
-                      ))}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Le titre sera généré automatiquement à la création de la demande
-                    </p>
-                  </div>
-                )}
               </div>
             );
           })}

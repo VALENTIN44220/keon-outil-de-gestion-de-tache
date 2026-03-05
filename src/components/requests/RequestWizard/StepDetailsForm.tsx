@@ -48,13 +48,19 @@ export function StepDetailsForm({ data, requestType, onDataChange, commonFieldsC
   const isPerson = requestType === 'person';
 
   // Only apply config for process requests
-  const cfg = requestType === 'process' && commonFieldsConfig
+  const rawCfg = requestType === 'process' && commonFieldsConfig
     ? commonFieldsConfig
     : DEFAULT_COMMON_FIELDS_CONFIG;
 
-  // Auto-generate title when pattern is set and title is not editable
+  // Title is ALWAYS auto-generated — force non-editable with default pattern
+  const cfg = {
+    ...rawCfg,
+    title: { ...rawCfg.title, editable: false, title_pattern: rawCfg.title.title_pattern || '{process} - {date}' },
+  };
+
+  // Auto-generate title
   useEffect(() => {
-    if (cfg.title.visible && !cfg.title.editable && cfg.title.title_pattern) {
+    if (cfg.title.visible && cfg.title.title_pattern) {
       const generated = resolveTitlePattern(cfg.title.title_pattern, {
         processName: data.processName || '',
         userName: profile?.display_name || '',
@@ -63,7 +69,7 @@ export function StepDetailsForm({ data, requestType, onDataChange, commonFieldsC
         onDataChange({ title: generated });
       }
     }
-  }, [cfg.title.editable, cfg.title.title_pattern, data.processName, profile?.display_name]);
+  }, [cfg.title.title_pattern, data.processName, profile?.display_name]);
 
   return (
     <div className="space-y-6">
@@ -84,31 +90,16 @@ export function StepDetailsForm({ data, requestType, onDataChange, commonFieldsC
 
       <ScrollArea className="h-[450px] pr-4">
         <div className="space-y-5 pb-4">
-          {/* Title */}
+          {/* Title — always auto-generated */}
           {cfg.title.visible && (
             <div className="space-y-2">
               <Label htmlFor="title">
-                Titre {cfg.title.editable ? '*' : ''}
-                {!cfg.title.editable && (
-                  <span className="text-xs text-muted-foreground ml-2">(généré automatiquement)</span>
-                )}
+                Titre
+                <span className="text-xs text-muted-foreground ml-2">(généré automatiquement)</span>
               </Label>
-              {cfg.title.editable ? (
-                <Input
-                  id="title"
-                  value={data.title}
-                  onChange={(e) => onDataChange({ title: e.target.value })}
-                  placeholder={
-                    isPersonal
-                      ? 'Ex: Préparer la présentation trimestrielle'
-                      : 'Ex: Demande de matériel informatique'
-                  }
-                />
-              ) : (
-                <div className="flex items-center h-10 px-3 rounded-md border bg-muted/50 text-sm">
-                  {data.title || 'Titre auto-généré à la création'}
-                </div>
-              )}
+              <div className="flex items-center h-10 px-3 rounded-md border bg-muted/50 text-sm">
+                {data.title || 'Titre auto-généré à la création'}
+              </div>
             </div>
           )}
 

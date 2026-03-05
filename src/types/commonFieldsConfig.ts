@@ -21,7 +21,7 @@ export interface CommonFieldsConfig {
 }
 
 export const DEFAULT_COMMON_FIELDS_CONFIG: CommonFieldsConfig = {
-  title: { visible: true, editable: true, title_pattern: null },
+  title: { visible: true, editable: false, title_pattern: '{process} - {date}' },
   description: { visible: true, editable: true },
   priority: { visible: true, editable: true, default_value: 'medium' },
   due_date: { visible: true, editable: true },
