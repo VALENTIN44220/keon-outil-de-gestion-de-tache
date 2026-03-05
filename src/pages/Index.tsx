@@ -56,6 +56,8 @@ const Index = () => {
   // Request tracking state
   const [myRequests, setMyRequests] = useState<Task[]>([]);
   const [isLoadingRequests, setIsLoadingRequests] = useState(false);
+  // All requests for analytics mode
+  const [allRequests, setAllRequests] = useState<Task[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<Task | null>(null);
   const [isRequestDetailOpen, setIsRequestDetailOpen] = useState(false);
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFiltersState>({
@@ -135,11 +137,41 @@ const Index = () => {
     }
   }, [profile?.id]);
 
+  // Fetch all requests for analytics mode
+  const fetchAllRequests = useCallback(async () => {
+    if (!profile?.id) return;
+    try {
+      const { data } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('type', 'request')
+        .order('created_at', { ascending: false });
+      setAllRequests((data || []) as Task[]);
+    } catch (error) {
+      console.error('Error fetching all requests:', error);
+    }
+  }, [profile?.id]);
+
   useEffect(() => {
     if (dashboardMode === 'tracking') {
       fetchMyRequests();
     }
-  }, [dashboardMode, fetchMyRequests]);
+    if (dashboardMode === 'analytics') {
+      fetchAllRequests();
+    }
+  }, [dashboardMode, fetchMyRequests, fetchAllRequests]);
+
+  // Merge tasks + requests for analytics mode
+  const analyticsTasksAndRequests = useMemo(() => {
+    const merged = [...allTasks];
+    const existingIds = new Set(merged.map(t => t.id));
+    for (const r of allRequests) {
+      if (!existingIds.has(r.id)) {
+        merged.push(r);
+      }
+    }
+    return merged;
+  }, [allTasks, allRequests]);
 
   // Stats for request tracking dashboard
   const requestStats = useMemo((): TaskStats => {
@@ -475,7 +507,7 @@ const Index = () => {
       ) : dashboardMode === 'analytics' ? (
         /* Configurable Dashboard with widgets */
         <ConfigurableDashboard
-          tasks={allTasks}
+          tasks={analyticsTasksAndRequests}
           stats={stats}
           globalProgress={globalProgress}
           onTaskClick={(task) => {
