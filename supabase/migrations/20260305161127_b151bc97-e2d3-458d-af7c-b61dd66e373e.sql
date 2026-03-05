@@ -1,0 +1,1 @@
+ALTER TYPE public.wf_step_type ADD VALUE IF NOT EXISTS 'task_generation';

@@ -25,7 +25,7 @@ interface Props {
   maxOrderIndex: number;
 }
 
-const EDITABLE_STEP_TYPES: WfStepType[] = ['validation', 'execution', 'assignment', 'automatic', 'subprocess', 'notification'];
+const EDITABLE_STEP_TYPES: WfStepType[] = ['validation', 'execution', 'assignment', 'automatic', 'subprocess', 'notification', 'task_generation'];
 
 export function WfStepDrawer({ open, onClose, onSave, assignmentRules, existingSteps, mode, initialData, maxOrderIndex }: Props) {
   const [name, setName] = useState('');

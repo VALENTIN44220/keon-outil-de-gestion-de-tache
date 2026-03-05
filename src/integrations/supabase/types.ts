@@ -7444,6 +7444,7 @@ export type Database = {
         | "automatic"
         | "subprocess"
         | "notification"
+        | "task_generation"
       wf_validation_mode: "none" | "simple" | "n_of_m" | "sequence"
       workflow_node_type:
         | "start"
@@ -7668,6 +7669,7 @@ export const Constants = {
         "automatic",
         "subprocess",
         "notification",
+        "task_generation",
       ],
       wf_validation_mode: ["none", "simple", "n_of_m", "sequence"],
       workflow_node_type: [
