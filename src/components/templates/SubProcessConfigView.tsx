@@ -46,6 +46,7 @@ import {
   Filter,
   Eye,
   EyeOff,
+  Workflow,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { SubProcessTemplate, TaskTemplate, ASSIGNMENT_TYPE_LABELS } from '@/types/template';
@@ -56,6 +57,7 @@ import { EditTaskTemplateDialog } from './EditTaskTemplateDialog';
 import { SubProcessNotificationsPanel } from './SubProcessNotificationsPanel';
 import { TableOutputMappingPanel } from './TableOutputMappingPanel';
 import { addTaskToWorkflow, removeTaskFromWorkflow } from '@/hooks/useAutoWorkflowGeneration';
+import { WorkflowConfigTab } from '@/components/workflow-config/WorkflowConfigTab';
 import { cn } from '@/lib/utils';
 
 interface SubProcessConfigViewProps {
@@ -472,12 +474,13 @@ export function SubProcessConfigView({
     { id: 'output', label: 'Sortie table', icon: Database },
     { id: 'visibility', label: 'Visibilité', icon: Eye },
     { id: 'notifications', label: 'Notifications', icon: Bell },
+    { id: 'workflow', label: 'Workflow', icon: Workflow },
   ];
 
   return (
     <>
     <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <SheetContent className="w-full sm:max-w-3xl p-0 flex flex-col h-full">
+      <SheetContent className="w-full sm:max-w-[90vw] p-0 flex flex-col h-full">
         <SheetHeader className="p-6 pb-4 border-b shrink-0">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={onClose}>
@@ -509,7 +512,7 @@ export function SubProcessConfigView({
           className="flex-1 flex flex-col min-h-0"
         >
           <div className="px-6 pt-4 shrink-0">
-            <TabsList className="w-full grid grid-cols-7">
+            <TabsList className="w-full grid grid-cols-8">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 return (
@@ -1203,6 +1206,15 @@ export function SubProcessConfigView({
                   subProcessId={subProcessId}
                   canManage={canManage}
                   onUpdate={onUpdate}
+                />
+              </TabsContent>
+
+              {/* Workflow Tab */}
+              <TabsContent value="workflow" className="mt-0 space-y-4">
+                <WorkflowConfigTab
+                  subProcessId={subProcessId}
+                  subProcessName={subProcess.name}
+                  canManage={canManage}
                 />
               </TabsContent>
 
