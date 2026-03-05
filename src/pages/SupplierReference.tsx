@@ -20,11 +20,13 @@ export default function SupplierReference() {
 
   const handleOpenSupplier = (id: string) => {
     setSelectedSupplierId(id);
+    setSynthesisOpen(false);
     setDrawerOpen(true);
   };
 
   const handleViewSupplier = (id: string) => {
     setSelectedSupplierId(id);
+    setDrawerOpen(false);
     setSynthesisOpen(true);
   };
 
