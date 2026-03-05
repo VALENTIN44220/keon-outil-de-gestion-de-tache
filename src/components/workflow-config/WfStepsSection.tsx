@@ -52,6 +52,8 @@ export function WfStepsSection({ steps, assignmentRules, canManage, onAdd, onUpd
       case 'validation': return 'default' as const;
       case 'execution': return 'secondary' as const;
       case 'task_generation': return 'default' as const;
+      case 'request_creation': return 'default' as const;
+      case 'status_change': return 'secondary' as const;
       default: return 'outline' as const;
     }
   };

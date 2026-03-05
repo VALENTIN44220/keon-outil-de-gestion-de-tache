@@ -506,6 +506,8 @@ export const WF_STEP_TYPE_LABELS: Record<WfStepType, string> = {
   subprocess: 'Sous-processus',
   notification: 'Notification',
   task_generation: 'Génération de tâche',
+  request_creation: 'Création de la demande',
+  status_change: 'Changement d\'état',
 };
 
 export const WF_VALIDATION_MODE_LABELS: Record<WfValidationMode, string> = {
