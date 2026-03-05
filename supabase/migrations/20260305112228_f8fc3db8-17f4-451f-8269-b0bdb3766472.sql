@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS idx_user_filter_presets_default;
