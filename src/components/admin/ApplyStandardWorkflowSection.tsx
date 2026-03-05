@@ -1,15 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, Play, AlertCircle } from 'lucide-react';
+import { Loader2, Play, AlertCircle, CheckSquare, Square, MinusSquare } from 'lucide-react';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -145,9 +144,8 @@ async function applyStandardToSubProcesses(
 
 export function ApplyStandardWorkflowSection({ workflowId }: { workflowId: string }) {
   const [subProcesses, setSubProcesses] = useState<SubProcessOption[]>([]);
-  const [selectedSpId, setSelectedSpId] = useState<string>('');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isApplying, setIsApplying] = useState(false);
-  const [isApplyingAll, setIsApplyingAll] = useState(false);
   const [results, setResults] = useState<{ total: number; success: number; errors: number } | null>(null);
 
   useEffect(() => {
@@ -156,26 +154,66 @@ export function ApplyStandardWorkflowSection({ workflowId }: { workflowId: strin
       .select('id, name, process_templates(name)')
       .order('name')
       .then(({ data }) => {
-        setSubProcesses(
-          (data || []).map((sp: any) => ({
-            id: sp.id,
-            name: sp.name,
-            process_name: sp.process_templates?.name || null,
-          }))
-        );
+        const items = (data || []).map((sp: any) => ({
+          id: sp.id,
+          name: sp.name,
+          process_name: sp.process_templates?.name || null,
+        }));
+        setSubProcesses(items);
+        // Select all by default
+        setSelectedIds(new Set(items.map(i => i.id)));
       });
   }, []);
 
-  const applyToOne = async () => {
-    const sp = subProcesses.find(s => s.id === selectedSpId);
-    if (!sp) return;
+  // Group by process name
+  const grouped = useMemo(() => {
+    const map = new Map<string, SubProcessOption[]>();
+    for (const sp of subProcesses) {
+      const key = sp.process_name || 'Sans processus';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(sp);
+    }
+    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+  }, [subProcesses]);
+
+  const toggleOne = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (selectedIds.size === subProcesses.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(subProcesses.map(s => s.id)));
+    }
+  };
+
+  const toggleGroup = (groupSps: SubProcessOption[]) => {
+    const allSelected = groupSps.every(sp => selectedIds.has(sp.id));
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      for (const sp of groupSps) {
+        if (allSelected) next.delete(sp.id);
+        else next.add(sp.id);
+      }
+      return next;
+    });
+  };
+
+  const applyToSelected = async () => {
+    const targets = subProcesses.filter(sp => selectedIds.has(sp.id));
+    if (targets.length === 0) return;
     setIsApplying(true);
     setResults(null);
     try {
-      const res = await applyStandardToSubProcesses(workflowId, [sp]);
+      const res = await applyStandardToSubProcesses(workflowId, targets);
       setResults(res);
-      if (res.success > 0) toast.success(`Workflow standard appliqué à "${sp.name}"`);
-      else toast.error(`Échec de l'application à "${sp.name}"`);
+      toast.success(`Workflow standard appliqué à ${res.success}/${res.total} sous-processus`);
     } catch {
       toast.error("Erreur lors de l'application");
     } finally {
@@ -183,21 +221,8 @@ export function ApplyStandardWorkflowSection({ workflowId }: { workflowId: strin
     }
   };
 
-  const applyToAll = async () => {
-    setIsApplyingAll(true);
-    setResults(null);
-    try {
-      const res = await applyStandardToSubProcesses(workflowId, subProcesses);
-      setResults(res);
-      toast.success(`Workflow standard appliqué à ${res.success} sous-processus`);
-    } catch {
-      toast.error("Erreur lors de l'application");
-    } finally {
-      setIsApplyingAll(false);
-    }
-  };
-
-  const isLoading = isApplying || isApplyingAll;
+  const allChecked = selectedIds.size === subProcesses.length;
+  const someChecked = selectedIds.size > 0 && !allChecked;
 
   return (
     <Card>
@@ -207,83 +232,103 @@ export function ApplyStandardWorkflowSection({ workflowId }: { workflowId: strin
           Appliquer le workflow standard
         </CardTitle>
         <CardDescription>
-          Appliquez la configuration standard à un sous-processus spécifique ou à tous.
+          Sélectionnez les sous-processus auxquels appliquer la configuration standard.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-start gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
           <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-          <p>La régénération écrasera les workflows personnalisés existants.</p>
+          <p>La régénération écrasera les workflows personnalisés existants des sous-processus sélectionnés.</p>
         </div>
 
-        {/* Individual apply */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Appliquer à un sous-processus</label>
-          <div className="flex gap-2">
-            <Select value={selectedSpId} onValueChange={setSelectedSpId}>
-              <SelectTrigger className="flex-1">
-                <SelectValue placeholder="Sélectionner un sous-processus…" />
-              </SelectTrigger>
-              <SelectContent>
-                {subProcesses.map(sp => (
-                  <SelectItem key={sp.id} value={sp.id}>
-                    {sp.process_name ? `${sp.process_name} › ` : ''}{sp.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="default" disabled={!selectedSpId || isLoading} className="gap-2 shrink-0">
-                  {isApplying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-                  Appliquer
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Appliquer le workflow standard ?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Le workflow de <strong>{subProcesses.find(s => s.id === selectedSpId)?.name}</strong> sera régénéré avec la configuration standard. Le workflow personnalisé existant sera écrasé.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Annuler</AlertDialogCancel>
-                  <AlertDialogAction onClick={applyToOne}>Confirmer</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
+        {/* Select all / none */}
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={toggleAll}
+            className="flex items-center gap-2 text-sm font-medium hover:text-primary transition-colors"
+          >
+            {allChecked ? (
+              <CheckSquare className="h-4 w-4 text-primary" />
+            ) : someChecked ? (
+              <MinusSquare className="h-4 w-4 text-primary" />
+            ) : (
+              <Square className="h-4 w-4 text-muted-foreground" />
+            )}
+            {allChecked ? 'Tout désélectionner' : 'Tout sélectionner'}
+          </button>
+          <span className="text-sm text-muted-foreground">
+            {selectedIds.size} / {subProcesses.length} sélectionnés
+          </span>
         </div>
 
-        {/* Separator */}
-        <div className="relative py-2">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-card px-2 text-muted-foreground">ou</span>
-          </div>
-        </div>
+        {/* Checkbox list grouped by process */}
+        <ScrollArea className="max-h-72 border rounded-lg">
+          <div className="p-2 space-y-3">
+            {grouped.map(([processName, sps]) => {
+              const groupAllSelected = sps.every(sp => selectedIds.has(sp.id));
+              const groupSomeSelected = sps.some(sp => selectedIds.has(sp.id)) && !groupAllSelected;
 
-        {/* Apply to all */}
+              return (
+                <div key={processName}>
+                  {/* Group header */}
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(sps)}
+                    className="flex items-center gap-2 text-xs font-semibold uppercase text-muted-foreground mb-1 hover:text-foreground transition-colors w-full"
+                  >
+                    {groupAllSelected ? (
+                      <CheckSquare className="h-3.5 w-3.5 text-primary" />
+                    ) : groupSomeSelected ? (
+                      <MinusSquare className="h-3.5 w-3.5 text-primary" />
+                    ) : (
+                      <Square className="h-3.5 w-3.5" />
+                    )}
+                    {processName} ({sps.length})
+                  </button>
+                  {/* Items */}
+                  <div className="space-y-0.5 ml-1">
+                    {sps.map(sp => (
+                      <label
+                        key={sp.id}
+                        className="flex items-center gap-2 py-1 px-2 rounded hover:bg-accent cursor-pointer text-sm"
+                      >
+                        <Checkbox
+                          checked={selectedIds.has(sp.id)}
+                          onCheckedChange={() => toggleOne(sp.id)}
+                        />
+                        {sp.name}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </ScrollArea>
+
+        {/* Apply button */}
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button variant="outline" disabled={isLoading} className="gap-2 w-full">
-              {isApplyingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-              Appliquer à tous les sous-processus ({subProcesses.length})
+            <Button
+              variant="default"
+              disabled={selectedIds.size === 0 || isApplying}
+              className="gap-2 w-full"
+            >
+              {isApplying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+              Appliquer aux {selectedIds.size} sous-processus sélectionnés
             </Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Appliquer à tous les sous-processus ?</AlertDialogTitle>
+              <AlertDialogTitle>Appliquer le workflow standard ?</AlertDialogTitle>
               <AlertDialogDescription>
-                Cette action va régénérer les workflows de <strong>tous les {subProcesses.length} sous-processus</strong> avec la configuration standard. Les workflows personnalisés seront écrasés.
+                Cette action va régénérer les workflows de <strong>{selectedIds.size} sous-processus</strong> avec la configuration standard. Les workflows personnalisés existants seront écrasés.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Annuler</AlertDialogCancel>
-              <AlertDialogAction onClick={applyToAll}>Confirmer</AlertDialogAction>
+              <AlertDialogAction onClick={applyToSelected}>Confirmer</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
