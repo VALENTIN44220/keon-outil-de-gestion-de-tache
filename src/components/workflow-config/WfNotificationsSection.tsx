@@ -54,12 +54,18 @@ function getChannels(json: Json): string[] {
 
 function getRecipients(json: Json): string[] {
   if (!json) return ['requester'];
-  if (Array.isArray(json)) return json as string[];
+  if (Array.isArray(json)) {
+    return json.map(item => {
+      if (typeof item === 'string') return item;
+      if (typeof item === 'object' && item !== null && 'type' in item) return String((item as any).type);
+      return String(item);
+    });
+  }
   if (typeof json === 'object' && json !== null && 'types' in json && Array.isArray((json as any).types)) {
-    return (json as any).types;
+    return (json as any).types.map((t: any) => typeof t === 'string' ? t : String(t));
   }
   if (typeof json === 'object' && json !== null && 'type' in json) {
-    return [(json as any).type];
+    return [String((json as any).type)];
   }
   return ['requester'];
 }
