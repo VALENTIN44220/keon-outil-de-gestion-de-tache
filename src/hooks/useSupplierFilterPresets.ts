@@ -59,10 +59,10 @@ export function useSupplierFilterPresets(
       }));
       setPresets(mapped);
 
-      // Priority: user's own default > global standard
-      const userDefault = mapped.find(p => p.is_default && p.user_id === user.id);
+      // Priority: global standard > user's own default
       const globalDefault = mapped.find(p => p.is_global);
-      const toApply = userDefault || globalDefault;
+      const userDefault = mapped.find(p => p.is_default && p.user_id === user.id);
+      const toApply = globalDefault || userDefault;
       if (toApply) {
         setFilters({ ...defaultFilters, ...toApply.filters });
         if (toApply.visible_columns?.length && setVisibleColumns) {
@@ -135,13 +135,9 @@ export function useSupplierFilterPresets(
     }
 
     if (!wasDefault) {
-      const updatedPayload = {
-        filters: preset?.filters ?? filters,
-        visible_columns: visibleColumns,
-      };
       const { error: setError } = await (supabase as any)
         .from('user_filter_presets')
-        .update({ is_default: true, filters: updatedPayload, visible_columns: visibleColumns ? JSON.parse(JSON.stringify(visibleColumns)) : null })
+        .update({ is_default: true })
         .eq('id', presetId);
 
       if (setError) {
@@ -153,10 +149,9 @@ export function useSupplierFilterPresets(
     setPresets(prev => prev.map(p => ({
       ...p,
       is_default: p.id === presetId ? !wasDefault : (p.user_id === user.id ? false : p.is_default),
-      visible_columns: p.id === presetId && !wasDefault ? visibleColumns : p.visible_columns,
     })));
     toast.success(wasDefault ? 'Contexte par défaut retiré' : 'Contexte défini par défaut');
-  }, [user, presets, filters, visibleColumns]);
+  }, [user, presets]);
 
   const toggleGlobal = useCallback(async (presetId: string) => {
     if (!user) return;
