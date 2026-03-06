@@ -584,10 +584,75 @@ export function ConfigurableDashboard({
     }
   }, [filteredStats, filteredTasks, getChartData, getTimelineData, onTaskClick]);
 
-  // Get height style based on widget h dimension
-  const getHeightStyle = (widget: WidgetConfig): React.CSSProperties => {
+  // Get height in px for a widget
+  const getWidgetHeightPx = (widget: WidgetConfig): number => {
     const preset = getHeightPresetFromWidget(widget);
-    return { height: `${HEIGHT_PRESET_PX[preset]}px` };
+    return HEIGHT_PRESET_PX[preset];
+  };
+
+  // Is a widget full-width (spans 2 columns)?
+  const isFullWidth = (widget: WidgetConfig) => widget.size.w >= 3;
+
+  // Compute a smart 2-column layout via greedy bin-packing
+  // Each placed widget gets: { widget, col: 0|1|'full', top: number }
+  const gridLayout = useMemo(() => {
+    const GAP = 16; // matches gap-4
+    const colHeights = [0, 0]; // track cumulative height per column
+    const placements: { widget: WidgetConfig; col: 0 | 1 | 'full'; top: number }[] = [];
+
+    for (const w of widgets) {
+      const h = getWidgetHeightPx(w);
+      if (isFullWidth(w)) {
+        // Full-width: place at the max of both columns
+        const top = Math.max(colHeights[0], colHeights[1]);
+        placements.push({ widget: w, col: 'full', top });
+        const newBottom = top + h + GAP;
+        colHeights[0] = newBottom;
+        colHeights[1] = newBottom;
+      } else {
+        // Place in the shorter column (greedy bin-packing)
+        const targetCol = colHeights[0] <= colHeights[1] ? 0 : 1;
+        const top = colHeights[targetCol];
+        placements.push({ widget: w, col: targetCol as 0 | 1, top });
+        colHeights[targetCol] = top + h + GAP;
+      }
+    }
+
+    const totalHeight = Math.max(colHeights[0], colHeights[1]);
+    return { placements, totalHeight };
+  }, [widgets]);
+
+  // Drop zone tracking for edit mode
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+
+  const handleDragOverEnhanced = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    if (!draggedWidget || draggedWidget === targetId) return;
+    setDropTargetId(targetId);
+  };
+
+  const handleDropEnhanced = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    setDropTargetId(null);
+    if (!draggedWidget || draggedWidget === targetId) return;
+
+    setWidgets(prev => {
+      const newWidgets = [...prev];
+      const draggedIndex = newWidgets.findIndex(w => w.id === draggedWidget);
+      const targetIndex = newWidgets.findIndex(w => w.id === targetId);
+      if (draggedIndex === -1 || targetIndex === -1) return prev;
+      const [removed] = newWidgets.splice(draggedIndex, 1);
+      newWidgets.splice(targetIndex, 0, removed);
+      return newWidgets;
+    });
+
+    setDraggedWidget(null);
+    if (isProcessMode) setFiltersDirty(true);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedWidget(null);
+    setDropTargetId(null);
   };
 
   return (
@@ -686,35 +751,99 @@ export function ConfigurableDashboard({
         contextId="analytics"
       />
 
-      {/* Widget Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {widgets.map(widget => (
-          <div
-            key={widget.id}
-            className={cn(
-              getGridClasses(widget),
-              isEditing && 'cursor-move',
-              draggedWidget === widget.id && 'opacity-50'
-            )}
-            style={getHeightStyle(widget)}
-            draggable={isEditing}
-            onDragStart={() => handleDragStart(widget.id)}
-            onDragOver={(e) => handleDragOver(e, widget.id)}
-            onDrop={(e) => handleDrop(e, widget.id)}
-          >
-            <WidgetWrapper
-              title={widget.title}
-              onRemove={isEditing ? () => handleRemoveWidget(widget.id) : undefined}
-              isDragging={draggedWidget === widget.id}
-              sizePreset={isEditing ? getSizePreset(widget) : undefined}
-              onResize={isEditing ? (preset) => handleResizeWidget(widget.id, preset) : undefined}
-              heightPreset={isEditing ? getHeightPresetFromWidget(widget) : undefined}
-              onHeightChange={isEditing ? (preset) => handleHeightChange(widget.id, preset) : undefined}
-            >
-              {renderWidgetContent(widget)}
-            </WidgetWrapper>
+      {/* Widget Grid - Smart 2-column bin-packing layout */}
+      <div
+        className={cn(
+          'relative',
+          isEditing && 'rounded-xl border-2 border-dashed border-primary/30 p-4'
+        )}
+        style={{ minHeight: gridLayout.totalHeight || 'auto' }}
+      >
+        {/* Grid overlay in edit mode */}
+        {isEditing && (
+          <div className="absolute inset-0 pointer-events-none z-0 rounded-xl overflow-hidden">
+            {/* Vertical center divider */}
+            <div className="absolute top-0 bottom-0 left-1/2 -translate-x-px w-[2px] border-l-2 border-dashed border-primary/15" />
+            {/* Horizontal guide lines every ~200px */}
+            {Array.from({ length: Math.ceil((gridLayout.totalHeight || 600) / 200) }).map((_, i) => (
+              <div
+                key={i}
+                className="absolute left-0 right-0 h-[1px] border-t border-dashed border-primary/10"
+                style={{ top: i * 200 }}
+              />
+            ))}
           </div>
-        ))}
+        )}
+
+        {/* Absolutely positioned widgets for true 2-column packing */}
+        <div className="hidden md:block relative" style={{ height: gridLayout.totalHeight || 'auto' }}>
+          {gridLayout.placements.map(({ widget, col, top }) => {
+            const heightPx = getWidgetHeightPx(widget);
+            const isFull = col === 'full';
+            return (
+              <div
+                key={widget.id}
+                className={cn(
+                  'absolute transition-all duration-300 ease-in-out',
+                  isEditing && 'cursor-move',
+                  draggedWidget === widget.id && 'opacity-40 scale-[0.98]',
+                  dropTargetId === widget.id && 'ring-2 ring-primary ring-offset-2 rounded-xl'
+                )}
+                style={{
+                  top,
+                  left: isFull ? 0 : col === 0 ? 0 : 'calc(50% + 8px)',
+                  width: isFull ? '100%' : 'calc(50% - 8px)',
+                  height: heightPx,
+                }}
+                draggable={isEditing}
+                onDragStart={() => handleDragStart(widget.id)}
+                onDragOver={(e) => handleDragOverEnhanced(e, widget.id)}
+                onDrop={(e) => handleDropEnhanced(e, widget.id)}
+                onDragEnd={handleDragEnd}
+                onDragLeave={() => setDropTargetId(null)}
+              >
+                <WidgetWrapper
+                  title={widget.title}
+                  onRemove={isEditing ? () => handleRemoveWidget(widget.id) : undefined}
+                  isDragging={draggedWidget === widget.id}
+                  sizePreset={isEditing ? getSizePreset(widget) : undefined}
+                  onResize={isEditing ? (preset) => handleResizeWidget(widget.id, preset) : undefined}
+                  heightPreset={isEditing ? getHeightPresetFromWidget(widget) : undefined}
+                  onHeightChange={isEditing ? (preset) => handleHeightChange(widget.id, preset) : undefined}
+                >
+                  {renderWidgetContent(widget)}
+                </WidgetWrapper>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Mobile fallback: simple stacked layout */}
+        <div className="md:hidden space-y-4">
+          {widgets.map(widget => (
+            <div
+              key={widget.id}
+              style={{ height: getWidgetHeightPx(widget) }}
+              draggable={isEditing}
+              onDragStart={() => handleDragStart(widget.id)}
+              onDragOver={(e) => handleDragOverEnhanced(e, widget.id)}
+              onDrop={(e) => handleDropEnhanced(e, widget.id)}
+              onDragEnd={handleDragEnd}
+            >
+              <WidgetWrapper
+                title={widget.title}
+                onRemove={isEditing ? () => handleRemoveWidget(widget.id) : undefined}
+                isDragging={draggedWidget === widget.id}
+                sizePreset={isEditing ? getSizePreset(widget) : undefined}
+                onResize={isEditing ? (preset) => handleResizeWidget(widget.id, preset) : undefined}
+                heightPreset={isEditing ? getHeightPresetFromWidget(widget) : undefined}
+                onHeightChange={isEditing ? (preset) => handleHeightChange(widget.id, preset) : undefined}
+              >
+                {renderWidgetContent(widget)}
+              </WidgetWrapper>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Add Widget Dialog */}
