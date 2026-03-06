@@ -635,8 +635,8 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
           </Select>
         </div>
 
-        {/* Date range */}
-        <div className="space-y-1.5">
+         {/* Date range */}
+         <div className="space-y-1.5 flex-1 min-w-[160px]">
           <Label className="text-xs text-keon-600">Plage de dates</Label>
           <Popover>
             <PopoverTrigger asChild>
