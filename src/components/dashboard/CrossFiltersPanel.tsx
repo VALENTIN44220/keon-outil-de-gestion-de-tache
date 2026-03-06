@@ -455,8 +455,8 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
 
   return (
     <div className="bg-gradient-to-r from-white to-keon-50 border-2 border-keon-200 rounded-xl p-4 mb-4 shadow-keon">
-      {/* Header row */}
-      <div className="flex items-center justify-between">
+       {/* Header row */}
+       <div className="flex flex-wrap items-center justify-between gap-2">
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="flex items-center gap-2 hover:opacity-80 transition-opacity"
