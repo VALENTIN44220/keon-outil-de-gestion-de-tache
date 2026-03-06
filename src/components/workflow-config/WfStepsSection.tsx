@@ -15,6 +15,7 @@ interface Props {
   steps: WfStep[];
   assignmentRules: EnrichedAssignmentRule[];
   canManage: boolean;
+  subProcessId: string;
   onAdd: (step: Omit<WfStepInsert, 'workflow_id'>) => Promise<WfStep | null>;
   onUpdate: (id: string, updates: WfStepUpdate) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
@@ -22,7 +23,7 @@ interface Props {
   onReorder: (reordered: { id: string; order_index: number }[]) => Promise<void>;
 }
 
-export function WfStepsSection({ steps, assignmentRules, canManage, onAdd, onUpdate, onDelete, onDuplicate, onReorder }: Props) {
+export function WfStepsSection({ steps, assignmentRules, canManage, subProcessId, onAdd, onUpdate, onDelete, onDuplicate, onReorder }: Props) {
   const [editingStep, setEditingStep] = useState<WfStep | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
@@ -225,6 +226,7 @@ export function WfStepsSection({ steps, assignmentRules, canManage, onAdd, onUpd
         existingSteps={steps}
         mode="add"
         maxOrderIndex={Math.max(...steps.map(s => s.order_index), 0)}
+        subProcessId={subProcessId}
       />
 
       {editingStep && (
@@ -237,6 +239,7 @@ export function WfStepsSection({ steps, assignmentRules, canManage, onAdd, onUpd
           mode="edit"
           initialData={editingStep}
           maxOrderIndex={Math.max(...steps.map(s => s.order_index), 0)}
+          subProcessId={subProcessId}
         />
       )}
     </>

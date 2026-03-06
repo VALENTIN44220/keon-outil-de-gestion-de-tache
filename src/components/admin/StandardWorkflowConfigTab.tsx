@@ -77,6 +77,7 @@ export function StandardWorkflowConfigTab() {
           steps={wf.steps}
           assignmentRules={wf.assignmentRules}
           canManage={true}
+          subProcessId=""
           onAdd={wf.addStep}
           onUpdate={wf.updateStep}
           onDelete={wf.deleteStep}

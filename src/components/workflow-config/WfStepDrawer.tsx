@@ -14,6 +14,7 @@ import { Save, Loader2, Info } from 'lucide-react';
 import type { WfStep, WfStepInsert, WfStepUpdate, WfStepType, WfValidationMode } from '@/types/workflow';
 import { WF_STEP_TYPE_LABELS, WF_VALIDATION_MODE_LABELS } from '@/types/workflow';
 import type { EnrichedAssignmentRule } from '@/lib/workflowAssignmentRules';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Props {
   open: boolean;
@@ -24,6 +25,7 @@ interface Props {
   mode: 'add' | 'edit';
   initialData?: WfStep;
   maxOrderIndex: number;
+  subProcessId: string;
 }
 
 const EDITABLE_STEP_TYPES: WfStepType[] = ['request_creation', 'validation', 'execution', 'assignment', 'automatic', 'subprocess', 'task_generation', 'status_change'];
@@ -53,14 +55,18 @@ const STEP_TYPE_HELP: Partial<Record<WfStepType, string>> = {
   validation: 'Un ou plusieurs valideurs doivent approuver ou rejeter avant de passer à l\'étape suivante.',
   execution: 'L\'exécutant réalise la tâche assignée.',
   assignment: 'Affectation de la tâche à un utilisateur, groupe ou service.',
-  task_generation: 'Génère une nouvelle tâche à ce stade du workflow (ex: après une validation).',
+  task_generation: 'Génère une tâche du sous-processus à ce stade du workflow.',
   status_change: 'Change le statut de la tâche. Utile quand l\'exécutant termine lui-même (sans validation). Permet de lier des actions et notifications à ce changement.',
-  notification: 'Envoi de notifications aux destinataires configurés.',
   automatic: 'Action automatique exécutée par le système (ex: mise à jour BDD, appel API).',
   subprocess: 'Déclenche un sous-processus enfant.',
 };
 
-export function WfStepDrawer({ open, onClose, onSave, assignmentRules, existingSteps, mode, initialData, maxOrderIndex }: Props) {
+interface TaskTemplateOption {
+  id: string;
+  name: string;
+}
+
+export function WfStepDrawer({ open, onClose, onSave, assignmentRules, existingSteps, mode, initialData, maxOrderIndex, subProcessId }: Props) {
   const [name, setName] = useState('');
   const [stepType, setStepType] = useState<WfStepType>('execution');
   const [stateLabel, setStateLabel] = useState('');
@@ -75,6 +81,23 @@ export function WfStepDrawer({ open, onClose, onSave, assignmentRules, existingS
   // Champs spécifiques par type
   const [targetStatus, setTargetStatus] = useState('done');
   const [statusChangeActor, setStatusChangeActor] = useState<'assignee' | 'requester' | 'system'>('assignee');
+
+  // Task generation
+  const [taskTemplates, setTaskTemplates] = useState<TaskTemplateOption[]>([]);
+  const [selectedTaskTemplateId, setSelectedTaskTemplateId] = useState<string | null>(null);
+
+  // Load task templates for this sub-process
+  useEffect(() => {
+    if (!subProcessId) return;
+    supabase
+      .from('task_templates')
+      .select('id, title')
+      .eq('sub_process_template_id', subProcessId)
+      .order('order_index')
+      .then(({ data }) => {
+        setTaskTemplates((data || []).map(t => ({ id: t.id, name: t.title })));
+      });
+  }, [subProcessId]);
 
   useEffect(() => {
     if (initialData) {
@@ -92,6 +115,7 @@ export function WfStepDrawer({ open, onClose, onSave, assignmentRules, existingS
       if (cfg && typeof cfg === 'object') {
         setTargetStatus(cfg.target_status || 'done');
         setStatusChangeActor(cfg.actor || 'assignee');
+        setSelectedTaskTemplateId(cfg.task_template_id || null);
       }
     } else {
       setName('');
@@ -104,6 +128,9 @@ export function WfStepDrawer({ open, onClose, onSave, assignmentRules, existingS
       setNRequired(null);
       setTargetStatus('done');
       setStatusChangeActor('assignee');
+      setSelectedTaskTemplateId(null);
+
+      // Place before end step if exists
       const endStep = existingSteps.find(s => s.step_type === 'end');
       setOrderIndex(endStep ? endStep.order_index - 1 : maxOrderIndex + 1);
     }
@@ -115,6 +142,9 @@ export function WfStepDrawer({ open, onClose, onSave, assignmentRules, existingS
   const buildConfigJson = () => {
     if (stepType === 'status_change') {
       return { target_status: targetStatus, actor: statusChangeActor };
+    }
+    if (stepType === 'task_generation' && selectedTaskTemplateId) {
+      return { task_template_id: selectedTaskTemplateId };
     }
     return null;
   };
@@ -232,7 +262,32 @@ export function WfStepDrawer({ open, onClose, onSave, assignmentRules, existingS
             </>
           )}
 
-          {/* === Règle d'affectation (conditionnelle) === */}
+          {/* === Champs spécifiques : Génération de tâche === */}
+          {stepType === 'task_generation' && (
+            <div className="space-y-2">
+              <Label>Tâche à générer *</Label>
+              <Select
+                value={selectedTaskTemplateId || '__none__'}
+                onValueChange={v => setSelectedTaskTemplateId(v === '__none__' ? null : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner une tâche" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Sélectionner...</SelectItem>
+                  {taskTemplates.map(t => (
+                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {taskTemplates.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Aucune tâche configurée dans ce sous-processus. Ajoutez des tâches dans l'onglet "Tâches".
+                </p>
+              )}
+            </div>
+          )}
+
           {showAssignment && (
             <div className="space-y-2">
               <Label>Règle d'affectation</Label>
