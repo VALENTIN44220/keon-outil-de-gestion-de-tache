@@ -26,7 +26,7 @@ interface Props {
   maxOrderIndex: number;
 }
 
-const EDITABLE_STEP_TYPES: WfStepType[] = ['request_creation', 'validation', 'execution', 'assignment', 'automatic', 'subprocess', 'notification', 'task_generation', 'status_change'];
+const EDITABLE_STEP_TYPES: WfStepType[] = ['request_creation', 'validation', 'execution', 'assignment', 'automatic', 'subprocess', 'task_generation', 'status_change'];
 
 // Types d'étapes qui nécessitent une règle d'affectation
 const TYPES_WITH_ASSIGNMENT: WfStepType[] = ['validation', 'execution', 'assignment', 'task_generation'];
