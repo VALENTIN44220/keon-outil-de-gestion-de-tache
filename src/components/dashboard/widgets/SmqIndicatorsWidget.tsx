@@ -56,19 +56,24 @@ export function SmqIndicatorsWidget({ tasks }: SmqIndicatorsWidgetProps) {
     const range = getPeriodRange(period);
     const interval = { start: range.start, end: range.end };
 
-    // Total tickets created in the period (regardless of current status)
-    const createdInPeriod = tasks.filter(t => isWithinInterval(new Date(t.created_at), interval));
+    // Helper: get opening date (date_demande from Planner, fallback to created_at)
+    const getOpenDate = (t: Task): Date => new Date(t.date_demande || t.created_at);
+    // Helper: get closing date (updated_at as proxy for closure)
+    const getCloseDate = (t: Task): Date => new Date(t.updated_at);
+    const isClosed = (t: Task) => t.status === 'done' || t.status === 'validated';
+
+    // Total tickets opened in the period (using Planner date)
+    const createdInPeriod = tasks.filter(t => isWithinInterval(getOpenDate(t), interval));
 
     const closedInPeriod = tasks.filter(t => {
-      const updated = new Date(t.updated_at);
-      return (t.status === 'done' || t.status === 'validated') && isWithinInterval(updated, interval);
+      return isClosed(t) && isWithinInterval(getCloseDate(t), interval);
     });
 
-    const openCount = createdInPeriod.filter(t => t.status !== 'done' && t.status !== 'validated').length;
+    const openCount = createdInPeriod.filter(t => !isClosed(t)).length;
 
     let avgDays = 0;
     if (closedInPeriod.length > 0) {
-      const totalDays = closedInPeriod.reduce((sum, t) => sum + differenceInCalendarDays(new Date(t.updated_at), new Date(t.created_at)), 0);
+      const totalDays = closedInPeriod.reduce((sum, t) => sum + differenceInCalendarDays(getCloseDate(t), getOpenDate(t)), 0);
       avgDays = Math.round((totalDays / closedInPeriod.length) * 10) / 10;
     }
 
@@ -96,21 +101,19 @@ export function SmqIndicatorsWidget({ tasks }: SmqIndicatorsWidgetProps) {
     const chartData = buckets.map(bucket => {
       const bucketInterval = { start: bucket.start, end: bucket.end };
 
-      // Count ALL tickets created in this bucket (not just currently open)
-      const created = tasks.filter(t => isWithinInterval(new Date(t.created_at), bucketInterval)).length;
+      // Tickets opened in this bucket (using Planner date)
+      const created = tasks.filter(t => isWithinInterval(getOpenDate(t), bucketInterval)).length;
 
-      const closed = tasks.filter(t => {
-        const updated = new Date(t.updated_at);
-        return (t.status === 'done' || t.status === 'validated') && isWithinInterval(updated, bucketInterval);
-      });
+      // Tickets closed in this bucket
+      const closedBucket = tasks.filter(t => isClosed(t) && isWithinInterval(getCloseDate(t), bucketInterval));
 
       let avg: number | null = null;
-      if (closed.length > 0) {
-        const total = closed.reduce((s, t) => s + differenceInCalendarDays(new Date(t.updated_at), new Date(t.created_at)), 0);
-        avg = Math.round((total / closed.length) * 10) / 10;
+      if (closedBucket.length > 0) {
+        const total = closedBucket.reduce((s, t) => s + differenceInCalendarDays(getCloseDate(t), getOpenDate(t)), 0);
+        avg = Math.round((total / closedBucket.length) * 10) / 10;
       }
 
-      return { name: bucket.label, tickets: created, duree: avg };
+      return { name: bucket.label, ouverts: created, fermes: closedBucket.length, duree: avg };
     });
 
     return { range, metrics: { openCount, totalCreated: createdInPeriod.length, avgDays, closedCount: closedInPeriod.length }, chartData };
@@ -125,6 +128,13 @@ export function SmqIndicatorsWidget({ tasks }: SmqIndicatorsWidgetProps) {
       bgColor: 'bg-amber-50 dark:bg-amber-900/20',
     },
     {
+      label: `Tickets fermés (${range.label})`,
+      value: metrics.closedCount,
+      icon: CheckCircle2,
+      color: 'text-emerald-600',
+      bgColor: 'bg-emerald-50 dark:bg-emerald-900/20',
+    },
+    {
       label: 'Durée moy. traitement (j)',
       value: metrics.closedCount > 0 ? `${metrics.avgDays} j` : '—',
       icon: Clock,
@@ -132,7 +142,6 @@ export function SmqIndicatorsWidget({ tasks }: SmqIndicatorsWidgetProps) {
       bgColor: 'bg-blue-50 dark:bg-blue-900/20',
     },
   ];
-
   const maxDuree = Math.max(...chartData.map(d => d.duree ?? 0), 1);
 
   return (
