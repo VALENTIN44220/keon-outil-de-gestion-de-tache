@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
@@ -108,6 +109,32 @@ export function WfStandardModePanel({ options, canManage, onOptionsChange, onApp
                 </SelectContent>
               </Select>
             </div>
+            {/* Executor value - shown for types that need a value */}
+            {['specific_user', 'role', 'field_value'].includes(options.executor_type) && (
+              <div className="space-y-1.5">
+                <Label className="text-xs">
+                  {options.executor_type === 'specific_user' && 'Identifiant utilisateur'}
+                  {options.executor_type === 'role' && 'Nom du rôle'}
+                  {options.executor_type === 'field_value' && 'Nom du champ formulaire'}
+                </Label>
+                <Input
+                  value={options.executor_value || ''}
+                  onChange={e => update({ executor_value: e.target.value || null })}
+                  placeholder={
+                    options.executor_type === 'specific_user' ? 'ID ou nom du profil'
+                    : options.executor_type === 'role' ? 'Ex: Ingénieur études'
+                    : 'Ex: responsable_projet'
+                  }
+                  className="h-8 text-xs"
+                  disabled={!canManage}
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  {options.executor_type === 'specific_user' && "L'utilisateur qui exécutera les tâches de ce workflow."}
+                  {options.executor_type === 'role' && 'Le rôle ou poste responsable de l\'exécution.'}
+                  {options.executor_type === 'field_value' && 'Le champ du formulaire contenant l\'utilisateur assigné.'}
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 

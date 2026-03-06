@@ -10,6 +10,7 @@ export interface StandardWorkflowOptions {
   final_validation: boolean;
   assignment_mode: 'auto' | 'manual' | 'role' | 'manager';
   executor_type: 'specific_user' | 'requester' | 'requester_manager' | 'role' | 'manual' | 'field_value';
+  executor_value: string | null;
   completion_behavior: 'close_task' | 'send_to_validation';
   enable_notifications: boolean;
   enable_auto_actions: boolean;
@@ -20,6 +21,7 @@ export const DEFAULT_STANDARD_OPTIONS: StandardWorkflowOptions = {
   final_validation: false,
   assignment_mode: 'manual',
   executor_type: 'manual',
+  executor_value: null,
   completion_behavior: 'close_task',
   enable_notifications: true,
   enable_auto_actions: false,
@@ -30,7 +32,7 @@ import type { Json } from '@/integrations/supabase/types';
 interface GeneratedStep { step_key: string; name: string; step_type: string; order_index: number; state_label: string; is_required: boolean; validation_mode?: string; }
 interface GeneratedTransition { from_step_key: string; to_step_key: string; event: string; }
 interface GeneratedNotification { step_key: string; event: string; subject_template: string; body_template: string; channels_json: Json; recipients_rules_json: Json; is_active: boolean; }
-interface GeneratedTask { name: string; task_key: string; step_key: string; executor_type: string; trigger_mode: string; initial_status: string; completion_behavior: string; is_active: boolean; is_required: boolean; order_index: number; assignment_mode: string; }
+interface GeneratedTask { name: string; task_key: string; step_key: string; executor_type: string; executor_value?: string | null; trigger_mode: string; initial_status: string; completion_behavior: string; is_active: boolean; is_required: boolean; order_index: number; assignment_mode: string; }
 interface GeneratedValidation { name: string; validation_key: string; object_type: string; source_step_key: string; validator_type: string; on_approved_effect: string; on_rejected_effect: string; on_rejected_target_step_key?: string; is_active: boolean; order_index: number; validation_mode: string; }
 
 export interface GeneratedStructure {
@@ -94,7 +96,9 @@ export function generateStandardStructure(options: StandardWorkflowOptions): Gen
 
   taskConfigs.push({
     name: 'Tâche principale', task_key: 'std_main_task', step_key: execKey,
-    executor_type: options.executor_type, trigger_mode: 'on_step_entry',
+    executor_type: options.executor_type,
+    executor_value: options.executor_value || null,
+    trigger_mode: 'on_step_entry',
     initial_status: 'todo', completion_behavior: options.completion_behavior,
     is_active: true, is_required: true, order_index: 0, assignment_mode: 'direct',
   });
