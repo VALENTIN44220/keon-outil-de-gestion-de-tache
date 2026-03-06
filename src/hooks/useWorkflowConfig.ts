@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { fetchEnrichedWorkflowAssignmentRules } from '@/lib/workflowAssignmentRules';
+import type { EnrichedAssignmentRule } from '@/lib/workflowAssignmentRules';
 import type {
   WfWorkflow, WfStep, WfTransition, WfNotification, WfAction,
   WfAssignmentRule, WfWorkflowInsert, WfStepInsert, WfTransitionInsert,
@@ -8,10 +10,6 @@ import type {
   WfNotificationUpdate, WfActionUpdate, WfWorkflowUpdate,
   WfStepPoolValidator, WfStepSequenceValidator,
 } from '@/types/workflow';
-
-export interface EnrichedAssignmentRule extends WfAssignmentRule {
-  display_name: string;
-}
 
 export function useWorkflowConfig(subProcessTemplateId: string | undefined) {
   const [workflow, setWorkflow] = useState<WfWorkflow | null>(null);
@@ -52,15 +50,14 @@ export function useWorkflowConfig(subProcessTemplateId: string | undefined) {
       const wfId = wfData.id;
 
       // Fetch all related data in parallel
-      const [stepsRes, transRes, notifsRes, actionsRes, rulesRes, poolRes, seqRes, deptsRes] = await Promise.all([
+      const [stepsRes, transRes, notifsRes, actionsRes, poolRes, seqRes, enrichedRules] = await Promise.all([
         supabase.from('wf_steps').select('*').eq('workflow_id', wfId).order('order_index'),
         supabase.from('wf_transitions').select('*').eq('workflow_id', wfId).order('created_at'),
         supabase.from('wf_notifications').select('*').eq('workflow_id', wfId).order('created_at'),
         supabase.from('wf_actions').select('*').eq('workflow_id', wfId).order('order_index'),
-        supabase.from('wf_assignment_rules').select('*').order('name'),
         supabase.from('wf_step_pool_validators').select('*'),
         supabase.from('wf_step_sequence_validators').select('*').order('order_index'),
-        supabase.from('departments').select('id, name'),
+        fetchEnrichedWorkflowAssignmentRules(),
       ]);
 
       setSteps(stepsRes.data || []);
@@ -69,36 +66,7 @@ export function useWorkflowConfig(subProcessTemplateId: string | undefined) {
       setActions(actionsRes.data || []);
       setPoolValidators(poolRes.data || []);
       setSequenceValidators(seqRes.data || []);
-
-      // Enrich assignment rules with human-readable names and deduplicate
-      const departments = deptsRes.data || [];
-      const deptMap = new Map(departments.map(d => [d.id, d.name]));
-      const rawRules = rulesRes.data || [];
-      
-      // Deduplicate by type+target_id
-      const seen = new Set<string>();
-      const enriched: EnrichedAssignmentRule[] = [];
-      for (const rule of rawRules) {
-        const key = `${rule.type}:${rule.target_id}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        
-        let displayName = rule.name;
-        if (rule.type === 'department' && rule.target_id) {
-          const deptName = deptMap.get(rule.target_id);
-          displayName = deptName ? `Service : ${deptName}` : rule.name;
-        } else if (rule.type === 'manager') {
-          displayName = 'Manager';
-        } else if (rule.type === 'requester') {
-          displayName = 'Demandeur';
-        } else if (rule.type === 'user') {
-          displayName = `Utilisateur : ${rule.target_id?.slice(0, 8) || ''}`;
-        }
-        
-        enriched.push({ ...rule, display_name: displayName });
-      }
-      
-      setAssignmentRules(enriched);
+      setAssignmentRules(enrichedRules);
     } catch (error) {
       console.error('Error fetching workflow config:', error);
       toast.error('Erreur lors du chargement du workflow');

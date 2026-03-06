@@ -13,7 +13,7 @@ import {
 import { Save, Loader2, Info } from 'lucide-react';
 import type { WfStep, WfStepInsert, WfStepUpdate, WfStepType, WfValidationMode } from '@/types/workflow';
 import { WF_STEP_TYPE_LABELS, WF_VALIDATION_MODE_LABELS } from '@/types/workflow';
-import type { EnrichedAssignmentRule } from '@/hooks/useWorkflowConfig';
+import type { EnrichedAssignmentRule } from '@/lib/workflowAssignmentRules';
 
 interface Props {
   open: boolean;

@@ -380,13 +380,41 @@ async function resolveAssignmentRule(supabase: any, rule: any, instance: any): P
 
   const profileIds: string[] = [];
 
+  const resolveProfileId = async (targetId: string | null | undefined): Promise<string | null> => {
+    if (!targetId) return null;
+
+    // 1) Already a profile id
+    const { data: byProfileId } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("id", targetId)
+      .maybeSingle();
+    if (byProfileId?.id) return byProfileId.id;
+
+    // 2) Legacy / alternative: auth user id
+    const { data: byUserId } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("user_id", targetId)
+      .maybeSingle();
+    return byUserId?.id || null;
+  };
+
   switch (rule.type) {
     case "user": {
-      if (rule.target_id) profileIds.push(rule.target_id);
+      const resolved = await resolveProfileId(rule.target_id);
+      if (resolved) profileIds.push(resolved);
       break;
     }
     case "manager": {
-      // Get the requester's manager
+      // Manager spécifique prioritaire si configuré
+      if (rule.target_id) {
+        const resolvedManager = await resolveProfileId(rule.target_id);
+        if (resolvedManager) profileIds.push(resolvedManager);
+        break;
+      }
+
+      // Sinon: manager du demandeur
       const { data: task } = await supabase.from("tasks").select("user_id").eq("id", instance.demand_id).single();
       if (task?.user_id) {
         const { data: profile } = await supabase.from("profiles").select("manager_id").eq("user_id", task.user_id).single();
@@ -419,13 +447,26 @@ async function resolveAssignmentRule(supabase: any, rule: any, instance: any): P
     case "group": {
       if (rule.target_id) {
         const { data: members } = await supabase.from("collaborator_group_members").select("user_id").eq("group_id", rule.target_id);
-        if (members) profileIds.push(...members.map((m: any) => m.user_id));
+        const rawMemberIds = (members || []).map((m: any) => m.user_id).filter(Boolean);
+
+        if (rawMemberIds.length > 0) {
+          // Cas nominal: user_id stocke un profile.id
+          profileIds.push(...rawMemberIds);
+
+          // Compat legacy: user_id stocke un auth user_id
+          const { data: mappedProfiles } = await supabase
+            .from("profiles")
+            .select("id")
+            .in("user_id", rawMemberIds);
+          if (mappedProfiles) profileIds.push(...mappedProfiles.map((p: any) => p.id));
+        }
       }
       break;
     }
   }
 
-  return profileIds;
+  // Deduplicate and remove empties
+  return Array.from(new Set(profileIds.filter(Boolean)));
 }
 
 // ===================== HELPERS =====================

@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { fetchEnrichedWorkflowAssignmentRules } from '@/lib/workflowAssignmentRules';
+import type { EnrichedAssignmentRule } from '@/lib/workflowAssignmentRules';
 import type {
   WfWorkflow, WfStep, WfTransition, WfNotification, WfAction,
   WfAssignmentRule, WfWorkflowInsert, WfStepInsert, WfTransitionInsert,
   WfNotificationInsert, WfActionInsert, WfStepUpdate, WfTransitionUpdate,
   WfNotificationUpdate, WfActionUpdate, WfWorkflowUpdate,
 } from '@/types/workflow';
-import type { EnrichedAssignmentRule } from '@/hooks/useWorkflowConfig';
 
 /**
  * Hook identical to useWorkflowConfig but for the standard workflow template
@@ -46,39 +47,19 @@ export function useStandardWorkflowConfig() {
       setWorkflow(wfData);
       const wfId = wfData.id;
 
-      const [stepsRes, transRes, notifsRes, actionsRes, rulesRes, deptsRes] = await Promise.all([
+      const [stepsRes, transRes, notifsRes, actionsRes, enrichedRules] = await Promise.all([
         supabase.from('wf_steps').select('*').eq('workflow_id', wfId).order('order_index'),
         supabase.from('wf_transitions').select('*').eq('workflow_id', wfId).order('created_at'),
         supabase.from('wf_notifications').select('*').eq('workflow_id', wfId).order('created_at'),
         supabase.from('wf_actions').select('*').eq('workflow_id', wfId).order('order_index'),
-        supabase.from('wf_assignment_rules').select('*').order('name'),
-        supabase.from('departments').select('id, name'),
+        fetchEnrichedWorkflowAssignmentRules(),
       ]);
 
       setSteps(stepsRes.data || []);
       setTransitions(transRes.data || []);
       setNotifications(notifsRes.data || []);
       setActions(actionsRes.data || []);
-
-      // Enrich assignment rules
-      const departments = deptsRes.data || [];
-      const deptMap = new Map(departments.map(d => [d.id, d.name]));
-      const rawRules = rulesRes.data || [];
-      const seen = new Set<string>();
-      const enriched: EnrichedAssignmentRule[] = [];
-      for (const rule of rawRules) {
-        const key = `${rule.type}:${rule.target_id}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        let displayName = rule.name;
-        if (rule.type === 'department' && rule.target_id) {
-          displayName = deptMap.get(rule.target_id) ? `Service : ${deptMap.get(rule.target_id)}` : rule.name;
-        } else if (rule.type === 'manager') displayName = 'Manager';
-        else if (rule.type === 'requester') displayName = 'Demandeur';
-        else if (rule.type === 'user') displayName = `Utilisateur : ${rule.target_id?.slice(0, 8) || ''}`;
-        enriched.push({ ...rule, display_name: displayName });
-      }
-      setAssignmentRules(enriched);
+      setAssignmentRules(enrichedRules);
     } catch (error) {
       console.error('Error fetching standard workflow config:', error);
       toast.error('Erreur lors du chargement du workflow standard');

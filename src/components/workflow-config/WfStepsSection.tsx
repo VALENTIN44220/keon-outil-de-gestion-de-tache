@@ -8,7 +8,7 @@ import {
 import { Plus, Trash2, Edit2, Copy, GripVertical, Eye, EyeOff } from 'lucide-react';
 import type { WfStep, WfStepInsert, WfStepUpdate } from '@/types/workflow';
 import { WF_STEP_TYPE_LABELS, WF_VALIDATION_MODE_LABELS } from '@/types/workflow';
-import type { EnrichedAssignmentRule } from '@/hooks/useWorkflowConfig';
+import type { EnrichedAssignmentRule } from '@/lib/workflowAssignmentRules';
 import { WfStepDrawer } from './WfStepDrawer';
 
 interface Props {
