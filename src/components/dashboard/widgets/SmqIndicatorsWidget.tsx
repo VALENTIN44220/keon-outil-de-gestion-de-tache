@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Task } from '@/types/task';
 import { format, differenceInCalendarDays, startOfMonth, endOfMonth, subMonths, startOfQuarter, endOfQuarter, startOfYear, endOfYear, isWithinInterval, eachMonthOfInterval, eachQuarterOfInterval } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { TicketCheck, Clock } from 'lucide-react';
+import { TicketCheck, Clock, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, LabelList } from 'recharts';
