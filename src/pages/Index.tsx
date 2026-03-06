@@ -384,8 +384,8 @@ const Index = () => {
   const renderDashboardContent = () => (
     <>
       {/* Mode toggle: Tasks vs Analytics vs Tracking */}
-      <div className="flex items-center gap-2 mb-4">
-        <div className="flex bg-white rounded-lg border-2 border-keon-200 p-1">
+       <div className="flex flex-wrap items-center gap-2 mb-4">
+         <div className="flex flex-wrap bg-white rounded-lg border-2 border-keon-200 p-1 gap-1">
           <Button
             variant={dashboardMode === 'tasks' ? 'default' : 'ghost'}
             size="sm"
