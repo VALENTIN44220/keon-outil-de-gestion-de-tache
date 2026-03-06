@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, memo } from 'react';
 import { RepeatableTableRenderer } from './RepeatableTableRenderer';
+import { MultiEmailInput } from '@/components/ui/MultiEmailInput';
 import { TemplateCustomField, CustomFieldType, LOOKUP_TABLES } from '@/types/customField';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';

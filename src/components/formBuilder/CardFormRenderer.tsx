@@ -1,6 +1,7 @@
 import { memo, useState, useMemo, useCallback, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { RepeatableTableRenderer } from '@/components/tasks/RepeatableTableRenderer';
+import { MultiEmailInput } from '@/components/ui/MultiEmailInput';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
