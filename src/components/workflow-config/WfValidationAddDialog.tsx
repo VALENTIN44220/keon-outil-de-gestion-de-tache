@@ -96,7 +96,7 @@ export function WfValidationAddDialog({ steps, existingKeys, onSave, onClose }: 
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Étape source</Label>
-              <Select value={sourceStepKey} onValueChange={setSourceStepKey}>
+              <Select value={sourceStepKey || '__none__'} onValueChange={(v) => setSourceStepKey(v === '__none__' ? '' : v)}>
                 <SelectTrigger className="h-9"><SelectValue placeholder="Aucune" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__">Aucune</SelectItem>
