@@ -470,7 +470,7 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
             </Badge>
           )}
         </button>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
           {/* Preset selector */}
           {presets.length > 0 && (
             <Popover>
