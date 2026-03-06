@@ -60,6 +60,13 @@ const WIDGET_OPTIONS: { type: WidgetType; label: string; description: string; ic
     icon: Hash,
     color: 'text-indigo-500 bg-indigo-500/10'
   },
+  { 
+    type: 'smq-indicators', 
+    label: 'Indicateurs SMQ', 
+    description: 'Tickets ouverts / mois & durée moy. traitement', 
+    icon: ShieldCheck,
+    color: 'text-emerald-600 bg-emerald-600/10'
+  },
 ];
 
 const DATA_KEYS = [
