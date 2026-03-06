@@ -13,8 +13,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
-  Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter,
-} from '@/components/ui/sheet';
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from '@/components/ui/dialog';
 import { Plus, Trash2, Edit2, Eye, EyeOff, Bell, Mail, MessageSquare, Save, Loader2 } from 'lucide-react';
 import type { WfNotification, WfNotificationInsert, WfNotificationUpdate, WfStep } from '@/types/workflow';
 import { WF_EVENT_LABELS } from '@/types/workflow';
@@ -290,11 +290,11 @@ function NotificationDrawer({ open, onClose, steps, initialData, onSave }: Drawe
   };
 
   return (
-    <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent className="w-[420px] sm:w-[500px] overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>{isEdit ? 'Modifier la notification' : 'Ajouter une notification'}</SheetTitle>
-        </SheetHeader>
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{isEdit ? 'Modifier la notification' : 'Ajouter une notification'}</DialogTitle>
+        </DialogHeader>
 
         <div className="space-y-5 py-4">
           {/* Step */}
@@ -406,7 +406,7 @@ function NotificationDrawer({ open, onClose, steps, initialData, onSave }: Drawe
           </div>
         </div>
 
-        <SheetFooter>
+        <DialogFooter>
           <Button variant="outline" onClick={onClose}>Annuler</Button>
           <Button
             onClick={handleSave}
@@ -415,8 +415,8 @@ function NotificationDrawer({ open, onClose, steps, initialData, onSave }: Drawe
             {isSaving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
             {isEdit ? 'Enregistrer' : 'Ajouter'}
           </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
-  Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter,
-} from '@/components/ui/sheet';
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -160,11 +160,11 @@ export function WfStepDrawer({ open, onClose, onSave, assignmentRules, existingS
   };
 
   return (
-    <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent className="w-[400px] sm:w-[480px] overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>{mode === 'add' ? 'Ajouter une étape' : 'Modifier l\'étape'}</SheetTitle>
-        </SheetHeader>
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{mode === 'add' ? 'Ajouter une étape' : 'Modifier l\'étape'}</DialogTitle>
+        </DialogHeader>
 
         <div className="space-y-4 py-4">
           {/* Nom */}
@@ -300,14 +300,14 @@ export function WfStepDrawer({ open, onClose, onSave, assignmentRules, existingS
           )}
         </div>
 
-        <SheetFooter>
+        <DialogFooter>
           <Button variant="outline" onClick={onClose}>Annuler</Button>
           <Button onClick={handleSave} disabled={isSaving || !name.trim()}>
             {isSaving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
             {mode === 'add' ? 'Ajouter' : 'Enregistrer'}
           </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
