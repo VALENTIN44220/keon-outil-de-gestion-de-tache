@@ -7,7 +7,8 @@ export type WidgetType =
   | 'line-chart' 
   | 'data-table'
   | 'task-table'
-  | 'progress-ring';
+  | 'progress-ring'
+  | 'smq-indicators';
 
 export interface WidgetConfig {
   id: string;

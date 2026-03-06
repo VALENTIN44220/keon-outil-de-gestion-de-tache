@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { WidgetType, WidgetConfig } from '../types';
-import { BarChart2, PieChart, TrendingUp, Table, Activity, Hash, ListChecks } from 'lucide-react';
+import { BarChart2, PieChart, TrendingUp, Table, Activity, Hash, ListChecks, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface AddWidgetDialogProps {
@@ -60,6 +60,13 @@ const WIDGET_OPTIONS: { type: WidgetType; label: string; description: string; ic
     icon: Hash,
     color: 'text-indigo-500 bg-indigo-500/10'
   },
+  { 
+    type: 'smq-indicators', 
+    label: 'Indicateurs SMQ', 
+    description: 'Tickets ouverts / mois & durée moy. traitement', 
+    icon: ShieldCheck,
+    color: 'text-emerald-600 bg-emerald-600/10'
+  },
 ];
 
 const DATA_KEYS = [
@@ -77,6 +84,7 @@ export function AddWidgetDialog({ open, onClose, onAdd }: AddWidgetDialogProps) 
     const defaultSize = type === 'stats-summary' ? { w: 4, h: 2 } : 
                         type === 'data-table' || type === 'task-table' ? { w: 4, h: 4 } : 
                         type === 'line-chart' ? { w: 4, h: 3 } : 
+                        type === 'smq-indicators' ? { w: 2, h: 3 } :
                         { w: 2, h: 3 };
     
     onAdd({

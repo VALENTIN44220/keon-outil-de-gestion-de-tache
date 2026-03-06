@@ -19,6 +19,7 @@ import { DataTableWidget } from './widgets/DataTableWidget';
 import { TaskTableWidget } from './widgets/TaskTableWidget';
 import { AddWidgetDialog } from './widgets/AddWidgetDialog';
 import { ProgressRing } from './ProgressRing';
+import { SmqIndicatorsWidget } from './widgets/SmqIndicatorsWidget';
 import { Button } from '@/components/ui/button';
 import { Plus, RotateCcw, Settings2, Save, Check, Download, Upload, Trash2 } from 'lucide-react';
 import { format, subDays, startOfWeek, startOfMonth, startOfQuarter, startOfYear, isWithinInterval } from 'date-fns';
@@ -576,6 +577,8 @@ export function ConfigurableDashboard({
             <ProgressRing progress={filteredStats.completionRate} size={140} />
           </div>
         );
+      case 'smq-indicators':
+        return <SmqIndicatorsWidget tasks={filteredTasks} />;
       default:
         return <div className="text-keon-500">Widget non reconnu</div>;
     }
