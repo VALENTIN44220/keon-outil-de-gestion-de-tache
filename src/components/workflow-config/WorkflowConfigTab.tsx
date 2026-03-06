@@ -109,6 +109,7 @@ export function WorkflowConfigTab({ subProcessId, subProcessName, canManage }: P
           transitions={wf.transitions}
           steps={wf.steps}
           canManage={canManage}
+          subProcessId={subProcessId}
           onAdd={wf.addAction}
           onUpdate={wf.updateAction}
           onDelete={wf.deleteAction}

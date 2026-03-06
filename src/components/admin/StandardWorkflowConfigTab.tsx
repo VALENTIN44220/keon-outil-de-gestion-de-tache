@@ -114,6 +114,7 @@ export function StandardWorkflowConfigTab() {
           transitions={wf.transitions}
           steps={wf.steps}
           canManage={true}
+          subProcessId=""
           onAdd={wf.addAction}
           onUpdate={wf.updateAction}
           onDelete={wf.deleteAction}
