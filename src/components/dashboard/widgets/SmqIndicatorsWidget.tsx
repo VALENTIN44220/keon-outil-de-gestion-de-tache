@@ -25,16 +25,16 @@ export function SmqIndicatorsWidget({ tasks }: SmqIndicatorsWidgetProps) {
       );
     }).length;
 
-    // Average processing time: difference between created_at and completed_at for done/validated tasks
+    // Average processing time: difference between created_at and updated_at for done/validated tasks
     const closedTasks = tasks.filter(t =>
-      (t.status === 'done' || t.status === 'validated') && t.completed_at
+      (t.status === 'done' || t.status === 'validated')
     );
 
     let avgDays = 0;
     if (closedTasks.length > 0) {
       const totalDays = closedTasks.reduce((sum, t) => {
         const opened = new Date(t.created_at);
-        const closed = new Date(t.completed_at!);
+        const closed = new Date(t.updated_at);
         return sum + differenceInCalendarDays(closed, opened);
       }, 0);
       avgDays = Math.round((totalDays / closedTasks.length) * 10) / 10;

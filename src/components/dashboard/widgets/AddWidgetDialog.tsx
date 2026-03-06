@@ -84,6 +84,7 @@ export function AddWidgetDialog({ open, onClose, onAdd }: AddWidgetDialogProps) 
     const defaultSize = type === 'stats-summary' ? { w: 4, h: 2 } : 
                         type === 'data-table' || type === 'task-table' ? { w: 4, h: 4 } : 
                         type === 'line-chart' ? { w: 4, h: 3 } : 
+                        type === 'smq-indicators' ? { w: 2, h: 3 } :
                         { w: 2, h: 3 };
     
     onAdd({
