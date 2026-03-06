@@ -1,6 +1,8 @@
 import { useState, useMemo, useEffect } from 'react';
 import { BEProject } from '@/types/beProject';
 import { ProjectFiltersState, FilterPreset, DEFAULT_PROJECT_FILTERS } from '@/hooks/useProjectFilters';
+import { QUESTIONNAIRE_FILTER_FIELDS, qstFilterKey } from '@/config/questionnaireFilterConfig';
+import { PILIERS } from '@/config/questionnaireConfig';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -11,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import {
   Filter, X, RotateCcw, Search, Save, Trash2, Star,
-  ChevronDown, ChevronUp, CalendarIcon,
+  ChevronDown, ChevronUp, CalendarIcon, ClipboardList,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -29,6 +31,8 @@ interface ProjectMultiFiltersPanelProps {
   onLoadPreset: (preset: FilterPreset) => void;
   onToggleDefault: (id: string) => void;
   onClear: () => void;
+  // Questionnaire distinct values loader
+  getQstDistinctValues?: (champId: string) => string[];
 }
 
 const STATUS_OPTIONS = [
@@ -168,9 +172,11 @@ function DatePickerSmall({ value, onChange, placeholder }: { value: string | nul
 export function ProjectMultiFiltersPanel({
   filters, onFiltersChange, projects, activeFiltersCount,
   presets, onSavePreset, onDeletePreset, onLoadPreset, onToggleDefault, onClear,
+  getQstDistinctValues,
 }: ProjectMultiFiltersPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [presetName, setPresetName] = useState('');
+  const [showQstFilters, setShowQstFilters] = useState(false);
 
   // Extract distinct values from projects
   const paysOptions = useMemo(() => {
@@ -188,8 +194,19 @@ export function ProjectMultiFiltersPanel({
     return Array.from(set).sort().map(v => ({ value: v, label: v }));
   }, [projects]);
 
-  const toggleValue = (key: keyof ProjectFiltersState, value: string) => {
-    const current = filters[key] as string[];
+  // Count active questionnaire filters
+  const qstActiveCount = useMemo(() => {
+    let count = 0;
+    for (const field of QUESTIONNAIRE_FILTER_FIELDS) {
+      const key = qstFilterKey(field.champ_id);
+      const val = filters[key];
+      if (Array.isArray(val) && val.length > 0) count++;
+    }
+    return count;
+  }, [filters]);
+
+  const toggleValue = (key: string, value: string) => {
+    const current = (filters[key] as string[]) || [];
     const updated = current.includes(value)
       ? current.filter(v => v !== value)
       : [...current, value];
@@ -201,6 +218,17 @@ export function ProjectMultiFiltersPanel({
     onSavePreset(presetName.trim());
     setPresetName('');
   };
+
+  // Group questionnaire fields by pilier
+  const qstFieldsByPilier = useMemo(() => {
+    const map = new Map<string, typeof QUESTIONNAIRE_FILTER_FIELDS>();
+    for (const field of QUESTIONNAIRE_FILTER_FIELDS) {
+      const list = map.get(field.pilier) || [];
+      list.push(field);
+      map.set(field.pilier, list);
+    }
+    return map;
+  }, []);
 
   return (
     <div className="space-y-0">
@@ -277,39 +305,39 @@ export function ProjectMultiFiltersPanel({
             <MultiSelectFilter
               label="Statut"
               options={STATUS_OPTIONS}
-              selected={filters.statuses}
+              selected={filters.statuses as string[]}
               onToggle={v => toggleValue('statuses', v)}
             />
             <MultiSelectFilter
               label="Pays"
               options={paysOptions}
-              selected={filters.pays}
+              selected={filters.pays as string[]}
               onToggle={v => toggleValue('pays', v)}
               searchable
             />
             <MultiSelectFilter
               label="Région"
               options={regionOptions}
-              selected={filters.regions}
+              selected={filters.regions as string[]}
               onToggle={v => toggleValue('regions', v)}
               searchable
             />
             <MultiSelectFilter
               label="Typologie"
               options={TYPOLOGIE_OPTIONS}
-              selected={filters.typologies}
+              selected={filters.typologies as string[]}
               onToggle={v => toggleValue('typologies', v)}
             />
             <MultiSelectFilter
               label="Actionnariat"
               options={ACTIONNARIAT_OPTIONS}
-              selected={filters.actionnariats}
+              selected={filters.actionnariats as string[]}
               onToggle={v => toggleValue('actionnariats', v)}
             />
             <MultiSelectFilter
               label="Régime ICPE"
               options={regimeOptions}
-              selected={filters.regimes_icpe}
+              selected={filters.regimes_icpe as string[]}
               onToggle={v => toggleValue('regimes_icpe', v)}
               searchable
             />
@@ -327,6 +355,61 @@ export function ProjectMultiFiltersPanel({
                 onToChange={v => onFiltersChange({ ...filters, [`${df.key}_to`]: v })}
               />
             ))}
+          </div>
+
+          {/* Questionnaire Filters Section */}
+          <div className="pt-2 border-t">
+            <Button
+              variant={qstActiveCount > 0 ? 'default' : 'outline'}
+              size="sm"
+              className="gap-2 mb-3"
+              onClick={() => setShowQstFilters(!showQstFilters)}
+            >
+              <ClipboardList className="h-4 w-4" />
+              Filtres Questionnaire KEON
+              {qstActiveCount > 0 && (
+                <Badge variant="secondary" className="h-5 px-1.5 text-xs bg-background/20 text-current">
+                  {qstActiveCount}
+                </Badge>
+              )}
+              {showQstFilters ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+            </Button>
+
+            {showQstFilters && (
+              <div className="space-y-4">
+                {Array.from(qstFieldsByPilier.entries()).map(([pilierCode, fields]) => {
+                  const pilier = PILIERS.find(p => p.code === pilierCode);
+                  return (
+                    <div key={pilierCode} className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs font-semibold">
+                          {pilier?.shortLabel || pilierCode}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">{pilier?.label}</span>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+                        {fields.map(field => {
+                          const filterKey = qstFilterKey(field.champ_id);
+                          const selected = (filters[filterKey] as string[]) || [];
+                          // Use distinct values from data, plus known options
+                          const distinctFromData = getQstDistinctValues?.(field.champ_id) || [];
+                          const allOptions = Array.from(new Set([...field.options, ...distinctFromData])).sort();
+                          return (
+                            <MultiSelectFilter
+                              key={field.champ_id}
+                              label={field.label}
+                              options={allOptions.map(v => ({ value: v, label: v }))}
+                              selected={selected}
+                              onToggle={v => toggleValue(filterKey, v)}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Actions */}

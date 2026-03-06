@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { BEProject } from '@/types/beProject';
 import { toast } from 'sonner';
+import { QUESTIONNAIRE_FILTER_FIELDS, qstFilterKey, QST_FILTER_PREFIX } from '@/config/questionnaireFilterConfig';
+import { QuestionnaireProjectMap } from '@/hooks/useQuestionnaireProjectData';
 
 export interface ProjectFiltersState {
   statuses: string[];
@@ -19,6 +21,8 @@ export interface ProjectFiltersState {
   date_cloture_bancaire_to: string | null;
   date_cloture_juridique_from: string | null;
   date_cloture_juridique_to: string | null;
+  // Dynamic questionnaire filters: key = "qst_<champ_id>", value = string[]
+  [key: string]: string[] | string | null;
 }
 
 export const DEFAULT_PROJECT_FILTERS: ProjectFiltersState = {
@@ -36,6 +40,8 @@ export const DEFAULT_PROJECT_FILTERS: ProjectFiltersState = {
   date_cloture_bancaire_to: null,
   date_cloture_juridique_from: null,
   date_cloture_juridique_to: null,
+  // Initialize questionnaire filters
+  ...Object.fromEntries(QUESTIONNAIRE_FILTER_FIELDS.map(f => [qstFilterKey(f.champ_id), []])),
 };
 
 export interface FilterPreset {
@@ -53,6 +59,12 @@ export function useProjectFilters(visibleColumns?: string[], setVisibleColumns?:
   const [filters, setFilters] = useState<ProjectFiltersState>(DEFAULT_PROJECT_FILTERS);
   const [presets, setPresets] = useState<FilterPreset[]>([]);
   const [presetsLoaded, setPresetsLoaded] = useState(false);
+  const [qstData, setQstData] = useState<QuestionnaireProjectMap>({});
+
+  /** Allows parent to inject questionnaire data for filter application */
+  const setQuestionnaireData = useCallback((data: QuestionnaireProjectMap) => {
+    setQstData(data);
+  }, []);
 
   // Load presets and apply default
   useEffect(() => {
@@ -221,6 +233,12 @@ export function useProjectFilters(visibleColumns?: string[], setVisibleColumns?:
     if (filters.date_os_travaux_from || filters.date_os_travaux_to) count++;
     if (filters.date_cloture_bancaire_from || filters.date_cloture_bancaire_to) count++;
     if (filters.date_cloture_juridique_from || filters.date_cloture_juridique_to) count++;
+    // Count active questionnaire filters
+    for (const field of QUESTIONNAIRE_FILTER_FIELDS) {
+      const key = qstFilterKey(field.champ_id);
+      const val = filters[key];
+      if (Array.isArray(val) && val.length > 0) count++;
+    }
     return count;
   }, [filters]);
 
@@ -241,14 +259,24 @@ export function useProjectFilters(visibleColumns?: string[], setVisibleColumns?:
         return true;
       };
 
-      if (!checkDate(p.date_os_etude, filters.date_os_etude_from, filters.date_os_etude_to)) return false;
-      if (!checkDate(p.date_os_travaux, filters.date_os_travaux_from, filters.date_os_travaux_to)) return false;
-      if (!checkDate(p.date_cloture_bancaire, filters.date_cloture_bancaire_from, filters.date_cloture_bancaire_to)) return false;
-      if (!checkDate(p.date_cloture_juridique, filters.date_cloture_juridique_from, filters.date_cloture_juridique_to)) return false;
+      if (!checkDate(p.date_os_etude, filters.date_os_etude_from as string | null, filters.date_os_etude_to as string | null)) return false;
+      if (!checkDate(p.date_os_travaux, filters.date_os_travaux_from as string | null, filters.date_os_travaux_to as string | null)) return false;
+      if (!checkDate(p.date_cloture_bancaire, filters.date_cloture_bancaire_from as string | null, filters.date_cloture_bancaire_to as string | null)) return false;
+      if (!checkDate(p.date_cloture_juridique, filters.date_cloture_juridique_from as string | null, filters.date_cloture_juridique_to as string | null)) return false;
+
+      // Apply questionnaire filters
+      for (const field of QUESTIONNAIRE_FILTER_FIELDS) {
+        const key = qstFilterKey(field.champ_id);
+        const selectedValues = filters[key];
+        if (Array.isArray(selectedValues) && selectedValues.length > 0) {
+          const projectQstValue = qstData[p.id]?.[field.champ_id];
+          if (!projectQstValue || !selectedValues.includes(projectQstValue)) return false;
+        }
+      }
 
       return true;
     });
-  }, [filters]);
+  }, [filters, qstData]);
 
   return {
     filters,
@@ -264,5 +292,6 @@ export function useProjectFilters(visibleColumns?: string[], setVisibleColumns?:
     clearFilters,
     activeFiltersCount,
     applyFilters,
+    setQuestionnaireData,
   };
 }

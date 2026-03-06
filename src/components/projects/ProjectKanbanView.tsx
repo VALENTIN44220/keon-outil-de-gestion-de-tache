@@ -7,6 +7,9 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Building2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { QUESTIONNAIRE_FILTER_FIELDS } from '@/config/questionnaireFilterConfig';
+import { PILIERS } from '@/config/questionnaireConfig';
+import { QuestionnaireProjectMap } from '@/hooks/useQuestionnaireProjectData';
 
 export type GroupByField = 
   | 'status' 
@@ -21,7 +24,8 @@ export type GroupByField =
   | 'date_os_travaux' 
   | 'actionnariat' 
   | 'regime_icpe' 
-  | 'typologie';
+  | 'typologie'
+  | string; // Allow dynamic questionnaire field keys
 
 interface ProjectKanbanViewProps {
   projects: BEProject[];
@@ -29,9 +33,10 @@ interface ProjectKanbanViewProps {
   onGroupByChange: (field: GroupByField) => void;
   onProjectClick?: (project: BEProject) => void;
   canEdit?: boolean;
+  qstData?: QuestionnaireProjectMap;
 }
 
-const GROUP_BY_OPTIONS: { value: GroupByField; label: string }[] = [
+const BASE_GROUP_BY_OPTIONS: { value: GroupByField; label: string; group?: string }[] = [
   { value: 'status', label: 'Statut' },
   { value: 'pays_site', label: 'Pays site' },
   { value: 'region', label: 'Région' },
@@ -46,6 +51,19 @@ const GROUP_BY_OPTIONS: { value: GroupByField; label: string }[] = [
   { value: 'date_os_etude', label: 'OS Étude' },
   { value: 'date_os_travaux', label: 'OS Travaux' },
 ];
+
+// Generate questionnaire grouping options
+const QST_PREFIX = 'qst:';
+const QST_GROUP_BY_OPTIONS = QUESTIONNAIRE_FILTER_FIELDS.map(field => {
+  const pilier = PILIERS.find(p => p.code === field.pilier);
+  return {
+    value: `${QST_PREFIX}${field.champ_id}` as GroupByField,
+    label: `${pilier?.shortLabel || field.pilier} — ${field.shortLabel}`,
+    group: 'questionnaire',
+  };
+});
+
+const ALL_GROUP_BY_OPTIONS = [...BASE_GROUP_BY_OPTIONS, ...QST_GROUP_BY_OPTIONS];
 
 const STATUS_COLORS: Record<string, string> = {
   active: 'bg-green-500/10 border-green-500/30 text-green-700',
@@ -94,13 +112,22 @@ export function ProjectKanbanView({
   groupBy, 
   onGroupByChange, 
   onProjectClick,
-  canEdit 
+  canEdit,
+  qstData,
 }: ProjectKanbanViewProps) {
+  const isQstGroupBy = groupBy.startsWith(QST_PREFIX);
+  const qstChampId = isQstGroupBy ? groupBy.slice(QST_PREFIX.length) : null;
+
   const groupedProjects = useMemo(() => {
     const groups: Record<string, BEProject[]> = {};
     
     projects.forEach(project => {
-      const value = (project as any)[groupBy] || '';
+      let value: string;
+      if (isQstGroupBy && qstChampId && qstData) {
+        value = qstData[project.id]?.[qstChampId] || '';
+      } else {
+        value = (project as any)[groupBy] || '';
+      }
       const key = String(value);
       if (!groups[key]) {
         groups[key] = [];
@@ -120,7 +147,7 @@ export function ProjectKanbanView({
       label: getColumnLabel(groupBy, key || null),
       projects: groups[key],
     }));
-  }, [projects, groupBy]);
+  }, [projects, groupBy, isQstGroupBy, qstChampId, qstData]);
 
   const getStatusBadge = (status: string) => {
     const colorClass = STATUS_COLORS[status] || 'bg-muted text-muted-foreground';
@@ -137,15 +164,28 @@ export function ProjectKanbanView({
       <div className="flex items-center gap-3">
         <span className="text-sm font-medium text-muted-foreground">Regrouper par :</span>
         <Select value={groupBy} onValueChange={(v) => onGroupByChange(v as GroupByField)}>
-          <SelectTrigger className="w-[200px]">
+          <SelectTrigger className="w-[300px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {GROUP_BY_OPTIONS.map(option => (
+            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Champs projet</div>
+            {BASE_GROUP_BY_OPTIONS.map(option => (
               <SelectItem key={option.value} value={option.value}>
                 {option.label}
               </SelectItem>
             ))}
+            {QST_GROUP_BY_OPTIONS.length > 0 && (
+              <>
+                <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground border-t mt-1 pt-2">
+                  📋 Questionnaire KEON
+                </div>
+                {QST_GROUP_BY_OPTIONS.map(option => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </>
+            )}
           </SelectContent>
         </Select>
       </div>

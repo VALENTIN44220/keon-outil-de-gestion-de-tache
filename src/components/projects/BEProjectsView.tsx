@@ -5,6 +5,7 @@ import { useBEProjects } from '@/hooks/useBEProjects';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { useProjectViewConfig } from '@/hooks/useProjectViewConfig';
 import { useProjectFilters } from '@/hooks/useProjectFilters';
+import { useQuestionnaireProjectData } from '@/hooks/useQuestionnaireProjectData';
 import { BEProject } from '@/types/beProject';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,6 +43,7 @@ export function BEProjectsView() {
     clearFilters: clearMultiFilters,
     activeFiltersCount: multiFiltersCount,
     applyFilters: applyMultiFilters,
+    setQuestionnaireData,
   } = useProjectFilters();
   const { 
     activeViewType,
@@ -63,21 +65,12 @@ export function BEProjectsView() {
   
   // KEON filter: only projects with questionnaire data
   const [showKeonOnly, setShowKeonOnly] = useState(false);
-  const [keonProjectIds, setKeonProjectIds] = useState<Set<string>>(new Set());
+  const { qstData, keonProjectIds, getDistinctValues: getQstDistinctValues } = useQuestionnaireProjectData(projects);
 
+  // Sync questionnaire data to filter hook for questionnaire-based filtering
   useEffect(() => {
-    async function fetchKeonProjectIds() {
-      const { data } = await supabase
-        .from('project_questionnaire')
-        .select('project_id')
-        .not('valeur', 'is', null)
-        .neq('valeur', '');
-      if (data) {
-        setKeonProjectIds(new Set(data.map(r => r.project_id)));
-      }
-    }
-    fetchKeonProjectIds();
-  }, [projects]);
+    setQuestionnaireData(qstData);
+  }, [qstData, setQuestionnaireData]);
 
   // Get active config
   const activeConfig = getActiveConfig();
@@ -361,6 +354,7 @@ export function BEProjectsView() {
               onLoadPreset={loadPreset}
               onToggleDefault={toggleDefault}
               onClear={clearMultiFilters}
+              getQstDistinctValues={getQstDistinctValues}
             />
           </div>
         </CardContent>
@@ -384,6 +378,7 @@ export function BEProjectsView() {
           onGroupByChange={setKanbanGroupBy}
           onProjectClick={canEdit ? handleEditProject : undefined}
           canEdit={canEdit}
+          qstData={qstData}
         />
       )}
 
