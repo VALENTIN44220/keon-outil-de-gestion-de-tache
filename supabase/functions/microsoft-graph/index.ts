@@ -913,6 +913,16 @@ Deno.serve(async (req) => {
               if (dueDate !== localTask.due_date) updates.due_date = dueDate;
             }
 
+            // Sync date_demande from Planner createdDateTime
+            if (plannerTask.createdDateTime && !localTask.date_demande) {
+              updates.date_demande = plannerTask.createdDateTime;
+            }
+
+            // Sync date_lancement from Planner startDateTime
+            if (plannerTask.startDateTime && !localTask.date_lancement) {
+              updates.date_lancement = plannerTask.startDateTime;
+            }
+
             // Update planner labels
             const newLabels = resolveLabels(plannerTask.appliedCategories || null, categoryDescriptions);
             const currentLabels = localTask.planner_labels || [];
