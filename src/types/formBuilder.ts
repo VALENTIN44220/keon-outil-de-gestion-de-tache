@@ -280,6 +280,13 @@ export const FIELD_TYPE_CONFIGS: FieldTypeConfig[] = [
     defaultProps: { validation_type: 'email' },
   },
   {
+    type: 'multi_email',
+    label: 'Emails multiples',
+    icon: 'Mails',
+    category: 'advanced',
+    description: 'Saisie de plusieurs adresses email',
+  },
+  {
     type: 'phone',
     label: 'Téléphone',
     icon: 'Phone',
