@@ -8,6 +8,8 @@ import {
 import type { WfStep, WfTransition, WfNotification, WfAction } from '@/types/workflow';
 import { WF_STEP_TYPE_LABELS, WF_VALIDATION_MODE_LABELS, WF_EVENT_LABELS, WF_ACTION_TYPE_LABELS } from '@/types/workflow';
 import type { EnrichedAssignmentRule } from '@/lib/workflowAssignmentRules';
+import type { WfTaskConfig, WfValidationConfig } from '@/types/workflowTaskConfig';
+import { EXECUTOR_TYPE_LABELS, COMPLETION_BEHAVIOR_LABELS } from '@/types/workflowTaskConfig';
 
 interface Props {
   step: WfStep;
@@ -16,11 +18,14 @@ interface Props {
   notifications: WfNotification[];
   actions: WfAction[];
   assignmentRules: EnrichedAssignmentRule[];
+  taskConfigs?: WfTaskConfig[];
+  validationConfigs?: WfValidationConfig[];
   onClose: () => void;
 }
 
 export function WfStepDetailPanel({
-  step, steps, transitions, notifications, actions, assignmentRules, onClose,
+  step, steps, transitions, notifications, actions, assignmentRules,
+  taskConfigs = [], validationConfigs = [], onClose,
 }: Props) {
   const getStepName = (key: string) => steps.find(s => s.step_key === key)?.name || key;
   const assignmentRule = assignmentRules.find(r => r.id === step.assignment_rule_id);
@@ -30,11 +35,17 @@ export function WfStepDetailPanel({
   const stepTransitionsIn = transitions.filter(t => t.to_step_key === step.step_key);
   const stepNotifications = notifications.filter(n => n.step_key === step.step_key);
   const stepActions = actions.filter(a => a.step_key === step.step_key);
+  const stepTasks = taskConfigs.filter(t => t.step_key === step.step_key);
+  const stepValidations = validationConfigs.filter(v => v.source_step_key === step.step_key);
 
   // Actions linked to transitions from this step
   const transitionIds = stepTransitionsOut.map(t => t.id);
   const transitionActions = actions.filter(a => a.transition_id && transitionIds.includes(a.transition_id));
   const allStepActions = [...stepActions, ...transitionActions];
+
+  // Task summary
+  const tasksToValidation = stepTasks.filter(t => t.completion_behavior === 'send_to_validation' || t.completion_behavior === 'wait_validation');
+  const tasksDirect = stepTasks.filter(t => t.completion_behavior === 'close_task' || t.completion_behavior === 'close_and_advance_step');
 
   // Parse config
   const config = (step as any).config as Record<string, any> | null;
@@ -88,6 +99,58 @@ export function WfStepDetailPanel({
               <SectionTitle icon={<User className="h-3.5 w-3.5" />} label="Affectation" />
               <div className="mt-2 p-2.5 bg-muted/40 rounded-lg text-sm flex items-center gap-2">
                 <Badge variant="outline" className="text-xs">{assignmentRule.display_name}</Badge>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Tasks linked to this step */}
+        {stepTasks.length > 0 && (
+          <>
+            <Separator />
+            <div>
+              <SectionTitle icon={<ListTodo className="h-3.5 w-3.5" />} label={`Tâches (${stepTasks.length})`} />
+              <div className="mt-2 space-y-1.5">
+                {stepTasks.map(t => (
+                  <div key={t.id} className="flex items-center gap-2 p-2 bg-muted/30 rounded-lg text-xs">
+                    <ListTodo className="h-3 w-3 text-orange-600 shrink-0" />
+                    <span className="font-medium truncate">{t.name}</span>
+                    <Badge variant="outline" className="text-[9px] h-4 ml-auto shrink-0">
+                      {COMPLETION_BEHAVIOR_LABELS[t.completion_behavior] || t.completion_behavior}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+              {(tasksToValidation.length > 0 || tasksDirect.length > 0) && (
+                <div className="mt-2 flex gap-2 text-[10px]">
+                  {tasksDirect.length > 0 && (
+                    <span className="text-muted-foreground">{tasksDirect.length} clôture(s) directe(s)</span>
+                  )}
+                  {tasksToValidation.length > 0 && (
+                    <span className="text-amber-700">{tasksToValidation.length} vers validation</span>
+                  )}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* Validations linked to this step */}
+        {stepValidations.length > 0 && (
+          <>
+            <Separator />
+            <div>
+              <SectionTitle icon={<CheckCircle className="h-3.5 w-3.5" />} label={`Validations (${stepValidations.length})`} />
+              <div className="mt-2 space-y-1.5">
+                {stepValidations.map(v => (
+                  <div key={v.id} className="flex items-center gap-2 p-2 bg-muted/30 rounded-lg text-xs">
+                    <CheckCircle className="h-3 w-3 text-blue-600 shrink-0" />
+                    <span className="font-medium truncate">{v.name}</span>
+                    <Badge variant="outline" className="text-[9px] h-4 ml-auto shrink-0">
+                      {v.object_type}
+                    </Badge>
+                  </div>
+                ))}
               </div>
             </div>
           </>

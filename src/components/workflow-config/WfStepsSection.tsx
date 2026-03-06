@@ -12,6 +12,7 @@ import {
 import type { WfStep, WfStepInsert, WfStepUpdate, WfTransition, WfNotification, WfAction } from '@/types/workflow';
 import { WF_STEP_TYPE_LABELS, WF_VALIDATION_MODE_LABELS } from '@/types/workflow';
 import type { EnrichedAssignmentRule } from '@/lib/workflowAssignmentRules';
+import type { WfTaskConfig, WfValidationConfig } from '@/types/workflowTaskConfig';
 import { WfStepDrawer } from './WfStepDrawer';
 import { WfStepDetailPanel } from './WfStepDetailPanel';
 
@@ -23,6 +24,8 @@ interface Props {
   assignmentRules: EnrichedAssignmentRule[];
   canManage: boolean;
   subProcessId: string;
+  taskConfigs?: WfTaskConfig[];
+  validationConfigs?: WfValidationConfig[];
   onAdd: (step: Omit<WfStepInsert, 'workflow_id'>) => Promise<WfStep | null>;
   onUpdate: (id: string, updates: WfStepUpdate) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
@@ -45,6 +48,7 @@ const STEP_TYPE_COLORS: Record<string, string> = {
 
 export function WfStepsSection({
   steps, transitions, notifications, actions, assignmentRules, canManage, subProcessId,
+  taskConfigs = [], validationConfigs = [],
   onAdd, onUpdate, onDelete, onDuplicate, onReorder,
 }: Props) {
   const [editingStep, setEditingStep] = useState<WfStep | null>(null);
@@ -78,10 +82,11 @@ export function WfStepsSection({
     const transCount = transitions.filter(t => t.from_step_key === step.step_key || t.to_step_key === step.step_key).length;
     const notifCount = notifications.filter(n => n.step_key === step.step_key).length;
     const actionCount = actions.filter(a => a.step_key === step.step_key).length;
-    // Also count actions on transitions from this step
     const transitionIds = transitions.filter(t => t.from_step_key === step.step_key).map(t => t.id);
     const transActionCount = actions.filter(a => a.transition_id && transitionIds.includes(a.transition_id)).length;
-    return { transCount, notifCount, actionCount: actionCount + transActionCount };
+    const taskCount = taskConfigs.filter(t => t.step_key === step.step_key).length;
+    const valCount = validationConfigs.filter(v => v.source_step_key === step.step_key).length;
+    return { transCount, notifCount, actionCount: actionCount + transActionCount, taskCount, valCount };
   };
 
   // Drag and drop handlers
@@ -222,16 +227,22 @@ export function WfStepsSection({
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center justify-center gap-1.5">
+                          {counts.taskCount > 0 && (
+                            <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground" title={`${counts.taskCount} tâche(s)`}>
+                              <Hash className="h-3 w-3" />
+                              {counts.taskCount}
+                            </span>
+                          )}
+                          {counts.valCount > 0 && (
+                            <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground" title={`${counts.valCount} validation(s)`}>
+                              <Eye className="h-3 w-3" />
+                              {counts.valCount}
+                            </span>
+                          )}
                           {counts.transCount > 0 && (
                             <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground" title={`${counts.transCount} transition(s)`}>
                               <ArrowRightLeft className="h-3 w-3" />
                               {counts.transCount}
-                            </span>
-                          )}
-                          {counts.notifCount > 0 && (
-                            <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground" title={`${counts.notifCount} notification(s)`}>
-                              <Bell className="h-3 w-3" />
-                              {counts.notifCount}
                             </span>
                           )}
                           {counts.actionCount > 0 && (
@@ -279,6 +290,8 @@ export function WfStepsSection({
             notifications={notifications}
             actions={actions}
             assignmentRules={assignmentRules}
+            taskConfigs={taskConfigs}
+            validationConfigs={validationConfigs}
             onClose={() => setSelectedStepId(null)}
           />
         )}

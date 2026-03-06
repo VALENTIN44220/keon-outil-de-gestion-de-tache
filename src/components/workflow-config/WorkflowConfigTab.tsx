@@ -1,17 +1,20 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  Loader2, Plus, Workflow, Settings, ListOrdered, ArrowRightLeft,
-  Bell, Zap, Eye as EyeIcon, FileEdit, Rocket,
+  Loader2, Plus, Workflow, ListOrdered, ArrowRightLeft,
+  Bell, Zap, Eye as EyeIcon, ListTodo, ShieldCheck,
 } from 'lucide-react';
 import { useWorkflowConfig } from '@/hooks/useWorkflowConfig';
+import { useWorkflowTasksAndValidations } from '@/hooks/useWorkflowTasksAndValidations';
 import { WfGeneralSection } from './WfGeneralSection';
 import { WfStepsSection } from './WfStepsSection';
 import { WfTransitionsSection } from './WfTransitionsSection';
 import { WfNotificationsSection } from './WfNotificationsSection';
 import { WfActionsSection } from './WfActionsSection';
+import { WfTasksSection } from './WfTasksSection';
+import { WfValidationsSection } from './WfValidationsSection';
 import { WfFlowPreview } from './WfFlowPreview';
 
 interface Props {
@@ -22,7 +25,13 @@ interface Props {
 
 export function WorkflowConfigTab({ subProcessId, subProcessName, canManage }: Props) {
   const wf = useWorkflowConfig(subProcessId);
+  const tv = useWorkflowTasksAndValidations(wf.workflow?.id);
   const [activeTab, setActiveTab] = useState('steps');
+
+  // Fetch tasks & validations when workflow is loaded
+  useEffect(() => {
+    if (wf.workflow?.id) tv.fetchTasksAndValidations();
+  }, [wf.workflow?.id]);
 
   if (wf.isLoading) {
     return (
@@ -54,14 +63,17 @@ export function WorkflowConfigTab({ subProcessId, subProcessName, canManage }: P
     );
   }
 
-  // Counts for badges
   const stepCount = wf.steps.filter(s => s.step_type !== 'start' && s.step_type !== 'end').length;
   const transitionCount = wf.transitions.length;
   const notifCount = wf.notifications.length;
   const actionCount = wf.actions.length;
+  const taskCount = tv.taskConfigs.length;
+  const validationCount = tv.validationConfigs.length;
 
   const subTabs = [
     { id: 'steps', label: 'Étapes', icon: ListOrdered, count: stepCount },
+    { id: 'tasks', label: 'Tâches', icon: ListTodo, count: taskCount },
+    { id: 'validations', label: 'Validations', icon: ShieldCheck, count: validationCount },
     { id: 'transitions', label: 'Transitions', icon: ArrowRightLeft, count: transitionCount },
     { id: 'notifications', label: 'Notifications', icon: Bell, count: notifCount },
     { id: 'actions', label: 'Actions auto.', icon: Zap, count: actionCount },
@@ -70,7 +82,6 @@ export function WorkflowConfigTab({ subProcessId, subProcessName, canManage }: P
 
   return (
     <div className="space-y-5">
-      {/* General params - compact header card */}
       <WfGeneralSection
         workflow={wf.workflow}
         canManage={canManage}
@@ -78,7 +89,6 @@ export function WorkflowConfigTab({ subProcessId, subProcessName, canManage }: P
         onPublish={wf.publishWorkflow}
       />
 
-      {/* Sub-tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="w-full justify-start bg-muted/50 p-1 h-auto flex-wrap">
           {subTabs.map((tab) => {
@@ -110,11 +120,36 @@ export function WorkflowConfigTab({ subProcessId, subProcessName, canManage }: P
             assignmentRules={wf.assignmentRules}
             canManage={canManage}
             subProcessId={subProcessId}
+            taskConfigs={tv.taskConfigs}
+            validationConfigs={tv.validationConfigs}
             onAdd={wf.addStep}
             onUpdate={wf.updateStep}
             onDelete={wf.deleteStep}
             onDuplicate={wf.duplicateStep}
             onReorder={wf.reorderSteps}
+          />
+        </TabsContent>
+
+        <TabsContent value="tasks" className="mt-4">
+          <WfTasksSection
+            taskConfigs={tv.taskConfigs}
+            validationConfigs={tv.validationConfigs}
+            steps={wf.steps}
+            canManage={canManage}
+            onAdd={tv.addTaskConfig}
+            onUpdate={tv.updateTaskConfig}
+            onDelete={tv.deleteTaskConfig}
+          />
+        </TabsContent>
+
+        <TabsContent value="validations" className="mt-4">
+          <WfValidationsSection
+            validationConfigs={tv.validationConfigs}
+            steps={wf.steps}
+            canManage={canManage}
+            onAdd={tv.addValidationConfig}
+            onUpdate={tv.updateValidationConfig}
+            onDelete={tv.deleteValidationConfig}
           />
         </TabsContent>
 
@@ -159,6 +194,8 @@ export function WorkflowConfigTab({ subProcessId, subProcessName, canManage }: P
             transitions={wf.transitions}
             actions={wf.actions}
             notifications={wf.notifications}
+            taskConfigs={tv.taskConfigs}
+            validationConfigs={tv.validationConfigs}
           />
         </TabsContent>
       </Tabs>

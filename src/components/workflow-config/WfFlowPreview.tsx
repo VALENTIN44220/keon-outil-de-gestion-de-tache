@@ -6,12 +6,16 @@ import {
 } from 'lucide-react';
 import type { WfStep, WfTransition, WfAction, WfNotification } from '@/types/workflow';
 import { WF_STEP_TYPE_LABELS, WF_EVENT_LABELS, WF_ACTION_TYPE_LABELS } from '@/types/workflow';
+import type { WfTaskConfig, WfValidationConfig } from '@/types/workflowTaskConfig';
+import { COMPLETION_BEHAVIOR_LABELS } from '@/types/workflowTaskConfig';
 
 interface Props {
   steps: WfStep[];
   transitions: WfTransition[];
   actions: WfAction[];
   notifications: WfNotification[];
+  taskConfigs?: WfTaskConfig[];
+  validationConfigs?: WfValidationConfig[];
 }
 
 const STEP_ICON_MAP: Record<string, React.ReactNode> = {
@@ -41,7 +45,7 @@ const STEP_COLOR_MAP: Record<string, string> = {
   status_change: 'bg-yellow-100 border-yellow-300 text-yellow-700',
 };
 
-export function WfFlowPreview({ steps, transitions, actions, notifications }: Props) {
+export function WfFlowPreview({ steps, transitions, actions, notifications, taskConfigs = [], validationConfigs = [] }: Props) {
   const sortedSteps = [...steps].sort((a, b) => a.order_index - b.order_index);
 
   if (sortedSteps.length === 0) {
@@ -68,6 +72,8 @@ export function WfFlowPreview({ steps, transitions, actions, notifications }: Pr
           {sortedSteps.map((step, idx) => {
             const stepActions = actions.filter(a => a.step_key === step.step_key && a.is_active);
             const stepNotifs = notifications.filter(n => n.step_key === step.step_key && n.is_active);
+            const stepTasks = taskConfigs.filter(t => t.step_key === step.step_key && t.is_active);
+            const stepValidations = validationConfigs.filter(v => v.source_step_key === step.step_key && v.is_active);
             const transitionsOut = transitions.filter(t => t.from_step_key === step.step_key && t.is_active);
             const colorClass = STEP_COLOR_MAP[step.step_type] || 'bg-muted border-border text-foreground';
             const config = (step as any).config as Record<string, any> | null;
@@ -123,7 +129,34 @@ export function WfFlowPreview({ steps, transitions, actions, notifications }: Pr
                     </div>
                   </div>
 
-                  {/* Attached items */}
+                  {/* Tasks attached to this step */}
+                  {stepTasks.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-current/10 space-y-1">
+                      {stepTasks.map(t => (
+                        <div key={t.id} className="flex items-center gap-1.5 text-[10px]">
+                          <ListTodo className="h-2.5 w-2.5 opacity-70" />
+                          <span className="font-medium">{t.name}</span>
+                          {t.completion_behavior === 'send_to_validation' || t.completion_behavior === 'wait_validation' ? (
+                            <Badge variant="outline" className="text-[8px] h-3.5 px-1 bg-white/40 border-current/20">→ Validation</Badge>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Validations */}
+                  {stepValidations.length > 0 && (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {stepValidations.map(v => (
+                        <Badge key={v.id} className="text-[9px] h-4 px-1.5 bg-white/40 text-current border-current/20" variant="outline">
+                          <Shield className="h-2.5 w-2.5 mr-0.5" />
+                          {v.name}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Actions & Notifications */}
                   {(stepActions.length > 0 || stepNotifs.length > 0) && (
                     <div className="mt-2 pt-2 border-t border-current/10 flex flex-wrap gap-1">
                       {stepActions.map(a => (

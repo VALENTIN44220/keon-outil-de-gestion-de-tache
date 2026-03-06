@@ -6094,6 +6094,102 @@ export type Database = {
           },
         ]
       }
+      wf_task_configs: {
+        Row: {
+          assignment_mode: string
+          completion_action_id: string | null
+          completion_behavior: string
+          completion_target_step_key: string | null
+          completion_target_task_key: string | null
+          created_at: string
+          description: string | null
+          executor_type: string
+          executor_value: string | null
+          id: string
+          initial_status: string
+          is_active: boolean
+          is_required: boolean
+          name: string
+          order_index: number
+          outcome_behaviors_json: Json | null
+          step_key: string
+          task_key: string
+          trigger_condition_json: Json | null
+          trigger_mode: string
+          trigger_task_key: string | null
+          updated_at: string
+          validation_config_id: string | null
+          workflow_id: string
+        }
+        Insert: {
+          assignment_mode?: string
+          completion_action_id?: string | null
+          completion_behavior?: string
+          completion_target_step_key?: string | null
+          completion_target_task_key?: string | null
+          created_at?: string
+          description?: string | null
+          executor_type?: string
+          executor_value?: string | null
+          id?: string
+          initial_status?: string
+          is_active?: boolean
+          is_required?: boolean
+          name: string
+          order_index?: number
+          outcome_behaviors_json?: Json | null
+          step_key: string
+          task_key: string
+          trigger_condition_json?: Json | null
+          trigger_mode?: string
+          trigger_task_key?: string | null
+          updated_at?: string
+          validation_config_id?: string | null
+          workflow_id: string
+        }
+        Update: {
+          assignment_mode?: string
+          completion_action_id?: string | null
+          completion_behavior?: string
+          completion_target_step_key?: string | null
+          completion_target_task_key?: string | null
+          created_at?: string
+          description?: string | null
+          executor_type?: string
+          executor_value?: string | null
+          id?: string
+          initial_status?: string
+          is_active?: boolean
+          is_required?: boolean
+          name?: string
+          order_index?: number
+          outcome_behaviors_json?: Json | null
+          step_key?: string
+          task_key?: string
+          trigger_condition_json?: Json | null
+          trigger_mode?: string
+          trigger_task_key?: string | null
+          updated_at?: string
+          validation_config_id?: string | null
+          workflow_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wf_task_configs_validation_config_fk"
+            columns: ["validation_config_id"]
+            isOneToOne: false
+            referencedRelation: "wf_validation_configs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wf_task_configs_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "wf_workflows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       wf_transitions: {
         Row: {
           condition_json: Json | null
@@ -6131,6 +6227,89 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "wf_transitions_workflow_id_fkey"
+            columns: ["workflow_id"]
+            isOneToOne: false
+            referencedRelation: "wf_workflows"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wf_validation_configs: {
+        Row: {
+          condition_json: Json | null
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          n_required: number | null
+          name: string
+          object_type: string
+          on_approved_effect: string
+          on_approved_target_step_key: string | null
+          on_rejected_effect: string
+          on_rejected_target_step_key: string | null
+          order_index: number
+          source_step_key: string | null
+          source_task_key: string | null
+          target_step_key: string | null
+          updated_at: string
+          validation_key: string
+          validation_mode: string
+          validator_type: string
+          validator_value: string | null
+          workflow_id: string
+        }
+        Insert: {
+          condition_json?: Json | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          n_required?: number | null
+          name: string
+          object_type?: string
+          on_approved_effect?: string
+          on_approved_target_step_key?: string | null
+          on_rejected_effect?: string
+          on_rejected_target_step_key?: string | null
+          order_index?: number
+          source_step_key?: string | null
+          source_task_key?: string | null
+          target_step_key?: string | null
+          updated_at?: string
+          validation_key: string
+          validation_mode?: string
+          validator_type?: string
+          validator_value?: string | null
+          workflow_id: string
+        }
+        Update: {
+          condition_json?: Json | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          n_required?: number | null
+          name?: string
+          object_type?: string
+          on_approved_effect?: string
+          on_approved_target_step_key?: string | null
+          on_rejected_effect?: string
+          on_rejected_target_step_key?: string | null
+          order_index?: number
+          source_step_key?: string | null
+          source_task_key?: string | null
+          target_step_key?: string | null
+          updated_at?: string
+          validation_key?: string
+          validation_mode?: string
+          validator_type?: string
+          validator_value?: string | null
+          workflow_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wf_validation_configs_workflow_id_fkey"
             columns: ["workflow_id"]
             isOneToOne: false
             referencedRelation: "wf_workflows"
