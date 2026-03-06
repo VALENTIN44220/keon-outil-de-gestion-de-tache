@@ -72,12 +72,7 @@ interface TaskTemplateWithChecklist extends TaskTemplate {
   checklist_count: number;
 }
 
-interface ValidationLevel {
-  level: number;
-  type: 'manager' | 'requester' | 'user';
-  userId: string | null;
-  timing: 'before_close';
-}
+// ValidationLevel interface removed — validation is now managed via workflow steps
 
 interface Profile {
   id: string;
@@ -110,7 +105,7 @@ export function SubProcessConfigView({
   // Sub-process data
   const [subProcess, setSubProcess] = useState<SubProcessTemplate | null>(null);
   const [tasks, setTasks] = useState<TaskTemplateWithChecklist[]>([]);
-  const [validationLevels, setValidationLevels] = useState<ValidationLevel[]>([]);
+  // validationLevels state removed — managed via workflow steps
   
   // Reference data
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -209,13 +204,7 @@ export function SubProcessConfigView({
           setEnabledFilterTables(Array.isArray((formSchema as any).enabled_filter_tables) ? (formSchema as any).enabled_filter_tables : []);
         }
 
-        // Load validation levels from validation_config JSONB column
-        const validationConfig = (spData as any).validation_config;
-        if (validationConfig && Array.isArray(validationConfig)) {
-          setValidationLevels(validationConfig as ValidationLevel[]);
-        } else {
-          setValidationLevels([]);
-        }
+        // validation_config loading removed — managed via workflow steps
       }
 
       // Fetch tasks with checklist count
@@ -348,56 +337,7 @@ export function SubProcessConfigView({
     }
   };
 
-  const addValidationLevel = () => {
-    if (validationLevels.length >= 5) {
-      toast.error('Maximum 5 niveaux de validation');
-      return;
-    }
-    setValidationLevels([
-      ...validationLevels,
-      {
-        level: validationLevels.length + 1,
-        type: 'manager',
-        userId: null,
-        timing: 'before_close',
-      },
-    ]);
-  };
-
-  const removeValidationLevel = (level: number) => {
-    setValidationLevels(validationLevels.filter(v => v.level !== level));
-  };
-
-  const handleSaveValidation = async () => {
-    if (!subProcess) return;
-    setIsSaving(true);
-
-    try {
-      // Renumber levels sequentially
-      const renumberedLevels = validationLevels.map((v, idx) => ({
-        ...v,
-        level: idx + 1,
-      }));
-
-      const { error } = await supabase
-        .from('sub_process_templates')
-        .update({
-          validation_config: renumberedLevels,
-        })
-        .eq('id', subProcessId);
-
-      if (error) throw error;
-
-      setValidationLevels(renumberedLevels);
-      toast.success('Validations enregistrées');
-      // onUpdate() removed to prevent tab reset
-    } catch (error) {
-      console.error('Error saving validation:', error);
-      toast.error('Erreur lors de la sauvegarde');
-    } finally {
-      setIsSaving(false);
-    }
-  };
+  // addValidationLevel, removeValidationLevel, handleSaveValidation removed — managed via workflow steps
 
   const handleAddTask = async (
     task: Omit<TaskTemplate, 'id' | 'user_id' | 'process_template_id' | 'sub_process_template_id' | 'created_at' | 'updated_at'>
@@ -470,7 +410,6 @@ export function SubProcessConfigView({
     { id: 'general', label: 'Général', icon: Settings },
     { id: 'tasks', label: 'Tâches', icon: ListTodo },
     { id: 'assignment', label: 'Affectation', icon: Users },
-    { id: 'validations', label: 'Validations', icon: CheckSquare },
     { id: 'output', label: 'Sortie table', icon: Database },
     { id: 'visibility', label: 'Visibilité', icon: Eye },
     { id: 'notifications', label: 'Notifications', icon: Bell },
@@ -944,127 +883,7 @@ export function SubProcessConfigView({
                 </Card>
               </TabsContent>
 
-              {/* Validations Tab */}
-              <TabsContent value="validations" className="mt-0 space-y-4">
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <div>
-                      <CardTitle className="text-base">Niveaux de validation</CardTitle>
-                      <CardDescription>
-                        Configurez les étapes de validation (0 à 5 niveaux)
-                      </CardDescription>
-                    </div>
-                    {canManage && validationLevels.length < 5 && (
-                      <Button size="sm" variant="outline" onClick={addValidationLevel}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Ajouter niveau
-                      </Button>
-                    )}
-                  </CardHeader>
-                  <CardContent>
-                    {validationLevels.length === 0 ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <CheckSquare className="h-10 w-10 mx-auto mb-3 opacity-50" />
-                        <p>Aucune validation configurée</p>
-                        <p className="text-sm">Les tâches seront directement clôturées</p>
-                      </div>
-                    ) : (
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Niveau</TableHead>
-                            <TableHead>Type</TableHead>
-                            <TableHead>Validateur</TableHead>
-                            <TableHead>Moment</TableHead>
-                            <TableHead className="w-[60px]"></TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {validationLevels.map((v) => (
-                            <TableRow key={v.level}>
-                              <TableCell className="font-medium">N{v.level}</TableCell>
-                              <TableCell>
-                                <Select
-                                  value={v.type}
-                                  onValueChange={(val) => {
-                                    setValidationLevels(validationLevels.map(vl => 
-                                      vl.level === v.level ? { ...vl, type: val as any } : vl
-                                    ));
-                                  }}
-                                  disabled={!canManage}
-                                >
-                                  <SelectTrigger className="w-[140px]">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="manager">Manager</SelectItem>
-                                    <SelectItem value="requester">Demandeur</SelectItem>
-                                    <SelectItem value="user">Utilisateur</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </TableCell>
-                              <TableCell>
-                                {v.type === 'user' ? (
-                                  <Select
-                                    value={v.userId || '__none__'}
-                                    onValueChange={(val) => {
-                                      setValidationLevels(validationLevels.map(vl => 
-                                        vl.level === v.level ? { ...vl, userId: val === '__none__' ? null : val } : vl
-                                      ));
-                                    }}
-                                    disabled={!canManage}
-                                  >
-                                    <SelectTrigger className="w-[160px]">
-                                      <SelectValue placeholder="Sélectionner..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="__none__">Sélectionner...</SelectItem>
-                                      {profiles.map((p) => (
-                                        <SelectItem key={p.id} value={p.id}>
-                                          {p.display_name || 'Sans nom'}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                ) : (
-                                  <span className="text-muted-foreground">—</span>
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="outline" className="text-xs">
-                                  Avant clôture
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                {canManage && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-destructive"
-                                    onClick={() => removeValidationLevel(v.level)}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    )}
-                    
-                    {canManage && (
-                      <div className="flex justify-end pt-4 border-t mt-4">
-                        <Button onClick={handleSaveValidation} disabled={isSaving}>
-                          {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                          <Save className="h-4 w-4 mr-2" />
-                          Enregistrer les validations
-                        </Button>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
+              {/* Validations Tab removed — managed via workflow steps */}
 
               {/* Visibility Tab - Request detail fields */}
               <TabsContent value="visibility" className="mt-0 space-y-4">
