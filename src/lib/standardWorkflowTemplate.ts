@@ -5,10 +5,15 @@
 import type { WfStepInsert, WfTransitionInsert, WfNotificationInsert } from '@/types/workflow';
 import type { WfTaskConfigInsert, WfValidationConfigInsert } from '@/types/workflowTaskConfig';
 
+export type ManagerResolution = 'requester_manager' | 'target_department_manager' | 'contextual';
+export type FallbackBehavior = 'wait_manual' | 'escalate_n2' | 'department_head';
+
 export interface StandardWorkflowOptions {
   request_validation: boolean;
   final_validation: boolean;
   assignment_mode: 'auto' | 'manual' | 'role' | 'manager';
+  manager_resolution: ManagerResolution;
+  fallback_behavior: FallbackBehavior;
   executor_type: 'specific_user' | 'requester' | 'requester_manager' | 'role' | 'manual' | 'field_value';
   executor_value: string | null;
   completion_behavior: 'close_task' | 'send_to_validation';
@@ -20,6 +25,8 @@ export const DEFAULT_STANDARD_OPTIONS: StandardWorkflowOptions = {
   request_validation: true,
   final_validation: false,
   assignment_mode: 'manual',
+  manager_resolution: 'contextual',
+  fallback_behavior: 'wait_manual',
   executor_type: 'manual',
   executor_value: null,
   completion_behavior: 'close_task',
@@ -29,7 +36,7 @@ export const DEFAULT_STANDARD_OPTIONS: StandardWorkflowOptions = {
 
 import type { Json } from '@/integrations/supabase/types';
 
-interface GeneratedStep { step_key: string; name: string; step_type: string; order_index: number; state_label: string; is_required: boolean; validation_mode?: string; }
+interface GeneratedStep { step_key: string; name: string; step_type: string; order_index: number; state_label: string; is_required: boolean; validation_mode?: string; manager_resolution?: string; fallback_behavior?: string; }
 interface GeneratedTransition { from_step_key: string; to_step_key: string; event: string; }
 interface GeneratedNotification { step_key: string; event: string; subject_template: string; body_template: string; channels_json: Json; recipients_rules_json: Json; is_active: boolean; }
 interface GeneratedTask { name: string; task_key: string; step_key: string; executor_type: string; executor_value?: string | null; trigger_mode: string; initial_status: string; completion_behavior: string; is_active: boolean; is_required: boolean; order_index: number; assignment_mode: string; }
@@ -66,12 +73,21 @@ export function generateStandardStructure(options: StandardWorkflowOptions): Gen
   // 3. Request validation (optional)
   if (options.request_validation) {
     const valKey = 'std_validation_request';
-    steps.push({ step_key: valKey, name: 'Validation de la demande', step_type: 'validation', order_index: orderIdx++, state_label: 'En attente de validation', is_required: true, validation_mode: 'simple' });
+    const valManagerResolution = options.assignment_mode === 'manager'
+      ? (options.manager_resolution === 'contextual' ? 'requester_manager' : options.manager_resolution)
+      : undefined;
+    steps.push({
+      step_key: valKey, name: 'Validation de la demande', step_type: 'validation',
+      order_index: orderIdx++, state_label: 'En attente de validation', is_required: true,
+      validation_mode: 'simple',
+      manager_resolution: valManagerResolution,
+      fallback_behavior: options.assignment_mode === 'manager' ? options.fallback_behavior : undefined,
+    });
     transitions.push({ from_step_key: lastKey, to_step_key: valKey, event: 'done' });
 
     validationConfigs.push({
       name: 'Validation de la demande', validation_key: 'std_val_request', object_type: 'request',
-      source_step_key: valKey, validator_type: 'requester_manager',
+      source_step_key: valKey, validator_type: valManagerResolution || 'requester_manager',
       on_approved_effect: 'advance_step', on_rejected_effect: 'goto_step',
       is_active: true, order_index: 0, validation_mode: 'simple',
     });
@@ -85,7 +101,15 @@ export function generateStandardStructure(options: StandardWorkflowOptions): Gen
 
   // 4. Assignment
   const assignKey = 'std_assignment';
-  steps.push({ step_key: assignKey, name: 'Affectation', step_type: 'assignment', order_index: orderIdx++, state_label: 'À affecter', is_required: true });
+  const assignManagerResolution = options.assignment_mode === 'manager'
+    ? (options.manager_resolution === 'contextual' ? 'target_department_manager' : options.manager_resolution)
+    : undefined;
+  steps.push({
+    step_key: assignKey, name: 'Affectation', step_type: 'assignment',
+    order_index: orderIdx++, state_label: 'À affecter', is_required: true,
+    manager_resolution: assignManagerResolution,
+    fallback_behavior: options.assignment_mode === 'manager' ? options.fallback_behavior : undefined,
+  });
   transitions.push({ from_step_key: lastKey, to_step_key: assignKey, event: options.request_validation ? 'approved' : 'done' });
   lastKey = assignKey;
 
@@ -152,6 +176,36 @@ export const ASSIGNMENT_MODE_LABELS: Record<string, string> = {
   manual: 'Manuelle',
   role: 'Par rôle',
   manager: 'Par manager',
+};
+
+export const MANAGER_RESOLUTION_LABELS: Record<ManagerResolution, { label: string; description: string }> = {
+  requester_manager: {
+    label: 'Manager du demandeur',
+    description: 'Le manager hiérarchique (N+1) de la personne qui a créé la demande.',
+  },
+  target_department_manager: {
+    label: 'Manager du service cible',
+    description: 'Le responsable du département/service vers lequel la demande est dirigée.',
+  },
+  contextual: {
+    label: 'Contextuel (par étape)',
+    description: 'Manager du demandeur pour la validation, manager du service cible pour l\'affectation d\'exécution.',
+  },
+};
+
+export const FALLBACK_BEHAVIOR_LABELS: Record<FallbackBehavior, { label: string; description: string }> = {
+  wait_manual: {
+    label: 'Attente manuelle',
+    description: 'La tâche reste en statut "À affecter" jusqu\'à affectation manuelle.',
+  },
+  escalate_n2: {
+    label: 'Remonter au N+2',
+    description: 'Si le manager direct est absent, remonter au manager du manager.',
+  },
+  department_head: {
+    label: 'Responsable du département',
+    description: 'Affecter au premier utilisateur avec un rôle manager dans le même département.',
+  },
 };
 
 export const EXECUTOR_TYPE_STANDARD_LABELS: Record<string, string> = {

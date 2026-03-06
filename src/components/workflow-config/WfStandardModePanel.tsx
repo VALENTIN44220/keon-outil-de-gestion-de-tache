@@ -16,6 +16,8 @@ import {
   ASSIGNMENT_MODE_LABELS,
   EXECUTOR_TYPE_STANDARD_LABELS,
   COMPLETION_BEHAVIOR_OPTIONS,
+  MANAGER_RESOLUTION_LABELS,
+  FALLBACK_BEHAVIOR_LABELS,
 } from '@/lib/standardWorkflowTemplate';
 import type { StandardWorkflowOptions } from '@/lib/standardWorkflowTemplate';
 import { EXECUTOR_TYPE_LABELS } from '@/types/workflowTaskConfig';
@@ -108,6 +110,39 @@ export function WfStandardModePanel({ options, canManage, onOptionsChange, onApp
                 </SelectContent>
               </Select>
             </div>
+            {/* Manager-specific options */}
+            {options.assignment_mode === 'manager' && (
+              <>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Résolution du manager</Label>
+                  <Select value={options.manager_resolution} onValueChange={v => update({ manager_resolution: v as any })} disabled={!canManage}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(MANAGER_RESOLUTION_LABELS).map(([k, v]) => (
+                        <SelectItem key={k} value={k} className="text-xs">{v.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] text-muted-foreground">
+                    {MANAGER_RESOLUTION_LABELS[options.manager_resolution]?.description}
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Repli si manager absent</Label>
+                  <Select value={options.fallback_behavior} onValueChange={v => update({ fallback_behavior: v as any })} disabled={!canManage}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(FALLBACK_BEHAVIOR_LABELS).map(([k, v]) => (
+                        <SelectItem key={k} value={k} className="text-xs">{v.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] text-muted-foreground">
+                    {FALLBACK_BEHAVIOR_LABELS[options.fallback_behavior]?.description}
+                  </p>
+                </div>
+              </>
+            )}
             <div className="space-y-1.5">
               <Label className="text-xs">Type d'exécutant principal</Label>
               <Select value={options.executor_type} onValueChange={v => update({ executor_type: v as any })} disabled={!canManage}>
