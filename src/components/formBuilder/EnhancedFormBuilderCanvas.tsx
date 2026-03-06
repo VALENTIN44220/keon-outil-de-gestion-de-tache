@@ -73,6 +73,7 @@ const FIELD_ICONS: Record<CustomFieldType, string> = {
   date: '📅',
   datetime: '🕐',
   email: '✉️',
+  multi_email: '✉️',
   phone: '📞',
   url: '🔗',
   checkbox: '☑️',

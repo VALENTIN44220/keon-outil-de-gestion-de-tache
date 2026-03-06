@@ -63,6 +63,7 @@ const FIELD_ICONS: Record<CustomFieldType, React.ElementType> = {
   date: Calendar,
   datetime: Clock,
   email: Mail,
+  multi_email: Mail,
   phone: Phone,
   url: Link,
   checkbox: CheckSquare,

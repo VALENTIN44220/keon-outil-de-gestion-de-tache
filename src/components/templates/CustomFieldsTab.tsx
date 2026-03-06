@@ -89,6 +89,7 @@ const FIELD_TYPE_ICON_MAP: Record<CustomFieldType, React.ElementType> = {
   date: Calendar,
   datetime: Clock,
   email: Mail,
+  multi_email: Mail,
   phone: Phone,
   url: Link,
   checkbox: CheckSquare,
