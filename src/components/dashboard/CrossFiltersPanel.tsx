@@ -597,8 +597,8 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
        {/* Filters grid - collapsible */}
        {!collapsed && (
        <div className="flex flex-wrap gap-3 items-end mt-3">
-        {/* Search */}
-        <div className="space-y-1.5 col-span-2 md:col-span-1">
+         {/* Search */}
+         <div className="space-y-1.5 flex-1 min-w-[200px]">
           <Label className="text-xs text-keon-600 flex items-center gap-1">
             <Search className="h-3 w-3" />
             Recherche
