@@ -7601,6 +7601,7 @@ export type Database = {
         | "file"
         | "table_lookup"
         | "repeatable_table"
+        | "multi_email"
       datalake_sync_direction: "app_to_datalake" | "datalake_to_app"
       datalake_sync_mode: "full" | "incremental"
       datalake_upsert_strategy: "insert_only" | "upsert" | "overwrite"
@@ -7823,6 +7824,7 @@ export const Constants = {
         "file",
         "table_lookup",
         "repeatable_table",
+        "multi_email",
       ],
       datalake_sync_direction: ["app_to_datalake", "datalake_to_app"],
       datalake_sync_mode: ["full", "incremental"],
