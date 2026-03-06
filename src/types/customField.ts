@@ -5,6 +5,7 @@ export type CustomFieldType =
   | 'date'
   | 'datetime'
   | 'email'
+  | 'multi_email'
   | 'phone'
   | 'url'
   | 'checkbox'
@@ -23,6 +24,7 @@ export const FIELD_TYPE_LABELS: Record<CustomFieldType, string> = {
   date: 'Date',
   datetime: 'Date et heure',
   email: 'Email',
+  multi_email: 'Emails multiples',
   phone: 'Téléphone',
   url: 'URL',
   checkbox: 'Case à cocher',
@@ -42,6 +44,7 @@ export const FIELD_TYPE_ICONS: Record<CustomFieldType, string> = {
   date: 'Calendar',
   datetime: 'Clock',
   email: 'Mail',
+  multi_email: 'Mails',
   phone: 'Phone',
   url: 'Link',
   checkbox: 'CheckSquare',
