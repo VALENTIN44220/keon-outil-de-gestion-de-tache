@@ -6319,7 +6319,9 @@ export type Database = {
       }
       wf_workflows: {
         Row: {
+          config_mode: string
           created_at: string
+          customized_at: string | null
           default_subprocess_mode: string
           description: string | null
           id: string
@@ -6329,12 +6331,16 @@ export type Database = {
           legacy_workflow_id: string | null
           name: string
           published_at: string | null
+          standard_options: Json | null
+          standard_template_id: string | null
           sub_process_template_id: string | null
           updated_at: string
           version: number
         }
         Insert: {
+          config_mode?: string
           created_at?: string
+          customized_at?: string | null
           default_subprocess_mode?: string
           description?: string | null
           id?: string
@@ -6344,12 +6350,16 @@ export type Database = {
           legacy_workflow_id?: string | null
           name: string
           published_at?: string | null
+          standard_options?: Json | null
+          standard_template_id?: string | null
           sub_process_template_id?: string | null
           updated_at?: string
           version?: number
         }
         Update: {
+          config_mode?: string
           created_at?: string
+          customized_at?: string | null
           default_subprocess_mode?: string
           description?: string | null
           id?: string
@@ -6359,6 +6369,8 @@ export type Database = {
           legacy_workflow_id?: string | null
           name?: string
           published_at?: string | null
+          standard_options?: Json | null
+          standard_template_id?: string | null
           sub_process_template_id?: string | null
           updated_at?: string
           version?: number
@@ -6369,6 +6381,13 @@ export type Database = {
             columns: ["legacy_workflow_id"]
             isOneToOne: false
             referencedRelation: "workflow_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wf_workflows_standard_template_id_fkey"
+            columns: ["standard_template_id"]
+            isOneToOne: false
+            referencedRelation: "wf_workflows"
             referencedColumns: ["id"]
           },
           {
