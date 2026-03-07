@@ -600,6 +600,18 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
               <span>{format(new Date(task.created_at), 'dd MMMM yyyy', { locale: fr })}</span>
             </div>
             <div className="flex items-center gap-2">
+              <CalendarClock className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">Date d'ouverture:</span>
+              <span>{format(new Date(task.date_demande || task.created_at), 'dd MMMM yyyy', { locale: fr })}</span>
+            </div>
+            {(task.status === 'done' || task.status === 'validated') && task.updated_at && (
+              <div className="flex items-center gap-2">
+                <CalendarCheck className="h-4 w-4 text-success" />
+                <span className="text-muted-foreground">Date de fermeture:</span>
+                <span className="text-success">{format(new Date(task.updated_at), 'dd MMMM yyyy', { locale: fr })}</span>
+              </div>
+            )}
+            <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground">Date de demande:</span>
               <span>{task.date_demande ? format(new Date(task.date_demande), 'dd MMMM yyyy', { locale: fr }) : <span className="italic text-muted-foreground">—</span>}</span>
