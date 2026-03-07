@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { UserPlus } from 'lucide-react';
-import { Clock, User, MoreVertical, Trash2, ChevronDown, ChevronRight, ListChecks, FileText, Eye, Building2, Pencil } from 'lucide-react';
+import { Clock, User, MoreVertical, Trash2, ChevronDown, ChevronRight, ListChecks, FileText, Eye, Building2, Pencil, CalendarClock, CalendarCheck } from 'lucide-react';
 import { Task, TaskStatus } from '@/types/task';
 import { useParentRequestNumber } from '@/hooks/useParentRequestNumber';
 import { cn } from '@/lib/utils';
