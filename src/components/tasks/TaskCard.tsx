@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { UserPlus } from 'lucide-react';
-import { Clock, User, MoreVertical, Trash2, ChevronDown, ChevronRight, ListChecks, FileText, Eye, Building2, Pencil } from 'lucide-react';
+import { Clock, User, MoreVertical, Trash2, ChevronDown, ChevronRight, ListChecks, FileText, Eye, Building2, Pencil, CalendarClock, CalendarCheck } from 'lucide-react';
 import { Task, TaskStatus } from '@/types/task';
 import { useParentRequestNumber } from '@/hooks/useParentRequestNumber';
 import { cn } from '@/lib/utils';
@@ -152,11 +152,27 @@ export function TaskCard({ task, onStatusChange, onDelete, compact = false, task
           )}
 
           {/* Meta */}
-          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
             {task.category && (
               <div className="flex items-center gap-1.5">
                 <User className="w-3.5 h-3.5" />
                 <span>{task.category}</span>
+              </div>
+            )}
+            {/* Date d'ouverture */}
+            <div className="flex items-center gap-1">
+              <CalendarClock className="w-3.5 h-3.5" />
+              <span>
+                {new Date(task.date_demande || task.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: '2-digit' })}
+              </span>
+            </div>
+            {/* Date de fermeture */}
+            {(task.status === 'done' || task.status === 'validated') && task.updated_at && (
+              <div className="flex items-center gap-1 text-success">
+                <CalendarCheck className="w-3.5 h-3.5" />
+                <span>
+                  {new Date(task.updated_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: '2-digit' })}
+                </span>
               </div>
             )}
             {dueDate && (
