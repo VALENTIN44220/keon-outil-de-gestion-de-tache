@@ -116,7 +116,7 @@ export function SmqIndicatorsWidget({ tasks }: SmqIndicatorsWidgetProps) {
       return { name: bucket.label, ouverts: created, fermes: closedBucket.length, duree: avg };
     });
 
-    return { range, metrics: { openCount, totalCreated: createdInPeriod.length, avgDays, closedCount: closedInPeriod.length }, chartData };
+    return { range, metrics: { openCount, avgDays, closedCount: closedInPeriod.length }, chartData };
   }, [tasks, period, step]);
 
   const cards = [
