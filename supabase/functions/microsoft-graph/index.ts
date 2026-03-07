@@ -684,25 +684,32 @@ Deno.serve(async (req) => {
       if (mappingError || !mapping) throw new Error('Plan mapping not found');
 
       // Create sync log at start so history updates even if sync is interrupted
-      try {
-        const { data: startedLog } = await supabase
-          .from('planner_sync_logs')
-          .insert({
-            user_id: userId,
-            plan_mapping_id: planMappingId,
-            direction: mapping.sync_direction,
-            tasks_pushed: 0,
-            tasks_pulled: 0,
-            tasks_updated: 0,
-            errors: [],
-            status: 'running',
-          })
-          .select('id')
-          .single();
+      // Retry up to 2 times to ensure log is always created
+      for (let attempt = 0; attempt < 2 && !syncLogId; attempt++) {
+        try {
+          const { data: startedLog, error: logError } = await supabase
+            .from('planner_sync_logs')
+            .insert({
+              user_id: userId,
+              plan_mapping_id: planMappingId,
+              direction: mapping.sync_direction,
+              tasks_pushed: 0,
+              tasks_pulled: 0,
+              tasks_updated: 0,
+              errors: [],
+              status: 'running',
+            })
+            .select('id')
+            .single();
 
-        syncLogId = startedLog?.id ?? null;
-      } catch (logStartErr) {
-        console.error('Failed to create start sync log:', logStartErr);
+          if (logError) {
+            console.error(`Sync log creation attempt ${attempt + 1} failed:`, logError);
+          } else {
+            syncLogId = startedLog?.id ?? null;
+          }
+        } catch (logStartErr) {
+          console.error(`Sync log creation attempt ${attempt + 1} error:`, logStartErr);
+        }
       }
 
       const plannerTasks: any[] = await getPlannerTasks(accessToken, mapping.planner_plan_id);
