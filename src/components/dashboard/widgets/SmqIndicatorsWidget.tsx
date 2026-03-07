@@ -58,7 +58,7 @@ export function SmqIndicatorsWidget({ tasks }: SmqIndicatorsWidgetProps) {
 
     // Helper: get opening date (date_demande from Planner, fallback to created_at)
     const getOpenDate = (t: Task): Date => new Date(t.date_demande || t.created_at);
-    // Helper: get closing date (date_fermeture from Planner completedDateTime, fallback to updated_at)
+    // Helper: get closing date (date_fermeture reference, fallback updated_at)
     const getCloseDate = (t: Task): Date => new Date(t.date_fermeture || t.updated_at);
     const isClosed = (t: Task) => t.status === 'done' || t.status === 'validated';
 
@@ -69,7 +69,7 @@ export function SmqIndicatorsWidget({ tasks }: SmqIndicatorsWidgetProps) {
       return isClosed(t) && isWithinInterval(getCloseDate(t), interval);
     });
 
-    const openCount = createdInPeriod.filter(t => !isClosed(t)).length;
+    const openCount = createdInPeriod.length;
 
     let avgDays = 0;
     if (closedInPeriod.length > 0) {
@@ -116,7 +116,7 @@ export function SmqIndicatorsWidget({ tasks }: SmqIndicatorsWidgetProps) {
       return { name: bucket.label, ouverts: created, fermes: closedBucket.length, duree: avg };
     });
 
-    return { range, metrics: { openCount, totalCreated: createdInPeriod.length, avgDays, closedCount: closedInPeriod.length }, chartData };
+    return { range, metrics: { openCount, avgDays, closedCount: closedInPeriod.length }, chartData };
   }, [tasks, period, step]);
 
   const cards = [

@@ -462,21 +462,27 @@ export function ConfigurableDashboard({
       const dateStr = format(date, 'dd/MM', { locale: fr });
       
       const dayTasks = filteredTasks.filter(t => {
-        const taskDate = new Date(t.created_at);
-        return format(taskDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd');
+        const openDate = new Date(t.date_demande || t.created_at);
+        return format(openDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd');
       });
       
       const completedTasks = filteredTasks.filter(t => {
-        if (t.status !== 'done' || !t.updated_at) return false;
-        const doneDate = new Date(t.updated_at);
-        return format(doneDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd');
+        if ((t.status !== 'done' && t.status !== 'validated') || !(t.date_fermeture || t.updated_at)) return false;
+        const closeDate = new Date(t.date_fermeture || t.updated_at);
+        return format(closeDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd');
+      });
+
+      const startedTasks = filteredTasks.filter(t => {
+        if (!t.date_lancement) return false;
+        const startDate = new Date(t.date_lancement);
+        return format(startDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd');
       });
       
       data.push({
         date: dateStr,
         created: dayTasks.length,
         completed: completedTasks.length,
-        inProgress: filteredTasks.filter(t => t.status === 'in-progress').length,
+        inProgress: startedTasks.length,
       });
     }
     
