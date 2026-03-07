@@ -454,28 +454,36 @@ export function ConfigurableDashboard({
 
   // Generate timeline data
   const getTimelineData = useCallback((): TimelineDataPoint[] => {
+    const parseTaskDate = (value?: string | null): Date | null => {
+      if (!value) return null;
+      const iso = parseISO(value);
+      if (isValid(iso)) return iso;
+      const fallback = new Date(value);
+      return isValid(fallback) ? fallback : null;
+    };
+
     const days = 14;
     const data: TimelineDataPoint[] = [];
     
     for (let i = days - 1; i >= 0; i--) {
       const date = subDays(new Date(), i);
       const dateStr = format(date, 'dd/MM', { locale: fr });
+      const dayKey = format(date, 'yyyy-MM-dd');
       
       const dayTasks = filteredTasks.filter(t => {
-        const openDate = new Date(t.date_demande || t.created_at);
-        return format(openDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd');
+        const openDate = parseTaskDate(t.date_demande || t.created_at);
+        return openDate ? format(openDate, 'yyyy-MM-dd') === dayKey : false;
       });
       
       const completedTasks = filteredTasks.filter(t => {
-        if ((t.status !== 'done' && t.status !== 'validated') || !(t.date_fermeture || t.updated_at)) return false;
-        const closeDate = new Date(t.date_fermeture || t.updated_at);
-        return format(closeDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd');
+        if (t.status !== 'done' && t.status !== 'validated') return false;
+        const closeDate = parseTaskDate(t.date_fermeture || t.updated_at);
+        return closeDate ? format(closeDate, 'yyyy-MM-dd') === dayKey : false;
       });
 
       const startedTasks = filteredTasks.filter(t => {
-        if (!t.date_lancement) return false;
-        const startDate = new Date(t.date_lancement);
-        return format(startDate, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd');
+        const startDate = parseTaskDate(t.date_lancement);
+        return startDate ? format(startDate, 'yyyy-MM-dd') === dayKey : false;
       });
       
       data.push({

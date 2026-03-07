@@ -56,25 +56,43 @@ export function SmqIndicatorsWidget({ tasks }: SmqIndicatorsWidgetProps) {
     const range = getPeriodRange(period);
     const interval = { start: range.start, end: range.end };
 
-    // Helper: get opening date (date_demande from Planner, fallback to created_at)
-    const getOpenDate = (t: Task): Date => new Date(t.date_demande || t.created_at);
-    // Helper: get closing date (date_fermeture reference, fallback updated_at)
-    const getCloseDate = (t: Task): Date => new Date(t.date_fermeture || t.updated_at);
+    // Helpers: robust date parsing with fallback
+    const parseTaskDate = (value?: string | null): Date | null => {
+      if (!value) return null;
+      const parsed = new Date(value);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    };
+
+    const getOpenDate = (t: Task): Date | null => parseTaskDate(t.date_demande || t.created_at);
+    const getCloseDate = (t: Task): Date | null => parseTaskDate(t.date_fermeture || t.updated_at);
     const isClosed = (t: Task) => t.status === 'done' || t.status === 'validated';
 
     // Total tickets opened in the period (using Planner date)
-    const createdInPeriod = tasks.filter(t => isWithinInterval(getOpenDate(t), interval));
-
-    const closedInPeriod = tasks.filter(t => {
-      return isClosed(t) && isWithinInterval(getCloseDate(t), interval);
+    const createdInPeriod = tasks.filter(t => {
+      const openDate = getOpenDate(t);
+      return openDate ? isWithinInterval(openDate, interval) : false;
     });
 
-    const openCount = createdInPeriod.length;
+    const closedInPeriod = tasks.filter(t => {
+      if (!isClosed(t)) return false;
+      const closeDate = getCloseDate(t);
+      return closeDate ? isWithinInterval(closeDate, interval) : false;
+    });
 
     let avgDays = 0;
     if (closedInPeriod.length > 0) {
-      const totalDays = closedInPeriod.reduce((sum, t) => sum + differenceInCalendarDays(getCloseDate(t), getOpenDate(t)), 0);
-      avgDays = Math.round((totalDays / closedInPeriod.length) * 10) / 10;
+      const validDurations = closedInPeriod
+        .map(t => {
+          const closeDate = getCloseDate(t);
+          const openDate = getOpenDate(t);
+          return closeDate && openDate ? differenceInCalendarDays(closeDate, openDate) : null;
+        })
+        .filter((v): v is number => v !== null);
+
+      if (validDurations.length > 0) {
+        const totalDays = validDurations.reduce((sum, v) => sum + v, 0);
+        avgDays = Math.round((totalDays / validDurations.length) * 10) / 10;
+      }
     }
 
     // Build chart data by step
@@ -102,19 +120,38 @@ export function SmqIndicatorsWidget({ tasks }: SmqIndicatorsWidgetProps) {
       const bucketInterval = { start: bucket.start, end: bucket.end };
 
       // Tickets opened in this bucket (using Planner date)
-      const created = tasks.filter(t => isWithinInterval(getOpenDate(t), bucketInterval)).length;
+      const created = tasks.filter(t => {
+        const openDate = getOpenDate(t);
+        return openDate ? isWithinInterval(openDate, bucketInterval) : false;
+      }).length;
 
       // Tickets closed in this bucket
-      const closedBucket = tasks.filter(t => isClosed(t) && isWithinInterval(getCloseDate(t), bucketInterval));
+      const closedBucket = tasks.filter(t => {
+        if (!isClosed(t)) return false;
+        const closeDate = getCloseDate(t);
+        return closeDate ? isWithinInterval(closeDate, bucketInterval) : false;
+      });
 
       let avg: number | null = null;
       if (closedBucket.length > 0) {
-        const total = closedBucket.reduce((s, t) => s + differenceInCalendarDays(getCloseDate(t), getOpenDate(t)), 0);
-        avg = Math.round((total / closedBucket.length) * 10) / 10;
+        const durations = closedBucket
+          .map(t => {
+            const closeDate = getCloseDate(t);
+            const openDate = getOpenDate(t);
+            return closeDate && openDate ? differenceInCalendarDays(closeDate, openDate) : null;
+          })
+          .filter((v): v is number => v !== null);
+
+        if (durations.length > 0) {
+          const total = durations.reduce((s, v) => s + v, 0);
+          avg = Math.round((total / durations.length) * 10) / 10;
+        }
       }
 
       return { name: bucket.label, ouverts: created, fermes: closedBucket.length, duree: avg };
     });
+
+    const openCount = chartData.reduce((sum, item) => sum + item.ouverts, 0);
 
     return { range, metrics: { openCount, avgDays, closedCount: closedInPeriod.length }, chartData };
   }, [tasks, period, step]);

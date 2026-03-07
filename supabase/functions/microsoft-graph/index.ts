@@ -866,7 +866,7 @@ Deno.serve(async (req) => {
                 subcategory_id: subcategoryId || null,
                 source_process_template_id: mapping.mapped_process_template_id,
                 planner_labels: plannerLabels.length > 0 ? plannerLabels : null,
-                date_demande: pt.createdDateTime ? pt.createdDateTime : new Date().toISOString(),
+                date_demande: pt.createdDateTime || null,
                 date_lancement: pt.startDateTime ? pt.startDateTime : null,
                 date_fermeture: pt.completedDateTime
                   ? pt.completedDateTime
