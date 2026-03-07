@@ -924,13 +924,8 @@ Deno.serve(async (req) => {
         if (!plannerTask) continue;
 
         try {
-          // Get local task
-          const { data: localTask } = await supabase
-            .from('tasks')
-            .select('*')
-            .eq('id', link.local_task_id)
-            .single();
-
+          // Get local task from prefetched map
+          const localTask = localTasksById.get(link.local_task_id);
           if (!localTask) continue;
 
           // Pull updates from Planner
