@@ -69,7 +69,7 @@ export function SmqIndicatorsWidget({ tasks }: SmqIndicatorsWidgetProps) {
       return isClosed(t) && isWithinInterval(getCloseDate(t), interval);
     });
 
-    const openCount = createdInPeriod.filter(t => !isClosed(t)).length;
+    const openCount = createdInPeriod.length;
 
     let avgDays = 0;
     if (closedInPeriod.length > 0) {
