@@ -4634,6 +4634,7 @@ export type Database = {
           created_at: string
           current_validation_level: number | null
           date_demande: string | null
+          date_fermeture: string | null
           date_lancement: string | null
           depends_on_task_id: string | null
           description: string | null
@@ -4712,6 +4713,7 @@ export type Database = {
           created_at?: string
           current_validation_level?: number | null
           date_demande?: string | null
+          date_fermeture?: string | null
           date_lancement?: string | null
           depends_on_task_id?: string | null
           description?: string | null
@@ -4790,6 +4792,7 @@ export type Database = {
           created_at?: string
           current_validation_level?: number | null
           date_demande?: string | null
+          date_fermeture?: string | null
           date_lancement?: string | null
           depends_on_task_id?: string | null
           description?: string | null
