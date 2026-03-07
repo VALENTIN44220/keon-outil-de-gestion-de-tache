@@ -1075,17 +1075,28 @@ Deno.serve(async (req) => {
       // Update mapping
       await supabase.from('planner_plan_mappings').update({ last_sync_at: new Date().toISOString() }).eq('id', planMappingId);
 
-      // Log sync
-      await supabase.from('planner_sync_logs').insert({
-        user_id: userId,
-        plan_mapping_id: planMappingId,
-        direction: mapping.sync_direction,
-        tasks_pushed: tasksPushed,
-        tasks_pulled: tasksPulled,
-        tasks_updated: tasksUpdated,
-        errors,
-        status: errors.length > 0 ? 'partial' : 'success',
-      });
+      // Finalize sync log
+      if (syncLogId) {
+        await supabase.from('planner_sync_logs').update({
+          direction: mapping.sync_direction,
+          tasks_pushed: tasksPushed,
+          tasks_pulled: tasksPulled,
+          tasks_updated: tasksUpdated,
+          errors,
+          status: errors.length > 0 ? 'partial' : 'success',
+        }).eq('id', syncLogId);
+      } else {
+        await supabase.from('planner_sync_logs').insert({
+          user_id: userId,
+          plan_mapping_id: planMappingId,
+          direction: mapping.sync_direction,
+          tasks_pushed: tasksPushed,
+          tasks_pulled: tasksPulled,
+          tasks_updated: tasksUpdated,
+          errors,
+          status: errors.length > 0 ? 'partial' : 'success',
+        });
+      }
 
       return new Response(JSON.stringify({
         success: true,
