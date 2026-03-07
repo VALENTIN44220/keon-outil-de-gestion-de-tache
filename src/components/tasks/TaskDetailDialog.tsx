@@ -26,6 +26,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { 
   Building2, 
   Calendar, 
+  CalendarClock,
+  CalendarCheck,
   User, 
   Flag, 
   Workflow, 
