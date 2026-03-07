@@ -755,130 +755,76 @@ export function SubProcessConfigView({
                 </Card>
               </TabsContent>
 
-              {/* Assignment Tab */}
+              {/* Assignment Tab — Read-only summary, config lives in Workflow */}
               <TabsContent value="assignment" className="mt-0 space-y-4">
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base">Mode d'affectation</CardTitle>
                     <CardDescription>
-                      Définit comment les tâches sont affectées
+                      L'affectation est configurée dans le workflow. Voici un résumé de la configuration actuelle.
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-3">
-                      {Object.entries(ASSIGNMENT_TYPE_LABELS).map(([value, label]) => {
-                        const isSelected = formData.assignment_type === value;
-                        return (
-                          <button
-                            key={value}
-                            type="button"
-                            onClick={() => canManage && setFormData({ ...formData, assignment_type: value as any })}
-                            disabled={!canManage}
-                            className={`p-4 rounded-lg border text-left transition-all ${
-                              isSelected
-                                ? 'border-primary bg-primary/5 ring-1 ring-primary'
-                                : 'border-border hover:border-primary/50'
-                            } ${!canManage ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                          >
-                            <span className={`font-medium ${isSelected ? 'text-primary' : ''}`}>
-                              {label}
-                            </span>
-                          </button>
-                        );
-                      })}
+                    <div className="p-4 rounded-lg bg-muted/50 border space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">Type d'affectation</span>
+                        <Badge variant="outline">
+                          {ASSIGNMENT_TYPE_LABELS[formData.assignment_type] || 'Non défini'}
+                        </Badge>
+                      </div>
+
+                      {formData.assignment_type === 'user' && formData.target_assignee_id && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Utilisateur cible</span>
+                          <span className="text-sm font-medium">
+                            {profiles.find(p => p.id === formData.target_assignee_id)?.display_name || '—'}
+                          </span>
+                        </div>
+                      )}
+
+                      {formData.assignment_type === 'manager' && formData.target_manager_id && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Manager cible</span>
+                          <span className="text-sm font-medium">
+                            {profiles.find(p => p.id === formData.target_manager_id)?.display_name || 'Premier manager du service'}
+                          </span>
+                        </div>
+                      )}
+
+                      {formData.assignment_type === 'group' && formData.target_group_id && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Groupe cible</span>
+                          <span className="text-sm font-medium">
+                            {groups.find(g => g.id === formData.target_group_id)?.name || '—'}
+                          </span>
+                        </div>
+                      )}
+
+                      {formData.assignment_type === 'user' && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-muted-foreground">Modifiable à la demande</span>
+                          <Badge variant={formData.modifiable_at_request ? 'default' : 'secondary'}>
+                            {formData.modifiable_at_request ? 'Oui' : 'Non'}
+                          </Badge>
+                        </div>
+                      )}
                     </div>
 
-                    <Separator />
-
-                    {formData.assignment_type === 'user' && (
-                      <div className="space-y-2">
-                        <Label>Utilisateur cible</Label>
-                        <Select
-                          value={formData.target_assignee_id || '__none__'}
-                          onValueChange={(v) => setFormData({ ...formData, target_assignee_id: v === '__none__' ? null : v })}
-                          disabled={!canManage}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Sélectionner..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__none__">Sélectionner...</SelectItem>
-                            {profiles.map((p) => (
-                              <SelectItem key={p.id} value={p.id}>
-                                {p.display_name || 'Sans nom'}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg mt-3">
-                          <div>
-                            <Label>Modifiable à la demande</Label>
-                            <p className="text-xs text-muted-foreground">
-                              Le demandeur peut changer l'affectataire
-                            </p>
-                          </div>
-                          <Switch
-                            checked={formData.modifiable_at_request}
-                            onCheckedChange={(checked) => setFormData({ ...formData, modifiable_at_request: checked })}
-                            disabled={!canManage}
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {formData.assignment_type === 'manager' && (
-                      <div className="space-y-2">
-                        <Label>Manager du service cible</Label>
-                        <Select
-                          value={formData.target_manager_id || '__none__'}
-                          onValueChange={(v) => setFormData({ ...formData, target_manager_id: v === '__none__' ? null : v })}
-                          disabled={!canManage}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Premier manager du service" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__none__">Premier manager du service</SelectItem>
-                            {profiles.map((p) => (
-                              <SelectItem key={p.id} value={p.id}>
-                                {p.display_name || 'Sans nom'}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-
-                    {formData.assignment_type === 'group' && (
-                      <div className="space-y-2">
-                        <Label>Groupe cible</Label>
-                        <Select
-                          value={formData.target_group_id || '__none__'}
-                          onValueChange={(v) => setFormData({ ...formData, target_group_id: v === '__none__' ? null : v })}
-                          disabled={!canManage}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Sélectionner un groupe" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__none__">Sélectionner...</SelectItem>
-                            {groups.map((g) => (
-                              <SelectItem key={g.id} value={g.id}>
-                                {g.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-
-                    {canManage && (
-                      <Button onClick={handleSaveAssignment} disabled={isSaving}>
-                        {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                        <Save className="h-4 w-4 mr-2" />
-                        Enregistrer
+                    <div className="flex items-center gap-2 p-3 rounded-lg border border-primary/20 bg-primary/5">
+                      <Workflow className="h-4 w-4 text-primary shrink-0" />
+                      <p className="text-sm text-primary flex-1">
+                        Pour modifier l'affectation, utilisez la configuration du workflow.
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setActiveTab('workflow')}
+                        className="shrink-0"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                        Aller au Workflow
                       </Button>
-                    )}
+                    </div>
                   </CardContent>
                 </Card>
               </TabsContent>
