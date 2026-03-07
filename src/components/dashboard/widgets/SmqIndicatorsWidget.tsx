@@ -58,8 +58,8 @@ export function SmqIndicatorsWidget({ tasks }: SmqIndicatorsWidgetProps) {
 
     // Helper: get opening date (date_demande from Planner, fallback to created_at)
     const getOpenDate = (t: Task): Date => new Date(t.date_demande || t.created_at);
-    // Helper: get closing date (updated_at as proxy for closure)
-    const getCloseDate = (t: Task): Date => new Date(t.updated_at);
+    // Helper: get closing date (date_fermeture from Planner completedDateTime, fallback to updated_at)
+    const getCloseDate = (t: Task): Date => new Date(t.date_fermeture || t.updated_at);
     const isClosed = (t: Task) => t.status === 'done' || t.status === 'validated';
 
     // Total tickets opened in the period (using Planner date)
