@@ -63,7 +63,19 @@ export function SmqIndicatorsWidget({ tasks }: SmqIndicatorsWidgetProps) {
       return Number.isNaN(parsed.getTime()) ? null : parsed;
     };
 
-    const getOpenDate = (t: Task): Date | null => parseTaskDate(t.date_demande || t.created_at);
+    // IMPORTANT: for Planner-synced tasks, do not fallback to created_at when date_demande is missing
+    // because created_at can reflect sync/import timestamp and inflate monthly "opened" metrics.
+    const getOpenDate = (t: Task): Date | null => {
+      const explicitOpenDate = parseTaskDate(t.date_demande);
+      if (explicitOpenDate) return explicitOpenDate;
+
+      // Keep fallback only for non-Planner tasks
+      if (!t.source_process_template_id) {
+        return parseTaskDate(t.created_at);
+      }
+
+      return null;
+    };
     const getCloseDate = (t: Task): Date | null => parseTaskDate(t.date_fermeture || t.updated_at);
     const isClosed = (t: Task) => t.status === 'done' || t.status === 'validated';
 
