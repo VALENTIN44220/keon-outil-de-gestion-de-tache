@@ -966,6 +966,12 @@ Deno.serve(async (req) => {
               updates.date_fermeture = plannerTask.completedDateTime;
             }
 
+            // Fallback: if Planner task is completed but completedDateTime is missing,
+            // use imported creation date to avoid false closure spikes on sync date
+            if (!plannerTask.completedDateTime && !localTask.date_fermeture && plannerStatus === 'done' && plannerTask.createdDateTime) {
+              updates.date_fermeture = plannerTask.createdDateTime;
+            }
+
             // Update planner labels
             const newLabels = resolveLabels(plannerTask.appliedCategories || null, categoryDescriptions);
             const currentLabels = localTask.planner_labels || [];
