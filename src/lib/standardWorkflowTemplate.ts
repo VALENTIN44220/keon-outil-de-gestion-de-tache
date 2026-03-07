@@ -229,3 +229,11 @@ export const COMPLETION_BEHAVIOR_OPTIONS: Record<string, string> = {
   close_task: 'Clôture directe',
   send_to_validation: 'Envoi vers validation',
 };
+
+export const VALIDATOR_TYPE_STANDARD_LABELS: Record<string, string> = {
+  requester: 'Demandeur',
+  requester_manager: 'Manager du demandeur',
+  specific_user: 'Utilisateur spécifique',
+  role: 'Rôle',
+  department: 'Service',
+};
