@@ -951,25 +951,27 @@ Deno.serve(async (req) => {
               if (dueDate !== localTask.due_date) updates.due_date = dueDate;
             }
 
-            // Sync date_demande from Planner createdDateTime
-            if (plannerTask.createdDateTime && !localTask.date_demande) {
+            // Sync date_demande from Planner createdDateTime (overwrite if incorrect)
+            if (plannerTask.createdDateTime && plannerTask.createdDateTime !== localTask.date_demande) {
               updates.date_demande = plannerTask.createdDateTime;
             }
 
-            // Sync date_lancement from Planner startDateTime
-            if (plannerTask.startDateTime && !localTask.date_lancement) {
+            // Sync date_lancement from Planner startDateTime (overwrite if incorrect)
+            if (plannerTask.startDateTime && plannerTask.startDateTime !== localTask.date_lancement) {
               updates.date_lancement = plannerTask.startDateTime;
             }
 
             // Sync date_fermeture from Planner completedDateTime
-            if (plannerTask.completedDateTime && !localTask.date_fermeture) {
-              updates.date_fermeture = plannerTask.completedDateTime;
-            }
-
-            // Fallback: if Planner task is completed but completedDateTime is missing,
-            // use imported creation date to avoid false closure spikes on sync date
-            if (!plannerTask.completedDateTime && !localTask.date_fermeture && plannerStatus === 'done' && plannerTask.createdDateTime) {
+            if (plannerTask.completedDateTime) {
+              if (plannerTask.completedDateTime !== localTask.date_fermeture) {
+                updates.date_fermeture = plannerTask.completedDateTime;
+              }
+            } else if (!localTask.date_fermeture && plannerStatus === 'done' && plannerTask.createdDateTime) {
+              // Fallback when Planner task is completed but completion timestamp is unavailable
               updates.date_fermeture = plannerTask.createdDateTime;
+            } else if (plannerStatus !== 'done' && plannerStatus !== 'validated' && localTask.date_fermeture) {
+              // Re-opened in Planner: clear local closure date
+              updates.date_fermeture = null;
             }
 
             // Update planner labels
