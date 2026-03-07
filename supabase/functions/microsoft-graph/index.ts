@@ -959,6 +959,11 @@ Deno.serve(async (req) => {
               updates.date_lancement = plannerTask.startDateTime;
             }
 
+            // Sync date_fermeture from Planner completedDateTime
+            if (plannerTask.completedDateTime && !localTask.date_fermeture) {
+              updates.date_fermeture = plannerTask.completedDateTime;
+            }
+
             // Update planner labels
             const newLabels = resolveLabels(plannerTask.appliedCategories || null, categoryDescriptions);
             const currentLabels = localTask.planner_labels || [];
