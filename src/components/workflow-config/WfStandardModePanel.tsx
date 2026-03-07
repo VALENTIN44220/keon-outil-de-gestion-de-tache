@@ -18,6 +18,7 @@ import {
   COMPLETION_BEHAVIOR_OPTIONS,
   MANAGER_RESOLUTION_LABELS,
   FALLBACK_BEHAVIOR_LABELS,
+  VALIDATOR_TYPE_STANDARD_LABELS,
 } from '@/lib/standardWorkflowTemplate';
 import type { StandardWorkflowOptions } from '@/lib/standardWorkflowTemplate';
 import { EXECUTOR_TYPE_LABELS } from '@/types/workflowTaskConfig';
@@ -83,10 +84,66 @@ export function WfStandardModePanel({ options, canManage, onOptionsChange, onApp
               <Label className="text-xs">Validation de la demande</Label>
               <Switch checked={options.request_validation} onCheckedChange={v => update({ request_validation: v })} disabled={!canManage} />
             </div>
+            {options.request_validation && (
+              <>
+                <div className="space-y-1.5 pl-4 border-l-2 border-amber-200">
+                  <Label className="text-xs">Valideur de la demande</Label>
+                  <Select value={options.request_validator_type} onValueChange={v => update({ request_validator_type: v as any })} disabled={!canManage}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(VALIDATOR_TYPE_STANDARD_LABELS).map(([k, v]) => (
+                        <SelectItem key={k} value={k} className="text-xs">{v}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {options.request_validator_type === 'specific_user' && (
+                  <div className="space-y-1.5 pl-4 border-l-2 border-amber-200">
+                    <Label className="text-xs">Utilisateur valideur</Label>
+                    <Select value={options.request_validator_value || ''} onValueChange={v => update({ request_validator_value: v || null })} disabled={!canManage}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Sélectionner" /></SelectTrigger>
+                      <SelectContent>
+                        {profiles.map(p => (
+                          <SelectItem key={p.id} value={p.id} className="text-xs">{p.display_name || p.id}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </>
+            )}
             <div className="flex items-center justify-between">
-              <Label className="text-xs">Validation finale</Label>
+              <Label className="text-xs">Validation finale (tâche)</Label>
               <Switch checked={options.final_validation} onCheckedChange={v => update({ final_validation: v })} disabled={!canManage} />
             </div>
+            {options.final_validation && (
+              <>
+                <div className="space-y-1.5 pl-4 border-l-2 border-amber-200">
+                  <Label className="text-xs">Valideur de la tâche</Label>
+                  <Select value={options.final_validator_type} onValueChange={v => update({ final_validator_type: v as any })} disabled={!canManage}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(VALIDATOR_TYPE_STANDARD_LABELS).map(([k, v]) => (
+                        <SelectItem key={k} value={k} className="text-xs">{v}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {options.final_validator_type === 'specific_user' && (
+                  <div className="space-y-1.5 pl-4 border-l-2 border-amber-200">
+                    <Label className="text-xs">Utilisateur valideur</Label>
+                    <Select value={options.final_validator_value || ''} onValueChange={v => update({ final_validator_value: v || null })} disabled={!canManage}>
+                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Sélectionner" /></SelectTrigger>
+                      <SelectContent>
+                        {profiles.map(p => (
+                          <SelectItem key={p.id} value={p.id} className="text-xs">{p.display_name || p.id}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </>
+            )}
           </CardContent>
         </Card>
 

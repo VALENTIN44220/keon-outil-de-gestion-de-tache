@@ -10,7 +10,11 @@ export type FallbackBehavior = 'wait_manual' | 'escalate_n2' | 'department_head'
 
 export interface StandardWorkflowOptions {
   request_validation: boolean;
+  request_validator_type: 'requester_manager' | 'specific_user' | 'requester' | 'role' | 'department';
+  request_validator_value: string | null;
   final_validation: boolean;
+  final_validator_type: 'requester' | 'requester_manager' | 'specific_user' | 'role' | 'department';
+  final_validator_value: string | null;
   assignment_mode: 'auto' | 'manual' | 'role' | 'manager';
   manager_resolution: ManagerResolution;
   fallback_behavior: FallbackBehavior;
@@ -23,7 +27,11 @@ export interface StandardWorkflowOptions {
 
 export const DEFAULT_STANDARD_OPTIONS: StandardWorkflowOptions = {
   request_validation: true,
+  request_validator_type: 'requester_manager',
+  request_validator_value: null,
   final_validation: false,
+  final_validator_type: 'requester',
+  final_validator_value: null,
   assignment_mode: 'manual',
   manager_resolution: 'contextual',
   fallback_behavior: 'wait_manual',
@@ -87,7 +95,7 @@ export function generateStandardStructure(options: StandardWorkflowOptions): Gen
 
     validationConfigs.push({
       name: 'Validation de la demande', validation_key: 'std_val_request', object_type: 'request',
-      source_step_key: valKey, validator_type: valManagerResolution || 'requester_manager',
+      source_step_key: valKey, validator_type: options.request_validator_type,
       on_approved_effect: 'advance_step', on_rejected_effect: 'goto_step',
       is_active: true, order_index: 0, validation_mode: 'simple',
     });
@@ -137,7 +145,7 @@ export function generateStandardStructure(options: StandardWorkflowOptions): Gen
 
     validationConfigs.push({
       name: 'Validation finale', validation_key: 'std_val_final', object_type: 'task',
-      source_step_key: finalValKey, validator_type: 'requester',
+      source_step_key: finalValKey, validator_type: options.final_validator_type,
       on_approved_effect: 'advance_step', on_rejected_effect: 'goto_step',
       on_rejected_target_step_key: execKey, is_active: true, order_index: 1, validation_mode: 'simple',
     });
@@ -220,4 +228,12 @@ export const EXECUTOR_TYPE_STANDARD_LABELS: Record<string, string> = {
 export const COMPLETION_BEHAVIOR_OPTIONS: Record<string, string> = {
   close_task: 'Clôture directe',
   send_to_validation: 'Envoi vers validation',
+};
+
+export const VALIDATOR_TYPE_STANDARD_LABELS: Record<string, string> = {
+  requester: 'Demandeur',
+  requester_manager: 'Manager du demandeur',
+  specific_user: 'Utilisateur spécifique',
+  role: 'Rôle',
+  department: 'Service',
 };
