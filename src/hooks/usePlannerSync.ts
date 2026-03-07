@@ -195,6 +195,7 @@ export function usePlannerSync() {
       return result;
     } catch (error: any) {
       toast.error(`Erreur sync: ${error.message}`);
+      await fetchSyncLogs();
       return null;
     } finally {
       setIsSyncing(null);
