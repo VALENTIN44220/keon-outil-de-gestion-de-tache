@@ -80,6 +80,49 @@ serve(async (req) => {
       });
     }
 
+    // --- Authorization: only assignee, requester's manager, or admin ---
+    const isAssignee = request.assignee_id === validator_id;
+    const isRequester = request.requester_id === validator_id || request.user_id === user.id;
+
+    // Check if caller is the requester's manager
+    let isManager = false;
+    if (request.requester_id) {
+      const { data: requesterProfile } = await supabase
+        .from("profiles")
+        .select("manager_id")
+        .eq("id", request.requester_id)
+        .single();
+      if (requesterProfile?.manager_id === validator_id) {
+        isManager = true;
+      }
+    }
+    if (!isManager && request.user_id) {
+      const { data: ownerProfile } = await supabase
+        .from("profiles")
+        .select("manager_id")
+        .eq("user_id", request.user_id)
+        .single();
+      if (ownerProfile?.manager_id === validator_id) {
+        isManager = true;
+      }
+    }
+
+    // Check if caller is admin
+    const { data: adminRole } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("role", "admin")
+      .maybeSingle();
+    const isAdmin = !!adminRole;
+
+    if (!isAssignee && !isManager && !isAdmin) {
+      return new Response(JSON.stringify({ error: "Vous n'êtes pas autorisé à valider cette demande" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (action === "validate") {
       // 1. Activate material lines
       await supabase
