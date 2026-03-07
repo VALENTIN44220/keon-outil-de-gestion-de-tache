@@ -74,6 +74,7 @@ export function EditTaskTemplateDialog({ task, open, onClose, onSave }: EditTask
     const { data } = await supabase
       .from('profiles')
       .select('id, display_name')
+      .eq('status', 'active')
       .order('display_name');
     if (data) setProfiles(data);
   };

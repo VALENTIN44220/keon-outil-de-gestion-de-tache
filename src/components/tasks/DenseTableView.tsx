@@ -109,7 +109,7 @@ export function DenseTableView({ tasks, onStatusChange, onDelete, progressMap, o
   useEffect(() => {
     (async () => {
       const [{ data: profiles }, { data: cats }] = await Promise.all([
-        supabase.from('profiles').select('id, display_name'),
+        supabase.from('profiles').select('id, display_name').eq('status', 'active'),
         supabase.from('categories').select('id, name'),
       ]);
       if (profiles) {

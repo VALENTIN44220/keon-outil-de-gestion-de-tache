@@ -53,7 +53,7 @@ export function WfStandardModePanel({ options, canManage, onOptionsChange, onApp
   
   useEffect(() => {
     const loadProfiles = async () => {
-      const { data } = await supabase.from('profiles').select('id, display_name').order('display_name');
+      const { data } = await supabase.from('profiles').select('id, display_name').eq('status', 'active').order('display_name');
       if (data) setProfiles(data);
     };
     loadProfiles();

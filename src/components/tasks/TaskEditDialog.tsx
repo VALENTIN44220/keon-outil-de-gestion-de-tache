@@ -132,6 +132,7 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
     const { data, error } = await supabase
       .from('profiles')
       .select('id, display_name, job_title')
+      .eq('status', 'active')
       .order('display_name');
 
     if (!error && data) {
