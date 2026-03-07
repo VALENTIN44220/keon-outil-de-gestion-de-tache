@@ -24,6 +24,8 @@ import {
   GitBranch,
   Workflow,
   Calendar,
+  CalendarCheck,
+  CalendarClock,
   Building2,
   XCircle,
   ChevronRight,
