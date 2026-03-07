@@ -81,6 +81,7 @@ export interface Task {
   // Dates
   date_demande?: string | null;
   date_lancement?: string | null;
+  date_fermeture?: string | null;
   // Metadata
   created_at: string;
   updated_at: string;
