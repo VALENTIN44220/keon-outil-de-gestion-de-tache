@@ -22,7 +22,7 @@ import { ProgressRing } from './ProgressRing';
 import { SmqIndicatorsWidget } from './widgets/SmqIndicatorsWidget';
 import { Button } from '@/components/ui/button';
 import { Plus, RotateCcw, Settings2, Save, Check, Download, Upload, Trash2 } from 'lucide-react';
-import { format, subDays, startOfWeek, startOfMonth, startOfQuarter, startOfYear, isWithinInterval } from 'date-fns';
+import { format, subDays, startOfWeek, startOfMonth, startOfQuarter, startOfYear, isWithinInterval, parseISO, isValid } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
