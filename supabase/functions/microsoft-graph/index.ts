@@ -833,11 +833,20 @@ Deno.serve(async (req) => {
             const assigneeInfo = await resolveAssigneeToProfile(pt);
             const assigneeId = assigneeInfo.profileId || userProfile?.id;
 
+            // Fetch Planner note details only for tasks that will be imported
+            let plannerDescription: string | null = null;
+            try {
+              const details = await getPlannerTaskDetails(accessToken, pt.id);
+              plannerDescription = details.description || null;
+            } catch {
+              plannerDescription = null;
+            }
+
             const { data: newTask, error: insertErr } = await supabase
               .from('tasks')
               .insert({
                 title: pt.title,
-                description: pt._description || null,
+                description: plannerDescription,
                 status,
                 priority,
                 due_date: pt.dueDateTime ? pt.dueDateTime.substring(0, 10) : null,
