@@ -380,6 +380,10 @@ export function PlannerSyncPanel() {
                       {log.tasks_pushed > 0 && <span className="text-success">↑ {log.tasks_pushed} poussées</span>}
                       {log.tasks_updated > 0 && <span className="text-warning">↻ {log.tasks_updated} mises à jour</span>}
                       {log.errors?.length > 0 && <span className="text-destructive">⚠ {log.errors.length} erreurs</span>}
+                      {log.status === 'running' && <span className="text-muted-foreground italic">En cours…</span>}
+                      {log.status !== 'running' && log.tasks_pulled === 0 && log.tasks_pushed === 0 && log.tasks_updated === 0 && (!log.errors || log.errors.length === 0) && (
+                        <span className="text-muted-foreground">Aucune modification</span>
+                      )}
                     </div>
                   </div>
                 ))}
