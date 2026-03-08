@@ -1,232 +1,476 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useITProjects } from '@/hooks/useITProjects';
-import { ITProject, IT_PROJECT_STATUS_CONFIG, IT_PROJECT_TYPE_CONFIG, IT_PROJECT_PRIORITY_CONFIG } from '@/types/itProject';
+import { ITProject, ITProjectStatus, IT_PROJECT_STATUS_CONFIG, IT_PROJECT_TYPE_CONFIG, IT_PROJECT_PHASES } from '@/types/itProject';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Plus, Search, Monitor, Calendar, Users, TrendingUp, ArrowRight, MessageSquareText, Link2, LayoutGrid, List, Download } from 'lucide-react';
-import { format } from 'date-fns';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Plus, Monitor, Search, Download, Save, RotateCcw, Filter,
+  FolderKanban, AlertTriangle, TrendingUp, ArrowUpDown, ChevronRight
+} from 'lucide-react';
+import { format, subMonths, startOfMonth, startOfYear, isAfter } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 import { ITProjectFormDialog } from '@/components/it/ITProjectFormDialog';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend
+} from 'recharts';
+
+const NONE = '__none__';
+const LS_KEY = 'it_project_filters';
+
+type PeriodFilter = 'all' | 'month' | 'last3' | 'last6' | 'year';
+type ProgressFilter = 'all' | 'lt25' | '25-50' | '50-75' | 'gt75' | '100';
+
+interface Filters {
+  period: PeriodFilter;
+  entiteId: string;
+  responsableItId: string;
+  statut: string;
+  progress: ProgressFilter;
+}
+
+const DEFAULT_FILTERS: Filters = {
+  period: 'all',
+  entiteId: NONE,
+  responsableItId: NONE,
+  statut: 'all',
+  progress: 'all',
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  backlog: '#94a3b8',
+  en_cours: '#3b82f6',
+  recette: '#f59e0b',
+  deploye: '#10b981',
+  cloture: '#6b7280',
+  suspendu: '#ef4444',
+};
+
+const TYPE_COLORS = ['#8b5cf6', '#3b82f6', '#f59e0b', '#10b981', '#ef4444', '#94a3b8'];
+
+type SortKey = 'code_projet_digital' | 'nom_projet' | 'type_projet' | 'statut' | 'phase_courante' | 'progress' | 'date_fin_prevue';
 
 export default function ITProjects() {
   const navigate = useNavigate();
-  const { projects, isLoading, searchQuery, setSearchQuery } = useITProjects();
+  const { projects, isLoading } = useITProjects();
   const [showCreate, setShowCreate] = useState(false);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [statusFilter, setStatusFilter] = useState('all');
 
-  const filtered = projects.filter(p => statusFilter === 'all' || p.statut === statusFilter);
-  const stats = {
-    total: projects.length,
-    en_cours: projects.filter(p => p.statut === 'en_cours').length,
-    recette: projects.filter(p => p.statut === 'recette').length,
-    deploye: projects.filter(p => p.statut === 'deploye').length,
+  // Lookup data
+  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
+  const [profiles, setProfiles] = useState<{ id: string; display_name: string }[]>([]);
+
+  // Filters
+  const [filters, setFilters] = useState<Filters>(() => {
+    try {
+      const stored = localStorage.getItem(LS_KEY);
+      return stored ? { ...DEFAULT_FILTERS, ...JSON.parse(stored) } : DEFAULT_FILTERS;
+    } catch { return DEFAULT_FILTERS; }
+  });
+
+  // Sort
+  const [sortKey, setSortKey] = useState<SortKey>('code_projet_digital');
+  const [sortAsc, setSortAsc] = useState(true);
+
+  useEffect(() => {
+    supabase.from('departments').select('id, name').order('name').then(({ data }) => setDepartments(data || []));
+    supabase.from('profiles').select('id, display_name').order('display_name').then(({ data }) => setProfiles(data || []));
+  }, []);
+
+  const setFilter = <K extends keyof Filters>(key: K, value: Filters[K]) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
   };
+
+  const saveFilters = () => {
+    localStorage.setItem(LS_KEY, JSON.stringify(filters));
+  };
+
+  const resetFilters = () => {
+    setFilters(DEFAULT_FILTERS);
+    localStorage.removeItem(LS_KEY);
+  };
+
+  // Apply filters
+  const filtered = useMemo(() => {
+    const now = new Date();
+    return projects.filter(p => {
+      // Period
+      if (filters.period !== 'all' && p.created_at) {
+        let cutoff: Date;
+        switch (filters.period) {
+          case 'month': cutoff = startOfMonth(now); break;
+          case 'last3': cutoff = startOfMonth(subMonths(now, 2)); break;
+          case 'last6': cutoff = startOfMonth(subMonths(now, 5)); break;
+          case 'year': cutoff = startOfYear(now); break;
+          default: cutoff = new Date(0);
+        }
+        if (!isAfter(new Date(p.created_at), cutoff)) return false;
+      }
+      if (filters.entiteId !== NONE && p.entite_id !== filters.entiteId) return false;
+      if (filters.responsableItId !== NONE && p.chef_projet_it_id !== filters.responsableItId) return false;
+      if (filters.statut !== 'all' && p.statut !== filters.statut) return false;
+      // Progress
+      const prog = p.progress || 0;
+      switch (filters.progress) {
+        case 'lt25': if (prog >= 25) return false; break;
+        case '25-50': if (prog < 25 || prog > 50) return false; break;
+        case '50-75': if (prog < 50 || prog > 75) return false; break;
+        case 'gt75': if (prog <= 75 || prog >= 100) return false; break;
+        case '100': if (prog < 100) return false; break;
+      }
+      return true;
+    });
+  }, [projects, filters]);
+
+  // Sort
+  const sorted = useMemo(() => {
+    return [...filtered].sort((a, b) => {
+      let va: any = a[sortKey] ?? '';
+      let vb: any = b[sortKey] ?? '';
+      if (sortKey === 'progress') { va = a.progress || 0; vb = b.progress || 0; }
+      if (typeof va === 'string') va = va.toLowerCase();
+      if (typeof vb === 'string') vb = vb.toLowerCase();
+      if (va < vb) return sortAsc ? -1 : 1;
+      if (va > vb) return sortAsc ? 1 : -1;
+      return 0;
+    });
+  }, [filtered, sortKey, sortAsc]);
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) setSortAsc(!sortAsc);
+    else { setSortKey(key); setSortAsc(true); }
+  };
+
+  // KPIs
+  const kpis = useMemo(() => {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const enCours = filtered.filter(p => p.statut === 'en_cours').length;
+    const enRetard = filtered.filter(p => {
+      if (!p.date_fin_prevue) return false;
+      if (['deploye', 'cloture'].includes(p.statut)) return false;
+      return new Date(p.date_fin_prevue) < today;
+    }).length;
+    const avgProgress = filtered.length > 0
+      ? Math.round(filtered.reduce((s, p) => s + (p.progress || 0), 0) / filtered.length)
+      : 0;
+    return { total: filtered.length, enCours, enRetard, avgProgress };
+  }, [filtered]);
+
+  // Chart: par statut
+  const statusChartData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    filtered.forEach(p => { counts[p.statut] = (counts[p.statut] || 0) + 1; });
+    return Object.entries(IT_PROJECT_STATUS_CONFIG).map(([key, cfg]) => ({
+      name: cfg.label, value: counts[key] || 0, fill: STATUS_COLORS[key] || '#94a3b8',
+    })).filter(d => d.value > 0);
+  }, [filtered]);
+
+  // Chart: par type
+  const typeChartData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    filtered.forEach(p => { const t = p.type_projet || 'autre'; counts[t] = (counts[t] || 0) + 1; });
+    return Object.entries(IT_PROJECT_TYPE_CONFIG).map(([key, cfg]) => ({
+      name: cfg.label, value: counts[key] || 0,
+    })).filter(d => d.value > 0);
+  }, [filtered]);
+
+  // Chart: par phase
+  const phaseChartData = useMemo(() => {
+    return IT_PROJECT_PHASES.map(phase => {
+      const inPhase = filtered.filter(p => p.phase_courante === phase.value);
+      const avgProg = inPhase.length > 0
+        ? Math.round(inPhase.reduce((s, p) => s + (p.progress || 0), 0) / inPhase.length)
+        : 0;
+      return { name: phase.label.split(' /')[0].split(' &')[0], count: inPhase.length, avgProgress: avgProg };
+    });
+  }, [filtered]);
 
   return (
     <Layout>
       <div className="flex flex-col h-full">
-        <div className="px-6 pt-6 space-y-4">
-          {/* Header */}
-          <div className="flex items-start justify-between">
-            <div className="space-y-1">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/25">
-                  <Monitor className="h-5 w-5" />
-                </div>
-                <h1 className="text-2xl font-bold tracking-tight">Projets IT</h1>
+        {/* Header */}
+        <div className="px-6 pt-6 pb-4 border-b bg-background/95 backdrop-blur">
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/25">
+                <Monitor className="h-5 w-5" />
               </div>
-              <p className="text-sm text-muted-foreground ml-[52px]">
-                Suivi des projets digitaux — Code Projet Digital NSK_IT-XXXXX
-              </p>
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight">Projets IT — Tableau de bord</h1>
+                <p className="text-sm text-muted-foreground">Vue consolidée du portefeuille projets digitaux</p>
+              </div>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => navigate('/it/projects/import-fdr')} className="gap-2">
-                <Download className="h-4 w-4" /> Importer depuis FDR
+                <Download className="h-4 w-4" /> Importer FDR
               </Button>
               <Button onClick={() => setShowCreate(true)} className="gap-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 shadow-lg shadow-violet-500/25">
-                <Plus className="h-4 w-4" /> Nouveau projet IT
+                <Plus className="h-4 w-4" /> Nouveau projet
               </Button>
             </div>
           </div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-4 gap-3">
-            {[
-              { label: 'Total', value: stats.total, color: 'text-foreground' },
-              { label: 'En cours', value: stats.en_cours, color: 'text-blue-600' },
-              { label: 'Recette', value: stats.recette, color: 'text-amber-600' },
-              { label: 'Déployés', value: stats.deploye, color: 'text-emerald-600' },
-            ].map(k => (
-              <div key={k.label} className="text-center p-3 rounded-xl border bg-card">
-                <p className={cn('text-2xl font-bold', k.color)}>{k.value}</p>
-                <p className="text-xs text-muted-foreground">{k.label}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Filters */}
-          <div className="flex items-center gap-3">
-            <div className="relative flex-1 max-w-xs">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Rechercher un projet..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="pl-9 h-9"
-              />
+          {/* Filters bar */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+              <Filter className="h-4 w-4" /> FILTRES
             </div>
-            <div className="flex gap-1">
-              {[
-                { v: 'all', l: 'Tous' },
-                { v: 'en_cours', l: 'En cours' },
-                { v: 'recette', l: 'Recette' },
-                { v: 'deploye', l: 'Déployé' },
-                { v: 'backlog', l: 'Backlog' },
-              ].map(f => (
-                <Badge
-                  key={f.v}
-                  variant={statusFilter === f.v ? 'default' : 'outline'}
-                  className="cursor-pointer"
-                  onClick={() => setStatusFilter(f.v)}
-                >
-                  {f.l}
-                </Badge>
-              ))}
-            </div>
-            <div className="flex gap-1 ml-auto">
-              <Button variant={viewMode === 'grid' ? 'default' : 'outline'} size="icon" className="h-8 w-8" onClick={() => setViewMode('grid')}>
-                <LayoutGrid className="h-4 w-4" />
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={filters.period} onValueChange={v => setFilter('period', v as PeriodFilter)}>
+                <SelectTrigger className="h-8 text-xs w-[140px]"><SelectValue placeholder="Période" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tout</SelectItem>
+                  <SelectItem value="month">Ce mois</SelectItem>
+                  <SelectItem value="last3">3 derniers mois</SelectItem>
+                  <SelectItem value="last6">6 derniers mois</SelectItem>
+                  <SelectItem value="year">Cette année</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={filters.entiteId} onValueChange={v => setFilter('entiteId', v)}>
+                <SelectTrigger className="h-8 text-xs w-[160px]"><SelectValue placeholder="Entité" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>Toutes entités</SelectItem>
+                  {departments.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Select value={filters.responsableItId} onValueChange={v => setFilter('responsableItId', v)}>
+                <SelectTrigger className="h-8 text-xs w-[180px]"><SelectValue placeholder="Responsable IT" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE}>Tous responsables</SelectItem>
+                  {profiles.map(p => <SelectItem key={p.id} value={p.id}>{p.display_name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Select value={filters.statut} onValueChange={v => setFilter('statut', v)}>
+                <SelectTrigger className="h-8 text-xs w-[130px]"><SelectValue placeholder="Statut" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous statuts</SelectItem>
+                  {Object.entries(IT_PROJECT_STATUS_CONFIG).map(([k, v]) => (
+                    <SelectItem key={k} value={k}>{v.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={filters.progress} onValueChange={v => setFilter('progress', v as ProgressFilter)}>
+                <SelectTrigger className="h-8 text-xs w-[130px]"><SelectValue placeholder="Avancement" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous</SelectItem>
+                  <SelectItem value="lt25">{'< 25%'}</SelectItem>
+                  <SelectItem value="25-50">25–50%</SelectItem>
+                  <SelectItem value="50-75">50–75%</SelectItem>
+                  <SelectItem value="gt75">{'> 75%'}</SelectItem>
+                  <SelectItem value="100">100%</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button variant="outline" size="sm" className="h-8 gap-1 text-xs" onClick={saveFilters}>
+                <Save className="h-3 w-3" /> Enregistrer
               </Button>
-              <Button variant={viewMode === 'list' ? 'default' : 'outline'} size="icon" className="h-8 w-8" onClick={() => setViewMode('list')}>
-                <List className="h-4 w-4" />
+              <Button variant="ghost" size="sm" className="h-8 gap-1 text-xs" onClick={resetFilters}>
+                <RotateCcw className="h-3 w-3" /> Réinitialiser
               </Button>
             </div>
           </div>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-auto p-6">
+        <div className="flex-1 overflow-auto p-6 space-y-6">
           {isLoading ? (
-            <div className={cn(viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4' : 'space-y-2')}>
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="h-48 rounded-xl bg-muted animate-pulse" />
-              ))}
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-center">
-              <Monitor className="h-12 w-12 text-muted-foreground/30 mb-4" />
-              <p className="text-muted-foreground">Aucun projet IT trouvé</p>
-              <Button variant="outline" className="mt-4" onClick={() => setShowCreate(true)}>
-                <Plus className="h-4 w-4 mr-2" /> Créer un projet IT
-              </Button>
+            <div className="grid grid-cols-4 gap-4">
+              {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-24 rounded-xl bg-muted animate-pulse" />)}
             </div>
           ) : (
-            <div className={cn(viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4' : 'space-y-2')}>
-              {filtered.map(p => (
-                <ITProjectCard
-                  key={p.id}
-                  project={p}
-                  compact={viewMode === 'list'}
-                  onClick={() => navigate(`/it/projects/${p.code_projet_digital}/overview`)}
-                />
-              ))}
-            </div>
+            <>
+              {/* KPIs */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {[
+                  { label: 'Total projets', value: kpis.total, icon: FolderKanban, color: 'text-foreground', bg: 'bg-muted' },
+                  { label: 'En cours', value: kpis.enCours, icon: Monitor, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-950/30' },
+                  { label: 'En retard', value: kpis.enRetard, icon: AlertTriangle, color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-950/30' },
+                  { label: 'Avancement moyen', value: `${kpis.avgProgress}%`, icon: TrendingUp, color: 'text-violet-600', bg: 'bg-violet-50 dark:bg-violet-950/30' },
+                ].map(k => {
+                  const Icon = k.icon;
+                  return (
+                    <Card key={k.label}>
+                      <CardContent className="flex items-center gap-4 p-4">
+                        <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center', k.bg)}>
+                          <Icon className={cn('h-6 w-6', k.color)} />
+                        </div>
+                        <div>
+                          <p className={cn('text-2xl font-bold', k.color)}>{k.value}</p>
+                          <p className="text-xs text-muted-foreground">{k.label}</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+
+              {/* Charts row */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {/* Par statut */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-semibold">Par statut</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[200px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={statusChartData} layout="vertical" margin={{ left: 10, right: 20, top: 5, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-border" horizontal={false} />
+                          <XAxis type="number" tick={{ fontSize: 10 }} className="fill-muted-foreground" allowDecimals={false} />
+                          <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} className="fill-muted-foreground" width={70} />
+                          <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid hsl(var(--border))', background: 'hsl(var(--card))' }} />
+                          <Bar dataKey="value" name="Projets" radius={[0, 4, 4, 0]}>
+                            {statusChartData.map((entry, i) => (
+                              <Cell key={i} fill={entry.fill} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Par type (Donut) */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-semibold">Par type de projet</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[200px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie data={typeChartData} cx="50%" cy="50%" innerRadius={45} outerRadius={75} dataKey="value" paddingAngle={2}
+                            label={({ name, percent }) => percent > 0.05 ? `${name} (${Math.round(percent * 100)}%)` : ''}>
+                            {typeChartData.map((_, i) => (
+                              <Cell key={i} fill={TYPE_COLORS[i % TYPE_COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid hsl(var(--border))', background: 'hsl(var(--card))' }} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Par phase */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-semibold">Avancement par phase</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {phaseChartData.map(phase => (
+                      <div key={phase.name} className="space-y-1">
+                        <div className="flex justify-between text-xs">
+                          <span className="text-muted-foreground">{phase.name}</span>
+                          <span className="font-medium">{phase.count} projets · {phase.avgProgress}%</span>
+                        </div>
+                        <Progress value={phase.avgProgress} className="h-2" />
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Table */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <FolderKanban className="h-4 w-4 text-violet-600" />
+                    Projets filtrés ({sorted.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="overflow-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b bg-muted/40">
+                          {([
+                            ['code_projet_digital', 'Code'],
+                            ['nom_projet', 'Nom'],
+                            ['type_projet', 'Type'],
+                            ['statut', 'Statut'],
+                            ['phase_courante', 'Phase'],
+                            ['progress', 'Avancement'],
+                            ['date_fin_prevue', 'Date fin'],
+                          ] as [SortKey, string][]).map(([key, label]) => (
+                            <th
+                              key={key}
+                              className="text-left px-3 py-2 font-medium text-xs text-muted-foreground cursor-pointer hover:text-foreground select-none"
+                              onClick={() => toggleSort(key)}
+                            >
+                              <span className="flex items-center gap-1">
+                                {label}
+                                <ArrowUpDown className={cn('h-3 w-3', sortKey === key ? 'text-violet-600' : 'opacity-30')} />
+                              </span>
+                            </th>
+                          ))}
+                          <th className="text-left px-3 py-2 font-medium text-xs text-muted-foreground">Chef IT</th>
+                          <th className="w-8" />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sorted.map(p => {
+                          const sc = IT_PROJECT_STATUS_CONFIG[p.statut] || IT_PROJECT_STATUS_CONFIG.backlog;
+                          const tc = p.type_projet ? IT_PROJECT_TYPE_CONFIG[p.type_projet] : null;
+                          const today = new Date(); today.setHours(0, 0, 0, 0);
+                          const isLate = p.date_fin_prevue && !['deploye', 'cloture'].includes(p.statut) && new Date(p.date_fin_prevue) < today;
+                          return (
+                            <tr
+                              key={p.id}
+                              className="border-b hover:bg-muted/30 cursor-pointer transition-colors"
+                              onClick={() => navigate(`/it/projects/${p.code_projet_digital}/overview`)}
+                            >
+                              <td className="px-3 py-2.5 font-mono text-xs text-violet-600 font-medium">{p.code_projet_digital}</td>
+                              <td className="px-3 py-2.5 font-medium max-w-[250px] truncate">{p.nom_projet}</td>
+                              <td className="px-3 py-2.5 text-xs">{tc ? `${tc.icon} ${tc.label}` : '—'}</td>
+                              <td className="px-3 py-2.5">
+                                <Badge className={cn(sc.className, 'border text-[10px]')}>{sc.label}</Badge>
+                              </td>
+                              <td className="px-3 py-2.5 text-xs text-muted-foreground">
+                                {p.phase_courante ? IT_PROJECT_PHASES.find(ph => ph.value === p.phase_courante)?.label.split(' /')[0] || p.phase_courante : '—'}
+                              </td>
+                              <td className="px-3 py-2.5">
+                                <div className="flex items-center gap-2">
+                                  <Progress value={p.progress || 0} className="h-1.5 w-16" />
+                                  <span className="text-xs font-medium w-8">{p.progress || 0}%</span>
+                                </div>
+                              </td>
+                              <td className={cn('px-3 py-2.5 text-xs', isLate && 'text-red-500 font-medium')}>
+                                {p.date_fin_prevue ? format(new Date(p.date_fin_prevue), 'dd/MM/yy') : '—'}
+                                {isLate && <AlertTriangle className="inline h-3 w-3 ml-1" />}
+                              </td>
+                              <td className="px-3 py-2.5 text-xs text-muted-foreground truncate max-w-[120px]">
+                                {p.chef_projet_it?.display_name || '—'}
+                              </td>
+                              <td className="px-3 py-2.5">
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {sorted.length === 0 && (
+                          <tr>
+                            <td colSpan={9} className="text-center py-12 text-muted-foreground">
+                              Aucun projet ne correspond aux filtres
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
           )}
         </div>
       </div>
 
       <ITProjectFormDialog open={showCreate} onClose={() => setShowCreate(false)} />
     </Layout>
-  );
-}
-
-function ITProjectCard({ project, compact, onClick }: { project: ITProject; compact?: boolean; onClick: () => void }) {
-  const statusConfig = IT_PROJECT_STATUS_CONFIG[project.statut] || IT_PROJECT_STATUS_CONFIG.backlog;
-  const typeConfig = project.type_projet ? IT_PROJECT_TYPE_CONFIG[project.type_projet] : null;
-  const priorityConfig = project.priorite ? IT_PROJECT_PRIORITY_CONFIG[project.priorite] : null;
-
-  if (compact) {
-    return (
-      <div
-        onClick={onClick}
-        className="flex items-center gap-4 p-3 rounded-xl border bg-card hover:shadow-md transition-all cursor-pointer"
-      >
-        <div className="p-2 rounded-lg bg-violet-100 text-lg">
-          {typeConfig?.icon || '💻'}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-mono text-muted-foreground">{project.code_projet_digital}</span>
-            <Badge className={cn(statusConfig.className, 'border text-[10px]')}>{statusConfig.label}</Badge>
-          </div>
-          <p className="text-sm font-medium truncate">{project.nom_projet}</p>
-        </div>
-        <div className="text-right flex-shrink-0">
-          <p className="text-sm font-bold">{project.progress || 0}%</p>
-          <p className="text-[10px] text-muted-foreground">Avancement</p>
-        </div>
-        <ArrowRight className="h-4 w-4 text-muted-foreground" />
-      </div>
-    );
-  }
-
-  return (
-    <Card onClick={onClick} className="hover:shadow-lg transition-all cursor-pointer group overflow-hidden">
-      <div className="h-1 bg-gradient-to-r from-violet-600 to-indigo-600" />
-      <CardContent className="p-5 space-y-4">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-violet-100 text-xl">
-              {typeConfig?.icon || '💻'}
-            </div>
-            <div>
-              <span className="text-xs font-mono text-muted-foreground">{project.code_projet_digital}</span>
-              <div className="flex gap-1.5 mt-1">
-                <Badge className={cn(statusConfig.className, 'border text-[10px]')}>{statusConfig.label}</Badge>
-                {priorityConfig && <Badge variant="outline" className={cn(priorityConfig.className, 'border text-[10px]')}>{priorityConfig.label}</Badge>}
-              </div>
-            </div>
-          </div>
-          <div className="flex gap-1">
-            {project.teams_channel_url && <MessageSquareText className="h-3.5 w-3.5 text-blue-500" />}
-            {project.loop_workspace_url && <Link2 className="h-3.5 w-3.5 text-violet-500" />}
-          </div>
-        </div>
-
-        <h3 className="font-semibold text-sm group-hover:text-violet-700 transition-colors">{project.nom_projet}</h3>
-
-        {project.description && (
-          <p className="text-xs text-muted-foreground line-clamp-2">{project.description}</p>
-        )}
-
-        <div className="space-y-1.5">
-          <div className="flex justify-between text-xs">
-            <span className="text-muted-foreground">Avancement</span>
-            <span className="font-bold">{project.progress || 0}%</span>
-          </div>
-          <Progress value={project.progress || 0} className="h-1.5" />
-        </div>
-
-        <div className="flex items-center justify-between text-xs text-muted-foreground pt-1 border-t">
-          <div className="flex items-center gap-1.5">
-            <Calendar className="h-3 w-3" />
-            {project.date_fin_prevue
-              ? format(new Date(project.date_fin_prevue), 'dd MMM yyyy', { locale: fr })
-              : '—'}
-          </div>
-          {project.responsable_it && (
-            <span className="truncate max-w-[120px]">{project.responsable_it.display_name}</span>
-          )}
-          <ArrowRight className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
-        </div>
-      </CardContent>
-    </Card>
   );
 }
