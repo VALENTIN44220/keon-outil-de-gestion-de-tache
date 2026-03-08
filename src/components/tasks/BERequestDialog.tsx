@@ -25,7 +25,7 @@ import { useRequestWorkflow } from '@/hooks/useRequestWorkflow';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Building2, CheckSquare, FileText, Info, FormInput } from 'lucide-react';
+import { Building2, CheckSquare, FileText, Info, FormInput, Monitor } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCustomFields } from '@/hooks/useCustomFields';
 import { CustomFieldsRenderer, validateCustomFields } from '@/components/tasks/CustomFieldsRenderer';
