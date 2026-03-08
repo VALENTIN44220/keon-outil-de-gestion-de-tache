@@ -161,9 +161,10 @@ export function UserPermissionViewerTab({ users, permissionProfiles }: UserPermi
     }
     // defaults
     const screenDefaults: Record<string, boolean> = {
-      can_access_dashboard: true, can_access_requests: true, can_access_templates: true,
-      can_access_workload: true, can_access_calendar: true, can_access_projects: true,
-      can_access_team: true, can_access_suppliers: false, can_access_process_tracking: true,
+      can_access_dashboard: true, can_access_requests: true, can_access_tasks: true,
+      can_access_templates: true, can_access_workload: true, can_access_calendar: true,
+      can_access_projects: true, can_access_team: true, can_access_suppliers: false,
+      can_access_process_tracking: true, can_access_settings: false, can_access_analytics: false,
     };
     if (key in screenDefaults) return { value: screenDefaults[key], source: 'Défaut système' };
     return { value: false, source: 'Défaut système' };
