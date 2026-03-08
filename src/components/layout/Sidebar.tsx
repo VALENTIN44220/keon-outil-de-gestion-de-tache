@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, BarChart3, Users, ChevronLeft, ChevronRight, Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText, ArrowLeftRight, Calendar, MessageCircle, Building2, ClipboardList, Lightbulb } from 'lucide-react';
+import { LayoutDashboard, BarChart3, Users, ChevronLeft, ChevronRight, Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText, ArrowLeftRight, Calendar, MessageCircle, Building2, ClipboardList, Lightbulb, Monitor } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
 import { useAuth } from '@/contexts/AuthContext';
@@ -37,6 +37,7 @@ const menuGroups = [
   // Group 3
   [
     { id: 'projects', label: 'Projets', icon: FolderOpen, path: '/projects', permissionKey: 'can_access_projects' as ScreenPermissionKey },
+    { id: 'it-projects', label: 'Projets IT', icon: Monitor, path: '/it/projects', permissionKey: 'can_access_projects' as ScreenPermissionKey },
     { id: 'innovation', label: 'Innovation', icon: Lightbulb, path: '/innovation', permissionKey: 'can_access_dashboard' as ScreenPermissionKey },
     { id: 'suppliers', label: 'Fournisseurs', icon: Building2, path: '/suppliers', permissionKey: 'can_access_suppliers' as ScreenPermissionKey },
     { id: 'templates', label: 'Modèles', icon: Workflow, path: '/templates', permissionKey: 'can_access_templates' as ScreenPermissionKey },
@@ -135,6 +136,12 @@ const menuColors: Record<string, { bg: string; text: string; border: string; ico
     text: 'text-[#F59E0B]',
     border: 'border-[#F59E0B]',
     iconBg: 'bg-gradient-to-br from-[#F59E0B] to-[#F59E0B]/80'
+  },
+  'it-projects': {
+    bg: 'bg-[#7C3AED]/10',
+    text: 'text-[#7C3AED]',
+    border: 'border-[#7C3AED]',
+    iconBg: 'bg-gradient-to-br from-[#7C3AED] to-[#7C3AED]/80'
   },
 };
 

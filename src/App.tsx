@@ -37,6 +37,13 @@ import BEProjectHubDiscussions from "./pages/be/BEProjectHubDiscussions";
 import BEProjectHubFiles from "./pages/be/BEProjectHubFiles";
 import BEProjectHubQuestionnaire from "./pages/be/BEProjectHubQuestionnaire";
 
+// IT Project Hub pages
+import ITProjects from "./pages/it/ITProjects";
+import ITProjectHubOverview from "./pages/it/ITProjectHubOverview";
+import ITProjectHubTasks from "./pages/it/ITProjectHubTasks";
+import ITProjectHubTimeline from "./pages/it/ITProjectHubTimeline";
+import ITProjectHubSync from "./pages/it/ITProjectHubSync";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -226,6 +233,12 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+              {/* IT Projects routes */}
+              <Route path="/it/projects" element={<ProtectedRoute><ITProjects /></ProtectedRoute>} />
+              <Route path="/it/projects/:code/overview" element={<ProtectedRoute><ITProjectHubOverview /></ProtectedRoute>} />
+              <Route path="/it/projects/:code/tasks" element={<ProtectedRoute><ITProjectHubTasks /></ProtectedRoute>} />
+              <Route path="/it/projects/:code/timeline" element={<ProtectedRoute><ITProjectHubTimeline /></ProtectedRoute>} />
+              <Route path="/it/projects/:code/sync" element={<ProtectedRoute><ITProjectHubSync /></ProtectedRoute>} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
