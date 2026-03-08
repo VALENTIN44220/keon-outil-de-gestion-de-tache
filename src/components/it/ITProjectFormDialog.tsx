@@ -86,7 +86,7 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
       budget_previsionnel: budgetPrevisionnel ? parseFloat(budgetPrevisionnel) : null,
       teams_channel_url: teamsChannelUrl || null,
       loop_workspace_url: loopWorkspaceUrl || null,
-      progress: parseInt(progress) || 0,
+      
     };
 
     if (isEdit && project) {
