@@ -488,24 +488,17 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
 
                   <div className="space-y-2">
                     <Label>Rapporteur</Label>
-                    <Select 
-                      value={reporterId || 'none'} 
+                    <SearchableSelect
+                      value={reporterId || 'none'}
                       onValueChange={(v) => setReporterId(v === 'none' ? null : v)}
                       disabled={isAssigneeReadOnly}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner le rapporteur" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Non défini</SelectItem>
-                        {profiles.map(profile => (
-                          <SelectItem key={profile.id} value={profile.id}>
-                            {profile.display_name || 'Sans nom'} 
-                            {profile.job_title && ` - ${profile.job_title}`}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      placeholder="Sélectionner le rapporteur"
+                      searchPlaceholder="Rechercher un collaborateur..."
+                      options={[
+                        { value: 'none', label: 'Non défini' },
+                        ...profiles.map(p => ({ value: p.id, label: `${p.display_name || 'Sans nom'}${p.job_title ? ` - ${p.job_title}` : ''}` }))
+                      ]}
+                    />
                   </div>
                 </div>
               </div>
