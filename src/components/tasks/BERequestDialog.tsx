@@ -96,6 +96,7 @@ export function BERequestDialog({
   const [priority, setPriority] = useState<TaskPriority>('medium');
   const [dueDate, setDueDate] = useState('');
   const [beProjectId, setBeProjectId] = useState<string | null>(null);
+  const [itProjectId, setItProjectId] = useState<string | null>(null);
 
   // Form state - Détails BE
   const [codeAffaire, setCodeAffaire] = useState('');
