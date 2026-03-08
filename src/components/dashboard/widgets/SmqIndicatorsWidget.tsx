@@ -142,7 +142,7 @@ export function SmqIndicatorsWidget({ tasks }: SmqIndicatorsWidgetProps) {
         const durations = closedBucket
           .map(t => {
             const closeDate = getCloseDate(t);
-            const openDate = getOpenDate(t);
+            const openDate = getOpenDateForDuration(t);
             return closeDate && openDate ? differenceInCalendarDays(closeDate, openDate) : null;
           })
           .filter((v): v is number => v !== null);
