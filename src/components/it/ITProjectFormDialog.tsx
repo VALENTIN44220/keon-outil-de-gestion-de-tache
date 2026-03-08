@@ -34,7 +34,7 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
   const [budgetPrevisionnel, setBudgetPrevisionnel] = useState('');
   const [teamsChannelUrl, setTeamsChannelUrl] = useState('');
   const [loopWorkspaceUrl, setLoopWorkspaceUrl] = useState('');
-  const [progress, setProgress] = useState('0');
+  
 
   useEffect(() => {
     if (project) {
