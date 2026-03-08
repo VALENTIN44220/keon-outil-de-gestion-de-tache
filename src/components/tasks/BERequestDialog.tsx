@@ -312,6 +312,7 @@ export function BERequestDialog({
           source_process_template_id: beProcessId,
            be_project_id: beProjectId,
            it_project_id: itProjectId,
+           it_project_phase: itProjectPhase,
         })
         .select()
         .single();
