@@ -29,7 +29,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
 import { 
   Info, ArrowRight, Workflow, FormInput, CheckSquare, FileText, 
-  Calendar, AlertCircle, Folder, Package
+  Calendar, AlertCircle, Folder, Package, Monitor
 } from 'lucide-react';
 import { BEProjectSelect } from '@/components/be/BEProjectSelect';
 import { ITProjectSelect } from '@/components/it/ITProjectSelect';
