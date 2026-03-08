@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { BEProjectSelect } from '@/components/be/BEProjectSelect';
+import { ITProjectSelect } from '@/components/it/ITProjectSelect';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRequestWorkflow } from '@/hooks/useRequestWorkflow';
