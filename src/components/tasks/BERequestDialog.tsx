@@ -19,13 +19,14 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { BEProjectSelect } from '@/components/be/BEProjectSelect';
+import { ITProjectSelect } from '@/components/it/ITProjectSelect';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRequestWorkflow } from '@/hooks/useRequestWorkflow';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Building2, CheckSquare, FileText, Info, FormInput } from 'lucide-react';
+import { Building2, CheckSquare, FileText, Info, FormInput, Monitor } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCustomFields } from '@/hooks/useCustomFields';
 import { CustomFieldsRenderer, validateCustomFields } from '@/components/tasks/CustomFieldsRenderer';
@@ -96,6 +97,7 @@ export function BERequestDialog({
   const [priority, setPriority] = useState<TaskPriority>('medium');
   const [dueDate, setDueDate] = useState('');
   const [beProjectId, setBeProjectId] = useState<string | null>(null);
+  const [itProjectId, setItProjectId] = useState<string | null>(null);
 
   // Form state - Détails BE
   const [codeAffaire, setCodeAffaire] = useState('');
@@ -306,7 +308,8 @@ export function BERequestDialog({
           requester_id: currentUser?.id || null,
           target_department_id: targetDepartmentId,
           source_process_template_id: beProcessId,
-          be_project_id: beProjectId,
+           be_project_id: beProjectId,
+           it_project_id: itProjectId,
         })
         .select()
         .single();
@@ -411,6 +414,7 @@ export function BERequestDialog({
     setPriority('medium');
     setDueDate('');
     setBeProjectId(null);
+    setItProjectId(null);
     setCodeAffaire('');
     setNumCmdeDivalto('');
     setNumDevisDivalto('');
@@ -530,6 +534,14 @@ export function BERequestDialog({
                       onChange={(e) => setDueDate(e.target.value)}
                     />
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1.5">
+                    <Monitor className="h-3.5 w-3.5 text-violet-600" />
+                    Projet IT associé
+                  </Label>
+                  <ITProjectSelect value={itProjectId} onChange={setItProjectId} />
                 </div>
 
                 <div className="space-y-2">

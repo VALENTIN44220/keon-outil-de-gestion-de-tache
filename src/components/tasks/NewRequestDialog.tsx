@@ -29,9 +29,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
 import { 
   Info, ArrowRight, Workflow, FormInput, CheckSquare, FileText, 
-  Calendar, AlertCircle, Folder, Package
+  Calendar, AlertCircle, Folder, Package, Monitor
 } from 'lucide-react';
 import { BEProjectSelect } from '@/components/be/BEProjectSelect';
+import { ITProjectSelect } from '@/components/it/ITProjectSelect';
 import { toast } from 'sonner';
 import { TemplateCustomField } from '@/types/customField';
 import { CommonFieldsConfig, DEFAULT_COMMON_FIELDS_CONFIG, resolveTitlePattern } from '@/types/commonFieldsConfig';
@@ -103,6 +104,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
   const [links, setLinks] = useState<LinkItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [beProjectId, setBeProjectId] = useState<string | null>(null);
+  const [itProjectId, setItProjectId] = useState<string | null>(null);
   
   // Process/sub-process state
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -623,6 +625,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
           source_process_template_id: linkedProcessId,
           source_sub_process_template_id: linkedSubProcessId,
           be_project_id: beProjectId,
+          it_project_id: itProjectId,
           // Request validation fields
           request_validation_enabled: hasRequestValidation,
           request_validation_status: requestValidationStatus,
@@ -808,6 +811,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
     setSelectedSubProcessIds([]);
     setHasMultipleSubProcesses(false);
     setBeProjectId(null);
+    setItProjectId(null);
     setProcessImposedValues(false);
     setCustomFieldValues({});
     setFieldErrors({});
@@ -1025,6 +1029,20 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                       />
                     </div>
                   )}
+
+                  {/* IT Project Selection */}
+                  <div className="space-y-2.5">
+                    <Label className="text-sm font-semibold flex items-center gap-2 text-foreground">
+                      <div className="p-1.5 rounded-lg bg-violet-500/10">
+                        <Monitor className="h-4 w-4 text-violet-600" />
+                      </div>
+                      Projet IT associé
+                    </Label>
+                    <ITProjectSelect
+                      value={itProjectId}
+                      onChange={setItProjectId}
+                    />
+                  </div>
 
                   {/* Process Info Banner */}
                   {(linkedProcessId || linkedSubProcessId) && !hasMultipleSubProcesses && (
