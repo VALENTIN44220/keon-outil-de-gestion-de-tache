@@ -135,7 +135,7 @@ export function SmqIndicatorsWidget({ tasks }: SmqIndicatorsWidgetProps) {
 
       // Tickets closed in this bucket
       const closedBucket = tasks.filter(t => {
-        if (!isClosed(t) || isImportedHistoricalClosure(t)) return false;
+        if (!isClosed(t)) return false;
         const closeDate = getCloseDate(t);
         return closeDate ? isWithinInterval(closeDate, bucketInterval) : false;
       });
