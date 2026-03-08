@@ -83,7 +83,11 @@ export function SmqIndicatorsWidget({ tasks }: SmqIndicatorsWidgetProps) {
       if (!closeDate || !createdDate) return false;
       return closeDate.toDateString() === createdDate.toDateString();
     };
-
+    const getDurationDays = (closeDate: Date, openDate: Date): number => {
+      const diff = differenceInCalendarDays(closeDate, openDate);
+      if (Number.isNaN(diff)) return 1;
+      return Math.max(1, diff);
+    };
 
     const closedInPeriod = tasks.filter(t => {
       if (!isClosed(t) || isImportedHistoricalClosure(t)) return false;
@@ -97,7 +101,7 @@ export function SmqIndicatorsWidget({ tasks }: SmqIndicatorsWidgetProps) {
         .map(t => {
           const closeDate = getCloseDate(t);
           const openDate = getOpenDateForDuration(t);
-          return closeDate && openDate ? differenceInCalendarDays(closeDate, openDate) : null;
+          return closeDate && openDate ? getDurationDays(closeDate, openDate) : null;
         })
         .filter((v): v is number => v !== null);
 
