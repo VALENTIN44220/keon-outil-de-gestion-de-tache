@@ -2,6 +2,7 @@
 export const SCREEN_PERMISSIONS = [
   'can_access_dashboard',
   'can_access_requests',
+  'can_access_tasks',
   'can_access_templates',
   'can_access_workload',
   'can_access_calendar',
@@ -9,6 +10,8 @@ export const SCREEN_PERMISSIONS = [
   'can_access_team',
   'can_access_suppliers',
   'can_access_process_tracking',
+  'can_access_settings',
+  'can_access_analytics',
 ] as const;
 
 export type ScreenPermissionKey = typeof SCREEN_PERMISSIONS[number];
@@ -29,6 +32,10 @@ export const FEATURE_PERMISSIONS = [
   'can_create_be_projects',
   'can_edit_be_projects',
   'can_delete_be_projects',
+  'can_view_it_projects',
+  'can_create_it_projects',
+  'can_edit_it_projects',
+  'can_delete_it_projects',
   'can_view_suppliers',
   'can_create_suppliers',
   'can_edit_suppliers',
@@ -43,6 +50,7 @@ export type AllPermissionKeys = ScreenPermissionKey | FeaturePermissionKey;
 export const SCREEN_LABELS: Record<ScreenPermissionKey, string> = {
   can_access_dashboard: 'Tableau de bord',
   can_access_requests: 'Demandes',
+  can_access_tasks: 'Tâches',
   can_access_templates: 'Modèles',
   can_access_workload: 'Plan de charge',
   can_access_calendar: 'Calendrier',
@@ -50,6 +58,8 @@ export const SCREEN_LABELS: Record<ScreenPermissionKey, string> = {
   can_access_team: 'Équipe',
   can_access_suppliers: 'Fournisseurs',
   can_access_process_tracking: 'Suivi processus',
+  can_access_settings: 'Paramètres',
+  can_access_analytics: 'Analytique',
 };
 
 // User permission overrides (null = use profile default)
@@ -59,6 +69,7 @@ export interface UserPermissionOverride {
   // Screen access
   can_access_dashboard: boolean | null;
   can_access_requests: boolean | null;
+  can_access_tasks: boolean | null;
   can_access_templates: boolean | null;
   can_access_workload: boolean | null;
   can_access_calendar: boolean | null;
@@ -66,6 +77,8 @@ export interface UserPermissionOverride {
   can_access_team: boolean | null;
   can_access_suppliers: boolean | null;
   can_access_process_tracking: boolean | null;
+  can_access_settings: boolean | null;
+  can_access_analytics: boolean | null;
   // Task permissions
   can_manage_users: boolean | null;
   can_manage_templates: boolean | null;
@@ -82,6 +95,11 @@ export interface UserPermissionOverride {
   can_create_be_projects: boolean | null;
   can_edit_be_projects: boolean | null;
   can_delete_be_projects: boolean | null;
+  // IT Projects
+  can_view_it_projects: boolean | null;
+  can_create_it_projects: boolean | null;
+  can_edit_it_projects: boolean | null;
+  can_delete_it_projects: boolean | null;
   // Suppliers
   can_view_suppliers: boolean | null;
   can_create_suppliers: boolean | null;
@@ -113,6 +131,7 @@ export interface EffectivePermissions {
   // Screen access
   can_access_dashboard: boolean;
   can_access_requests: boolean;
+  can_access_tasks: boolean;
   can_access_templates: boolean;
   can_access_workload: boolean;
   can_access_calendar: boolean;
@@ -120,6 +139,8 @@ export interface EffectivePermissions {
   can_access_team: boolean;
   can_access_suppliers: boolean;
   can_access_process_tracking: boolean;
+  can_access_settings: boolean;
+  can_access_analytics: boolean;
   // Task permissions
   can_manage_users: boolean;
   can_manage_templates: boolean;
@@ -136,6 +157,11 @@ export interface EffectivePermissions {
   can_create_be_projects: boolean;
   can_edit_be_projects: boolean;
   can_delete_be_projects: boolean;
+  // IT Projects
+  can_view_it_projects: boolean;
+  can_create_it_projects: boolean;
+  can_edit_it_projects: boolean;
+  can_delete_it_projects: boolean;
   // Suppliers
   can_view_suppliers: boolean;
   can_create_suppliers: boolean;
