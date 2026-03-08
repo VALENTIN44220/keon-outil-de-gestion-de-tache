@@ -20,6 +20,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import { BEProjectSelect } from '@/components/be/BEProjectSelect';
 import { ITProjectSelect } from '@/components/it/ITProjectSelect';
+import { ITProjectPhaseSelect } from '@/components/it/ITProjectPhaseSelect';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRequestWorkflow } from '@/hooks/useRequestWorkflow';
@@ -98,6 +99,7 @@ export function BERequestDialog({
   const [dueDate, setDueDate] = useState('');
   const [beProjectId, setBeProjectId] = useState<string | null>(null);
   const [itProjectId, setItProjectId] = useState<string | null>(null);
+  const [itProjectPhase, setItProjectPhase] = useState<string | null>(null);
 
   // Form state - Détails BE
   const [codeAffaire, setCodeAffaire] = useState('');
@@ -310,6 +312,7 @@ export function BERequestDialog({
           source_process_template_id: beProcessId,
            be_project_id: beProjectId,
            it_project_id: itProjectId,
+           it_project_phase: itProjectPhase,
         })
         .select()
         .single();
@@ -415,6 +418,7 @@ export function BERequestDialog({
     setDueDate('');
     setBeProjectId(null);
     setItProjectId(null);
+    setItProjectPhase(null);
     setCodeAffaire('');
     setNumCmdeDivalto('');
     setNumDevisDivalto('');
@@ -541,8 +545,14 @@ export function BERequestDialog({
                     <Monitor className="h-3.5 w-3.5 text-violet-600" />
                     Projet IT associé
                   </Label>
-                  <ITProjectSelect value={itProjectId} onChange={setItProjectId} />
+                  <ITProjectSelect value={itProjectId} onChange={(v) => { setItProjectId(v); if (!v) setItProjectPhase(null); }} />
                 </div>
+                {itProjectId && (
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-1.5">Phase du projet IT</Label>
+                    <ITProjectPhaseSelect value={itProjectPhase} onChange={setItProjectPhase} />
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label>Priorité</Label>

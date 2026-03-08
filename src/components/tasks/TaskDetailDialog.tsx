@@ -54,6 +54,8 @@ import { TaskCommentsSection } from './TaskCommentsSection';
 import { useTasksProgress } from '@/hooks/useChecklists';
 import { useDueDatePermissionWithManager } from '@/hooks/useDueDatePermission';
 import { RequestInfoTab } from './RequestInfoTab';
+import { ITProjectPhaseSelect } from '@/components/it/ITProjectPhaseSelect';
+import { IT_PROJECT_PHASES } from '@/types/itProject';
 
 interface Profile {
   id: string;
@@ -584,6 +586,19 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
               <span className="text-muted-foreground">Catégorie:</span>
               {task.category ? <Badge variant="outline">{task.category}</Badge> : <span className="italic text-muted-foreground">—</span>}
             </div>
+            {task.it_project_id && (
+              <div className="flex items-center gap-2 col-span-2">
+                <Workflow className="h-4 w-4 text-violet-500" />
+                <span className="text-muted-foreground">Phase IT:</span>
+                <ITProjectPhaseSelect
+                  value={task.it_project_phase || null}
+                  onChange={async (phase) => {
+                    await supabase.from('tasks').update({ it_project_phase: phase }).eq('id', task.id);
+                    toast.success('Phase mise à jour');
+                  }}
+                />
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground">Début:</span>

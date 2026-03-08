@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { BEProjectSelect } from '@/components/be/BEProjectSelect';
 import { ITProjectSelect } from '@/components/it/ITProjectSelect';
+import { ITProjectPhaseSelect } from '@/components/it/ITProjectPhaseSelect';
 import { toast } from 'sonner';
 import { TemplateCustomField } from '@/types/customField';
 import { CommonFieldsConfig, DEFAULT_COMMON_FIELDS_CONFIG, resolveTitlePattern } from '@/types/commonFieldsConfig';
@@ -105,6 +106,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [beProjectId, setBeProjectId] = useState<string | null>(null);
   const [itProjectId, setItProjectId] = useState<string | null>(null);
+  const [itProjectPhase, setItProjectPhase] = useState<string | null>(null);
   
   // Process/sub-process state
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -626,6 +628,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
           source_sub_process_template_id: linkedSubProcessId,
           be_project_id: beProjectId,
           it_project_id: itProjectId,
+          it_project_phase: itProjectPhase,
           // Request validation fields
           request_validation_enabled: hasRequestValidation,
           request_validation_status: requestValidationStatus,
@@ -812,6 +815,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
     setHasMultipleSubProcesses(false);
     setBeProjectId(null);
     setItProjectId(null);
+    setItProjectPhase(null);
     setProcessImposedValues(false);
     setCustomFieldValues({});
     setFieldErrors({});
@@ -1040,9 +1044,17 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                     </Label>
                     <ITProjectSelect
                       value={itProjectId}
-                      onChange={setItProjectId}
+                      onChange={(v) => { setItProjectId(v); if (!v) setItProjectPhase(null); }}
                     />
                   </div>
+                  {itProjectId && (
+                    <div className="space-y-1.5">
+                      <Label className="text-sm font-semibold flex items-center gap-2 text-foreground">
+                        Phase du projet IT
+                      </Label>
+                      <ITProjectPhaseSelect value={itProjectPhase} onChange={setItProjectPhase} />
+                    </div>
+                  )}
 
                   {/* Process Info Banner */}
                   {(linkedProcessId || linkedSubProcessId) && !hasMultipleSubProcesses && (

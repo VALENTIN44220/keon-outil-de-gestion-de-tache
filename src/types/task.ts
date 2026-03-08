@@ -54,6 +54,9 @@ export interface Task {
   // BE Project fields
   be_project_id: string | null;
   be_label_id: string | null;
+  // IT Project fields
+  it_project_id: string | null;
+  it_project_phase: string | null;
   // Double validation (RBE + Requester)
   rbe_validator_id: string | null;
   rbe_validated_at: string | null;
