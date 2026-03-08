@@ -76,7 +76,7 @@ export function SmqIndicatorsWidget({ tasks }: SmqIndicatorsWidgetProps) {
 
       return null;
     };
-    const getCloseDate = (t: Task): Date | null => parseTaskDate(t.date_fermeture || t.updated_at);
+    const getCloseDate = (t: Task): Date | null => parseTaskDate(t.date_fermeture);
     const isClosed = (t: Task) => t.status === 'done' || t.status === 'validated';
 
 
