@@ -105,6 +105,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [beProjectId, setBeProjectId] = useState<string | null>(null);
   const [itProjectId, setItProjectId] = useState<string | null>(null);
+  const [itProjectPhase, setItProjectPhase] = useState<string | null>(null);
   
   // Process/sub-process state
   const [departments, setDepartments] = useState<Department[]>([]);
