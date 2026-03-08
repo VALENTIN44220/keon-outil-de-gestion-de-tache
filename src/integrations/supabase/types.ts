@@ -4821,6 +4821,7 @@ export type Database = {
           is_dependency_locked: boolean | null
           is_locked_for_validation: boolean | null
           it_project_id: string | null
+          it_project_phase: string | null
           original_assignee_id: string | null
           parent_request_id: string | null
           parent_sub_process_run_id: string | null
@@ -4901,6 +4902,7 @@ export type Database = {
           is_dependency_locked?: boolean | null
           is_locked_for_validation?: boolean | null
           it_project_id?: string | null
+          it_project_phase?: string | null
           original_assignee_id?: string | null
           parent_request_id?: string | null
           parent_sub_process_run_id?: string | null
@@ -4981,6 +4983,7 @@ export type Database = {
           is_dependency_locked?: boolean | null
           is_locked_for_validation?: boolean | null
           it_project_id?: string | null
+          it_project_phase?: string | null
           original_assignee_id?: string | null
           parent_request_id?: string | null
           parent_sub_process_run_id?: string | null
