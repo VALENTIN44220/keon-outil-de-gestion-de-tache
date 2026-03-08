@@ -39,6 +39,7 @@ import BEProjectHubQuestionnaire from "./pages/be/BEProjectHubQuestionnaire";
 
 // IT Project Hub pages
 import ITProjects from "./pages/it/ITProjects";
+import ITProjectImportFDR from "./pages/it/ITProjectImportFDR";
 import ITProjectHubOverview from "./pages/it/ITProjectHubOverview";
 import ITProjectHubTasks from "./pages/it/ITProjectHubTasks";
 import ITProjectHubTimeline from "./pages/it/ITProjectHubTimeline";
