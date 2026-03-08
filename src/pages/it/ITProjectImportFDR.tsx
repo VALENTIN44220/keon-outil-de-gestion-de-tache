@@ -83,29 +83,44 @@ export default function ITProjectImportFDR() {
   const fetchFDR = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setDebugInfo(null);
     try {
       const response = await fetch(
-        `${FDR_URL}/rest/v1/tasks_future?select=*&is_example=eq.false&order=created_at.desc`,
+        `${FDR_URL}/rest/v1/tasks_future?select=*&order=created_at.desc&limit=100`,
         {
           method: 'GET',
           headers: {
             'apikey': FDR_ANON_KEY,
             'Authorization': `Bearer ${FDR_ANON_KEY}`,
             'Content-Type': 'application/json',
-            'Prefer': 'return=representation'
           }
         }
       );
       
+      const data = await response.json();
+      
+      // Logs détaillés
+      console.log('Status:', response.status);
+      console.log('Data type:', typeof data);
+      console.log('Is array:', Array.isArray(data));
+      console.log('Length:', data?.length);
+      console.log('First item:', JSON.stringify(data?.[0]));
+      
+      // Stockage des infos pour affichage
+      setDebugInfo({
+        status: response.status,
+        isArray: Array.isArray(data),
+        length: data?.length || 0,
+        rawData: data
+      });
+      
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('FDR fetch error:', response.status, errorText);
-        throw new Error(`Erreur ${response.status}: ${errorText}`);
+        const errorMsg = `HTTP ${response.status}`;
+        console.error('FDR fetch error:', errorMsg);
+        throw new Error(errorMsg);
       }
       
-      const data: FDRTask[] = await response.json();
-      console.log('FDR data received:', data.length, 'actions');
-      setRows(data);
+      setRows(data || []);
     } catch (e: any) {
       const errorMsg = e.message || 'Erreur de chargement';
       console.error('FDR Error:', errorMsg);
