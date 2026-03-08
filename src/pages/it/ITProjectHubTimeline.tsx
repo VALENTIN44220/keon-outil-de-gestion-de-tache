@@ -155,7 +155,7 @@ export default function ITProjectHubTimeline() {
     }
   };
 
-  const handleInlineStatusChange = async (m: ITProjectMilestone, newStatus: string) => {
+  const handleInlineStatusChange = async (m: ITProjectMilestone, newStatus: MilestoneStatus) => {
     try {
       await updateMilestone(m.id, { statut: newStatus });
       toast.success('Statut mis à jour');
