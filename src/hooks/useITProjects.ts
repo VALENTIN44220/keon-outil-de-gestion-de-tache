@@ -13,7 +13,7 @@ export function useITProjects() {
     try {
       let query = supabase
         .from('it_projects')
-        .select(`*, responsable_it:profiles!it_projects_responsable_it_id_fkey(id,display_name,avatar_url), chef_projet:profiles!it_projects_chef_projet_id_fkey(id,display_name,avatar_url), sponsor:profiles!it_projects_sponsor_id_fkey(id,display_name,avatar_url)`)
+        .select(`*, responsable_it:profiles!it_projects_responsable_it_id_fkey(id,display_name,avatar_url), chef_projet:profiles!it_projects_chef_projet_id_fkey(id,display_name,avatar_url), sponsor:profiles!it_projects_sponsor_id_fkey(id,display_name,avatar_url), entite:departments!it_projects_entite_id_fkey(id,name), chef_projet_metier:profiles!it_projects_chef_projet_metier_id_fkey(id,display_name,avatar_url), chef_projet_it:profiles!it_projects_chef_projet_it_id_fkey(id,display_name,avatar_url)`)
         .order('code_projet_digital', { ascending: true });
       if (searchQuery) {
         query = query.or(`nom_projet.ilike.%${searchQuery}%,code_projet_digital.ilike.%${searchQuery}%`);

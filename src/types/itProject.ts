@@ -75,6 +75,9 @@ export interface ITProject {
   responsable_it?: { id: string; display_name: string; avatar_url?: string | null } | null;
   chef_projet?: { id: string; display_name: string; avatar_url?: string | null } | null;
   sponsor?: { id: string; display_name: string; avatar_url?: string | null } | null;
+  entite?: { id: string; name: string } | null;
+  chef_projet_metier?: { id: string; display_name: string; avatar_url?: string | null } | null;
+  chef_projet_it?: { id: string; display_name: string; avatar_url?: string | null } | null;
 }
 
 export interface ITProjectMilestone {

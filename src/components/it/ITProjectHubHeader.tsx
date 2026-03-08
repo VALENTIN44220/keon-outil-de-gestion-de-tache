@@ -60,6 +60,9 @@ export function ITProjectHubHeader({ project, stats, onEditProject }: ITProjectH
               <p className="text-sm text-muted-foreground">
                 {project.code_projet_digital}
                 {project.phase_courante && ` · ${project.phase_courante}`}
+                {project.entite && ` · 🏢 ${project.entite.name}`}
+                {project.chef_projet_metier && ` · 👤 ${project.chef_projet_metier.display_name}`}
+                {project.chef_projet_it && ` · 💻 ${project.chef_projet_it.display_name}`}
               </p>
             </div>
 
