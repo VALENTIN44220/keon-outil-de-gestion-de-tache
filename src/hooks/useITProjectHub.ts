@@ -2,6 +2,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ITProject, ITProjectMilestone } from '@/types/itProject';
 import { Task } from '@/types/task';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRef, useCallback } from 'react';
 
 export function useITProject(code: string | undefined) {
   return useQuery({
