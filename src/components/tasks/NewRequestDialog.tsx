@@ -1043,9 +1043,17 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                     </Label>
                     <ITProjectSelect
                       value={itProjectId}
-                      onChange={setItProjectId}
+                      onChange={(v) => { setItProjectId(v); if (!v) setItProjectPhase(null); }}
                     />
                   </div>
+                  {itProjectId && (
+                    <div className="space-y-1.5">
+                      <Label className="text-sm font-semibold flex items-center gap-2 text-foreground">
+                        Phase du projet IT
+                      </Label>
+                      <ITProjectPhaseSelect value={itProjectPhase} onChange={setItProjectPhase} />
+                    </div>
+                  )}
 
                   {/* Process Info Banner */}
                   {(linkedProcessId || linkedSubProcessId) && !hasMultipleSubProcesses && (
