@@ -37,6 +37,13 @@ import BEProjectHubDiscussions from "./pages/be/BEProjectHubDiscussions";
 import BEProjectHubFiles from "./pages/be/BEProjectHubFiles";
 import BEProjectHubQuestionnaire from "./pages/be/BEProjectHubQuestionnaire";
 
+// IT Project Hub pages
+import ITProjects from "./pages/it/ITProjects";
+import ITProjectHubOverview from "./pages/it/ITProjectHubOverview";
+import ITProjectHubTasks from "./pages/it/ITProjectHubTasks";
+import ITProjectHubTimeline from "./pages/it/ITProjectHubTimeline";
+import ITProjectHubSync from "./pages/it/ITProjectHubSync";
+
 const queryClient = new QueryClient();
 
 const App = () => (
