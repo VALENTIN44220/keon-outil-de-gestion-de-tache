@@ -371,23 +371,17 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Service cible</Label>
-                <Select 
-                  value={targetDepartmentId || 'none'} 
+                <SearchableSelect
+                  value={targetDepartmentId || 'none'}
                   onValueChange={(v) => setTargetDepartmentId(v === 'none' ? null : v)}
                   disabled={isAssigneeReadOnly}
-                >
-                  <SelectTrigger className={isAssigneeReadOnly ? 'opacity-60 cursor-not-allowed' : ''}>
-                    <SelectValue placeholder="Sélectionner un service" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Aucun</SelectItem>
-                    {departments.map(dept => (
-                      <SelectItem key={dept.id} value={dept.id}>
-                        {dept.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  placeholder="Sélectionner un service"
+                  searchPlaceholder="Rechercher un service..."
+                  options={[
+                    { value: 'none', label: 'Aucun' },
+                    ...departments.map(dept => ({ value: dept.id, label: dept.name }))
+                  ]}
+                />
               </div>
 
               <div className="space-y-2">
