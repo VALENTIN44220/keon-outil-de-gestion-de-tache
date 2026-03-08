@@ -240,7 +240,7 @@ export default function ITProjectHubTimeline() {
                         </div>
 
                         {/* Inline status select */}
-                        <Select value={m.statut} onValueChange={v => handleInlineStatusChange(m, v)}>
+                        <Select value={m.statut} onValueChange={v => handleInlineStatusChange(m, v as MilestoneStatus)}>
                           <SelectTrigger className="h-7 w-28 text-xs border-none bg-transparent">
                             <Badge className={cn(stConf.className, 'border text-[10px]')}>{stConf.label}</Badge>
                           </SelectTrigger>
