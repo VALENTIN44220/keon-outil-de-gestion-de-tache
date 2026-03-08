@@ -46,9 +46,14 @@ export default function ITProjects() {
                 Suivi des projets digitaux — Code Projet Digital NSK_IT-XXXXX
               </p>
             </div>
-            <Button onClick={() => setShowCreate(true)} className="gap-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 shadow-lg shadow-violet-500/25">
-              <Plus className="h-4 w-4" /> Nouveau projet IT
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => navigate('/it/projects/import-fdr')} className="gap-2">
+                <Download className="h-4 w-4" /> Importer depuis FDR
+              </Button>
+              <Button onClick={() => setShowCreate(true)} className="gap-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 shadow-lg shadow-violet-500/25">
+                <Plus className="h-4 w-4" /> Nouveau projet IT
+              </Button>
+            </div>
           </div>
 
           {/* Stats */}
