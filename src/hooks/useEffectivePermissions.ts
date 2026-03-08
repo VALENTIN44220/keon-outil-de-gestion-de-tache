@@ -167,14 +167,16 @@ export function useEffectivePermissions() {
     // Apply user-specific overrides (null = use profile default)
     if (userOverrides) {
       const allKeys: AllPermissionKeys[] = [
-        'can_access_dashboard', 'can_access_requests', 'can_access_templates',
+        'can_access_dashboard', 'can_access_requests', 'can_access_tasks', 'can_access_templates',
         'can_access_workload', 'can_access_calendar', 'can_access_projects',
         'can_access_team', 'can_access_suppliers', 'can_access_process_tracking',
+        'can_access_settings', 'can_access_analytics',
         'can_manage_users', 'can_manage_templates', 'can_view_own_tasks',
         'can_manage_own_tasks', 'can_view_subordinates_tasks', 'can_manage_subordinates_tasks',
         'can_assign_to_subordinates', 'can_view_all_tasks', 'can_manage_all_tasks',
         'can_assign_to_all', 'can_view_be_projects', 'can_create_be_projects',
         'can_edit_be_projects', 'can_delete_be_projects',
+        'can_view_it_projects', 'can_create_it_projects', 'can_edit_it_projects', 'can_delete_it_projects',
         'can_view_suppliers', 'can_create_suppliers', 'can_edit_suppliers', 'can_delete_suppliers'
       ];
 
