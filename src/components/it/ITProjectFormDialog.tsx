@@ -49,7 +49,7 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
       setBudgetPrevisionnel(project.budget_previsionnel?.toString() || '');
       setTeamsChannelUrl(project.teams_channel_url || '');
       setLoopWorkspaceUrl(project.loop_workspace_url || '');
-      setProgress(project.progress?.toString() || '0');
+      
     } else {
       resetForm();
     }
