@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Plus, Search, Monitor, Calendar, Users, TrendingUp, ArrowRight, MessageSquareText, Link2, LayoutGrid, List } from 'lucide-react';
+import { Plus, Search, Monitor, Calendar, Users, TrendingUp, ArrowRight, MessageSquareText, Link2, LayoutGrid, List, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
