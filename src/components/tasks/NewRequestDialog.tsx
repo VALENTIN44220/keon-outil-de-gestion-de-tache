@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { BEProjectSelect } from '@/components/be/BEProjectSelect';
 import { ITProjectSelect } from '@/components/it/ITProjectSelect';
+import { ITProjectPhaseSelect } from '@/components/it/ITProjectPhaseSelect';
 import { toast } from 'sonner';
 import { TemplateCustomField } from '@/types/customField';
 import { CommonFieldsConfig, DEFAULT_COMMON_FIELDS_CONFIG, resolveTitlePattern } from '@/types/commonFieldsConfig';
