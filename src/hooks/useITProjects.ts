@@ -36,6 +36,18 @@ export function useITProjects() {
       const payload = { ...project, date_debut: project.date_debut || new Date().toISOString().split('T')[0] };
       const { data, error } = await supabase.from('it_projects').insert(payload).select().single();
       if (error) throw error;
+
+      // Auto-create standard milestones
+      const milestones = [
+        { titre: 'Cadrage validé',        phase: 'cadrage',       ordre: 1 },
+        { titre: 'Conception approuvée',  phase: 'analyse',       ordre: 2 },
+        { titre: 'Développement terminé', phase: 'developpement', ordre: 3 },
+        { titre: 'Recette validée',       phase: 'recette',       ordre: 4 },
+        { titre: 'Mise en production',    phase: 'deploiement',   ordre: 5 },
+      ].map(m => ({ ...m, it_project_id: data.id, statut: 'a_venir', date_prevue: null }));
+
+      await supabase.from('it_project_milestones').insert(milestones);
+
       setProjects(prev => [...prev, data as ITProject]);
       toast({ title: 'Projet créé', description: `${data.nom_projet} — ${data.code_projet_digital}` });
       return data as ITProject;
