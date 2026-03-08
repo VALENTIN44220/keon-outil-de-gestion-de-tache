@@ -83,20 +83,32 @@ export default function ITProjectImportFDR() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(
-        `${FDR_URL}/rest/v1/tasks_future?select=*&is_example=neq.true`,
+      const response = await fetch(
+        `${FDR_URL}/rest/v1/tasks_future?select=*&is_example=eq.false&order=created_at.desc`,
         {
+          method: 'GET',
           headers: {
-            apikey: FDR_ANON_KEY,
-            Authorization: `Bearer ${FDR_ANON_KEY}`,
-          },
-        },
+            'apikey': FDR_ANON_KEY,
+            'Authorization': `Bearer ${FDR_ANON_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          }
+        }
       );
-      if (!res.ok) throw new Error(`Erreur ${res.status}`);
-      const data: FDRTask[] = await res.json();
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('FDR fetch error:', response.status, errorText);
+        throw new Error(`Erreur ${response.status}: ${errorText}`);
+      }
+      
+      const data: FDRTask[] = await response.json();
+      console.log('FDR data received:', data.length, 'actions');
       setRows(data);
     } catch (e: any) {
-      setError(e.message || 'Erreur de chargement');
+      const errorMsg = e.message || 'Erreur de chargement';
+      console.error('FDR Error:', errorMsg);
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }
