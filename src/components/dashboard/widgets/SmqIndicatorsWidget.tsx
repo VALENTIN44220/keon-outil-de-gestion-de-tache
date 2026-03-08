@@ -76,21 +76,13 @@ export function SmqIndicatorsWidget({ tasks }: SmqIndicatorsWidgetProps) {
     };
     const getCloseDate = (t: Task): Date | null => parseTaskDate(t.date_fermeture);
     const isClosed = (t: Task) => t.status === 'done' || t.status === 'validated';
-    const isImportedHistoricalClosure = (t: Task): boolean => {
-      if (!t.source_process_template_id || t.date_demande) return false;
-      const closeDate = getCloseDate(t);
-      const createdDate = parseTaskDate(t.created_at);
-      if (!closeDate || !createdDate) return false;
-      return closeDate.toDateString() === createdDate.toDateString();
-    };
     const getDurationDays = (closeDate: Date, openDate: Date): number => {
       const diff = differenceInCalendarDays(closeDate, openDate);
-      if (Number.isNaN(diff)) return 1;
-      return Math.max(1, diff);
+      return Number.isNaN(diff) ? 0 : diff;
     };
 
     const closedInPeriod = tasks.filter(t => {
-      if (!isClosed(t) || isImportedHistoricalClosure(t)) return false;
+      if (!isClosed(t)) return false;
       const closeDate = getCloseDate(t);
       return closeDate ? isWithinInterval(closeDate, interval) : false;
     });
@@ -143,7 +135,7 @@ export function SmqIndicatorsWidget({ tasks }: SmqIndicatorsWidgetProps) {
 
       // Tickets closed in this bucket
       const closedBucket = tasks.filter(t => {
-        if (!isClosed(t) || isImportedHistoricalClosure(t)) return false;
+        if (!isClosed(t)) return false;
         const closeDate = getCloseDate(t);
         return closeDate ? isWithinInterval(closeDate, bucketInterval) : false;
       });
