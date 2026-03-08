@@ -137,6 +137,12 @@ const menuColors: Record<string, { bg: string; text: string; border: string; ico
     border: 'border-[#F59E0B]',
     iconBg: 'bg-gradient-to-br from-[#F59E0B] to-[#F59E0B]/80'
   },
+  'it-projects': {
+    bg: 'bg-[#7C3AED]/10',
+    text: 'text-[#7C3AED]',
+    border: 'border-[#7C3AED]',
+    iconBg: 'bg-gradient-to-br from-[#7C3AED] to-[#7C3AED]/80'
+  },
 };
 
 export function Sidebar({
