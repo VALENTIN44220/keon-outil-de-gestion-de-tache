@@ -1,15 +1,21 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { ITProjectHubHeader } from '@/components/it/ITProjectHubHeader';
 import { useITProject, useITProjectTasks, useITProjectStats, useITProjectMilestones } from '@/hooks/useITProjectHub';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Calendar, Milestone, ListTodo } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Calendar, Milestone, ListTodo, Plus, Pencil, Trash2 } from 'lucide-react';
 import { format, differenceInDays, min, max, addDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
+import { ITMilestoneDialog } from '@/components/it/ITMilestoneDialog';
+import type { ITProjectMilestone, MilestoneStatus } from '@/types/itProject';
 
 interface TimelineItem {
   id: string;
@@ -33,12 +39,29 @@ const STATUS_COLORS: Record<string, string> = {
   'cancelled': 'bg-gray-400',
 };
 
+const MILESTONE_STATUS_LABELS: Record<string, { label: string; className: string }> = {
+  'a_venir': { label: 'À venir', className: 'bg-slate-500/10 text-slate-600 border-slate-500/20' },
+  'en_cours': { label: 'En cours', className: 'bg-blue-500/10 text-blue-600 border-blue-500/20' },
+  'termine': { label: 'Terminé', className: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20' },
+  'retarde': { label: 'Retardé', className: 'bg-red-500/10 text-red-600 border-red-500/20' },
+};
+
+const MILESTONE_STATUSES: { value: MilestoneStatus; label: string }[] = [
+  { value: 'a_venir', label: 'À venir' },
+  { value: 'en_cours', label: 'En cours' },
+  { value: 'termine', label: 'Terminé' },
+  { value: 'retarde', label: 'Retardé' },
+];
+
 export default function ITProjectHubTimeline() {
   const { code } = useParams<{ code: string }>();
   const { data: project, isLoading } = useITProject(code);
   const { data: tasks = [] } = useITProjectTasks(project?.id);
-  const { data: milestones = [] } = useITProjectMilestones(project?.id);
+  const { data: milestones = [], addMilestone, updateMilestone, deleteMilestone } = useITProjectMilestones(project?.id);
   const stats = useITProjectStats(tasks, project);
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingMilestone, setEditingMilestone] = useState<ITProjectMilestone | null>(null);
 
   const timelineItems = useMemo((): TimelineItem[] => {
     const items: TimelineItem[] = [];
@@ -93,7 +116,6 @@ export default function ITProjectHubTimeline() {
     return Math.max(0, Math.min(100, (days / totalDays) * 100));
   };
 
-  // Generate month markers
   const monthMarkers = useMemo(() => {
     const markers: { label: string; position: number }[] = [];
     const d = new Date(rangeStart);
@@ -109,6 +131,39 @@ export default function ITProjectHubTimeline() {
     return markers;
   }, [rangeStart, rangeEnd, totalDays]);
 
+  const handleSaveMilestone = async (data: any) => {
+    try {
+      if (editingMilestone) {
+        await updateMilestone(editingMilestone.id, data);
+        toast.success('Jalon mis à jour');
+      } else {
+        await addMilestone(data);
+        toast.success('Jalon créé');
+      }
+    } catch (e: any) {
+      toast.error('Erreur : ' + e.message);
+      throw e;
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteMilestone(id);
+      toast.success('Jalon supprimé');
+    } catch (e: any) {
+      toast.error('Erreur : ' + e.message);
+    }
+  };
+
+  const handleInlineStatusChange = async (m: ITProjectMilestone, newStatus: MilestoneStatus) => {
+    try {
+      await updateMilestone(m.id, { statut: newStatus });
+      toast.success('Statut mis à jour');
+    } catch (e: any) {
+      toast.error('Erreur : ' + e.message);
+    }
+  };
+
   if (isLoading || !project) {
     return (
       <Layout>
@@ -118,6 +173,8 @@ export default function ITProjectHubTimeline() {
       </Layout>
     );
   }
+
+  const nextOrdre = milestones.length > 0 ? Math.max(...milestones.map(m => m.ordre)) + 1 : 1;
 
   return (
     <Layout>
@@ -135,6 +192,105 @@ export default function ITProjectHubTimeline() {
             <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-red-500" /> Retardé</div>
           </div>
 
+          {/* Milestones Section */}
+          <Card className="border-border/50">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Milestone className="h-5 w-5 text-muted-foreground" />
+                  Jalons
+                  <Badge variant="secondary" className="ml-2">{milestones.length}</Badge>
+                </CardTitle>
+                <Button size="sm" onClick={() => { setEditingMilestone(null); setDialogOpen(true); }}>
+                  <Plus className="h-4 w-4 mr-1.5" />
+                  Ajouter un jalon
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              {milestones.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">Aucun jalon défini</p>
+              ) : (
+                <div className="space-y-2">
+                  {milestones.map(m => {
+                    const stConf = MILESTONE_STATUS_LABELS[m.statut] || { label: m.statut, className: '' };
+                    return (
+                      <div key={m.id} className="flex items-center gap-3 p-3 rounded-lg border border-border/50 hover:bg-muted/30 transition-colors group">
+                        {/* Diamond icon */}
+                        <span className="text-violet-500 text-lg flex-shrink-0">◆</span>
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{m.titre}</p>
+                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                            {m.phase && (
+                              <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                                {m.phase}
+                              </span>
+                            )}
+                            {m.date_prevue && (
+                              <span className="text-[11px] text-muted-foreground">
+                                {format(new Date(m.date_prevue), 'dd MMM yyyy', { locale: fr })}
+                              </span>
+                            )}
+                            {!m.date_prevue && (
+                              <span className="text-[11px] text-muted-foreground italic">Pas de date</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Inline status select */}
+                        <Select value={m.statut} onValueChange={v => handleInlineStatusChange(m, v as MilestoneStatus)}>
+                          <SelectTrigger className="h-7 w-28 text-xs border-none bg-transparent">
+                            <Badge className={cn(stConf.className, 'border text-[10px]')}>{stConf.label}</Badge>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {MILESTONE_STATUSES.map(s => (
+                              <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => { setEditingMilestone(m); setDialogOpen(true); }}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Supprimer ce jalon ?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Le jalon « {m.titre} » sera définitivement supprimé.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Annuler</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDelete(m.id)}>Supprimer</AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Gantt Chart */}
           <Card className="border-border/50">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-lg">
@@ -194,18 +350,24 @@ export default function ITProjectHubTimeline() {
                           <div className="flex-1 relative h-full">
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <div
-                                  className={cn(
-                                    'absolute top-1 h-6 rounded-md transition-opacity hover:opacity-80 cursor-default',
-                                    item.color,
-                                    item.type === 'milestone' ? 'rounded-full' : ''
-                                  )}
-                                  style={{
-                                    left: `${leftPct}%`,
-                                    width: `${widthPct}%`,
-                                    minWidth: item.type === 'milestone' ? '10px' : '16px',
-                                  }}
-                                />
+                                {item.type === 'milestone' ? (
+                                  <div
+                                    className="absolute top-1 w-4 h-4 rotate-45 bg-violet-500 border-2 border-violet-300 cursor-default hover:opacity-80 transition-opacity"
+                                    style={{ left: `${leftPct}%`, marginLeft: '-8px' }}
+                                  />
+                                ) : (
+                                  <div
+                                    className={cn(
+                                      'absolute top-1 h-6 rounded-md transition-opacity hover:opacity-80 cursor-default',
+                                      item.color,
+                                    )}
+                                    style={{
+                                      left: `${leftPct}%`,
+                                      width: `${widthPct}%`,
+                                      minWidth: '16px',
+                                    }}
+                                  />
+                                )}
                               </TooltipTrigger>
                               <TooltipContent>
                                 <p className="font-medium">{item.label}</p>
@@ -225,6 +387,18 @@ export default function ITProjectHubTimeline() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Milestone Dialog */}
+        {dialogOpen && (
+          <ITMilestoneDialog
+            open={dialogOpen}
+            onOpenChange={setDialogOpen}
+            projectId={project.id}
+            milestone={editingMilestone}
+            nextOrdre={nextOrdre}
+            onSave={handleSaveMilestone}
+          />
+        )}
       </div>
     </Layout>
   );
