@@ -81,7 +81,7 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
       priorite,
       statut,
       phase_courante: phaseCourante,
-      date_debut: dateDebut || null,
+      
       date_fin_prevue: dateFinPrevue || null,
       budget_previsionnel: budgetPrevisionnel ? parseFloat(budgetPrevisionnel) : null,
       teams_channel_url: teamsChannelUrl || null,
