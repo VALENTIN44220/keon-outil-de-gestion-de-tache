@@ -54,6 +54,8 @@ import { TaskCommentsSection } from './TaskCommentsSection';
 import { useTasksProgress } from '@/hooks/useChecklists';
 import { useDueDatePermissionWithManager } from '@/hooks/useDueDatePermission';
 import { RequestInfoTab } from './RequestInfoTab';
+import { ITProjectPhaseSelect } from '@/components/it/ITProjectPhaseSelect';
+import { IT_PROJECT_PHASES } from '@/types/itProject';
 
 interface Profile {
   id: string;
