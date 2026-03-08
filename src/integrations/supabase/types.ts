@@ -1398,6 +1398,169 @@ export type Database = {
         }
         Relationships: []
       }
+      it_project_milestones: {
+        Row: {
+          created_at: string
+          date_prevue: string | null
+          date_reelle: string | null
+          description: string | null
+          id: string
+          it_project_id: string
+          ordre: number | null
+          phase: string | null
+          statut: string | null
+          titre: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          date_prevue?: string | null
+          date_reelle?: string | null
+          description?: string | null
+          id?: string
+          it_project_id: string
+          ordre?: number | null
+          phase?: string | null
+          statut?: string | null
+          titre: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          date_prevue?: string | null
+          date_reelle?: string | null
+          description?: string | null
+          id?: string
+          it_project_id?: string
+          ordre?: number | null
+          phase?: string | null
+          statut?: string | null
+          titre?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_project_milestones_it_project_id_fkey"
+            columns: ["it_project_id"]
+            isOneToOne: false
+            referencedRelation: "it_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      it_projects: {
+        Row: {
+          budget_consomme: number | null
+          budget_previsionnel: number | null
+          chef_projet_id: string | null
+          code_projet_digital: string
+          created_at: string
+          created_by: string | null
+          date_debut: string | null
+          date_fin_prevue: string | null
+          date_fin_reelle: string | null
+          description: string | null
+          id: string
+          loop_workspace_id: string | null
+          loop_workspace_url: string | null
+          membres_ids: string[] | null
+          nom_projet: string
+          phase_courante: string | null
+          priorite: string | null
+          progress: number | null
+          responsable_it_id: string | null
+          sponsor_id: string | null
+          statut: string
+          teams_channel_id: string | null
+          teams_channel_url: string | null
+          type_projet: string | null
+          updated_at: string
+        }
+        Insert: {
+          budget_consomme?: number | null
+          budget_previsionnel?: number | null
+          chef_projet_id?: string | null
+          code_projet_digital: string
+          created_at?: string
+          created_by?: string | null
+          date_debut?: string | null
+          date_fin_prevue?: string | null
+          date_fin_reelle?: string | null
+          description?: string | null
+          id?: string
+          loop_workspace_id?: string | null
+          loop_workspace_url?: string | null
+          membres_ids?: string[] | null
+          nom_projet: string
+          phase_courante?: string | null
+          priorite?: string | null
+          progress?: number | null
+          responsable_it_id?: string | null
+          sponsor_id?: string | null
+          statut?: string
+          teams_channel_id?: string | null
+          teams_channel_url?: string | null
+          type_projet?: string | null
+          updated_at?: string
+        }
+        Update: {
+          budget_consomme?: number | null
+          budget_previsionnel?: number | null
+          chef_projet_id?: string | null
+          code_projet_digital?: string
+          created_at?: string
+          created_by?: string | null
+          date_debut?: string | null
+          date_fin_prevue?: string | null
+          date_fin_reelle?: string | null
+          description?: string | null
+          id?: string
+          loop_workspace_id?: string | null
+          loop_workspace_url?: string | null
+          membres_ids?: string[] | null
+          nom_projet?: string
+          phase_courante?: string | null
+          priorite?: string | null
+          progress?: number | null
+          responsable_it_id?: string | null
+          sponsor_id?: string | null
+          statut?: string
+          teams_channel_id?: string | null
+          teams_channel_url?: string | null
+          type_projet?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_projects_chef_projet_id_fkey"
+            columns: ["chef_projet_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "it_projects_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "it_projects_responsable_it_id_fkey"
+            columns: ["responsable_it_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "it_projects_sponsor_id_fkey"
+            columns: ["sponsor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_titles: {
         Row: {
           created_at: string
@@ -1737,10 +1900,13 @@ export type Database = {
           can_assign_to_all: boolean
           can_assign_to_subordinates: boolean
           can_create_be_projects: boolean | null
+          can_create_it_projects: boolean | null
           can_create_suppliers: boolean
           can_delete_be_projects: boolean | null
+          can_delete_it_projects: boolean | null
           can_delete_suppliers: boolean
           can_edit_be_projects: boolean | null
+          can_edit_it_projects: boolean | null
           can_edit_suppliers: boolean
           can_manage_all_tasks: boolean
           can_manage_own_tasks: boolean
@@ -1749,6 +1915,7 @@ export type Database = {
           can_manage_users: boolean
           can_view_all_tasks: boolean
           can_view_be_projects: boolean | null
+          can_view_it_projects: boolean | null
           can_view_own_tasks: boolean
           can_view_subordinates_tasks: boolean
           can_view_suppliers: boolean
@@ -1786,10 +1953,13 @@ export type Database = {
           can_assign_to_all?: boolean
           can_assign_to_subordinates?: boolean
           can_create_be_projects?: boolean | null
+          can_create_it_projects?: boolean | null
           can_create_suppliers?: boolean
           can_delete_be_projects?: boolean | null
+          can_delete_it_projects?: boolean | null
           can_delete_suppliers?: boolean
           can_edit_be_projects?: boolean | null
+          can_edit_it_projects?: boolean | null
           can_edit_suppliers?: boolean
           can_manage_all_tasks?: boolean
           can_manage_own_tasks?: boolean
@@ -1798,6 +1968,7 @@ export type Database = {
           can_manage_users?: boolean
           can_view_all_tasks?: boolean
           can_view_be_projects?: boolean | null
+          can_view_it_projects?: boolean | null
           can_view_own_tasks?: boolean
           can_view_subordinates_tasks?: boolean
           can_view_suppliers?: boolean
@@ -1835,10 +2006,13 @@ export type Database = {
           can_assign_to_all?: boolean
           can_assign_to_subordinates?: boolean
           can_create_be_projects?: boolean | null
+          can_create_it_projects?: boolean | null
           can_create_suppliers?: boolean
           can_delete_be_projects?: boolean | null
+          can_delete_it_projects?: boolean | null
           can_delete_suppliers?: boolean
           can_edit_be_projects?: boolean | null
+          can_edit_it_projects?: boolean | null
           can_edit_suppliers?: boolean
           can_manage_all_tasks?: boolean
           can_manage_own_tasks?: boolean
@@ -1847,6 +2021,7 @@ export type Database = {
           can_manage_users?: boolean
           can_view_all_tasks?: boolean
           can_view_be_projects?: boolean | null
+          can_view_it_projects?: boolean | null
           can_view_own_tasks?: boolean
           can_view_subordinates_tasks?: boolean
           can_view_suppliers?: boolean
@@ -4645,6 +4820,7 @@ export type Database = {
           is_assignment_task: boolean
           is_dependency_locked: boolean | null
           is_locked_for_validation: boolean | null
+          it_project_id: string | null
           original_assignee_id: string | null
           parent_request_id: string | null
           parent_sub_process_run_id: string | null
@@ -4724,6 +4900,7 @@ export type Database = {
           is_assignment_task?: boolean
           is_dependency_locked?: boolean | null
           is_locked_for_validation?: boolean | null
+          it_project_id?: string | null
           original_assignee_id?: string | null
           parent_request_id?: string | null
           parent_sub_process_run_id?: string | null
@@ -4803,6 +4980,7 @@ export type Database = {
           is_assignment_task?: boolean
           is_dependency_locked?: boolean | null
           is_locked_for_validation?: boolean | null
+          it_project_id?: string | null
           original_assignee_id?: string | null
           parent_request_id?: string | null
           parent_sub_process_run_id?: string | null
@@ -4903,6 +5081,13 @@ export type Database = {
             columns: ["depends_on_task_id"]
             isOneToOne: false
             referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_it_project_id_fkey"
+            columns: ["it_project_id"]
+            isOneToOne: false
+            referencedRelation: "it_projects"
             referencedColumns: ["id"]
           },
           {
