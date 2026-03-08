@@ -34,7 +34,7 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
   const [budgetPrevisionnel, setBudgetPrevisionnel] = useState('');
   const [teamsChannelUrl, setTeamsChannelUrl] = useState('');
   const [loopWorkspaceUrl, setLoopWorkspaceUrl] = useState('');
-  const [progress, setProgress] = useState('0');
+  
 
   useEffect(() => {
     if (project) {
@@ -49,7 +49,7 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
       setBudgetPrevisionnel(project.budget_previsionnel?.toString() || '');
       setTeamsChannelUrl(project.teams_channel_url || '');
       setLoopWorkspaceUrl(project.loop_workspace_url || '');
-      setProgress(project.progress?.toString() || '0');
+      
     } else {
       resetForm();
     }
@@ -67,7 +67,7 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
     setBudgetPrevisionnel('');
     setTeamsChannelUrl('');
     setLoopWorkspaceUrl('');
-    setProgress('0');
+    
   };
 
   const handleSubmit = async () => {
@@ -86,7 +86,7 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
       budget_previsionnel: budgetPrevisionnel ? parseFloat(budgetPrevisionnel) : null,
       teams_channel_url: teamsChannelUrl || null,
       loop_workspace_url: loopWorkspaceUrl || null,
-      progress: parseInt(progress) || 0,
+      
     };
 
     if (isEdit && project) {
@@ -203,17 +203,6 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>Avancement global ({progress}%)</Label>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                value={progress}
-                onChange={e => setProgress(e.target.value)}
-                className="w-full accent-violet-600"
-              />
-            </div>
           </TabsContent>
 
           {/* Planning tab */}

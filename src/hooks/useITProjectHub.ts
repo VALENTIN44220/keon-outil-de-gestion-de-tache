@@ -81,9 +81,7 @@ export function useITProjectStats(tasks: Task[], project: ITProject | null | und
     if (['done', 'validated', 'closed', 'cancelled'].includes(t.status)) return false;
     return new Date(t.due_date) < today;
   }).length;
-  const progress = project?.progress !== undefined && project.progress !== null
-    ? project.progress
-    : totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
+  const progress = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
   const budgetRatio = project?.budget_previsionnel && project.budget_previsionnel > 0
     ? Math.round(((project.budget_consomme || 0) / project.budget_previsionnel) * 100)
     : null;
