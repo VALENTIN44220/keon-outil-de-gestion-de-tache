@@ -9,11 +9,12 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Search, ListTodo, Filter } from 'lucide-react';
+import { Search, ListTodo, Link2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Task, TaskStatus } from '@/types/task';
+import { ITLinkExistingTasksDialog } from '@/components/it/ITLinkExistingTasksDialog';
 
 const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   'to_assign': { label: 'À assigner', className: 'bg-slate-500/10 text-slate-600 border-slate-500/20' },
@@ -38,6 +39,7 @@ export default function ITProjectHubTasks() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
 
   const filteredTasks = useMemo(() => {
     return tasks.filter(t => {
@@ -107,11 +109,17 @@ export default function ITProjectHubTasks() {
           {/* Tasks Table */}
           <Card className="border-border/50">
             <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <ListTodo className="h-5 w-5 text-muted-foreground" />
-                Tâches & Demandes
-                <Badge variant="secondary" className="ml-2">{filteredTasks.length}</Badge>
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <ListTodo className="h-5 w-5 text-muted-foreground" />
+                  Tâches & Demandes
+                  <Badge variant="secondary" className="ml-2">{filteredTasks.length}</Badge>
+                </CardTitle>
+                <Button variant="outline" size="sm" onClick={() => setLinkDialogOpen(true)}>
+                  <Link2 className="h-4 w-4 mr-1.5" />
+                  Associer des tâches existantes
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="pt-0">
               {filteredTasks.length === 0 ? (
@@ -197,6 +205,11 @@ export default function ITProjectHubTasks() {
             </CardContent>
           </Card>
         </div>
+        <ITLinkExistingTasksDialog
+          open={linkDialogOpen}
+          onOpenChange={setLinkDialogOpen}
+          projectId={project.id}
+        />
       </div>
     </Layout>
   );
