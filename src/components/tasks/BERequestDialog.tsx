@@ -536,6 +536,14 @@ export function BERequestDialog({
                 </div>
 
                 <div className="space-y-2">
+                  <Label className="flex items-center gap-1.5">
+                    <Monitor className="h-3.5 w-3.5 text-violet-600" />
+                    Projet IT associé
+                  </Label>
+                  <ITProjectSelect value={itProjectId} onChange={setItProjectId} />
+                </div>
+
+                <div className="space-y-2">
                   <Label>Priorité</Label>
                   <Select value={priority} onValueChange={(v) => setPriority(v as TaskPriority)}>
                     <SelectTrigger>
