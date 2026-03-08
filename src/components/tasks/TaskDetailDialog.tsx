@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -366,22 +367,16 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Assigné à</Label>
-                    <Select
+                    <SearchableSelect
                       value={editForm.assignee_id || '__none__'}
                       onValueChange={(value) => setEditForm(prev => ({ ...prev, assignee_id: value === '__none__' ? '' : value }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Non assigné" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">Non assigné</SelectItem>
-                        {profilesList.map((profile) => (
-                          <SelectItem key={profile.id} value={profile.id}>
-                            {profile.display_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      placeholder="Non assigné"
+                      searchPlaceholder="Rechercher un collaborateur..."
+                      options={[
+                        { value: '__none__', label: 'Non assigné' },
+                        ...profilesList.map(p => ({ value: p.id, label: p.display_name || 'Sans nom' }))
+                      ]}
+                    />
                   </div>
 
                   <div className="space-y-2">

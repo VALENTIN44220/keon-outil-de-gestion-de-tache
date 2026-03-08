@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { CategorySelect } from '@/components/templates/CategorySelect';
 import { useCategories } from '@/hooks/useCategories';
 import { useAssignmentRules } from '@/hooks/useAssignmentRules';
@@ -351,43 +352,30 @@ export function UnifiedTaskDialog({ open, onClose, onAdd }: UnifiedTaskDialogPro
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Service cible</Label>
-                  <Select 
-                    value={targetDepartmentId || 'none'} 
+                  <SearchableSelect
+                    value={targetDepartmentId || 'none'}
                     onValueChange={(v) => setTargetDepartmentId(v === 'none' ? null : v)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner un service" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Aucun (tâche personnelle)</SelectItem>
-                      {departments.map(dept => (
-                        <SelectItem key={dept.id} value={dept.id}>
-                          {dept.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    placeholder="Sélectionner un service"
+                    searchPlaceholder="Rechercher un service..."
+                    options={[
+                      { value: 'none', label: 'Aucun (tâche personnelle)' },
+                      ...departments.map(dept => ({ value: dept.id, label: dept.name }))
+                    ]}
+                  />
                 </div>
 
                 <div className="space-y-2">
                   <Label>Exécutant</Label>
-                  <Select 
-                    value={assigneeId || 'none'} 
+                  <SearchableSelect
+                    value={assigneeId || 'none'}
                     onValueChange={(v) => setAssigneeId(v === 'none' ? null : v)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner l'exécutant" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Non défini</SelectItem>
-                      {profiles.map(profile => (
-                        <SelectItem key={profile.id} value={profile.id}>
-                          {profile.display_name || 'Sans nom'} 
-                          {profile.job_title && ` - ${profile.job_title}`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    placeholder="Sélectionner l'exécutant"
+                    searchPlaceholder="Rechercher un collaborateur..."
+                    options={[
+                      { value: 'none', label: 'Non défini' },
+                      ...profiles.map(p => ({ value: p.id, label: `${p.display_name || 'Sans nom'}${p.job_title ? ` - ${p.job_title}` : ''}` }))
+                    ]}
+                  />
                 </div>
               </div>
             </div>
@@ -418,44 +406,30 @@ export function UnifiedTaskDialog({ open, onClose, onAdd }: UnifiedTaskDialogPro
             <TabsContent value="roles" className="mt-4 space-y-4">
               <div className="space-y-2">
                 <Label>Demandeur (qui crée l'action)</Label>
-                <Select 
-                  value={requesterId || 'none'} 
+                <SearchableSelect
+                  value={requesterId || 'none'}
                   onValueChange={(v) => setRequesterId(v === 'none' ? null : v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner le demandeur" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Non défini</SelectItem>
-                    {profiles.map(profile => (
-                      <SelectItem key={profile.id} value={profile.id}>
-                        {profile.display_name || 'Sans nom'} 
-                        {profile.job_title && ` - ${profile.job_title}`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  placeholder="Sélectionner le demandeur"
+                  searchPlaceholder="Rechercher un collaborateur..."
+                  options={[
+                    { value: 'none', label: 'Non défini' },
+                    ...profiles.map(p => ({ value: p.id, label: `${p.display_name || 'Sans nom'}${p.job_title ? ` - ${p.job_title}` : ''}` }))
+                  ]}
+                />
               </div>
 
               <div className="space-y-2">
                 <Label>Rapporteur (à qui rapporter l'action)</Label>
-                <Select 
-                  value={reporterId || 'none'} 
+                <SearchableSelect
+                  value={reporterId || 'none'}
                   onValueChange={(v) => setReporterId(v === 'none' ? null : v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner le rapporteur" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Non défini</SelectItem>
-                    {profiles.map(profile => (
-                      <SelectItem key={profile.id} value={profile.id}>
-                        {profile.display_name || 'Sans nom'} 
-                        {profile.job_title && ` - ${profile.job_title}`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  placeholder="Sélectionner le rapporteur"
+                  searchPlaceholder="Rechercher un collaborateur..."
+                  options={[
+                    { value: 'none', label: 'Non défini' },
+                    ...profiles.map(p => ({ value: p.id, label: `${p.display_name || 'Sans nom'}${p.job_title ? ` - ${p.job_title}` : ''}` }))
+                  ]}
+                />
               </div>
             </TabsContent>
           </Tabs>
