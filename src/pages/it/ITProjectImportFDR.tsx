@@ -293,6 +293,26 @@ export default function ITProjectImportFDR() {
           </div>
         </div>
 
+        {/* Debug Info */}
+        {debugInfo && (
+          <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg">
+            <h3 className="text-sm font-semibold mb-3 text-slate-700 dark:text-slate-300">Infos de diagnostic</h3>
+            <div className="space-y-2 text-xs text-slate-600 dark:text-slate-400 font-mono">
+              <p>Statut HTTP: <span className="font-bold text-slate-900 dark:text-slate-100">{debugInfo.status}</span></p>
+              <p>Est un tableau: <span className="font-bold text-slate-900 dark:text-slate-100">{String(debugInfo.isArray)}</span></p>
+              <p>Nombre d'éléments: <span className="font-bold text-slate-900 dark:text-slate-100">{debugInfo.length}</span></p>
+            </div>
+            {debugInfo.length === 0 && (
+              <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded">
+                <p className="text-xs font-semibold text-amber-800 dark:text-amber-200 mb-2">Réponse brute (vide):</p>
+                <pre className="text-xs overflow-auto max-h-64 text-amber-700 dark:text-amber-300">
+                  {JSON.stringify(debugInfo.rawData, null, 2)}
+                </pre>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Table */}
         <div className="flex-1 overflow-auto px-6 pb-6 pt-4">
           {loading ? (
