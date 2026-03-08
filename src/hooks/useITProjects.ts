@@ -33,7 +33,8 @@ export function useITProjects() {
 
   const addProject = async (project: Omit<ITProject, 'id' | 'created_at' | 'updated_at' | 'responsable_it' | 'chef_projet' | 'sponsor'>) => {
     try {
-      const { data, error } = await supabase.from('it_projects').insert(project).select().single();
+      const payload = { ...project, date_debut: project.date_debut || new Date().toISOString().split('T')[0] };
+      const { data, error } = await supabase.from('it_projects').insert(payload).select().single();
       if (error) throw error;
       setProjects(prev => [...prev, data as ITProject]);
       toast({ title: 'Projet créé', description: `${data.nom_projet} — ${data.code_projet_digital}` });

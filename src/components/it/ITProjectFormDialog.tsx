@@ -209,15 +209,6 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
           <TabsContent value="planning" className="space-y-4 pt-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="date-debut">Date de début</Label>
-                <Input
-                  id="date-debut"
-                  type="date"
-                  value={dateDebut}
-                  onChange={e => setDateDebut(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
                 <Label htmlFor="date-fin">Date de fin prévue</Label>
                 <Input
                   id="date-fin"
