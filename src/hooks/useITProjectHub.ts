@@ -12,7 +12,7 @@ export function useITProject(code: string | undefined) {
       if (!code) return null;
       const { data, error } = await supabase
         .from('it_projects')
-        .select(`*, responsable_it:profiles!it_projects_responsable_it_id_fkey(id,display_name,avatar_url), chef_projet:profiles!it_projects_chef_projet_id_fkey(id,display_name,avatar_url), sponsor:profiles!it_projects_sponsor_id_fkey(id,display_name,avatar_url), entite:departments!it_projects_entite_id_fkey(id,name), chef_projet_metier:profiles!it_projects_chef_projet_metier_id_fkey(id,display_name,avatar_url), chef_projet_it:profiles!it_projects_chef_projet_it_id_fkey(id,display_name,avatar_url), groupe_service:departments!it_projects_groupe_service_id_fkey(id,name), directeur:profiles!it_projects_directeur_id_fkey(id,display_name,avatar_url)`)
+        .select(`*, responsable_it:profiles!it_projects_responsable_it_id_fkey(id,display_name,avatar_url), chef_projet:profiles!it_projects_chef_projet_id_fkey(id,display_name,avatar_url), sponsor:profiles!it_projects_sponsor_id_fkey(id,display_name,avatar_url), company:companies!it_projects_company_id_fkey(id,name), chef_projet_metier:profiles!it_projects_chef_projet_metier_id_fkey(id,display_name,avatar_url), chef_projet_it:profiles!it_projects_chef_projet_it_id_fkey(id,display_name,avatar_url), groupe_service:departments!it_projects_groupe_service_id_fkey(id,name), directeur:profiles!it_projects_directeur_id_fkey(id,display_name,avatar_url)`)
         .eq('code_projet_digital', code)
         .maybeSingle();
       if (error) throw error;
