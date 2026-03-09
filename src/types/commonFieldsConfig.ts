@@ -27,6 +27,7 @@ export const DEFAULT_COMMON_FIELDS_CONFIG: CommonFieldsConfig = {
   priority: { visible: true, editable: true, default_value: 'medium' },
   due_date: { visible: true, editable: true },
   be_project: { visible: true, editable: true },
+  it_project: { visible: false, editable: true },
 };
 
 export const COMMON_FIELD_LABELS: Record<keyof CommonFieldsConfig, string> = {
