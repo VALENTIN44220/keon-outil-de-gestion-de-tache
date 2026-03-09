@@ -30,6 +30,7 @@ export function ITProjectHubHeader({ project, stats, onEditProject }: ITProjectH
   const statusConfig = IT_PROJECT_STATUS_CONFIG[project.statut] || IT_PROJECT_STATUS_CONFIG.backlog;
   const priorityConfig = project.priorite ? IT_PROJECT_PRIORITY_CONFIG[project.priorite] : null;
   const pilierConfig = project.pilier ? IT_PROJECT_PILIER_CONFIG[project.pilier as ITProjectPilier] : null;
+  const fdrConfig = project.statut_fdr ? STATUT_FDR_CONFIG[project.statut_fdr as StatutFDR] : null;
 
   return (
     <div className="space-y-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
