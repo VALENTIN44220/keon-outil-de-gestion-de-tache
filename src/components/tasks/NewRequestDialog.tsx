@@ -1250,7 +1250,9 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                           <Info className="h-5 w-5 text-info" />
                         </div>
                         <p className="text-sm text-muted-foreground leading-relaxed">
-                          Sélectionnez les tâches à réaliser pour cette demande. Chaque tâche cochée déclenchera la création des actions correspondantes.
+                          {subprocessSelectionMode === 'single'
+                            ? `Sélectionnez 1 tâche parmi ${availableSubProcesses.length} disponible(s). Chaque tâche cochée déclenchera la création des actions correspondantes.`
+                            : 'Sélectionnez les tâches à réaliser pour cette demande. Chaque tâche cochée déclenchera la création des actions correspondantes.'}
                         </p>
                       </div>
                     </div>

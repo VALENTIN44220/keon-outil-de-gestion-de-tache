@@ -41,7 +41,8 @@ export function TaskSelectionCard({
       {/* Checkbox */}
       <div className="flex-shrink-0">
         <input
-          type="checkbox"
+          type={selectionMode === 'single' ? 'radio' : 'checkbox'}
+          name={selectionMode === 'single' ? 'task-selection' : undefined}
           checked={isSelected}
           readOnly
           aria-label={`Sélectionner ${name}`}
