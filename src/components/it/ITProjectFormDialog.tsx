@@ -57,7 +57,13 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
   const [allProfiles, setAllProfiles] = useState<{ id: string; display_name: string; department_id: string | null }[]>([]);
+
+  // Search states for each select
   const [companySearch, setCompanySearch] = useState('');
+  const [chefMetierSearch, setChefMetierSearch] = useState('');
+  const [chefItSearch, setChefItSearch] = useState('');
+  const [groupeServiceSearch, setGroupeServiceSearch] = useState('');
+  const [directeurSearch, setDirecteurSearch] = useState('');
 
   useEffect(() => {
     if (!open) return;
@@ -67,14 +73,25 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
     supabase.from('departments').select('id, name').order('name').then(({ data }) => {
       setDepartments(data || []);
     });
-    supabase.from('profiles').select('id, display_name, department_id').order('display_name').then(({ data }) => {
+    supabase.from('profiles').select('id, display_name, department_id').eq('status', 'active').order('display_name').then(({ data }) => {
       setAllProfiles(data || []);
     });
+    // Reset searches on open
+    setCompanySearch('');
+    setChefMetierSearch('');
+    setChefItSearch('');
+    setGroupeServiceSearch('');
+    setDirecteurSearch('');
   }, [open]);
 
-  const filteredCompanies = companySearch
-    ? companies.filter(c => c.name.toLowerCase().includes(companySearch.toLowerCase()))
-    : companies;
+  const filterList = <T extends { name?: string; display_name?: string }>(items: T[], query: string): T[] => {
+    if (!query) return items;
+    const q = query.toLowerCase();
+    return items.filter(item => {
+      const label = (item as any).display_name || (item as any).name || '';
+      return label.toLowerCase().includes(q);
+    });
+  };
 
   useEffect(() => {
     if (project) {
