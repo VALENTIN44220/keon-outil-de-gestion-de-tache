@@ -118,6 +118,10 @@ export interface ITProject {
   updated_at: string;
   created_by?: string | null;
 
+  // FDR governance
+  statut_fdr?: StatutFDR | null;
+  etape_validation_fdr?: number | null;
+
   // Joined data (optional, for display)
   responsable_it?: { id: string; display_name: string; avatar_url?: string | null } | null;
   chef_projet?: { id: string; display_name: string; avatar_url?: string | null } | null;
