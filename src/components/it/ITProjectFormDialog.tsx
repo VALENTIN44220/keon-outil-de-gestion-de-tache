@@ -40,7 +40,7 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
   const [loopWorkspaceUrl, setLoopWorkspaceUrl] = useState('');
 
   // Équipe
-  const [entiteId, setEntiteId] = useState(NONE);
+  const [companyId, setCompanyId] = useState(NONE);
   const [chefProjetMetierId, setChefProjetMetierId] = useState(NONE);
   const [chefProjetItId, setChefProjetItId] = useState(NONE);
   const [groupeServiceId, setGroupeServiceId] = useState(NONE);
