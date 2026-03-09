@@ -334,6 +334,16 @@ export default function ITProjects() {
               <Filter className="h-4 w-4" /> FILTRES
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Rechercher projet..."
+                  value={filters.search}
+                  onChange={e => setFilter('search', e.target.value)}
+                  className="h-8 text-xs w-[200px] pl-8"
+                />
+              </div>
               <Select value={filters.period} onValueChange={v => setFilter('period', v as PeriodFilter)}>
                 <SelectTrigger className="h-8 text-xs w-[140px]"><SelectValue placeholder="Période" /></SelectTrigger>
                 <SelectContent>
@@ -369,6 +379,24 @@ export default function ITProjects() {
                   ))}
                 </SelectContent>
               </Select>
+              <Select value={filters.statutFdr} onValueChange={v => setFilter('statutFdr', v)}>
+                <SelectTrigger className="h-8 text-xs w-[170px]"><SelectValue placeholder="Statut FDR" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous statuts FDR</SelectItem>
+                  {(Object.entries(STATUT_FDR_CONFIG) as [StatutFDR, typeof STATUT_FDR_CONFIG['non_soumis']][]).map(([k, cfg]) => (
+                    <SelectItem key={k} value={k}>{cfg.icon} {cfg.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={filters.phase} onValueChange={v => setFilter('phase', v)}>
+                <SelectTrigger className="h-8 text-xs w-[150px]"><SelectValue placeholder="Phase" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Toutes phases</SelectItem>
+                  {IT_PROJECT_PHASES.map(ph => (
+                    <SelectItem key={ph.value} value={ph.value}>{ph.label.split(' /')[0]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Select value={filters.pilier} onValueChange={v => setFilter('pilier', v)}>
                 <SelectTrigger className="h-8 text-xs w-[130px]"><SelectValue placeholder="Pilier" /></SelectTrigger>
                 <SelectContent>
@@ -389,10 +417,36 @@ export default function ITProjects() {
                   <SelectItem value="100">100%</SelectItem>
                 </SelectContent>
               </Select>
-              <Button variant="outline" size="sm" className="h-8 gap-1 text-xs" onClick={saveFilters}>
+            </div>
+            {/* Context actions */}
+            <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-border/50">
+              <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={() => setShowSaveDialog(true)}>
                 <Save className="h-3 w-3" /> Enregistrer
               </Button>
-              <Button variant="ghost" size="sm" className="h-8 gap-1 text-xs" onClick={resetFilters}>
+              {/* Load context dropdown */}
+              <Select value="__load__" onValueChange={name => {
+                const ctx = contexts.find(c => c.name === name);
+                if (ctx) loadContext(ctx);
+              }}>
+                <SelectTrigger className="h-7 text-xs w-[160px]">
+                  <span className="flex items-center gap-1"><FolderOpen className="h-3 w-3" /> Charger contexte</span>
+                </SelectTrigger>
+                <SelectContent>
+                  {contexts.length === 0 ? (
+                    <SelectItem value="__load__" disabled>Aucun contexte</SelectItem>
+                  ) : (
+                    contexts.map(ctx => (
+                      <SelectItem key={ctx.name} value={ctx.name}>
+                        <span className="flex items-center gap-1.5">
+                          {ctx.isDefault && <Bookmark className="h-3 w-3 text-amber-500" />}
+                          {ctx.name}
+                        </span>
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={resetFilters}>
                 <RotateCcw className="h-3 w-3" /> Réinitialiser
               </Button>
             </div>
