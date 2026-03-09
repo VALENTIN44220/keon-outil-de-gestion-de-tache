@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { ITProject, ITProjectStatus, ITProjectType, ITProjectPriority, ITProjectPhase, ITProjectPilier, IT_PROJECT_PHASES, IT_PROJECT_PILIER_CONFIG } from '@/types/itProject';
+import { ITProject, ITProjectStatus, ITProjectType, ITProjectPriority, ITProjectPhase, ITProjectPilier, IT_PROJECT_PHASES, IT_PROJECT_PILIER_CONFIG, STATUT_FDR_CONFIG, StatutFDR } from '@/types/itProject';
 import { useITProjects } from '@/hooks/useITProjects';
 import { supabase } from '@/integrations/supabase/client';
 import { Monitor, Users, Calendar, Euro, Link2, MessageSquareText, Loader2, Target } from 'lucide-react';
