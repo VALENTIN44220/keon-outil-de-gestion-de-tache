@@ -2681,6 +2681,7 @@ export type Database = {
           service_group_id: string | null
           settings: Json | null
           subcategory_id: string | null
+          subprocess_selection_mode: string | null
           target_company_id: string | null
           target_department_id: string | null
           updated_at: string
@@ -2708,6 +2709,7 @@ export type Database = {
           service_group_id?: string | null
           settings?: Json | null
           subcategory_id?: string | null
+          subprocess_selection_mode?: string | null
           target_company_id?: string | null
           target_department_id?: string | null
           updated_at?: string
@@ -2735,6 +2737,7 @@ export type Database = {
           service_group_id?: string | null
           settings?: Json | null
           subcategory_id?: string | null
+          subprocess_selection_mode?: string | null
           target_company_id?: string | null
           target_department_id?: string | null
           updated_at?: string
