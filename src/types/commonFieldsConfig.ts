@@ -36,6 +36,7 @@ export const COMMON_FIELD_LABELS: Record<keyof CommonFieldsConfig, string> = {
   priority: 'Priorité',
   due_date: 'Échéance',
   be_project: 'Projet associé',
+  it_project: 'Projet IT associé',
 };
 
 /** Available variables for title pattern */
