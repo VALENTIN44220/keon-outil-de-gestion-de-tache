@@ -126,6 +126,8 @@ export function RequestWizardDialog({ open, onClose, onSuccess, initialProcessId
           const settings = (ptData as any)?.settings;
           if (settings?.common_fields_config) {
             setCommonFieldsConfig(settings.common_fields_config);
+            // Load subprocess selection mode
+            setSubprocessSelectionMode(settings.subprocess_selection_mode || 'multiple');
             // Apply default values for non-editable fields
             const priorityCfg = settings.common_fields_config.priority;
             if (priorityCfg && !priorityCfg.editable && priorityCfg.default_value) {
