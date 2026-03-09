@@ -84,6 +84,7 @@ export const defaultWizardData: RequestWizardData = {
   availableSubProcesses: [],
   customFieldValues: {},
   beProjectId: null,
+  itProjectId: null,
   categoryId: null,
   subcategoryId: null,
   targetDepartmentId: null,

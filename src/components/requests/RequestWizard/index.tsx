@@ -277,6 +277,7 @@ export function RequestWizardDialog({ open, onClose, onSuccess, initialProcessId
           requester_id: userId,
           due_date: data.dueDate,
           be_project_id: data.beProjectId,
+          it_project_id: data.itProjectId,
           category_id: data.categoryId,
           subcategory_id: data.subcategoryId,
           target_department_id: data.targetDepartmentId,
