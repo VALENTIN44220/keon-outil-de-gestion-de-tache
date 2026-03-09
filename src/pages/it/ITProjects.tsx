@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import {
   Plus, Monitor, Search, Download, Save, RotateCcw, Filter,
   FolderKanban, AlertTriangle, TrendingUp, ArrowUpDown, ChevronRight
@@ -63,7 +64,7 @@ export default function ITProjects() {
   const [showCreate, setShowCreate] = useState(false);
 
   // Lookup data
-  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
+  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
   const [profiles, setProfiles] = useState<{ id: string; display_name: string }[]>([]);
 
   // Filters
@@ -79,7 +80,7 @@ export default function ITProjects() {
   const [sortAsc, setSortAsc] = useState(true);
 
   useEffect(() => {
-    supabase.from('departments').select('id, name').order('name').then(({ data }) => setDepartments(data || []));
+    supabase.from('companies').select('id, name').order('name').then(({ data }) => setCompanies(data || []));
     supabase.from('profiles').select('id, display_name').order('display_name').then(({ data }) => setProfiles(data || []));
   }, []);
 
@@ -112,7 +113,7 @@ export default function ITProjects() {
         }
         if (!isAfter(new Date(p.created_at), cutoff)) return false;
       }
-      if (filters.entiteId !== NONE && p.entite_id !== filters.entiteId) return false;
+      if (filters.entiteId !== NONE && (p as any).entite?.company_id !== filters.entiteId) return false;
       if (filters.responsableItId !== NONE && p.chef_projet_it_id !== filters.responsableItId) return false;
       if (filters.statut !== 'all' && p.statut !== filters.statut) return false;
       // Progress
@@ -232,20 +233,22 @@ export default function ITProjects() {
                   <SelectItem value="year">Cette année</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={filters.entiteId} onValueChange={v => setFilter('entiteId', v)}>
-                <SelectTrigger className="h-8 text-xs w-[160px]"><SelectValue placeholder="Entité" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NONE}>Toutes entités</SelectItem>
-                  {departments.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Select value={filters.responsableItId} onValueChange={v => setFilter('responsableItId', v)}>
-                <SelectTrigger className="h-8 text-xs w-[180px]"><SelectValue placeholder="Responsable IT" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NONE}>Tous responsables</SelectItem>
-                  {profiles.map(p => <SelectItem key={p.id} value={p.id}>{p.display_name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={filters.entiteId}
+                onValueChange={v => setFilter('entiteId', v)}
+                options={[{ value: NONE, label: 'Toutes sociétés' }, ...companies.map(c => ({ value: c.id, label: c.name }))]}
+                placeholder="Société"
+                searchPlaceholder="Rechercher société..."
+                triggerClassName="h-8 text-xs w-[180px]"
+              />
+              <SearchableSelect
+                value={filters.responsableItId}
+                onValueChange={v => setFilter('responsableItId', v)}
+                options={[{ value: NONE, label: 'Tous responsables' }, ...profiles.map(p => ({ value: p.id, label: p.display_name }))]}
+                placeholder="Responsable IT"
+                searchPlaceholder="Rechercher responsable..."
+                triggerClassName="h-8 text-xs w-[200px]"
+              />
               <Select value={filters.statut} onValueChange={v => setFilter('statut', v)}>
                 <SelectTrigger className="h-8 text-xs w-[130px]"><SelectValue placeholder="Statut" /></SelectTrigger>
                 <SelectContent>
