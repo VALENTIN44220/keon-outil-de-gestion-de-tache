@@ -47,6 +47,7 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
   const [directeurId, setDirecteurId] = useState(NONE);
 
   // FDR / Contexte
+  const [statutFdr, setStatutFdr] = useState('__none__');
   const [pilier, setPilier] = useState(NONE);
   const [fdrPriorite, setFdrPriorite] = useState('');
   const [fdrDescription, setFdrDescription] = useState('');
