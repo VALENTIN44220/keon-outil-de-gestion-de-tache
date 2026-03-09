@@ -1,17 +1,21 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useITProjects } from '@/hooks/useITProjects';
-import { ITProject, ITProjectStatus, ITProjectPilier, IT_PROJECT_STATUS_CONFIG, IT_PROJECT_TYPE_CONFIG, IT_PROJECT_PHASES, IT_PROJECT_PILIER_CONFIG, STATUT_FDR_CONFIG, StatutFDR } from '@/types/itProject';
+import { ITProject, ITProjectStatus, ITProjectPilier, IT_PROJECT_STATUS_CONFIG, IT_PROJECT_TYPE_CONFIG, IT_PROJECT_PHASES, IT_PROJECT_PILIER_CONFIG, STATUT_FDR_CONFIG, StatutFDR, ITProjectPhase } from '@/types/itProject';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import {
   Plus, Monitor, Search, Download, Save, RotateCcw, Filter,
-  FolderKanban, AlertTriangle, TrendingUp, ArrowUpDown, ChevronRight, Target
+  FolderKanban, AlertTriangle, TrendingUp, ArrowUpDown, ChevronRight, Target,
+  FolderOpen, Bookmark
 } from 'lucide-react';
 import { format, subMonths, startOfMonth, startOfYear, isAfter } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -22,9 +26,11 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
 } from 'recharts';
+import { toast } from 'sonner';
 
 const NONE = '__none__';
 const LS_KEY = 'it_project_filters';
+const LS_CONTEXTS_KEY = 'it_project_filter_contexts';
 
 type PeriodFilter = 'all' | 'month' | 'last3' | 'last6' | 'year';
 type ProgressFilter = 'all' | 'lt25' | '25-50' | '50-75' | 'gt75' | '100';
@@ -36,6 +42,15 @@ interface Filters {
   statut: string;
   progress: ProgressFilter;
   pilier: string;
+  search: string;
+  statutFdr: string;
+  phase: string;
+}
+
+interface FilterContext {
+  name: string;
+  filters: Filters;
+  isDefault?: boolean;
 }
 
 const DEFAULT_FILTERS: Filters = {
@@ -45,7 +60,33 @@ const DEFAULT_FILTERS: Filters = {
   statut: 'all',
   progress: 'all',
   pilier: 'all',
+  search: '',
+  statutFdr: 'all',
+  phase: 'all',
 };
+
+const STANDARD_CONTEXT: FilterContext = {
+  name: 'Standard',
+  isDefault: true,
+  filters: {
+    ...DEFAULT_FILTERS,
+    statut: 'en_cours',
+    statutFdr: 'fdr_2027',
+  },
+};
+
+// Helper to load contexts from localStorage
+function loadContexts(): FilterContext[] {
+  try {
+    const stored = localStorage.getItem(LS_CONTEXTS_KEY);
+    if (stored) return JSON.parse(stored);
+  } catch {}
+  return [STANDARD_CONTEXT];
+}
+
+function saveContexts(contexts: FilterContext[]) {
+  localStorage.setItem(LS_CONTEXTS_KEY, JSON.stringify(contexts));
+}
 
 const STATUS_COLORS: Record<string, string> = {
   backlog: '#94a3b8',
