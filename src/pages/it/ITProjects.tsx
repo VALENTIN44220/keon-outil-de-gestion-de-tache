@@ -113,17 +113,26 @@ export default function ITProjects() {
   const navigate = useNavigate();
   const { projects, isLoading } = useITProjects();
   const [showCreate, setShowCreate] = useState(false);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [contextName, setContextName] = useState('');
 
   // Lookup data
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
   const [profiles, setProfiles] = useState<{ id: string; display_name: string }[]>([]);
 
-  // Filters
+  // Filter contexts
+  const [contexts, setContexts] = useState<FilterContext[]>(loadContexts);
+
+  // Filters — initialize from localStorage or standard context
   const [filters, setFilters] = useState<Filters>(() => {
     try {
       const stored = localStorage.getItem(LS_KEY);
-      return stored ? { ...DEFAULT_FILTERS, ...JSON.parse(stored) } : DEFAULT_FILTERS;
-    } catch { return DEFAULT_FILTERS; }
+      if (stored) return { ...DEFAULT_FILTERS, ...JSON.parse(stored) };
+    } catch {}
+    // Apply standard context on first load
+    const ctxs = loadContexts();
+    const standard = ctxs.find(c => c.isDefault);
+    return standard ? { ...DEFAULT_FILTERS, ...standard.filters } : DEFAULT_FILTERS;
   });
 
   // Sort
@@ -136,11 +145,36 @@ export default function ITProjects() {
   }, []);
 
   const setFilter = <K extends keyof Filters>(key: K, value: Filters[K]) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
+    setFilters(prev => {
+      const next = { ...prev, [key]: value };
+      localStorage.setItem(LS_KEY, JSON.stringify(next));
+      return next;
+    });
   };
 
-  const saveFilters = () => {
-    localStorage.setItem(LS_KEY, JSON.stringify(filters));
+  const handleSaveContext = () => {
+    if (!contextName.trim()) return;
+    const newCtx: FilterContext = { name: contextName.trim(), filters: { ...filters } };
+    const updated = [...contexts.filter(c => c.name !== newCtx.name), newCtx];
+    setContexts(updated);
+    saveContexts(updated);
+    setShowSaveDialog(false);
+    setContextName('');
+    toast.success(`Contexte "${newCtx.name}" sauvegardé`);
+  };
+
+  const loadContext = (ctx: FilterContext) => {
+    const merged = { ...DEFAULT_FILTERS, ...ctx.filters };
+    setFilters(merged);
+    localStorage.setItem(LS_KEY, JSON.stringify(merged));
+    toast.success(`Contexte "${ctx.name}" chargé`);
+  };
+
+  const deleteContext = (name: string) => {
+    const updated = contexts.filter(c => c.name !== name);
+    setContexts(updated);
+    saveContexts(updated);
+    toast.success(`Contexte "${name}" supprimé`);
   };
 
   const resetFilters = () => {
@@ -151,7 +185,19 @@ export default function ITProjects() {
   // Apply filters
   const filtered = useMemo(() => {
     const now = new Date();
+    const q = filters.search?.toLowerCase() || '';
     return projects.filter(p => {
+      // Search multi-columns
+      if (q) {
+        const haystack = [
+          p.nom_projet,
+          p.code_projet_digital,
+          p.description,
+          p.fdr_commentaires,
+          p.pilier,
+        ].filter(Boolean).join(' ').toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
       // Period
       if (filters.period !== 'all' && p.created_at) {
         let cutoff: Date;
@@ -168,6 +214,8 @@ export default function ITProjects() {
       if (filters.responsableItId !== NONE && p.chef_projet_it_id !== filters.responsableItId) return false;
       if (filters.statut !== 'all' && p.statut !== filters.statut) return false;
       if (filters.pilier !== 'all' && p.pilier !== filters.pilier) return false;
+      if (filters.statutFdr !== 'all' && (p.statut_fdr || '') !== filters.statutFdr) return false;
+      if (filters.phase !== 'all' && (p.phase_courante || '') !== filters.phase) return false;
       // Progress
       const prog = p.progress || 0;
       switch (filters.progress) {
