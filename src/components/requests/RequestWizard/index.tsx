@@ -16,6 +16,7 @@ import { StepCustomFields } from "./StepCustomFields";
 import { StepMaterialLines } from "./StepMaterialLines";
 import { StepSummary } from "./StepSummary";
 import { RequestType, RequestWizardData, defaultWizardData, WIZARD_STEPS, SubProcessSelection } from "./types";
+import { mergeCommonFieldsConfig } from "@/types/commonFieldsConfig";
 
 interface RequestWizardDialogProps {
   open: boolean;
