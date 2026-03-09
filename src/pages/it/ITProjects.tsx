@@ -123,7 +123,7 @@ export default function ITProjects() {
         }
         if (!isAfter(new Date(p.created_at), cutoff)) return false;
       }
-      if (filters.entiteId !== NONE && (p as any).entite?.company_id !== filters.entiteId) return false;
+      if (filters.entiteId !== NONE && p.company_id !== filters.entiteId) return false;
       if (filters.responsableItId !== NONE && p.chef_projet_it_id !== filters.responsableItId) return false;
       if (filters.statut !== 'all' && p.statut !== filters.statut) return false;
       if (filters.pilier !== 'all' && p.pilier !== filters.pilier) return false;

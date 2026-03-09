@@ -263,13 +263,21 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
           {/* Équipe tab */}
           <TabsContent value="equipe" className="space-y-4 pt-4">
             <div className="space-y-2">
-              <Label className="flex items-center gap-1.5">🏢 Entité KEON</Label>
-              <Select value={entiteId} onValueChange={setEntiteId}>
-                <SelectTrigger><SelectValue placeholder="Sélectionner une entité" /></SelectTrigger>
+              <Label className="flex items-center gap-1.5">🏢 Société</Label>
+              <Select value={companyId} onValueChange={setCompanyId}>
+                <SelectTrigger><SelectValue placeholder="Sélectionner une société" /></SelectTrigger>
                 <SelectContent>
+                  <div className="px-2 pb-2">
+                    <Input
+                      placeholder="Rechercher société..."
+                      value={companySearch}
+                      onChange={e => setCompanySearch(e.target.value)}
+                      className="h-8 text-xs"
+                    />
+                  </div>
                   <SelectItem value={NONE}>— Aucune —</SelectItem>
-                  {departments.map(d => (
-                    <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                  {filteredCompanies.map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -280,14 +288,11 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
                 <SelectTrigger><SelectValue placeholder="Sélectionner un chef de projet métier" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NONE}>— Aucun —</SelectItem>
-                  {filteredMetierProfiles.map(p => (
+                  {allProfiles.map(p => (
                     <SelectItem key={p.id} value={p.id}>{p.display_name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {entiteId !== NONE && (
-                <p className="text-xs text-muted-foreground">Filtré sur l'entité sélectionnée</p>
-              )}
             </div>
             <div className="space-y-2">
               <Label className="flex items-center gap-1.5">💻 Chef de projet IT/Digital</Label>

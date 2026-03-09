@@ -72,7 +72,7 @@ export function ITProjectHubHeader({ project, stats, onEditProject }: ITProjectH
               <p className="text-sm text-muted-foreground">
                 {project.code_projet_digital}
                 {project.phase_courante && ` · ${project.phase_courante}`}
-                {project.entite && ` · 🏢 ${project.entite.name}`}
+                {project.company && ` · 🏢 ${project.company.name}`}
                 {project.groupe_service && ` · 🏬 ${project.groupe_service.name}`}
                 {project.directeur && ` · 👔 ${project.directeur.display_name}`}
                 {project.chef_projet_metier && ` · 👤 ${project.chef_projet_metier.display_name}`}
