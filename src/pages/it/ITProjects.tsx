@@ -535,7 +535,7 @@ export default function ITProjects() {
                         })}
                         {sorted.length === 0 && (
                           <tr>
-                            <td colSpan={10} className="text-center py-12 text-muted-foreground">
+                            <td colSpan={11} className="text-center py-12 text-muted-foreground">
                               Aucun projet ne correspond aux filtres
                             </td>
                           </tr>
