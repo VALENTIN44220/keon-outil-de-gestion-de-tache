@@ -694,6 +694,54 @@ export default function ITProjects() {
       </div>
 
       <ITProjectFormDialog open={showCreate} onClose={() => setShowCreate(false)} />
+
+      {/* Save context dialog */}
+      <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-sm flex items-center gap-2">
+              <Save className="h-4 w-4" /> Enregistrer le contexte de filtres
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 pt-2">
+            <div className="space-y-2">
+              <Label className="text-xs">Nom du contexte</Label>
+              <Input
+                placeholder="Ex: Projets FDR 2027 actifs"
+                value={contextName}
+                onChange={e => setContextName(e.target.value)}
+                className="h-8 text-xs"
+                onKeyDown={e => e.key === 'Enter' && handleSaveContext()}
+              />
+            </div>
+            {contexts.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-[10px] text-muted-foreground font-medium">Contextes existants :</p>
+                <div className="flex flex-wrap gap-1">
+                  {contexts.map(ctx => (
+                    <Badge key={ctx.name} variant="outline" className="text-[10px] gap-1">
+                      {ctx.isDefault && <Bookmark className="h-2.5 w-2.5 text-amber-500" />}
+                      {ctx.name}
+                      {!ctx.isDefault && (
+                        <button
+                          onClick={() => deleteContext(ctx.name)}
+                          className="ml-1 text-destructive hover:text-destructive/80"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" size="sm" onClick={() => setShowSaveDialog(false)}>Annuler</Button>
+              <Button size="sm" onClick={handleSaveContext} disabled={!contextName.trim()}>Enregistrer</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
