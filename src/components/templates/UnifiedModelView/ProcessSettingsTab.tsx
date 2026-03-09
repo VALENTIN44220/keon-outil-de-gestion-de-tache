@@ -21,6 +21,7 @@ import {
   CommonFieldConfig,
   DEFAULT_COMMON_FIELDS_CONFIG,
   COMMON_FIELD_LABELS,
+  mergeCommonFieldsConfig,
 } from '@/types/commonFieldsConfig';
 
 interface ProcessSettingsTabProps {
@@ -82,14 +83,7 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
 
     // Load common fields config from settings
     const settings = (process as any).settings;
-    if (settings?.common_fields_config) {
-      setCommonFieldsConfig({
-        ...DEFAULT_COMMON_FIELDS_CONFIG,
-        ...settings.common_fields_config,
-      });
-    } else {
-      setCommonFieldsConfig(DEFAULT_COMMON_FIELDS_CONFIG);
-    }
+    setCommonFieldsConfig(mergeCommonFieldsConfig(settings?.common_fields_config));
 
     // Sync recurrence
     setRecurrence({

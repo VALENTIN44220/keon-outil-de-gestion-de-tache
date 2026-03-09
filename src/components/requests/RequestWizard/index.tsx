@@ -16,6 +16,7 @@ import { StepCustomFields } from "./StepCustomFields";
 import { StepMaterialLines } from "./StepMaterialLines";
 import { StepSummary } from "./StepSummary";
 import { RequestType, RequestWizardData, defaultWizardData, WIZARD_STEPS, SubProcessSelection } from "./types";
+import { mergeCommonFieldsConfig } from "@/types/commonFieldsConfig";
 
 interface RequestWizardDialogProps {
   open: boolean;
@@ -125,7 +126,8 @@ export function RequestWizardDialog({ open, onClose, onSuccess, initialProcessId
         .then(({ data: ptData }) => {
           const settings = (ptData as any)?.settings;
           if (settings?.common_fields_config) {
-            setCommonFieldsConfig(settings.common_fields_config);
+            const mergedCfg = mergeCommonFieldsConfig(settings.common_fields_config);
+            setCommonFieldsConfig(mergedCfg);
             // Load subprocess selection mode
             setSubprocessSelectionMode(settings.subprocess_selection_mode || 'multiple');
             // Apply default values for non-editable fields

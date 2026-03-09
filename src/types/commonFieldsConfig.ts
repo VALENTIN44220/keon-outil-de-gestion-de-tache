@@ -30,6 +30,25 @@ export const DEFAULT_COMMON_FIELDS_CONFIG: CommonFieldsConfig = {
   it_project: { visible: true, editable: true },
 };
 
+/**
+ * Deep-merge a partial common_fields_config from DB with defaults.
+ * Ensures nested field objects are merged correctly (not overwritten by shallow spread).
+ */
+export function mergeCommonFieldsConfig(
+  override?: Partial<CommonFieldsConfig> | null
+): CommonFieldsConfig {
+  if (!override) return { ...DEFAULT_COMMON_FIELDS_CONFIG };
+  const keys = Object.keys(DEFAULT_COMMON_FIELDS_CONFIG) as (keyof CommonFieldsConfig)[];
+  const result: any = {};
+  for (const key of keys) {
+    result[key] = {
+      ...DEFAULT_COMMON_FIELDS_CONFIG[key],
+      ...(override[key] || {}),
+    };
+  }
+  return result as CommonFieldsConfig;
+}
+
 export const COMMON_FIELD_LABELS: Record<keyof CommonFieldsConfig, string> = {
   title: 'Titre',
   description: 'Description',
