@@ -279,69 +279,95 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
 
           {/* Équipe tab */}
           <TabsContent value="equipe" className="space-y-4 pt-4">
+            {/* Société */}
             <div className="space-y-2">
               <Label className="flex items-center gap-1.5">🏢 Société</Label>
               <Select value={companyId} onValueChange={setCompanyId}>
                 <SelectTrigger><SelectValue placeholder="Sélectionner une société" /></SelectTrigger>
                 <SelectContent>
                   <div className="px-2 pb-2">
-                    <Input
-                      placeholder="Rechercher société..."
-                      value={companySearch}
-                      onChange={e => setCompanySearch(e.target.value)}
-                      className="h-8 text-xs"
-                    />
+                    <Input placeholder="Rechercher société..." value={companySearch} onChange={e => setCompanySearch(e.target.value)} className="h-8 text-xs" />
                   </div>
                   <SelectItem value={NONE}>— Aucune —</SelectItem>
-                  {filteredCompanies.map(c => (
+                  {filterList(companies, companySearch).length === 0 && companySearch ? (
+                    <div className="px-2 py-1.5 text-xs text-muted-foreground text-center">Aucun résultat</div>
+                  ) : filterList(companies, companySearch).map(c => (
                     <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Chef de projet Métier */}
             <div className="space-y-2">
               <Label className="flex items-center gap-1.5">👤 Chef de projet Métier</Label>
               <Select value={chefProjetMetierId} onValueChange={setChefProjetMetierId}>
                 <SelectTrigger><SelectValue placeholder="Sélectionner un chef de projet métier" /></SelectTrigger>
                 <SelectContent>
+                  <div className="px-2 pb-2">
+                    <Input placeholder="Rechercher..." value={chefMetierSearch} onChange={e => setChefMetierSearch(e.target.value)} className="h-8 text-xs" />
+                  </div>
                   <SelectItem value={NONE}>— Aucun —</SelectItem>
-                  {allProfiles.map(p => (
+                  {filterList(allProfiles, chefMetierSearch).length === 0 && chefMetierSearch ? (
+                    <div className="px-2 py-1.5 text-xs text-muted-foreground text-center">Aucun résultat</div>
+                  ) : filterList(allProfiles, chefMetierSearch).map(p => (
                     <SelectItem key={p.id} value={p.id}>{p.display_name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Chef de projet IT/Digital */}
             <div className="space-y-2">
               <Label className="flex items-center gap-1.5">💻 Chef de projet IT/Digital</Label>
               <Select value={chefProjetItId} onValueChange={setChefProjetItId}>
                 <SelectTrigger><SelectValue placeholder="Sélectionner un chef de projet IT" /></SelectTrigger>
                 <SelectContent>
+                  <div className="px-2 pb-2">
+                    <Input placeholder="Rechercher..." value={chefItSearch} onChange={e => setChefItSearch(e.target.value)} className="h-8 text-xs" />
+                  </div>
                   <SelectItem value={NONE}>— Aucun —</SelectItem>
-                  {allProfiles.map(p => (
+                  {filterList(allProfiles, chefItSearch).length === 0 && chefItSearch ? (
+                    <div className="px-2 py-1.5 text-xs text-muted-foreground text-center">Aucun résultat</div>
+                  ) : filterList(allProfiles, chefItSearch).map(p => (
                     <SelectItem key={p.id} value={p.id}>{p.display_name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Groupe de service */}
             <div className="space-y-2">
               <Label className="flex items-center gap-1.5">🏬 Groupe de service</Label>
               <Select value={groupeServiceId} onValueChange={setGroupeServiceId}>
                 <SelectTrigger><SelectValue placeholder="Sélectionner un groupe de service" /></SelectTrigger>
                 <SelectContent>
+                  <div className="px-2 pb-2">
+                    <Input placeholder="Rechercher..." value={groupeServiceSearch} onChange={e => setGroupeServiceSearch(e.target.value)} className="h-8 text-xs" />
+                  </div>
                   <SelectItem value={NONE}>— Aucun —</SelectItem>
-                  {departments.map(d => (
+                  {filterList(departments, groupeServiceSearch).length === 0 && groupeServiceSearch ? (
+                    <div className="px-2 py-1.5 text-xs text-muted-foreground text-center">Aucun résultat</div>
+                  ) : filterList(departments, groupeServiceSearch).map(d => (
                     <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Directeur */}
             <div className="space-y-2">
               <Label className="flex items-center gap-1.5">👔 Directeur</Label>
               <Select value={directeurId} onValueChange={setDirecteurId}>
                 <SelectTrigger><SelectValue placeholder="Sélectionner un directeur" /></SelectTrigger>
                 <SelectContent>
+                  <div className="px-2 pb-2">
+                    <Input placeholder="Rechercher..." value={directeurSearch} onChange={e => setDirecteurSearch(e.target.value)} className="h-8 text-xs" />
+                  </div>
                   <SelectItem value={NONE}>— Aucun —</SelectItem>
-                  {allProfiles.map(p => (
+                  {filterList(allProfiles, directeurSearch).length === 0 && directeurSearch ? (
+                    <div className="px-2 py-1.5 text-xs text-muted-foreground text-center">Aucun résultat</div>
+                  ) : filterList(allProfiles, directeurSearch).map(p => (
                     <SelectItem key={p.id} value={p.id}>{p.display_name}</SelectItem>
                   ))}
                 </SelectContent>
