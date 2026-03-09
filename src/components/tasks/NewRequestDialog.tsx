@@ -384,6 +384,8 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
       .single()
       .then(({ data: ptData }) => {
         const settings = (ptData as any)?.settings;
+        // Load subprocess selection mode
+        setSubprocessSelectionMode(settings?.subprocess_selection_mode || 'multiple');
         if (settings?.common_fields_config) {
           const cfg = { ...DEFAULT_COMMON_FIELDS_CONFIG, ...settings.common_fields_config } as CommonFieldsConfig;
           setCommonFieldsConfig(cfg);
