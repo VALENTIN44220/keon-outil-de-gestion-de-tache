@@ -198,6 +198,23 @@ export function StepDetailsForm({ data, requestType, onDataChange, commonFieldsC
               </div>
             )
           )}
+
+          {/* IT Project selection for process requests */}
+          {requestType === 'process' && cfg.it_project?.visible && (
+            cfg.it_project.editable ? (
+              <ITProjectSelect
+                value={data.itProjectId}
+                onChange={(value) => onDataChange({ itProjectId: value })}
+              />
+            ) : (
+              <div className="space-y-2">
+                <Label>Projet IT associé <span className="text-xs text-muted-foreground ml-1">(imposé)</span></Label>
+                <div className="flex items-center h-10 px-3 rounded-md border bg-muted/50 text-sm">
+                  {data.itProjectId ? <ITProjectReadOnly projectId={data.itProjectId} /> : '—'}
+                </div>
+              </div>
+            )
+          )}
         </div>
       </ScrollArea>
     </div>
