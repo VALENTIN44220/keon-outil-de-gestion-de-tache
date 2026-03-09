@@ -64,7 +64,7 @@ export default function ITProjects() {
   const [showCreate, setShowCreate] = useState(false);
 
   // Lookup data
-  const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
+  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
   const [profiles, setProfiles] = useState<{ id: string; display_name: string }[]>([]);
 
   // Filters
