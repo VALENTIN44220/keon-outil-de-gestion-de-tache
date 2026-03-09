@@ -1398,6 +1398,60 @@ export type Database = {
         }
         Relationships: []
       }
+      it_project_fdr_validation: {
+        Row: {
+          commentaire: string | null
+          created_at: string
+          date_validation: string | null
+          etape: number
+          etape_label: string
+          id: string
+          it_project_id: string
+          statut: string | null
+          updated_at: string
+          valideur_id: string | null
+        }
+        Insert: {
+          commentaire?: string | null
+          created_at?: string
+          date_validation?: string | null
+          etape: number
+          etape_label: string
+          id?: string
+          it_project_id: string
+          statut?: string | null
+          updated_at?: string
+          valideur_id?: string | null
+        }
+        Update: {
+          commentaire?: string | null
+          created_at?: string
+          date_validation?: string | null
+          etape?: number
+          etape_label?: string
+          id?: string
+          it_project_id?: string
+          statut?: string | null
+          updated_at?: string
+          valideur_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_project_fdr_validation_it_project_id_fkey"
+            columns: ["it_project_id"]
+            isOneToOne: false
+            referencedRelation: "it_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "it_project_fdr_validation_valideur_id_fkey"
+            columns: ["valideur_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       it_project_milestones: {
         Row: {
           created_at: string
@@ -1464,6 +1518,7 @@ export type Database = {
           description: string | null
           directeur_id: string | null
           entite_id: string | null
+          etape_validation_fdr: number | null
           fdr_commentaires: string | null
           fdr_description: string | null
           fdr_priorite: string | null
@@ -1481,6 +1536,7 @@ export type Database = {
           responsable_it_id: string | null
           sponsor_id: string | null
           statut: string
+          statut_fdr: string | null
           teams_channel_id: string | null
           teams_channel_url: string | null
           type_projet: string | null
@@ -1501,6 +1557,7 @@ export type Database = {
           description?: string | null
           directeur_id?: string | null
           entite_id?: string | null
+          etape_validation_fdr?: number | null
           fdr_commentaires?: string | null
           fdr_description?: string | null
           fdr_priorite?: string | null
@@ -1518,6 +1575,7 @@ export type Database = {
           responsable_it_id?: string | null
           sponsor_id?: string | null
           statut?: string
+          statut_fdr?: string | null
           teams_channel_id?: string | null
           teams_channel_url?: string | null
           type_projet?: string | null
@@ -1538,6 +1596,7 @@ export type Database = {
           description?: string | null
           directeur_id?: string | null
           entite_id?: string | null
+          etape_validation_fdr?: number | null
           fdr_commentaires?: string | null
           fdr_description?: string | null
           fdr_priorite?: string | null
@@ -1555,6 +1614,7 @@ export type Database = {
           responsable_it_id?: string | null
           sponsor_id?: string | null
           statut?: string
+          statut_fdr?: string | null
           teams_channel_id?: string | null
           teams_channel_url?: string | null
           type_projet?: string | null
