@@ -21,6 +21,7 @@ import {
   CommonFieldConfig,
   DEFAULT_COMMON_FIELDS_CONFIG,
   COMMON_FIELD_LABELS,
+  mergeCommonFieldsConfig,
 } from '@/types/commonFieldsConfig';
 
 interface ProcessSettingsTabProps {
