@@ -392,6 +392,9 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
           if (cfg.be_project && !cfg.be_project.editable && cfg.be_project.default_value) {
             setBeProjectId(cfg.be_project.default_value);
           }
+          if (cfg.it_project && !cfg.it_project.editable && cfg.it_project.default_value) {
+            setItProjectId(cfg.it_project.default_value);
+          }
           // Title is always auto-generated
           const titlePattern = cfg.title?.title_pattern || '{process} - {date}';
           const resolvedTitle = resolveTitlePattern(titlePattern, {

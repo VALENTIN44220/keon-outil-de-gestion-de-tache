@@ -134,6 +134,10 @@ export function RequestWizardDialog({ open, onClose, onSuccess, initialProcessId
             if (beProjectCfg && !beProjectCfg.editable && beProjectCfg.default_value) {
               setData((prev) => ({ ...prev, beProjectId: beProjectCfg.default_value }));
             }
+            const itProjectCfg = settings.common_fields_config.it_project;
+            if (itProjectCfg && !itProjectCfg.editable && itProjectCfg.default_value) {
+              setData((prev) => ({ ...prev, itProjectId: itProjectCfg.default_value }));
+            }
           } else {
             setCommonFieldsConfig(undefined);
           }
