@@ -36,7 +36,7 @@ import { ITProjectSelect } from '@/components/it/ITProjectSelect';
 import { ITProjectPhaseSelect } from '@/components/it/ITProjectPhaseSelect';
 import { toast } from 'sonner';
 import { TemplateCustomField } from '@/types/customField';
-import { CommonFieldsConfig, DEFAULT_COMMON_FIELDS_CONFIG, resolveTitlePattern } from '@/types/commonFieldsConfig';
+import { CommonFieldsConfig, DEFAULT_COMMON_FIELDS_CONFIG, resolveTitlePattern, mergeCommonFieldsConfig } from '@/types/commonFieldsConfig';
 import { ArticleFilterConfig } from '@/components/maintenance/ArticleSearchSelect';
 
 import {
