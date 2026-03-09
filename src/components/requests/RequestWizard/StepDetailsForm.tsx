@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { BEProjectSelect } from '@/components/be/BEProjectSelect';
+import { ITProjectSelect } from '@/components/it/ITProjectSelect';
 import { RequestWizardData, RequestType } from './types';
 import { CommonFieldsConfig, DEFAULT_COMMON_FIELDS_CONFIG, resolveTitlePattern } from '@/types/commonFieldsConfig';
 import { useAuth } from '@/contexts/AuthContext';
@@ -23,6 +24,18 @@ function BEProjectReadOnly({ projectId }: { projectId: string }) {
       .then(({ data }) => {
         if (data) setName(`${data.code_projet} — ${data.nom_projet}`);
         else setName('Projet inconnu');
+      });
+  }, [projectId]);
+  return <span>{name}</span>;
+}
+
+function ITProjectReadOnly({ projectId }: { projectId: string }) {
+  const [name, setName] = useState<string>('...');
+  useEffect(() => {
+    supabase.from('it_projects').select('nom_projet, code_projet_digital').eq('id', projectId).single()
+      .then(({ data }) => {
+        if (data) setName(`${data.code_projet_digital} — ${data.nom_projet}`);
+        else setName('Projet IT inconnu');
       });
   }, [projectId]);
   return <span>{name}</span>;
@@ -180,6 +193,23 @@ export function StepDetailsForm({ data, requestType, onDataChange, commonFieldsC
                 <Label>Projet associé <span className="text-xs text-muted-foreground ml-1">(imposé)</span></Label>
                 <div className="flex items-center h-10 px-3 rounded-md border bg-muted/50 text-sm">
                   {data.beProjectId ? <BEProjectReadOnly projectId={data.beProjectId} /> : '—'}
+                </div>
+              </div>
+            )
+          )}
+
+          {/* IT Project selection for process requests */}
+          {requestType === 'process' && cfg.it_project?.visible && (
+            cfg.it_project.editable ? (
+              <ITProjectSelect
+                value={data.itProjectId}
+                onChange={(value) => onDataChange({ itProjectId: value })}
+              />
+            ) : (
+              <div className="space-y-2">
+                <Label>Projet IT associé <span className="text-xs text-muted-foreground ml-1">(imposé)</span></Label>
+                <div className="flex items-center h-10 px-3 rounded-md border bg-muted/50 text-sm">
+                  {data.itProjectId ? <ITProjectReadOnly projectId={data.itProjectId} /> : '—'}
                 </div>
               </div>
             )

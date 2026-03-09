@@ -58,6 +58,7 @@ export interface RequestWizardData {
   
   // Additional
   beProjectId: string | null;
+  itProjectId: string | null;
   categoryId: string | null;
   subcategoryId: string | null;
   targetDepartmentId: string | null;
@@ -83,6 +84,7 @@ export const defaultWizardData: RequestWizardData = {
   availableSubProcesses: [],
   customFieldValues: {},
   beProjectId: null,
+  itProjectId: null,
   categoryId: null,
   subcategoryId: null,
   targetDepartmentId: null,

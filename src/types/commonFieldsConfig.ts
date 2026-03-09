@@ -18,6 +18,7 @@ export interface CommonFieldsConfig {
   priority: CommonFieldConfig;
   due_date: CommonFieldConfig;
   be_project: CommonFieldConfig;
+  it_project: CommonFieldConfig;
 }
 
 export const DEFAULT_COMMON_FIELDS_CONFIG: CommonFieldsConfig = {
@@ -26,6 +27,7 @@ export const DEFAULT_COMMON_FIELDS_CONFIG: CommonFieldsConfig = {
   priority: { visible: true, editable: true, default_value: 'medium' },
   due_date: { visible: true, editable: true },
   be_project: { visible: true, editable: true },
+  it_project: { visible: false, editable: true },
 };
 
 export const COMMON_FIELD_LABELS: Record<keyof CommonFieldsConfig, string> = {
@@ -34,6 +36,7 @@ export const COMMON_FIELD_LABELS: Record<keyof CommonFieldsConfig, string> = {
   priority: 'Priorité',
   due_date: 'Échéance',
   be_project: 'Projet associé',
+  it_project: 'Projet IT associé',
 };
 
 /** Available variables for title pattern */

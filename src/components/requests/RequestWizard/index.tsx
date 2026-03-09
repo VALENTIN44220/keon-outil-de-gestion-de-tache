@@ -134,6 +134,10 @@ export function RequestWizardDialog({ open, onClose, onSuccess, initialProcessId
             if (beProjectCfg && !beProjectCfg.editable && beProjectCfg.default_value) {
               setData((prev) => ({ ...prev, beProjectId: beProjectCfg.default_value }));
             }
+            const itProjectCfg = settings.common_fields_config.it_project;
+            if (itProjectCfg && !itProjectCfg.editable && itProjectCfg.default_value) {
+              setData((prev) => ({ ...prev, itProjectId: itProjectCfg.default_value }));
+            }
           } else {
             setCommonFieldsConfig(undefined);
           }
@@ -277,6 +281,7 @@ export function RequestWizardDialog({ open, onClose, onSuccess, initialProcessId
           requester_id: userId,
           due_date: data.dueDate,
           be_project_id: data.beProjectId,
+          it_project_id: data.itProjectId,
           category_id: data.categoryId,
           subcategory_id: data.subcategoryId,
           target_department_id: data.targetDepartmentId,

@@ -44,6 +44,8 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
   const [isSavingFields, setIsSavingFields] = useState(false);
   const [beProjects, setBeProjects] = useState<{ id: string; nom_projet: string; code_projet: string }[]>([]);
   const [beProjectSearch, setBeProjectSearch] = useState('');
+  const [itProjects, setItProjects] = useState<{ id: string; nom_projet: string; code_projet_digital: string }[]>([]);
+  const [itProjectSearch, setItProjectSearch] = useState('');
 
   // Recurrence config state
   const [recurrence, setRecurrence] = useState<RecurrenceData>({
@@ -99,6 +101,13 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
         .select('id, nom_projet, code_projet')
         .order('nom_projet');
       if (data) setBeProjects(data);
+    })();
+    (async () => {
+      const { data } = await supabase
+        .from('it_projects')
+        .select('id, nom_projet, code_projet_digital')
+        .order('nom_projet');
+      if (data) setItProjects(data);
     })();
   }, []);
 
@@ -309,6 +318,7 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
             const config = commonFieldsConfig[key];
             const showPriorityDefault = key === 'priority' && config.visible && !config.editable;
             const showProjectDefault = key === 'be_project' && !config.editable;
+            const showItProjectDefault = key === 'it_project' && !config.editable;
 
             // Title is always auto-generated — skip config row
             if (key === 'title') {
@@ -354,7 +364,7 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
                       onCheckedChange={(checked) =>
                         updateFieldConfig(key, { editable: checked })
                       }
-                      disabled={!canManage || (key !== 'be_project' && !config.visible)}
+                      disabled={!canManage || (key !== 'be_project' && key !== 'it_project' && !config.visible)}
                     />
                   </div>
 
@@ -414,6 +424,52 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
                                 <SelectItem key={p.id} value={p.id}>
                                   <div className="flex items-center gap-1.5">
                                     <Badge variant="outline" className="font-mono text-[10px] px-1 py-0">{p.code_projet}</Badge>
+                                    <span className="text-xs truncate max-w-[120px]">{p.nom_projet}</span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                          </div>
+                        </SelectContent>
+                      </Select>
+                    ) : showItProjectDefault ? (
+                      <Select
+                        value={config.default_value || ''}
+                        onValueChange={(v) => updateFieldConfig(key, { default_value: v || null })}
+                        disabled={!canManage}
+                      >
+                        <SelectTrigger className="h-7 text-xs w-36">
+                          <SelectValue placeholder="Choisir...">
+                            {config.default_value
+                              ? (() => {
+                                  const p = itProjects.find(pr => pr.id === config.default_value);
+                                  return p ? p.code_projet_digital : 'Projet IT';
+                                })()
+                              : 'Choisir...'}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <div className="p-1.5 border-b">
+                            <div className="relative">
+                              <Search className="absolute left-2 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
+                              <Input
+                                placeholder="Rechercher..."
+                                value={itProjectSearch}
+                                onChange={(e) => setItProjectSearch(e.target.value)}
+                                className="h-7 pl-7 text-xs"
+                              />
+                            </div>
+                          </div>
+                          <div className="max-h-48 overflow-y-auto">
+                            {itProjects
+                              .filter(p =>
+                                !itProjectSearch ||
+                                p.nom_projet.toLowerCase().includes(itProjectSearch.toLowerCase()) ||
+                                p.code_projet_digital.toLowerCase().includes(itProjectSearch.toLowerCase())
+                              )
+                              .map(p => (
+                                <SelectItem key={p.id} value={p.id}>
+                                  <div className="flex items-center gap-1.5">
+                                    <Badge variant="outline" className="font-mono text-[10px] px-1 py-0">{p.code_projet_digital}</Badge>
                                     <span className="text-xs truncate max-w-[120px]">{p.nom_projet}</span>
                                   </div>
                                 </SelectItem>
