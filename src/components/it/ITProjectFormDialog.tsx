@@ -54,11 +54,16 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
   const [fdrCommentaires, setFdrCommentaires] = useState('');
 
   // Lookup data
+  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
   const [departments, setDepartments] = useState<{ id: string; name: string }[]>([]);
   const [allProfiles, setAllProfiles] = useState<{ id: string; display_name: string; department_id: string | null }[]>([]);
+  const [companySearch, setCompanySearch] = useState('');
 
   useEffect(() => {
     if (!open) return;
+    supabase.from('companies').select('id, name').order('name').then(({ data }) => {
+      setCompanies(data || []);
+    });
     supabase.from('departments').select('id, name').order('name').then(({ data }) => {
       setDepartments(data || []);
     });
@@ -67,9 +72,9 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
     });
   }, [open]);
 
-  const filteredMetierProfiles = entiteId !== NONE
-    ? allProfiles.filter(p => p.department_id === entiteId)
-    : allProfiles;
+  const filteredCompanies = companySearch
+    ? companies.filter(c => c.name.toLowerCase().includes(companySearch.toLowerCase()))
+    : companies;
 
   useEffect(() => {
     if (project) {
