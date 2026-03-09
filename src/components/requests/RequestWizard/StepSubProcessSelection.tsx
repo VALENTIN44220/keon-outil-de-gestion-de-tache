@@ -111,6 +111,19 @@ export function StepSubProcessSelection({
     (subProcessId: string, isMandatory?: boolean) => {
       if (isMandatory) return; // Can't deselect mandatory
 
+      if (selectionMode === 'single') {
+        // In single mode, select only this one (plus mandatory ones)
+        const mandatoryIds = subProcesses.filter(sp => sp.isMandatory).map(sp => sp.id);
+        const isCurrentlySelected = selectedSubProcesses.includes(subProcessId);
+        const nextSelection = isCurrentlySelected
+          ? mandatoryIds // deselect: keep only mandatory
+          : [...mandatoryIds, subProcessId]; // select: mandatory + this one
+        if (!sameStringSet(nextSelection, selectedSubProcesses)) {
+          onSelectionChange(nextSelection, subProcesses);
+        }
+        return;
+      }
+
       const nextSelection = selectedSubProcesses.includes(subProcessId)
         ? selectedSubProcesses.filter((id) => id !== subProcessId)
         : [...selectedSubProcesses, subProcessId];
@@ -120,7 +133,7 @@ export function StepSubProcessSelection({
 
       onSelectionChange(nextSelection, subProcesses);
     },
-    [onSelectionChange, selectedSubProcesses, subProcesses],
+    [onSelectionChange, selectedSubProcesses, subProcesses, selectionMode],
   );
 
   const getAssignmentLabel = (type?: string) => {
