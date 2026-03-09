@@ -17,6 +17,7 @@ interface StepSubProcessSelectionProps {
   processName: string | null;
   selectedSubProcesses: string[];
   onSelectionChange: (selected: string[], available: SubProcessSelection[]) => void;
+  selectionMode?: 'multiple' | 'single';
 }
 
 const DEBUG_REACT_185 =
