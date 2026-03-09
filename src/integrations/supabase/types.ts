@@ -1510,6 +1510,7 @@ export type Database = {
           chef_projet_it_id: string | null
           chef_projet_metier_id: string | null
           code_projet_digital: string
+          company_id: string | null
           created_at: string
           created_by: string | null
           date_debut: string | null
@@ -1517,7 +1518,6 @@ export type Database = {
           date_fin_reelle: string | null
           description: string | null
           directeur_id: string | null
-          entite_id: string | null
           etape_validation_fdr: number | null
           fdr_commentaires: string | null
           fdr_description: string | null
@@ -1549,6 +1549,7 @@ export type Database = {
           chef_projet_it_id?: string | null
           chef_projet_metier_id?: string | null
           code_projet_digital: string
+          company_id?: string | null
           created_at?: string
           created_by?: string | null
           date_debut?: string | null
@@ -1556,7 +1557,6 @@ export type Database = {
           date_fin_reelle?: string | null
           description?: string | null
           directeur_id?: string | null
-          entite_id?: string | null
           etape_validation_fdr?: number | null
           fdr_commentaires?: string | null
           fdr_description?: string | null
@@ -1588,6 +1588,7 @@ export type Database = {
           chef_projet_it_id?: string | null
           chef_projet_metier_id?: string | null
           code_projet_digital?: string
+          company_id?: string | null
           created_at?: string
           created_by?: string | null
           date_debut?: string | null
@@ -1595,7 +1596,6 @@ export type Database = {
           date_fin_reelle?: string | null
           description?: string | null
           directeur_id?: string | null
-          entite_id?: string | null
           etape_validation_fdr?: number | null
           fdr_commentaires?: string | null
           fdr_description?: string | null
@@ -1643,6 +1643,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "it_projects_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "it_projects_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
@@ -1654,13 +1661,6 @@ export type Database = {
             columns: ["directeur_id"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "it_projects_entite_id_fkey"
-            columns: ["entite_id"]
-            isOneToOne: false
-            referencedRelation: "departments"
             referencedColumns: ["id"]
           },
           {
