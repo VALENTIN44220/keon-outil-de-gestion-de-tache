@@ -51,7 +51,7 @@ export default function ITProjectHubOverview() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    supabase.from('profiles').select('id, display_name').order('display_name').then(({ data }) => setAllProfiles(data || []));
+    supabase.from('profiles').select('id, display_name').eq('status', 'active').order('display_name').then(({ data }) => setAllProfiles(data || []));
   }, []);
 
   if (isLoading) {
