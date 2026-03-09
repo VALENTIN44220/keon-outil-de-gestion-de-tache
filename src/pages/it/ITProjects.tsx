@@ -482,6 +482,7 @@ export default function ITProjects() {
                           const sc = IT_PROJECT_STATUS_CONFIG[p.statut] || IT_PROJECT_STATUS_CONFIG.backlog;
                           const tc = p.type_projet ? IT_PROJECT_TYPE_CONFIG[p.type_projet] : null;
                           const pc = p.pilier ? IT_PROJECT_PILIER_CONFIG[p.pilier as ITProjectPilier] : null;
+                          const fdrCfg = p.statut_fdr ? STATUT_FDR_CONFIG[p.statut_fdr as StatutFDR] : null;
                           const today = new Date(); today.setHours(0, 0, 0, 0);
                           const isLate = p.date_fin_prevue && !['deploye', 'cloture'].includes(p.statut) && new Date(p.date_fin_prevue) < today;
                           return (
