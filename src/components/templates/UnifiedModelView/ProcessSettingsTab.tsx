@@ -431,6 +431,52 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
                           </div>
                         </SelectContent>
                       </Select>
+                    ) : showItProjectDefault ? (
+                      <Select
+                        value={config.default_value || ''}
+                        onValueChange={(v) => updateFieldConfig(key, { default_value: v || null })}
+                        disabled={!canManage}
+                      >
+                        <SelectTrigger className="h-7 text-xs w-36">
+                          <SelectValue placeholder="Choisir...">
+                            {config.default_value
+                              ? (() => {
+                                  const p = itProjects.find(pr => pr.id === config.default_value);
+                                  return p ? p.code_projet_digital : 'Projet IT';
+                                })()
+                              : 'Choisir...'}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <div className="p-1.5 border-b">
+                            <div className="relative">
+                              <Search className="absolute left-2 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
+                              <Input
+                                placeholder="Rechercher..."
+                                value={itProjectSearch}
+                                onChange={(e) => setItProjectSearch(e.target.value)}
+                                className="h-7 pl-7 text-xs"
+                              />
+                            </div>
+                          </div>
+                          <div className="max-h-48 overflow-y-auto">
+                            {itProjects
+                              .filter(p =>
+                                !itProjectSearch ||
+                                p.nom_projet.toLowerCase().includes(itProjectSearch.toLowerCase()) ||
+                                p.code_projet_digital.toLowerCase().includes(itProjectSearch.toLowerCase())
+                              )
+                              .map(p => (
+                                <SelectItem key={p.id} value={p.id}>
+                                  <div className="flex items-center gap-1.5">
+                                    <Badge variant="outline" className="font-mono text-[10px] px-1 py-0">{p.code_projet_digital}</Badge>
+                                    <span className="text-xs truncate max-w-[120px]">{p.nom_projet}</span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                          </div>
+                        </SelectContent>
+                      </Select>
                     ) : (
                       <span className="text-xs text-muted-foreground">—</span>
                     )}
