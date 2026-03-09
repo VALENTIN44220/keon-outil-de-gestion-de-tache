@@ -126,7 +126,7 @@ export function RequestWizardDialog({ open, onClose, onSuccess, initialProcessId
         .then(({ data: ptData }) => {
           const settings = (ptData as any)?.settings;
           if (settings?.common_fields_config) {
-            const mergedCfg = (await import('@/types/commonFieldsConfig')).mergeCommonFieldsConfig(settings.common_fields_config);
+            const mergedCfg = mergeCommonFieldsConfig(settings.common_fields_config);
             setCommonFieldsConfig(mergedCfg);
             // Load subprocess selection mode
             setSubprocessSelectionMode(settings.subprocess_selection_mode || 'multiple');
