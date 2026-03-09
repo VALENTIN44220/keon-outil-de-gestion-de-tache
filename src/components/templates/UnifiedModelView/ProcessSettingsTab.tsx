@@ -98,6 +98,11 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
       delayDays: (process as any).recurrence_delay_days || 7,
       startDate: (process as any).recurrence_start_date || '',
     });
+
+    // Sync subprocess selection mode
+    setSubprocessSelectionMode(
+      ((process as any).settings?.subprocess_selection_mode as 'multiple' | 'single') || 'multiple'
+    );
   }, [process.id, process.name, process.description]);
 
   // Fetch BE projects for imposed value selector
