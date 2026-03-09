@@ -80,7 +80,7 @@ export default function ITProjects() {
   const [sortAsc, setSortAsc] = useState(true);
 
   useEffect(() => {
-    supabase.from('departments').select('id, name').order('name').then(({ data }) => setDepartments(data || []));
+    supabase.from('companies').select('id, name').order('name').then(({ data }) => setCompanies(data || []));
     supabase.from('profiles').select('id, display_name').order('display_name').then(({ data }) => setProfiles(data || []));
   }, []);
 
