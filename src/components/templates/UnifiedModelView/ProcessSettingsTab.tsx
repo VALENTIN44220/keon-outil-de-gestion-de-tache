@@ -44,6 +44,8 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
   const [isSavingFields, setIsSavingFields] = useState(false);
   const [beProjects, setBeProjects] = useState<{ id: string; nom_projet: string; code_projet: string }[]>([]);
   const [beProjectSearch, setBeProjectSearch] = useState('');
+  const [itProjects, setItProjects] = useState<{ id: string; nom_projet: string; code_projet_digital: string }[]>([]);
+  const [itProjectSearch, setItProjectSearch] = useState('');
 
   // Recurrence config state
   const [recurrence, setRecurrence] = useState<RecurrenceData>({
