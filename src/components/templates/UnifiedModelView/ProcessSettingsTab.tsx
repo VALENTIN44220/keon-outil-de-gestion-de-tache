@@ -326,6 +326,69 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
         </CardContent>
       </Card>
 
+      {/* Configuration des sous-processus */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <GitBranch className="h-4 w-4 text-primary" />
+            Configuration des sous-processus
+            <Badge variant={subprocessSelectionMode === 'single' ? 'default' : 'secondary'} className={cn(
+              'ml-2 text-[10px]',
+              subprocessSelectionMode === 'single' && 'bg-violet-500 hover:bg-violet-600'
+            )}>
+              {subprocessSelectionMode === 'single' ? 'Sélection exclusive' : 'Sélection multiple'}
+            </Badge>
+          </CardTitle>
+          <CardDescription className="text-xs">
+            Définissez comment le demandeur peut sélectionner les sous-processus lors de la création
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-3">
+            <Label className="text-sm font-medium">Mode de sélection</Label>
+            <RadioGroup
+              value={subprocessSelectionMode}
+              onValueChange={(v) => setSubprocessSelectionMode(v as 'multiple' | 'single')}
+              disabled={!canManage}
+              className="space-y-3"
+            >
+              <div className="flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/30 transition-colors">
+                <RadioGroupItem value="multiple" id="mode-multiple" className="mt-0.5" />
+                <div>
+                  <Label htmlFor="mode-multiple" className="text-sm font-medium cursor-pointer">
+                    Sélection multiple
+                  </Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Le demandeur peut cocher plusieurs sous-processus
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/30 transition-colors">
+                <RadioGroupItem value="single" id="mode-single" className="mt-0.5" />
+                <div>
+                  <Label htmlFor="mode-single" className="text-sm font-medium cursor-pointer">
+                    Sélection exclusive
+                  </Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Le demandeur ne peut choisir qu'un seul sous-processus
+                  </p>
+                </div>
+              </div>
+            </RadioGroup>
+          </div>
+
+          {canManage && (
+            <div className="pt-3 border-t">
+              <Button size="sm" onClick={handleSaveSelectionMode} disabled={isSavingSelectionMode}>
+                {isSavingSelectionMode && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                <Save className="h-3 w-3 mr-1" />
+                Enregistrer le mode
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Configuration des champs généraux */}
       <Card>
         <CardHeader className="pb-3">
