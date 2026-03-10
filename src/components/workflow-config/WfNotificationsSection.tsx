@@ -207,11 +207,12 @@ interface DrawerProps {
   open: boolean;
   onClose: () => void;
   steps: WfStep[];
+  subProcessTemplateId?: string;
   initialData: WfNotification | null;
   onSave: (data: any) => Promise<void>;
 }
 
-function NotificationDrawer({ open, onClose, steps, initialData, onSave }: DrawerProps) {
+function NotificationDrawer({ open, onClose, steps, subProcessTemplateId, initialData, onSave }: DrawerProps) {
   const isEdit = !!initialData;
 
   const [stepKey, setStepKey] = useState('');
