@@ -275,6 +275,11 @@ export const EnhancedFormBuilderCanvas = memo(function EnhancedFormBuilderCanvas
                   Commun
                 </Badge>
               )}
+              {(field as any).is_agent_field && (
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-orange-600 border-orange-300">
+                  👷 Agent
+                </Badge>
+              )}
               {field.validation_type && (
                 <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-green-600 border-green-300">
                   ✓ {field.validation_type}

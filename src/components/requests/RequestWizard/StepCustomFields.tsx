@@ -71,6 +71,7 @@ export function StepCustomFields({ data, onDataChange }: StepCustomFieldsProps) 
             .from("template_custom_fields")
             .select("*")
             .in("sub_process_template_id", data.selectedSubProcesses)
+            .eq("is_agent_field", false)
             .order("order_index");
           subProcessFields = spFields || [];
         }
