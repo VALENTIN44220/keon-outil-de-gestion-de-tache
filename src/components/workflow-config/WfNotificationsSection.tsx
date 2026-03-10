@@ -379,24 +379,25 @@ function NotificationDrawer({ open, onClose, steps, initialData, onSave }: Drawe
           <div className="space-y-2">
             <Label>Sujet du message</Label>
             <Input
+              id="notif-subject"
               value={subject}
               onChange={e => setSubject(e.target.value)}
               placeholder="Ex: Votre demande a été validée"
             />
-            <p className="text-xs text-muted-foreground">
-              Variables disponibles : {'{request_number}'}, {'{requester_name}'}, {'{step_name}'}
-            </p>
+            <VariableChips onInsert={(v) => setSubject(prev => prev + v)} />
           </div>
 
           {/* Body */}
           <div className="space-y-2">
             <Label>Corps du message (optionnel)</Label>
             <textarea
+              id="notif-body"
               className="w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               value={bodyTemplate}
               onChange={e => setBodyTemplate(e.target.value)}
               placeholder="Ex: La demande {request_number} a été traitée..."
             />
+            <VariableChips onInsert={(v) => setBodyTemplate(prev => prev + v)} />
           </div>
 
           {/* Active */}
