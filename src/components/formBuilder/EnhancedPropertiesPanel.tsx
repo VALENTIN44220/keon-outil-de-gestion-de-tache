@@ -542,6 +542,17 @@ export const EnhancedPropertiesPanel = memo(function EnhancedPropertiesPanel({
                     disabled={!canManage}
                   />
                 </div>
+
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-2 text-sm" title="Ce champ n'apparaît pas dans le formulaire de demande. Il est rempli par les agents lors du traitement de la tâche.">
+                    👷 Réservé aux agents
+                  </Label>
+                  <Switch
+                    checked={(localField as any).is_agent_field || false}
+                    onCheckedChange={(v) => handleFieldChange('is_agent_field' as any, v)}
+                    disabled={!canManage}
+                  />
+                </div>
               </div>
 
               {/* Repeatable Table Columns Config */}

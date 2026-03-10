@@ -5378,6 +5378,7 @@ export type Database = {
           description: string | null
           field_type: Database["public"]["Enums"]["custom_field_type"]
           id: string
+          is_agent_field: boolean
           is_common: boolean
           is_required: boolean
           label: string
@@ -5415,6 +5416,7 @@ export type Database = {
           description?: string | null
           field_type?: Database["public"]["Enums"]["custom_field_type"]
           id?: string
+          is_agent_field?: boolean
           is_common?: boolean
           is_required?: boolean
           label: string
@@ -5452,6 +5454,7 @@ export type Database = {
           description?: string | null
           field_type?: Database["public"]["Enums"]["custom_field_type"]
           id?: string
+          is_agent_field?: boolean
           is_common?: boolean
           is_required?: boolean
           label?: string

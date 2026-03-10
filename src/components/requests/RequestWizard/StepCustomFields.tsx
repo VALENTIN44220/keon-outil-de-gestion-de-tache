@@ -55,12 +55,13 @@ export function StepCustomFields({ data, onDataChange }: StepCustomFieldsProps) 
           setSections(sectionsData as FormSection[]);
         }
 
-        // Fetch process-level fields
+        // Fetch process-level fields (exclude agent-only fields)
         const { data: processFields } = await supabase
           .from("template_custom_fields")
           .select("*")
           .eq("process_template_id", data.processId)
           .is("sub_process_template_id", null)
+          .eq("is_agent_field", false)
           .order("order_index");
 
         // Fetch sub-process fields for selected sub-processes
@@ -70,6 +71,7 @@ export function StepCustomFields({ data, onDataChange }: StepCustomFieldsProps) 
             .from("template_custom_fields")
             .select("*")
             .in("sub_process_template_id", data.selectedSubProcesses)
+            .eq("is_agent_field", false)
             .order("order_index");
           subProcessFields = spFields || [];
         }

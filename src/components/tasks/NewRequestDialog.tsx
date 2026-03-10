@@ -175,6 +175,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
         .from('template_custom_fields')
         .select('*')
         .in('sub_process_template_id', allRelevantIds)
+        .eq('is_agent_field', false)
         .order('order_index');
 
       if (cancelled || error) return;
