@@ -81,11 +81,11 @@ export default function BEProjectHubOverview() {
       });
       if (fnError) throw fnError;
       const result = Array.isArray(data) ? data : [];
-      if (!data || data.length === 0) {
-        toast({ title: 'Aucun résultat', description: 'Nominatim n\'a trouvé aucune correspondance pour cette adresse.', variant: 'destructive' });
+      if (!result || result.length === 0) {
+        toast({ title: 'Aucun résultat', description: 'Aucune correspondance trouvée pour cette adresse.', variant: 'destructive' });
         return;
       }
-      const { lat, lon } = data[0];
+      const { lat, lon } = result[0];
       const coords = `${lat}, ${lon}`;
       const { error } = await supabase.from('be_projects').update({ gps_coordinates: coords }).eq('id', project.id);
       if (error) throw error;

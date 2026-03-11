@@ -114,7 +114,7 @@ function ProjectMapCard({ projects }: { projects: BEProject[] }) {
         if (fnError) throw fnError;
         const result = Array.isArray(data) ? data : [];
         if (result.length > 0) {
-          const coords = `${data[0].lat}, ${data[0].lon}`;
+          const coords = `${result[0].lat}, ${result[0].lon}`;
           const { error } = await supabase.from('be_projects').update({ gps_coordinates: coords }).eq('id', p.id);
           if (error) { errors++; failedNames.push(p.code_projet); } else { success++; }
         } else {
