@@ -21,6 +21,10 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   loadWidgetConfig,
   WidgetConfig,
 } from './SyntheseWidgetConfigPanel';
@@ -166,7 +170,14 @@ function ProjectMapCard({ projects, allProjectStats = {} }: { projects: BEProjec
       return false;
     }), [projects]);
 
-  const geocodeProject = useCallback(async (project: BEProject): Promise<{ address: string | null; qstKeys: string[] }> => {
+  type GpsMode = 'missing' | 'questionnaire' | 'societe';
+
+  const buildAddress = useCallback(async (project: BEProject, mode: GpsMode): Promise<{ address: string | null; qstKeys: string[] }> => {
+    if (mode === 'societe') {
+      const parts = [project.adresse_societe, project.pays || 'France'].filter(Boolean);
+      return { address: parts.length > 0 ? parts.join(', ') : null, qstKeys: [] };
+    }
+
     const { data: qstRows } = await (supabase as any)
       .from('project_questionnaire')
       .select('champ_id, valeur')
@@ -174,9 +185,21 @@ function ProjectMapCard({ projects, allProjectStats = {} }: { projects: BEProjec
       .in('champ_id', ['04_GEN_commune', '04_GEN_code_postal', '04_GEN_departement_nom', '04_GEN_region', '04_GEN_pays']);
 
     const qst: Record<string, string> = {};
-    qstRows?.forEach((r: any) => { qst[r.champ_id] = r.valeur; });
+    qstRows?.forEach((r: any) => { if (r.valeur) qst[r.champ_id] = r.valeur; });
     const qstKeys = Object.keys(qst);
 
+    if (mode === 'questionnaire') {
+      const parts = [
+        qst['04_GEN_commune'],
+        qst['04_GEN_code_postal'],
+        qst['04_GEN_departement_nom'],
+        qst['04_GEN_region'],
+        qst['04_GEN_pays'] || 'France'
+      ].filter(Boolean);
+      return { address: parts.length > 0 ? parts.join(', ') : null, qstKeys };
+    }
+
+    // mode === 'missing': questionnaire priority then fallback
     const addressParts = [
       qst['04_GEN_commune'],
       qst['04_GEN_code_postal'],
@@ -186,15 +209,16 @@ function ProjectMapCard({ projects, allProjectStats = {} }: { projects: BEProjec
     ].filter(Boolean);
 
     if (addressParts.length === 0) {
-      const fallback = [project.adresse_site || project.adresse_societe, project.pays || 'France'].filter(Boolean);
-      if (fallback.length === 0) return { address: null, qstKeys };
-      return { address: fallback.join(', '), qstKeys };
+      const fallback = [project.adresse_societe, project.pays || 'France'].filter(Boolean);
+      return { address: fallback.length > 0 ? fallback.join(', ') : null, qstKeys };
     }
 
     return { address: addressParts.join(', '), qstKeys };
   }, []);
 
-  const bulkGeocode = useCallback(async (targetProjects: BEProject[], setLoading: (v: boolean) => void) => {
+  const [confirmAction, setConfirmAction] = useState<{ label: string; action: () => void } | null>(null);
+
+  const bulkGeocode = useCallback(async (targetProjects: BEProject[], mode: GpsMode, setLoading: (v: boolean) => void) => {
     if (targetProjects.length === 0) {
       toast({ title: 'Rien à géocoder', description: 'Aucun projet à traiter.' });
       return;
@@ -209,8 +233,8 @@ function ProjectMapCard({ projects, allProjectStats = {} }: { projects: BEProjec
 
     for (let i = 0; i < targetProjects.length; i++) {
       const p = targetProjects[i];
-      const { address, qstKeys } = await geocodeProject(p);
-      console.log(`[GPS] ${p.code_projet} → address: "${address}" | qst keys: ${qstKeys.join(', ')}`);
+      const { address, qstKeys } = await buildAddress(p, mode);
+      console.log(`[GPS][${mode}] ${p.code_projet} → address: "${address}" | qst keys: ${qstKeys.join(', ')}`);
       if (!address) { errors++; failedNames.push(p.code_projet); continue; }
 
       try {
@@ -234,10 +258,7 @@ function ProjectMapCard({ projects, allProjectStats = {} }: { projects: BEProjec
       title: 'Géocodage terminé',
       description: `${success} coordonnées générées, ${errors} échecs sur ${total} projets.${failedNames.length > 0 ? ` Échecs : ${failedNames.slice(0, 5).join(', ')}${failedNames.length > 5 ? '...' : ''}` : ''}`,
     });
-  }, [queryClient, geocodeProject]);
-
-  const handleBulkGeocode = useCallback(() => bulkGeocode(missingGps, setIsBulkGeocoding), [missingGps, bulkGeocode]);
-  const handleRegenGeocode = useCallback(() => bulkGeocode(projects, setIsRegenGeocoding), [projects, bulkGeocode]);
+  }, [queryClient, buildAddress]);
 
   // Leaflet map initialization
   useEffect(() => {
@@ -303,29 +324,60 @@ function ProjectMapCard({ projects, allProjectStats = {} }: { projects: BEProjec
     return () => { if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; } };
   }, [withCoords, allProjectStats, navigate]);
 
+  const isGeocoding = isBulkGeocoding || isRegenGeocoding;
+
   const bulkButton = (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="h-7 px-2 text-xs gap-1 ml-auto"
-          disabled={isBulkGeocoding || isRegenGeocoding}>
-          {(isBulkGeocoding || isRegenGeocoding) ? <Loader2 className="h-3 w-3 animate-spin" /> : <span>⚡</span>}
-          GPS
-          <ChevronDown className="h-3 w-3" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        {missingGps.length > 0 && (
-          <DropdownMenuItem onClick={handleBulkGeocode} disabled={isBulkGeocoding || isRegenGeocoding}>
-            <span className="mr-2">📍</span>
-            Générer GPS manquants ({missingGps.length})
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm" className="h-7 px-2 text-xs gap-1 ml-auto" disabled={isGeocoding}>
+            {isGeocoding ? <Loader2 className="h-3 w-3 animate-spin" /> : <span>⚡</span>}
+            GPS
+            <ChevronDown className="h-3 w-3" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {missingGps.length > 0 && (
+            <DropdownMenuItem disabled={isGeocoding} onClick={() => setConfirmAction({
+              label: `Compléter les GPS manquants pour ${missingGps.length} projet(s) ?`,
+              action: () => bulkGeocode(missingGps, 'missing', setIsBulkGeocoding),
+            })}>
+              <span className="mr-2">📍</span>
+              Compléter GPS manquants ({missingGps.length})
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuItem disabled={isGeocoding} onClick={() => setConfirmAction({
+            label: `Régénérer les GPS par questionnaire pour ${projects.length} projet(s) ?`,
+            action: () => bulkGeocode(projects, 'questionnaire', setIsRegenGeocoding),
+          })}>
+            <span className="mr-2">🗺️</span>
+            Régénérer par questionnaire ({projects.length})
           </DropdownMenuItem>
-        )}
-        <DropdownMenuItem onClick={handleRegenGeocode} disabled={isBulkGeocoding || isRegenGeocoding}>
-          <span className="mr-2">🔄</span>
-          Régénérer GPS filtrés ({projects.length})
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          <DropdownMenuItem disabled={isGeocoding} onClick={() => setConfirmAction({
+            label: `Régénérer les GPS par adresse société pour ${projects.length} projet(s) ?`,
+            action: () => bulkGeocode(projects, 'societe', setIsRegenGeocoding),
+          })}>
+            <span className="mr-2">🏢</span>
+            Régénérer par adresse société ({projects.length})
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <AlertDialog open={!!confirmAction} onOpenChange={(open) => { if (!open) setConfirmAction(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmation</AlertDialogTitle>
+            <AlertDialogDescription>{confirmAction?.label}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { confirmAction?.action(); setConfirmAction(null); }}>
+              Confirmer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 
   if (withCoords.length === 0) {

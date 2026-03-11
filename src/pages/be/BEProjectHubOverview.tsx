@@ -16,6 +16,13 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { 
   MapPin, 
@@ -65,37 +72,59 @@ export default function BEProjectHubOverview() {
   const { data: project, isLoading: projectLoading } = useBEProjectByCode(code);
   const { data: tasks = [], isLoading: tasksLoading } = useBEProjectTasks(project?.id);
   const [isGeocodingGps, setIsGeocodingGps] = useState(false);
-  const [isForceGeocodingGps, setIsForceGeocodingGps] = useState(false);
+  const [gpsConfirm, setGpsConfirm] = useState<{ label: string; action: () => void } | null>(null);
 
-  const geocodeProject = async (forceRegen: boolean) => {
+  type GpsMode = 'auto' | 'questionnaire' | 'societe';
+
+  const geocodeProject = async (mode: GpsMode) => {
     if (!project) return;
-    const setLoading = forceRegen ? setIsForceGeocodingGps : setIsGeocodingGps;
-    setLoading(true);
+    setIsGeocodingGps(true);
     try {
-      // Load questionnaire data for precise site location
-      const { data: qstRows } = await (supabase as any)
-        .from('project_questionnaire')
-        .select('champ_id, valeur')
-        .eq('project_id', project.id)
-        .in('champ_id', ['04_GEN_commune', '04_GEN_code_postal', '04_GEN_departement_nom', '04_GEN_region', '04_GEN_pays']);
+      let address: string | undefined;
 
-      const qst: Record<string, string> = {};
-      (qstRows || []).forEach((r: any) => { if (r.valeur) qst[r.champ_id] = r.valeur; });
+      if (mode === 'societe') {
+        const parts = [project.adresse_societe, project.pays || 'France'].filter(Boolean);
+        address = parts.length > 0 ? parts.join(', ') : undefined;
+      } else if (mode === 'questionnaire') {
+        const { data: qstRows } = await (supabase as any)
+          .from('project_questionnaire')
+          .select('champ_id, valeur')
+          .eq('project_id', project.id)
+          .in('champ_id', ['04_GEN_commune', '04_GEN_code_postal', '04_GEN_departement_nom', '04_GEN_region', '04_GEN_pays']);
+        const qst: Record<string, string> = {};
+        (qstRows || []).forEach((r: any) => { if (r.valeur) qst[r.champ_id] = r.valeur; });
+        const parts = [qst['04_GEN_commune'], qst['04_GEN_code_postal'], qst['04_GEN_departement_nom'], qst['04_GEN_region'], qst['04_GEN_pays'] || 'France'].filter(Boolean);
+        address = parts.length > 0 ? parts.join(', ') : undefined;
+      } else {
+        // auto: questionnaire priority then fallback
+        const { data: qstRows } = await (supabase as any)
+          .from('project_questionnaire')
+          .select('champ_id, valeur')
+          .eq('project_id', project.id)
+          .in('champ_id', ['04_GEN_commune', '04_GEN_code_postal', '04_GEN_departement_nom', '04_GEN_region', '04_GEN_pays']);
+        const qst: Record<string, string> = {};
+        (qstRows || []).forEach((r: any) => { if (r.valeur) qst[r.champ_id] = r.valeur; });
+        const parts = [
+          qst['04_GEN_commune'] || project.adresse_site,
+          qst['04_GEN_code_postal'],
+          qst['04_GEN_departement_nom'] || project.departement,
+          qst['04_GEN_region'] || project.region,
+          qst['04_GEN_pays'] || project.pays_site || project.pays || 'France'
+        ].filter(Boolean);
+        if (parts.length === 0) {
+          const fb = [project.adresse_societe, project.pays || 'France'].filter(Boolean);
+          address = fb.length > 0 ? fb.join(', ') : undefined;
+        } else {
+          address = parts.join(', ');
+        }
+      }
 
-      const addressParts = [
-        qst['04_GEN_commune'] || project.adresse_site,
-        qst['04_GEN_code_postal'],
-        qst['04_GEN_departement_nom'] || project.departement,
-        qst['04_GEN_region'] || project.region,
-        qst['04_GEN_pays'] || project.pays_site || project.pays || 'France'
-      ].filter(Boolean);
-
-      if (addressParts.length === 0) {
+      if (!address) {
         toast({ title: 'Adresse manquante', description: 'Aucune information d\'adresse pour géocoder.', variant: 'destructive' });
         return;
       }
 
-      const address = addressParts.join(', ');
+      console.log(`[GPS][${mode}] ${project.code_projet} → address: "${address}"`);
       const { data, error: fnError } = await supabase.functions.invoke('geocode', { body: { address } });
       if (fnError) throw fnError;
       const result = Array.isArray(data) ? data : [];
@@ -112,12 +141,15 @@ export default function BEProjectHubOverview() {
     } catch (err: any) {
       toast({ title: 'Erreur', description: err.message || 'Erreur lors du géocodage', variant: 'destructive' });
     } finally {
-      setLoading(false);
+      setIsGeocodingGps(false);
     }
   };
 
-  const handleGenerateGps = () => geocodeProject(false);
-  const handleForceRegenerateGps = () => geocodeProject(true);
+  const hasValidCoords = useMemo(() => {
+    if (!project?.gps_coordinates) return false;
+    const pts = project.gps_coordinates.split(',').map(s => parseFloat(s.trim()));
+    return pts.length === 2 && !isNaN(pts[0]) && !isNaN(pts[1]) && !(Math.abs(pts[0]) < 0.001 && Math.abs(pts[1]) < 0.001);
+  }, [project?.gps_coordinates]);
 
   const [expandedRequests, setExpandedRequests] = useState<Set<string>>(new Set());
   
@@ -232,28 +264,55 @@ export default function BEProjectHubOverview() {
                         if (pts.length === 2 && Math.abs(pts[0]) < 0.001 && Math.abs(pts[1]) < 0.001) return 'Non renseigné';
                         return project.gps_coordinates;
                       })()}</span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 px-2 text-xs gap-1"
-                        onClick={handleGenerateGps}
-                        disabled={isGeocodingGps || isForceGeocodingGps}
-                      >
-                        {isGeocodingGps ? <Loader2 className="h-3 w-3 animate-spin" /> : <span>📍</span>}
-                        Générer GPS
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 px-2 text-xs gap-1"
-                        onClick={handleForceRegenerateGps}
-                        disabled={isGeocodingGps || isForceGeocodingGps}
-                      >
-                        {isForceGeocodingGps ? <Loader2 className="h-3 w-3 animate-spin" /> : <span>🔄</span>}
-                        Forcer régénération GPS
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm" className="h-7 px-2 text-xs gap-1" disabled={isGeocodingGps}>
+                            {isGeocodingGps ? <Loader2 className="h-3 w-3 animate-spin" /> : <span>⚡</span>}
+                            GPS
+                            <ChevronDown className="h-3 w-3" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem disabled={isGeocodingGps} onClick={() => setGpsConfirm({
+                            label: hasValidCoords ? 'Régénérer les coordonnées GPS (auto) ?' : 'Générer les coordonnées GPS ?',
+                            action: () => geocodeProject('auto'),
+                          })}>
+                            <span className="mr-2">📍</span>
+                            {hasValidCoords ? 'Générer GPS (auto)' : 'Générer GPS'}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem disabled={isGeocodingGps} onClick={() => setGpsConfirm({
+                            label: 'Forcer la génération GPS par données questionnaire uniquement ?',
+                            action: () => geocodeProject('questionnaire'),
+                          })}>
+                            <span className="mr-2">🗺️</span>
+                            Forcer par questionnaire
+                          </DropdownMenuItem>
+                          <DropdownMenuItem disabled={isGeocodingGps} onClick={() => setGpsConfirm({
+                            label: 'Forcer la génération GPS par adresse société uniquement ?',
+                            action: () => geocodeProject('societe'),
+                          })}>
+                            <span className="mr-2">🏢</span>
+                            Forcer par adresse société
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
+
+                  <AlertDialog open={!!gpsConfirm} onOpenChange={(open) => { if (!open) setGpsConfirm(null); }}>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Confirmation</AlertDialogTitle>
+                        <AlertDialogDescription>{gpsConfirm?.label}</AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Annuler</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => { gpsConfirm?.action(); setGpsConfirm(null); }}>
+                          Confirmer
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
 
                 {/* Map embed */}
