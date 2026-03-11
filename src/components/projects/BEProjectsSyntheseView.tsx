@@ -209,8 +209,8 @@ function ProjectMapCard({ projects, allProjectStats = {} }: { projects: BEProjec
 
     for (let i = 0; i < targetProjects.length; i++) {
       const p = targetProjects[i];
-      const address = await geocodeProject(p);
-      console.log(p.code_projet, '→ address:', address);
+      const { address, qstKeys } = await geocodeProject(p);
+      console.log(`[GPS] ${p.code_projet} → address: "${address}" | qst keys: ${qstKeys.join(', ')}`);
       if (!address) { errors++; failedNames.push(p.code_projet); continue; }
 
       try {
