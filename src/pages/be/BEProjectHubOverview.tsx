@@ -234,6 +234,7 @@ export default function BEProjectHubOverview() {
                   const lat = parseFloat(parts[0]);
                   const lon = parseFloat(parts[1]);
                   if (isNaN(lat) || isNaN(lon)) return null;
+                  if (Math.abs(lat) < 0.001 && Math.abs(lon) < 0.001) return null;
                   return (
                     <div className="mt-3 rounded-lg overflow-hidden border border-border">
                       <iframe

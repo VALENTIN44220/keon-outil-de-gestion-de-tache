@@ -140,7 +140,7 @@ function ProjectMapCard({ projects }: { projects: BEProject[] }) {
     queryClient.invalidateQueries({ queryKey: ['be-synthese-stats'] });
     toast({
       title: 'Géocodage terminé',
-      description: `${success} coordonnées générées, ${errors} échecs sur ${total} projets.`,
+      description: `${success} coordonnées générées, ${errors} échecs sur ${total} projets.${failedNames.length > 0 ? ` Échecs : ${failedNames.slice(0, 5).join(', ')}${failedNames.length > 5 ? '...' : ''}` : ''}`,
     });
   }, [missingGps, queryClient]);
 
