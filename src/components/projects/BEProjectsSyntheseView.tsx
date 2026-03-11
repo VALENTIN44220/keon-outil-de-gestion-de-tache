@@ -96,8 +96,8 @@ function ProjectMapCard({ projects }: { projects: BEProject[] }) {
     setIsBulkGeocoding(true);
     let success = 0;
     let errors = 0;
+    const failedNames: string[] = [];
     const total = missingGps.length;
-    const toastId = `bulk-gps-${Date.now()}`;
 
     toast({ title: 'Géocodage en cours...', description: `0 / ${total} projets traités...` });
 
