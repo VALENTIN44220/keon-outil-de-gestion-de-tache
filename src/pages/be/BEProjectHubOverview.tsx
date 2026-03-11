@@ -208,7 +208,12 @@ export default function BEProjectHubOverview() {
                   <div className="flex items-center justify-between py-1.5 border-b border-border/50">
                     <span className="text-sm text-muted-foreground">Coordonnées GPS</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-right font-mono">{project.gps_coordinates || '-'}</span>
+                      <span className="text-sm text-right font-mono">{(() => {
+                        if (!project.gps_coordinates) return '-';
+                        const pts = project.gps_coordinates.split(',').map(s => parseFloat(s.trim()));
+                        if (pts.length === 2 && Math.abs(pts[0]) < 0.001 && Math.abs(pts[1]) < 0.001) return 'Non renseigné';
+                        return project.gps_coordinates;
+                      })()}</span>
                       <Button
                         variant="outline"
                         size="sm"
