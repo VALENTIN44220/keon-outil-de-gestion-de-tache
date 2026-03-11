@@ -166,7 +166,7 @@ function ProjectMapCard({ projects, allProjectStats = {} }: { projects: BEProjec
       return false;
     }), [projects]);
 
-  const geocodeProject = useCallback(async (project: BEProject): Promise<string | null> => {
+  const geocodeProject = useCallback(async (project: BEProject): Promise<{ address: string | null; qstKeys: string[] }> => {
     const { data: qstRows } = await (supabase as any)
       .from('project_questionnaire')
       .select('champ_id, valeur')
@@ -175,6 +175,7 @@ function ProjectMapCard({ projects, allProjectStats = {} }: { projects: BEProjec
 
     const qst: Record<string, string> = {};
     qstRows?.forEach((r: any) => { qst[r.champ_id] = r.valeur; });
+    const qstKeys = Object.keys(qst);
 
     const addressParts = [
       qst['04_GEN_commune'],
@@ -186,11 +187,11 @@ function ProjectMapCard({ projects, allProjectStats = {} }: { projects: BEProjec
 
     if (addressParts.length === 0) {
       const fallback = [project.adresse_site || project.adresse_societe, project.pays || 'France'].filter(Boolean);
-      if (fallback.length === 0) return null;
-      return fallback.join(', ');
+      if (fallback.length === 0) return { address: null, qstKeys };
+      return { address: fallback.join(', '), qstKeys };
     }
 
-    return addressParts.join(', ');
+    return { address: addressParts.join(', '), qstKeys };
   }, []);
 
   const bulkGeocode = useCallback(async (targetProjects: BEProject[], setLoading: (v: boolean) => void) => {
