@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Plus, Search, Pencil, Trash2, Building2, FolderOpen, Loader2, FileDown, Filter, LayoutDashboard, LayoutGrid, List, Kanban, ClipboardList, BarChart2 } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Building2, FolderOpen, Loader2, FileDown, Filter, LayoutDashboard, LayoutGrid, List, Kanban, ClipboardList, BarChart2, Settings } from 'lucide-react';
 import { BEProjectDialog } from './BEProjectDialog';
 import { ALL_PROJECT_COLUMNS, ColumnDefinition } from './ProjectColumnSelector';
 import { ProjectKanbanView, GroupByField } from './ProjectKanbanView';
@@ -22,6 +22,11 @@ import { useFilteredProjects } from './ProjectFilters';
 import { BEProjectCardsView } from './BEProjectCardsView';
 import { BEProjectsSyntheseView } from './BEProjectsSyntheseView';
 import { ProjectMultiFiltersPanel } from './ProjectMultiFiltersPanel';
+import {
+  SyntheseWidgetConfigPanel,
+  loadWidgetConfig,
+  WidgetConfig,
+} from './SyntheseWidgetConfigPanel';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { toast } from '@/hooks/use-toast';
