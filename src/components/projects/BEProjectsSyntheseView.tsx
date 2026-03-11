@@ -303,20 +303,28 @@ function ProjectMapCard({ projects, allProjectStats = {} }: { projects: BEProjec
   }, [withCoords, allProjectStats, navigate]);
 
   const bulkButton = (
-    <div className="flex items-center gap-1 ml-auto">
-      {missingGps.length > 0 && (
-        <Button variant="outline" size="sm" className="h-7 px-2 text-xs gap-1"
-          onClick={handleBulkGeocode} disabled={isBulkGeocoding || isRegenGeocoding}>
-          {isBulkGeocoding ? <Loader2 className="h-3 w-3 animate-spin" /> : <span>📍</span>}
-          Générer GPS manquants ({missingGps.length})
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" className="h-7 px-2 text-xs gap-1 ml-auto"
+          disabled={isBulkGeocoding || isRegenGeocoding}>
+          {(isBulkGeocoding || isRegenGeocoding) ? <Loader2 className="h-3 w-3 animate-spin" /> : <span>⚡</span>}
+          GPS
+          <ChevronDown className="h-3 w-3" />
         </Button>
-      )}
-      <Button variant="outline" size="sm" className="h-7 px-2 text-xs gap-1"
-        onClick={handleRegenGeocode} disabled={isBulkGeocoding || isRegenGeocoding}>
-        {isRegenGeocoding ? <Loader2 className="h-3 w-3 animate-spin" /> : <span>🔄</span>}
-        Régénérer GPS filtrés ({projects.length})
-      </Button>
-    </div>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {missingGps.length > 0 && (
+          <DropdownMenuItem onClick={handleBulkGeocode} disabled={isBulkGeocoding || isRegenGeocoding}>
+            <span className="mr-2">📍</span>
+            Générer GPS manquants ({missingGps.length})
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem onClick={handleRegenGeocode} disabled={isBulkGeocoding || isRegenGeocoding}>
+          <span className="mr-2">🔄</span>
+          Régénérer GPS filtrés ({projects.length})
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 
   if (withCoords.length === 0) {
