@@ -139,26 +139,10 @@ export function BEProjectsView() {
     }
 
     const headers = [
-      'code_projet',
-      'nom_projet',
-      'description',
-      'adresse_site',
-      'adresse_societe',
-      'pays',
-      'pays_site',
-      'region',
-      'departement',
-      'code_divalto',
-      'siret',
-      'date_cloture_bancaire',
-      'date_cloture_juridique',
-      'date_os_etude',
-      'date_os_travaux',
-      'actionnariat',
-      'regime_icpe',
-      'typologie',
-      'gps_coordinates',
-      'status',
+      'code_projet', 'nom_projet', 'description', 'adresse_site', 'adresse_societe',
+      'pays', 'pays_site', 'region', 'departement', 'code_divalto', 'siret',
+      'date_cloture_bancaire', 'date_cloture_juridique', 'date_os_etude', 'date_os_travaux',
+      'actionnariat', 'regime_icpe', 'typologie', 'gps_coordinates', 'status',
     ];
 
     const csvContent = [
@@ -205,13 +189,8 @@ export function BEProjectsView() {
 
   const renderCellValue = (project: BEProject, key: string) => {
     const value = (project as any)[key];
-    
     if (value === null || value === undefined) return '-';
-    
-    if (key === 'status') {
-      return getStatusBadge(value);
-    }
-    
+    if (key === 'status') return getStatusBadge(value);
     if (['date_cloture_bancaire', 'date_cloture_juridique', 'date_os_etude', 'date_os_travaux', 'created_at'].includes(key)) {
       try {
         return format(new Date(value), 'dd MMM yyyy', { locale: fr });
@@ -219,7 +198,6 @@ export function BEProjectsView() {
         return value;
       }
     }
-    
     return String(value);
   };
 
@@ -251,7 +229,6 @@ export function BEProjectsView() {
             <FileDown className="h-4 w-4" />
             Export CSV
           </Button>
-
           {canCreate && (
             <Button onClick={handleAddProject} className="gap-2 shadow-sm">
               <Plus className="h-4 w-4" />
@@ -339,14 +316,7 @@ export function BEProjectsView() {
               </Button>
             </div>
 
-            {currentView === 'synthese' && (
-        <BEProjectsSyntheseView
-          projects={filteredProjects}
-          qstData={qstData}
-        />
-      )}
-
-      {currentView === 'table' && (
+            {currentView === 'table' && (
               <ProjectViewConfigPanel
                 config={activeConfig}
                 isAdmin={isAdmin}
@@ -378,6 +348,13 @@ export function BEProjectsView() {
       </Card>
 
       {/* Projects View */}
+      {currentView === 'synthese' && (
+        <BEProjectsSyntheseView
+          projects={filteredProjects}
+          qstData={qstData}
+        />
+      )}
+
       {currentView === 'cards' && (
         <BEProjectCardsView
           projects={filteredProjects}
