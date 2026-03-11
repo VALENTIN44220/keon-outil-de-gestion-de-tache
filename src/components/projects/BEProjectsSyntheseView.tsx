@@ -163,6 +163,33 @@ function ProjectMapCard({ projects, allProjectStats = {} }: { projects: BEProjec
       return false;
     }), [projects]);
 
+  const geocodeProject = useCallback(async (project: BEProject): Promise<string | null> => {
+    const { data: qstRows } = await (supabase as any)
+      .from('project_questionnaire')
+      .select('champ_id, valeur')
+      .eq('project_id', project.id)
+      .in('champ_id', ['04_GEN_commune', '04_GEN_code_postal', '04_GEN_departement_nom', '04_GEN_region', '04_GEN_pays']);
+
+    const qst: Record<string, string> = {};
+    qstRows?.forEach((r: any) => { qst[r.champ_id] = r.valeur; });
+
+    const addressParts = [
+      qst['04_GEN_commune'],
+      qst['04_GEN_code_postal'],
+      qst['04_GEN_departement_nom'] || project.departement,
+      qst['04_GEN_region'] || project.region,
+      qst['04_GEN_pays'] || project.pays_site || project.pays || 'France'
+    ].filter(Boolean);
+
+    if (addressParts.length === 0) {
+      const fallback = [project.adresse_site || project.adresse_societe, project.pays || 'France'].filter(Boolean);
+      if (fallback.length === 0) return null;
+      return fallback.join(', ');
+    }
+
+    return addressParts.join(', ');
+  }, []);
+
   const bulkGeocode = useCallback(async (targetProjects: BEProject[], setLoading: (v: boolean) => void) => {
     if (targetProjects.length === 0) {
       toast({ title: 'Rien à géocoder', description: 'Aucun projet à traiter.' });
@@ -178,11 +205,11 @@ function ProjectMapCard({ projects, allProjectStats = {} }: { projects: BEProjec
 
     for (let i = 0; i < targetProjects.length; i++) {
       const p = targetProjects[i];
-      const addressParts = [p.adresse_site || p.adresse_societe, p.departement, p.region, p.pays_site || p.pays || 'France'].filter(Boolean);
-      if (addressParts.length === 0) { errors++; continue; }
+      const address = await geocodeProject(p);
+      console.log(p.code_projet, '→ address:', address);
+      if (!address) { errors++; failedNames.push(p.code_projet); continue; }
 
       try {
-        const address = addressParts.join(', ');
         const { data, error: fnError } = await supabase.functions.invoke('geocode', { body: { address } });
         if (fnError) throw fnError;
         const result = Array.isArray(data) ? data : [];
@@ -203,7 +230,7 @@ function ProjectMapCard({ projects, allProjectStats = {} }: { projects: BEProjec
       title: 'Géocodage terminé',
       description: `${success} coordonnées générées, ${errors} échecs sur ${total} projets.${failedNames.length > 0 ? ` Échecs : ${failedNames.slice(0, 5).join(', ')}${failedNames.length > 5 ? '...' : ''}` : ''}`,
     });
-  }, [queryClient]);
+  }, [queryClient, geocodeProject]);
 
   const handleBulkGeocode = useCallback(() => bulkGeocode(missingGps, setIsBulkGeocoding), [missingGps, bulkGeocode]);
   const handleRegenGeocode = useCallback(() => bulkGeocode(projects, setIsRegenGeocoding), [projects, bulkGeocode]);
