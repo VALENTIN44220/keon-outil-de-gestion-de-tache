@@ -20,7 +20,7 @@ interface UseGanttUndoProps {
 
 export function useGanttUndo({ undoTimeoutMs = 5000 }: UseGanttUndoProps = {}) {
   const [pendingActions, setPendingActions] = useState<UndoAction[]>([]);
-  const timeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const timeoutsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   
   const addUndoAction = useCallback((action: Omit<UndoAction, 'id' | 'timestamp'>) => {
     const id = `undo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;

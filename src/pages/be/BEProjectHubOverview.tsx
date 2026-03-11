@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { BEProjectHubLayout } from '@/components/be/BEProjectHubLayout';
 import { 
   useBEProjectByCode, 
@@ -7,12 +8,14 @@ import {
   useBEProjectStats,
   useBEProjectRecentActivity 
 } from '@/hooks/useBEProjectHub';
+import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { 
   MapPin, 
@@ -30,8 +33,10 @@ import {
   ChevronDown,
   ChevronRight,
   ListTodo,
-  ClipboardList
+  ClipboardList,
+  Loader2
 } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 import { format, isPast, isToday } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -56,8 +61,42 @@ function DescriptionItem({ label, value, mono }: DescriptionItemProps) {
 
 export default function BEProjectHubOverview() {
   const { code } = useParams<{ code: string }>();
+  const queryClient = useQueryClient();
   const { data: project, isLoading: projectLoading } = useBEProjectByCode(code);
   const { data: tasks = [], isLoading: tasksLoading } = useBEProjectTasks(project?.id);
+  const [isGeocodingGps, setIsGeocodingGps] = useState(false);
+
+  const handleGenerateGps = async () => {
+    if (!project) return;
+    const addressParts = [project.adresse_site, project.departement, project.region, project.pays_site].filter(Boolean);
+    if (addressParts.length === 0) {
+      toast({ title: 'Adresse manquante', description: 'Aucune information d\'adresse pour géocoder.', variant: 'destructive' });
+      return;
+    }
+    setIsGeocodingGps(true);
+    try {
+      const query = encodeURIComponent(addressParts.join(', '));
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`, {
+        headers: { 'User-Agent': 'keon-app' },
+      });
+      const data = await res.json();
+      if (!data || data.length === 0) {
+        toast({ title: 'Aucun résultat', description: 'Nominatim n\'a trouvé aucune correspondance pour cette adresse.', variant: 'destructive' });
+        return;
+      }
+      const { lat, lon } = data[0];
+      const coords = `${lat}, ${lon}`;
+      const { error } = await supabase.from('be_projects').update({ gps_coordinates: coords }).eq('id', project.id);
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ['be-project', code] });
+      toast({ title: 'GPS générées', description: `Coordonnées : ${coords}` });
+    } catch (err: any) {
+      toast({ title: 'Erreur', description: err.message || 'Erreur lors du géocodage', variant: 'destructive' });
+    } finally {
+      setIsGeocodingGps(false);
+    }
+  };
+
   const [expandedRequests, setExpandedRequests] = useState<Set<string>>(new Set());
   
   const stats = useBEProjectStats(project?.id, tasks);
@@ -162,7 +201,22 @@ export default function BEProjectHubOverview() {
                   <DescriptionItem label="Pays site" value={project.pays_site} />
                   <DescriptionItem label="Région" value={project.region} />
                   <DescriptionItem label="Département" value={project.departement} />
-                  <DescriptionItem label="Coordonnées GPS" value={project.gps_coordinates} mono />
+                  <div className="flex items-center justify-between py-1.5 border-b border-border/50">
+                    <span className="text-sm text-muted-foreground">Coordonnées GPS</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-right font-mono">{project.gps_coordinates || '-'}</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2 text-xs gap-1"
+                        onClick={handleGenerateGps}
+                        disabled={isGeocodingGps}
+                      >
+                        {isGeocodingGps ? <Loader2 className="h-3 w-3 animate-spin" /> : <span>📍</span>}
+                        Générer GPS
+                      </Button>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Map embed */}

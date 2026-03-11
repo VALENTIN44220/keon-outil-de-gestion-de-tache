@@ -1,19 +1,21 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { BEProject } from '@/types/beProject';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { toast } from '@/hooks/use-toast';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from 'recharts';
 import {
   MapPin, CheckCircle2, Clock, AlertTriangle, FolderOpen,
-  TrendingUp, Activity, Zap, Globe
+  TrendingUp, Activity, Zap, Globe, Loader2
 } from 'lucide-react';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -64,7 +66,9 @@ function RadialProgress({ value, size = 80, stroke = 7, color = '#10b981' }: {
 // ─── OSM Map tile card ────────────────────────────────────────────────────────
 function ProjectMapCard({ projects }: { projects: BEProject[] }) {
   const [hovered, setHovered] = useState<string | null>(null);
+  const [isBulkGeocoding, setIsBulkGeocoding] = useState(false);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const withCoords = useMemo(() =>
     projects.filter(p => {
@@ -73,6 +77,74 @@ function ProjectMapCard({ projects }: { projects: BEProject[] }) {
       return parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1]);
     }), [projects]);
 
+  const missingGps = useMemo(() =>
+    projects.filter(p => !p.gps_coordinates || p.gps_coordinates.trim() === ''), [projects]);
+
+  const handleBulkGeocode = useCallback(async () => {
+    if (missingGps.length === 0) {
+      toast({ title: 'Rien à géocoder', description: 'Tous les projets ont déjà des coordonnées GPS.' });
+      return;
+    }
+    setIsBulkGeocoding(true);
+    let success = 0;
+    let errors = 0;
+    const total = missingGps.length;
+    const toastId = `bulk-gps-${Date.now()}`;
+
+    toast({ title: 'Géocodage en cours...', description: `0 / ${total} projets traités...` });
+
+    for (let i = 0; i < missingGps.length; i++) {
+      const p = missingGps[i];
+      const addressParts = [p.adresse_site, p.departement, p.region, p.pays_site].filter(Boolean);
+      if (addressParts.length === 0) { errors++; continue; }
+
+      try {
+        const query = encodeURIComponent(addressParts.join(', '));
+        const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`, {
+          headers: { 'User-Agent': 'keon-app' },
+        });
+        const data = await res.json();
+        if (data && data.length > 0) {
+          const coords = `${data[0].lat}, ${data[0].lon}`;
+          const { error } = await supabase.from('be_projects').update({ gps_coordinates: coords }).eq('id', p.id);
+          if (error) { errors++; } else { success++; }
+        } else {
+          errors++;
+        }
+      } catch {
+        errors++;
+      }
+
+      // Update progress toast
+      toast({ title: 'Géocodage en cours...', description: `${i + 1} / ${total} projets traités...` });
+
+      // Rate limit: 1100ms between calls
+      if (i < missingGps.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1100));
+      }
+    }
+
+    setIsBulkGeocoding(false);
+    queryClient.invalidateQueries({ queryKey: ['be-synthese-stats'] });
+    toast({
+      title: 'Géocodage terminé',
+      description: `${success} coordonnées générées, ${errors} échecs sur ${total} projets.`,
+    });
+  }, [missingGps, queryClient]);
+
+  const bulkButton = missingGps.length > 0 ? (
+    <Button
+      variant="outline"
+      size="sm"
+      className="h-7 px-2 text-xs gap-1 ml-auto"
+      onClick={handleBulkGeocode}
+      disabled={isBulkGeocoding}
+    >
+      {isBulkGeocoding ? <Loader2 className="h-3 w-3 animate-spin" /> : <span>📍</span>}
+      Générer GPS manquants ({missingGps.length})
+    </Button>
+  ) : null;
+
   if (withCoords.length === 0) {
     return (
       <Card className="col-span-2 border-border/50">
@@ -80,6 +152,7 @@ function ProjectMapCard({ projects }: { projects: BEProject[] }) {
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <Globe className="h-4 w-4 text-muted-foreground" />
             Carte de localisation
+            {bulkButton}
           </CardTitle>
         </CardHeader>
         <CardContent className="flex items-center justify-center h-64 text-muted-foreground text-sm">
@@ -110,7 +183,8 @@ function ProjectMapCard({ projects }: { projects: BEProject[] }) {
         <CardTitle className="text-sm font-medium flex items-center gap-2">
           <Globe className="h-4 w-4 text-muted-foreground" />
           Carte de localisation
-          <Badge variant="secondary" className="ml-auto">{withCoords.length} projets géolocalisés</Badge>
+          <Badge variant="secondary">{withCoords.length} projets géolocalisés</Badge>
+          {bulkButton}
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0">

@@ -107,7 +107,7 @@ export function WorkflowNodePropertiesPanel({
   const [config, setConfig] = useState<WorkflowNodeConfig>({});
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previousNodeIdRef = useRef<string | null>(null);
 
   // Auto-save function with debounce
