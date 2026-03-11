@@ -362,6 +362,7 @@ export function BEProjectsView() {
         <BEProjectsSyntheseView
           projects={filteredProjects}
           qstData={qstData}
+          widgets={syntheseWidgets}
         />
       )}
 
