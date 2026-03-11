@@ -74,11 +74,19 @@ function ProjectMapCard({ projects }: { projects: BEProject[] }) {
     projects.filter(p => {
       if (!p.gps_coordinates) return false;
       const parts = p.gps_coordinates.split(',').map(s => parseFloat(s.trim()));
-      return parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1]);
+      if (parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1])) return false;
+      if (Math.abs(parts[0]) < 0.001 && Math.abs(parts[1]) < 0.001) return false;
+      return true;
     }), [projects]);
 
   const missingGps = useMemo(() =>
-    projects.filter(p => !p.gps_coordinates || p.gps_coordinates.trim() === ''), [projects]);
+    projects.filter(p => {
+      if (!p.gps_coordinates || p.gps_coordinates.trim() === '') return true;
+      const parts = p.gps_coordinates.split(',').map(s => parseFloat(s.trim()));
+      if (parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1])) return true;
+      if (Math.abs(parts[0]) < 0.001 && Math.abs(parts[1]) < 0.001) return true;
+      return false;
+    }), [projects]);
 
   const handleBulkGeocode = useCallback(async () => {
     if (missingGps.length === 0) {
