@@ -89,21 +89,23 @@ function ProjectMapCard({ projects, allProjectStats = {} }: { projects: BEProjec
       return false;
     }), [projects]);
 
-  const handleBulkGeocode = useCallback(async () => {
-    if (missingGps.length === 0) {
-      toast({ title: 'Rien à géocoder', description: 'Tous les projets ont déjà des coordonnées GPS.' });
+  const [isRegenGeocoding, setIsRegenGeocoding] = useState(false);
+
+  const bulkGeocode = useCallback(async (targetProjects: BEProject[], setLoading: (v: boolean) => void) => {
+    if (targetProjects.length === 0) {
+      toast({ title: 'Rien à géocoder', description: 'Aucun projet à traiter.' });
       return;
     }
-    setIsBulkGeocoding(true);
+    setLoading(true);
     let success = 0;
     let errors = 0;
     const failedNames: string[] = [];
-    const total = missingGps.length;
+    const total = targetProjects.length;
 
     toast({ title: 'Géocodage en cours...', description: `0 / ${total} projets traités...` });
 
-    for (let i = 0; i < missingGps.length; i++) {
-      const p = missingGps[i];
+    for (let i = 0; i < targetProjects.length; i++) {
+      const p = targetProjects[i];
       const addressParts = [p.adresse_site || p.adresse_societe, p.departement, p.region, p.pays_site || p.pays || 'France'].filter(Boolean);
       if (addressParts.length === 0) { errors++; continue; }
 
@@ -129,18 +131,26 @@ function ProjectMapCard({ projects, allProjectStats = {} }: { projects: BEProjec
 
       toast({ title: 'Géocodage en cours...', description: `${i + 1} / ${total} projets traités...` });
 
-      if (i < missingGps.length - 1) {
+      if (i < targetProjects.length - 1) {
         await new Promise(resolve => setTimeout(resolve, 1100));
       }
     }
 
-    setIsBulkGeocoding(false);
+    setLoading(false);
     queryClient.invalidateQueries({ queryKey: ['be-synthese-stats'] });
     toast({
       title: 'Géocodage terminé',
       description: `${success} coordonnées générées, ${errors} échecs sur ${total} projets.${failedNames.length > 0 ? ` Échecs : ${failedNames.slice(0, 5).join(', ')}${failedNames.length > 5 ? '...' : ''}` : ''}`,
     });
-  }, [missingGps, queryClient]);
+  }, [queryClient]);
+
+  const handleBulkGeocode = useCallback(() => {
+    bulkGeocode(missingGps, setIsBulkGeocoding);
+  }, [missingGps, bulkGeocode]);
+
+  const handleRegenGeocode = useCallback(() => {
+    bulkGeocode(projects, setIsRegenGeocoding);
+  }, [projects, bulkGeocode]);
 
   // Leaflet map initialization
   useEffect(() => {
@@ -237,18 +247,32 @@ function ProjectMapCard({ projects, allProjectStats = {} }: { projects: BEProjec
     };
   }, [withCoords, allProjectStats, navigate]);
 
-  const bulkButton = missingGps.length > 0 ? (
-    <Button
-      variant="outline"
-      size="sm"
-      className="h-7 px-2 text-xs gap-1 ml-auto"
-      onClick={handleBulkGeocode}
-      disabled={isBulkGeocoding}
-    >
-      {isBulkGeocoding ? <Loader2 className="h-3 w-3 animate-spin" /> : <span>📍</span>}
-      Générer GPS manquants ({missingGps.length})
-    </Button>
-  ) : null;
+  const bulkButton = (
+    <div className="flex items-center gap-1 ml-auto">
+      {missingGps.length > 0 && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 px-2 text-xs gap-1"
+          onClick={handleBulkGeocode}
+          disabled={isBulkGeocoding || isRegenGeocoding}
+        >
+          {isBulkGeocoding ? <Loader2 className="h-3 w-3 animate-spin" /> : <span>📍</span>}
+          Générer GPS manquants ({missingGps.length})
+        </Button>
+      )}
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-7 px-2 text-xs gap-1"
+        onClick={handleRegenGeocode}
+        disabled={isBulkGeocoding || isRegenGeocoding}
+      >
+        {isRegenGeocoding ? <Loader2 className="h-3 w-3 animate-spin" /> : <span>🔄</span>}
+        Régénérer GPS filtrés ({projects.length})
+      </Button>
+    </div>
+  );
 
   if (withCoords.length === 0) {
     return (

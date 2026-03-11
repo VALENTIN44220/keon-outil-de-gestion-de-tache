@@ -65,15 +65,17 @@ export default function BEProjectHubOverview() {
   const { data: project, isLoading: projectLoading } = useBEProjectByCode(code);
   const { data: tasks = [], isLoading: tasksLoading } = useBEProjectTasks(project?.id);
   const [isGeocodingGps, setIsGeocodingGps] = useState(false);
+  const [isForceGeocodingGps, setIsForceGeocodingGps] = useState(false);
 
-  const handleGenerateGps = async () => {
+  const geocodeProject = async (forceRegen: boolean) => {
     if (!project) return;
     const addressParts = [project.adresse_site || project.adresse_societe, project.departement, project.region, project.pays_site || project.pays || 'France'].filter(Boolean);
     if (addressParts.length === 0) {
       toast({ title: 'Adresse manquante', description: 'Aucune information d\'adresse pour géocoder.', variant: 'destructive' });
       return;
     }
-    setIsGeocodingGps(true);
+    const setLoading = forceRegen ? setIsForceGeocodingGps : setIsGeocodingGps;
+    setLoading(true);
     try {
       const address = addressParts.join(', ');
       const { data, error: fnError } = await supabase.functions.invoke('geocode', {
@@ -94,9 +96,12 @@ export default function BEProjectHubOverview() {
     } catch (err: any) {
       toast({ title: 'Erreur', description: err.message || 'Erreur lors du géocodage', variant: 'destructive' });
     } finally {
-      setIsGeocodingGps(false);
+      setLoading(false);
     }
   };
+
+  const handleGenerateGps = () => geocodeProject(false);
+  const handleForceRegenerateGps = () => geocodeProject(true);
 
   const [expandedRequests, setExpandedRequests] = useState<Set<string>>(new Set());
   
@@ -216,10 +221,20 @@ export default function BEProjectHubOverview() {
                         size="sm"
                         className="h-7 px-2 text-xs gap-1"
                         onClick={handleGenerateGps}
-                        disabled={isGeocodingGps}
+                        disabled={isGeocodingGps || isForceGeocodingGps}
                       >
                         {isGeocodingGps ? <Loader2 className="h-3 w-3 animate-spin" /> : <span>📍</span>}
                         Générer GPS
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2 text-xs gap-1"
+                        onClick={handleForceRegenerateGps}
+                        disabled={isGeocodingGps || isForceGeocodingGps}
+                      >
+                        {isForceGeocodingGps ? <Loader2 className="h-3 w-3 animate-spin" /> : <span>🔄</span>}
+                        Forcer régénération GPS
                       </Button>
                     </div>
                   </div>
