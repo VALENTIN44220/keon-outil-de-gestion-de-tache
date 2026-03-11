@@ -15,10 +15,12 @@ import {
 } from 'recharts';
 import {
   MapPin, CheckCircle2, Clock, AlertTriangle, FolderOpen,
-  TrendingUp, Activity, Zap, Globe, Loader2
+  TrendingUp, Activity, Zap, Globe, Loader2, ChevronDown
 } from 'lucide-react';
 import {
-  SyntheseWidgetConfigPanel,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   loadWidgetConfig,
   WidgetConfig,
 } from './SyntheseWidgetConfigPanel';
@@ -34,6 +36,7 @@ interface ProjectStats {
 interface Props {
   projects: BEProject[];
   qstData: Record<string, Record<string, any>>;
+  widgets?: WidgetConfig[];
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -300,20 +303,28 @@ function ProjectMapCard({ projects, allProjectStats = {} }: { projects: BEProjec
   }, [withCoords, allProjectStats, navigate]);
 
   const bulkButton = (
-    <div className="flex items-center gap-1 ml-auto">
-      {missingGps.length > 0 && (
-        <Button variant="outline" size="sm" className="h-7 px-2 text-xs gap-1"
-          onClick={handleBulkGeocode} disabled={isBulkGeocoding || isRegenGeocoding}>
-          {isBulkGeocoding ? <Loader2 className="h-3 w-3 animate-spin" /> : <span>📍</span>}
-          Générer GPS manquants ({missingGps.length})
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" className="h-7 px-2 text-xs gap-1 ml-auto"
+          disabled={isBulkGeocoding || isRegenGeocoding}>
+          {(isBulkGeocoding || isRegenGeocoding) ? <Loader2 className="h-3 w-3 animate-spin" /> : <span>⚡</span>}
+          GPS
+          <ChevronDown className="h-3 w-3" />
         </Button>
-      )}
-      <Button variant="outline" size="sm" className="h-7 px-2 text-xs gap-1"
-        onClick={handleRegenGeocode} disabled={isBulkGeocoding || isRegenGeocoding}>
-        {isRegenGeocoding ? <Loader2 className="h-3 w-3 animate-spin" /> : <span>🔄</span>}
-        Régénérer GPS filtrés ({projects.length})
-      </Button>
-    </div>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {missingGps.length > 0 && (
+          <DropdownMenuItem onClick={handleBulkGeocode} disabled={isBulkGeocoding || isRegenGeocoding}>
+            <span className="mr-2">📍</span>
+            Générer GPS manquants ({missingGps.length})
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem onClick={handleRegenGeocode} disabled={isBulkGeocoding || isRegenGeocoding}>
+          <span className="mr-2">🔄</span>
+          Régénérer GPS filtrés ({projects.length})
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 
   if (withCoords.length === 0) {
@@ -351,9 +362,10 @@ function ProjectMapCard({ projects, allProjectStats = {} }: { projects: BEProjec
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export function BEProjectsSyntheseView({ projects, qstData }: Props) {
+export function BEProjectsSyntheseView({ projects, qstData, widgets: externalWidgets }: Props) {
   const navigate = useNavigate();
-  const [widgets, setWidgets] = useState<WidgetConfig[]>(loadWidgetConfig);
+  const [internalWidgets, setInternalWidgets] = useState<WidgetConfig[]>(loadWidgetConfig);
+  const widgets = externalWidgets ?? internalWidgets;
 
   // Fetch task stats for all projects (batch)
   const projectIds = useMemo(() => projects.map(p => p.id), [projects]);
@@ -780,10 +792,6 @@ export function BEProjectsSyntheseView({ projects, qstData }: Props) {
 
   return (
     <div className="space-y-6">
-      {/* Config panel button — positioned by parent via props */}
-      <div className="flex justify-end">
-        <SyntheseWidgetConfigPanel widgets={widgets} onChange={setWidgets} />
-      </div>
 
       {/* Render widgets in order */}
       {visibleWidgets.map(widget => {
