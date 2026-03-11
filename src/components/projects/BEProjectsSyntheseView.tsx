@@ -320,29 +320,60 @@ function ProjectMapCard({ projects, allProjectStats = {} }: { projects: BEProjec
     return () => { if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; } };
   }, [withCoords, allProjectStats, navigate]);
 
+  const isGeocoding = isBulkGeocoding || isRegenGeocoding;
+
   const bulkButton = (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="h-7 px-2 text-xs gap-1 ml-auto"
-          disabled={isBulkGeocoding || isRegenGeocoding}>
-          {(isBulkGeocoding || isRegenGeocoding) ? <Loader2 className="h-3 w-3 animate-spin" /> : <span>⚡</span>}
-          GPS
-          <ChevronDown className="h-3 w-3" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        {missingGps.length > 0 && (
-          <DropdownMenuItem onClick={handleBulkGeocode} disabled={isBulkGeocoding || isRegenGeocoding}>
-            <span className="mr-2">📍</span>
-            Générer GPS manquants ({missingGps.length})
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm" className="h-7 px-2 text-xs gap-1 ml-auto" disabled={isGeocoding}>
+            {isGeocoding ? <Loader2 className="h-3 w-3 animate-spin" /> : <span>⚡</span>}
+            GPS
+            <ChevronDown className="h-3 w-3" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {missingGps.length > 0 && (
+            <DropdownMenuItem disabled={isGeocoding} onClick={() => setConfirmAction({
+              label: `Compléter les GPS manquants pour ${missingGps.length} projet(s) ?`,
+              action: () => bulkGeocode(missingGps, 'missing', setIsBulkGeocoding),
+            })}>
+              <span className="mr-2">📍</span>
+              Compléter GPS manquants ({missingGps.length})
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuItem disabled={isGeocoding} onClick={() => setConfirmAction({
+            label: `Régénérer les GPS par questionnaire pour ${projects.length} projet(s) ?`,
+            action: () => bulkGeocode(projects, 'questionnaire', setIsRegenGeocoding),
+          })}>
+            <span className="mr-2">🗺️</span>
+            Régénérer par questionnaire ({projects.length})
           </DropdownMenuItem>
-        )}
-        <DropdownMenuItem onClick={handleRegenGeocode} disabled={isBulkGeocoding || isRegenGeocoding}>
-          <span className="mr-2">🔄</span>
-          Régénérer GPS filtrés ({projects.length})
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          <DropdownMenuItem disabled={isGeocoding} onClick={() => setConfirmAction({
+            label: `Régénérer les GPS par adresse société pour ${projects.length} projet(s) ?`,
+            action: () => bulkGeocode(projects, 'societe', setIsRegenGeocoding),
+          })}>
+            <span className="mr-2">🏢</span>
+            Régénérer par adresse société ({projects.length})
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <AlertDialog open={!!confirmAction} onOpenChange={(open) => { if (!open) setConfirmAction(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmation</AlertDialogTitle>
+            <AlertDialogDescription>{confirmAction?.label}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { confirmAction?.action(); setConfirmAction(null); }}>
+              Confirmer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 
   if (withCoords.length === 0) {
