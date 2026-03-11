@@ -64,11 +64,12 @@ function RadialProgress({ value, size = 80, stroke = 7, color = '#10b981' }: {
 }
 
 // ─── OSM Map tile card ────────────────────────────────────────────────────────
-function ProjectMapCard({ projects }: { projects: BEProject[] }) {
-  const [hovered, setHovered] = useState<string | null>(null);
+function ProjectMapCard({ projects, allProjectStats = {} }: { projects: BEProject[]; allProjectStats?: Record<string, ProjectStats> }) {
   const [isBulkGeocoding, setIsBulkGeocoding] = useState(false);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<any>(null);
 
   const withCoords = useMemo(() =>
     projects.filter(p => {
@@ -141,6 +142,101 @@ function ProjectMapCard({ projects }: { projects: BEProject[] }) {
     });
   }, [missingGps, queryClient]);
 
+  // Leaflet map initialization
+  useEffect(() => {
+    const L = (window as any).L;
+    if (!L || !mapContainerRef.current || withCoords.length === 0) return;
+
+    // Destroy previous map
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.remove();
+      mapInstanceRef.current = null;
+    }
+
+    const map = L.map(mapContainerRef.current, {
+      zoomControl: true,
+      scrollWheelZoom: true,
+    });
+    mapInstanceRef.current = map;
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap',
+      maxZoom: 18,
+    }).addTo(map);
+
+    const statusColor: Record<string, string> = {
+      active: '#10b981',
+      on_hold: '#f59e0b',
+      closed: '#6b7280',
+    };
+
+    const markers = L.markerClusterGroup({
+      iconCreateFunction: (cluster: any) => {
+        const count = cluster.getChildCount();
+        let bg = '#10b981';
+        if (count > 20) bg = '#ef4444';
+        else if (count > 5) bg = '#f59e0b';
+        return L.divIcon({
+          html: `<div style="background:${bg};color:#fff;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3);">${count}</div>`,
+          className: '',
+          iconSize: L.point(36, 36),
+        });
+      },
+    });
+
+    const bounds: [number, number][] = [];
+
+    withCoords.forEach(p => {
+      const parts = p.gps_coordinates!.split(',').map(s => parseFloat(s.trim()));
+      const lat = parts[0];
+      const lon = parts[1];
+      bounds.push([lat, lon]);
+
+      const color = statusColor[p.status] || statusColor.active;
+      const sc = STATUS_CONFIG[p.status] || STATUS_CONFIG.active;
+      const stats = allProjectStats[p.id];
+      const progressHtml = stats
+        ? `<div style="margin-top:6px;font-size:11px;color:#6b7280;">Avancement: ${stats.progress}% · ${stats.doneTasks}/${stats.totalTasks} tâches</div>`
+        : '';
+
+      const marker = L.circleMarker([lat, lon], {
+        radius: 8,
+        fillColor: color,
+        color: '#fff',
+        weight: 2,
+        fillOpacity: 0.9,
+      });
+
+      marker.bindPopup(`
+        <div style="min-width:180px;font-family:system-ui,sans-serif;">
+          <div style="font-weight:700;font-size:13px;color:${color};">${p.code_projet}</div>
+          <div style="font-size:12px;margin-top:2px;">${p.nom_projet}</div>
+          <div style="margin-top:4px;">
+            <span style="display:inline-block;padding:1px 8px;border-radius:9999px;font-size:10px;font-weight:600;background:${color}20;color:${color};">${sc.label}</span>
+          </div>
+          ${p.region ? `<div style="margin-top:4px;font-size:11px;color:#6b7280;">📍 ${p.region}</div>` : ''}
+          ${progressHtml}
+          <a href="/be/projects/${p.code_projet}/overview" style="display:inline-block;margin-top:6px;font-size:11px;color:#3b82f6;text-decoration:underline;">Ouvrir le projet →</a>
+        </div>
+      `, { maxWidth: 250 });
+
+      markers.addLayer(marker);
+    });
+
+    map.addLayer(markers);
+
+    if (bounds.length > 0) {
+      map.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 });
+    }
+
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+    };
+  }, [withCoords, allProjectStats, navigate]);
+
   const bulkButton = missingGps.length > 0 ? (
     <Button
       variant="outline"
@@ -171,21 +267,6 @@ function ProjectMapCard({ projects }: { projects: BEProject[] }) {
     );
   }
 
-  // Calculate bounding box
-  const lats = withCoords.map(p => parseFloat(p.gps_coordinates!.split(',')[0].trim()));
-  const lons = withCoords.map(p => parseFloat(p.gps_coordinates!.split(',')[1].trim()));
-  const minLat = Math.min(...lats);
-  const maxLat = Math.max(...lats);
-  const minLon = Math.min(...lons);
-  const maxLon = Math.max(...lons);
-  const pad = 0.5;
-  const bbox = `${minLon - pad},${minLat - pad},${maxLon + pad},${maxLat + pad}`;
-
-  // Use single-marker URL for 1 project, bbox for multiple
-  const mapSrc = withCoords.length === 1
-    ? `https://www.openstreetmap.org/export/embed.html?bbox=${parseFloat(withCoords[0].gps_coordinates!.split(',')[1])-0.05},${parseFloat(withCoords[0].gps_coordinates!.split(',')[0])-0.05},${parseFloat(withCoords[0].gps_coordinates!.split(',')[1])+0.05},${parseFloat(withCoords[0].gps_coordinates!.split(',')[0])+0.05}&layer=mapnik&marker=${withCoords[0].gps_coordinates!.split(',')[0].trim()},${withCoords[0].gps_coordinates!.split(',')[1].trim()}`
-    : `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik`;
-
   return (
     <Card className="col-span-2 border-border/50 overflow-hidden">
       <CardHeader className="pb-2">
@@ -197,42 +278,7 @@ function ProjectMapCard({ projects }: { projects: BEProject[] }) {
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="relative">
-          <iframe
-            title="Carte des projets"
-            width="100%"
-            height="340"
-            style={{ border: 0, display: 'block' }}
-            loading="lazy"
-            src={mapSrc}
-          />
-          {/* Overlay list */}
-          <div className="absolute top-2 right-2 flex flex-col gap-1 max-h-72 overflow-y-auto">
-            {withCoords.slice(0, 8).map(p => {
-              const sc = STATUS_CONFIG[p.status] || STATUS_CONFIG.active;
-              return (
-                <button
-                  key={p.id}
-                  onMouseEnter={() => setHovered(p.id)}
-                  onMouseLeave={() => setHovered(null)}
-                  onClick={() => navigate(`/be/projects/${p.code_projet}/overview`)}
-                  className={cn(
-                    'text-xs px-2 py-1 rounded-md bg-background/90 backdrop-blur border shadow-sm text-left transition-all',
-                    hovered === p.id ? 'ring-2 ring-primary' : 'border-border/50'
-                  )}
-                >
-                  <span className="font-mono text-primary">{p.code_projet}</span>
-                  <span className="ml-1 text-muted-foreground truncate max-w-[120px] inline-block align-middle">{p.nom_projet}</span>
-                </button>
-              );
-            })}
-            {withCoords.length > 8 && (
-              <div className="text-xs text-center text-muted-foreground bg-background/80 rounded px-2 py-0.5">
-                +{withCoords.length - 8} autres
-              </div>
-            )}
-          </div>
-        </div>
+        <div ref={mapContainerRef} style={{ height: 340, width: '100%' }} />
       </CardContent>
     </Card>
   );
