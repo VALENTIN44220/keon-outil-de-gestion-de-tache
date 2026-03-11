@@ -212,7 +212,9 @@ function ProjectMapCard({ projects, allProjectStats = {} }: { projects: BEProjec
     return { address: addressParts.join(', '), qstKeys };
   }, []);
 
-  const bulkGeocode = useCallback(async (targetProjects: BEProject[], setLoading: (v: boolean) => void) => {
+  const [confirmAction, setConfirmAction] = useState<{ label: string; action: () => void } | null>(null);
+
+  const bulkGeocode = useCallback(async (targetProjects: BEProject[], mode: GpsMode, setLoading: (v: boolean) => void) => {
     if (targetProjects.length === 0) {
       toast({ title: 'Rien à géocoder', description: 'Aucun projet à traiter.' });
       return;
@@ -227,8 +229,8 @@ function ProjectMapCard({ projects, allProjectStats = {} }: { projects: BEProjec
 
     for (let i = 0; i < targetProjects.length; i++) {
       const p = targetProjects[i];
-      const { address, qstKeys } = await geocodeProject(p);
-      console.log(`[GPS] ${p.code_projet} → address: "${address}" | qst keys: ${qstKeys.join(', ')}`);
+      const { address, qstKeys } = await buildAddress(p, mode);
+      console.log(`[GPS][${mode}] ${p.code_projet} → address: "${address}" | qst keys: ${qstKeys.join(', ')}`);
       if (!address) { errors++; failedNames.push(p.code_projet); continue; }
 
       try {
@@ -252,10 +254,7 @@ function ProjectMapCard({ projects, allProjectStats = {} }: { projects: BEProjec
       title: 'Géocodage terminé',
       description: `${success} coordonnées générées, ${errors} échecs sur ${total} projets.${failedNames.length > 0 ? ` Échecs : ${failedNames.slice(0, 5).join(', ')}${failedNames.length > 5 ? '...' : ''}` : ''}`,
     });
-  }, [queryClient, geocodeProject]);
-
-  const handleBulkGeocode = useCallback(() => bulkGeocode(missingGps, setIsBulkGeocoding), [missingGps, bulkGeocode]);
-  const handleRegenGeocode = useCallback(() => bulkGeocode(projects, setIsRegenGeocoding), [projects, bulkGeocode]);
+  }, [queryClient, buildAddress]);
 
   // Leaflet map initialization
   useEffect(() => {
