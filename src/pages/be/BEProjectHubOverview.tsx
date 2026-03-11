@@ -221,10 +221,20 @@ export default function BEProjectHubOverview() {
                         size="sm"
                         className="h-7 px-2 text-xs gap-1"
                         onClick={handleGenerateGps}
-                        disabled={isGeocodingGps}
+                        disabled={isGeocodingGps || isForceGeocodingGps}
                       >
                         {isGeocodingGps ? <Loader2 className="h-3 w-3 animate-spin" /> : <span>📍</span>}
                         Générer GPS
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2 text-xs gap-1"
+                        onClick={handleForceRegenerateGps}
+                        disabled={isGeocodingGps || isForceGeocodingGps}
+                      >
+                        {isForceGeocodingGps ? <Loader2 className="h-3 w-3 animate-spin" /> : <span>🔄</span>}
+                        Forcer régénération GPS
                       </Button>
                     </div>
                   </div>
