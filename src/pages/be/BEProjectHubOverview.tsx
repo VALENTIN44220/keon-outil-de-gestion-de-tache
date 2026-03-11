@@ -201,7 +201,22 @@ export default function BEProjectHubOverview() {
                   <DescriptionItem label="Pays site" value={project.pays_site} />
                   <DescriptionItem label="Région" value={project.region} />
                   <DescriptionItem label="Département" value={project.departement} />
-                  <DescriptionItem label="Coordonnées GPS" value={project.gps_coordinates} mono />
+                  <div className="flex items-center justify-between py-1.5 border-b border-border/50">
+                    <span className="text-sm text-muted-foreground">Coordonnées GPS</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-right font-mono">{project.gps_coordinates || '-'}</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2 text-xs gap-1"
+                        onClick={handleGenerateGps}
+                        disabled={isGeocodingGps}
+                      >
+                        {isGeocodingGps ? <Loader2 className="h-3 w-3 animate-spin" /> : <span>📍</span>}
+                        Générer GPS
+                      </Button>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Map embed */}
