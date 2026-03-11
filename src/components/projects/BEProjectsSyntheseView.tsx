@@ -792,10 +792,6 @@ export function BEProjectsSyntheseView({ projects, qstData, widgets: externalWid
 
   return (
     <div className="space-y-6">
-      {/* Config panel button — positioned by parent via props */}
-      <div className="flex justify-end">
-        <SyntheseWidgetConfigPanel widgets={widgets} onChange={setWidgets} />
-      </div>
 
       {/* Render widgets in order */}
       {visibleWidgets.map(widget => {
