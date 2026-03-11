@@ -52,6 +52,7 @@ import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { TaskCommentsSection } from './TaskCommentsSection';
+import { TaskChecklist } from './TaskChecklist';
 import { useTasksProgress } from '@/hooks/useChecklists';
 import { useDueDatePermissionWithManager } from '@/hooks/useDueDatePermission';
 import { RequestInfoTab } from './RequestInfoTab';
