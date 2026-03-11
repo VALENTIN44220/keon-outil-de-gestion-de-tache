@@ -69,18 +69,34 @@ export default function BEProjectHubOverview() {
 
   const geocodeProject = async (forceRegen: boolean) => {
     if (!project) return;
-    const addressParts = [project.adresse_site || project.adresse_societe, project.departement, project.region, project.pays_site || project.pays || 'France'].filter(Boolean);
-    if (addressParts.length === 0) {
-      toast({ title: 'Adresse manquante', description: 'Aucune information d\'adresse pour géocoder.', variant: 'destructive' });
-      return;
-    }
     const setLoading = forceRegen ? setIsForceGeocodingGps : setIsGeocodingGps;
     setLoading(true);
     try {
+      // Load questionnaire data for precise site location
+      const { data: qstRows } = await (supabase as any)
+        .from('project_questionnaire')
+        .select('champ_id, valeur')
+        .eq('project_id', project.id)
+        .in('champ_id', ['04_GEN_commune', '04_GEN_code_postal', '04_GEN_departement_nom', '04_GEN_region', '04_GEN_pays']);
+
+      const qst: Record<string, string> = {};
+      (qstRows || []).forEach((r: any) => { if (r.valeur) qst[r.champ_id] = r.valeur; });
+
+      const addressParts = [
+        qst['04_GEN_commune'] || project.adresse_site,
+        qst['04_GEN_code_postal'],
+        qst['04_GEN_departement_nom'] || project.departement,
+        qst['04_GEN_region'] || project.region,
+        qst['04_GEN_pays'] || project.pays_site || project.pays || 'France'
+      ].filter(Boolean);
+
+      if (addressParts.length === 0) {
+        toast({ title: 'Adresse manquante', description: 'Aucune information d\'adresse pour géocoder.', variant: 'destructive' });
+        return;
+      }
+
       const address = addressParts.join(', ');
-      const { data, error: fnError } = await supabase.functions.invoke('geocode', {
-        body: { address },
-      });
+      const { data, error: fnError } = await supabase.functions.invoke('geocode', { body: { address } });
       if (fnError) throw fnError;
       const result = Array.isArray(data) ? data : [];
       if (!result || result.length === 0) {
