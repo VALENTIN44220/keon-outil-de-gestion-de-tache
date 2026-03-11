@@ -15,8 +15,11 @@ import {
 } from 'recharts';
 import {
   MapPin, CheckCircle2, Clock, AlertTriangle, FolderOpen,
-  TrendingUp, Activity, Zap, Globe, Loader2
+  TrendingUp, Activity, Zap, Globe, Loader2, ChevronDown
 } from 'lucide-react';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   SyntheseWidgetConfigPanel,
   loadWidgetConfig,
