@@ -28,6 +28,7 @@ import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
 type ViewType = 'synthese' | 'cards' | 'table' | 'kanban';
+
 export function BEProjectsView() {
   const navigate = useNavigate();
   const { projects, isLoading, searchQuery, setSearchQuery, addProject, updateProject, deleteProject } = useBEProjects();
@@ -57,22 +58,27 @@ export function BEProjectsView() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<BEProject | null>(null);
   const [deletingProject, setDeletingProject] = useState<BEProject | null>(null);
+  
   // View state
   const [currentView, setCurrentView] = useState<ViewType>('synthese');
   const [kanbanGroupBy, setKanbanGroupBy] = useState<GroupByField>('status');
   const [localSearch, setLocalSearch] = useState(searchQuery);
+  
   // KEON filter: only projects with questionnaire data
   const [showKeonOnly, setShowKeonOnly] = useState(false);
   const { qstData, keonProjectIds, getDistinctValues: getQstDistinctValues } = useQuestionnaireProjectData(projects);
+
   // Sync questionnaire data to filter hook for questionnaire-based filtering
   useEffect(() => {
     setQuestionnaireData(qstData);
   }, [qstData, setQuestionnaireData]);
+
   // Get active config
   const activeConfig = getActiveConfig();
   const visibleColumns = activeConfig.visible_columns;
   const columnOrder = activeConfig.column_order;
   const columnFilters = activeConfig.column_filters;
+
   // Apply multi-criteria filters first, then column filters
   const multiFilteredProjects = useMemo(() => applyMultiFilters(projects), [projects, applyMultiFilters]);
   const columnFilteredProjects = useFilteredProjects(multiFilteredProjects, columnFilters);
@@ -80,6 +86,7 @@ export function BEProjectsView() {
     if (!showKeonOnly) return columnFilteredProjects;
     return columnFilteredProjects.filter(p => keonProjectIds.has(p.id));
   }, [columnFilteredProjects, showKeonOnly, keonProjectIds]);
+
   // Get ordered columns based on config
   const orderedVisibleColumns = useMemo(() => {
     return columnOrder
@@ -87,16 +94,23 @@ export function BEProjectsView() {
       .map(key => ALL_PROJECT_COLUMNS.find(c => c.key === key))
       .filter(Boolean) as ColumnDefinition[];
   }, [columnOrder, visibleColumns]);
+
   const activeFiltersCount = Object.keys(columnFilters).filter(k => columnFilters[k]?.value).length + multiFiltersCount;
+
   const canCreate = permissionProfile?.can_create_be_projects ?? false;
   const canEdit = permissionProfile?.can_edit_be_projects ?? false;
   const canDelete = permissionProfile?.can_delete_be_projects ?? false;
+
   const handleAddProject = () => {
     setEditingProject(null);
     setIsDialogOpen(true);
   };
+
   const handleEditProject = (project: BEProject) => {
     setEditingProject(project);
+    setIsDialogOpen(true);
+  };
+
   const handleSaveProject = async (projectData: Omit<BEProject, 'id' | 'created_at' | 'updated_at'>) => {
     if (editingProject) {
       await updateProject(editingProject.id, projectData);
@@ -104,10 +118,16 @@ export function BEProjectsView() {
       await addProject(projectData);
     }
     setIsDialogOpen(false);
+    setEditingProject(null);
+  };
+
   const handleConfirmDelete = async () => {
     if (deletingProject) {
       await deleteProject(deletingProject.id);
       setDeletingProject(null);
+    }
+  };
+
   const handleExportCSV = () => {
     if (filteredProjects.length === 0) {
       toast({
@@ -116,6 +136,8 @@ export function BEProjectsView() {
         variant: 'destructive',
       });
       return;
+    }
+
     const headers = [
       'code_projet',
       'nom_projet',
@@ -138,6 +160,7 @@ export function BEProjectsView() {
       'gps_coordinates',
       'status',
     ];
+
     const csvContent = [
       headers.join(';'),
       ...filteredProjects.map(project => 
@@ -152,6 +175,7 @@ export function BEProjectsView() {
         }).join(';')
       ),
     ].join('\n');
+
     const bom = '\uFEFF';
     const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -162,10 +186,13 @@ export function BEProjectsView() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+
     toast({
       title: 'Export terminé',
       description: `${filteredProjects.length} projets exportés en CSV`,
     });
+  };
+
   const getStatusBadge = (status: string) => {
     const variants: Record<string, { className: string; label: string }> = {
       active: { className: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20', label: 'Actif' },
@@ -174,19 +201,28 @@ export function BEProjectsView() {
     };
     const config = variants[status] || { className: 'bg-slate-500/10 text-slate-600', label: status };
     return <Badge className={cn('border', config.className)}>{config.label}</Badge>;
+  };
+
   const renderCellValue = (project: BEProject, key: string) => {
     const value = (project as any)[key];
     
     if (value === null || value === undefined) return '-';
+    
     if (key === 'status') {
       return getStatusBadge(value);
+    }
+    
     if (['date_cloture_bancaire', 'date_cloture_juridique', 'date_os_etude', 'date_os_travaux', 'created_at'].includes(key)) {
       try {
         return format(new Date(value), 'dd MMM yyyy', { locale: fr });
       } catch {
         return value;
       }
+    }
+    
     return String(value);
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -194,6 +230,7 @@ export function BEProjectsView() {
       </div>
     );
   }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -214,12 +251,16 @@ export function BEProjectsView() {
             <FileDown className="h-4 w-4" />
             Export CSV
           </Button>
+
           {canCreate && (
             <Button onClick={handleAddProject} className="gap-2 shadow-sm">
               <Plus className="h-4 w-4" />
               Nouveau projet
             </Button>
           )}
+        </div>
+      </div>
+
       {/* Search and View Controls */}
       <Card className="border-border/50">
         <CardContent className="p-4">
@@ -239,6 +280,9 @@ export function BEProjectsView() {
                   }
                 }}
                 className="pl-10"
+              />
+            </div>
+
             {/* KEON Filter Toggle */}
             <Button
               variant={showKeonOnly ? 'default' : 'outline'}
@@ -253,6 +297,7 @@ export function BEProjectsView() {
                   {keonProjectIds.size}
                 </Badge>
               )}
+            </Button>
             
             {/* View Toggle */}
             <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-lg">
@@ -274,16 +319,26 @@ export function BEProjectsView() {
                 <LayoutGrid className="h-4 w-4" />
                 <span className="hidden sm:inline">Cards</span>
               </Button>
+              <Button
                 variant={currentView === 'table' ? 'default' : 'ghost'}
+                size="sm"
                 className={cn('h-8 px-3 gap-2', currentView === 'table' && 'shadow-sm')}
                 onClick={() => setCurrentView('table')}
+              >
                 <List className="h-4 w-4" />
                 <span className="hidden sm:inline">Table</span>
+              </Button>
+              <Button
                 variant={currentView === 'kanban' ? 'default' : 'ghost'}
+                size="sm"
                 className={cn('h-8 px-3 gap-2', currentView === 'kanban' && 'shadow-sm')}
                 onClick={() => setCurrentView('kanban')}
+              >
                 <Kanban className="h-4 w-4" />
                 <span className="hidden sm:inline">Kanban</span>
+              </Button>
+            </div>
+
             {currentView === 'synthese' && (
         <BEProjectsSyntheseView
           projects={filteredProjects}
@@ -299,8 +354,10 @@ export function BEProjectsView() {
                 onSaveCustom={saveCustomConfig}
                 activeViewType={activeViewType}
                 onSwitchView={switchView}
+              />
             )}
           </div>
+
           {/* Multi-criteria filters */}
           <div className="mt-3">
             <ProjectMultiFiltersPanel
@@ -316,8 +373,10 @@ export function BEProjectsView() {
               onClear={clearMultiFilters}
               getQstDistinctValues={getQstDistinctValues}
             />
+          </div>
         </CardContent>
       </Card>
+
       {/* Projects View */}
       {currentView === 'cards' && (
         <BEProjectCardsView
@@ -328,12 +387,18 @@ export function BEProjectsView() {
           onDelete={setDeletingProject}
         />
       )}
+
       {currentView === 'kanban' && (
         <ProjectKanbanView
+          projects={filteredProjects}
           groupBy={kanbanGroupBy}
           onGroupByChange={setKanbanGroupBy}
           onProjectClick={canEdit ? handleEditProject : undefined}
+          canEdit={canEdit}
           qstData={qstData}
+        />
+      )}
+
       {currentView === 'table' && (
         <Card className="border-border/50">
           <CardHeader className="pb-4">
@@ -382,6 +447,7 @@ export function BEProjectsView() {
                               col.key === 'code_projet' && 'font-mono font-medium text-primary',
                               col.key === 'nom_projet' && 'font-medium',
                               !['code_projet', 'nom_projet', 'status'].includes(col.key) && 'text-muted-foreground'
+                            )}
                           >
                             {renderCellValue(project, col.key)}
                           </TableCell>
@@ -409,17 +475,28 @@ export function BEProjectsView() {
                                 </Button>
                               )}
                               {canDelete && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
                                   className="h-8 w-8 text-destructive hover:text-destructive"
                                   onClick={() => setDeletingProject(project)}
+                                >
                                   <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
                             </div>
+                          </TableCell>
                         )}
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
+              </div>
+            )}
           </CardContent>
         </Card>
+      )}
+
       {/* Project Dialog */}
       <BEProjectDialog
         open={isDialogOpen}
@@ -430,6 +507,7 @@ export function BEProjectsView() {
         onSave={handleSaveProject}
         project={editingProject}
       />
+
       {/* Delete Confirmation */}
       <AlertDialog open={!!deletingProject} onOpenChange={() => setDeletingProject(null)}>
         <AlertDialogContent>
