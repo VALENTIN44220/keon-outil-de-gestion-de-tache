@@ -166,7 +166,14 @@ function ProjectMapCard({ projects, allProjectStats = {} }: { projects: BEProjec
       return false;
     }), [projects]);
 
-  const geocodeProject = useCallback(async (project: BEProject): Promise<{ address: string | null; qstKeys: string[] }> => {
+  type GpsMode = 'missing' | 'questionnaire' | 'societe';
+
+  const buildAddress = useCallback(async (project: BEProject, mode: GpsMode): Promise<{ address: string | null; qstKeys: string[] }> => {
+    if (mode === 'societe') {
+      const parts = [project.adresse_societe, project.pays || 'France'].filter(Boolean);
+      return { address: parts.length > 0 ? parts.join(', ') : null, qstKeys: [] };
+    }
+
     const { data: qstRows } = await (supabase as any)
       .from('project_questionnaire')
       .select('champ_id, valeur')
@@ -174,9 +181,21 @@ function ProjectMapCard({ projects, allProjectStats = {} }: { projects: BEProjec
       .in('champ_id', ['04_GEN_commune', '04_GEN_code_postal', '04_GEN_departement_nom', '04_GEN_region', '04_GEN_pays']);
 
     const qst: Record<string, string> = {};
-    qstRows?.forEach((r: any) => { qst[r.champ_id] = r.valeur; });
+    qstRows?.forEach((r: any) => { if (r.valeur) qst[r.champ_id] = r.valeur; });
     const qstKeys = Object.keys(qst);
 
+    if (mode === 'questionnaire') {
+      const parts = [
+        qst['04_GEN_commune'],
+        qst['04_GEN_code_postal'],
+        qst['04_GEN_departement_nom'],
+        qst['04_GEN_region'],
+        qst['04_GEN_pays'] || 'France'
+      ].filter(Boolean);
+      return { address: parts.length > 0 ? parts.join(', ') : null, qstKeys };
+    }
+
+    // mode === 'missing': questionnaire priority then fallback
     const addressParts = [
       qst['04_GEN_commune'],
       qst['04_GEN_code_postal'],
@@ -186,9 +205,8 @@ function ProjectMapCard({ projects, allProjectStats = {} }: { projects: BEProjec
     ].filter(Boolean);
 
     if (addressParts.length === 0) {
-      const fallback = [project.adresse_site || project.adresse_societe, project.pays || 'France'].filter(Boolean);
-      if (fallback.length === 0) return { address: null, qstKeys };
-      return { address: fallback.join(', '), qstKeys };
+      const fallback = [project.adresse_societe, project.pays || 'France'].filter(Boolean);
+      return { address: fallback.length > 0 ? fallback.join(', ') : null, qstKeys };
     }
 
     return { address: addressParts.join(', '), qstKeys };
