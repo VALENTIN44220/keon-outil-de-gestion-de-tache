@@ -183,7 +183,8 @@ function ProjectMapCard({ projects }: { projects: BEProject[] }) {
         <CardTitle className="text-sm font-medium flex items-center gap-2">
           <Globe className="h-4 w-4 text-muted-foreground" />
           Carte de localisation
-          <Badge variant="secondary" className="ml-auto">{withCoords.length} projets géolocalisés</Badge>
+          <Badge variant="secondary">{withCoords.length} projets géolocalisés</Badge>
+          {bulkButton}
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0">
