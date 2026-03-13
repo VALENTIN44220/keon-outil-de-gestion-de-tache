@@ -246,6 +246,8 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+              {/* KEON Dashboard */}
+              <Route path="/keon" element={<ProtectedRoute><KeonDashboard /></ProtectedRoute>} />
               {/* IT Projects routes */}
               <Route path="/it/projects" element={<ProtectedRoute><ITProjects /></ProtectedRoute>} />
               <Route path="/it/projects/import-fdr" element={<ProtectedRoute><ITProjectImportFDR /></ProtectedRoute>} />
