@@ -99,6 +99,10 @@ function SortableWidgetRow({
         <GripVertical className="h-4 w-4" />
       </button>
 
+      <span
+        className="h-2.5 w-2.5 rounded-full shrink-0"
+        style={{ backgroundColor: widget.dotColor }}
+      />
       <span className={cn('flex-1 text-sm font-medium', !widget.visible && 'text-muted-foreground line-through')}>
         {widget.label}
       </span>
