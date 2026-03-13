@@ -69,8 +69,6 @@ export function BEProjectsView() {
   const [kanbanGroupBy, setKanbanGroupBy] = useState<GroupByField>('status');
   const [localSearch, setLocalSearch] = useState(searchQuery);
   
-  // KEON filter: only projects with questionnaire data
-  const [showKeonOnly, setShowKeonOnly] = useState(false);
   const [syntheseWidgets, setSyntheseWidgets] = useState<WidgetConfig[]>(loadWidgetConfig);
   const { qstData, keonProjectIds, getDistinctValues: getQstDistinctValues } = useQuestionnaireProjectData(projects);
 
