@@ -128,12 +128,6 @@ const menuColors: Record<string, { bg: string; text: string; border: string; ico
     border: 'border-info',
     iconBg: 'bg-gradient-to-br from-info to-info/80'
   },
-  team: { 
-    bg: 'bg-accent/10', 
-    text: 'text-accent', 
-    border: 'border-accent',
-    iconBg: 'bg-gradient-to-br from-accent to-accent/80'
-  },
   suppliers: { 
     bg: 'bg-[#10B981]/10', 
     text: 'text-[#10B981]', 
