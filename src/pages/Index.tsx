@@ -52,7 +52,7 @@ const Index = () => {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [showFullStats, setShowFullStats] = useState(false);
   const [dashboardMode, setDashboardMode] = useState<'tasks' | 'planner' | 'validations'>('tasks');
-  const [taskSubMode, setTaskSubMode] = useState<'grid' | 'kanban' | 'calendar' | 'table' | 'analytics' | 'tracking'>('grid');
+  const [taskSubMode, setTaskSubMode] = useState<'grid' | 'kanban' | 'calendar' | 'table' | 'analytics'>('grid');
   const [isBulkActionOpen, setIsBulkActionOpen] = useState(false);
   const [kanbanGroupMode, setKanbanGroupMode] = useState<KanbanGroupMode>('status');
   const [crossFilters, setCrossFilters] = useState<CrossFilters>(DEFAULT_CROSS_FILTERS);
