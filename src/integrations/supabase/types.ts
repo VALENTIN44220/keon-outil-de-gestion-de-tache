@@ -4083,6 +4083,7 @@ export type Database = {
         Row: {
           adresse_mail: string | null
           avenants: string | null
+          ca_estime: number | null
           categorie: string | null
           commentaires: string | null
           commentaires_date_contrat: string | null
@@ -4092,6 +4093,7 @@ export type Database = {
           date_premiere_signature: string | null
           delai_de_paiement: string | null
           delais_de_paiement_commentaires: string | null
+          description: string | null
           detail_par_entite: string | null
           echeances_de_paiement: string | null
           entite: string | null
@@ -4109,12 +4111,14 @@ export type Database = {
           remise: string | null
           rfa: string | null
           segment: string | null
+          siret: string | null
           site_web: string | null
           sous_segment: string | null
           status: string | null
           telephone: string | null
           tiers: string
           transport: string | null
+          tva: string | null
           type_de_contrat: string | null
           updated_at: string | null
           updated_by: string | null
@@ -4124,6 +4128,7 @@ export type Database = {
         Insert: {
           adresse_mail?: string | null
           avenants?: string | null
+          ca_estime?: number | null
           categorie?: string | null
           commentaires?: string | null
           commentaires_date_contrat?: string | null
@@ -4133,6 +4138,7 @@ export type Database = {
           date_premiere_signature?: string | null
           delai_de_paiement?: string | null
           delais_de_paiement_commentaires?: string | null
+          description?: string | null
           detail_par_entite?: string | null
           echeances_de_paiement?: string | null
           entite?: string | null
@@ -4150,12 +4156,14 @@ export type Database = {
           remise?: string | null
           rfa?: string | null
           segment?: string | null
+          siret?: string | null
           site_web?: string | null
           sous_segment?: string | null
           status?: string | null
           telephone?: string | null
           tiers: string
           transport?: string | null
+          tva?: string | null
           type_de_contrat?: string | null
           updated_at?: string | null
           updated_by?: string | null
@@ -4165,6 +4173,7 @@ export type Database = {
         Update: {
           adresse_mail?: string | null
           avenants?: string | null
+          ca_estime?: number | null
           categorie?: string | null
           commentaires?: string | null
           commentaires_date_contrat?: string | null
@@ -4174,6 +4183,7 @@ export type Database = {
           date_premiere_signature?: string | null
           delai_de_paiement?: string | null
           delais_de_paiement_commentaires?: string | null
+          description?: string | null
           detail_par_entite?: string | null
           echeances_de_paiement?: string | null
           entite?: string | null
@@ -4191,12 +4201,14 @@ export type Database = {
           remise?: string | null
           rfa?: string | null
           segment?: string | null
+          siret?: string | null
           site_web?: string | null
           sous_segment?: string | null
           status?: string | null
           telephone?: string | null
           tiers?: string
           transport?: string | null
+          tva?: string | null
           type_de_contrat?: string | null
           updated_at?: string | null
           updated_by?: string | null
