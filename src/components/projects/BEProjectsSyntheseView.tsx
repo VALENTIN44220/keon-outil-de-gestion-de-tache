@@ -900,6 +900,10 @@ export function BEProjectsSyntheseView({ projects, qstData, widgets: externalWid
 
         {isEditing && (
           <>
+            <Button variant="outline" size="sm" onClick={() => setIsAddDialogOpen(true)} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Ajouter
+            </Button>
             <Button variant="outline" size="sm" onClick={handleReset} className="gap-2">
               <RotateCcw className="h-4 w-4" />
               Réinitialiser
