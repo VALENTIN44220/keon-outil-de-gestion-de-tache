@@ -16,7 +16,7 @@ import {
 import {
   MapPin, CheckCircle2, Clock, AlertTriangle, FolderOpen,
   TrendingUp, Activity, Zap, Globe, Loader2, ChevronDown,
-  Settings2, RotateCcw,
+  Settings2, RotateCcw, Plus,
 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -32,6 +32,7 @@ import {
   WidgetConfig,
 } from './SyntheseWidgetConfigPanel';
 import { WidgetWrapper, type WidgetSizePreset, type HeightPreset } from '@/components/dashboard/widgets/WidgetWrapper';
+import { AddSyntheseWidgetDialog } from './AddSyntheseWidgetDialog';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface ProjectStats {
@@ -416,6 +417,7 @@ export function BEProjectsSyntheseView({ projects, qstData, widgets: externalWid
 
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [draggedWidget, setDraggedWidget] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
 
@@ -575,6 +577,26 @@ export function BEProjectsSyntheseView({ projects, qstData, widgets: externalWid
     setWidgets(prev => prev.map(w => ({ ...w, visible: true })));
     toast({ title: 'Tous les widgets sont visibles' });
   }, [setWidgets]);
+
+  const handleAddWidget = useCallback((widget: WidgetConfig) => {
+    setWidgets(prev => [...prev, widget]);
+    toast({ title: `Widget "${widget.label}" ajouté` });
+  }, [setWidgets]);
+
+  // Build dynamic data for custom widgets
+  const buildCriterionData = useCallback((criterion: string) => {
+    const COLORS = ['#10b981', '#f59e0b', '#6b7280', '#3b82f6', '#ec4899', '#8b5cf6', '#ef4444', '#FF9432', '#12B6C8'];
+    const map: Record<string, number> = {};
+    projects.forEach(p => {
+      const raw = (p as any)[criterion];
+      const k = raw || 'Non renseigné';
+      map[k] = (map[k] || 0) + 1;
+    });
+    return Object.entries(map)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 12)
+      .map(([name, value], i) => ({ name, value, color: COLORS[i % COLORS.length], fill: COLORS[i % COLORS.length] }));
+  }, [projects]);
 
   // Drag-and-drop
   const handleDragStart = (widgetId: string) => {
@@ -812,10 +834,47 @@ export function BEProjectsSyntheseView({ projects, qstData, widgets: externalWid
           </div>
         );
 
-      default:
-        return null;
+      default: {
+        // Custom widgets: parse id to extract chart type and criterion
+        const match = widget.id.match(/^custom_(pie|bar)_(\w+)_/);
+        if (!match) return null;
+        const [, chartType, criterion] = match;
+        const data = buildCriterionData(criterion);
+        const h = getHeightPx(widget) - 60;
+
+        if (chartType === 'pie') {
+          return (
+            <ResponsiveContainer width="100%" height={h}>
+              <PieChart>
+                <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%"
+                  innerRadius={h * 0.22} outerRadius={h * 0.37} paddingAngle={3}>
+                  {data.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                </Pie>
+                <Tooltip formatter={(v: any, n: any) => [`${v} projet(s)`, n]} />
+                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
+              </PieChart>
+            </ResponsiveContainer>
+          );
+        }
+
+        // bar chart
+        return data.length === 0 ? (
+          <div className="text-center text-muted-foreground text-sm py-8">Aucune donnée</div>
+        ) : (
+          <ResponsiveContainer width="100%" height={Math.max(h, data.length * 28)}>
+            <BarChart data={data} layout="vertical" margin={{ left: 8, right: 24, top: 4, bottom: 4 }}>
+              <XAxis type="number" tick={{ fontSize: 10 }} />
+              <YAxis type="category" dataKey="name" width={100} tick={{ fontSize: 10 }} />
+              <Tooltip formatter={(v: any) => [`${v} projet(s)`, 'Projets']} />
+              <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                {data.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        );
+      }
     }
-  }, [kpis, projects, allProjectStats, statusData, typoData, progressData, regionData, spvData, keonProjects, atRiskProjects, topProjects, navigate]);
+  }, [kpis, projects, allProjectStats, statusData, typoData, progressData, regionData, spvData, keonProjects, atRiskProjects, topProjects, navigate, buildCriterionData]);
 
   if (projects.length === 0) {
     return (
@@ -841,6 +900,10 @@ export function BEProjectsSyntheseView({ projects, qstData, widgets: externalWid
 
         {isEditing && (
           <>
+            <Button variant="outline" size="sm" onClick={() => setIsAddDialogOpen(true)} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Ajouter
+            </Button>
             <Button variant="outline" size="sm" onClick={handleReset} className="gap-2">
               <RotateCcw className="h-4 w-4" />
               Réinitialiser
@@ -946,6 +1009,13 @@ export function BEProjectsSyntheseView({ projects, qstData, widgets: externalWid
           ))}
         </div>
       </div>
+
+      {/* Add Widget Dialog */}
+      <AddSyntheseWidgetDialog
+        open={isAddDialogOpen}
+        onClose={() => setIsAddDialogOpen(false)}
+        onAdd={handleAddWidget}
+      />
     </div>
   );
 }
