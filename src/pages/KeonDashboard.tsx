@@ -1,4 +1,4 @@
-import { MainLayout } from '@/components/layout/MainLayout';
+import { Layout } from '@/components/layout/Layout';
 import { useBEProjects } from '@/hooks/useBEProjects';
 import { useQuestionnaireProjectData } from '@/hooks/useQuestionnaireProjectData';
 import { BEProjectsKeonView } from '@/components/projects/BEProjectsKeonView';
