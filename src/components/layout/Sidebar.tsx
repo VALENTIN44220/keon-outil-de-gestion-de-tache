@@ -22,31 +22,59 @@ interface SidebarProps {
   onViewChange: (view: string) => void;
 }
 
-const menuGroups = [
-  // Group 1
-  [
-    { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard, path: '/', permissionKey: 'can_access_dashboard' as ScreenPermissionKey },
-    { id: 'requests', label: 'Demandes', icon: FileText, path: '/requests', permissionKey: 'can_access_requests' as ScreenPermissionKey },
-  ],
-  // Group 2
-  [
-    { id: 'process-tracking', label: 'Suivi des processus', icon: ClipboardList, path: '/process-tracking', permissionKey: 'can_access_process_tracking' as ScreenPermissionKey },
-    { id: 'workload', label: 'Plan de charge', icon: CalendarClock, path: '/workload', permissionKey: 'can_access_workload' as ScreenPermissionKey },
-    { id: 'team', label: 'Équipe', icon: Users, path: '/', permissionKey: 'can_access_team' as ScreenPermissionKey },
-  ],
-  // Group 3
-  [
-    { id: 'projects', label: 'Projets', icon: FolderOpen, path: '/projects', permissionKey: 'can_access_projects' as ScreenPermissionKey },
-    { id: 'spv', label: 'SPV', icon: Leaf, path: '/spv', permissionKey: 'can_access_projects' as ScreenPermissionKey },
-    { id: 'it-projects', label: 'Projets IT', icon: Monitor, path: '/it/projects', permissionKey: 'can_access_projects' as ScreenPermissionKey },
-    { id: 'innovation', label: 'Innovation', icon: Lightbulb, path: '/innovation', permissionKey: 'can_access_dashboard' as ScreenPermissionKey },
-    { id: 'suppliers', label: 'Fournisseurs', icon: Building2, path: '/suppliers', permissionKey: 'can_access_suppliers' as ScreenPermissionKey },
-    { id: 'templates', label: 'Modèles', icon: Workflow, path: '/templates', permissionKey: 'can_access_templates' as ScreenPermissionKey },
-  ],
-  // Group 4
-  [
-    { id: 'calendar', label: 'Calendrier', icon: Calendar, path: '/calendar', permissionKey: 'can_access_calendar' as ScreenPermissionKey },
-  ],
+interface MenuGroup {
+  label?: string;
+  items: {
+    id: string;
+    label: string;
+    icon: any;
+    path: string;
+    permissionKey?: ScreenPermissionKey;
+  }[];
+}
+
+const menuGroups: MenuGroup[] = [
+  {
+    items: [
+      { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard, path: '/', permissionKey: 'can_access_dashboard' },
+      { id: 'requests', label: 'Demandes', icon: FileText, path: '/requests', permissionKey: 'can_access_requests' },
+      { id: 'process-tracking', label: 'Suivi de processus', icon: ClipboardList, path: '/process-tracking', permissionKey: 'can_access_process_tracking' },
+    ],
+  },
+  {
+    label: 'ÉQUIPE',
+    items: [
+      { id: 'workload', label: 'Plan de charge équipe', icon: CalendarClock, path: '/workload', permissionKey: 'can_access_workload' },
+    ],
+  },
+  {
+    label: 'PROJETS',
+    items: [
+      { id: 'projects', label: 'Projets Bioénergie', icon: FolderOpen, path: '/projects', permissionKey: 'can_access_projects' },
+      { id: 'spv', label: 'Projets SPV', icon: Leaf, path: '/spv', permissionKey: 'can_access_projects' },
+      { id: 'it-projects', label: 'Projets IT', icon: Monitor, path: '/it/projects', permissionKey: 'can_access_projects' },
+      { id: 'innovation', label: 'Projets INNO', icon: Lightbulb, path: '/innovation', permissionKey: 'can_access_dashboard' },
+    ],
+  },
+  {
+    label: 'RÉFÉRENTIELS',
+    items: [
+      { id: 'suppliers', label: 'Fournisseurs', icon: Building2, path: '/suppliers', permissionKey: 'can_access_suppliers' },
+    ],
+  },
+  {
+    label: 'CONFIGURATION',
+    items: [
+      { id: 'templates', label: 'Modèles', icon: Workflow, path: '/templates', permissionKey: 'can_access_templates' },
+    ],
+  },
+  {
+    label: 'OUTILS',
+    items: [
+      { id: 'calendar', label: 'Calendrier', icon: Calendar, path: '/calendar', permissionKey: 'can_access_calendar' },
+      { id: 'chat', label: 'Messages', icon: MessageCircle, path: '/chat', permissionKey: 'can_access_dashboard' },
+    ],
+  },
 ];
 
 const adminMenuItem = {
@@ -54,14 +82,6 @@ const adminMenuItem = {
   label: 'Administration',
   icon: ShieldCheck,
   path: '/admin'
-};
-
-const chatMenuItem = {
-  id: 'chat',
-  label: 'Messages',
-  icon: MessageCircle,
-  path: '/chat',
-  permissionKey: 'can_access_dashboard' as ScreenPermissionKey
 };
 
 // Color assignments for menu items - using new premium palette
