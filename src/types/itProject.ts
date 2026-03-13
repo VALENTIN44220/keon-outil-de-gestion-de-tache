@@ -35,6 +35,7 @@ export type StatutFDR =
   | 'non_soumis'
   | 'en_cours_validation'
   | 'abandonne'
+  | 'fdr_2026'
   | 'fdr_2027'
   | 'fdr_2030'
   | 'stand_by'
@@ -44,6 +45,7 @@ export const STATUT_FDR_CONFIG: Record<StatutFDR, { label: string; className: st
   non_soumis: { label: 'Non soumis', icon: '⬜', className: 'bg-slate-100 text-slate-600 border-slate-300' },
   en_cours_validation: { label: 'En cours de validation', icon: '🔄', className: 'bg-blue-100 text-blue-700 border-blue-300' },
   abandonne: { label: 'Abandonné', icon: '❌', className: 'bg-red-100 text-red-700 border-red-300' },
+  fdr_2026: { label: 'Feuille de Route 2026', icon: '📅', className: 'bg-teal-100 text-teal-700 border-teal-300' },
   fdr_2027: { label: 'Feuille de Route 2027', icon: '✅', className: 'bg-emerald-100 text-emerald-700 border-emerald-300' },
   fdr_2030: { label: 'Feuille de Route 2030', icon: '🎯', className: 'bg-violet-100 text-violet-700 border-violet-300' },
   stand_by: { label: 'Mis en stand-by', icon: '⏸️', className: 'bg-amber-100 text-amber-700 border-amber-300' },
