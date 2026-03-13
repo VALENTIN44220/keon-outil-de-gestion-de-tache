@@ -37,7 +37,8 @@ export type StatutFDR =
   | 'abandonne'
   | 'fdr_2027'
   | 'fdr_2030'
-  | 'stand_by';
+  | 'stand_by'
+  | 'inclus_autre_projet';
 
 export const STATUT_FDR_CONFIG: Record<StatutFDR, { label: string; className: string; icon: string }> = {
   non_soumis: { label: 'Non soumis', icon: '⬜', className: 'bg-slate-100 text-slate-600 border-slate-300' },
@@ -46,6 +47,7 @@ export const STATUT_FDR_CONFIG: Record<StatutFDR, { label: string; className: st
   fdr_2027: { label: 'Feuille de Route 2027', icon: '✅', className: 'bg-emerald-100 text-emerald-700 border-emerald-300' },
   fdr_2030: { label: 'Feuille de Route 2030', icon: '🎯', className: 'bg-violet-100 text-violet-700 border-violet-300' },
   stand_by: { label: 'Mis en stand-by', icon: '⏸️', className: 'bg-amber-100 text-amber-700 border-amber-300' },
+  inclus_autre_projet: { label: 'Inclus dans un autre projet IT', icon: '🔗', className: 'bg-cyan-100 text-cyan-700 border-cyan-300' },
 };
 
 export interface ITProjectFDRValidation {
