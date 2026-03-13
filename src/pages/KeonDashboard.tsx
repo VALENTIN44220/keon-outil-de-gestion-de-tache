@@ -33,6 +33,6 @@ export default function KeonDashboard() {
           />
         )}
       </div>
-    </MainLayout>
+    </Layout>
   );
 }
