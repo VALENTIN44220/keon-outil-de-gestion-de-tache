@@ -396,7 +396,7 @@ function ProjectMapCard({ projects, allProjectStats = {} }: { projects: BEProjec
         <Badge variant="secondary">{withCoords.length} projets géolocalisés</Badge>
         {bulkButton}
       </div>
-      <div ref={mapContainerRef} className="flex-1 min-h-0 rounded-lg overflow-hidden" />
+      <div ref={mapContainerRef} className="flex-1 min-h-0 rounded-lg overflow-hidden relative z-0" />
     </div>
   );
 }
