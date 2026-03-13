@@ -29,7 +29,7 @@ import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Workflow, ChevronDown, ChevronUp, Eye, Zap, Settings2, ShieldCheck, LayoutGrid, Columns, Calendar, TableProperties, BarChart3 } from 'lucide-react';
+import { Loader2, Workflow, ChevronDown, ChevronUp, Zap, Settings2, ShieldCheck, LayoutGrid, Columns, Calendar, TableProperties, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Layers } from 'lucide-react';
