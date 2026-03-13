@@ -86,10 +86,7 @@ export function BEProjectsView() {
   // Apply multi-criteria filters first, then column filters
   const multiFilteredProjects = useMemo(() => applyMultiFilters(projects), [projects, applyMultiFilters]);
   const columnFilteredProjects = useFilteredProjects(multiFilteredProjects, columnFilters);
-  const filteredProjects = useMemo(() => {
-    if (!showKeonOnly) return columnFilteredProjects;
-    return columnFilteredProjects.filter(p => keonProjectIds.has(p.id));
-  }, [columnFilteredProjects, showKeonOnly, keonProjectIds]);
+  const filteredProjects = columnFilteredProjects;
 
   // Get ordered columns based on config
   const orderedVisibleColumns = useMemo(() => {
