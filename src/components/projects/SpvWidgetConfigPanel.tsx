@@ -29,16 +29,17 @@ export interface SpvWidgetConfig {
   label: string;
   visible: boolean;
   size: WidgetSize;
+  dotColor: string;
 }
 
 const STORAGE_KEY = 'spv_widget_config';
 
 const DEFAULT_WIDGETS: SpvWidgetConfig[] = [
-  { id: 'kpi_band', label: 'KPI Band', visible: true, size: 'normal' },
-  { id: 'map', label: 'Carte des projets SPV', visible: true, size: 'normal' },
-  { id: 'typologie', label: 'Répartition par Typologie', visible: true, size: 'normal' },
-  { id: 'gisement', label: 'Gisement par projet', visible: true, size: 'normal' },
-  { id: 'table', label: 'Tableau récap', visible: true, size: 'normal' },
+  { id: 'kpi_band', label: 'KPI Band', visible: true, size: 'normal', dotColor: '#3b82f6' },
+  { id: 'map', label: 'Carte des projets SPV', visible: true, size: 'normal', dotColor: '#10b981' },
+  { id: 'typologie', label: 'Répartition par Typologie', visible: true, size: 'normal', dotColor: '#8b5cf6' },
+  { id: 'gisement', label: 'Gisement par projet', visible: true, size: 'normal', dotColor: '#059669' },
+  { id: 'table', label: 'Tableau récap', visible: true, size: 'normal', dotColor: '#f97316' },
 ];
 
 export function loadSpvWidgetConfig(): SpvWidgetConfig[] {
