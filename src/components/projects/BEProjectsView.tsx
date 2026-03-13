@@ -20,6 +20,7 @@ import { ProjectKanbanView, GroupByField } from './ProjectKanbanView';
 import { ProjectViewConfigPanel } from './ProjectViewConfigPanel';
 import { useFilteredProjects } from './ProjectFilters';
 import { BEProjectCardsView } from './BEProjectCardsView';
+import { BEProjectsKeonView } from './BEProjectsKeonView';
 import { BEProjectsSyntheseView } from './BEProjectsSyntheseView';
 import { ProjectMultiFiltersPanel } from './ProjectMultiFiltersPanel';
 import {
@@ -31,7 +32,7 @@ import { fr } from 'date-fns/locale';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
-type ViewType = 'synthese' | 'cards' | 'table' | 'kanban';
+type ViewType = 'synthese' | 'cards' | 'table' | 'kanban' | 'keon';
 
 export function BEProjectsView() {
   const navigate = useNavigate();
@@ -319,6 +320,15 @@ export function BEProjectsView() {
                 <Kanban className="h-4 w-4" />
                 <span className="hidden sm:inline">Kanban</span>
               </Button>
+              <Button
+                variant={currentView === 'keon' ? 'default' : 'ghost'}
+                size="sm"
+                className={cn('h-8 px-3 gap-2', currentView === 'keon' && 'shadow-sm')}
+                onClick={() => setCurrentView('keon')}
+              >
+                <span>🌿</span>
+                <span className="hidden sm:inline">KEON</span>
+              </Button>
             </div>
 
             {currentView === 'table' && (
@@ -379,6 +389,14 @@ export function BEProjectsView() {
           onProjectClick={canEdit ? handleEditProject : undefined}
           canEdit={canEdit}
           qstData={qstData}
+        />
+      )}
+
+      {currentView === 'keon' && (
+        <BEProjectsKeonView
+          projects={filteredProjects}
+          qstData={qstData}
+          keonProjectIds={keonProjectIds}
         />
       )}
 
