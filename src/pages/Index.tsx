@@ -135,9 +135,8 @@ const Index = () => {
   }, [profile?.id]);
 
   useEffect(() => {
-    if (taskSubMode === 'tracking') fetchMyRequests();
     if (taskSubMode === 'analytics') fetchAllRequests();
-  }, [taskSubMode, fetchMyRequests, fetchAllRequests]);
+  }, [taskSubMode, fetchAllRequests]);
 
   // Merge tasks + requests for analytics mode
   const analyticsTasksAndRequests = useMemo(() => {
