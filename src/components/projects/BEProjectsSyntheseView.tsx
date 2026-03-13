@@ -32,6 +32,7 @@ import {
   WidgetConfig,
 } from './SyntheseWidgetConfigPanel';
 import { WidgetWrapper, type WidgetSizePreset, type HeightPreset } from '@/components/dashboard/widgets/WidgetWrapper';
+import { AddSyntheseWidgetDialog } from './AddSyntheseWidgetDialog';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface ProjectStats {
