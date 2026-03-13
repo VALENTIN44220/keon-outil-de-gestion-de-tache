@@ -37,6 +37,7 @@ const menuGroups = [
   // Group 3
   [
     { id: 'projects', label: 'Projets', icon: FolderOpen, path: '/projects', permissionKey: 'can_access_projects' as ScreenPermissionKey },
+    { id: 'keon', label: 'KEON', icon: Leaf, path: '/keon', permissionKey: 'can_access_projects' as ScreenPermissionKey },
     { id: 'it-projects', label: 'Projets IT', icon: Monitor, path: '/it/projects', permissionKey: 'can_access_projects' as ScreenPermissionKey },
     { id: 'innovation', label: 'Innovation', icon: Lightbulb, path: '/innovation', permissionKey: 'can_access_dashboard' as ScreenPermissionKey },
     { id: 'suppliers', label: 'Fournisseurs', icon: Building2, path: '/suppliers', permissionKey: 'can_access_suppliers' as ScreenPermissionKey },
