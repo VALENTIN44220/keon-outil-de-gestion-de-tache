@@ -1,7 +1,8 @@
-import { forwardRef } from 'react';
+import { forwardRef, useState, useEffect, useMemo } from 'react';
 import { Task, TaskStatus } from '@/types/task';
 import { TaskCard } from './TaskCard';
-import { ClipboardList } from 'lucide-react';
+import { ClipboardList, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface TaskListProps {
   tasks: Task[];
@@ -13,11 +14,20 @@ interface TaskListProps {
   onTaskUpdated?: () => void;
 }
 
+const PAGE_SIZE = 24;
+
 export const TaskList = forwardRef<HTMLDivElement, TaskListProps>(
   function TaskList(
     { tasks, onStatusChange, onDelete, groupBy, groupLabels, progressMap, onTaskUpdated },
     ref
   ) {
+    const [page, setPage] = useState(1);
+
+    useEffect(() => { setPage(1); }, [tasks.length]);
+
+    const totalPages = Math.ceil(tasks.length / PAGE_SIZE);
+    const paginatedTasks = useMemo(() => tasks.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [tasks, page]);
+
     if (tasks.length === 0) {
       return (
         <div
@@ -98,17 +108,32 @@ export const TaskList = forwardRef<HTMLDivElement, TaskListProps>(
     }
 
     return (
-      <div ref={ref} className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {tasks.map((task) => (
-          <TaskCard
-            key={task.id}
-            task={task}
-            onStatusChange={onStatusChange}
-            onDelete={onDelete}
-            taskProgress={progressMap?.[task.id]}
-            onTaskUpdated={onTaskUpdated}
-          />
-        ))}
+      <div ref={ref}>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {paginatedTasks.map((task) => (
+            <TaskCard
+              key={task.id}
+              task={task}
+              onStatusChange={onStatusChange}
+              onDelete={onDelete}
+              taskProgress={progressMap?.[task.id]}
+              onTaskUpdated={onTaskUpdated}
+            />
+          ))}
+        </div>
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 mt-6">
+            <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Page {page} / {totalPages}
+            </span>
+            <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
       </div>
     );
   }
