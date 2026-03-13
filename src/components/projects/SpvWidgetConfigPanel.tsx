@@ -155,24 +155,25 @@ export function SpvWidgetConfigPanel({ config, onChange }: Props) {
     const newIndex = config.findIndex(w => w.id === over.id);
     const next = arrayMove(config, oldIndex, newIndex);
     onChange(next);
-    saveConfig(next);
+    saveSpvWidgetConfig(next);
   };
 
   const toggleVisibility = (id: string) => {
     const next = config.map(w => (w.id === id ? { ...w, visible: !w.visible } : w));
     onChange(next);
-    saveConfig(next);
+    saveSpvWidgetConfig(next);
   };
 
   const changeSize = (id: string, size: WidgetSize) => {
     const next = config.map(w => (w.id === id ? { ...w, size } : w));
     onChange(next);
-    saveConfig(next);
+    saveSpvWidgetConfig(next);
   };
 
   const reset = () => {
-    onChange(DEFAULT_WIDGETS);
-    saveConfig(DEFAULT_WIDGETS);
+    const defaults = getDefaultSpvWidgetConfig();
+    onChange(defaults);
+    saveSpvWidgetConfig(defaults);
   };
 
   return (
