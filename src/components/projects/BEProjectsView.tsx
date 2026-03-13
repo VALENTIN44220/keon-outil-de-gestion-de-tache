@@ -261,22 +261,6 @@ export function BEProjectsView() {
               />
             </div>
 
-            {/* KEON Filter Toggle */}
-            <Button
-              variant={showKeonOnly ? 'default' : 'outline'}
-              size="sm"
-              className={cn('h-8 px-3 gap-2', showKeonOnly && 'shadow-sm')}
-              onClick={() => setShowKeonOnly(!showKeonOnly)}
-            >
-              <ClipboardList className="h-4 w-4" />
-              <span className="hidden sm:inline">Projets KEON</span>
-              {showKeonOnly && keonProjectIds.size > 0 && (
-                <Badge variant="secondary" className="ml-1 text-xs h-5 px-1.5">
-                  {keonProjectIds.size}
-                </Badge>
-              )}
-            </Button>
-            
             {/* View Toggle */}
             <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-lg">
               <Button
