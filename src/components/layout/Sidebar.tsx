@@ -358,12 +358,17 @@ export function Sidebar({
             {filteredGroups.map((group, groupIndex) => (
               <div key={groupIndex}>
                 {groupIndex > 0 && (
-                  <div className="py-2">
+                  <div className="pt-3 pb-1">
                     <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
                   </div>
                 )}
-                <div className="space-y-1">
-                  {group.map((item) => {
+                {group.label && (
+                  <div className="px-3 pt-2 pb-1">
+                    <span className="text-[10px] font-semibold tracking-widest uppercase text-muted-foreground/60">{group.label}</span>
+                  </div>
+                )}
+                <div className="space-y-0.5">
+                  {group.items.map((item) => {
                     const Icon = item.icon;
                     const isActive = activeView === item.id;
                     const colors = menuColors[item.id] || menuColors.dashboard;
@@ -374,21 +379,21 @@ export function Sidebar({
                         className={cn(
                           "w-full flex items-center gap-3 transition-all duration-200 font-body group relative px-3 py-2.5 rounded-xl",
                           isActive && [colors.bg, "border-l-4", colors.border],
-                          !isActive && "hover:bg-muted border-l-4 border-transparent",
+                          !isActive && "hover:bg-muted/60 border-l-4 border-transparent",
                         )}
                       >
                         <div className={cn(
                           "flex items-center justify-center rounded-xl transition-all duration-200 relative p-2",
                           isActive
                             ? [colors.iconBg, "text-white shadow-md"]
-                            : "bg-muted text-muted-foreground group-hover:text-foreground",
+                            : "bg-muted/50 text-foreground/50 group-hover:text-foreground group-hover:bg-muted",
                         )}>
                           <Icon className="w-4 h-4 relative z-10" />
                           {isActive && <div className={cn("absolute inset-0 rounded-xl blur-sm opacity-50", colors.iconBg)} />}
                         </div>
                         <span className={cn(
                           "font-medium text-sm transition-colors flex-1 text-left",
-                          isActive ? [colors.text, "font-semibold"] : "text-muted-foreground group-hover:text-foreground"
+                          isActive ? [colors.text, "font-semibold"] : "text-foreground/60 group-hover:text-foreground"
                         )}>
                           {item.label}
                         </span>
