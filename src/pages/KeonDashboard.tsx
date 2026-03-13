@@ -253,6 +253,7 @@ export default function KeonDashboard() {
                 projects={filteredProjects}
                 qstData={qstData}
                 keonProjectIds={keonProjectIds}
+                widgetConfig={widgetConfig}
               />
             )}
 
