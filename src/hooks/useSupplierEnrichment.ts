@@ -45,6 +45,11 @@ export interface SupplierEnrichment {
   detail_par_entite: string | null;
   site_web: string | null;
 
+  ca_estime: number | null;
+  description: string | null;
+  siret: string | null;
+  tva: string | null;
+
   completeness_score: number;
   status: 'a_completer' | 'en_cours' | 'complet';
 
