@@ -29,7 +29,10 @@ import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Workflow, ChevronDown, ChevronUp, Eye, Zap, Settings2, ShieldCheck } from 'lucide-react';
+import { Loader2, Workflow, ChevronDown, ChevronUp, Eye, Zap, Settings2, ShieldCheck, LayoutGrid, Columns, Calendar, TableProperties, BarChart3 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Layers } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useCategories } from '@/hooks/useCategories';
@@ -48,7 +51,8 @@ const Index = () => {
   const [taskView, setTaskView] = useState<TaskView>('grid');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [showFullStats, setShowFullStats] = useState(false);
-  const [dashboardMode, setDashboardMode] = useState<'tasks' | 'analytics' | 'tracking' | 'planner' | 'validations'>('tasks');
+  const [dashboardMode, setDashboardMode] = useState<'tasks' | 'planner' | 'validations'>('tasks');
+  const [taskSubMode, setTaskSubMode] = useState<'grid' | 'kanban' | 'calendar' | 'table' | 'analytics' | 'tracking'>('grid');
   const [isBulkActionOpen, setIsBulkActionOpen] = useState(false);
   const [kanbanGroupMode, setKanbanGroupMode] = useState<KanbanGroupMode>('status');
   const [crossFilters, setCrossFilters] = useState<CrossFilters>(DEFAULT_CROSS_FILTERS);
@@ -153,13 +157,9 @@ const Index = () => {
   }, [profile?.id]);
 
   useEffect(() => {
-    if (dashboardMode === 'tracking') {
-      fetchMyRequests();
-    }
-    if (dashboardMode === 'analytics') {
-      fetchAllRequests();
-    }
-  }, [dashboardMode, fetchMyRequests, fetchAllRequests]);
+    if (taskSubMode === 'tracking') fetchMyRequests();
+    if (taskSubMode === 'analytics') fetchAllRequests();
+  }, [taskSubMode, fetchMyRequests, fetchAllRequests]);
 
   // Merge tasks + requests for analytics mode
   const analyticsTasksAndRequests = useMemo(() => {
@@ -381,68 +381,187 @@ const Index = () => {
     }
   };
 
-  const renderDashboardContent = () => (
-    <>
-      {/* Mode toggle: Tasks vs Analytics vs Tracking */}
-       <div className="flex flex-wrap items-center gap-2 mb-4">
-         <div className="flex flex-wrap bg-white rounded-lg border-2 border-keon-200 p-1 gap-1">
-          <Button
-            variant={dashboardMode === 'tasks' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => setDashboardMode('tasks')}
-            className="text-xs"
+  const renderTasksSubContent = () => {
+    if (taskSubMode === 'analytics') {
+      return (
+        <ConfigurableDashboard
+          tasks={analyticsTasksAndRequests}
+          stats={stats}
+          globalProgress={globalProgress}
+          onTaskClick={(task) => {
+            if (task.type === 'request') {
+              setSelectedRequest(task);
+              setIsRequestDetailOpen(true);
+            } else {
+              setSelectedTaskForComment(task);
+              setIsCommentDetailOpen(true);
+            }
+          }}
+        />
+      );
+    }
+    if (taskSubMode === 'tracking') {
+      return isLoadingRequests ? (
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      ) : (
+        <ConfigurableDashboard
+          tasks={myRequests}
+          stats={requestStats}
+          globalProgress={requestGlobalProgress}
+          onTaskClick={(task) => {
+            setSelectedRequest(task);
+            setIsRequestDetailOpen(true);
+          }}
+        />
+      );
+    }
+    // Task management views (grid/kanban/calendar/table)
+    return (
+      <>
+        <CrossFiltersPanel
+          filters={crossFilters}
+          onFiltersChange={setCrossFilters}
+          contextId="tasks"
+        />
+        <div className="mb-4">
+          <button
+            onClick={() => setShowFullStats(!showFullStats)}
+            className="flex items-center gap-2 text-sm text-keon-700 hover:text-keon-900 mb-2"
           >
-            Gestion des tâches
+            {showFullStats ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {showFullStats ? 'Masquer les statistiques' : 'Afficher les statistiques détaillées'}
+          </button>
+          <DashboardStats
+            stats={stats}
+            globalProgress={globalProgress}
+            globalStats={globalStats}
+            unassignedCount={canAssignToTeam ? (unassignedCount + pendingCount) : 0}
+            onViewUnassigned={() => setActiveView('to-assign')}
+            collapsed={!showFullStats}
+          />
+        </div>
+        <div className="flex justify-end gap-2 mb-4">
+          <Button
+            variant="outline"
+            onClick={() => setIsBulkActionOpen(true)}
+            className="gap-2 border-keon-300 text-keon-700 hover:bg-keon-100"
+          >
+            <Settings2 className="h-4 w-4" />
+            Actions en masse
           </Button>
           <Button
-            variant={dashboardMode === 'analytics' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => setDashboardMode('analytics')}
-            className="text-xs"
+            variant="outline"
+            onClick={() => setIsTemplateDialogOpen(true)}
+            className="gap-2 border-keon-300 text-keon-700 hover:bg-keon-100"
           >
-            Tableau de bord analytique
-          </Button>
-          <Button
-            variant={dashboardMode === 'tracking' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => setDashboardMode('tracking')}
-            className="text-xs gap-1"
-          >
-            <Eye className="h-3.5 w-3.5" />
-            Suivi des demandes
-            {myRequests.length > 0 && (
-              <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">
-                {myRequests.length}
-              </Badge>
-            )}
-          </Button>
-          <Button
-            variant={dashboardMode === 'planner' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => setDashboardMode('planner')}
-            className="text-xs gap-1"
-          >
-            <Zap className="h-3.5 w-3.5" />
-            Planner
-          </Button>
-          <Button
-            variant={dashboardMode === 'validations' ? 'default' : 'ghost'}
-            size="sm"
-            onClick={() => setDashboardMode('validations')}
-            className="text-xs gap-1"
-          >
-            <ShieldCheck className="h-3.5 w-3.5" />
-            Validations
-            {totalValidationCount > 0 && (
-              <Badge variant="destructive" className="ml-1 text-[10px] px-1.5 py-0">
-                {totalValidationCount}
-              </Badge>
-            )}
+            <Workflow className="h-4 w-4" />
+            Depuis un modèle
           </Button>
         </div>
-      </div>
+        {renderTaskView()}
+      </>
+    );
+  };
 
-      {dashboardMode === 'validations' ? (
+  const taskSubModeOptions = [
+    { value: 'grid' as const, label: 'Grille', icon: LayoutGrid },
+    { value: 'kanban' as const, label: 'Kanban', icon: Columns },
+    { value: 'calendar' as const, label: 'Calendrier', icon: Calendar },
+    { value: 'table' as const, label: 'Tableau', icon: TableProperties },
+  ];
+
+  const renderDashboardContent = () => (
+    <Tabs value={dashboardMode} onValueChange={(v) => setDashboardMode(v as any)} className="w-full">
+      <TabsList className="mb-0 bg-white border-b border-keon-200 rounded-none w-full justify-start h-10 px-0 gap-0">
+        <TabsTrigger value="tasks" className="rounded-none border-b-2 border-transparent data-[state=active]:border-keon-blue data-[state=active]:text-keon-blue data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 h-10">
+          Tâches & Demandes
+        </TabsTrigger>
+        <TabsTrigger value="planner" className="rounded-none border-b-2 border-transparent data-[state=active]:border-keon-blue data-[state=active]:text-keon-blue data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 h-10 gap-1">
+          <Zap className="h-3.5 w-3.5" /> Planner
+        </TabsTrigger>
+        <TabsTrigger value="validations" className="rounded-none border-b-2 border-transparent data-[state=active]:border-keon-blue data-[state=active]:text-keon-blue data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 h-10 gap-1">
+          <ShieldCheck className="h-3.5 w-3.5" /> Validations
+          {totalValidationCount > 0 && <Badge variant="destructive" className="ml-1 text-[10px] px-1.5 py-0">{totalValidationCount}</Badge>}
+        </TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="tasks" className="mt-0">
+        {/* Sub-navigation for tasks tab */}
+        <div className="flex items-center bg-keon-50 border-b border-keon-200 px-0 mb-4">
+          {taskSubModeOptions.map(({ value, label, icon: Icon }) => (
+            <button
+              key={value}
+              onClick={() => { setTaskSubMode(value); setTaskView(value as TaskView); }}
+              className={cn(
+                "flex items-center gap-1.5 px-4 py-2 text-xs border-b-2 transition-colors",
+                taskSubMode === value
+                  ? "border-keon-blue text-keon-blue bg-white font-medium"
+                  : "border-transparent text-keon-600 hover:text-keon-900 hover:bg-keon-100"
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {label}
+            </button>
+          ))}
+
+          {/* Kanban group selector */}
+          {taskSubMode === 'kanban' && (
+            <div className="flex items-center gap-1.5 ml-2 pr-2">
+              <Layers className="h-3.5 w-3.5 text-keon-700" />
+              <Select value={kanbanGroupMode} onValueChange={(v) => setKanbanGroupMode(v as KanbanGroupMode)}>
+                <SelectTrigger className="h-7 text-xs w-[130px] border-keon-300 bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="status">Par statut</SelectItem>
+                  <SelectItem value="category">Par catégorie</SelectItem>
+                  <SelectItem value="priority">Par priorité</SelectItem>
+                  <SelectItem value="assignee">Par assigné</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          <div className="w-px bg-keon-300 mx-1 my-1.5 self-stretch" />
+
+          <button
+            onClick={() => { setTaskSubMode('analytics'); fetchAllRequests(); }}
+            className={cn(
+              "flex items-center gap-1.5 px-4 py-2 text-xs border-b-2 transition-colors",
+              taskSubMode === 'analytics'
+                ? "border-keon-blue text-keon-blue bg-white font-medium"
+                : "border-transparent text-keon-600 hover:text-keon-900 hover:bg-keon-100"
+            )}
+          >
+            <BarChart3 className="h-3.5 w-3.5" />
+            Analytique
+          </button>
+
+          <button
+            onClick={() => { setTaskSubMode('tracking'); fetchMyRequests(); }}
+            className={cn(
+              "flex items-center gap-1.5 px-4 py-2 text-xs border-b-2 transition-colors",
+              taskSubMode === 'tracking'
+                ? "border-keon-blue text-keon-blue bg-white font-medium"
+                : "border-transparent text-keon-600 hover:text-keon-900 hover:bg-keon-100"
+            )}
+          >
+            <Eye className="h-3.5 w-3.5" />
+            Suivi
+            {myRequests.length > 0 && <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0">{myRequests.length}</Badge>}
+          </button>
+        </div>
+
+        {renderTasksSubContent()}
+      </TabsContent>
+
+      <TabsContent value="planner" className="mt-4">
+        <PlannerSyncPanel />
+      </TabsContent>
+
+      <TabsContent value="validations" className="mt-4">
         <Tabs defaultValue="requests" className="w-full">
           <TabsList className="mb-4">
             <TabsTrigger value="requests" className="gap-1.5">
@@ -485,104 +604,8 @@ const Index = () => {
             />
           </TabsContent>
         </Tabs>
-      ) : dashboardMode === 'planner' ? (
-        <PlannerSyncPanel />
-      ) : dashboardMode === 'tracking' ? (
-        /* Request tracking dashboard */
-        isLoadingRequests ? (
-          <div className="flex items-center justify-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        ) : (
-          <ConfigurableDashboard
-            tasks={myRequests}
-            stats={requestStats}
-            globalProgress={requestGlobalProgress}
-            onTaskClick={(task) => {
-              setSelectedRequest(task);
-              setIsRequestDetailOpen(true);
-            }}
-          />
-        )
-      ) : dashboardMode === 'analytics' ? (
-        /* Configurable Dashboard with widgets */
-        <ConfigurableDashboard
-          tasks={analyticsTasksAndRequests}
-          stats={stats}
-          globalProgress={globalProgress}
-          onTaskClick={(task) => {
-            if (task.type === 'request') {
-              setSelectedRequest(task);
-              setIsRequestDetailOpen(true);
-            } else {
-              setSelectedTaskForComment(task);
-              setIsCommentDetailOpen(true);
-            }
-          }}
-        />
-      ) : (
-        /* Task management view */
-        <>
-          {/* Unified Toolbar */}
-          <DashboardToolbar
-            currentView={taskView}
-            onViewChange={setTaskView}
-            kanbanGroupMode={kanbanGroupMode}
-            onKanbanGroupModeChange={setKanbanGroupMode}
-          />
-
-          {/* Cross Filters Panel */}
-          <CrossFiltersPanel
-            filters={crossFilters}
-            onFiltersChange={setCrossFilters}
-            contextId="tasks"
-          />
-
-          {/* Collapsible Stats */}
-          <div className="mb-4">
-            <button
-              onClick={() => setShowFullStats(!showFullStats)}
-              className="flex items-center gap-2 text-sm text-keon-700 hover:text-keon-900 mb-2"
-            >
-              {showFullStats ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-              {showFullStats ? 'Masquer les statistiques' : 'Afficher les statistiques détaillées'}
-            </button>
-            
-            <DashboardStats
-              stats={stats}
-              globalProgress={globalProgress}
-              globalStats={globalStats}
-              unassignedCount={canAssignToTeam ? (unassignedCount + pendingCount) : 0}
-              onViewUnassigned={() => setActiveView('to-assign')}
-              collapsed={!showFullStats}
-            />
-          </div>
-
-          {/* Action buttons */}
-          <div className="flex justify-end gap-2 mb-4">
-            <Button 
-              variant="outline" 
-              onClick={() => setIsBulkActionOpen(true)}
-              className="gap-2 border-keon-300 text-keon-700 hover:bg-keon-100"
-            >
-              <Settings2 className="h-4 w-4" />
-              Actions en masse
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={() => setIsTemplateDialogOpen(true)}
-              className="gap-2 border-keon-300 text-keon-700 hover:bg-keon-100"
-            >
-              <Workflow className="h-4 w-4" />
-              Depuis un modèle
-            </Button>
-          </div>
-
-          {/* Task View */}
-          {renderTaskView()}
-        </>
-      )}
-    </>
+      </TabsContent>
+    </Tabs>
   );
 
   const renderContent = () => {
