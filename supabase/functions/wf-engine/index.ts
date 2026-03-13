@@ -304,7 +304,7 @@ async function handleValidation(supabase: any, instance: any, step: any, event: 
     if (seqValidators && approvedCount < seqValidators.length) {
       const nextValidator = seqValidators[approvedCount];
       const resolvedIds = await resolveAssignmentRule(supabase, nextValidator.assignment_rule, instance);
-      if (!resolvedIds.includes(actorId)) {
+      if (!resolvedIds.includes(actorId!)) {
         return { canProceed: false, message: `It is not this actor's turn in the sequence`, forbidden: true };
       }
     }
