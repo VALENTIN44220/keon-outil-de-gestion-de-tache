@@ -57,9 +57,6 @@ const Index = () => {
   const [kanbanGroupMode, setKanbanGroupMode] = useState<KanbanGroupMode>('status');
   const [crossFilters, setCrossFilters] = useState<CrossFilters>(DEFAULT_CROSS_FILTERS);
   
-  // Request tracking state
-  const [myRequests, setMyRequests] = useState<Task[]>([]);
-  const [isLoadingRequests, setIsLoadingRequests] = useState(false);
   // All requests for analytics mode
   const [allRequests, setAllRequests] = useState<Task[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<Task | null>(null);
