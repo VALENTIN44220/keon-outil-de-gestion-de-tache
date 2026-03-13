@@ -42,24 +42,28 @@ const DEFAULT_WIDGETS: SpvWidgetConfig[] = [
   { id: 'tableau', label: 'Tableau récap', visible: true, size: 'normal', dotColor: '#f59e0b' },
 ];
 
+export function getDefaultSpvWidgetConfig(): SpvWidgetConfig[] {
+  return DEFAULT_WIDGETS.map(widget => ({ ...widget }));
+}
+
 export function loadSpvWidgetConfig(): SpvWidgetConfig[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_WIDGETS;
+    if (!raw) return getDefaultSpvWidgetConfig();
     const parsed = JSON.parse(raw) as SpvWidgetConfig[];
-    // Merge with defaults to handle new widgets
+    const defaults = getDefaultSpvWidgetConfig();
     const ids = new Set(parsed.map(w => w.id));
     const merged = [...parsed];
-    DEFAULT_WIDGETS.forEach(dw => {
+    defaults.forEach(dw => {
       if (!ids.has(dw.id)) merged.push(dw);
     });
-    return merged.filter(w => DEFAULT_WIDGETS.some(dw => dw.id === w.id));
+    return merged.filter(w => defaults.some(dw => dw.id === w.id));
   } catch {
-    return DEFAULT_WIDGETS;
+    return getDefaultSpvWidgetConfig();
   }
 }
 
-function saveConfig(config: SpvWidgetConfig[]) {
+export function saveSpvWidgetConfig(config: SpvWidgetConfig[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
 }
 
@@ -151,24 +155,25 @@ export function SpvWidgetConfigPanel({ config, onChange }: Props) {
     const newIndex = config.findIndex(w => w.id === over.id);
     const next = arrayMove(config, oldIndex, newIndex);
     onChange(next);
-    saveConfig(next);
+    saveSpvWidgetConfig(next);
   };
 
   const toggleVisibility = (id: string) => {
     const next = config.map(w => (w.id === id ? { ...w, visible: !w.visible } : w));
     onChange(next);
-    saveConfig(next);
+    saveSpvWidgetConfig(next);
   };
 
   const changeSize = (id: string, size: WidgetSize) => {
     const next = config.map(w => (w.id === id ? { ...w, size } : w));
     onChange(next);
-    saveConfig(next);
+    saveSpvWidgetConfig(next);
   };
 
   const reset = () => {
-    onChange(DEFAULT_WIDGETS);
-    saveConfig(DEFAULT_WIDGETS);
+    const defaults = getDefaultSpvWidgetConfig();
+    onChange(defaults);
+    saveSpvWidgetConfig(defaults);
   };
 
   return (

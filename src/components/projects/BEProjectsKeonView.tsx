@@ -1,10 +1,12 @@
-import { useMemo, useRef, useEffect } from 'react';
+import { useMemo, useRef, useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { BEProject } from '@/types/beProject';
-import { QUESTIONS, PILIERS, PilierCode } from '@/config/questionnaireConfig';
+import { PilierCode } from '@/config/questionnaireConfig';
 import { computePilierCompletion } from './keon-synthese/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { useTableSort } from '@/hooks/useTableSort';
@@ -13,27 +15,31 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from 'recharts';
-import { Leaf, Building2, Flame, BarChart2, MapPin, CheckCircle2 } from 'lucide-react';
+import { Leaf, Building2, Flame, BarChart2, MapPin, CheckCircle2, Settings2, RotateCcw, GripVertical } from 'lucide-react';
+import {
+  SpvWidgetConfig,
+  WidgetSize,
+  getDefaultSpvWidgetConfig,
+  loadSpvWidgetConfig,
+  saveSpvWidgetConfig,
+} from './SpvWidgetConfigPanel';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
 const CHART_COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#6b7280'];
-
 const PILIER_CODES: PilierCode[] = ['00', '02', '04', '05', '06', '07'];
 
 interface Props {
   projects: BEProject[];
   qstData: Record<string, Record<string, any>>;
   keonProjectIds: Set<string>;
-  widgetConfig?: import('./SpvWidgetConfigPanel').SpvWidgetConfig[];
+  widgetConfig?: SpvWidgetConfig[];
+  onWidgetConfigChange?: (config: SpvWidgetConfig[]) => void;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 function safeFloat(v: any): number {
   const n = parseFloat(v);
   return isNaN(n) ? 0 : n;
 }
 
-/** Flexible qstData key lookup: finds first key containing ALL keywords */
 function getQstValue(qst: Record<string, any>, ...keywords: string[]): string | null {
   const key = Object.keys(qst).find(k => keywords.every(kw => k.toLowerCase().includes(kw.toLowerCase())));
   return key ? qst[key] : null;
@@ -50,16 +56,32 @@ function completionColor(pct: number) {
   return 'text-emerald-500';
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
-export function BEProjectsKeonView({ projects, qstData, keonProjectIds, widgetConfig }: Props) {
+export function BEProjectsKeonView({ projects, qstData, keonProjectIds, widgetConfig, onWidgetConfigChange }: Props) {
   const navigate = useNavigate();
+  const [internalWidgetConfig, setInternalWidgetConfig] = useState<SpvWidgetConfig[]>(loadSpvWidgetConfig);
+  const [isEditing, setIsEditing] = useState(false);
+  const [draggedWidget, setDraggedWidget] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+
+  const widgets = widgetConfig ?? internalWidgetConfig;
+
+  const setWidgets = useCallback((next: SpvWidgetConfig[] | ((prev: SpvWidgetConfig[]) => SpvWidgetConfig[])) => {
+    const prev = widgetConfig ?? internalWidgetConfig;
+    const result = typeof next === 'function' ? next(prev) : next;
+
+    if (!widgetConfig) {
+      setInternalWidgetConfig(result);
+    }
+
+    onWidgetConfigChange?.(result);
+    saveSpvWidgetConfig(result);
+  }, [widgetConfig, internalWidgetConfig, onWidgetConfigChange]);
 
   const keonProjects = useMemo(
     () => projects.filter(p => keonProjectIds.has(p.id)),
     [projects, keonProjectIds]
   );
 
-  // ── KPIs ─────────────────────────────────────────────────────────────────
   const kpis = useMemo(() => {
     let spvCount = 0;
     let gisementSum = 0;
@@ -93,7 +115,6 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds, widgetCo
     };
   }, [keonProjects, qstData]);
 
-  // ── Typologie pie data ───────────────────────────────────────────────────
   const typoPieData = useMemo(() => {
     const counts: Record<string, number> = {};
     keonProjects.forEach(p => {
@@ -103,7 +124,6 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds, widgetCo
     return Object.entries(counts).map(([name, value]) => ({ name, value }));
   }, [keonProjects, qstData]);
 
-  // ── Gisement bar data ────────────────────────────────────────────────────
   const gisementBarData = useMemo(() => {
     return keonProjects
       .map(p => {
@@ -117,7 +137,6 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds, widgetCo
       .sort((a, b) => b.gisement - a.gisement);
   }, [keonProjects, qstData]);
 
-  // ── Table data ───────────────────────────────────────────────────────────
   const tableData = useMemo(() => {
     return keonProjects.map(p => {
       const d = qstData[p.id] || {};
@@ -138,7 +157,6 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds, widgetCo
 
   const { sortedData, sortConfig, handleSort } = useTableSort(tableData, 'code_projet', 'asc');
 
-  // ── Map ──────────────────────────────────────────────────────────────────
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
 
@@ -192,32 +210,75 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds, widgetCo
     return () => { if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; } };
   }, [keonWithCoords]);
 
-  // ── Widget visibility helper ─────────────────────────────────────────────
-  const isVisible = (id: string) => {
-    if (!widgetConfig) return true;
-    const w = widgetConfig.find(c => c.id === id);
-    return w ? w.visible : true;
-  };
-
-  const getWidgetSize = (id: string) => {
-    if (!widgetConfig) return 'normal';
-    const w = widgetConfig.find(c => c.id === id);
+  const getWidgetSize = useCallback((id: string): WidgetSize => {
+    const w = widgets.find(c => c.id === id);
     return w?.size ?? 'normal';
-  };
+  }, [widgets]);
 
-  const sizeToHeight = (id: string, base: number) => {
+  const sizeToHeight = useCallback((id: string, base: number) => {
     const s = getWidgetSize(id);
     if (s === 'compact') return Math.round(base * 0.7);
     if (s === 'large') return Math.round(base * 1.4);
     return base;
+  }, [getWidgetSize]);
+
+  const orderedWidgetIds = widgets.filter(w => w.visible).map(w => w.id);
+  const hiddenCount = widgets.length - orderedWidgetIds.length;
+
+  const handleReset = useCallback(() => {
+    setWidgets(getDefaultSpvWidgetConfig());
+  }, [setWidgets]);
+
+  const handleRestoreAll = useCallback(() => {
+    setWidgets(prev => prev.map(widget => ({ ...widget, visible: true })));
+  }, [setWidgets]);
+
+  const handleToggleVisibility = useCallback((id: string) => {
+    setWidgets(prev => prev.map(widget => (
+      widget.id === id ? { ...widget, visible: !widget.visible } : widget
+    )));
+  }, [setWidgets]);
+
+  const handleSizeChange = useCallback((id: string, size: WidgetSize) => {
+    setWidgets(prev => prev.map(widget => (
+      widget.id === id ? { ...widget, size } : widget
+    )));
+  }, [setWidgets]);
+
+  const handleDragStart = (widgetId: string) => {
+    if (!isEditing) return;
+    setDraggedWidget(widgetId);
   };
 
-  // ── Ordered widgets ─────────────────────────────────────────────────────
-  const orderedWidgetIds = widgetConfig
-    ? widgetConfig.filter(w => w.visible).map(w => w.id)
-    : ['kpis', 'map', 'typologie', 'gisement', 'tableau'];
+  const handleDragOver = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    if (!draggedWidget || draggedWidget === targetId) return;
+    setDropTargetId(targetId);
+  };
 
-  // ── Render ───────────────────────────────────────────────────────────────
+  const handleDrop = (e: React.DragEvent, targetId: string) => {
+    e.preventDefault();
+    setDropTargetId(null);
+    if (!draggedWidget || draggedWidget === targetId) return;
+
+    setWidgets(prev => {
+      const newWidgets = [...prev];
+      const draggedIndex = newWidgets.findIndex(w => w.id === draggedWidget);
+      const targetIndex = newWidgets.findIndex(w => w.id === targetId);
+      if (draggedIndex === -1 || targetIndex === -1) return prev;
+      const [moved] = newWidgets.splice(draggedIndex, 1);
+      newWidgets.splice(targetIndex, 0, moved);
+      return newWidgets;
+    });
+
+    setDraggedWidget(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedWidget(null);
+    setDropTargetId(null);
+  };
+
   if (keonProjects.length === 0) {
     return (
       <Card className="border-border/50">
@@ -232,7 +293,6 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds, widgetCo
   const mapHeight = sizeToHeight('map', 350);
   const pieHeight = sizeToHeight('typologie', 300);
 
-  // Widget renderers
   const widgetRenderers: Record<string, () => React.ReactNode> = {
     kpis: () => (
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -360,49 +420,132 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds, widgetCo
     ),
   };
 
-  // Check if map and typologie are adjacent in ordered list → render them side by side
+  const renderWidgetShell = (id: string, node: React.ReactNode) => {
+    const widget = widgets.find(w => w.id === id);
+    if (!widget) return null;
+
+    const sizes: { key: WidgetSize; label: string }[] = [
+      { key: 'compact', label: 'C' },
+      { key: 'normal', label: 'N' },
+      { key: 'large', label: 'L' },
+    ];
+
+    return (
+      <div
+        key={id}
+        className={cn(
+          'space-y-2 transition-all duration-200',
+          isEditing && 'cursor-move',
+          draggedWidget === id && 'opacity-40 scale-[0.98]',
+          dropTargetId === id && 'ring-2 ring-primary ring-offset-2 rounded-xl p-2'
+        )}
+        draggable={isEditing}
+        onDragStart={() => handleDragStart(id)}
+        onDragOver={(e) => handleDragOver(e, id)}
+        onDrop={(e) => handleDrop(e, id)}
+        onDragEnd={handleDragEnd}
+        onDragLeave={() => setDropTargetId(null)}
+      >
+        {isEditing && (
+          <div className="flex items-center gap-3 p-2 rounded-lg border border-dashed border-border bg-muted/20">
+            <GripVertical className="h-4 w-4 text-muted-foreground shrink-0" />
+            <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: widget.dotColor }} />
+            <span className="flex-1 text-sm font-medium">{widget.label}</span>
+            <div className="flex items-center gap-0.5 p-0.5 bg-muted/50 rounded-md">
+              {sizes.map(size => (
+                <button
+                  key={size.key}
+                  onClick={() => handleSizeChange(widget.id, size.key)}
+                  className={cn(
+                    'px-2 py-0.5 text-xs font-medium rounded transition-colors',
+                    widget.size === size.key
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  {size.label}
+                </button>
+              ))}
+            </div>
+            <Switch checked={widget.visible} onCheckedChange={() => handleToggleVisibility(widget.id)} />
+          </div>
+        )}
+        {node}
+      </div>
+    );
+  };
+
   const renderWidgets = () => {
     const result: React.ReactNode[] = [];
     let i = 0;
+
     while (i < orderedWidgetIds.length) {
       const id = orderedWidgetIds[i];
       const nextId = orderedWidgetIds[i + 1];
 
-      // If map + typologie are adjacent (either order), render in side-by-side grid
-      if (
-        (id === 'map' && nextId === 'typologie') ||
-        (id === 'typologie' && nextId === 'map')
-      ) {
-        const mapWidget = widgetRenderers['map']();
-        const typoWidget = widgetRenderers['typologie']();
+      if ((id === 'map' && nextId === 'typologie') || (id === 'typologie' && nextId === 'map')) {
+        const mapWidget = renderWidgetShell('map', widgetRenderers.map());
+        const typoWidget = renderWidgetShell('typologie', widgetRenderers.typologie());
+
         result.push(
-          <div key="map-typo-row" className="grid grid-cols-1 lg:grid-cols-5 gap-6" style={{ minHeight: Math.max(mapHeight, pieHeight) + 80 }}>
-            <div className="lg:col-span-3">
-              {id === 'map' ? mapWidget : typoWidget}
-            </div>
-            <div className="lg:col-span-2">
-              {id === 'map' ? typoWidget : mapWidget}
-            </div>
+          <div key={`map-typo-row-${i}`} className="grid grid-cols-1 lg:grid-cols-5 gap-6" style={{ minHeight: Math.max(mapHeight, pieHeight) + 80 }}>
+            <div className="lg:col-span-3">{id === 'map' ? mapWidget : typoWidget}</div>
+            <div className="lg:col-span-2">{id === 'map' ? typoWidget : mapWidget}</div>
           </div>
         );
+
         i += 2;
-      } else {
-        const node = widgetRenderers[id]?.();
-        if (node) result.push(<div key={id}>{node}</div>);
-        i++;
+        continue;
       }
+
+      const node = widgetRenderers[id]?.();
+      if (node) result.push(renderWidgetShell(id, node));
+      i += 1;
     }
+
     return result;
   };
 
   return (
-    <div className="space-y-6">
-      {renderWidgets()}
+    <div className="space-y-4">
+      <div className="flex items-center justify-end gap-2 flex-wrap">
+        <Button
+          variant={isEditing ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setIsEditing(!isEditing)}
+          className="gap-2"
+        >
+          <Settings2 className="h-4 w-4" />
+          {isEditing ? 'Terminer' : 'Personnaliser'}
+        </Button>
+
+        {isEditing && (
+          <>
+            <Button variant="outline" size="sm" onClick={handleReset} className="gap-2">
+              <RotateCcw className="h-4 w-4" />
+              Réinitialiser
+            </Button>
+            {hiddenCount > 0 && (
+              <Button variant="outline" size="sm" onClick={handleRestoreAll}>
+                Afficher tout ({hiddenCount} masqué{hiddenCount > 1 ? 's' : ''})
+              </Button>
+            )}
+          </>
+        )}
+      </div>
+
+      <div
+        className={cn(
+          'space-y-6',
+          isEditing && 'rounded-xl border-2 border-dashed border-primary/30 p-4'
+        )}
+      >
+        {renderWidgets()}
+      </div>
     </div>
   );
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
 function KpiCard({ icon, label, value, badge, badgeClass }: { icon: React.ReactNode; label: string; value: string; badge?: boolean; badgeClass?: string }) {
   return (
     <Card className="border-border/50">
