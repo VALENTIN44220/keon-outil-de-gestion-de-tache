@@ -35,6 +35,7 @@ export type StatutFDR =
   | 'non_soumis'
   | 'en_cours_validation'
   | 'abandonne'
+  | 'fdr_2026'
   | 'fdr_2027'
   | 'fdr_2030'
   | 'stand_by'
