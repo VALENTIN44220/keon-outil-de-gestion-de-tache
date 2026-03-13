@@ -299,15 +299,6 @@ export function BEProjectsView() {
                 <Kanban className="h-4 w-4" />
                 <span className="hidden sm:inline">Kanban</span>
               </Button>
-              <Button
-                variant={currentView === 'keon' ? 'default' : 'ghost'}
-                size="sm"
-                className={cn('h-8 px-3 gap-2', currentView === 'keon' && 'shadow-sm')}
-                onClick={() => setCurrentView('keon')}
-              >
-                <span>🌿</span>
-                <span className="hidden sm:inline">KEON</span>
-              </Button>
             </div>
 
             {currentView === 'table' && (
