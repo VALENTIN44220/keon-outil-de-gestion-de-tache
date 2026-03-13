@@ -215,7 +215,7 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds, widgetCo
   // ── Ordered widgets ─────────────────────────────────────────────────────
   const orderedWidgetIds = widgetConfig
     ? widgetConfig.filter(w => w.visible).map(w => w.id)
-    : ['kpi_band', 'map', 'typologie', 'gisement', 'table'];
+    : ['kpis', 'map', 'typologie', 'gisement', 'tableau'];
 
   // ── Render ───────────────────────────────────────────────────────────────
   if (keonProjects.length === 0) {
@@ -234,7 +234,7 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds, widgetCo
 
   // Widget renderers
   const widgetRenderers: Record<string, () => React.ReactNode> = {
-    kpi_band: () => (
+    kpis: () => (
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <KpiCard icon={<Leaf className="h-5 w-5 text-emerald-500" />} label="Projets SPV" value={String(kpis.total)} />
         <KpiCard icon={<Building2 className="h-5 w-5 text-blue-500" />} label="SPV créées" value={String(kpis.spv)} badge badgeClass="bg-emerald-500/10 text-emerald-600 border-emerald-500/20" />
@@ -304,7 +304,7 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds, widgetCo
       </Card>
     ) : null,
 
-    table: () => (
+    tableau: () => (
       <Card className="border-border/50">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm flex items-center gap-2">
