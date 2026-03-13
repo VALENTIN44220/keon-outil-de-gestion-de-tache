@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { useBEProjects } from '@/hooks/useBEProjects';
@@ -19,6 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Loader2, Search, BarChart2, LayoutGrid, List, Kanban, Leaf, Pencil, Trash2, Building2, LayoutDashboard } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { SpvWidgetConfigPanel, loadSpvWidgetConfig, SpvWidgetConfig } from '@/components/projects/SpvWidgetConfigPanel';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { useTableSort } from '@/hooks/useTableSort';
 import { computePilierCompletion } from '@/components/projects/keon-synthese/utils';
@@ -58,6 +59,7 @@ export default function KeonDashboard() {
   const [editingProject, setEditingProject] = useState<BEProject | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [deletingProject, setDeletingProject] = useState<BEProject | null>(null);
+  const [widgetConfig, setWidgetConfig] = useState<SpvWidgetConfig[]>(loadSpvWidgetConfig);
 
   const {
     filters: multiFilters,
@@ -213,6 +215,11 @@ export default function KeonDashboard() {
                   <span className="hidden sm:inline">Kanban</span>
                 </Button>
               </div>
+
+              {/* Widget config button (only in synthese view) */}
+              {currentView === 'synthese' && (
+                <SpvWidgetConfigPanel config={widgetConfig} onChange={setWidgetConfig} />
+              )}
             </div>
 
             {/* Multi-criteria filters */}
@@ -246,6 +253,7 @@ export default function KeonDashboard() {
                 projects={filteredProjects}
                 qstData={qstData}
                 keonProjectIds={keonProjectIds}
+                widgetConfig={widgetConfig}
               />
             )}
 

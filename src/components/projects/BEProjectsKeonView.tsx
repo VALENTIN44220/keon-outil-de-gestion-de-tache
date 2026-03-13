@@ -24,6 +24,7 @@ interface Props {
   projects: BEProject[];
   qstData: Record<string, Record<string, any>>;
   keonProjectIds: Set<string>;
+  widgetConfig?: import('./SpvWidgetConfigPanel').SpvWidgetConfig[];
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -50,7 +51,7 @@ function completionColor(pct: number) {
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
-export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props) {
+export function BEProjectsKeonView({ projects, qstData, keonProjectIds, widgetConfig }: Props) {
   const navigate = useNavigate();
 
   const keonProjects = useMemo(
@@ -191,6 +192,31 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
     return () => { if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; } };
   }, [keonWithCoords]);
 
+  // ── Widget visibility helper ─────────────────────────────────────────────
+  const isVisible = (id: string) => {
+    if (!widgetConfig) return true;
+    const w = widgetConfig.find(c => c.id === id);
+    return w ? w.visible : true;
+  };
+
+  const getWidgetSize = (id: string) => {
+    if (!widgetConfig) return 'normal';
+    const w = widgetConfig.find(c => c.id === id);
+    return w?.size ?? 'normal';
+  };
+
+  const sizeToHeight = (id: string, base: number) => {
+    const s = getWidgetSize(id);
+    if (s === 'compact') return Math.round(base * 0.7);
+    if (s === 'large') return Math.round(base * 1.4);
+    return base;
+  };
+
+  // ── Ordered widgets ─────────────────────────────────────────────────────
+  const orderedWidgetIds = widgetConfig
+    ? widgetConfig.filter(w => w.visible).map(w => w.id)
+    : ['kpi_band', 'map', 'typologie', 'gisement', 'table'];
+
   // ── Render ───────────────────────────────────────────────────────────────
   if (keonProjects.length === 0) {
     return (
@@ -203,9 +229,12 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
     );
   }
 
-  return (
-    <div className="space-y-6">
-      {/* KPI BAND */}
+  const mapHeight = sizeToHeight('map', 350);
+  const pieHeight = sizeToHeight('typologie', 300);
+
+  // Widget renderers
+  const widgetRenderers: Record<string, () => React.ReactNode> = {
+    kpi_band: () => (
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <KpiCard icon={<Leaf className="h-5 w-5 text-emerald-500" />} label="Projets SPV" value={String(kpis.total)} />
         <KpiCard icon={<Building2 className="h-5 w-5 text-blue-500" />} label="SPV créées" value={String(kpis.spv)} badge badgeClass="bg-emerald-500/10 text-emerald-600 border-emerald-500/20" />
@@ -214,67 +243,68 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
         <KpiCard icon={<BarChart2 className="h-5 w-5 text-violet-500" />} label="KS Keon moyen" value={`${kpis.ks} %`} />
         <KpiCard icon={<CheckCircle2 className="h-5 w-5 text-emerald-500" />} label="Questionnaire >50%" value={String(kpis.complete)} />
       </div>
+    ),
 
-      {/* ROW 2: Map + Typologie Pie */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        <Card className="border-border/50 lg:col-span-3">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <MapPin className="h-4 w-4 text-muted-foreground" />
-              Carte des projets SPV
-              <Badge variant="secondary" className="ml-auto text-xs">{keonWithCoords.length} localisés</Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div ref={mapRef} className="h-[350px] w-full rounded-b-lg" />
-          </CardContent>
-        </Card>
+    map: () => (
+      <Card className="border-border/50 overflow-hidden">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <MapPin className="h-4 w-4 text-muted-foreground" />
+            Carte des projets SPV
+            <Badge variant="secondary" className="ml-auto text-xs">{keonWithCoords.length} localisés</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div ref={mapRef} style={{ height: mapHeight }} className="w-full rounded-b-lg" />
+        </CardContent>
+      </Card>
+    ),
 
-        <Card className="border-border/50 lg:col-span-2">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Répartition par Typologie</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {typoPieData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie data={typoPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={95} paddingAngle={3} label={({ name, percent }) => percent > 0.05 ? name : ''}>
-                    {typoPieData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <p className="text-center text-muted-foreground py-8">Aucune donnée</p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* ROW 3: Gisement Bar Chart */}
-      {gisementBarData.length > 0 && (
-        <Card className="border-border/50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <BarChart2 className="h-4 w-4 text-muted-foreground" />
-              Gisement par projet (tMB/an)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={Math.max(200, gisementBarData.length * 38)}>
-              <BarChart data={gisementBarData} layout="vertical" margin={{ left: 80, right: 40 }}>
-                <XAxis type="number" tick={{ fontSize: 11 }} />
-                <YAxis dataKey="code" type="category" tick={{ fontSize: 11 }} width={80} />
-                <Tooltip formatter={(v: number) => [`${v.toLocaleString('fr-FR')} tMB/an`, 'Gisement']} />
-                <Bar dataKey="gisement" fill="#10b981" radius={[0, 4, 4, 0]} label={{ position: 'right', fontSize: 11, formatter: (v: number) => v.toLocaleString('fr-FR') }} />
-              </BarChart>
+    typologie: () => (
+      <Card className="border-border/50 overflow-hidden">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Répartition par Typologie</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {typoPieData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={pieHeight}>
+              <PieChart>
+                <Pie data={typoPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={95} paddingAngle={3} label={({ name, percent }) => percent > 0.05 ? name : ''}>
+                  {typoPieData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
             </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      )}
+          ) : (
+            <p className="text-center text-muted-foreground py-8">Aucune donnée</p>
+          )}
+        </CardContent>
+      </Card>
+    ),
 
-      {/* ROW 4: Table */}
+    gisement: () => gisementBarData.length > 0 ? (
+      <Card className="border-border/50">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <BarChart2 className="h-4 w-4 text-muted-foreground" />
+            Gisement par projet (tMB/an)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={Math.max(200, gisementBarData.length * 38)}>
+            <BarChart data={gisementBarData} layout="vertical" margin={{ left: 80, right: 40 }}>
+              <XAxis type="number" tick={{ fontSize: 11 }} />
+              <YAxis dataKey="code" type="category" tick={{ fontSize: 11 }} width={80} />
+              <Tooltip formatter={(v: number) => [`${v.toLocaleString('fr-FR')} tMB/an`, 'Gisement']} />
+              <Bar dataKey="gisement" fill="#10b981" radius={[0, 4, 4, 0]} label={{ position: 'right', fontSize: 11, formatter: (v: number) => v.toLocaleString('fr-FR') }} />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+    ) : null,
+
+    table: () => (
       <Card className="border-border/50">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm flex items-center gap-2">
@@ -327,6 +357,47 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
           </div>
         </CardContent>
       </Card>
+    ),
+  };
+
+  // Check if map and typologie are adjacent in ordered list → render them side by side
+  const renderWidgets = () => {
+    const result: React.ReactNode[] = [];
+    let i = 0;
+    while (i < orderedWidgetIds.length) {
+      const id = orderedWidgetIds[i];
+      const nextId = orderedWidgetIds[i + 1];
+
+      // If map + typologie are adjacent (either order), render in side-by-side grid
+      if (
+        (id === 'map' && nextId === 'typologie') ||
+        (id === 'typologie' && nextId === 'map')
+      ) {
+        const mapWidget = widgetRenderers['map']();
+        const typoWidget = widgetRenderers['typologie']();
+        result.push(
+          <div key="map-typo-row" className="grid grid-cols-1 lg:grid-cols-5 gap-6" style={{ minHeight: Math.max(mapHeight, pieHeight) + 80 }}>
+            <div className="lg:col-span-3">
+              {id === 'map' ? mapWidget : typoWidget}
+            </div>
+            <div className="lg:col-span-2">
+              {id === 'map' ? typoWidget : mapWidget}
+            </div>
+          </div>
+        );
+        i += 2;
+      } else {
+        const node = widgetRenderers[id]?.();
+        if (node) result.push(<div key={id}>{node}</div>);
+        i++;
+      }
+    }
+    return result;
+  };
+
+  return (
+    <div className="space-y-6">
+      {renderWidgets()}
     </div>
   );
 }
