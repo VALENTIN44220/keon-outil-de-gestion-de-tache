@@ -38,7 +38,10 @@ export function useUnassignedTasks(): UseUnassignedTasksResult {
 
       if (error) throw error;
       setUnassignedTasks((data || []) as Task[]);
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.message?.includes('AbortError') || error?.code === '20') {
+        return;
+      }
       console.error('Error fetching unassigned tasks:', error);
       toast({
         title: 'Erreur',

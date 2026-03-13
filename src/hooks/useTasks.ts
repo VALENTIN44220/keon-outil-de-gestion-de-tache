@@ -104,6 +104,10 @@ export function useTasks(externalScope?: TaskScope) {
     const { data, error } = await query;
 
     if (error) {
+      // Ignore abort errors (React StrictMode / fast navigation)
+      if (error.message?.includes('AbortError') || error.code === '20') {
+        return;
+      }
       console.error('Error fetching tasks:', error);
       toast({
         title: 'Erreur',

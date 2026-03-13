@@ -21,7 +21,9 @@ export function useTaskAttachments(taskId: string | null) {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching attachments:', error);
+      if (!error.message?.includes('AbortError') && error.code !== '20') {
+        console.error('Error fetching attachments:', error);
+      }
     } else {
       setAttachments((data || []) as TaskAttachment[]);
     }

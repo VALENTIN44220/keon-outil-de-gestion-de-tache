@@ -109,7 +109,10 @@ export function usePendingAssignments(): UsePendingAssignmentsResult {
       }));
 
       setTasksToAssign(tasksWithRelations);
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.message?.includes('AbortError') || error?.code === '20') {
+        return;
+      }
       console.error('Error fetching tasks to assign:', error);
       toast({
         title: 'Erreur',
