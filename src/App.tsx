@@ -29,6 +29,7 @@ import SupplierReference from "./pages/SupplierReference";
 import ProcessTracking from "./pages/ProcessTracking";
 import Innovation from "./pages/Innovation";
 import InnovationRequests from "./pages/InnovationRequests";
+import KeonDashboard from "./pages/KeonDashboard";
 
 // BE Project Hub pages
 import BEProjectHubOverview from "./pages/be/BEProjectHubOverview";
