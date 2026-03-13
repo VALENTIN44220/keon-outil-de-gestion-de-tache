@@ -227,9 +227,8 @@ export function CalendarView({ tasks, onStatusChange, onDelete, progressMap, onT
           open={!!selectedTask}
           onClose={() => setSelectedTask(null)}
           onStatusChange={onStatusChange}
-          onDelete={onDelete}
-          onTaskUpdated={onTaskUpdated}
         />
+
       )}
     </div>
   );
