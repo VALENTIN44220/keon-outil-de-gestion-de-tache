@@ -14,7 +14,11 @@ export function useQuestionnaireProjectData(projects: BEProject[]) {
   const [qstData, setQstData] = useState<QuestionnaireProjectMap>({});
   const [keonProjectIds, setKeonProjectIds] = useState<Set<string>>(new Set());
 
-  const champIds = useMemo(() => QUESTIONNAIRE_FILTER_FIELDS.map(f => f.champ_id), []);
+  const champIds = useMemo(() => {
+    const baseIds = QUESTIONNAIRE_FILTER_FIELDS.map(f => f.champ_id);
+    // Needed by KEON dashboard KPIs (gisement + Cmax)
+    return Array.from(new Set([...baseIds, '06_GEN_quantite_totale', '05_GEN_cmax1']));
+  }, []);
 
   useEffect(() => {
     if (champIds.length === 0) return;
