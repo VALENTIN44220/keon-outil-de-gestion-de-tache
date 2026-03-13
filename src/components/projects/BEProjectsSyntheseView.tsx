@@ -16,7 +16,7 @@ import {
 import {
   MapPin, CheckCircle2, Clock, AlertTriangle, FolderOpen,
   TrendingUp, Activity, Zap, Globe, Loader2, ChevronDown,
-  Settings2, RotateCcw,
+  Settings2, RotateCcw, Plus,
 } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
