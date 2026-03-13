@@ -36,6 +36,7 @@ import BEProjectHubTimeline from "./pages/be/BEProjectHubTimeline";
 import BEProjectHubDiscussions from "./pages/be/BEProjectHubDiscussions";
 import BEProjectHubFiles from "./pages/be/BEProjectHubFiles";
 import BEProjectHubQuestionnaire from "./pages/be/BEProjectHubQuestionnaire";
+import BEProjectHubKeonSynthese from "./pages/be/BEProjectHubKeonSynthese";
 
 // IT Project Hub pages
 import ITProjects from "./pages/it/ITProjects";
