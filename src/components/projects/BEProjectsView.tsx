@@ -23,7 +23,6 @@ import { BEProjectCardsView } from './BEProjectCardsView';
 import { BEProjectsSyntheseView } from './BEProjectsSyntheseView';
 import { ProjectMultiFiltersPanel } from './ProjectMultiFiltersPanel';
 import {
-  SyntheseWidgetConfigPanel,
   loadWidgetConfig,
   WidgetConfig,
 } from './SyntheseWidgetConfigPanel';
