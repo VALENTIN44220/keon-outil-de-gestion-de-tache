@@ -29,16 +29,17 @@ export interface SpvWidgetConfig {
   label: string;
   visible: boolean;
   size: WidgetSize;
+  dotColor: string;
 }
 
 const STORAGE_KEY = 'spv_widget_config';
 
 const DEFAULT_WIDGETS: SpvWidgetConfig[] = [
-  { id: 'kpi_band', label: 'KPI Band', visible: true, size: 'normal' },
-  { id: 'map', label: 'Carte des projets SPV', visible: true, size: 'normal' },
-  { id: 'typologie', label: 'Répartition par Typologie', visible: true, size: 'normal' },
-  { id: 'gisement', label: 'Gisement par projet', visible: true, size: 'normal' },
-  { id: 'table', label: 'Tableau récap', visible: true, size: 'normal' },
+  { id: 'kpi_band', label: 'KPI Band', visible: true, size: 'normal', dotColor: '#3b82f6' },
+  { id: 'map', label: 'Carte des projets SPV', visible: true, size: 'normal', dotColor: '#10b981' },
+  { id: 'typologie', label: 'Répartition par Typologie', visible: true, size: 'normal', dotColor: '#8b5cf6' },
+  { id: 'gisement', label: 'Gisement par projet', visible: true, size: 'normal', dotColor: '#059669' },
+  { id: 'table', label: 'Tableau récap', visible: true, size: 'normal', dotColor: '#f97316' },
 ];
 
 export function loadSpvWidgetConfig(): SpvWidgetConfig[] {
@@ -98,6 +99,10 @@ function SortableWidgetRow({
         <GripVertical className="h-4 w-4" />
       </button>
 
+      <span
+        className="h-2.5 w-2.5 rounded-full shrink-0"
+        style={{ backgroundColor: widget.dotColor }}
+      />
       <span className={cn('flex-1 text-sm font-medium', !widget.visible && 'text-muted-foreground line-through')}>
         {widget.label}
       </span>
