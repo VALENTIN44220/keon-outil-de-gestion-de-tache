@@ -32,7 +32,7 @@ import { fr } from 'date-fns/locale';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
-type ViewType = 'synthese' | 'cards' | 'table' | 'kanban' | 'keon';
+type ViewType = 'synthese' | 'cards' | 'table' | 'kanban';
 
 export function BEProjectsView() {
   const navigate = useNavigate();
