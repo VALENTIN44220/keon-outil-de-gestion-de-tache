@@ -307,29 +307,29 @@ export function Sidebar({
                   {group.items.map((item) => {
                     const Icon = item.icon;
                     const isActive = activeView === item.id;
-                    const colors = menuColors[item.id] || menuColors.dashboard;
+                    const gc = groupColors[getGroupColorIndex(group.label)];
                     return (
                       <button
                         key={item.id}
                         onClick={() => handleMenuClick(item.id, item.path)}
                         className={cn(
                           "w-full flex items-center gap-3 transition-all duration-200 font-body group relative px-3 py-2.5 rounded-xl",
-                          isActive && [colors.bg, "border-l-4", colors.border],
+                          isActive && [gc.bg, "border-l-4", gc.border],
                           !isActive && "hover:bg-muted/60 border-l-4 border-transparent",
                         )}
                       >
                         <div className={cn(
                           "flex items-center justify-center rounded-xl transition-all duration-200 relative p-2",
                           isActive
-                            ? [colors.iconBg, "text-white shadow-md"]
-                            : "bg-muted/50 text-foreground/50 group-hover:text-foreground group-hover:bg-muted",
+                            ? [gc.iconBg, "text-white shadow-md"]
+                            : [gc.iconInactive, "bg-muted/50 group-hover:bg-muted"],
                         )}>
                           <Icon className="w-4 h-4 relative z-10" />
-                          {isActive && <div className={cn("absolute inset-0 rounded-xl blur-sm opacity-50", colors.iconBg)} />}
+                          {isActive && <div className={cn("absolute inset-0 rounded-xl blur-sm opacity-50", gc.iconBg)} />}
                         </div>
                         <span className={cn(
                           "font-medium text-sm transition-colors flex-1 text-left",
-                          isActive ? [colors.text, "font-semibold"] : "text-foreground/60 group-hover:text-foreground"
+                          isActive ? [gc.text, "font-semibold"] : [gc.textMuted, "group-hover:opacity-80"]
                         )}>
                           {item.label}
                         </span>
@@ -338,7 +338,7 @@ export function Sidebar({
                             {pendingValidationCount}
                           </Badge>
                         )}
-                        {isActive && <div className={cn("w-2 h-2 rounded-full", colors.iconBg)} />}
+                        {isActive && <div className={cn("w-2 h-2 rounded-full", gc.iconBg)} />}
                       </button>
                     );
                   })}
