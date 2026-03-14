@@ -456,7 +456,7 @@ export function Sidebar({
               {group.items.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeView === item.id;
-                const colors = menuColors[item.id] || menuColors.dashboard;
+                const gc = groupColors[getGroupColorIndex(group.label)];
                 
                 return (
                   <button 
@@ -465,9 +465,9 @@ export function Sidebar({
                     className={cn(
                       "w-full flex items-center gap-3 transition-all duration-200 font-body group relative",
                       collapsed ? "justify-center p-2" : "px-3 py-2.5 rounded-xl",
-                      isActive && !collapsed && [colors.bg, "border-l-4", colors.border],
+                      isActive && !collapsed && [gc.bg, "border-l-4", gc.border],
                       !isActive && !collapsed && "hover:bg-muted/60 border-l-4 border-transparent",
-                      isActive && collapsed && "bg-muted/80",
+                      isActive && collapsed && gc.bg,
                       !isActive && collapsed && "hover:bg-muted/60",
                     )}
                     title={collapsed ? item.label : undefined}
@@ -476,12 +476,12 @@ export function Sidebar({
                       "flex items-center justify-center rounded-xl transition-all duration-200 relative",
                       collapsed ? "p-3" : "p-2",
                       isActive 
-                        ? [colors.iconBg, "text-white shadow-md"]
-                        : "bg-muted/50 text-foreground/50 group-hover:bg-muted group-hover:text-foreground",
+                        ? [gc.iconBg, "text-white shadow-md"]
+                        : [gc.iconInactive, "bg-transparent group-hover:bg-muted/50"],
                     )}>
                       <Icon className={cn("relative z-10", collapsed ? "w-5 h-5" : "w-4 h-4")} />
                       {isActive && (
-                        <div className={cn("absolute inset-0 rounded-xl blur-sm opacity-50", colors.iconBg)} />
+                        <div className={cn("absolute inset-0 rounded-xl blur-sm opacity-50", gc.iconBg)} />
                       )}
                       {collapsed && item.id === 'dashboard' && pendingValidationCount > 0 && (
                         <div className="absolute -top-1 -right-1 w-4 h-4 bg-destructive text-destructive-foreground rounded-full text-[9px] flex items-center justify-center font-bold z-20">
@@ -494,7 +494,7 @@ export function Sidebar({
                       <>
                         <span className={cn(
                           "font-medium text-sm transition-colors flex-1 text-left",
-                          isActive ? [colors.text, "font-semibold"] : "text-foreground/60 group-hover:text-foreground"
+                          isActive ? [gc.text, "font-semibold"] : [gc.textMuted, "group-hover:opacity-80"]
                         )}>
                           {item.label}
                         </span>
@@ -504,7 +504,7 @@ export function Sidebar({
                           </Badge>
                         )}
                         {isActive && (
-                          <div className={cn("w-2 h-2 rounded-full", colors.iconBg)} />
+                          <div className={cn("w-2 h-2 rounded-full", gc.iconBg)} />
                         )}
                       </>
                     )}
