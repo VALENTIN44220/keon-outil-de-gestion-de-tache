@@ -84,86 +84,28 @@ const adminMenuItem = {
   path: '/admin'
 };
 
-// Color assignments for menu items - using new premium palette
-const menuColors: Record<string, { bg: string; text: string; border: string; iconBg: string }> = {
-  dashboard: { 
-    bg: 'bg-primary/10', 
-    text: 'text-primary', 
-    border: 'border-primary',
-    iconBg: 'bg-gradient-to-br from-primary to-primary/80'
-  },
-  requests: { 
-    bg: 'bg-warning/10', 
-    text: 'text-warning', 
-    border: 'border-warning',
-    iconBg: 'bg-gradient-to-br from-warning to-warning/80'
-  },
-  chat: { 
-    bg: 'bg-[#7C3AED]/10', 
-    text: 'text-[#7C3AED]', 
-    border: 'border-[#7C3AED]',
-    iconBg: 'bg-gradient-to-br from-[#7C3AED] to-[#7C3AED]/80'
-  },
-  templates: { 
-    bg: 'bg-success/10', 
-    text: 'text-success', 
-    border: 'border-success',
-    iconBg: 'bg-gradient-to-br from-success to-success/80'
-  },
-  workload: { 
-    bg: 'bg-accent/10', 
-    text: 'text-accent', 
-    border: 'border-accent',
-    iconBg: 'bg-gradient-to-br from-accent to-accent/80'
-  },
-  calendar: { 
-    bg: 'bg-[#0078D4]/10', 
-    text: 'text-[#0078D4]', 
-    border: 'border-[#0078D4]',
-    iconBg: 'bg-gradient-to-br from-[#0078D4] to-[#0078D4]/80'
-  },
-  projects: { 
-    bg: 'bg-info/10', 
-    text: 'text-info', 
-    border: 'border-info',
-    iconBg: 'bg-gradient-to-br from-info to-info/80'
-  },
-  suppliers: { 
-    bg: 'bg-[#10B981]/10', 
-    text: 'text-[#10B981]', 
-    border: 'border-[#10B981]',
-    iconBg: 'bg-gradient-to-br from-[#10B981] to-[#10B981]/80'
-  },
-  'process-tracking': { 
-    bg: 'bg-[#6366F1]/10', 
-    text: 'text-[#6366F1]', 
-    border: 'border-[#6366F1]',
-    iconBg: 'bg-gradient-to-br from-[#6366F1] to-[#6366F1]/80'
-  },
-  admin: { 
-    bg: 'bg-destructive/10', 
-    text: 'text-destructive', 
-    border: 'border-destructive',
-    iconBg: 'bg-gradient-to-br from-destructive to-destructive/80'
-  },
-  innovation: {
-    bg: 'bg-[#F59E0B]/10',
-    text: 'text-[#F59E0B]',
-    border: 'border-[#F59E0B]',
-    iconBg: 'bg-gradient-to-br from-[#F59E0B] to-[#F59E0B]/80'
-  },
-  'it-projects': {
-    bg: 'bg-[#7C3AED]/10',
-    text: 'text-[#7C3AED]',
-    border: 'border-[#7C3AED]',
-    iconBg: 'bg-gradient-to-br from-[#7C3AED] to-[#7C3AED]/80'
-  },
-  spv: {
-    bg: 'bg-[#10B981]/10',
-    text: 'text-[#10B981]',
-    border: 'border-[#10B981]',
-    iconBg: 'bg-gradient-to-br from-[#10B981] to-[#10B981]/80'
-  },
+// Group-based color system
+const groupColors: Record<number, { hex: string; bg: string; text: string; textMuted: string; border: string; iconBg: string; iconInactive: string }> = {
+  0: { hex: '#3b82f6', bg: 'bg-[#3b82f6]/15', text: 'text-[#3b82f6]', textMuted: 'text-[#3b82f6]/50', border: 'border-[#3b82f6]', iconBg: 'bg-[#3b82f6]', iconInactive: 'text-[#3b82f6]/60' },
+  1: { hex: '#8b5cf6', bg: 'bg-[#8b5cf6]/15', text: 'text-[#8b5cf6]', textMuted: 'text-[#8b5cf6]/50', border: 'border-[#8b5cf6]', iconBg: 'bg-[#8b5cf6]', iconInactive: 'text-[#8b5cf6]/60' },
+  2: { hex: '#10b981', bg: 'bg-[#10b981]/15', text: 'text-[#10b981]', textMuted: 'text-[#10b981]/50', border: 'border-[#10b981]', iconBg: 'bg-[#10b981]', iconInactive: 'text-[#10b981]/60' },
+  3: { hex: '#f59e0b', bg: 'bg-[#f59e0b]/15', text: 'text-[#f59e0b]', textMuted: 'text-[#f59e0b]/50', border: 'border-[#f59e0b]', iconBg: 'bg-[#f59e0b]', iconInactive: 'text-[#f59e0b]/60' },
+  4: { hex: '#64748b', bg: 'bg-[#64748b]/15', text: 'text-[#64748b]', textMuted: 'text-[#64748b]/50', border: 'border-[#64748b]', iconBg: 'bg-[#64748b]', iconInactive: 'text-[#64748b]/60' },
+  5: { hex: '#ec4899', bg: 'bg-[#ec4899]/15', text: 'text-[#ec4899]', textMuted: 'text-[#ec4899]/50', border: 'border-[#ec4899]', iconBg: 'bg-[#ec4899]', iconInactive: 'text-[#ec4899]/60' },
+};
+
+// Map group labels to group index for color lookup
+const groupLabelToIndex: Record<string, number> = {
+  '': 0,
+  'ÉQUIPE': 1,
+  'PROJETS': 2,
+  'RÉFÉRENTIELS': 3,
+  'CONFIGURATION': 4,
+  'OUTILS': 5,
+};
+
+const getGroupColorIndex = (groupLabel?: string): number => {
+  return groupLabelToIndex[groupLabel || ''] ?? 0;
 };
 
 export function Sidebar({
