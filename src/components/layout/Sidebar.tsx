@@ -84,86 +84,28 @@ const adminMenuItem = {
   path: '/admin'
 };
 
-// Color assignments for menu items - using new premium palette
-const menuColors: Record<string, { bg: string; text: string; border: string; iconBg: string }> = {
-  dashboard: { 
-    bg: 'bg-primary/10', 
-    text: 'text-primary', 
-    border: 'border-primary',
-    iconBg: 'bg-gradient-to-br from-primary to-primary/80'
-  },
-  requests: { 
-    bg: 'bg-warning/10', 
-    text: 'text-warning', 
-    border: 'border-warning',
-    iconBg: 'bg-gradient-to-br from-warning to-warning/80'
-  },
-  chat: { 
-    bg: 'bg-[#7C3AED]/10', 
-    text: 'text-[#7C3AED]', 
-    border: 'border-[#7C3AED]',
-    iconBg: 'bg-gradient-to-br from-[#7C3AED] to-[#7C3AED]/80'
-  },
-  templates: { 
-    bg: 'bg-success/10', 
-    text: 'text-success', 
-    border: 'border-success',
-    iconBg: 'bg-gradient-to-br from-success to-success/80'
-  },
-  workload: { 
-    bg: 'bg-accent/10', 
-    text: 'text-accent', 
-    border: 'border-accent',
-    iconBg: 'bg-gradient-to-br from-accent to-accent/80'
-  },
-  calendar: { 
-    bg: 'bg-[#0078D4]/10', 
-    text: 'text-[#0078D4]', 
-    border: 'border-[#0078D4]',
-    iconBg: 'bg-gradient-to-br from-[#0078D4] to-[#0078D4]/80'
-  },
-  projects: { 
-    bg: 'bg-info/10', 
-    text: 'text-info', 
-    border: 'border-info',
-    iconBg: 'bg-gradient-to-br from-info to-info/80'
-  },
-  suppliers: { 
-    bg: 'bg-[#10B981]/10', 
-    text: 'text-[#10B981]', 
-    border: 'border-[#10B981]',
-    iconBg: 'bg-gradient-to-br from-[#10B981] to-[#10B981]/80'
-  },
-  'process-tracking': { 
-    bg: 'bg-[#6366F1]/10', 
-    text: 'text-[#6366F1]', 
-    border: 'border-[#6366F1]',
-    iconBg: 'bg-gradient-to-br from-[#6366F1] to-[#6366F1]/80'
-  },
-  admin: { 
-    bg: 'bg-destructive/10', 
-    text: 'text-destructive', 
-    border: 'border-destructive',
-    iconBg: 'bg-gradient-to-br from-destructive to-destructive/80'
-  },
-  innovation: {
-    bg: 'bg-[#F59E0B]/10',
-    text: 'text-[#F59E0B]',
-    border: 'border-[#F59E0B]',
-    iconBg: 'bg-gradient-to-br from-[#F59E0B] to-[#F59E0B]/80'
-  },
-  'it-projects': {
-    bg: 'bg-[#7C3AED]/10',
-    text: 'text-[#7C3AED]',
-    border: 'border-[#7C3AED]',
-    iconBg: 'bg-gradient-to-br from-[#7C3AED] to-[#7C3AED]/80'
-  },
-  spv: {
-    bg: 'bg-[#10B981]/10',
-    text: 'text-[#10B981]',
-    border: 'border-[#10B981]',
-    iconBg: 'bg-gradient-to-br from-[#10B981] to-[#10B981]/80'
-  },
+// Group-based color system
+const groupColors: Record<number, { hex: string; bg: string; text: string; textMuted: string; border: string; iconBg: string; iconInactive: string }> = {
+  0: { hex: '#3b82f6', bg: 'bg-[#3b82f6]/15', text: 'text-[#3b82f6]', textMuted: 'text-[#3b82f6]/50', border: 'border-[#3b82f6]', iconBg: 'bg-[#3b82f6]', iconInactive: 'text-[#3b82f6]/60' },
+  1: { hex: '#8b5cf6', bg: 'bg-[#8b5cf6]/15', text: 'text-[#8b5cf6]', textMuted: 'text-[#8b5cf6]/50', border: 'border-[#8b5cf6]', iconBg: 'bg-[#8b5cf6]', iconInactive: 'text-[#8b5cf6]/60' },
+  2: { hex: '#10b981', bg: 'bg-[#10b981]/15', text: 'text-[#10b981]', textMuted: 'text-[#10b981]/50', border: 'border-[#10b981]', iconBg: 'bg-[#10b981]', iconInactive: 'text-[#10b981]/60' },
+  3: { hex: '#f59e0b', bg: 'bg-[#f59e0b]/15', text: 'text-[#f59e0b]', textMuted: 'text-[#f59e0b]/50', border: 'border-[#f59e0b]', iconBg: 'bg-[#f59e0b]', iconInactive: 'text-[#f59e0b]/60' },
+  4: { hex: '#64748b', bg: 'bg-[#64748b]/15', text: 'text-[#64748b]', textMuted: 'text-[#64748b]/50', border: 'border-[#64748b]', iconBg: 'bg-[#64748b]', iconInactive: 'text-[#64748b]/60' },
+  5: { hex: '#ec4899', bg: 'bg-[#ec4899]/15', text: 'text-[#ec4899]', textMuted: 'text-[#ec4899]/50', border: 'border-[#ec4899]', iconBg: 'bg-[#ec4899]', iconInactive: 'text-[#ec4899]/60' },
+};
+
+// Map group labels to group index for color lookup
+const groupLabelToIndex: Record<string, number> = {
+  '': 0,
+  'ÉQUIPE': 1,
+  'PROJETS': 2,
+  'RÉFÉRENTIELS': 3,
+  'CONFIGURATION': 4,
+  'OUTILS': 5,
+};
+
+const getGroupColorIndex = (groupLabel?: string): number => {
+  return groupLabelToIndex[groupLabel || ''] ?? 0;
 };
 
 export function Sidebar({
@@ -365,29 +307,29 @@ export function Sidebar({
                   {group.items.map((item) => {
                     const Icon = item.icon;
                     const isActive = activeView === item.id;
-                    const colors = menuColors[item.id] || menuColors.dashboard;
+                    const gc = groupColors[getGroupColorIndex(group.label)];
                     return (
                       <button
                         key={item.id}
                         onClick={() => handleMenuClick(item.id, item.path)}
                         className={cn(
                           "w-full flex items-center gap-3 transition-all duration-200 font-body group relative px-3 py-2.5 rounded-xl",
-                          isActive && [colors.bg, "border-l-4", colors.border],
+                          isActive && [gc.bg, "border-l-4", gc.border],
                           !isActive && "hover:bg-muted/60 border-l-4 border-transparent",
                         )}
                       >
                         <div className={cn(
                           "flex items-center justify-center rounded-xl transition-all duration-200 relative p-2",
                           isActive
-                            ? [colors.iconBg, "text-white shadow-md"]
-                            : "bg-muted/50 text-foreground/50 group-hover:text-foreground group-hover:bg-muted",
+                            ? [gc.iconBg, "text-white shadow-md"]
+                            : [gc.iconInactive, "bg-muted/50 group-hover:bg-muted"],
                         )}>
                           <Icon className="w-4 h-4 relative z-10" />
-                          {isActive && <div className={cn("absolute inset-0 rounded-xl blur-sm opacity-50", colors.iconBg)} />}
+                          {isActive && <div className={cn("absolute inset-0 rounded-xl blur-sm opacity-50", gc.iconBg)} />}
                         </div>
                         <span className={cn(
                           "font-medium text-sm transition-colors flex-1 text-left",
-                          isActive ? [colors.text, "font-semibold"] : "text-foreground/60 group-hover:text-foreground"
+                          isActive ? [gc.text, "font-semibold"] : [gc.textMuted, "group-hover:opacity-80"]
                         )}>
                           {item.label}
                         </span>
@@ -396,7 +338,7 @@ export function Sidebar({
                             {pendingValidationCount}
                           </Badge>
                         )}
-                        {isActive && <div className={cn("w-2 h-2 rounded-full", colors.iconBg)} />}
+                        {isActive && <div className={cn("w-2 h-2 rounded-full", gc.iconBg)} />}
                       </button>
                     );
                   })}
@@ -514,7 +456,7 @@ export function Sidebar({
               {group.items.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeView === item.id;
-                const colors = menuColors[item.id] || menuColors.dashboard;
+                const gc = groupColors[getGroupColorIndex(group.label)];
                 
                 return (
                   <button 
@@ -523,9 +465,9 @@ export function Sidebar({
                     className={cn(
                       "w-full flex items-center gap-3 transition-all duration-200 font-body group relative",
                       collapsed ? "justify-center p-2" : "px-3 py-2.5 rounded-xl",
-                      isActive && !collapsed && [colors.bg, "border-l-4", colors.border],
+                      isActive && !collapsed && [gc.bg, "border-l-4", gc.border],
                       !isActive && !collapsed && "hover:bg-muted/60 border-l-4 border-transparent",
-                      isActive && collapsed && "bg-muted/80",
+                      isActive && collapsed && gc.bg,
                       !isActive && collapsed && "hover:bg-muted/60",
                     )}
                     title={collapsed ? item.label : undefined}
@@ -534,12 +476,12 @@ export function Sidebar({
                       "flex items-center justify-center rounded-xl transition-all duration-200 relative",
                       collapsed ? "p-3" : "p-2",
                       isActive 
-                        ? [colors.iconBg, "text-white shadow-md"]
-                        : "bg-muted/50 text-foreground/50 group-hover:bg-muted group-hover:text-foreground",
+                        ? [gc.iconBg, "text-white shadow-md"]
+                        : [gc.iconInactive, "bg-transparent group-hover:bg-muted/50"],
                     )}>
                       <Icon className={cn("relative z-10", collapsed ? "w-5 h-5" : "w-4 h-4")} />
                       {isActive && (
-                        <div className={cn("absolute inset-0 rounded-xl blur-sm opacity-50", colors.iconBg)} />
+                        <div className={cn("absolute inset-0 rounded-xl blur-sm opacity-50", gc.iconBg)} />
                       )}
                       {collapsed && item.id === 'dashboard' && pendingValidationCount > 0 && (
                         <div className="absolute -top-1 -right-1 w-4 h-4 bg-destructive text-destructive-foreground rounded-full text-[9px] flex items-center justify-center font-bold z-20">
@@ -552,7 +494,7 @@ export function Sidebar({
                       <>
                         <span className={cn(
                           "font-medium text-sm transition-colors flex-1 text-left",
-                          isActive ? [colors.text, "font-semibold"] : "text-foreground/60 group-hover:text-foreground"
+                          isActive ? [gc.text, "font-semibold"] : [gc.textMuted, "group-hover:opacity-80"]
                         )}>
                           {item.label}
                         </span>
@@ -562,7 +504,7 @@ export function Sidebar({
                           </Badge>
                         )}
                         {isActive && (
-                          <div className={cn("w-2 h-2 rounded-full", colors.iconBg)} />
+                          <div className={cn("w-2 h-2 rounded-full", gc.iconBg)} />
                         )}
                       </>
                     )}
