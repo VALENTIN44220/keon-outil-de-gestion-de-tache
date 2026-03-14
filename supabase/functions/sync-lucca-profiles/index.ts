@@ -135,6 +135,7 @@ Deno.serve(async (req) => {
       created: 0,
       updated: 0,
       skipped: 0,
+      email_updated: 0,
       errors: [] as string[],
       unresolved_fk: [] as string[],
     };
