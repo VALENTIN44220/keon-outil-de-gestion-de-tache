@@ -115,6 +115,9 @@ export function AdminTabs(props: AdminTabsProps) {
           <TabsTrigger value="device-visibility" className="px-2 py-1.5" title="Visibilité par appareil">
             <MonitorSmartphone className="h-4 w-4" />
           </TabsTrigger>
+          <TabsTrigger value="lucca-duplicates" className="px-2 py-1.5" title="Doublons Lucca">
+            <GitMerge className="h-4 w-4" />
+          </TabsTrigger>
 
         </TabsList>
 
