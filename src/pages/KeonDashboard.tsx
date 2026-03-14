@@ -59,7 +59,7 @@ export default function KeonDashboard() {
   const [editingProject, setEditingProject] = useState<BEProject | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [deletingProject, setDeletingProject] = useState<BEProject | null>(null);
-  const [widgetConfig, setWidgetConfig] = useState<SpvWidgetConfig[]>(loadSpvWidgetConfig);
+  
 
   const {
     filters: multiFilters,
