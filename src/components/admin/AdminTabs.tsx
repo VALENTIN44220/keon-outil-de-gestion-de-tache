@@ -3,7 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Building2, Briefcase, Users, Layers, Shield, UserCog, Download,
   UsersRound, UserRoundCog, Workflow, Database,
-  FolderKanban, Tags, MonitorSmartphone
+  FolderKanban, Tags, MonitorSmartphone, GitMerge
 } from 'lucide-react';
 import { CompaniesTab } from './CompaniesTab';
 import { DepartmentsTab } from './DepartmentsTab';
@@ -24,6 +24,7 @@ import { TableLookupConfigTab } from './TableLookupConfigTab';
 import { ServiceGroupsTab } from './ServiceGroupsTab';
 import { CategoriesManagementTab } from './CategoriesManagementTab';
 import { PageDeviceVisibilityTab } from './PageDeviceVisibilityTab';
+import { LuccaDuplicatesTab } from './LuccaDuplicatesTab';
 import type { Company, Department, JobTitle, HierarchyLevel, PermissionProfile, UserProfile } from '@/types/admin';
 
 interface AdminTabsProps {
@@ -113,6 +114,9 @@ export function AdminTabs(props: AdminTabsProps) {
           </TabsTrigger>
           <TabsTrigger value="device-visibility" className="px-2 py-1.5" title="Visibilité par appareil">
             <MonitorSmartphone className="h-4 w-4" />
+          </TabsTrigger>
+          <TabsTrigger value="lucca-duplicates" className="px-2 py-1.5" title="Doublons Lucca">
+            <GitMerge className="h-4 w-4" />
           </TabsTrigger>
 
         </TabsList>
@@ -226,6 +230,10 @@ export function AdminTabs(props: AdminTabsProps) {
 
         <TabsContent value="device-visibility">
           <PageDeviceVisibilityTab />
+        </TabsContent>
+
+        <TabsContent value="lucca-duplicates">
+          <LuccaDuplicatesTab />
         </TabsContent>
 
       </Tabs>
