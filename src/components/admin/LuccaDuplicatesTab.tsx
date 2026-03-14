@@ -2,8 +2,7 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
+// Radio imports removed – selection now uses clickable cards with badges
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, RefreshCw, CheckCircle2, AlertTriangle, GitMerge } from 'lucide-react';
@@ -186,48 +185,66 @@ export function LuccaDuplicatesTab() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <RadioGroup
-              value={selected[group.id_lucca] || ''}
-              onValueChange={(val) => setSelected(prev => ({ ...prev, [group.id_lucca]: val }))}
-              className="space-y-3"
-            >
-              {group.profiles.map(p => (
-                <div
-                  key={p.id}
-                  className={`flex items-center gap-3 rounded-lg border p-3 transition-colors ${
-                    selected[group.id_lucca] === p.id ? 'border-primary bg-primary/5' : ''
-                  }`}
-                >
-                  <RadioGroupItem value={p.id} id={`radio-${p.id}`} />
-                  <Label htmlFor={`radio-${p.id}`} className="flex-1 cursor-pointer">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium">{p.display_name || '(sans nom)'}</span>
-                      {p.lovable_email && (
-                        <span className="text-sm text-muted-foreground">{p.lovable_email}</span>
-                      )}
-                      <Badge variant={p.lovable_status === 'OK' ? 'default' : 'secondary'} className="text-xs">
-                        {p.lovable_status || 'N/A'}
-                      </Badge>
-                      <Badge variant="outline" className="text-xs">{p.status || 'N/A'}</Badge>
-                      <span className="text-xs text-muted-foreground">
-                        Créé le {new Date(p.created_at).toLocaleDateString('fr-FR')}
-                      </span>
-                    </div>
-                  </Label>
-                </div>
-              ))}
-            </RadioGroup>
+            {(() => {
+              const keepId = selected[group.id_lucca];
+              const keepProfile = group.profiles.find(p => p.id === keepId);
+              return (
+                <>
+                  <div className="space-y-3">
+                    {group.profiles.map(p => {
+                      const isKept = keepId === p.id;
+                      const isMarkedDelete = !!keepId && !isKept;
+                      return (
+                        <div
+                          key={p.id}
+                          onClick={() => setSelected(prev => ({ ...prev, [group.id_lucca]: p.id }))}
+                          className={`rounded-lg border p-3 cursor-pointer transition-colors ${
+                            isKept ? 'border-success bg-success/5' : isMarkedDelete ? 'border-destructive/40 bg-destructive/5' : ''
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {keepId && (
+                              isKept
+                                ? <Badge variant="success" className="text-xs">Conserver</Badge>
+                                : <Badge variant="destructive" className="text-xs">Supprimer</Badge>
+                            )}
+                            <span className="font-medium">{p.display_name || '(sans nom)'}</span>
+                            {p.lovable_email && (
+                              <span className="text-sm text-muted-foreground">{p.lovable_email}</span>
+                            )}
+                            <Badge variant={p.lovable_status === 'OK' ? 'default' : 'secondary'} className="text-xs">
+                              {p.lovable_status || 'N/A'}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">{p.status || 'N/A'}</Badge>
+                            <span className="text-xs text-muted-foreground">
+                              Créé le {new Date(p.created_at).toLocaleDateString('fr-FR')}
+                            </span>
+                          </div>
+                          {isMarkedDelete && keepProfile && (
+                            <p className="text-xs text-muted-foreground mt-1.5 ml-1">
+                              Les tâches assignées seront transférées vers {keepProfile.display_name || keepProfile.lovable_email || keepProfile.id}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
 
-            <div className="mt-4 flex justify-end">
-              <Button
-                variant="destructive"
-                disabled={!selected[group.id_lucca] || merging === group.id_lucca}
-                onClick={() => setConfirmGroup(group)}
-              >
-                {merging === group.id_lucca && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                Fusionner
-              </Button>
-            </div>
+                  <div className="mt-4 flex justify-end">
+                    <Button
+                      variant="destructive"
+                      disabled={!keepId || merging === group.id_lucca}
+                      onClick={() => setConfirmGroup(group)}
+                    >
+                      {merging === group.id_lucca && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                      {keepId && keepProfile
+                        ? `Fusionner : conserver ${keepProfile.display_name || keepProfile.lovable_email} · supprimer ${group.profiles.filter(p => p.id !== keepId).map(p => p.display_name || p.lovable_email || p.id).join(', ')}`
+                        : 'Fusionner'}
+                    </Button>
+                  </div>
+                </>
+              );
+            })()}
           </CardContent>
         </Card>
       ))}
