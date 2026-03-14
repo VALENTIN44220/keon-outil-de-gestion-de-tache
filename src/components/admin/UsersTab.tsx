@@ -1360,6 +1360,9 @@ export function UsersTab({
                                 <Building2 className="h-3 w-3 flex-shrink-0" />
                                 {user.company?.name || 'Aucune société'}
                               </p>
+                              {user.id_lucca && (
+                                <p className="text-xs text-muted-foreground truncate">Lucca #{user.id_lucca}</p>
+                              )}
                             </div>
                             <ChevronDown 
                               className={`h-4 w-4 text-muted-foreground transition-transform flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`} 
