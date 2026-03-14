@@ -3,7 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Building2, Briefcase, Users, Layers, Shield, UserCog, Download,
   UsersRound, UserRoundCog, Workflow, Database,
-  FolderKanban, Tags, MonitorSmartphone
+  FolderKanban, Tags, MonitorSmartphone, GitMerge
 } from 'lucide-react';
 import { CompaniesTab } from './CompaniesTab';
 import { DepartmentsTab } from './DepartmentsTab';
