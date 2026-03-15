@@ -709,6 +709,16 @@ export function BulkActionDialog({ open, onOpenChange, tasks, onComplete, canRea
               onChange={setFilterServiceGroups}
               options={serviceGroups.map(sg => ({ value: sg.id, label: sg.name }))}
             />
+            <MultiSelectFilter
+              label="Tous les projets IT"
+              icon={<Monitor className="h-3.5 w-3.5" />}
+              selected={filterItProjects}
+              onChange={setFilterItProjects}
+              options={[
+                { value: '__none__', label: 'Sans projet IT' },
+                ...itProjectsList.map(p => ({ value: p.id, label: `${p.code} – ${p.name}` })),
+              ]}
+            />
           </div>
 
           {/* Selection summary */}
