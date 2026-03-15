@@ -35,6 +35,7 @@ export interface CrossFilters {
   statuses: TaskStatus[];
   priorities: TaskPriority[];
   labelIds: string[];
+  itProjectIds: string[];
 }
 
 export const DEFAULT_CROSS_FILTERS: CrossFilters = {
@@ -48,6 +49,7 @@ export const DEFAULT_CROSS_FILTERS: CrossFilters = {
   statuses: [],
   priorities: [],
   labelIds: [],
+  itProjectIds: [],
 };
 
 export const DEFAULT_WIDGETS: WidgetConfig[] = [

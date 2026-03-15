@@ -27,6 +27,7 @@ import {
   Trash2,
   Star,
   Globe,
+  Monitor,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -215,6 +216,7 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [processes, setProcesses] = useState<{ id: string; name: string }[]>([]);
   const [sgLabels, setSgLabels] = useState<{ id: string; name: string; color: string }[]>([]);
+  const [itProjects, setItProjects] = useState<{ id: string; name: string }[]>([]);
   const [presets, setPresets] = useState<FilterPreset[]>([]);
   const [presetName, setPresetName] = useState('');
   const [showSavePreset, setShowSavePreset] = useState(false);
@@ -222,12 +224,13 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
 
   useEffect(() => {
     const fetchData = async () => {
-      const [profilesRes, sgRes, catsRes, procsRes, labelsRes] = await Promise.all([
+      const [profilesRes, sgRes, catsRes, procsRes, labelsRes, itProjectsRes] = await Promise.all([
         supabase.from('profiles').select('id, display_name').eq('status', 'active'),
         supabase.from('service_groups').select('id, name').order('name'),
         supabase.from('categories').select('id, name'),
         supabase.from('process_templates').select('id, name'),
         (supabase as any).from('service_group_labels').select('id, name, color').eq('is_active', true).order('name'),
+        supabase.from('it_projects').select('id, code_projet_digital, nom_projet').order('code_projet_digital'),
       ]);
       
       if (profilesRes.data) setProfiles(profilesRes.data);
@@ -235,6 +238,12 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
       if (catsRes.data) setCategories(catsRes.data);
       if (procsRes.data) setProcesses(procsRes.data);
       if (labelsRes.data) setSgLabels(labelsRes.data);
+      if (itProjectsRes.data) {
+        setItProjects([
+          { id: '__none__', name: 'Sans projet IT' },
+          ...itProjectsRes.data.map((p: any) => ({ id: p.id, name: `${p.code_projet_digital} – ${p.nom_projet}` })),
+        ]);
+      }
     };
     fetchData();
   }, []);
@@ -475,6 +484,7 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
     filters.statuses.length + 
     filters.priorities.length +
     (filters.labelIds?.length || 0) +
+    (filters.itProjectIds?.length || 0) +
     (filters.dateRange.start ? 1 : 0);
 
   // Status/Priority items formatted for MultiSelectDropdown
@@ -754,6 +764,15 @@ export function CrossFiltersPanel({ filters, onFiltersChange, onClose, processId
             colorDotKey="color"
           />
         )}
+
+        {/* IT Projects */}
+        <MultiSelectDropdown
+          label="Projet IT"
+          icon={<Monitor className="h-3 w-3" />}
+          items={itProjects}
+          selectedIds={filters.itProjectIds || []}
+          onChange={(ids) => onFiltersChange({ ...filters, itProjectIds: ids })}
+        />
       </div>
       )}
     </div>

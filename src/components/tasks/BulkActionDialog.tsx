@@ -9,7 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Loader2, Search, CheckCircle2, Filter, Settings2, ChevronDown, X, UserRoundPlus, Tags, UserCheck } from 'lucide-react';
+import { Loader2, Search, CheckCircle2, Filter, Settings2, ChevronDown, X, UserRoundPlus, Tags, UserCheck, Monitor } from 'lucide-react';
 import { Task } from '@/types/task';
 import { useCategories } from '@/hooks/useCategories';
 import { supabase } from '@/integrations/supabase/client';
@@ -33,6 +33,12 @@ interface TeamMember {
 
 interface ServiceGroup {
   id: string;
+  name: string;
+}
+
+interface ITProjectItem {
+  id: string;
+  code: string;
   name: string;
 }
 
@@ -148,26 +154,34 @@ export function BulkActionDialog({ open, onOpenChange, tasks, onComplete, canRea
   const [requesterSearchOpen, setRequesterSearchOpen] = useState(false);
   const [requesterSearchQuery, setRequesterSearchQuery] = useState('');
 
+  // IT Project target
+  const [targetItProjectId, setTargetItProjectId] = useState<string>('');
+  const [itProjectSearchOpen, setItProjectSearchOpen] = useState(false);
+  const [itProjectSearchQuery, setItProjectSearchQuery] = useState('');
+
   // Data
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loadingData, setLoadingData] = useState(false);
   const [serviceGroups, setServiceGroups] = useState<ServiceGroup[]>([]);
   const [processServiceGroupMap, setProcessServiceGroupMap] = useState<Map<string, string>>(new Map());
   const [plannerTaskIds, setPlannerTaskIds] = useState<Set<string>>(new Set());
+  const [itProjectsList, setItProjectsList] = useState<ITProjectItem[]>([]);
 
   useEffect(() => {
     if (!open) return;
     const fetchData = async () => {
       setLoadingData(true);
-      const [membersRes, sgRes, ptRes, plannerRes] = await Promise.all([
+      const [membersRes, sgRes, ptRes, plannerRes, itProjRes] = await Promise.all([
         supabase.from('profiles').select('id, display_name, avatar_url, job_title, department').eq('status', 'active').order('display_name'),
         (supabase as any).from('service_groups').select('id, name').order('name'),
         (supabase as any).from('process_templates').select('id, service_group_id'),
         supabase.from('planner_task_links').select('local_task_id'),
+        supabase.from('it_projects').select('id, code_projet_digital, nom_projet').order('code_projet_digital'),
       ]);
       setTeamMembers(membersRes.data || []);
       setServiceGroups(sgRes.data || []);
       if (plannerRes.data) setPlannerTaskIds(new Set(plannerRes.data.map(d => d.local_task_id)));
+      if (itProjRes.data) setItProjectsList(itProjRes.data.map((p: any) => ({ id: p.id, code: p.code_projet_digital, name: p.nom_projet })));
 
       const ptSgMap = new Map<string, string>();
       (ptRes.data || []).forEach((pt: any) => {
@@ -293,12 +307,20 @@ export function BulkActionDialog({ open, onOpenChange, tasks, onComplete, canRea
     );
   }, [teamMembers, requesterSearchQuery]);
 
+  const filteredItProjectMembers = useMemo(() => {
+    if (!itProjectSearchQuery) return itProjectsList;
+    const q = itProjectSearchQuery.toLowerCase();
+    return itProjectsList.filter(p => p.code.toLowerCase().includes(q) || p.name.toLowerCase().includes(q));
+  }, [itProjectsList, itProjectSearchQuery]);
+
   const getCategoryName = (categoryId: string | null) => {
     if (!categoryId) return null;
     return categories.find(c => c.id === categoryId)?.name;
   };
 
-  const hasAnyAction = targetCategoryId || targetUserId || targetRequesterId;
+  const selectedItProject = itProjectsList.find(p => p.id === targetItProjectId);
+
+  const hasAnyAction = targetCategoryId || targetUserId || targetRequesterId || targetItProjectId;
 
   const handleApply = async () => {
     if (selectedTaskIds.size === 0 || !hasAnyAction) return;
@@ -317,6 +339,9 @@ export function BulkActionDialog({ open, onOpenChange, tasks, onComplete, canRea
       }
       if (targetRequesterId) {
         updates.requester_id = targetRequesterId;
+      }
+      if (targetItProjectId) {
+        updates.it_project_id = targetItProjectId === '__remove__' ? null : targetItProjectId;
       }
 
       for (let i = 0; i < ids.length; i += 50) {
@@ -337,6 +362,13 @@ export function BulkActionDialog({ open, onOpenChange, tasks, onComplete, canRea
       if (targetCategoryId) actions.push('catégorisée(s)');
       if (targetUserId) actions.push(`réaffectée(s) à ${selectedMember?.display_name}`);
       if (targetRequesterId) actions.push(`demandeur → ${selectedRequester?.display_name}`);
+      if (targetItProjectId) {
+        if (targetItProjectId === '__remove__') {
+          actions.push('projet IT retiré');
+        } else {
+          actions.push(`affectée(s) au projet ${selectedItProject?.code || ''}`);
+        }
+      }
       toast.success(`${ids.length} tâche(s) ${actions.join(' et ')}`);
 
       setSelectedTaskIds(new Set());
@@ -354,6 +386,7 @@ export function BulkActionDialog({ open, onOpenChange, tasks, onComplete, canRea
     setTargetSubcategoryId('');
     setTargetUserId('');
     setTargetRequesterId('');
+    setTargetItProjectId('');
     setSearchQuery('');
     setFilterStatuses(new Set());
     setFilterCurrentAssignees(new Set());
@@ -361,6 +394,7 @@ export function BulkActionDialog({ open, onOpenChange, tasks, onComplete, canRea
     setFilterServiceGroups(new Set());
     setTargetSearchQuery('');
     setRequesterSearchQuery('');
+    setItProjectSearchQuery('');
   };
 
   return (
@@ -378,7 +412,7 @@ export function BulkActionDialog({ open, onOpenChange, tasks, onComplete, canRea
 
         <div className="flex-1 min-h-0 flex flex-col space-y-4 overflow-hidden">
           {/* Action panels */}
-          <div className={`grid ${canReassign ? 'grid-cols-3' : 'grid-cols-1'} gap-3 shrink-0`}>
+          <div className={`grid ${canReassign ? 'grid-cols-4' : 'grid-cols-2'} gap-3 shrink-0`}>
             {/* Category assignment */}
             <div className="p-3 rounded-lg border bg-muted/30 space-y-2">
               <Label className="text-xs font-semibold flex items-center gap-1.5">
@@ -560,6 +594,64 @@ export function BulkActionDialog({ open, onOpenChange, tasks, onComplete, canRea
                 )}
               </div>
             )}
+
+            {/* IT Project assignment */}
+            <div className="p-3 rounded-lg border bg-muted/30 space-y-2">
+              <Label className="text-xs font-semibold flex items-center gap-1.5">
+                <Monitor className="h-3.5 w-3.5" />
+                Projet IT cible
+              </Label>
+              <Popover open={itProjectSearchOpen} onOpenChange={setItProjectSearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" className="w-full justify-between h-9 font-normal">
+                    {targetItProjectId ? (
+                      targetItProjectId === '__remove__' ? (
+                        <span className="text-destructive">Retirer du projet IT</span>
+                      ) : (
+                        <span className="truncate">{selectedItProject?.code} – {selectedItProject?.name}</span>
+                      )
+                    ) : (
+                      <span className="text-muted-foreground">Sélectionner...</span>
+                    )}
+                    <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0 z-50 bg-popover" align="start">
+                  <div className="p-2 border-b">
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Rechercher un projet IT..."
+                        value={itProjectSearchQuery}
+                        onChange={(e) => setItProjectSearchQuery(e.target.value)}
+                        className="pl-9 h-9"
+                        autoFocus
+                      />
+                    </div>
+                  </div>
+                  <ScrollArea className="max-h-[220px]">
+                    <button
+                      onClick={() => { setTargetItProjectId('__remove__'); setItProjectSearchOpen(false); setItProjectSearchQuery(''); }}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-accent transition-colors text-sm text-destructive ${targetItProjectId === '__remove__' ? 'bg-primary/10' : ''}`}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                      Retirer du projet IT
+                    </button>
+                    {filteredItProjectMembers.map(p => (
+                      <button
+                        key={p.id}
+                        onClick={() => { setTargetItProjectId(p.id); setItProjectSearchOpen(false); setItProjectSearchQuery(''); }}
+                        className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-accent transition-colors text-sm ${targetItProjectId === p.id ? 'bg-primary/10' : ''}`}
+                      >
+                        <Badge variant="outline" className="text-[9px] font-mono border-violet-300 text-violet-700 shrink-0">{p.code}</Badge>
+                        <span className="flex-1 truncate">{p.name}</span>
+                        {targetItProjectId === p.id && <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />}
+                      </button>
+                    ))}
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
 
           {/* Filters */}

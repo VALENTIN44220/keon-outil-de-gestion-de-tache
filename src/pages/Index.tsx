@@ -211,6 +211,17 @@ const Index = () => {
         const taskDate = new Date(task.created_at);
         if (taskDate > crossFilters.dateRange.end) return false;
       }
+      if (crossFilters.itProjectIds && crossFilters.itProjectIds.length > 0) {
+        const hasNone = crossFilters.itProjectIds.includes('__none__');
+        const projectIds = crossFilters.itProjectIds.filter(id => id !== '__none__');
+        if (hasNone && !task.it_project_id) {
+          // matches "Sans projet IT"
+        } else if (projectIds.length > 0 && task.it_project_id && projectIds.includes(task.it_project_id)) {
+          // matches a specific project
+        } else {
+          return false;
+        }
+      }
       return true;
     });
   }, [tasks, advancedFilters, crossFilters]);

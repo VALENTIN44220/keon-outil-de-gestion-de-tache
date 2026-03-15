@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Task, TaskStatus, TaskPriority } from '@/types/task';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -7,7 +7,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Columns3, ClipboardList } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Columns3, ClipboardList, Search, Monitor } from 'lucide-react';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { useTableSort, SortDirection } from '@/hooks/useTableSort';
 import { format } from 'date-fns';
@@ -15,6 +16,7 @@ import { fr } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { TaskDetailDialog } from './TaskDetailDialog';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface DenseTableViewProps {
   tasks: Task[];
@@ -30,6 +32,12 @@ interface ColumnDef {
   defaultVisible: boolean;
 }
 
+interface ITProjectOption {
+  id: string;
+  code: string;
+  name: string;
+}
+
 const ALL_COLUMNS: ColumnDef[] = [
   { key: 'request_number', label: 'N°', defaultVisible: true },
   { key: 'title', label: 'Titre', defaultVisible: true },
@@ -39,6 +47,7 @@ const ALL_COLUMNS: ColumnDef[] = [
   { key: 'assignee', label: 'Assigné', defaultVisible: true },
   { key: 'requester', label: 'Demandeur', defaultVisible: false },
   { key: 'category', label: 'Catégorie', defaultVisible: true },
+  { key: 'it_project', label: 'Projet IT', defaultVisible: false },
   { key: 'due_date', label: 'Échéance', defaultVisible: true },
   { key: 'progress', label: 'Progression', defaultVisible: false },
   { key: 'created_at', label: 'Créé le', defaultVisible: false },
@@ -96,8 +105,12 @@ export function DenseTableView({ tasks, onStatusChange, onDelete, progressMap, o
   });
   const [profilesMap, setProfilesMap] = useState<Map<string, string>>(new Map());
   const [categoriesMap, setCategoriesMap] = useState<Map<string, string>>(new Map());
+  const [itProjectsMap, setItProjectsMap] = useState<Map<string, string>>(new Map());
+  const [itProjectsList, setItProjectsList] = useState<ITProjectOption[]>([]);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [colSelectorOpen, setColSelectorOpen] = useState(false);
+  const [editingItProjectTaskId, setEditingItProjectTaskId] = useState<string | null>(null);
+  const [itProjectSearch, setItProjectSearch] = useState('');
 
   const { sortedData: sortedTasks, sortConfig, handleSort } = useTableSort<Task>(tasks, 'created_at', 'desc');
 
@@ -105,12 +118,13 @@ export function DenseTableView({ tasks, onStatusChange, onDelete, progressMap, o
     localStorage.setItem(STORAGE_KEY, JSON.stringify(visibleColumns));
   }, [visibleColumns]);
 
-  // Fetch profiles & categories
+  // Fetch profiles, categories & IT projects
   useEffect(() => {
     (async () => {
-      const [{ data: profiles }, { data: cats }] = await Promise.all([
+      const [{ data: profiles }, { data: cats }, { data: itProjects }] = await Promise.all([
         supabase.from('profiles').select('id, display_name').eq('status', 'active'),
         supabase.from('categories').select('id, name'),
+        supabase.from('it_projects').select('id, code_projet_digital, nom_projet').order('code_projet_digital'),
       ]);
       if (profiles) {
         const m = new Map<string, string>();
@@ -122,6 +136,12 @@ export function DenseTableView({ tasks, onStatusChange, onDelete, progressMap, o
         cats.forEach(c => m.set(c.id, c.name));
         setCategoriesMap(m);
       }
+      if (itProjects) {
+        const m = new Map<string, string>();
+        itProjects.forEach((p: any) => m.set(p.id, p.code_projet_digital));
+        setItProjectsMap(m);
+        setItProjectsList(itProjects.map((p: any) => ({ id: p.id, code: p.code_projet_digital, name: p.nom_projet })));
+      }
     })();
   }, []);
 
@@ -132,6 +152,25 @@ export function DenseTableView({ tasks, onStatusChange, onDelete, progressMap, o
       prev.includes(key) ? prev.filter(c => c !== key) : [...prev, key]
     );
   };
+
+  const handleUpdateItProject = async (taskId: string, itProjectId: string | null) => {
+    try {
+      const { error } = await supabase.from('tasks').update({ it_project_id: itProjectId }).eq('id', taskId);
+      if (error) throw error;
+      const projectCode = itProjectId ? itProjectsMap.get(itProjectId) : null;
+      toast.success(projectCode ? `Projet IT → ${projectCode}` : 'Projet IT retiré');
+      setEditingItProjectTaskId(null);
+      onTaskUpdated?.();
+    } catch (error: any) {
+      toast.error(`Erreur: ${error.message}`);
+    }
+  };
+
+  const filteredItProjects = useMemo(() => {
+    if (!itProjectSearch.trim()) return itProjectsList;
+    const q = itProjectSearch.toLowerCase();
+    return itProjectsList.filter(p => p.code.toLowerCase().includes(q) || p.name.toLowerCase().includes(q));
+  }, [itProjectsList, itProjectSearch]);
 
   const renderCellContent = (task: Task, colKey: string) => {
     switch (colKey) {
@@ -151,6 +190,70 @@ export function DenseTableView({ tasks, onStatusChange, onDelete, progressMap, o
         return <span className="text-xs">{profilesMap.get(task.requester_id || '') || '—'}</span>;
       case 'category':
         return <span className="text-xs">{categoriesMap.get(task.category_id || '') || '—'}</span>;
+      case 'it_project': {
+        const code = task.it_project_id ? itProjectsMap.get(task.it_project_id) : null;
+        return (
+          <Popover
+            open={editingItProjectTaskId === task.id}
+            onOpenChange={(open) => {
+              if (open) {
+                setEditingItProjectTaskId(task.id);
+                setItProjectSearch('');
+              } else {
+                setEditingItProjectTaskId(null);
+              }
+            }}
+          >
+            <PopoverTrigger asChild>
+              <button
+                className="text-xs hover:underline text-left"
+                onClick={(e) => { e.stopPropagation(); setEditingItProjectTaskId(task.id); setItProjectSearch(''); }}
+              >
+                {code ? (
+                  <Badge variant="outline" className="text-[10px] font-mono border-violet-300 text-violet-700">{code}</Badge>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-72 p-0" align="start" onClick={(e) => e.stopPropagation()}>
+              <div className="p-2 border-b">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    placeholder="Rechercher un projet IT..."
+                    value={itProjectSearch}
+                    onChange={(e) => setItProjectSearch(e.target.value)}
+                    className="pl-8 h-8 text-sm"
+                    autoFocus
+                  />
+                </div>
+              </div>
+              <ScrollArea className="max-h-[200px]">
+                <button
+                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-accent transition-colors text-muted-foreground"
+                  onClick={() => handleUpdateItProject(task.id, null)}
+                >
+                  Aucun projet IT
+                </button>
+                {filteredItProjects.map(p => (
+                  <button
+                    key={p.id}
+                    className={cn(
+                      'w-full text-left px-3 py-1.5 text-sm hover:bg-accent transition-colors',
+                      task.it_project_id === p.id && 'bg-primary/10'
+                    )}
+                    onClick={() => handleUpdateItProject(task.id, p.id)}
+                  >
+                    <Badge variant="outline" className="text-[9px] font-mono border-violet-300 text-violet-700 mr-1">{p.code}</Badge>
+                    <span className="truncate">{p.name}</span>
+                  </button>
+                ))}
+              </ScrollArea>
+            </PopoverContent>
+          </Popover>
+        );
+      }
       case 'due_date':
         return task.due_date ? <span className="text-xs">{format(new Date(task.due_date), 'dd/MM/yyyy', { locale: fr })}</span> : <span className="text-xs text-muted-foreground">—</span>;
       case 'progress': {
