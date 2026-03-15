@@ -155,6 +155,10 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
     }), [keonProjects]);
 
   useEffect(() => {
+    let resizeObserver: ResizeObserver | null = null;
+    let initTimeoutId: number | null = null;
+    let invalidateTimeoutId: number | null = null;
+
     // Load Leaflet CSS if not already loaded
     if (!document.querySelector('link[href*="leaflet"]')) {
       const link = document.createElement('link');
@@ -162,13 +166,30 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
       link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
       document.head.appendChild(link);
     }
-    // Load Leaflet JS if not already loaded
+
+    const scheduleInvalidate = () => {
+      if (invalidateTimeoutId) window.clearTimeout(invalidateTimeoutId);
+      invalidateTimeoutId = window.setTimeout(() => {
+        mapInstanceRef.current?.invalidateSize();
+      }, 100);
+    };
+
     const initMap = () => {
       const L = (window as any).L;
-      if (!L || !mapRef.current || keonWithCoords.length === 0) return;
+      const container = mapRef.current;
+      if (!L || !container || keonWithCoords.length === 0) return;
+
+      const { height } = container.getBoundingClientRect();
+      if (height <= 0) {
+        initTimeoutId = window.setTimeout(initMap, 100);
+        return;
+      }
+
       if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; }
-      const map = L.map(mapRef.current, { zoomControl: true, scrollWheelZoom: true });
+
+      const map = L.map(container, { zoomControl: true, scrollWheelZoom: true });
       mapInstanceRef.current = map;
+
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 18 }).addTo(map);
       const bounds: [number, number][] = [];
       keonWithCoords.forEach(p => {
@@ -179,16 +200,40 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
         marker.addTo(map);
       });
       if (bounds.length > 0) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 });
+
+      // Force layout recompute once map is in the DOM
+      scheduleInvalidate();
+
+      if (typeof ResizeObserver !== 'undefined') {
+        resizeObserver = new ResizeObserver(() => {
+          scheduleInvalidate();
+        });
+        resizeObserver.observe(container);
+      }
     };
+
+    const launchInit = () => {
+      initTimeoutId = window.setTimeout(initMap, 150);
+    };
+
     if ((window as any).L) {
-      setTimeout(initMap, 150);
+      launchInit();
     } else {
-      const script = document.createElement('script');
-      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-      script.onload = () => setTimeout(initMap, 150);
-      document.head.appendChild(script);
+      const existingScript = document.querySelector('script[src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"]') as HTMLScriptElement | null;
+      if (existingScript) {
+        existingScript.addEventListener('load', launchInit, { once: true });
+      } else {
+        const script = document.createElement('script');
+        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+        script.onload = launchInit;
+        document.head.appendChild(script);
+      }
     }
+
     return () => {
+      if (initTimeoutId) window.clearTimeout(initTimeoutId);
+      if (invalidateTimeoutId) window.clearTimeout(invalidateTimeoutId);
+      resizeObserver?.disconnect();
       if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; }
     };
   }, [keonWithCoords]);
@@ -257,6 +302,7 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
   // --- Widget content renderers ---
   const renderWidgetContent = useCallback((widget: WidgetConfig) => {
     const mapH = getWidgetHeightPx(widget) - 60;
+    const safeMapHeight = Math.max(200, mapH);
     switch (widget.id) {
       case 'kpis':
         return (
@@ -278,14 +324,14 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
               <Badge variant="secondary" className="ml-auto text-xs">{keonWithCoords.length} localisés</Badge>
             </div>
             {keonWithCoords.length === 0 ? (
-              <div className="flex flex-col items-center justify-center text-center py-12 text-muted-foreground" style={{ height: Math.max(200, mapH) }}>
+              <div className="flex flex-col items-center justify-center text-center py-12 text-muted-foreground" style={{ height: safeMapHeight }}>
                 <MapPin className="h-10 w-10 mb-3 opacity-30" />
                 <p className="text-sm font-medium">Aucun projet localisé</p>
                 <p className="text-xs mt-1">Renseignez les coordonnées GPS dans les fiches projet.</p>
               </div>
             ) : (
               <div className="space-y-3">
-                <div ref={mapRef} style={{ height: Math.max(200, mapH - 80) }} className="w-full rounded-lg border border-border" />
+                <div ref={mapRef} style={{ height: safeMapHeight }} className="w-full rounded-lg border border-border" />
                 <div className="flex flex-wrap gap-1.5 max-h-[120px] overflow-y-auto">
                   {keonWithCoords.map(p => (
                     <Badge
