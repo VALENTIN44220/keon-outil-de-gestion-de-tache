@@ -147,7 +147,8 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
   const { sortedData, sortConfig, handleSort } = useTableSort(tableData, 'code_projet', 'asc');
 
   // --- Map ---
-  const mapRef = useRef<HTMLDivElement>(null);
+  const desktopMapRef = useRef<HTMLDivElement>(null);
+  const mobileMapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const keonWithCoords = useMemo(() =>
     keonProjects.filter(p => {
