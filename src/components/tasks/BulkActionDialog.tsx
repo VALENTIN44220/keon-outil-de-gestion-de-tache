@@ -264,7 +264,7 @@ export function BulkActionDialog({ open, onOpenChange, tasks, onComplete, canRea
       }
       return true;
     });
-  }, [tasks, searchQuery, filterStatuses, filterCurrentAssignees, filterSources, filterServiceGroups, taskServiceGroupMap, plannerTaskIds]);
+  }, [tasks, searchQuery, filterStatuses, filterCurrentAssignees, filterSources, filterServiceGroups, filterItProjects, taskServiceGroupMap, plannerTaskIds]);
 
   useEffect(() => {
     setSelectedTaskIds(new Set());
