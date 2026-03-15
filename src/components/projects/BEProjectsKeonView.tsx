@@ -158,6 +158,11 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
     }), [keonProjects]);
 
   useEffect(() => {
+    // Expose navigate for popup buttons
+    (window as any).__navigateToProject = (code: string) => {
+      navigate(`/be/projects/${code}/overview`);
+    };
+
     let resizeObserver: ResizeObserver | null = null;
     let initTimeoutId: number | null = null;
     let invalidateTimeoutId: number | null = null;
@@ -169,7 +174,35 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
       }, 100);
     };
 
-    const initMap = () => {
+    const loadClusterPlugin = (): Promise<void> => {
+      return new Promise((resolve) => {
+        // CSS
+        if (!document.querySelector('link[href*="MarkerCluster.css"]')) {
+          const css1 = document.createElement('link');
+          css1.rel = 'stylesheet';
+          css1.href = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css';
+          document.head.appendChild(css1);
+        }
+        if (!document.querySelector('link[href*="MarkerCluster.Default.css"]')) {
+          const css2 = document.createElement('link');
+          css2.rel = 'stylesheet';
+          css2.href = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css';
+          document.head.appendChild(css2);
+        }
+        // JS
+        if ((L as any).markerClusterGroup) {
+          resolve();
+          return;
+        }
+        const s = document.createElement('script');
+        s.src = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js';
+        s.onload = () => resolve();
+        s.onerror = () => resolve(); // fallback gracefully
+        document.head.appendChild(s);
+      });
+    };
+
+    const initMap = async () => {
       const desktopContainer = desktopMapRef.current;
       const mobileContainer = mobileMapRef.current;
       const visibleDesktop = desktopContainer && desktopContainer.offsetParent !== null;
@@ -183,6 +216,8 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
         initTimeoutId = window.setTimeout(initMap, 100);
         return;
       }
+
+      await loadClusterPlugin();
 
       try {
         if (mapInstanceRef.current) {
@@ -200,23 +235,43 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
           maxZoom: 18,
         }).addTo(map);
 
+        // Create cluster group
+        const hasCluster = typeof (L as any).markerClusterGroup === 'function';
+        const markers: L.LayerGroup = hasCluster
+          ? (L as any).markerClusterGroup({
+              maxClusterRadius: 80,
+              iconCreateFunction: (cluster: any) => {
+                const count = cluster.getChildCount();
+                const bg = count > 10 ? '#ef4444' : count > 4 ? '#f59e0b' : '#10b981';
+                return L.divIcon({
+                  html: `<div style="background:${bg};color:#fff;border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,.3);border:2px solid #fff;">${count}</div>`,
+                  className: '',
+                  iconSize: L.point(40, 40),
+                });
+              },
+            })
+          : L.layerGroup();
+
         const bounds: [number, number][] = [];
         keonWithCoords.forEach(p => {
           const [lat, lon] = p.gps_coordinates!.split(',').map(s => parseFloat(s.trim()));
           if (Number.isNaN(lat) || Number.isNaN(lon)) return;
 
           bounds.push([lat, lon]);
-          const marker = L.circleMarker([lat, lon], { radius: 8, fillColor: '#10b981', color: '#fff', weight: 2, fillOpacity: 0.9 });
-          marker.bindPopup(`<div style="min-width:160px;font-family:system-ui,sans-serif;"><div style="font-weight:700;font-size:13px;color:#10b981;">${p.code_projet}</div><div style="font-size:12px;margin-top:2px;">${p.nom_projet}</div>${p.region ? `<div style="margin-top:4px;font-size:11px;color:#6b7280;">📍 ${p.region}</div>` : ''}<a href="#" class="spv-map-project-link" style="display:inline-block;margin-top:6px;font-size:11px;color:#3b82f6;text-decoration:underline;cursor:pointer;">Voir le projet →</a></div>`, { maxWidth: 250 });
-          marker.on('popupopen', () => {
-            const link = document.querySelector('.spv-map-project-link');
-            if (link) link.addEventListener('click', (e) => {
-              e.preventDefault();
-              navigate(`/be/projects/${p.code_projet}/overview`);
-            });
+          const marker = L.circleMarker([lat, lon], {
+            radius: 9, fillColor: '#10b981', color: '#fff', weight: 2, fillOpacity: 0.95,
           });
-          marker.addTo(map);
+          marker.bindPopup(`
+            <div style="min-width:180px;font-family:system-ui,sans-serif;">
+              <div style="font-weight:700;font-size:13px;color:#10b981;">${p.code_projet}</div>
+              <div style="font-size:12px;margin-top:2px;">${p.nom_projet}</div>
+              ${p.region ? `<div style="margin-top:4px;font-size:11px;color:#6b7280;">📍 ${p.region}</div>` : ''}
+              <button onclick="window.__navigateToProject('${p.code_projet}')" style="margin-top:8px;font-size:11px;color:#3b82f6;background:none;border:none;padding:0;cursor:pointer;text-decoration:underline;">Ouvrir →</button>
+            </div>
+          `, { maxWidth: 220 });
+          markers.addLayer(marker);
         });
+        map.addLayer(markers);
 
         if (bounds.length > 0) {
           map.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 });
@@ -247,8 +302,9 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
       }
+      delete (window as any).__navigateToProject;
     };
-  }, [keonWithCoords]);
+  }, [keonWithCoords, navigate]);
 
   // --- Widget manipulation handlers (same as ConfigurableDashboard) ---
   const handleRemoveWidget = useCallback((id: string) => {
