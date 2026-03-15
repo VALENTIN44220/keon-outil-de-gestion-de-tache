@@ -207,7 +207,14 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
 
           bounds.push([lat, lon]);
           const marker = L.circleMarker([lat, lon], { radius: 8, fillColor: '#10b981', color: '#fff', weight: 2, fillOpacity: 0.9 });
-          marker.bindPopup(`<div style="min-width:160px;font-family:system-ui,sans-serif;"><div style="font-weight:700;font-size:13px;color:#10b981;">${p.code_projet}</div><div style="font-size:12px;margin-top:2px;">${p.nom_projet}</div>${p.region ? `<div style="margin-top:4px;font-size:11px;color:#6b7280;">📍 ${p.region}</div>` : ''}</div>`, { maxWidth: 250 });
+          marker.bindPopup(`<div style="min-width:160px;font-family:system-ui,sans-serif;"><div style="font-weight:700;font-size:13px;color:#10b981;">${p.code_projet}</div><div style="font-size:12px;margin-top:2px;">${p.nom_projet}</div>${p.region ? `<div style="margin-top:4px;font-size:11px;color:#6b7280;">📍 ${p.region}</div>` : ''}<a href="#" class="spv-map-project-link" style="display:inline-block;margin-top:6px;font-size:11px;color:#3b82f6;text-decoration:underline;cursor:pointer;">Voir le projet →</a></div>`, { maxWidth: 250 });
+          marker.on('popupopen', () => {
+            const link = document.querySelector('.spv-map-project-link');
+            if (link) link.addEventListener('click', (e) => {
+              e.preventDefault();
+              navigate(`/be/projects/${p.code_projet}/overview`);
+            });
+          });
           marker.addTo(map);
         });
 
