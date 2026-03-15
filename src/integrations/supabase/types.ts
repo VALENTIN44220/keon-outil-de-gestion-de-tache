@@ -1502,6 +1502,44 @@ export type Database = {
           },
         ]
       }
+      it_project_phase_progress: {
+        Row: {
+          advancement_mode: string
+          created_at: string | null
+          id: string
+          it_project_id: string
+          manual_progress: number | null
+          phase: string
+          updated_at: string | null
+        }
+        Insert: {
+          advancement_mode?: string
+          created_at?: string | null
+          id?: string
+          it_project_id: string
+          manual_progress?: number | null
+          phase: string
+          updated_at?: string | null
+        }
+        Update: {
+          advancement_mode?: string
+          created_at?: string | null
+          id?: string
+          it_project_id?: string
+          manual_progress?: number | null
+          phase?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_project_phase_progress_it_project_id_fkey"
+            columns: ["it_project_id"]
+            isOneToOne: false
+            referencedRelation: "it_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       it_projects: {
         Row: {
           budget_consomme: number | null
