@@ -178,38 +178,49 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
         return;
       }
 
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
-        mapInstanceRef.current = null;
-      }
+      try {
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.remove();
+          mapInstanceRef.current = null;
+        }
 
-      const map = L.map(container, { zoomControl: true, scrollWheelZoom: true });
-      mapInstanceRef.current = map;
+        const map = L.map(container, { zoomControl: true, scrollWheelZoom: true });
+        mapInstanceRef.current = map;
 
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap',
-        maxZoom: 18,
-      }).addTo(map);
+        map.setView([46.6, 2.2], 6);
 
-      const bounds: [number, number][] = [];
-      keonWithCoords.forEach(p => {
-        const [lat, lon] = p.gps_coordinates!.split(',').map(s => parseFloat(s.trim()));
-        bounds.push([lat, lon]);
-        const marker = L.circleMarker([lat, lon], { radius: 8, fillColor: '#10b981', color: '#fff', weight: 2, fillOpacity: 0.9 });
-        marker.bindPopup(`<div style="min-width:160px;font-family:system-ui,sans-serif;"><div style="font-weight:700;font-size:13px;color:#10b981;">${p.code_projet}</div><div style="font-size:12px;margin-top:2px;">${p.nom_projet}</div>${p.region ? `<div style="margin-top:4px;font-size:11px;color:#6b7280;">📍 ${p.region}</div>` : ''}</div>`, { maxWidth: 250 });
-        marker.addTo(map);
-      });
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap',
+          maxZoom: 18,
+        }).addTo(map);
 
-      if (bounds.length > 0) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 });
+        const bounds: [number, number][] = [];
+        keonWithCoords.forEach(p => {
+          const [lat, lon] = p.gps_coordinates!.split(',').map(s => parseFloat(s.trim()));
+          if (Number.isNaN(lat) || Number.isNaN(lon)) return;
 
-      scheduleInvalidate();
-      map.whenReady(scheduleInvalidate);
-
-      if (typeof ResizeObserver !== 'undefined') {
-        resizeObserver = new ResizeObserver(() => {
-          scheduleInvalidate();
+          bounds.push([lat, lon]);
+          const marker = L.circleMarker([lat, lon], { radius: 8, fillColor: '#10b981', color: '#fff', weight: 2, fillOpacity: 0.9 });
+          marker.bindPopup(`<div style="min-width:160px;font-family:system-ui,sans-serif;"><div style="font-weight:700;font-size:13px;color:#10b981;">${p.code_projet}</div><div style="font-size:12px;margin-top:2px;">${p.nom_projet}</div>${p.region ? `<div style="margin-top:4px;font-size:11px;color:#6b7280;">📍 ${p.region}</div>` : ''}</div>`, { maxWidth: 250 });
+          marker.addTo(map);
         });
-        resizeObserver.observe(container);
+
+        if (bounds.length > 0) {
+          map.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 });
+        }
+
+        scheduleInvalidate();
+        map.whenReady(scheduleInvalidate);
+        window.requestAnimationFrame(scheduleInvalidate);
+
+        if (typeof ResizeObserver !== 'undefined') {
+          resizeObserver = new ResizeObserver(() => {
+            scheduleInvalidate();
+          });
+          resizeObserver.observe(container);
+        }
+      } catch (error) {
+        console.error('[SPV Map] Leaflet init error:', error);
       }
     };
 
