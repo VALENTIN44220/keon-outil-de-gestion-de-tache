@@ -412,7 +412,7 @@ export function BulkActionDialog({ open, onOpenChange, tasks, onComplete, canRea
 
         <div className="flex-1 min-h-0 flex flex-col space-y-4 overflow-hidden">
           {/* Action panels */}
-          <div className={`grid ${canReassign ? 'grid-cols-3' : 'grid-cols-1'} gap-3 shrink-0`}>
+          <div className={`grid ${canReassign ? 'grid-cols-4' : 'grid-cols-2'} gap-3 shrink-0`}>
             {/* Category assignment */}
             <div className="p-3 rounded-lg border bg-muted/30 space-y-2">
               <Label className="text-xs font-semibold flex items-center gap-1.5">
