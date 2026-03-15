@@ -269,7 +269,15 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
               <span className="text-sm font-medium">Carte des projets SPV</span>
               <Badge variant="secondary" className="ml-auto text-xs">{keonWithCoords.length} localisés</Badge>
             </div>
-            <div ref={mapRef} style={{ height: Math.max(200, mapH) }} className="w-full rounded-lg" />
+            {keonWithCoords.length === 0 ? (
+              <div className="flex flex-col items-center justify-center text-center py-12 text-muted-foreground" style={{ height: Math.max(200, mapH) }}>
+                <MapPin className="h-10 w-10 mb-3 opacity-30" />
+                <p className="text-sm font-medium">Aucun projet localisé</p>
+                <p className="text-xs mt-1">Renseignez les coordonnées GPS dans les fiches projet.</p>
+              </div>
+            ) : (
+              <div ref={mapRef} style={{ height: Math.max(200, mapH) }} className="w-full rounded-lg border border-border" />
+            )}
           </div>
         );
       case 'typologie':
