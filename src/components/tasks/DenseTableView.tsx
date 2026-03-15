@@ -153,6 +153,25 @@ export function DenseTableView({ tasks, onStatusChange, onDelete, progressMap, o
     );
   };
 
+  const handleUpdateItProject = async (taskId: string, itProjectId: string | null) => {
+    try {
+      const { error } = await supabase.from('tasks').update({ it_project_id: itProjectId }).eq('id', taskId);
+      if (error) throw error;
+      const projectCode = itProjectId ? itProjectsMap.get(itProjectId) : null;
+      toast.success(projectCode ? `Projet IT → ${projectCode}` : 'Projet IT retiré');
+      setEditingItProjectTaskId(null);
+      onTaskUpdated?.();
+    } catch (error: any) {
+      toast.error(`Erreur: ${error.message}`);
+    }
+  };
+
+  const filteredItProjects = useMemo(() => {
+    if (!itProjectSearch.trim()) return itProjectsList;
+    const q = itProjectSearch.toLowerCase();
+    return itProjectsList.filter(p => p.code.toLowerCase().includes(q) || p.name.toLowerCase().includes(q));
+  }, [itProjectsList, itProjectSearch]);
+
   const renderCellContent = (task: Task, colKey: string) => {
     switch (colKey) {
       case 'request_number':
@@ -171,6 +190,70 @@ export function DenseTableView({ tasks, onStatusChange, onDelete, progressMap, o
         return <span className="text-xs">{profilesMap.get(task.requester_id || '') || '—'}</span>;
       case 'category':
         return <span className="text-xs">{categoriesMap.get(task.category_id || '') || '—'}</span>;
+      case 'it_project': {
+        const code = task.it_project_id ? itProjectsMap.get(task.it_project_id) : null;
+        return (
+          <Popover
+            open={editingItProjectTaskId === task.id}
+            onOpenChange={(open) => {
+              if (open) {
+                setEditingItProjectTaskId(task.id);
+                setItProjectSearch('');
+              } else {
+                setEditingItProjectTaskId(null);
+              }
+            }}
+          >
+            <PopoverTrigger asChild>
+              <button
+                className="text-xs hover:underline text-left"
+                onClick={(e) => { e.stopPropagation(); setEditingItProjectTaskId(task.id); setItProjectSearch(''); }}
+              >
+                {code ? (
+                  <Badge variant="outline" className="text-[10px] font-mono border-violet-300 text-violet-700">{code}</Badge>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-72 p-0" align="start" onClick={(e) => e.stopPropagation()}>
+              <div className="p-2 border-b">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    placeholder="Rechercher un projet IT..."
+                    value={itProjectSearch}
+                    onChange={(e) => setItProjectSearch(e.target.value)}
+                    className="pl-8 h-8 text-sm"
+                    autoFocus
+                  />
+                </div>
+              </div>
+              <ScrollArea className="max-h-[200px]">
+                <button
+                  className="w-full text-left px-3 py-1.5 text-sm hover:bg-accent transition-colors text-muted-foreground"
+                  onClick={() => handleUpdateItProject(task.id, null)}
+                >
+                  Aucun projet IT
+                </button>
+                {filteredItProjects.map(p => (
+                  <button
+                    key={p.id}
+                    className={cn(
+                      'w-full text-left px-3 py-1.5 text-sm hover:bg-accent transition-colors',
+                      task.it_project_id === p.id && 'bg-primary/10'
+                    )}
+                    onClick={() => handleUpdateItProject(task.id, p.id)}
+                  >
+                    <Badge variant="outline" className="text-[9px] font-mono border-violet-300 text-violet-700 mr-1">{p.code}</Badge>
+                    <span className="truncate">{p.name}</span>
+                  </button>
+                ))}
+              </ScrollArea>
+            </PopoverContent>
+          </Popover>
+        );
+      }
       case 'due_date':
         return task.due_date ? <span className="text-xs">{format(new Date(task.due_date), 'dd/MM/yyyy', { locale: fr })}</span> : <span className="text-xs text-muted-foreground">—</span>;
       case 'progress': {
