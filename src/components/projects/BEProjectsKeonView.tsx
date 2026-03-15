@@ -538,7 +538,7 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
                 heightPreset={isEditing ? getHeightPresetFromWidget(widget) : undefined}
                 onHeightChange={isEditing ? (preset) => handleHeightChange(widget.id, preset) : undefined}
               >
-                {renderWidgetContent(widget)}
+                {renderWidgetContent(widget, 'mobile')}
               </WidgetWrapper>
             </div>
           ))}
