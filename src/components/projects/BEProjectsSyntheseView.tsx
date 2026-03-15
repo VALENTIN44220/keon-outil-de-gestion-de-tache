@@ -1,6 +1,11 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import * as L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import 'leaflet.markercluster';
+import 'leaflet.markercluster/dist/MarkerCluster.css';
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import { BEProject } from '@/types/beProject';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -256,31 +261,43 @@ function ProjectMapCard({ projects, allProjectStats = {} }: { projects: BEProjec
 
   // Leaflet map initialization
   useEffect(() => {
-    const L = (window as any).L;
-    if (!L || !mapContainerRef.current || withCoords.length === 0) return;
+    if (!mapContainerRef.current || withCoords.length === 0) return;
 
-    if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; }
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.remove();
+      mapInstanceRef.current = null;
+    }
 
     const map = L.map(mapContainerRef.current, { zoomControl: true, scrollWheelZoom: true });
     mapInstanceRef.current = map;
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 18 }).addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap',
+      maxZoom: 18,
+    }).addTo(map);
 
     const statusColor: Record<string, string> = { active: '#10b981', on_hold: '#f59e0b', closed: '#6b7280' };
 
-    const markers = L.markerClusterGroup({
-      iconCreateFunction: (cluster: any) => {
-        const count = cluster.getChildCount();
-        let bg = '#10b981';
-        if (count > 20) bg = '#ef4444';
-        else if (count > 5) bg = '#f59e0b';
-        return L.divIcon({
-          html: `<div style="background:${bg};color:#fff;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3);">${count}</div>`,
-          className: '',
-          iconSize: L.point(36, 36),
-        });
-      },
-    });
+    const hasClusterPlugin = typeof (L as any).markerClusterGroup === 'function';
+    const markersLayer: L.LayerGroup = hasClusterPlugin
+      ? (L as any).markerClusterGroup({
+          iconCreateFunction: (cluster: any) => {
+            const count = cluster.getChildCount();
+            let bg = '#10b981';
+            if (count > 20) bg = '#ef4444';
+            else if (count > 5) bg = '#f59e0b';
+            return L.divIcon({
+              html: `<div style="background:${bg};color:#fff;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3);">${count}</div>`,
+              className: '',
+              iconSize: L.point(36, 36),
+            });
+          },
+        })
+      : L.layerGroup();
+
+    if (!hasClusterPlugin) {
+      console.warn('[BEProjectsSyntheseView] MarkerCluster plugin unavailable, using plain layer group.');
+    }
 
     const bounds: [number, number][] = [];
 
@@ -309,14 +326,19 @@ function ProjectMapCard({ projects, allProjectStats = {} }: { projects: BEProjec
           <a href="/be/projects/${p.code_projet}/overview" style="display:inline-block;margin-top:6px;font-size:11px;color:#3b82f6;text-decoration:underline;">Ouvrir le projet →</a>
         </div>
       `, { maxWidth: 250 });
-      markers.addLayer(marker);
+      markersLayer.addLayer(marker);
     });
 
-    map.addLayer(markers);
+    map.addLayer(markersLayer);
     if (bounds.length > 0) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 });
 
-    return () => { if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; } };
-  }, [withCoords, allProjectStats, navigate]);
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+    };
+  }, [withCoords, allProjectStats]);
 
   const isGeocoding = isBulkGeocoding || isRegenGeocoding;
 
