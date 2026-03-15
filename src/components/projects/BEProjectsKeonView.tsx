@@ -1,5 +1,7 @@
 import { useMemo, useRef, useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { BEProject } from '@/types/beProject';
 import { PilierCode } from '@/config/questionnaireConfig';
 import { computePilierCompletion } from './keon-synthese/utils';
@@ -159,14 +161,6 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
     let initTimeoutId: number | null = null;
     let invalidateTimeoutId: number | null = null;
 
-    // Load Leaflet CSS if not already loaded
-    if (!document.querySelector('link[href*="leaflet"]')) {
-      const link = document.createElement('link');
-      link.rel = 'stylesheet';
-      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-      document.head.appendChild(link);
-    }
-
     const scheduleInvalidate = () => {
       if (invalidateTimeoutId) window.clearTimeout(invalidateTimeoutId);
       invalidateTimeoutId = window.setTimeout(() => {
@@ -175,22 +169,28 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
     };
 
     const initMap = () => {
-      const L = (window as any).L;
       const container = mapRef.current;
-      if (!L || !container || keonWithCoords.length === 0) return;
+      if (!container || keonWithCoords.length === 0) return;
 
-      const { height } = container.getBoundingClientRect();
-      if (height <= 0) {
+      const { height, width } = container.getBoundingClientRect();
+      if (height <= 0 || width <= 0) {
         initTimeoutId = window.setTimeout(initMap, 100);
         return;
       }
 
-      if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; }
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
 
       const map = L.map(container, { zoomControl: true, scrollWheelZoom: true });
       mapInstanceRef.current = map;
 
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 18 }).addTo(map);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap',
+        maxZoom: 18,
+      }).addTo(map);
+
       const bounds: [number, number][] = [];
       keonWithCoords.forEach(p => {
         const [lat, lon] = p.gps_coordinates!.split(',').map(s => parseFloat(s.trim()));
@@ -199,10 +199,11 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
         marker.bindPopup(`<div style="min-width:160px;font-family:system-ui,sans-serif;"><div style="font-weight:700;font-size:13px;color:#10b981;">${p.code_projet}</div><div style="font-size:12px;margin-top:2px;">${p.nom_projet}</div>${p.region ? `<div style="margin-top:4px;font-size:11px;color:#6b7280;">📍 ${p.region}</div>` : ''}</div>`, { maxWidth: 250 });
         marker.addTo(map);
       });
+
       if (bounds.length > 0) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 });
 
-      // Force layout recompute once map is in the DOM
       scheduleInvalidate();
+      map.whenReady(scheduleInvalidate);
 
       if (typeof ResizeObserver !== 'undefined') {
         resizeObserver = new ResizeObserver(() => {
@@ -212,29 +213,16 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
       }
     };
 
-    const launchInit = () => {
-      initTimeoutId = window.setTimeout(initMap, 150);
-    };
-
-    if ((window as any).L) {
-      launchInit();
-    } else {
-      const existingScript = document.querySelector('script[src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"]') as HTMLScriptElement | null;
-      if (existingScript) {
-        existingScript.addEventListener('load', launchInit, { once: true });
-      } else {
-        const script = document.createElement('script');
-        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-        script.onload = launchInit;
-        document.head.appendChild(script);
-      }
-    }
+    initTimeoutId = window.setTimeout(initMap, 100);
 
     return () => {
       if (initTimeoutId) window.clearTimeout(initTimeoutId);
       if (invalidateTimeoutId) window.clearTimeout(invalidateTimeoutId);
       resizeObserver?.disconnect();
-      if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; }
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
     };
   }, [keonWithCoords]);
 
