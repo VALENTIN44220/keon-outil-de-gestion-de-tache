@@ -145,52 +145,12 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
   const { sortedData, sortConfig, handleSort } = useTableSort(tableData, 'code_projet', 'asc');
 
   // --- Map ---
-  const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<any>(null);
   const keonWithCoords = useMemo(() =>
     keonProjects.filter(p => {
       if (!p.gps_coordinates) return false;
       const parts = p.gps_coordinates.split(',').map(s => parseFloat(s.trim()));
       return parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1]) && (Math.abs(parts[0]) > 0.001 || Math.abs(parts[1]) > 0.001);
     }), [keonProjects]);
-
-  useEffect(() => {
-    const L = (window as any).L;
-    if (!L || !mapRef.current || keonWithCoords.length === 0) return;
-    // Small delay to ensure container is rendered and has dimensions
-    const timer = setTimeout(() => {
-      if (!mapRef.current) return;
-      if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; }
-      const map = L.map(mapRef.current, { zoomControl: true, scrollWheelZoom: true });
-      mapInstanceRef.current = map;
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 18 }).addTo(map);
-      const markers = L.markerClusterGroup({
-        iconCreateFunction: (cluster: any) => {
-          const count = cluster.getChildCount();
-          let bg = '#10b981';
-          if (count > 20) bg = '#ef4444'; else if (count > 5) bg = '#f59e0b';
-          return L.divIcon({
-            html: `<div style="background:${bg};color:#fff;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3);">${count}</div>`,
-            className: '', iconSize: L.point(36, 36),
-          });
-        },
-      });
-      const bounds: [number, number][] = [];
-      keonWithCoords.forEach(p => {
-        const [lat, lon] = p.gps_coordinates!.split(',').map(s => parseFloat(s.trim()));
-        bounds.push([lat, lon]);
-        const marker = L.circleMarker([lat, lon], { radius: 8, fillColor: '#10b981', color: '#fff', weight: 2, fillOpacity: 0.9 });
-        marker.bindPopup(`<div style="min-width:160px;font-family:system-ui,sans-serif;"><div style="font-weight:700;font-size:13px;color:#10b981;">${p.code_projet}</div><div style="font-size:12px;margin-top:2px;">${p.nom_projet}</div>${p.region ? `<div style="margin-top:4px;font-size:11px;color:#6b7280;">📍 ${p.region}</div>` : ''}<a href="/be/projects/${p.code_projet}/overview" style="display:inline-block;margin-top:6px;font-size:11px;color:#3b82f6;text-decoration:underline;">Ouvrir →</a></div>`, { maxWidth: 250 });
-        markers.addLayer(marker);
-      });
-      map.addLayer(markers);
-      if (bounds.length > 0) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 });
-    }, 100);
-    return () => {
-      clearTimeout(timer);
-      if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; }
-    };
-  }, [keonWithCoords]);
 
   // --- Widget manipulation handlers (same as ConfigurableDashboard) ---
   const handleRemoveWidget = useCallback((id: string) => {
@@ -283,7 +243,28 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
                 <p className="text-xs mt-1">Renseignez les coordonnées GPS dans les fiches projet.</p>
               </div>
             ) : (
-              <div ref={mapRef} style={{ height: Math.max(200, mapH) }} className="w-full rounded-lg border border-border" />
+              <div className="space-y-3">
+                <iframe
+                  title="Carte des projets SPV"
+                  className="w-full rounded-lg border border-border"
+                  style={{ height: Math.max(200, mapH), border: 0 }}
+                  loading="lazy"
+                  src="https://www.openstreetmap.org/export/embed.html?bbox=-5,42,10,51&layer=mapnik"
+                />
+                <div className="flex flex-wrap gap-1.5">
+                  {keonWithCoords.map(p => (
+                    <Badge
+                      key={p.id}
+                      variant="secondary"
+                      className="cursor-pointer hover:bg-accent/20 text-xs"
+                      onClick={() => navigate(`/be/projects/${p.code_projet}/overview`)}
+                    >
+                      <MapPin className="h-3 w-3 mr-1 text-emerald-500" />
+                      {p.code_projet}{p.region ? ` · ${p.region}` : ''}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
         );
