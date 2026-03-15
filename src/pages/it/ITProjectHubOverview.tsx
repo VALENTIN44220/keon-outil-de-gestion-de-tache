@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { ITProjectHubHeader } from '@/components/it/ITProjectHubHeader';
 import { useITProject, useITProjectTasks, useITProjectStats, useITProjectMilestones } from '@/hooks/useITProjectHub';
+import { useITProjectPhaseProgress } from '@/hooks/useITProjectHub';
 import { useITProjectSync } from '@/hooks/useITProjectSync';
 import { useITProjectFDR } from '@/hooks/useITProjectFDR';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,10 +15,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Slider } from '@/components/ui/slider';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Monitor, Calendar, Users, TrendingUp, Target, Euro,
   CheckCircle2, Clock, AlertTriangle, MessageSquareText,
-  Link2, Pencil, Flag, ExternalLink, Shield, Loader2
+  Link2, Pencil, Flag, ExternalLink, Shield, Loader2, Settings2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -42,6 +47,7 @@ export default function ITProjectHubOverview() {
   const stats = useITProjectStats(tasks, project);
   const { openTeams, openLoop, hasTeams, hasLoop } = useITProjectSync(project);
   const { etapes, isLoading: fdrLoading, initFDRValidation, updateEtape, etapeCourante } = useITProjectFDR(project?.id);
+  const { data: phaseProgressMap = new Map(), upsertPhaseProgress } = useITProjectPhaseProgress(project?.id);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editingEtape, setEditingEtape] = useState<ITProjectFDRValidation | null>(null);
   const [etapeForm, setEtapeForm] = useState({ statut: 'a_faire', date_validation: '', valideur_id: '', commentaire: '' });
@@ -53,6 +59,29 @@ export default function ITProjectHubOverview() {
   useEffect(() => {
     supabase.from('profiles').select('id, display_name').eq('status', 'active').order('display_name').then(({ data }) => setAllProfiles(data || []));
   }, []);
+
+  // Compute effective progress per phase (auto or manual)
+  const phaseProgressValues = useMemo(() => {
+    const values: Record<string, number> = {};
+    for (const phase of IT_PROJECT_PHASES) {
+      const record = phaseProgressMap.get(phase.value);
+      if (record && record.advancement_mode === 'manual' && record.manual_progress != null) {
+        values[phase.value] = record.manual_progress;
+      } else {
+        const phaseTasks = tasks.filter(t => t.it_project_phase === phase.value);
+        const total = phaseTasks.length;
+        const done = phaseTasks.filter(t => ['done', 'validated', 'closed'].includes(t.status)).length;
+        values[phase.value] = total > 0 ? Math.round((done / total) * 100) : 0;
+      }
+    }
+    return values;
+  }, [tasks, phaseProgressMap]);
+
+  // Weighted global progress (equal weight per phase)
+  const globalProgress = useMemo(() => {
+    const sum = IT_PROJECT_PHASES.reduce((acc, p) => acc + (phaseProgressValues[p.value] || 0), 0);
+    return Math.round(sum / IT_PROJECT_PHASES.length);
+  }, [phaseProgressValues]);
 
   if (isLoading) {
     return (
@@ -244,7 +273,10 @@ export default function ITProjectHubOverview() {
                       const phaseTasks = tasks.filter(t => t.it_project_phase === phase.value);
                       const totalPhase = phaseTasks.length;
                       const donePhase = phaseTasks.filter(t => ['done', 'validated', 'closed'].includes(t.status)).length;
-                      const phaseProgress = totalPhase > 0 ? Math.round((donePhase / totalPhase) * 100) : 0;
+                      const autoProgress = totalPhase > 0 ? Math.round((donePhase / totalPhase) * 100) : 0;
+                      const phaseRecord = phaseProgressMap.get(phase.value);
+                      const isManual = phaseRecord?.advancement_mode === 'manual';
+                      const effectiveProgress = phaseProgressValues[phase.value] || 0;
                       const isCurrent = phase.value === project.phase_courante;
                       const isDone = currentPhaseIndex >= 0 && idx < currentPhaseIndex;
                       const todayDate = new Date(); todayDate.setHours(0, 0, 0, 0);
@@ -287,7 +319,7 @@ export default function ITProjectHubOverview() {
                           </div>
 
                           <div className={cn(
-                            'flex-1 pb-5 rounded-lg',
+                            'flex-1 pb-5 rounded-lg group',
                             isCurrent && 'bg-violet-50/50 dark:bg-violet-950/20 -mx-2 px-3 py-2 border border-violet-200/50'
                           )}>
                             <div className="flex items-center gap-2 flex-wrap">
@@ -335,21 +367,53 @@ export default function ITProjectHubOverview() {
                               </p>
                             )}
 
-                            {totalPhase > 0 ? (
-                              <div className="mt-2 space-y-1.5">
-                                <div className="flex items-center gap-2">
-                                  <Progress value={phaseProgress} className="h-1.5 flex-1 bg-muted" />
-                                  <span className="text-[10px] font-medium text-muted-foreground w-16 text-right">
-                                    {donePhase}/{totalPhase} ({phaseProgress}%)
-                                  </span>
-                                </div>
-                                {hasOverdue && (
-                                  <p className="text-[10px] text-destructive flex items-center gap-1">
-                                    <AlertTriangle className="h-3 w-3" />
-                                    Tâches en retard
-                                  </p>
-                                )}
-                                {/* Task list for this phase */}
+                            {/* Progress bar with edit control */}
+                            <div className="mt-2 space-y-1.5">
+                              <div className="flex items-center gap-2">
+                                <Progress value={effectiveProgress} className="h-1.5 flex-1 bg-muted" />
+                                <span className="text-[10px] font-medium text-muted-foreground flex items-center gap-1 w-auto text-right whitespace-nowrap">
+                                  {isManual ? (
+                                    <>
+                                      {effectiveProgress}%
+                                      <TooltipProvider>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Pencil className="h-3 w-3 text-amber-500" />
+                                          </TooltipTrigger>
+                                          <TooltipContent>Avancement manuel</TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
+                                    </>
+                                  ) : (
+                                    <>{totalPhase > 0 ? `${donePhase}/${totalPhase} (${effectiveProgress}%)` : '0%'}</>
+                                  )}
+                                </span>
+                                <PhaseProgressPopover
+                                  phase={phase}
+                                  autoProgress={autoProgress}
+                                  totalPhase={totalPhase}
+                                  donePhase={donePhase}
+                                  currentRecord={phaseRecord || null}
+                                  onSave={async (mode, value) => {
+                                    await upsertPhaseProgress(phase.value, mode, value);
+                                    // Update global project progress
+                                    const newValues = { ...phaseProgressValues, [phase.value]: mode === 'manual' ? (value ?? 0) : autoProgress };
+                                    const sum = IT_PROJECT_PHASES.reduce((acc, p) => acc + (newValues[p.value] || 0), 0);
+                                    const newGlobal = Math.round(sum / IT_PROJECT_PHASES.length);
+                                    await supabase.from('it_projects').update({ progress: newGlobal }).eq('id', project.id);
+                                    refetch();
+                                    toast.success(`Avancement de la phase ${phase.label} mis à jour (${mode === 'manual' ? value : autoProgress}%)`);
+                                  }}
+                                />
+                              </div>
+                              {hasOverdue && (
+                                <p className="text-[10px] text-destructive flex items-center gap-1">
+                                  <AlertTriangle className="h-3 w-3" />
+                                  Tâches en retard
+                                </p>
+                              )}
+                              {/* Task list for this phase */}
+                              {totalPhase > 0 && (
                                 <div className="space-y-0.5 mt-1">
                                   {phaseTasks.slice(0, 5).map(t => {
                                     const isRequest = t.type === 'request' || (!t.parent_request_id && (t as any).source_process_template_id);
@@ -374,10 +438,11 @@ export default function ITProjectHubOverview() {
                                     <p className="text-[10px] text-muted-foreground">+{phaseTasks.length - 5} autres...</p>
                                   )}
                                 </div>
-                              </div>
-                            ) : (
-                              <p className="text-[10px] text-muted-foreground mt-1">Aucune tâche</p>
-                            )}
+                              )}
+                              {totalPhase === 0 && !isManual && (
+                                <p className="text-[10px] text-muted-foreground mt-1">Aucune tâche</p>
+                              )}
+                            </div>
                           </div>
                         </div>
                       );
@@ -398,9 +463,9 @@ export default function ITProjectHubOverview() {
                   <div>
                     <div className="flex justify-between mb-1.5">
                       <span className="text-sm text-muted-foreground">Avancement global</span>
-                      <span className="text-sm font-bold text-violet-600">{stats.progress}%</span>
+                      <span className="text-sm font-bold text-violet-600">{globalProgress}%</span>
                     </div>
-                    <Progress value={stats.progress} className="h-3 bg-muted" />
+                    <Progress value={globalProgress} className="h-3 bg-muted" />
                   </div>
 
                   <div className="grid grid-cols-3 gap-3">
@@ -600,6 +665,119 @@ export default function ITProjectHubOverview() {
         />
       )}
     </Layout>
+  );
+}
+
+// ============= Phase Progress Popover =============
+function PhaseProgressPopover({
+  phase,
+  autoProgress,
+  totalPhase,
+  donePhase,
+  currentRecord,
+  onSave,
+}: {
+  phase: { value: string; label: string };
+  autoProgress: number;
+  totalPhase: number;
+  donePhase: number;
+  currentRecord: { advancement_mode: string; manual_progress: number | null } | null;
+  onSave: (mode: 'auto' | 'manual', value?: number) => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<'auto' | 'manual'>(
+    (currentRecord?.advancement_mode as 'auto' | 'manual') || 'auto'
+  );
+  const [sliderValue, setSliderValue] = useState(currentRecord?.manual_progress ?? 0);
+  const [saving, setSaving] = useState(false);
+
+  // Reset state when popover opens
+  const handleOpenChange = (newOpen: boolean) => {
+    if (newOpen) {
+      setMode((currentRecord?.advancement_mode as 'auto' | 'manual') || 'auto');
+      setSliderValue(currentRecord?.manual_progress ?? 0);
+    }
+    setOpen(newOpen);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await onSave(mode, mode === 'manual' ? sliderValue : undefined);
+      setOpen(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Popover open={open} onOpenChange={handleOpenChange}>
+      <PopoverTrigger asChild>
+        <button className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-muted">
+          <Settings2 className="h-3.5 w-3.5 text-muted-foreground" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72" align="end">
+        <div className="space-y-4">
+          <p className="text-xs font-semibold">{phase.label}</p>
+
+          <RadioGroup value={mode} onValueChange={(v) => setMode(v as 'auto' | 'manual')}>
+            <div className="flex items-center gap-2">
+              <RadioGroupItem value="auto" id={`auto-${phase.value}`} />
+              <Label htmlFor={`auto-${phase.value}`} className="text-xs cursor-pointer">Auto (tâches)</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <RadioGroupItem value="manual" id={`manual-${phase.value}`} />
+              <Label htmlFor={`manual-${phase.value}`} className="text-xs cursor-pointer">Manuel</Label>
+            </div>
+          </RadioGroup>
+
+          {mode === 'manual' ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <Slider
+                  value={[sliderValue]}
+                  onValueChange={([v]) => setSliderValue(v)}
+                  min={0}
+                  max={100}
+                  step={5}
+                  className="flex-1"
+                />
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={sliderValue}
+                  onChange={(e) => {
+                    const v = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
+                    setSliderValue(v);
+                  }}
+                  className="w-16 h-7 text-xs text-center px-1"
+                />
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                L'avancement manuel remplace le calcul automatique des tâches
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Progress value={autoProgress} className="h-1.5 flex-1 bg-muted" />
+                <span className="text-xs font-medium">{totalPhase > 0 ? `${donePhase}/${totalPhase}` : '0'} ({autoProgress}%)</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                L'avancement est calculé automatiquement depuis les tâches liées à cette phase
+              </p>
+            </div>
+          )}
+
+          <Button size="sm" className="w-full" onClick={handleSave} disabled={saving}>
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
+            Enregistrer
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 

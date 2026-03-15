@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { ITProject, ITProjectMilestone } from '@/types/itProject';
+import { ITProject, ITProjectMilestone, ITProjectPhase } from '@/types/itProject';
 import { Task } from '@/types/task';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRef, useCallback } from 'react';
@@ -306,4 +306,61 @@ export function useITProjectFiles(
     },
     enabled: !!projectId,
   });
+}
+
+// =========== IT Project Phase Progress ===========
+export interface ITProjectPhaseProgress {
+  id: string;
+  it_project_id: string;
+  phase: string;
+  advancement_mode: 'auto' | 'manual';
+  manual_progress: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export function useITProjectPhaseProgress(projectId: string | undefined) {
+  const queryClient = useQueryClient();
+
+  const query = useQuery({
+    queryKey: ['it-project-phase-progress', projectId],
+    queryFn: async (): Promise<Map<string, ITProjectPhaseProgress>> => {
+      if (!projectId) return new Map();
+      const { data, error } = await supabase
+        .from('it_project_phase_progress')
+        .select('*')
+        .eq('it_project_id', projectId);
+      if (error) throw error;
+      const map = new Map<string, ITProjectPhaseProgress>();
+      for (const row of data || []) {
+        map.set(row.phase, row as ITProjectPhaseProgress);
+      }
+      return map;
+    },
+    enabled: !!projectId,
+  });
+
+  const upsertPhaseProgress = useCallback(async (
+    phase: string,
+    mode: 'auto' | 'manual',
+    manualValue?: number
+  ) => {
+    if (!projectId) return;
+    const { error } = await supabase
+      .from('it_project_phase_progress')
+      .upsert(
+        {
+          it_project_id: projectId,
+          phase,
+          advancement_mode: mode,
+          manual_progress: mode === 'manual' ? (manualValue ?? 0) : null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'it_project_id,phase' }
+      );
+    if (error) throw error;
+    queryClient.invalidateQueries({ queryKey: ['it-project-phase-progress', projectId] });
+  }, [projectId, queryClient]);
+
+  return { ...query, upsertPhaseProgress };
 }
