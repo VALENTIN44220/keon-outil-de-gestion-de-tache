@@ -145,12 +145,53 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
   const { sortedData, sortConfig, handleSort } = useTableSort(tableData, 'code_projet', 'asc');
 
   // --- Map ---
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<any>(null);
   const keonWithCoords = useMemo(() =>
     keonProjects.filter(p => {
       if (!p.gps_coordinates) return false;
       const parts = p.gps_coordinates.split(',').map(s => parseFloat(s.trim()));
       return parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1]) && (Math.abs(parts[0]) > 0.001 || Math.abs(parts[1]) > 0.001);
     }), [keonProjects]);
+
+  useEffect(() => {
+    // Load Leaflet CSS if not already loaded
+    if (!document.querySelector('link[href*="leaflet"]')) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+    }
+    // Load Leaflet JS if not already loaded
+    const initMap = () => {
+      const L = (window as any).L;
+      if (!L || !mapRef.current || keonWithCoords.length === 0) return;
+      if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; }
+      const map = L.map(mapRef.current, { zoomControl: true, scrollWheelZoom: true });
+      mapInstanceRef.current = map;
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 18 }).addTo(map);
+      const bounds: [number, number][] = [];
+      keonWithCoords.forEach(p => {
+        const [lat, lon] = p.gps_coordinates!.split(',').map(s => parseFloat(s.trim()));
+        bounds.push([lat, lon]);
+        const marker = L.circleMarker([lat, lon], { radius: 8, fillColor: '#10b981', color: '#fff', weight: 2, fillOpacity: 0.9 });
+        marker.bindPopup(`<div style="min-width:160px;font-family:system-ui,sans-serif;"><div style="font-weight:700;font-size:13px;color:#10b981;">${p.code_projet}</div><div style="font-size:12px;margin-top:2px;">${p.nom_projet}</div>${p.region ? `<div style="margin-top:4px;font-size:11px;color:#6b7280;">📍 ${p.region}</div>` : ''}</div>`, { maxWidth: 250 });
+        marker.addTo(map);
+      });
+      if (bounds.length > 0) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 });
+    };
+    if ((window as any).L) {
+      setTimeout(initMap, 150);
+    } else {
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      script.onload = () => setTimeout(initMap, 150);
+      document.head.appendChild(script);
+    }
+    return () => {
+      if (mapInstanceRef.current) { mapInstanceRef.current.remove(); mapInstanceRef.current = null; }
+    };
+  }, [keonWithCoords]);
 
   // --- Widget manipulation handlers (same as ConfigurableDashboard) ---
   const handleRemoveWidget = useCallback((id: string) => {
