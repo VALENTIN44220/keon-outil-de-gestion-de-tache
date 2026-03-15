@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Task, TaskStatus, TaskPriority } from '@/types/task';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -7,7 +7,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Columns3, ClipboardList } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Columns3, ClipboardList, Search, Monitor } from 'lucide-react';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { useTableSort, SortDirection } from '@/hooks/useTableSort';
 import { format } from 'date-fns';
@@ -15,6 +16,7 @@ import { fr } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { TaskDetailDialog } from './TaskDetailDialog';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface DenseTableViewProps {
   tasks: Task[];
@@ -30,6 +32,12 @@ interface ColumnDef {
   defaultVisible: boolean;
 }
 
+interface ITProjectOption {
+  id: string;
+  code: string;
+  name: string;
+}
+
 const ALL_COLUMNS: ColumnDef[] = [
   { key: 'request_number', label: 'N°', defaultVisible: true },
   { key: 'title', label: 'Titre', defaultVisible: true },
@@ -39,6 +47,7 @@ const ALL_COLUMNS: ColumnDef[] = [
   { key: 'assignee', label: 'Assigné', defaultVisible: true },
   { key: 'requester', label: 'Demandeur', defaultVisible: false },
   { key: 'category', label: 'Catégorie', defaultVisible: true },
+  { key: 'it_project', label: 'Projet IT', defaultVisible: false },
   { key: 'due_date', label: 'Échéance', defaultVisible: true },
   { key: 'progress', label: 'Progression', defaultVisible: false },
   { key: 'created_at', label: 'Créé le', defaultVisible: false },
