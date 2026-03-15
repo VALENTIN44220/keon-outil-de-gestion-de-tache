@@ -258,6 +258,11 @@ function ProjectMapCard({ projects, allProjectStats = {} }: { projects: BEProjec
 
   // Leaflet map initialization
   useEffect(() => {
+    // Expose navigate for popup buttons
+    (window as any).__navigateToProject = (code: string) => {
+      navigate(`/be/projects/${code}/overview`);
+    };
+
     if (!mapContainerRef.current || withCoords.length === 0) return;
 
     if (mapInstanceRef.current) {
@@ -265,77 +270,112 @@ function ProjectMapCard({ projects, allProjectStats = {} }: { projects: BEProjec
       mapInstanceRef.current = null;
     }
 
-    const map = L.map(mapContainerRef.current, { zoomControl: true, scrollWheelZoom: true });
-    mapInstanceRef.current = map;
+    const loadClusterPlugin = (): Promise<void> => {
+      return new Promise((resolve) => {
+        if (!document.querySelector('link[href*="MarkerCluster.css"]')) {
+          const css1 = document.createElement('link');
+          css1.rel = 'stylesheet';
+          css1.href = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css';
+          document.head.appendChild(css1);
+        }
+        if (!document.querySelector('link[href*="MarkerCluster.Default.css"]')) {
+          const css2 = document.createElement('link');
+          css2.rel = 'stylesheet';
+          css2.href = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css';
+          document.head.appendChild(css2);
+        }
+        if ((L as any).markerClusterGroup) {
+          resolve();
+          return;
+        }
+        const s = document.createElement('script');
+        s.src = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js';
+        s.onload = () => resolve();
+        s.onerror = () => resolve();
+        document.head.appendChild(s);
+      });
+    };
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap',
-      maxZoom: 18,
-    }).addTo(map);
+    const initMap = async () => {
+      if (!mapContainerRef.current) return;
 
-    const statusColor: Record<string, string> = { active: '#10b981', on_hold: '#f59e0b', closed: '#6b7280' };
+      await loadClusterPlugin();
 
-    const hasClusterPlugin = typeof (L as any).markerClusterGroup === 'function';
-    const markersLayer: L.LayerGroup = hasClusterPlugin
-      ? (L as any).markerClusterGroup({
-          iconCreateFunction: (cluster: any) => {
-            const count = cluster.getChildCount();
-            let bg = '#10b981';
-            if (count > 20) bg = '#ef4444';
-            else if (count > 5) bg = '#f59e0b';
-            return L.divIcon({
-              html: `<div style="background:${bg};color:#fff;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3);">${count}</div>`,
-              className: '',
-              iconSize: L.point(36, 36),
-            });
-          },
-        })
-      : L.layerGroup();
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
 
-    if (!hasClusterPlugin) {
-      console.warn('[BEProjectsSyntheseView] MarkerCluster plugin unavailable, using plain layer group.');
-    }
+      const map = L.map(mapContainerRef.current, { zoomControl: true, scrollWheelZoom: true });
+      mapInstanceRef.current = map;
 
-    const bounds: [number, number][] = [];
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap',
+        maxZoom: 18,
+      }).addTo(map);
 
-    withCoords.forEach(p => {
-      const parts = p.gps_coordinates!.split(',').map(s => parseFloat(s.trim()));
-      const lat = parts[0], lon = parts[1];
-      bounds.push([lat, lon]);
+      const statusColor: Record<string, string> = { active: '#10b981', on_hold: '#f59e0b', closed: '#6b7280' };
 
-      const color = statusColor[p.status] || statusColor.active;
-      const sc = STATUS_CONFIG[p.status] || STATUS_CONFIG.active;
-      const stats = allProjectStats[p.id];
-      const progressHtml = stats
-        ? `<div style="margin-top:6px;font-size:11px;color:#6b7280;">Avancement: ${stats.progress}% · ${stats.doneTasks}/${stats.totalTasks} tâches</div>`
-        : '';
+      const hasCluster = typeof (L as any).markerClusterGroup === 'function';
+      const markersLayer: L.LayerGroup = hasCluster
+        ? (L as any).markerClusterGroup({
+            maxClusterRadius: 80,
+            iconCreateFunction: (cluster: any) => {
+              const count = cluster.getChildCount();
+              const bg = count > 10 ? '#ef4444' : count > 4 ? '#f59e0b' : '#10b981';
+              return L.divIcon({
+                html: `<div style="background:${bg};color:#fff;border-radius:50%;width:40px;height:40px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,.3);border:2px solid #fff;">${count}</div>`,
+                className: '',
+                iconSize: L.point(40, 40),
+              });
+            },
+          })
+        : L.layerGroup();
 
-      const marker = L.circleMarker([lat, lon], { radius: 8, fillColor: color, color: '#fff', weight: 2, fillOpacity: 0.9 });
-      marker.bindPopup(`
-        <div style="min-width:180px;font-family:system-ui,sans-serif;">
-          <div style="font-weight:700;font-size:13px;color:${color};">${p.code_projet}</div>
-          <div style="font-size:12px;margin-top:2px;">${p.nom_projet}</div>
-          <div style="margin-top:4px;">
-            <span style="display:inline-block;padding:1px 8px;border-radius:9999px;font-size:10px;font-weight:600;background:${color}20;color:${color};">${sc.label}</span>
+      const bounds: [number, number][] = [];
+
+      withCoords.forEach(p => {
+        const parts = p.gps_coordinates!.split(',').map(s => parseFloat(s.trim()));
+        const lat = parts[0], lon = parts[1];
+        bounds.push([lat, lon]);
+
+        const color = statusColor[p.status] || statusColor.active;
+        const sc = STATUS_CONFIG[p.status] || STATUS_CONFIG.active;
+        const stats = allProjectStats[p.id];
+        const progressHtml = stats
+          ? `<div style="margin-top:6px;font-size:11px;color:#6b7280;">Avancement: ${stats.progress}% · ${stats.doneTasks}/${stats.totalTasks} tâches</div>`
+          : '';
+
+        const marker = L.circleMarker([lat, lon], { radius: 9, fillColor: color, color: '#fff', weight: 2, fillOpacity: 0.95 });
+        marker.bindPopup(`
+          <div style="min-width:180px;font-family:system-ui,sans-serif;">
+            <div style="font-weight:700;font-size:13px;color:${color};">${p.code_projet}</div>
+            <div style="font-size:12px;margin-top:2px;">${p.nom_projet}</div>
+            <div style="margin-top:4px;">
+              <span style="display:inline-block;padding:1px 8px;border-radius:9999px;font-size:10px;font-weight:600;background:${color}20;color:${color};">${sc.label}</span>
+            </div>
+            ${p.region ? `<div style="margin-top:4px;font-size:11px;color:#6b7280;">📍 ${p.region}</div>` : ''}
+            ${progressHtml}
+            <button onclick="window.__navigateToProject('${p.code_projet}')" style="margin-top:8px;font-size:11px;color:#3b82f6;background:none;border:none;padding:0;cursor:pointer;text-decoration:underline;">Ouvrir le projet →</button>
           </div>
-          ${p.region ? `<div style="margin-top:4px;font-size:11px;color:#6b7280;">📍 ${p.region}</div>` : ''}
-          ${progressHtml}
-          <a href="/be/projects/${p.code_projet}/overview" style="display:inline-block;margin-top:6px;font-size:11px;color:#3b82f6;text-decoration:underline;">Ouvrir le projet →</a>
-        </div>
-      `, { maxWidth: 250 });
-      markersLayer.addLayer(marker);
-    });
+        `, { maxWidth: 250 });
+        markersLayer.addLayer(marker);
+      });
 
-    map.addLayer(markersLayer);
-    if (bounds.length > 0) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 });
+      map.addLayer(markersLayer);
+      if (bounds.length > 0) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 });
+    };
+
+    initMap();
 
     return () => {
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
       }
+      delete (window as any).__navigateToProject;
     };
-  }, [withCoords, allProjectStats]);
+  }, [withCoords, allProjectStats, navigate]);
 
   const isGeocoding = isBulkGeocoding || isRegenGeocoding;
 
