@@ -136,11 +136,9 @@ export default function Auth() {
                 type="button"
                 className="w-full"
                 variant="outline"
-                onClick={handleMicrosoftLogin}
-                disabled={isSubmitting}
+                disabled
               >
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Se connecter avec Microsoft
+                Se connecter avec Microsoft (en développement)
               </Button>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <div className="h-px flex-1 bg-border" />
