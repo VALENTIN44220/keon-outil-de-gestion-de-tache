@@ -43,7 +43,7 @@ const AuthCallback = () => {
 
         if (provider === 'microsoft') {
           // Exchange the code for tokens via edge function (server-side flow, no PKCE)
-          const redirectUri = `${import.meta.env.VITE_APP_URL}/auth/callback`;
+          const redirectUri = import.meta.env.VITE_AZURE_REDIRECT_URI;
           
           const { data, error: exchangeError } = await supabase.functions.invoke('microsoft-graph', {
             body: { action: 'exchange-code', code, redirectUri },
