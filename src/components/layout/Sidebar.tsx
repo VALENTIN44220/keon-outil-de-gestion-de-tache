@@ -463,8 +463,7 @@ export function Sidebar({
                       "w-full flex items-center gap-3 transition-all duration-200 font-body group relative",
                       collapsed ? "justify-center p-2" : "px-3 py-2.5 rounded-xl",
                       isActive && !collapsed && [gc.bg, "border-l-4", gc.border],
-                      !isActive && !collapsed && "hover:bg-muted/60 border-l-4 border-transparent",
-                      isActive && collapsed && gc.bg
+                      !isActive && !collapsed && "hover:bg-muted/60 border-l-4 border-transparent"
                     )}
                     title={collapsed ? item.label : undefined}
                   >
