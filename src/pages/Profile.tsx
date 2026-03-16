@@ -394,7 +394,8 @@ export default function Profile() {
                       }
                     />
                     <p className="text-xs text-muted-foreground">
-                      L'email ne peut pas être modifié
+                    emailExistsInProfiles === false ?L'email ne peut pas être modifié. L'email n'existe pas dans la base de données mais a été ajouté à Lovable.
+                    : L'email ne peut pas être modifié
                     </p>
                   </div>
 
