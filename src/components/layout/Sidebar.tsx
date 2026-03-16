@@ -429,9 +429,6 @@ export function Sidebar({
           </button>
         </div>
         
-        {collapsed && (
-          <img src={keonLogo} alt="KEON" className="h-10 w-10 object-cover rounded-lg mx-auto" />
-        )}
       </div>
 
       <div className="px-3 my-2">
@@ -467,8 +464,7 @@ export function Sidebar({
                       collapsed ? "justify-center p-2" : "px-3 py-2.5 rounded-xl",
                       isActive && !collapsed && [gc.bg, "border-l-4", gc.border],
                       !isActive && !collapsed && "hover:bg-muted/60 border-l-4 border-transparent",
-                      isActive && collapsed && gc.bg,
-                      !isActive && collapsed && "hover:bg-muted/60",
+                      isActive && collapsed && gc.bg
                     )}
                     title={collapsed ? item.label : undefined}
                   >
@@ -477,7 +473,7 @@ export function Sidebar({
                       collapsed ? "p-3" : "p-2",
                       isActive 
                         ? [gc.iconBg, "text-white shadow-md"]
-                        : [gc.iconInactive, "bg-transparent group-hover:bg-muted/50"],
+                        : [gc.iconInactive, "bg-transparent"],
                     )}>
                       <Icon className={cn("relative z-10", collapsed ? "w-5 h-5" : "w-4 h-4")} />
                       {isActive && (
