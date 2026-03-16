@@ -5,9 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { CheckSquare, Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Auth() {
   const { user, isLoading, signIn, signUp } = useAuth();
@@ -34,6 +34,40 @@ export default function Auth() {
   if (user) {
     return <Navigate to="/" replace />;
   }
+
+  const handleMicrosoftLogin = async () => {
+    try {
+      setIsSubmitting(true);
+
+      const redirectTo =
+        import.meta.env.VITE_AZURE_REDIRECT_URI || `${window.location.origin}/auth/callback`;
+
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'azure',
+        options: {
+          scopes: 'email',
+          redirectTo,
+        },
+      });
+
+      if (error) {
+        toast({
+          title: 'Erreur de connexion Microsoft',
+          description: error.message,
+          variant: 'destructive',
+        });
+        setIsSubmitting(false);
+      }
+    } catch (error: any) {
+      console.error('Microsoft login error:', error);
+      toast({
+        title: 'Erreur de connexion Microsoft',
+        description: error.message ?? 'Une erreur est survenue lors de la connexion Microsoft.',
+        variant: 'destructive',
+      });
+      setIsSubmitting(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -97,6 +131,23 @@ export default function Auth() {
             <CardDescription>Connectez-vous à votre compte</CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="space-y-3 mb-4">
+              <Button
+                type="button"
+                className="w-full"
+                variant="outline"
+                onClick={handleMicrosoftLogin}
+                disabled={isSubmitting}
+              >
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Se connecter avec Microsoft
+              </Button>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <div className="h-px flex-1 bg-border" />
+                <span>ou avec email</span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+            </div>
             <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="login-email">Email</Label>
