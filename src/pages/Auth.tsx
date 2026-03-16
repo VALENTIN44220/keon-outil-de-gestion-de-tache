@@ -92,99 +92,44 @@ export default function Auth() {
         </div>
 
         <Card className="border-border/50 shadow-xl">
-          <Tabs defaultValue="login" className="w-full">
-            <CardHeader className="pb-4">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="login">Connexion</TabsTrigger>
-                <TabsTrigger value="register">Inscription</TabsTrigger>
-              </TabsList>
-            </CardHeader>
+          <CardHeader className="pb-4">
+            <CardTitle>Connexion</CardTitle>
+            <CardDescription>Connectez-vous à votre compte</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="login-email">Email</Label>
+                <Input
+                  id="login-email"
+                  type="email"
+                  placeholder="votre@email.com"
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  required
+                  disabled={isSubmitting}
+                />
+              </div>
 
-            <CardContent>
-              <TabsContent value="login" className="mt-0">
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="login-email">Email</Label>
-                    <Input
-                      id="login-email"
-                      type="email"
-                      placeholder="votre@email.com"
-                      value={loginEmail}
-                      onChange={(e) => setLoginEmail(e.target.value)}
-                      required
-                      disabled={isSubmitting}
-                    />
-                  </div>
+              <div className="space-y-2">
+                <Label htmlFor="login-password">Mot de passe</Label>
+                <Input
+                  id="login-password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  required
+                  disabled={isSubmitting}
+                />
+              </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="login-password">Mot de passe</Label>
-                    <Input
-                      id="login-password"
-                      type="password"
-                      placeholder="••••••••"
-                      value={loginPassword}
-                      onChange={(e) => setLoginPassword(e.target.value)}
-                      required
-                      disabled={isSubmitting}
-                    />
-                  </div>
-
-                  <Button type="submit" className="w-full" disabled={isSubmitting}>
-                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Se connecter
-                  </Button>
-                </form>
-              </TabsContent>
-
-              <TabsContent value="register" className="mt-0">
-                <form onSubmit={handleRegister} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="register-name">Nom complet</Label>
-                    <Input
-                      id="register-name"
-                      type="text"
-                      placeholder="Jean Dupont"
-                      value={registerName}
-                      onChange={(e) => setRegisterName(e.target.value)}
-                      disabled={isSubmitting}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="register-email">Email</Label>
-                    <Input
-                      id="register-email"
-                      type="email"
-                      placeholder="votre@email.com"
-                      value={registerEmail}
-                      onChange={(e) => setRegisterEmail(e.target.value)}
-                      required
-                      disabled={isSubmitting}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="register-password">Mot de passe</Label>
-                    <Input
-                      id="register-password"
-                      type="password"
-                      placeholder="••••••••"
-                      value={registerPassword}
-                      onChange={(e) => setRegisterPassword(e.target.value)}
-                      required
-                      minLength={6}
-                      disabled={isSubmitting}
-                    />
-                  </div>
-
-                  <Button type="submit" className="w-full" disabled={isSubmitting}>
-                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Créer un compte
-                  </Button>
-                </form>
-              </TabsContent>
-            </CardContent>
-          </Tabs>
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Se connecter
+              </Button>
+            </form>
+          </CardContent>
         </Card>
 
         <p className="text-center text-sm text-muted-foreground">
