@@ -81,6 +81,7 @@ export function UsersTab({
   const [secondaryEmail, setSecondaryEmail] = useState('');
   const [lovableStatus, setLovableStatus] = useState<LovableStatus>('NOK');
   const [viewMode, setViewMode] = useState<'cards' | 'grid'>('cards');
+  const [isAdminRole, setIsAdminRole] = useState(false);
 
   // Create a stable color map for companies
   const companyColorMap = useMemo(() => {
@@ -214,6 +215,7 @@ export function UsersTab({
     setSecondaryEmail('');
     setLovableStatus('NOK');
     setEditingUser(null);
+    setIsAdminRole(false);
   };
 
   const handleCreateUser = async () => {
@@ -229,8 +231,6 @@ export function UsersTab({
 
     setIsCreating(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
       const response = await supabase.functions.invoke('create-user', {
         body: {
           email: email.trim(),
@@ -247,6 +247,22 @@ export function UsersTab({
 
       if (response.error) {
         throw new Error(response.error.message || 'Erreur lors de la création');
+      }
+
+      const newUserId = response.data?.user?.id as string | undefined;
+
+      // Affectation du rôle global admin si demandé
+      if (newUserId && isAdminRole) {
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .upsert(
+            { user_id: newUserId, role: 'admin' },
+            { onConflict: 'user_id,role' }
+          );
+        if (roleError) {
+          console.error('Error assigning admin role:', roleError);
+          toast.warning("L'utilisateur a été créé mais le rôle admin n'a pas pu être appliqué.");
+        }
       }
 
       toast.success('Utilisateur créé avec succès');
@@ -306,6 +322,32 @@ export function UsersTab({
 
       if (error) throw error;
 
+      // Met à jour le rôle global admin associé au compte auth
+      if (editingUser?.user_id) {
+        if (isAdminRole) {
+          const { error: roleError } = await supabase
+            .from('user_roles')
+            .upsert(
+              { user_id: editingUser.user_id, role: 'admin' },
+              { onConflict: 'user_id,role' }
+            );
+          if (roleError) {
+            console.error('Error assigning admin role:', roleError);
+            toast.warning("Les droits admin n'ont pas pu être mis à jour.");
+          }
+        } else {
+          const { error: deleteError } = await supabase
+            .from('user_roles')
+            .delete()
+            .eq('user_id', editingUser.user_id)
+            .eq('role', 'admin');
+          if (deleteError) {
+            console.error('Error removing admin role:', deleteError);
+            toast.warning("Les droits admin n'ont pas pu être retirés.");
+          }
+        }
+      }
+
       toast.success('Utilisateur mis à jour');
       resetForm();
       setIsDialogOpen(false);
@@ -315,7 +357,7 @@ export function UsersTab({
     }
   };
 
-  const openEditDialog = (user: UserProfile) => {
+  const openEditDialog = async (user: UserProfile) => {
     setEditingUser(user);
     setDisplayName(user.display_name || '');
     setCompanyId(user.company_id || '');
@@ -328,6 +370,17 @@ export function UsersTab({
     setLovableEmail(user.lovable_email || '');
     setSecondaryEmail(user.secondary_email || '');
     setLovableStatus(user.lovable_status || 'NOK');
+    setIsAdminRole(false);
+    // Récupère les rôles globaux existants (notamment admin) pour ce user
+    if (user.user_id) {
+      const { data: rolesData, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.user_id);
+      if (!error && rolesData && rolesData.some(r => r.role === 'admin')) {
+        setIsAdminRole(true);
+      }
+    }
     setIsDialogOpen(true);
   };
 
@@ -888,6 +941,19 @@ export function UsersTab({
                           ))}
                         </SelectContent>
                       </Select>
+                    </div>
+                    <div className="flex items-start gap-2 pt-1">
+                      <Checkbox
+                        id="global-admin-role"
+                        checked={isAdminRole}
+                        onCheckedChange={(checked) => setIsAdminRole(!!checked)}
+                      />
+                      <div className="space-y-0.5">
+                        <Label htmlFor="global-admin-role">Administrateur global</Label>
+                        <p className="text-xs text-muted-foreground">
+                          Donne les droits d&apos;administration système (gestion avancée, exports, etc.).
+                        </p>
+                      </div>
                     </div>
                   </div>
 
