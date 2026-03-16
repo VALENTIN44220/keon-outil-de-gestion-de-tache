@@ -210,7 +210,7 @@ export function useTasks(externalScope?: TaskScope) {
     if (error) {
       toast({
         title: 'Erreur',
-        description: 'Impossible de créer la tâche',
+        description: 'Impossible de créer la tâche useTasks.ts',
         variant: 'destructive',
       });
     } else {
