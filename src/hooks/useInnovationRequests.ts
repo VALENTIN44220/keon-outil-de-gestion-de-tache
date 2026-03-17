@@ -1,3 +1,4 @@
+// Hook: reads from inno_demandes table
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
