@@ -53,7 +53,7 @@ const menuGroups: MenuGroup[] = [
       { id: 'projects', label: 'Projets Bioénergie', icon: FolderOpen, path: '/projects', permissionKey: 'can_access_projects' },
       { id: 'spv', label: 'Projets SPV', icon: Leaf, path: '/spv', permissionKey: 'can_access_projects' },
       { id: 'it-projects', label: 'Projets IT', icon: Monitor, path: '/it/projects', permissionKey: 'can_access_projects' },
-      { id: 'innovation', label: 'Projets INNO', icon: Lightbulb, path: '/innovation', permissionKey: 'can_access_dashboard' },
+      { id: 'innovation', label: 'Projets INNO', icon: Lightbulb, path: '/innovation/requests', permissionKey: 'can_access_dashboard' },
     ],
   },
   {

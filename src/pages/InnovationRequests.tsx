@@ -41,7 +41,7 @@ export default function InnovationRequests() {
             <Lightbulb className="w-6 h-6 text-warning" />
             <PageHeader title="Demandes Innovation" />
           </div>
-          <Button onClick={() => navigate('/requests')}>
+          <Button onClick={() => navigate('/innovation/new')}>
             <Plus className="w-4 h-4 mr-2" /> Nouvelle demande
           </Button>
         </div>
