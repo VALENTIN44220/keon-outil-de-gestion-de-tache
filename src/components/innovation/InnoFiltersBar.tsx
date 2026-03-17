@@ -17,6 +17,7 @@ interface Props {
     entites: string[];
     codeProjets: string[];
     usages: string[];
+    themes: string[];
   };
 }
 
