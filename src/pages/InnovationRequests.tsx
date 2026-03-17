@@ -21,6 +21,7 @@ export default function InnovationRequests() {
     entite: 'all',
     codeProjet: 'all',
     usage: 'all',
+    theme: 'all',
   });
 
   const { requests, isLoading, distinctValues, counters, total } = useInnovationRequests(filters);

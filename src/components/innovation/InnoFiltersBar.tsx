@@ -106,7 +106,7 @@ export function InnoFiltersBar({ filters, onChange, distinctValues }: Props) {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => onChange({ search: '', status: 'all', entite: 'all', codeProjet: 'all', usage: 'all', dateFrom: undefined, dateTo: undefined })}
+          onClick={() => onChange({ search: '', status: 'all', entite: 'all', codeProjet: 'all', usage: 'all', theme: 'all', dateFrom: undefined, dateTo: undefined })}
         >
           <X className="w-3.5 h-3.5 mr-1" /> Effacer
         </Button>
