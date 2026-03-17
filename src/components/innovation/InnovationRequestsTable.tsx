@@ -10,9 +10,6 @@ import { fr } from 'date-fns/locale';
 import { STATUS_CONFIG, type InnoRequest } from './constants';
 import { InnoRequestEditForm } from './InnoRequestEditForm';
 import { useInnoRole } from '@/hooks/useInnoRole';
-import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
-import { STATUS_CONFIG, type InnoRequest } from './constants';
 
 interface Props {
   requests: InnoRequest[];
