@@ -170,84 +170,107 @@ export function InnovationRequestsTable({ requests, onOpenDetail }: Props) {
         </div>
       )}
 
-      {/* Drawer detail */}
-      <Sheet open={!!drawerReq} onOpenChange={o => !o && setDrawerReq(null)}>
+      {/* Drawer detail / edit */}
+      <Sheet open={!!drawerReq} onOpenChange={o => { if (!o) { setDrawerReq(null); setEditMode(false); } }}>
         <SheetContent className="w-[450px] sm:w-[550px] overflow-y-auto">
           {drawerReq && (
             <>
               <SheetHeader>
-                <SheetTitle className="text-lg">{drawerReq.nom_projet || drawerReq.title}</SheetTitle>
+                <div className="flex items-center justify-between gap-2">
+                  <SheetTitle className="text-lg">{drawerReq.nom_projet || drawerReq.title}</SheetTitle>
+                  {isInnoAdmin && !editMode && (
+                    <Button variant="outline" size="sm" onClick={() => setEditMode(true)}>
+                      <Pencil className="w-3.5 h-3.5 mr-1" /> Modifier
+                    </Button>
+                  )}
+                </div>
               </SheetHeader>
-              <div className="space-y-4 mt-4">
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div><span className="text-xs text-muted-foreground block">Code</span>{drawerReq.code_projet || '-'}</div>
-                  <div><span className="text-xs text-muted-foreground block">Thème</span>{drawerReq.theme || '-'}</div>
-                  <div><span className="text-xs text-muted-foreground block">Sous-thème</span>{drawerReq.sous_theme || '-'}</div>
-                  <div><span className="text-xs text-muted-foreground block">Entité</span>{drawerReq.entite_concernee || '-'}</div>
-                  <div><span className="text-xs text-muted-foreground block">Usage</span>{drawerReq.usage_inno || '-'}</div>
-                  <div>
-                    <span className="text-xs text-muted-foreground block">Statut</span>
-                    <Badge style={{ backgroundColor: STATUS_CONFIG[drawerReq.status]?.color, color: '#fff' }}>
-                      {STATUS_CONFIG[drawerReq.status]?.label || drawerReq.status}
-                    </Badge>
+
+              {editMode ? (
+                <InnoRequestEditForm
+                  request={drawerReq}
+                  onSaved={() => { setEditMode(false); setDrawerReq(null); }}
+                  onCancel={() => setEditMode(false)}
+                />
+              ) : (
+                <div className="space-y-4 mt-4">
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div><span className="text-xs text-muted-foreground block">Code</span>{drawerReq.code_projet || '-'}</div>
+                    <div><span className="text-xs text-muted-foreground block">Thème</span>{drawerReq.theme || '-'}</div>
+                    <div><span className="text-xs text-muted-foreground block">Sous-thème</span>{drawerReq.sous_theme || '-'}</div>
+                    <div><span className="text-xs text-muted-foreground block">Entité</span>{drawerReq.entite_concernee || '-'}</div>
+                    <div><span className="text-xs text-muted-foreground block">Usage</span>{drawerReq.usage_inno || '-'}</div>
+                    <div>
+                      <span className="text-xs text-muted-foreground block">Statut</span>
+                      <Badge style={{ backgroundColor: STATUS_CONFIG[drawerReq.status]?.color, color: '#fff' }}>
+                        {STATUS_CONFIG[drawerReq.status]?.label || drawerReq.status}
+                      </Badge>
+                    </div>
+                    <div><span className="text-xs text-muted-foreground block">Demandeur</span>{drawerReq.requester_name}</div>
+                    <div><span className="text-xs text-muted-foreground block">Sponsor</span>{drawerReq.sponsor || '-'}</div>
+                    <div><span className="text-xs text-muted-foreground block">Créée le</span>{format(new Date(drawerReq.created_at), 'dd/MM/yyyy HH:mm', { locale: fr })}</div>
                   </div>
-                  <div><span className="text-xs text-muted-foreground block">Demandeur</span>{drawerReq.requester_name}</div>
-                  <div><span className="text-xs text-muted-foreground block">Sponsor</span>{drawerReq.sponsor || '-'}</div>
-                  <div><span className="text-xs text-muted-foreground block">Créée le</span>{format(new Date(drawerReq.created_at), 'dd/MM/yyyy HH:mm', { locale: fr })}</div>
-                </div>
-                <Separator />
-                <div>
-                  <span className="text-xs text-muted-foreground block mb-1">Gain attendu</span>
-                  <p className="text-sm">{drawerReq.gain_attendu || '-'}</p>
-                </div>
-                <div>
-                  <span className="text-xs text-muted-foreground block mb-1">Partenaires identifiés</span>
-                  <p className="text-sm">{drawerReq.partenaires_identifies || '-'}</p>
-                </div>
-                <Separator />
-                <div className="grid grid-cols-3 gap-3 text-sm">
-                  <div><span className="text-xs text-muted-foreground block">EBITDA (€/an)</span>{formatCurrency(drawerReq.ebitda_retour_financier)}</div>
-                  <div><span className="text-xs text-muted-foreground block">CAPEX (€)</span>{formatCurrency(drawerReq.capex_investissement)}</div>
-                  <div><span className="text-xs text-muted-foreground block">ROI</span>{drawerReq.roi != null ? drawerReq.roi.toFixed(1) : '-'}</div>
-                </div>
-                {drawerReq.commentaires_financiers && (
+                  <Separator />
                   <div>
-                    <span className="text-xs text-muted-foreground block mb-1">Commentaires financiers</span>
-                    <p className="text-sm whitespace-pre-wrap">{drawerReq.commentaires_financiers}</p>
+                    <span className="text-xs text-muted-foreground block mb-1">Gain attendu</span>
+                    <p className="text-sm">{drawerReq.gain_attendu || '-'}</p>
                   </div>
-                )}
-                <Separator />
-                <div className="grid grid-cols-3 gap-3 text-sm">
-                  <div><span className="text-xs text-muted-foreground block">Temps caractéristique</span>{drawerReq.temps_caracteristique || '-'}</div>
-                  <div><span className="text-xs text-muted-foreground block">Difficulté (1-10)</span>{drawerReq.difficulte_complexite ?? '-'}</div>
-                  <div><span className="text-xs text-muted-foreground block">Niveau stratégique (1-10)</span>{drawerReq.niveau_strategique ?? '-'}</div>
+                  <div>
+                    <span className="text-xs text-muted-foreground block mb-1">Partenaires identifiés</span>
+                    <p className="text-sm">{drawerReq.partenaires_identifies || '-'}</p>
+                  </div>
+                  <Separator />
+                  <div className="grid grid-cols-3 gap-3 text-sm">
+                    <div><span className="text-xs text-muted-foreground block">EBITDA (€/an)</span>{formatCurrency(drawerReq.ebitda_retour_financier)}</div>
+                    <div><span className="text-xs text-muted-foreground block">CAPEX (€)</span>{formatCurrency(drawerReq.capex_investissement)}</div>
+                    <div><span className="text-xs text-muted-foreground block">ROI</span>{drawerReq.roi != null ? drawerReq.roi.toFixed(1) : '-'}</div>
+                  </div>
+                  {drawerReq.commentaires_financiers && (
+                    <div>
+                      <span className="text-xs text-muted-foreground block mb-1">Commentaires financiers</span>
+                      <p className="text-sm whitespace-pre-wrap">{drawerReq.commentaires_financiers}</p>
+                    </div>
+                  )}
+                  <Separator />
+                  <div className="grid grid-cols-3 gap-3 text-sm">
+                    <div><span className="text-xs text-muted-foreground block">Temps caractéristique</span>{drawerReq.temps_caracteristique || '-'}</div>
+                    <div><span className="text-xs text-muted-foreground block">Difficulté (1-10)</span>{drawerReq.difficulte_complexite ?? '-'}</div>
+                    <div><span className="text-xs text-muted-foreground block">Niveau stratégique (1-10)</span>{drawerReq.niveau_strategique ?? '-'}</div>
+                  </div>
+                  <Separator />
+                  <div>
+                    <span className="text-xs text-muted-foreground block mb-1">Descriptif</span>
+                    <p className="text-sm whitespace-pre-wrap">{drawerReq.descriptif || '-'}</p>
+                  </div>
+                  {drawerReq.commentaire_demande && (
+                    <div>
+                      <span className="text-xs text-muted-foreground block mb-1">Commentaire demande</span>
+                      <p className="text-sm whitespace-pre-wrap">{drawerReq.commentaire_demande}</p>
+                    </div>
+                  )}
+                  {drawerReq.commentaire_projet && (
+                    <div>
+                      <span className="text-xs text-muted-foreground block mb-1">Commentaire projet</span>
+                      <p className="text-sm whitespace-pre-wrap">{drawerReq.commentaire_projet}</p>
+                    </div>
+                  )}
+                  {drawerReq.etiquettes && (
+                    <div>
+                      <span className="text-xs text-muted-foreground block mb-1">Étiquettes</span>
+                      <p className="text-sm">{drawerReq.etiquettes}</p>
+                    </div>
+                  )}
+                  <Separator />
+                  <div className="flex gap-2">
+                    {isInnoAdmin && (
+                      <Button variant="outline" className="flex-1" onClick={() => setEditMode(true)}>
+                        <Pencil className="w-4 h-4 mr-2" /> Modifier
+                      </Button>
+                    )}
+                    <Button className="flex-1" onClick={() => onOpenDetail(drawerReq.id)}>Ouvrir le détail</Button>
+                  </div>
                 </div>
-                <Separator />
-                <div>
-                  <span className="text-xs text-muted-foreground block mb-1">Descriptif</span>
-                  <p className="text-sm whitespace-pre-wrap">{drawerReq.descriptif || '-'}</p>
-                </div>
-                {drawerReq.commentaire_demande && (
-                  <div>
-                    <span className="text-xs text-muted-foreground block mb-1">Commentaire demande</span>
-                    <p className="text-sm whitespace-pre-wrap">{drawerReq.commentaire_demande}</p>
-                  </div>
-                )}
-                {drawerReq.commentaire_projet && (
-                  <div>
-                    <span className="text-xs text-muted-foreground block mb-1">Commentaire projet</span>
-                    <p className="text-sm whitespace-pre-wrap">{drawerReq.commentaire_projet}</p>
-                  </div>
-                )}
-                {drawerReq.etiquettes && (
-                  <div>
-                    <span className="text-xs text-muted-foreground block mb-1">Étiquettes</span>
-                    <p className="text-sm">{drawerReq.etiquettes}</p>
-                  </div>
-                )}
-                <Separator />
-                <Button className="w-full" onClick={() => onOpenDetail(drawerReq.id)}>Ouvrir le détail</Button>
-              </div>
+              )}
             </>
           )}
         </SheetContent>
