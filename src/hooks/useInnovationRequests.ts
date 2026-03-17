@@ -97,6 +97,7 @@ export function useInnovationRequests(filters: InnoFilters) {
       if (filters.entite && filters.entite !== 'all' && r.entite_concernee !== filters.entite) return false;
       if (filters.codeProjet && filters.codeProjet !== 'all' && r.code_projet !== filters.codeProjet) return false;
       if (filters.usage && filters.usage !== 'all' && r.usage_inno !== filters.usage) return false;
+      if (filters.theme && filters.theme !== 'all' && r.theme !== filters.theme) return false;
       if (filters.search) {
         const s = filters.search.toLowerCase();
         if (
