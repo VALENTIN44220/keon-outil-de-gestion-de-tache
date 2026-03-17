@@ -56,6 +56,16 @@ export function usePendingAssignments(): UsePendingAssignmentsResult {
 
     setIsLoading(true);
     try {
+      const orParts: string[] = [];
+      if (profile.id) orParts.push(`assignee_id.eq.${profile.id}`);
+      if (profile.department_id) orParts.push(`target_department_id.eq.${profile.department_id}`);
+
+      // If we have no valid filter values, avoid calling Postgres with "null" UUID casts.
+      if (orParts.length === 0) {
+        setTasksToAssign([]);
+        return;
+      }
+
       // Fetch tasks with status 'to_assign' that are assigned to the current user (as manager)
       // or tasks in their department that need assignment
       const { data, error } = await supabase
@@ -78,7 +88,7 @@ export function usePendingAssignments(): UsePendingAssignmentsResult {
         `)
         .eq('status', 'to_assign')
         .eq('type', 'task')
-        .or(`assignee_id.eq.${profile.id},target_department_id.eq.${profile.department_id}`)
+        .or(orParts.join(','))
         .order('created_at', { ascending: true });
 
       if (error) throw error;
