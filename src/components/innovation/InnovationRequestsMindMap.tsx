@@ -196,20 +196,22 @@ function renderMindMap(
   // Radial tree layout — generous separation to avoid overlaps
   const maxDepth = root.height;
   const baseRadius = Math.min(width, height) / 2 * 0.7;
-  // Scale radius based on total node count for breathing room
+  // Scale radius based on total node count — much more space per node
   const totalNodes = root.descendants().length;
-  const radius = Math.max(baseRadius, totalNodes * 18);
+  const leafCount = root.leaves().length;
+  const radius = Math.max(baseRadius, totalNodes * 28, leafCount * 45);
 
   const treeLayout = d3.tree<MindNode>()
     .size([2 * Math.PI, radius])
     .separation((a, b) => {
-      if (a.depth === 0) return 2;
+      if (a.depth === 0) return 3;
       const sibCount = a.parent?.children?.length || 1;
+      // Estimate node width in angular space — wider nodes need more separation
+      const nodeAngularWidth = a.depth >= 2 ? 2.5 : 2;
       if (a.parent === b.parent) {
-        // More space when fewer siblings (they spread wider)
-        return Math.max(1.5, 6 / sibCount);
+        return Math.max(nodeAngularWidth, 8 / sibCount);
       }
-      return Math.max(2.5, 10 / sibCount);
+      return Math.max(nodeAngularWidth + 1, 14 / sibCount);
     });
 
   const layoutRoot = treeLayout(root);
