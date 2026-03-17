@@ -17,6 +17,9 @@ export default function Auth() {
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [isSendingReset, setIsSendingReset] = useState(false);
 
   // Register form state
   const [registerEmail, setRegisterEmail] = useState('');
