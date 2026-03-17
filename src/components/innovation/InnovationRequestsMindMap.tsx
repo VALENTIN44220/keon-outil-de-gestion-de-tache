@@ -129,6 +129,23 @@ function buildTree(
 
 // ── D3 Rendering ──
 
+// Helper: wrap text into 2 lines if too long
+function wrapText(label: string, maxChars: number): string[] {
+  if (label.length <= maxChars) return [label];
+  // Try to split at a space near the middle
+  const mid = Math.floor(label.length / 2);
+  let splitIdx = label.lastIndexOf(' ', mid + 5);
+  if (splitIdx < 4) splitIdx = label.indexOf(' ', mid - 5);
+  if (splitIdx < 4 || splitIdx > label.length - 4) {
+    // No good space, hard split
+    return [label.slice(0, maxChars) + '…'];
+  }
+  let line1 = label.slice(0, splitIdx);
+  let line2 = label.slice(splitIdx + 1);
+  if (line2.length > maxChars) line2 = line2.slice(0, maxChars - 1) + '…';
+  return [line1, line2];
+}
+
 function renderMindMap(
   svgEl: SVGSVGElement,
   tree: MindNode,
@@ -141,30 +158,58 @@ function renderMindMap(
 
   svg.attr('width', width).attr('height', height);
 
+  // SVG filters for shadows
+  const defs = svg.append('defs');
+
+  // Shadow filter - soft
+  const shadowSoft = defs.append('filter').attr('id', 'shadow-soft').attr('x', '-30%').attr('y', '-30%').attr('width', '160%').attr('height', '160%');
+  shadowSoft.append('feDropShadow').attr('dx', 0).attr('dy', 3).attr('stdDeviation', 6).attr('flood-color', 'rgba(0,0,0,0.18)');
+
+  // Shadow filter - medium
+  const shadowMed = defs.append('filter').attr('id', 'shadow-med').attr('x', '-30%').attr('y', '-30%').attr('width', '160%').attr('height', '160%');
+  shadowMed.append('feDropShadow').attr('dx', 0).attr('dy', 4).attr('stdDeviation', 10).attr('flood-color', 'rgba(0,0,0,0.22)');
+
+  // Shadow filter - strong (root)
+  const shadowStrong = defs.append('filter').attr('id', 'shadow-strong').attr('x', '-40%').attr('y', '-40%').attr('width', '180%').attr('height', '180%');
+  shadowStrong.append('feDropShadow').attr('dx', 0).attr('dy', 6).attr('stdDeviation', 16).attr('flood-color', 'rgba(99,102,241,0.45)');
+
+  // Shadow for leaves
+  const shadowLeaf = defs.append('filter').attr('id', 'shadow-leaf').attr('x', '-30%').attr('y', '-30%').attr('width', '160%').attr('height', '160%');
+  shadowLeaf.append('feDropShadow').attr('dx', 0).attr('dy', 2).attr('stdDeviation', 4).attr('flood-color', 'rgba(0,0,0,0.12)');
+
+  // Root gradient
+  const rootGrad = defs.append('radialGradient').attr('id', 'root-grad');
+  rootGrad.append('stop').attr('offset', '0%').attr('stop-color', '#a5b4fc');
+  rootGrad.append('stop').attr('offset', '100%').attr('stop-color', '#6366f1');
+
   const g = svg.append('g').attr('class', 'mindmap-root');
 
   // Zoom & pan
   const zoomBehavior = d3.zoom<SVGSVGElement, unknown>()
-    .scaleExtent([0.2, 4])
+    .scaleExtent([0.15, 4])
     .on('zoom', e => g.attr('transform', e.transform.toString()));
   svg.call(zoomBehavior);
 
   // Build D3 hierarchy
   const root = d3.hierarchy(tree, d => d.children?.length ? d.children : null);
 
-  // Radial tree layout
+  // Radial tree layout — generous separation to avoid overlaps
   const maxDepth = root.height;
-  const radius = Math.min(width, height) / 2 * 0.75;
-  const depthRadius = radius / Math.max(maxDepth, 1);
+  const baseRadius = Math.min(width, height) / 2 * 0.7;
+  // Scale radius based on total node count for breathing room
+  const totalNodes = root.descendants().length;
+  const radius = Math.max(baseRadius, totalNodes * 18);
 
   const treeLayout = d3.tree<MindNode>()
     .size([2 * Math.PI, radius])
     .separation((a, b) => {
-      if (a.depth === 0) return 1;
-      const baseSep = (a.parent === b.parent ? 1 : 1.8);
-      // More separation at deeper levels with many siblings
-      const siblingCount = a.parent?.children?.length || 1;
-      return baseSep / Math.max(a.depth * 0.7, 0.5) * Math.max(1, 8 / siblingCount);
+      if (a.depth === 0) return 2;
+      const sibCount = a.parent?.children?.length || 1;
+      if (a.parent === b.parent) {
+        // More space when fewer siblings (they spread wider)
+        return Math.max(1.5, 6 / sibCount);
+      }
+      return Math.max(2.5, 10 / sibCount);
     });
 
   const layoutRoot = treeLayout(root);
@@ -175,7 +220,7 @@ function renderMindMap(
     return [d.y * Math.cos(angle), d.y * Math.sin(angle)];
   }
 
-  // ── Draw links ──
+  // ── Draw links — smooth radial curves ──
   const linkGen = d3.linkRadial<d3.HierarchyPointLink<MindNode>, d3.HierarchyPointNode<MindNode>>()
     .angle(d => d.x)
     .radius(d => d.y);
@@ -193,11 +238,11 @@ function renderMindMap(
     })
     .attr('stroke-width', d => {
       const level = d.target.data.level;
-      return level === 1 ? 3.5 : level === 2 ? 2.5 : 1.5;
+      return level === 1 ? 4 : level === 2 ? 2.5 : 1.5;
     })
     .attr('stroke-opacity', d => {
       const level = d.target.data.level;
-      return level === 1 ? 0.7 : level === 2 ? 0.55 : 0.4;
+      return level === 1 ? 0.65 : level === 2 ? 0.5 : 0.35;
     })
     .attr('stroke-linecap', 'round');
 
@@ -212,7 +257,7 @@ function renderMindMap(
       const [x, y] = project(d);
       return `translate(${x},${y})`;
     })
-    .style('cursor', d => d.data.level < 3 ? 'pointer' : 'pointer')
+    .style('cursor', 'pointer')
     .on('click', (event, d) => {
       event.stopPropagation();
       onNodeClick(d.data);
@@ -227,136 +272,186 @@ function renderMindMap(
     const pastel = PASTEL[colorIdx % PASTEL.length];
 
     if (data.level === 0) {
-      // ROOT — large gradient circle
-      const defs = svg.select('defs').empty() ? svg.append('defs') : svg.select('defs');
-      const gradId = 'root-grad';
-      if (defs.select(`#${gradId}`).empty()) {
-        const grad = defs.append('radialGradient').attr('id', gradId);
-        grad.append('stop').attr('offset', '0%').attr('stop-color', '#818cf8');
-        grad.append('stop').attr('offset', '100%').attr('stop-color', '#6366f1');
-      }
-      node.append('circle')
-        .attr('r', 56)
-        .attr('fill', `url(#${gradId})`)
-        .attr('filter', 'drop-shadow(0 6px 20px rgba(99,102,241,0.45))');
-      node.append('circle')
-        .attr('r', 50)
+      // ── ROOT — large ellipse with gradient ──
+      node.append('ellipse')
+        .attr('rx', 64).attr('ry', 52)
+        .attr('fill', 'url(#root-grad)')
+        .attr('filter', 'url(#shadow-strong)');
+      node.append('ellipse')
+        .attr('rx', 57).attr('ry', 46)
         .attr('fill', 'none')
-        .attr('stroke', 'rgba(255,255,255,0.25)')
+        .attr('stroke', 'rgba(255,255,255,0.3)')
         .attr('stroke-width', 2);
 
       node.append('text')
-        .attr('text-anchor', 'middle').attr('dy', '-0.3em')
-        .attr('fill', '#fff').attr('font-size', 14).attr('font-weight', 700)
+        .attr('text-anchor', 'middle').attr('dy', '-0.25em')
+        .attr('fill', '#fff').attr('font-size', 15).attr('font-weight', 700)
         .attr('pointer-events', 'none')
         .text('Innovation');
       node.append('text')
         .attr('text-anchor', 'middle').attr('dy', '1.2em')
-        .attr('fill', 'rgba(255,255,255,0.8)').attr('font-size', 11)
+        .attr('fill', 'rgba(255,255,255,0.85)').attr('font-size', 11)
         .attr('pointer-events', 'none')
         .text(`${data.count} demandes`);
 
     } else if (data.level === 1) {
-      // GROUP — rounded pill
-      const truncLabel = data.label.length > 20 ? data.label.slice(0, 20) + '…' : data.label;
-      const textW = Math.max(truncLabel.length * 7.5, 70);
-      const w = textW + 40;
-      const h = 34;
+      // ── GROUP — oval pill ──
+      const lines = wrapText(data.label, 18);
+      const isMulti = lines.length > 1;
+      const longestLine = Math.max(...lines.map(l => l.length));
+      const rx = Math.max(longestLine * 4.2, 45) + 22;
+      const ry = isMulti ? 28 : 22;
       const isExp = data.expanded;
 
-      node.append('rect')
-        .attr('x', -w / 2).attr('y', -h / 2)
-        .attr('width', w).attr('height', h)
-        .attr('rx', h / 2).attr('ry', h / 2)
+      node.append('ellipse')
+        .attr('rx', rx).attr('ry', ry)
         .attr('fill', isExp ? color : pastel)
         .attr('stroke', color)
         .attr('stroke-width', 2)
-        .attr('filter', 'drop-shadow(0 2px 8px rgba(0,0,0,0.12))');
+        .attr('filter', 'url(#shadow-med)');
 
-      node.append('text')
-        .attr('text-anchor', 'middle')
-        .attr('dy', '0.35em')
-        .attr('x', -10)
-        .attr('fill', isExp ? '#fff' : color)
-        .attr('font-size', 11).attr('font-weight', 600)
-        .attr('pointer-events', 'none')
-        .text(truncLabel);
+      if (isMulti) {
+        node.append('text')
+          .attr('text-anchor', 'middle').attr('dy', '-0.35em')
+          .attr('fill', isExp ? '#fff' : color)
+          .attr('font-size', 11).attr('font-weight', 600)
+          .attr('pointer-events', 'none')
+          .text(lines[0]);
+        node.append('text')
+          .attr('text-anchor', 'middle').attr('dy', '0.85em')
+          .attr('fill', isExp ? '#fff' : color)
+          .attr('font-size', 11).attr('font-weight', 600)
+          .attr('pointer-events', 'none')
+          .text(lines[1]);
+      } else {
+        node.append('text')
+          .attr('text-anchor', 'middle')
+          .attr('dy', '0.35em')
+          .attr('fill', isExp ? '#fff' : color)
+          .attr('font-size', 11).attr('font-weight', 600)
+          .attr('pointer-events', 'none')
+          .text(lines[0]);
+      }
 
       // Count badge
-      const badgeX = w / 2 - 16;
+      const badgeX = rx - 4;
       node.append('circle')
-        .attr('cx', badgeX).attr('cy', 0)
+        .attr('cx', badgeX).attr('cy', isMulti ? -ry + 6 : -ry + 4)
         .attr('r', 11)
-        .attr('fill', isExp ? 'rgba(255,255,255,0.25)' : color);
+        .attr('fill', isExp ? 'rgba(255,255,255,0.3)' : color)
+        .attr('filter', 'url(#shadow-leaf)');
       node.append('text')
         .attr('text-anchor', 'middle')
-        .attr('x', badgeX).attr('dy', '0.38em')
+        .attr('x', badgeX).attr('y', isMulti ? -ry + 6 : -ry + 4)
+        .attr('dy', '0.38em')
         .attr('fill', '#fff').attr('font-size', 9).attr('font-weight', 700)
         .attr('pointer-events', 'none')
         .text(data.count ?? '');
 
     } else if (data.level === 2) {
-      // SUB-GROUP — smaller pill
-      const truncLabel = data.label.length > 18 ? data.label.slice(0, 18) + '…' : data.label;
-      const textW = Math.max(truncLabel.length * 6.5, 55);
-      const w = textW + 32;
-      const h = 26;
+      // ── SUB-GROUP — smaller oval, SAME color family as parent ──
+      const lines = wrapText(data.label, 16);
+      const isMulti = lines.length > 1;
+      const longestLine = Math.max(...lines.map(l => l.length));
+      const rx = Math.max(longestLine * 3.8, 40) + 18;
+      const ry = isMulti ? 24 : 18;
 
-      node.append('rect')
-        .attr('x', -w / 2).attr('y', -h / 2)
-        .attr('width', w).attr('height', h)
-        .attr('rx', h / 2).attr('ry', h / 2)
+      node.append('ellipse')
+        .attr('rx', rx).attr('ry', ry)
         .attr('fill', pastel)
         .attr('stroke', color)
         .attr('stroke-width', 1.5)
-        .attr('opacity', 0.92);
+        .attr('filter', 'url(#shadow-soft)');
 
-      node.append('text')
-        .attr('text-anchor', 'middle')
-        .attr('dy', '0.35em')
-        .attr('x', -8)
-        .attr('fill', color)
-        .attr('font-size', 10).attr('font-weight', 500)
-        .attr('pointer-events', 'none')
-        .text(truncLabel);
+      if (isMulti) {
+        node.append('text')
+          .attr('text-anchor', 'middle').attr('dy', '-0.3em')
+          .attr('fill', color)
+          .attr('font-size', 10).attr('font-weight', 500)
+          .attr('pointer-events', 'none')
+          .text(lines[0]);
+        node.append('text')
+          .attr('text-anchor', 'middle').attr('dy', '0.8em')
+          .attr('fill', color)
+          .attr('font-size', 10).attr('font-weight', 500)
+          .attr('pointer-events', 'none')
+          .text(lines[1]);
+      } else {
+        node.append('text')
+          .attr('text-anchor', 'middle')
+          .attr('dy', '0.35em')
+          .attr('fill', color)
+          .attr('font-size', 10).attr('font-weight', 500)
+          .attr('pointer-events', 'none')
+          .text(lines[0]);
+      }
 
       if (data.count != null) {
-        const badgeX = w / 2 - 13;
+        const badgeX = rx - 2;
         node.append('circle')
-          .attr('cx', badgeX).attr('cy', 0)
+          .attr('cx', badgeX).attr('cy', -ry + 4)
           .attr('r', 9)
           .attr('fill', `${color}cc`);
         node.append('text')
           .attr('text-anchor', 'middle')
-          .attr('x', badgeX).attr('dy', '0.38em')
+          .attr('x', badgeX).attr('y', -ry + 4)
+          .attr('dy', '0.38em')
           .attr('fill', '#fff').attr('font-size', 8).attr('font-weight', 700)
           .attr('pointer-events', 'none')
           .text(data.count);
       }
 
     } else {
-      // LEAF — small status-colored pill
-      const statusColor = STATUS_CONFIG[data.status || '']?.color || '#888';
-      const truncLabel = data.label.length > 20 ? data.label.slice(0, 20) + '…' : data.label;
-      const w = Math.max(truncLabel.length * 6, 60);
-      const h = 22;
+      // ── LEAF — small oval, uses PARENT color for border + fill tint ──
+      const parentColor = BRANCH_COLORS[colorIdx % BRANCH_COLORS.length];
+      const parentPastel = PASTEL[colorIdx % PASTEL.length];
+      const statusColor = STATUS_CONFIG[data.status || '']?.color || parentColor;
+      const lines = wrapText(data.label, 18);
+      const isMulti = lines.length > 1;
+      const longestLine = Math.max(...lines.map(l => l.length));
+      const rx = Math.max(longestLine * 3.5, 38) + 12;
+      const ry = isMulti ? 20 : 15;
 
-      node.append('rect')
-        .attr('x', -w / 2).attr('y', -h / 2)
-        .attr('width', w).attr('height', h)
-        .attr('rx', h / 2).attr('ry', h / 2)
-        .attr('fill', statusColor)
-        .attr('fill-opacity', 0.15)
-        .attr('stroke', statusColor)
-        .attr('stroke-width', 1);
+      node.append('ellipse')
+        .attr('rx', rx).attr('ry', ry)
+        .attr('fill', parentPastel)
+        .attr('fill-opacity', 0.6)
+        .attr('stroke', parentColor)
+        .attr('stroke-width', 1)
+        .attr('stroke-opacity', 0.5)
+        .attr('filter', 'url(#shadow-leaf)');
 
-      node.append('text')
-        .attr('text-anchor', 'middle')
-        .attr('dy', '0.35em')
-        .attr('fill', statusColor)
-        .attr('font-size', 9).attr('font-weight', 500)
-        .attr('pointer-events', 'none')
-        .text(truncLabel);
+      // Small status dot
+      node.append('circle')
+        .attr('cx', -rx + 10).attr('cy', 0)
+        .attr('r', 4)
+        .attr('fill', statusColor);
+
+      if (isMulti) {
+        node.append('text')
+          .attr('text-anchor', 'middle').attr('dy', '-0.25em')
+          .attr('x', 4)
+          .attr('fill', '#374151')
+          .attr('font-size', 9).attr('font-weight', 500)
+          .attr('pointer-events', 'none')
+          .text(lines[0]);
+        node.append('text')
+          .attr('text-anchor', 'middle').attr('dy', '0.85em')
+          .attr('x', 4)
+          .attr('fill', '#374151')
+          .attr('font-size', 9).attr('font-weight', 500)
+          .attr('pointer-events', 'none')
+          .text(lines[1]);
+      } else {
+        node.append('text')
+          .attr('text-anchor', 'middle')
+          .attr('dy', '0.35em')
+          .attr('x', 4)
+          .attr('fill', '#374151')
+          .attr('font-size', 9).attr('font-weight', 500)
+          .attr('pointer-events', 'none')
+          .text(lines[0]);
+      }
     }
   });
 
@@ -384,7 +479,7 @@ function renderMindMap(
   requestAnimationFrame(() => {
     const bbox = (g.node() as SVGGElement)?.getBBox();
     if (!bbox) return;
-    const pad = 60;
+    const pad = 80;
     const scale = Math.min(
       (width - pad * 2) / (bbox.width || 1),
       (height - pad * 2) / (bbox.height || 1),
