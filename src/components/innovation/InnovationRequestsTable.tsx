@@ -29,10 +29,12 @@ const formatCurrency = (v: number | null) => {
 };
 
 export function InnovationRequestsTable({ requests, onOpenDetail }: Props) {
+  const { isInnoAdmin } = useInnoRole();
   const [sortKey, setSortKey] = useState<SortKey>('updated_at');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(0);
   const [drawerReq, setDrawerReq] = useState<InnoRequest | null>(null);
+  const [editMode, setEditMode] = useState(false);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
