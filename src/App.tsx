@@ -264,7 +264,6 @@ const App = () => (
         </TooltipProvider>
       </SimulationProvider>
     </AuthProvider>
-  </QueryClientProvider>
 );
 
 export default App;
