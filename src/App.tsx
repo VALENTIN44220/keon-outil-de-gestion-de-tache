@@ -50,10 +50,7 @@ import ITProjectHubSync from "./pages/it/ITProjectHubSync";
 import ITProjectHubDiscussions from "./pages/it/ITProjectHubDiscussions";
 import ITProjectHubFiles from "./pages/it/ITProjectHubFiles";
 
-const queryClient = new QueryClient();
-
 const App = () => (
-  <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <SimulationProvider>
         <TooltipProvider>
