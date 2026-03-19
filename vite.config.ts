@@ -25,6 +25,10 @@ export default defineConfig(({ mode }) => {
     },
     resolve: {
       alias: {
+        "@/integrations/supabase/client": path.resolve(
+          __dirname,
+          "./src/integrations/supabase/client.safe.ts"
+        ),
         "@": path.resolve(__dirname, "./src"),
       },
     },
