@@ -8,31 +8,39 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { CheckSquare, Loader2 } from 'lucide-react';
 
+// Lire les params URL au niveau module, AVANT que Supabase nettoie le ?code=
+// (le client Supabase efface le ?code après échange, donc on doit le capturer ici)
+const _hasRecoveryInUrl =
+  new URLSearchParams(window.location.search).has('code') ||
+  window.location.hash.includes('type=recovery');
+
 export default function ResetPassword() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isRecovery, setIsRecovery] = useState(false);
+  const [isRecovery, setIsRecovery] = useState(_hasRecoveryInUrl);
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
-    // Listen for the PASSWORD_RECOVERY event
+    // Si l'URL avait un code de recovery, on n'a pas besoin d'attendre l'événement
+    if (_hasRecoveryInUrl) {
+      setIsChecking(false);
+    }
+
+    // Écoute également l'événement PASSWORD_RECOVERY pour les flux alternatifs
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') {
         setIsRecovery(true);
+        setIsChecking(false);
+      } else if (event === 'SIGNED_IN' && !_hasRecoveryInUrl) {
+        // SIGNED_IN sans code de recovery = session normale, pas un reset
+        setIsChecking(false);
       }
-      setIsChecking(false);
     });
 
-    // Also check hash for recovery token
-    const hash = window.location.hash;
-    if (hash.includes('type=recovery')) {
-      setIsRecovery(true);
-    }
-    
-    // Fallback timeout
+    // Timeout de secours
     const timeout = setTimeout(() => setIsChecking(false), 3000);
 
     return () => {
