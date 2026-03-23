@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -6,13 +6,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { CheckSquare, Loader2 } from 'lucide-react';
+import { CheckSquare, Loader2, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 export default function Auth() {
   const { user, isLoading, signIn, signUp } = useAuth();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Temporary notice: after Supabase auth migration, users must reset their password once.
+  const [showPasswordMigrationNotice, setShowPasswordMigrationNotice] = useState(false);
 
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
@@ -25,6 +28,21 @@ export default function Auth() {
   const [registerEmail, setRegisterEmail] = useState('');
   const [registerPassword, setRegisterPassword] = useState('');
   const [registerName, setRegisterName] = useState('');
+
+  useEffect(() => {
+    // Default to "show" so the notice is visible right after the migration.
+    const flag = import.meta.env.VITE_PASSWORD_MIGRATION_NOTICE ?? '1';
+    const shouldShow = String(flag) === '1';
+    if (!shouldShow) return;
+
+    try {
+      const dismissed = localStorage.getItem('password_migration_notice_dismissed');
+      setShowPasswordMigrationNotice(dismissed !== '1');
+    } catch {
+      // If localStorage isn't available, just show the notice.
+      setShowPasswordMigrationNotice(true);
+    }
+  }, []);
 
   if (isLoading) {
     return (
@@ -162,6 +180,40 @@ export default function Auth() {
             <CardDescription>Connectez-vous à votre compte</CardDescription>
           </CardHeader>
           <CardContent>
+            {showPasswordMigrationNotice && (
+              <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <p className="font-semibold text-destructive">
+                      Une migration a été effectuée
+                    </p>
+                    <p className="text-muted-foreground">
+                      Pour finaliser l'accès à votre compte, utilisez « <span className="font-medium text-foreground">Mot de passe oublié</span> ».
+                      Vous pouvez ré-enregistrer votre mot de passe avec le même mot de passe que précédemment.
+                    </p>
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => {
+                      setShowPasswordMigrationNotice(false);
+                      try {
+                        localStorage.setItem('password_migration_notice_dismissed', '1');
+                      } catch {
+                        // ignore
+                      }
+                    }}
+                    aria-label="Fermer le message"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-3 mb-4">
               <Button
                 type="button"

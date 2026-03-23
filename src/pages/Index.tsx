@@ -378,6 +378,7 @@ const Index = () => {
           filters={crossFilters}
           onFiltersChange={setCrossFilters}
           contextId="tasks"
+          defaultCollapsed={true}
         />
         <div className="mb-4">
           <button

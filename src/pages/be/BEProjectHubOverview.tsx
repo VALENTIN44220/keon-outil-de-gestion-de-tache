@@ -86,24 +86,22 @@ export default function BEProjectHubOverview() {
         const parts = [project.adresse_societe, project.pays || 'France'].filter(Boolean);
         address = parts.length > 0 ? parts.join(', ') : undefined;
       } else if (mode === 'questionnaire') {
-        const { data: qstRows } = await (supabase as any)
-          .from('project_questionnaire')
-          .select('champ_id, valeur')
-          .eq('project_id', project.id)
-          .in('champ_id', ['04_GEN_commune', '04_GEN_code_postal', '04_GEN_departement_nom', '04_GEN_region', '04_GEN_pays']);
+        const { data: pfvRows1 } = await (supabase as any)
+          .from('project_field_values')
+          .select('valeur, field_def:questionnaire_field_definitions!field_def_id(champ_id)')
+          .eq('project_id', project.id);
         const qst: Record<string, string> = {};
-        (qstRows || []).forEach((r: any) => { if (r.valeur) qst[r.champ_id] = r.valeur; });
+        (pfvRows1 || []).forEach((r: any) => { if (r.valeur && r.field_def?.champ_id) qst[r.field_def.champ_id] = r.valeur; });
         const parts = [qst['04_GEN_commune'], qst['04_GEN_code_postal'], qst['04_GEN_departement_nom'], qst['04_GEN_region'], qst['04_GEN_pays'] || 'France'].filter(Boolean);
         address = parts.length > 0 ? parts.join(', ') : undefined;
       } else {
         // auto: questionnaire priority then fallback
-        const { data: qstRows } = await (supabase as any)
-          .from('project_questionnaire')
-          .select('champ_id, valeur')
-          .eq('project_id', project.id)
-          .in('champ_id', ['04_GEN_commune', '04_GEN_code_postal', '04_GEN_departement_nom', '04_GEN_region', '04_GEN_pays']);
+        const { data: pfvRows2 } = await (supabase as any)
+          .from('project_field_values')
+          .select('valeur, field_def:questionnaire_field_definitions!field_def_id(champ_id)')
+          .eq('project_id', project.id);
         const qst: Record<string, string> = {};
-        (qstRows || []).forEach((r: any) => { if (r.valeur) qst[r.champ_id] = r.valeur; });
+        (pfvRows2 || []).forEach((r: any) => { if (r.valeur && r.field_def?.champ_id) qst[r.field_def.champ_id] = r.valeur; });
         const parts = [
           qst['04_GEN_commune'] || project.adresse_site,
           qst['04_GEN_code_postal'],
