@@ -1,55 +1,61 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { QUESTIONNAIRE_FILTER_FIELDS } from '@/config/questionnaireFilterConfig';
 import { BEProject } from '@/types/beProject';
 
 export type QuestionnaireProjectMap = Record<string, Record<string, string>>;
 
 /**
- * Loads all questionnaire select-field values for all projects.
- * Returns a map: { projectId: { champ_id: valeur, ... } }
- * and a helper to enrich projects with questionnaire data.
+ * Charge les valeurs de questionnaire pour tous les projets.
+ * Lit depuis project_field_values (jointure avec questionnaire_field_definitions
+ * pour récupérer le champ_id). Ne dépend plus de la config statique QUESTIONS.
+ *
+ * Retourne : { projectId: { champ_id: valeur, ... } }
  */
 export function useQuestionnaireProjectData(projects: BEProject[]) {
   const [qstData, setQstData] = useState<QuestionnaireProjectMap>({});
   const [keonProjectIds, setKeonProjectIds] = useState<Set<string>>(new Set());
 
-  const champIds = useMemo(() => {
-    const baseIds = QUESTIONNAIRE_FILTER_FIELDS.map(f => f.champ_id);
-    // Needed by KEON dashboard KPIs (gisement + Cmax)
-    return Array.from(new Set([...baseIds, '06_GEN_quantite_totale', '05_GEN_cmax1']));
-  }, []);
-
   useEffect(() => {
-    if (champIds.length === 0) return;
+    if (projects.length === 0) return;
+
     (async () => {
-      const { data } = await (supabase as any)
-        .from('project_questionnaire')
-        .select('project_id, champ_id, valeur')
-        .in('champ_id', champIds)
+      const { data, error } = await (supabase as any)
+        .from('project_field_values')
+        .select(`
+          project_id,
+          valeur,
+          field_def:questionnaire_field_definitions!field_def_id(champ_id)
+        `)
         .not('valeur', 'is', null)
         .neq('valeur', '');
 
-      if (!data) return;
+      if (error) {
+        console.error('Erreur chargement données questionnaire:', error);
+        return;
+      }
 
       const map: QuestionnaireProjectMap = {};
       const ids = new Set<string>();
-      for (const row of data as { project_id: string; champ_id: string; valeur: string }[]) {
+
+      for (const row of (data || []) as { project_id: string; valeur: string; field_def: { champ_id: string } | null }[]) {
+        const champId = row.field_def?.champ_id;
+        if (!champId || !row.valeur) continue;
         if (!map[row.project_id]) map[row.project_id] = {};
-        map[row.project_id][row.champ_id] = row.valeur;
+        map[row.project_id][champId] = row.valeur;
         ids.add(row.project_id);
       }
+
       setQstData(map);
       setKeonProjectIds(ids);
     })();
-  }, [projects, champIds]);
+  }, [projects]);
 
-  /** Get questionnaire value for a project + champ_id */
+  /** Valeur d'un champ pour un projet */
   const getQstValue = (projectId: string, champId: string): string | undefined => {
     return qstData[projectId]?.[champId];
   };
 
-  /** Get all distinct values for a given champ_id across all projects */
+  /** Valeurs distinctes d'un champ_id sur tous les projets */
   const getDistinctValues = (champId: string): string[] => {
     const set = new Set<string>();
     for (const projectData of Object.values(qstData)) {
