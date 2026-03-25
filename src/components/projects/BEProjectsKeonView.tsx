@@ -172,7 +172,7 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
   useEffect(() => {
     // Expose navigate for popup buttons
     (window as any).__navigateToProject = (code: string) => {
-      navigate(`/be/projects/${code}/overview`);
+      navigate(`/spv/projects/${code}/overview`);
     };
 
     let resizeObserver: ResizeObserver | null = null;
@@ -457,7 +457,7 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
               </TableHeader>
               <TableBody>
                 {sortedData.map(row => (
-                  <TableRow key={row.id} className="cursor-pointer hover:bg-muted/30" onClick={() => navigate(`/be/projects/${row.code_projet}/overview`)}>
+                  <TableRow key={row.id} className="cursor-pointer hover:bg-muted/30" onClick={() => navigate(`/spv/projects/${row.code_projet}/overview`)}>
                     <TableCell className="font-mono font-medium text-primary">{row.code_projet}</TableCell>
                     <TableCell className="font-medium">{row.nom_projet}</TableCell>
                     <TableCell className="text-muted-foreground">{row.region}</TableCell>
