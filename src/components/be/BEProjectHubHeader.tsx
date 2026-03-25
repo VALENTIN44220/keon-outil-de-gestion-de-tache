@@ -61,12 +61,15 @@ export function BEProjectHubHeader({ project, stats, onEditProject }: BEProjectH
   );
   const navigate = useNavigate();
   const location = useLocation();
+  const isSpvContext = location.pathname.startsWith('/spv/projects/');
+  const projectBasePath = isSpvContext ? '/spv/projects' : '/be/projects';
+  const projectsListPath = isSpvContext ? '/spv' : '/projects';
 
   const pathParts = location.pathname.split('/');
   const activeTab = pathParts[pathParts.length - 1] || 'overview';
 
   const handleTabChange = (tab: string) => {
-    navigate(`/be/projects/${project.code_projet}/${tab}`);
+    navigate(`${projectBasePath}/${project.code_projet}/${tab}`);
   };
 
   const statusConfig = statusLabels[project.status] || statusLabels.active;
@@ -80,7 +83,7 @@ export function BEProjectHubHeader({ project, stats, onEditProject }: BEProjectH
             variant="ghost"
             size="sm"
             className="h-7 px-2 -ml-2"
-            onClick={() => navigate('/projects')}
+            onClick={() => navigate(projectsListPath)}
           >
             <ArrowLeft className="h-4 w-4 mr-1" />
             Projets

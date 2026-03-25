@@ -1,5 +1,5 @@
-import { ReactNode, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { ReactNode, useState } from 'react';
+import { useLocation, useParams } from 'react-router-dom';
 import { useBEProjectByCode, useBEProjectTasks, useBEProjectStats } from '@/hooks/useBEProjectHub';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -18,9 +18,13 @@ interface BEProjectHubLayoutProps {
 
 export function BEProjectHubLayout({ children }: BEProjectHubLayoutProps) {
   const { code } = useParams<{ code: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const isSpvContext = location.pathname.startsWith('/spv/projects/');
+  const sidebarView = isSpvContext ? 'spv' : 'projects';
+  const projectsListPath = isSpvContext ? '/spv' : '/projects';
   
   const { data: project, isLoading: projectLoading, error } = useBEProjectByCode(code);
   const { data: tasks = [], isLoading: tasksLoading } = useBEProjectTasks(project?.id);
@@ -46,7 +50,7 @@ export function BEProjectHubLayout({ children }: BEProjectHubLayoutProps) {
   if (projectLoading || tasksLoading) {
     return (
       <div className="flex min-h-screen bg-muted/20">
-        <Sidebar activeView="projects" onViewChange={() => {}} />
+        <Sidebar activeView={sidebarView} onViewChange={() => {}} />
         <main className="flex-1 p-6">
           <div className="space-y-4">
             <Skeleton className="h-16 w-full" />
@@ -61,7 +65,7 @@ export function BEProjectHubLayout({ children }: BEProjectHubLayoutProps) {
   if (error || !project) {
     return (
       <div className="flex min-h-screen bg-muted/20">
-        <Sidebar activeView="projects" onViewChange={() => {}} />
+        <Sidebar activeView={sidebarView} onViewChange={() => {}} />
         <main className="flex-1 p-6">
           <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
             <div className="p-4 rounded-full bg-muted">
@@ -71,7 +75,7 @@ export function BEProjectHubLayout({ children }: BEProjectHubLayoutProps) {
             <p className="text-muted-foreground">
               Le projet avec le code "{code}" n'existe pas.
             </p>
-            <Button onClick={() => navigate('/projects')} variant="outline" className="gap-2">
+            <Button onClick={() => navigate(projectsListPath)} variant="outline" className="gap-2">
               <ArrowLeft className="h-4 w-4" />
               Retour aux projets
             </Button>
@@ -83,7 +87,7 @@ export function BEProjectHubLayout({ children }: BEProjectHubLayoutProps) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-muted/20">
-      <Sidebar activeView="projects" onViewChange={() => {}} />
+      <Sidebar activeView={sidebarView} onViewChange={() => {}} />
       
       <main className="flex-1 flex flex-col min-w-0">
         <BEProjectHubHeader 

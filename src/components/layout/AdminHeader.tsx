@@ -19,7 +19,7 @@ export function AdminHeader({ title, subtitle }: AdminHeaderProps) {
           <span className="text-xs font-display font-semibold tracking-wider text-muted-foreground uppercase">Task Manager</span>
         </div>
         <div className="ml-4 border-l border-border pl-4">
-          <h1 className="text-xl font-display font-semibold tracking-wide text-foreground uppercase">
+          <h1 className="text-xl font-display font-bold tracking-wide text-foreground uppercase">
             {title}
           </h1>
           {subtitle && (
