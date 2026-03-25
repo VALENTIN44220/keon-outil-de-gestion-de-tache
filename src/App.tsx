@@ -202,6 +202,55 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            {/* SPV Project Hub routes (same pages, SPV URL namespace) */}
+            <Route
+              path="/spv/projects/:code/overview"
+              element={
+                <ProtectedRoute>
+                  <BEProjectHubOverview />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/spv/projects/:code/questionnaire"
+              element={
+                <ProtectedRoute>
+                  <BEProjectHubQuestionnaire />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/spv/projects/:code/keon-synthese"
+              element={
+                <ProtectedRoute>
+                  <BEProjectHubKeonSynthese />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/spv/projects/:code/timeline"
+              element={
+                <ProtectedRoute>
+                  <BEProjectHubTimeline />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/spv/projects/:code/discussions"
+              element={
+                <ProtectedRoute>
+                  <BEProjectHubDiscussions />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/spv/projects/:code/files"
+              element={
+                <ProtectedRoute>
+                  <BEProjectHubFiles />
+                </ProtectedRoute>
+              }
+            />
             {/* Supplier Reference */}
             <Route
               path="/suppliers"
