@@ -15,7 +15,7 @@ export default {
     extend: {
       fontFamily: {
         sans: ['Roboto', 'system-ui', 'sans-serif'],
-        display: ['Oswald', 'sans-serif'],
+        display: ['Helvetica Neue', 'Helvetica', 'Arial', 'sans-serif'],
         body: ['Roboto', 'sans-serif'],
       },
       colors: {
