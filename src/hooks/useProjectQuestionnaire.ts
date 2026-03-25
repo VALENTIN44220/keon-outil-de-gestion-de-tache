@@ -10,6 +10,7 @@ export interface QuestionnaireAnswer {
   champ_id: string;
   valeur: string | null;
   valeur_evaluation: string | null;
+  valeur_jsonb?: any;
   updated_at?: string;
   updated_by?: string;
 }
@@ -52,6 +53,7 @@ export function useProjectQuestionnaire(projectId: string, codeDivalto: string) 
         .select(`
           valeur,
           valeur_evaluation,
+          valeur_jsonb,
           updated_at,
           updated_by,
           field_def:questionnaire_field_definitions!field_def_id(champ_id, pilier_code)
@@ -69,6 +71,7 @@ export function useProjectQuestionnaire(projectId: string, codeDivalto: string) 
           champ_id: champId,
           valeur: row.valeur,
           valeur_evaluation: row.valeur_evaluation,
+          valeur_jsonb: row.valeur_jsonb,
           updated_at: row.updated_at,
           updated_by: row.updated_by,
         };
@@ -100,6 +103,7 @@ export function useProjectQuestionnaire(projectId: string, codeDivalto: string) 
         field_def_id: fd.id,
         valeur: localAnswers[fd.champ_id]?.valeur ?? null,
         valeur_evaluation: localAnswers[fd.champ_id]?.valeur_evaluation ?? null,
+        valeur_jsonb: localAnswers[fd.champ_id]?.valeur_jsonb ?? null,
         updated_by: profile?.id || null,
       }));
 
@@ -117,6 +121,7 @@ export function useProjectQuestionnaire(projectId: string, codeDivalto: string) 
             champ_id: champId,
             valeur: row.valeur,
             valeur_evaluation: row.valeur_evaluation,
+            valeur_jsonb: row.valeur_jsonb,
           };
         });
         return next;

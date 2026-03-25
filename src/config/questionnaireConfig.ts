@@ -9,7 +9,14 @@ export const PILIERS = [
 
 export type PilierCode = '00' | '02' | '04' | '05' | '06' | '07';
 
-export type ChampType = 'text' | 'textarea' | 'select' | 'number' | 'percentage' | 'euros';
+export type ChampType =
+  | 'text'
+  | 'textarea'
+  | 'select'
+  | 'number'
+  | 'percentage'
+  | 'euros'
+  | 'spreadsheet';
 
 export type EvaluationRisque = 'NA' | 'C' | 'PS' | 'NC' | 'OA' | 'PF';
 

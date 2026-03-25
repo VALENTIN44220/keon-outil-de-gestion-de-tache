@@ -8,8 +8,9 @@ interface TableInsertSpreadsheetProps {
   className?: string;
   disabled?: boolean;
   maxPickerSize?: number;
-  onChange?: (raw: Matrix) => void;
+  onChange?: (payload: { raw: Matrix; display: Matrix }) => void;
   persistenceKey?: string;
+  initialRaw?: Matrix | null;
 }
 
 type SuggestionItem = {
@@ -262,6 +263,7 @@ export function TableInsertSpreadsheet({
   maxPickerSize = 8,
   onChange,
   persistenceKey,
+  initialRaw = null,
 }: TableInsertSpreadsheetProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [hover, setHover] = useState({ r: -1, c: -1 });
@@ -334,8 +336,9 @@ export function TableInsertSpreadsheet({
 
   const refreshDisplay = useCallback((data: Matrix, rows: number, cols: number) => {
     if (!hfRef.current) {
-      setDisplayValues(data.map((r) => [...r]));
-      return;
+      const next = data.map((r) => [...r]);
+      setDisplayValues(next);
+      return next;
     }
     const next = Array.from({ length: rows }, (_, r) =>
       Array.from({ length: cols }, (_, c) => {
@@ -350,6 +353,7 @@ export function TableInsertSpreadsheet({
       }),
     );
     setDisplayValues(next);
+    return next;
   }, []);
 
   useEffect(() => {
@@ -371,7 +375,6 @@ export function TableInsertSpreadsheet({
       setDisplayValues(normalized);
       setSelected({ row: 0, col: 0 });
       setFormulaInput(normalized[0]?.[0] ?? '');
-      onChange?.(normalized);
 
       const hydrate = async () => {
         try {
@@ -379,7 +382,8 @@ export function TableInsertSpreadsheet({
           hfRef.current?.destroy?.();
           if (!window.HyperFormula) return;
           hfRef.current = window.HyperFormula.buildFromArray(normalized, { licenseKey: 'gpl-v3' });
-          refreshDisplay(normalized, rows, cols);
+          const display = refreshDisplay(normalized, rows, cols);
+          onChange?.({ raw: normalized, display });
           setHfError(null);
         } catch {
           setHfError('Moteur de formules indisponible.');
@@ -391,9 +395,49 @@ export function TableInsertSpreadsheet({
     }
   }, [persistenceKey, table, onChange, refreshDisplay]);
 
+  useEffect(() => {
+    if (table) return;
+    if (!initialRaw || initialRaw.length === 0) return;
+
+    const rows = initialRaw.length;
+    const cols = initialRaw[0]?.length ?? 0;
+    if (!rows || !cols) return;
+
+    const normalized = Array.from({ length: rows }, (_, r) =>
+      Array.from({ length: cols }, (_, c) => initialRaw?.[r]?.[c] ?? ''),
+    );
+
+    setTable({ rows, cols });
+    setCellData(normalized);
+    setDisplayValues(normalized);
+    setSelected({ row: 0, col: 0 });
+    setFormulaInput(normalized[0]?.[0] ?? '');
+
+    const hydrate = async () => {
+      try {
+        await ensureHyperFormulaLoaded();
+        hfRef.current?.destroy?.();
+        if (!window.HyperFormula) return;
+        hfRef.current = window.HyperFormula.buildFromArray(normalized, { licenseKey: 'gpl-v3' });
+        const display = refreshDisplay(normalized, rows, cols);
+        onChange?.({ raw: normalized, display });
+        setHfError(null);
+      } catch {
+        setHfError('Moteur de formules indisponible.');
+      }
+    };
+    hydrate();
+  }, [initialRaw, onChange, refreshDisplay, table]);
+
   const commitValue = useCallback((row: number, col: number, value: string) => {
     if (!table) return;
-    if (hasSelfReference(value, row, col)) {
+    let nextValue = value;
+    // Headers (row 0 and col 0) must be plain text (no formulas).
+    if ((row === 0 || col === 0) && nextValue.trim().startsWith('=')) {
+      nextValue = nextValue.trim().replace(/^=/, '');
+    }
+
+    if (hasSelfReference(nextValue, row, col)) {
       setHfError(`Reference circulaire interdite: ${COL_NAME(col)}${row + 1} ne peut pas se referencer elle-meme.`);
       setFormulaInput(cellData[row]?.[col] ?? '');
       setEditingValue(cellData[row]?.[col] ?? '');
@@ -403,15 +447,15 @@ export function TableInsertSpreadsheet({
     setHfError(null);
     setCellData((prev) => {
       const next = prev.map((r) => [...r]);
-      next[row][col] = value;
+      next[row][col] = nextValue;
       try {
-        hfRef.current?.setCellContents({ sheet: 0, row, col }, [[value || '']]);
+        hfRef.current?.setCellContents({ sheet: 0, row, col }, [[nextValue || '']]);
       } catch {
         // keep raw value even if formula parsing fails
       }
-      refreshDisplay(next, table.rows, table.cols);
+      const display = refreshDisplay(next, table.rows, table.cols);
       persistSnapshot(table.rows, table.cols, next);
-      onChange?.(next);
+      onChange?.({ raw: next, display });
       return next;
     });
   }, [onChange, refreshDisplay, table, persistSnapshot]);
@@ -602,7 +646,6 @@ export function TableInsertSpreadsheet({
     setFormulaInput('');
     setPickerOpen(false);
     persistSnapshot(rows, cols, data);
-    onChange?.(data);
 
     try {
       await ensureHyperFormulaLoaded();
@@ -612,7 +655,8 @@ export function TableInsertSpreadsheet({
         return;
       }
       hfRef.current = window.HyperFormula.buildFromArray(data, { licenseKey: 'gpl-v3' });
-      refreshDisplay(data, rows, cols);
+      const display = refreshDisplay(data, rows, cols);
+      onChange?.({ raw: data, display });
       setHfError(null);
     } catch {
       setHfError('Moteur de formules indisponible.');

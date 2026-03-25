@@ -21,6 +21,7 @@ export interface FieldDefinition {
   is_active: boolean;
   created_by: string | null;
   created_at: string;
+  spreadsheet_template?: any;
 }
 
 export interface SectionGroup {

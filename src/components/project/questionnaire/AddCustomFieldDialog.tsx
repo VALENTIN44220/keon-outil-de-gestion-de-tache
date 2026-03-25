@@ -21,6 +21,7 @@ const TYPE_LABELS: Record<ChampType, string> = {
   number:     'Nombre',
   percentage: 'Pourcentage (%)',
   euros:      'Montant (€)',
+  spreadsheet: 'Tableau (spreadsheet)',
 };
 
 interface AddCustomFieldDialogProps {
@@ -182,6 +183,11 @@ export function AddCustomFieldDialog({
                 </p>
               )}
             </div>
+          )}
+          {type === 'spreadsheet' && (
+            <p className="text-xs text-muted-foreground">
+              Le tableau (dimensions + en-têtes + cellules) sera configuré directement dans le questionnaire, une fois le champ créé.
+            </p>
           )}
 
           {/* Note */}
