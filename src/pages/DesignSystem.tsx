@@ -133,8 +133,8 @@ export default function DesignSystem() {
           <div className="grid md:grid-cols-2 gap-8">
             <Card className="card-keon">
               <CardHeader>
-                <CardTitle className="text-xl">Oswald</CardTitle>
-                <CardDescription>Titres uniquement - MAJUSCULES - Interlettrage +0.05em</CardDescription>
+                <CardTitle className="text-xl">Helvetica</CardTitle>
+                <CardDescription>Titres en Bold - MAJUSCULES - Interlettrage +0.05em</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>

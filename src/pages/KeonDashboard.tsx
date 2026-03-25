@@ -312,7 +312,7 @@ export default function KeonDashboard() {
                             <TableRow
                               key={row.id}
                               className="cursor-pointer hover:bg-muted/30"
-                              onClick={() => navigate(`/be/projects/${row.code_projet}/overview`)}
+                              onClick={() => navigate(`/spv/projects/${row.code_projet}/overview`)}
                             >
                               <TableCell className="font-mono font-medium text-primary">{row.code_projet}</TableCell>
                               <TableCell className="font-medium">{row.nom_projet}</TableCell>
@@ -332,7 +332,7 @@ export default function KeonDashboard() {
                               {(canEdit || canDelete) && (
                                 <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                                   <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/be/projects/${row.code_projet}/overview`)}>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/spv/projects/${row.code_projet}/overview`)}>
                                       <LayoutDashboard className="h-4 w-4" />
                                     </Button>
                                     {canEdit && (

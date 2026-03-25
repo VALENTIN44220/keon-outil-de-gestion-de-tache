@@ -60,7 +60,7 @@ export default function WorkflowEditor() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-xl font-semibold">{title}</h1>
+            <h1 className="text-xl font-bold">{title}</h1>
             <p className="text-sm text-muted-foreground">{subtitle}</p>
           </div>
         </div>
