@@ -4,7 +4,9 @@ import { Header } from '@/components/layout/Header';
 import { UnifiedCalendarView } from '@/components/calendar/UnifiedCalendarView';
 import { useMicrosoftConnection } from '@/hooks/useMicrosoftConnection';
 import { useNotifications } from '@/hooks/useNotifications';
-import { useTasks } from '@/hooks/useTasks';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Link2, Calendar as CalendarIcon, Loader2 } from 'lucide-react';
@@ -15,9 +17,27 @@ const CalendarPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
 
+  const { user } = useAuth();
   const { connection, isLoading: isLoadingConnection } = useMicrosoftConnection();
-  const { allTasks } = useTasks();
-  const { notifications, unreadCount, hasUrgent } = useNotifications(allTasks);
+
+  // Lightweight notification fetch — only fields needed, cached 5 min
+  const { data: notifTasks = [] } = useQuery({
+    queryKey: ['notif-tasks', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const { data } = await supabase
+        .from('tasks')
+        .select('id, title, status, due_date, priority, assigned_to')
+        .eq('assigned_to', user.id)
+        .neq('status', 'completed')
+        .not('due_date', 'is', null)
+        .limit(100);
+      return data ?? [];
+    },
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+  });
+  const { notifications, unreadCount, hasUrgent } = useNotifications(notifTasks);
 
   const handleConnectMicrosoft = () => {
     navigate('/profile?tab=sync');

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -37,6 +37,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const lastSessionSignatureRef = useRef<string | null>(null);
+  const lastProfileUserIdRef = useRef<string | null>(null);
+
+  const connectMicrosoftOnFirstOAuthLogin = async (session: Session) => {
+    try {
+      // These are present when using Supabase OAuth providers.
+      // We forward them once to the edge function so it can persist the connection.
+      const accessToken = (session as any).provider_token as string | undefined;
+      const refreshToken = (session as any).provider_refresh_token as string | undefined;
+      if (!accessToken) return;
+
+      const { error } = await supabase.functions.invoke('microsoft-graph', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: { action: 'connect-supabase-session', access_token: accessToken, refresh_token: refreshToken },
+      });
+      if (error) {
+        console.warn('Microsoft connect invoke returned error:', error);
+      }
+    } catch (e) {
+      // Non-blocking: login must succeed even if calendar connection fails.
+      console.warn('Microsoft connect (post-login) failed:', e);
+    }
+  };
 
   const fetchProfile = async (userId: string) => {
     const { data, error } = await supabase
@@ -56,28 +81,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+        // Ignore technical token refreshes to avoid global rerender storms
+        // when users switch browser tabs and come back.
+        if (event === 'TOKEN_REFRESHED') {
+          return;
+        }
+
+        const nextSignature = session?.access_token
+          ? `${session.user.id}:${session.access_token}`
+          : null;
+
+        // Supabase can emit SIGNED_IN repeatedly (e.g. tab focus/session recovery).
+        // Skip no-op updates to avoid rerendering the full app tree.
+        if (event === 'SIGNED_IN' && nextSignature === lastSessionSignatureRef.current) {
+          return;
+        }
+
+        lastSessionSignatureRef.current = nextSignature;
+        setSession(prev => (prev?.access_token === session?.access_token ? prev : session));
+        setUser(prev => (prev?.id === session?.user?.id ? prev : (session?.user ?? null)));
 
         if (session?.user) {
-          // Use setTimeout to avoid potential race conditions
-          setTimeout(async () => {
-            const profile = await fetchProfile(session.user.id);
-            setProfile(profile);
-          }, 0);
+          if (lastProfileUserIdRef.current !== session.user.id) {
+            lastProfileUserIdRef.current = session.user.id;
+            // Use setTimeout to avoid potential race conditions
+            setTimeout(async () => {
+              const profile = await fetchProfile(session.user.id);
+              setProfile(profile);
+            }, 0);
+          }
+
+          if (event === 'SIGNED_IN') {
+            void connectMicrosoftOnFirstOAuthLogin(session);
+          }
         } else {
-          setProfile(null);
+          lastProfileUserIdRef.current = null;
+          setProfile(prev => (prev === null ? prev : null));
         }
       }
     );
 
     // Then check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      const signature = session?.access_token ? `${session.user.id}:${session.access_token}` : null;
+      lastSessionSignatureRef.current = signature;
       setSession(session);
       setUser(session?.user ?? null);
       
       if (session?.user) {
+        lastProfileUserIdRef.current = session.user.id;
         fetchProfile(session.user.id).then(setProfile);
+        void connectMicrosoftOnFirstOAuthLogin(session);
+      } else {
+        lastProfileUserIdRef.current = null;
       }
       setIsLoading(false);
     });
@@ -129,19 +185,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error as Error | null };
   };
 
+  const value = useMemo(
+    () => ({
+      user,
+      profile,
+      session,
+      isLoading,
+      signUp,
+      signIn,
+      signOut,
+      updateProfile,
+    }),
+    [user, profile, session, isLoading]
+  );
+
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        profile,
-        session,
-        isLoading,
-        signUp,
-        signIn,
-        signOut,
-        updateProfile,
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

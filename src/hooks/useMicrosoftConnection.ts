@@ -32,7 +32,39 @@ export function useMicrosoftConnection() {
       });
 
       if (error) throw error;
-      setConnection(data);
+      // If not connected but we do have provider tokens in the current Supabase session,
+      // auto-create the microsoft connection (single-consent flow) then re-check.
+      if (!data?.connected) {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const currentSession = sessionData.session as any;
+        if (!currentSession?.access_token || !currentSession?.provider_token) {
+          setConnection(data);
+          return;
+        }
+
+        const connectResult = await supabase.functions.invoke('microsoft-graph', {
+          headers: {
+            Authorization: `Bearer ${currentSession.access_token}`,
+          },
+          body: {
+            action: 'connect-supabase-session',
+            access_token: currentSession.provider_token,
+            refresh_token: currentSession.provider_refresh_token ?? null,
+          },
+        });
+        if (connectResult.error) throw connectResult.error;
+
+        const recheck = await supabase.functions.invoke('microsoft-graph', {
+          headers: {
+            Authorization: `Bearer ${currentSession.access_token}`,
+          },
+          body: { action: 'check-connection' },
+        });
+        if (recheck.error) throw recheck.error;
+        setConnection(recheck.data);
+      } else {
+        setConnection(data);
+      }
     } catch (error) {
       console.error('Error checking Microsoft connection:', error);
       setConnection({ connected: false });

@@ -17,7 +17,6 @@ const AuthCallback = () => {
   useEffect(() => {
     const handleCallback = async () => {
       const code = searchParams.get('code');
-      const state = searchParams.get('state');
       const error = searchParams.get('error');
       const errorDescription = searchParams.get('error_description');
 
@@ -30,35 +29,36 @@ const AuthCallback = () => {
         return;
       }
 
-      // No code means invalid callback
+      // Supabase Auth redirect does not always include `code` here.
+      // If there's already a session, just redirect the user.
       if (!code) {
+        try {
+          const { data } = await supabase.auth.getSession();
+          if (data.session) {
+            setStatus('success');
+            setTimeout(() => navigate('/'), 300);
+            return;
+          }
+        } catch {
+          // ignore and show error below
+        }
+
         setStatus('error');
-        setErrorMessage('Code d\'autorisation manquant');
+        setErrorMessage("Connexion incomplète (session introuvable). Réessayez.");
         return;
       }
 
       try {
-        // Determine the provider from state or default to Microsoft
-        const provider = state?.includes('microsoft') ? 'microsoft' : 'microsoft';
+        // Supabase PKCE flow: exchange the authorization code for a session.
+        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+        if (exchangeError) throw exchangeError;
 
-        if (provider === 'microsoft') {
-          // Exchange the code for tokens via edge function (server-side flow, no PKCE)
-          const redirectUri = import.meta.env.VITE_AZURE_REDIRECT_URI;
-          
-          const { data, error: exchangeError } = await supabase.functions.invoke('microsoft-graph', {
-            body: { action: 'exchange-code', code, redirectUri },
-          });
+        setStatus('success');
+        toast.success('Connexion réussie');
 
-          if (exchangeError) throw exchangeError;
-
-          setStatus('success');
-          toast.success(`Connecté à Microsoft: ${data.email}`);
-          
-          // Redirect to calendar or profile after success
-          setTimeout(() => {
-            navigate('/calendar');
-          }, 1500);
-        }
+        setTimeout(() => {
+          navigate('/');
+        }, 800);
       } catch (err: any) {
         console.error('Callback error:', err);
         setStatus('error');

@@ -66,7 +66,10 @@ export default function Auth() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'azure',
         options: {
-          scopes: 'email',
+          // Request calendar consent during the very first OAuth login.
+          // Entra will remember consent, so subsequent logins won't prompt again.
+          scopes:
+            'openid profile email offline_access User.Read Calendars.Read Calendars.ReadWrite',
           redirectTo,
         },
       });
