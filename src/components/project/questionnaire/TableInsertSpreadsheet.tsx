@@ -382,8 +382,7 @@ export function TableInsertSpreadsheet({
           hfRef.current?.destroy?.();
           if (!window.HyperFormula) return;
           hfRef.current = window.HyperFormula.buildFromArray(normalized, { licenseKey: 'gpl-v3' });
-          const display = refreshDisplay(normalized, rows, cols);
-          onChange?.({ raw: normalized, display });
+          refreshDisplay(normalized, rows, cols);
           setHfError(null);
         } catch {
           setHfError('Moteur de formules indisponible.');
@@ -419,8 +418,7 @@ export function TableInsertSpreadsheet({
         hfRef.current?.destroy?.();
         if (!window.HyperFormula) return;
         hfRef.current = window.HyperFormula.buildFromArray(normalized, { licenseKey: 'gpl-v3' });
-        const display = refreshDisplay(normalized, rows, cols);
-        onChange?.({ raw: normalized, display });
+        refreshDisplay(normalized, rows, cols);
         setHfError(null);
       } catch {
         setHfError('Moteur de formules indisponible.');
@@ -676,7 +674,10 @@ export function TableInsertSpreadsheet({
         <div className="mb-2 text-[11px] font-medium uppercase tracking-wider" style={styles.formulaText}>
           Dimensions du tableau
         </div>
-        <div style={styles.pickerGrid} onMouseLeave={() => setHover({ r: -1, c: -1 })}>
+        <div
+          style={{ ...styles.pickerGrid, gridTemplateColumns: `repeat(${maxPickerSize}, 1fr)` }}
+          onMouseLeave={() => setHover({ r: -1, c: -1 })}
+        >
           {Array.from({ length: maxPickerSize }, (_, r) =>
             Array.from({ length: maxPickerSize }, (_, c) => {
               const isActive = r <= hover.r && c <= hover.c;

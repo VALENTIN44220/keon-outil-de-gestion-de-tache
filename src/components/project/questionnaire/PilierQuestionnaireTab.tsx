@@ -157,6 +157,8 @@ function SpreadsheetFieldWidget({
   const initialRaw = useMemo(() => buildInitialRawFromTemplateAndValue(templateJson, valueJsonb), [templateJson, valueJsonb]);
   const ignoreFirstOnChangeRef = useRef<boolean>(!!templateJson);
   const debounceRef = useRef<number | null>(null);
+  const lastTemplateStrRef = useRef<string>('');
+  const lastValueStrRef = useRef<string>('');
 
   const handleOnChange = useCallback(
     (payload: { raw: Matrix; display: Matrix }) => {
@@ -168,6 +170,11 @@ function SpreadsheetFieldWidget({
 
       const templateToPersist = buildTemplateJsonFromRaw(payload.raw);
       const valueToPersist = buildValueJsonbFromRawAndDisplay(payload.raw, payload.display);
+      const templateStr = JSON.stringify(templateToPersist);
+      const valueStr = JSON.stringify(valueToPersist);
+
+      const shouldUpdateTemplate = templateStr !== lastTemplateStrRef.current;
+      const shouldUpdateValue = valueStr !== lastValueStrRef.current;
 
       // Update local state immediately so "Save section" stays consistent
       onUpsertLocalValue(field.champ_id, valueToPersist);
@@ -176,28 +183,34 @@ function SpreadsheetFieldWidget({
       if (debounceRef.current) window.clearTimeout(debounceRef.current);
       debounceRef.current = window.setTimeout(async () => {
         try {
-          // 1) Propagate headers to all projects
-          const { error: templateError } = await supabase
-            .from('questionnaire_field_definitions')
-            .update({ spreadsheet_template: templateToPersist })
-            .eq('id', field.id);
-          if (templateError) throw templateError;
+          // 1) Propagate headers (only if changed)
+          if (shouldUpdateTemplate) {
+            const { error: templateError } = await supabase
+              .from('questionnaire_field_definitions')
+              .update({ spreadsheet_template: templateToPersist })
+              .eq('id', field.id);
+            if (templateError) throw templateError;
+            lastTemplateStrRef.current = templateStr;
+          }
 
-          // 2) Persist sparse internal cells for this project only
-          const { error: valueError } = await supabase
-            .from('project_field_values')
-            .upsert(
-              {
-                project_id: projectId,
-                field_def_id: field.id,
-                valeur: null,
-                valeur_evaluation: null,
-                valeur_jsonb: valueToPersist,
-                updated_by: profile?.id ?? null,
-              },
-              { onConflict: 'project_id,field_def_id' },
-            );
-          if (valueError) throw valueError;
+          // 2) Persist sparse internal cells (only if changed)
+          if (shouldUpdateValue) {
+            const { error: valueError } = await supabase
+              .from('project_field_values')
+              .upsert(
+                {
+                  project_id: projectId,
+                  field_def_id: field.id,
+                  valeur: null,
+                  valeur_evaluation: null,
+                  valeur_jsonb: valueToPersist,
+                  updated_by: profile?.id ?? null,
+                },
+                { onConflict: 'project_id,field_def_id' },
+              );
+            if (valueError) throw valueError;
+            lastValueStrRef.current = valueStr;
+          }
         } catch (e) {
           console.error('Spreadsheet persist error:', e);
         }
