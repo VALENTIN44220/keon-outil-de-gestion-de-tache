@@ -2,6 +2,8 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useSimulation } from '@/contexts/SimulationContext';
+import { usePermissionsContext } from '@/contexts/PermissionsContext';
 import { toast } from 'sonner';
 import type { PilierCode } from '@/config/questionnaireConfig';
 import type { FieldDefinition } from '@/hooks/useQuestionnaireFieldDefs';
@@ -20,25 +22,29 @@ export type AnswersMap = Record<string, QuestionnaireAnswer>;
 export function useProjectQuestionnaire(projectId: string, codeDivalto: string) {
   const { user, profile } = useAuth();
   const { isAdmin } = useUserRole();
+  const { isSimulating, simulatedProfile } = useSimulation();
+  const { permissionProfile } = usePermissionsContext();
   const [answers, setAnswers] = useState<AnswersMap>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  const activeProfile = (isSimulating && simulatedProfile ? simulatedProfile : profile) as any;
+  const isEffectivelyAdmin = isAdmin && !isSimulating;
+  const questionnairePermissionProfile = (permissionProfile ?? activeProfile?.permission_profile ?? null) as any;
+
   const canReadPilier = useCallback((pilierCode: PilierCode): boolean => {
-    if (isAdmin) return true;
-    if (!profile?.permission_profile_id) return false;
-    const pp = (profile as any)?.permission_profile;
-    if (!pp) return true;
-    return pp[`qst_pilier_${pilierCode}_read`] === true;
-  }, [profile, isAdmin]);
+    if (isEffectivelyAdmin) return true;
+    if (!activeProfile?.permission_profile_id) return false;
+    if (!questionnairePermissionProfile) return false;
+    return questionnairePermissionProfile[`qst_pilier_${pilierCode}_read`] === true;
+  }, [activeProfile, isEffectivelyAdmin, questionnairePermissionProfile]);
 
   const canWritePilier = useCallback((pilierCode: PilierCode): boolean => {
-    if (isAdmin) return true;
-    if (!profile?.permission_profile_id) return false;
-    const pp = (profile as any)?.permission_profile;
-    if (!pp) return false;
-    return pp[`qst_pilier_${pilierCode}_write`] === true;
-  }, [profile, isAdmin]);
+    if (isEffectivelyAdmin) return true;
+    if (!activeProfile?.permission_profile_id) return false;
+    if (!questionnairePermissionProfile) return false;
+    return questionnairePermissionProfile[`qst_pilier_${pilierCode}_write`] === true;
+  }, [activeProfile, isEffectivelyAdmin, questionnairePermissionProfile]);
 
   /**
    * Charge les réponses pour un pilier depuis project_field_values,
@@ -104,7 +110,7 @@ export function useProjectQuestionnaire(projectId: string, codeDivalto: string) 
         valeur: localAnswers[fd.champ_id]?.valeur ?? null,
         valeur_evaluation: localAnswers[fd.champ_id]?.valeur_evaluation ?? null,
         valeur_jsonb: localAnswers[fd.champ_id]?.valeur_jsonb ?? null,
-        updated_by: profile?.id || null,
+        updated_by: activeProfile?.id || null,
       }));
 
       const { error } = await (supabase as any)
@@ -136,7 +142,7 @@ export function useProjectQuestionnaire(projectId: string, codeDivalto: string) 
     } finally {
       setIsSaving(false);
     }
-  }, [projectId, user, profile]);
+  }, [projectId, user, activeProfile]);
 
   return {
     answers,

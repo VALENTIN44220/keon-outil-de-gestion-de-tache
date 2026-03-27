@@ -231,7 +231,16 @@ export function UsersTab({
 
     setIsCreating(true);
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        throw new Error('Session expirée. Merci de vous reconnecter puis réessayer.');
+      }
+
       const response = await supabase.functions.invoke('create-user', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
         body: {
           email: email.trim(),
           password,

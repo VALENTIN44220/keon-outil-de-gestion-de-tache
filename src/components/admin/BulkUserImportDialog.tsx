@@ -150,6 +150,14 @@ paul.durand@exemple.fr;Paul DURAND;;;Technicien;jean.dupont@exemple.fr`;
     
     setStep('importing');
     const importResults: ImportResult[] = [];
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+    if (!accessToken) {
+      toast.error('Session expirée. Merci de vous reconnecter puis réessayer.');
+      setStep('preview');
+      return;
+    }
     
     // Build a map of created users' emails to their profile IDs for manager resolution
     const createdUsersMap = new Map<string, string>();
@@ -218,6 +226,9 @@ paul.durand@exemple.fr;Paul DURAND;;;Technicien;jean.dupont@exemple.fr`;
         // First, check if user already exists by calling edge function with check_only flag
         // or by using RPC to query auth.users
         const response = await supabase.functions.invoke('create-user', {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
           body: {
             email: user.email,
             password: defaultPassword,

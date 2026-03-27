@@ -15,6 +15,7 @@ interface SimulatedProfile {
   manager_id: string | null;
   is_private: boolean;
   permission_profile_id: string | null;
+  permission_profile?: Record<string, any> | null;
   hierarchy_level_id: string | null;
 }
 
@@ -39,7 +40,7 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select('*, permission_profile:permission_profiles(*)')
         .eq('id', profileId)
         .single();
 
