@@ -15,6 +15,9 @@ verify_jwt = false
 [functions.invite-user]
 verify_jwt = false
 
+[functions.create-user]
+verify_jwt = false
+
 [functions.validate-material-request]
 verify_jwt = false
 
