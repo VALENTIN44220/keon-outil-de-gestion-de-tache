@@ -437,25 +437,8 @@ export function UsersTab({
       if (response.data?.already_exists) {
         toast.info('Cet utilisateur a déjà un compte dans l\'application');
       } else if (response.data?.generated_password) {
-        // Show success with password and copy button
-        toast.success(
-          <div className="space-y-2">
-            <p>Compte créé pour {response.data.email}</p>
-            <div className="flex items-center gap-2 bg-muted p-2 rounded text-sm font-mono">
-              <span className="flex-1 break-all">{response.data.generated_password}</span>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 px-2"
-                onClick={() => copyToClipboard(response.data.generated_password)}
-              >
-                <Copy className="h-3 w-3" />
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">Communiquez ce mot de passe à l'utilisateur</p>
-          </div>,
-          { duration: 15000 }
-        );
+        await copyToClipboard(response.data.generated_password);
+        toast.success(`Compte créé pour ${response.data.email}. Mot de passe temporaire copié.`);
       } else {
         toast.success(`Compte créé pour ${user.lovable_email || user.secondary_email}`);
       }
@@ -522,25 +505,8 @@ export function UsersTab({
     if (createdUsers.length > 0) {
       // Format all passwords for display and copy
       const passwordList = createdUsers.map(u => `${u.email}: ${u.password}`).join('\n');
-      
-      toast.success(
-        <div className="space-y-2">
-          <p>{successCount} compte(s) créé(s)</p>
-          <Button
-            size="sm"
-            variant="outline"
-            className="w-full"
-            onClick={() => copyToClipboard(passwordList)}
-          >
-            <Copy className="h-3 w-3 mr-2" />
-            Copier tous les mots de passe
-          </Button>
-          <p className="text-xs text-muted-foreground">
-            Format: email: mot de passe (un par ligne)
-          </p>
-        </div>,
-        { duration: 30000 }
-      );
+      await copyToClipboard(passwordList);
+      toast.success(`${successCount} compte(s) créé(s). Les mots de passe ont été copiés.`);
     }
     
     if (errorCount > 0) {
@@ -614,26 +580,10 @@ export function UsersTab({
       // Copy to clipboard
       try {
         await navigator.clipboard.writeText(temporary_password);
-        toast.success(
-          <div className="space-y-2">
-            <p className="font-medium">Mot de passe réinitialisé</p>
-            <p className="text-sm">Mot de passe temporaire copié dans le presse-papier :</p>
-            <code className="bg-muted px-2 py-1 rounded text-sm font-mono">{temporary_password}</code>
-            <p className="text-xs text-muted-foreground">L'utilisateur devra le changer à sa prochaine connexion.</p>
-          </div>,
-          { duration: 15000 }
-        );
+        toast.success('Mot de passe réinitialisé. Mot de passe temporaire copié dans le presse-papier.');
       } catch {
         // Fallback if clipboard fails
-        toast.success(
-          <div className="space-y-2">
-            <p className="font-medium">Mot de passe réinitialisé</p>
-            <p className="text-sm">Nouveau mot de passe temporaire :</p>
-            <code className="bg-muted px-2 py-1 rounded text-sm font-mono select-all">{temporary_password}</code>
-            <p className="text-xs text-muted-foreground">Copiez-le et transmettez-le à l'utilisateur. Il devra le changer.</p>
-          </div>,
-          { duration: 15000 }
-        );
+        toast.success(`Mot de passe réinitialisé. Nouveau mot de passe temporaire: ${temporary_password}`);
       }
 
       onUserUpdated();
