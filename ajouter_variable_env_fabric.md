@@ -15,7 +15,7 @@ Nom |Type | Valeur
 SUPABASE_URL | Chaine/string | `@variables('SUPABASE_URL')`
 
 6. Dans le notebook il suffira de faire un appel classique.
-
+la
 Attention cependant ! L'import fait ici est uniquement adapté pour le lancement du pipeline entier, un lancement manuel des cellules renvoie des variables d'environnement vide. Pour remédier à cela, créer un cellule en haut de chaque notebook avec l'import manuel des variables. Il suffira alors de décommenter la cellule au momment de lancer manuellement le notebook.
 
 _Exemple :_
