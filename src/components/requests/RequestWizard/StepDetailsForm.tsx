@@ -15,6 +15,7 @@ import { ITProjectSelect } from '@/components/it/ITProjectSelect';
 import { RequestWizardData, RequestType } from './types';
 import { CommonFieldsConfig, DEFAULT_COMMON_FIELDS_CONFIG, resolveTitlePattern } from '@/types/commonFieldsConfig';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserRole } from '@/hooks/useUserRole';
 import { supabase } from '@/integrations/supabase/client';
 
 function BEProjectReadOnly({ projectId }: { projectId: string }) {
@@ -57,6 +58,7 @@ interface StepDetailsFormProps {
 
 export function StepDetailsForm({ data, requestType, onDataChange, commonFieldsConfig }: StepDetailsFormProps) {
   const { profile } = useAuth();
+  const { isAdmin } = useUserRole();
   const isPersonal = requestType === 'personal';
   const isPerson = requestType === 'person';
 
@@ -83,6 +85,13 @@ export function StepDetailsForm({ data, requestType, onDataChange, commonFieldsC
       }
     }
   }, [cfg.title.title_pattern, data.processName, profile?.display_name]);
+
+  // Admin-only field safety: if user isn't admin, clear any pre-set IT project association.
+  useEffect(() => {
+    if (isAdmin) return;
+    if (!data.itProjectId) return;
+    onDataChange({ itProjectId: null });
+  }, [isAdmin, data.itProjectId, onDataChange]);
 
   return (
     <div className="space-y-6">
@@ -198,8 +207,8 @@ export function StepDetailsForm({ data, requestType, onDataChange, commonFieldsC
             )
           )}
 
-          {/* IT Project selection for process requests */}
-          {requestType === 'process' && cfg.it_project?.visible && (
+          {/* IT Project selection for process requests (admin only) */}
+          {isAdmin && requestType === 'process' && cfg.it_project?.visible && (
             cfg.it_project.editable ? (
               <ITProjectSelect
                 value={data.itProjectId}
@@ -214,6 +223,7 @@ export function StepDetailsForm({ data, requestType, onDataChange, commonFieldsC
               </div>
             )
           )}
+
         </div>
       </ScrollArea>
     </div>

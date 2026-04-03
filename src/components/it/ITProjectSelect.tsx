@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Search, Monitor } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
+import { useUserRole } from '@/hooks/useUserRole';
 
 interface ITProjectOption {
   id: string;
@@ -28,13 +29,10 @@ interface ITProjectSelectProps {
 const NONE_SENTINEL = '__none__';
 
 export function ITProjectSelect({ value, onChange, disabled }: ITProjectSelectProps) {
+  const { isAdmin, isLoading: roleLoading } = useUserRole();
   const [projects, setProjects] = useState<ITProjectOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-
-  useEffect(() => {
-    fetchProjects();
-  }, [searchQuery]);
 
   const fetchProjects = async () => {
     try {
@@ -60,7 +58,24 @@ export function ITProjectSelect({ value, onChange, disabled }: ITProjectSelectPr
     }
   };
 
+  const canRender = !roleLoading && isAdmin;
+
+  useEffect(() => {
+    if (!canRender) {
+      // Avoid fetching / resetting hook order; just ensure we don't show stale loading state.
+      setProjects([]);
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(true);
+    fetchProjects();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, canRender]);
+
   const selectedProject = projects.find((p) => p.id === value);
+
+  // Only admin profiles can see/select an IT project association.
+  if (!canRender) return null;
 
   return (
     <div className="space-y-2">

@@ -84,7 +84,7 @@ const Requests = () => {
   const fetchProcesses = async () => {
     const { data: processData } = await supabase
       .from('process_templates')
-      .select('id, name, description, department')
+      .select('id, name, description, target_department_id, departments:target_department_id(name)')
       .eq('is_shared', true)
       .order('name');
     
@@ -99,8 +99,10 @@ const Requests = () => {
       .eq('is_shared', true)
       .order('order_index');
 
-    const processesWithSubs: ProcessWithSubProcesses[] = processData.map(process => ({
+    const processesWithSubs: ProcessWithSubProcesses[] = processData.map((process: any) => ({
       ...process,
+      // Ensure card displays the real linked department name (FK) rather than legacy text field.
+      department: process.departments?.name || null,
       sub_processes: (subProcessData || []).filter(sp => sp.process_template_id === process.id)
     }));
 
@@ -133,6 +135,36 @@ const Requests = () => {
   useEffect(() => {
     fetchRequests();
   }, [fetchRequests]);
+
+  // Live-update request statuses without full refresh.
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('requests-live-status')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'tasks',
+          filter: 'type=eq.request',
+        },
+        (payload: any) => {
+          const updated = payload?.new;
+          if (!updated?.id) return;
+          setRequests((prev) =>
+            prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t))
+          );
+          setSelectedRequest((prev) => (prev && prev.id === updated.id ? { ...prev, ...updated } : prev));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
 
   // Get progress for all requests
   const requestIds = useMemo(() => requests.map(r => r.id), [requests]);
@@ -188,6 +220,19 @@ const Requests = () => {
     fetchRequests();
     refetchPending();
   };
+
+  // Requests are loaded in local state (not from useTasks), so we must update them locally too.
+  const handleRequestStatusChange = useCallback(
+    async (taskId: string, status: any) => {
+      await updateTaskStatus(taskId, status);
+      const now = new Date().toISOString();
+      setRequests((prev) =>
+        prev.map((t) => (t.id === taskId ? { ...t, status, updated_at: now } : t))
+      );
+      setSelectedRequest((prev) => (prev && prev.id === taskId ? { ...prev, status, updated_at: now } : prev));
+    },
+    [updateTaskStatus]
+  );
 
   const handleOpenRequest = (task: Task, subProcessId?: string, processId?: string) => {
     setSelectedProcessTemplateId(processId);
@@ -362,7 +407,7 @@ const Requests = () => {
             setSelectedRequest(null);
             handleRefresh();
           }}
-          onStatusChange={updateTaskStatus}
+          onStatusChange={handleRequestStatusChange}
         />
       )}
     </div>

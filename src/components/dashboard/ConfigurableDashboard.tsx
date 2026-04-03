@@ -42,6 +42,8 @@ interface ConfigurableDashboardProps {
   processId?: string;
   /** Whether the user can edit (customize) the dashboard layout */
   canEdit?: boolean;
+  /** Whether "Filtres croisés" starts collapsed. */
+  crossFiltersDefaultCollapsed?: boolean;
 }
 
 const STORAGE_KEY = 'dashboard-widgets-config';
@@ -103,6 +105,7 @@ export function ConfigurableDashboard({
   onTaskClick,
   processId,
   canEdit = true,
+  crossFiltersDefaultCollapsed = false,
 }: ConfigurableDashboardProps) {
   const { user } = useAuth();
   const isProcessMode = !!processId;
@@ -763,6 +766,7 @@ export function ConfigurableDashboard({
         filters={pendingFilters}
         onFiltersChange={handlePendingFiltersChange}
         contextId="analytics"
+        defaultCollapsed={crossFiltersDefaultCollapsed}
       />
 
       {/* Widget Grid - Smart 2-column bin-packing layout */}

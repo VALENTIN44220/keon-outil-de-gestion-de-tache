@@ -25,10 +25,10 @@ export const WIDGET_DEFINITIONS: Omit<WidgetConfig, 'visible' | 'size'>[] = [
   { id: 'top_projects',  label: 'Projets les plus avancés',      accentColor: '#10b981', gradientFrom: 'from-emerald-500/10',gradientTo: 'to-emerald-600/5'},
 ];
 
-// Default widths: kpi_strip & map = full (w:2), charts = half (w:1)
+// Default widths: kpi_strip = full (w:2), charts/widgets = half (w:1)
 const DEFAULT_SIZES: Record<string, { w: number; h: number }> = {
   kpi_strip:    { w: 2, h: 2 },
-  map:          { w: 2, h: 3 },
+  map:          { w: 1, h: 3 },
   status_pie:   { w: 1, h: 3 },
   typo_pie:     { w: 1, h: 3 },
   progress_bar: { w: 1, h: 3 },
@@ -64,9 +64,18 @@ export function loadWidgetConfig(): WidgetConfig[] {
       return s;
     });
 
-    const savedMap = new Map(migrated.map(w => [w.id, w]));
+    // Migration: align "map" default width with other half-width widgets.
+    // If user kept the old default map size (w:2,h:3), convert to (w:1,h:3).
+    const migrated2 = migrated.map(w => {
+      if (w.id === 'map' && w.size?.w === 2 && w.size?.h === 3) {
+        return { ...w, size: { ...w.size, w: 1 } };
+      }
+      return w;
+    });
+
+    const savedMap = new Map(migrated2.map(w => [w.id, w]));
     const merged: WidgetConfig[] = [];
-    migrated.forEach(s => {
+    migrated2.forEach(s => {
       const def = WIDGET_DEFINITIONS.find(d => d.id === s.id);
       if (def) merged.push({ ...def, visible: s.visible, size: s.size });
     });

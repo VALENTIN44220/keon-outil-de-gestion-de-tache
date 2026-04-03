@@ -126,6 +126,35 @@ export function useTasks(externalScope?: TaskScope) {
     }
   }, [fetchTasks, permissionsLoading]);
 
+  // Live-update task statuses without page refresh.
+  useEffect(() => {
+    if (!user?.id || !profile?.id) return;
+
+    const channel = supabase
+      .channel(`tasks-live-status-${scope}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'tasks',
+          filter: 'type=eq.task',
+        },
+        (payload: any) => {
+          const updated = payload?.new;
+          if (!updated?.id) return;
+          setTasks((prev) =>
+            prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t))
+          );
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, profile?.id, scope]);
+
   const filteredTasks = useMemo(() => {
     return tasks.filter((task) => {
       const matchesStatus = statusFilter === 'all' || task.status === statusFilter;

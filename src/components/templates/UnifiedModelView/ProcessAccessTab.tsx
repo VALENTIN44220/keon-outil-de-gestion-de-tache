@@ -6,6 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -48,6 +49,9 @@ export function ProcessAccessTab({ process, onUpdate, canManage }: ProcessAccess
   const [selectedCompanies, setSelectedCompanies] = useState<string[]>([]);
   const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [companySearchQuery, setCompanySearchQuery] = useState('');
+  const [departmentSearchQuery, setDepartmentSearchQuery] = useState('');
   
   const [companies, setCompanies] = useState<Company[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -72,7 +76,7 @@ export function ProcessAccessTab({ process, onUpdate, canManage }: ProcessAccess
 
   const loadCurrentAccess = async () => {
     // Load visibility associations
-    const [companyVis, deptVis] = await Promise.all([
+    const [companyVis, deptVis, userVis] = await Promise.all([
       supabase
         .from('process_template_visible_companies')
         .select('company_id')
@@ -81,6 +85,11 @@ export function ProcessAccessTab({ process, onUpdate, canManage }: ProcessAccess
         .from('process_template_visible_departments')
         .select('department_id')
         .eq('process_template_id', process.id),
+      (supabase as any)
+        .from('process_tracking_access')
+        .select('profile_id, can_read')
+        .eq('process_template_id', process.id)
+        .eq('can_read', true),
     ]);
 
     if (companyVis.data?.length) {
@@ -89,6 +98,9 @@ export function ProcessAccessTab({ process, onUpdate, canManage }: ProcessAccess
     } else if (deptVis.data?.length) {
       setAccessMode('departments');
       setSelectedDepartments(deptVis.data.map(v => v.department_id));
+    } else if (userVis.data?.length) {
+      setAccessMode('users');
+      setSelectedUsers(userVis.data.map((v: any) => v.profile_id));
     } else {
       // Determine from visibility_level
       switch (process.visibility_level) {
@@ -133,6 +145,10 @@ export function ProcessAccessTab({ process, onUpdate, canManage }: ProcessAccess
           .from('process_template_visible_departments')
           .delete()
           .eq('process_template_id', process.id),
+        (supabase as any)
+          .from('process_tracking_access')
+          .delete()
+          .eq('process_template_id', process.id),
       ]);
 
       // Insert new associations
@@ -151,6 +167,17 @@ export function ProcessAccessTab({ process, onUpdate, canManage }: ProcessAccess
           .insert(selectedDepartments.map(department_id => ({
             process_template_id: process.id,
             department_id,
+          })));
+      }
+
+      if (accessMode === 'users' && selectedUsers.length > 0) {
+        await (supabase as any)
+          .from('process_tracking_access')
+          .insert(selectedUsers.map(profile_id => ({
+            process_template_id: process.id,
+            profile_id,
+            can_read: true,
+            can_write: false,
           })));
       }
 
@@ -173,6 +200,12 @@ export function ProcessAccessTab({ process, onUpdate, canManage }: ProcessAccess
   const toggleDepartment = (id: string) => {
     setSelectedDepartments(prev => 
       prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]
+    );
+  };
+
+  const toggleUser = (id: string) => {
+    setSelectedUsers(prev =>
+      prev.includes(id) ? prev.filter(u => u !== id) : [...prev, id]
     );
   };
 
@@ -229,9 +262,26 @@ export function ProcessAccessTab({ process, onUpdate, canManage }: ProcessAccess
             <CardTitle className="text-base">Sociétés autorisées</CardTitle>
           </CardHeader>
           <CardContent>
+            <div className="space-y-2 mb-3">
+              <Label htmlFor="company-search" className="text-sm">
+                Rechercher
+              </Label>
+              <Input
+                id="company-search"
+                value={companySearchQuery}
+                onChange={(e) => setCompanySearchQuery(e.target.value)}
+                placeholder="Ex: IT, Digital, ... "
+              />
+            </div>
             <ScrollArea className="h-[200px]">
               <div className="space-y-2">
-                {companies.map((company) => (
+                {companies
+                  .filter((company) => {
+                    const q = companySearchQuery.trim().toLowerCase();
+                    if (!q) return true;
+                    return (company.name || '').toLowerCase().includes(q);
+                  })
+                  .map((company) => (
                   <div
                     key={company.id}
                     className="flex items-center space-x-2 p-2 rounded hover:bg-muted/50"
@@ -259,9 +309,26 @@ export function ProcessAccessTab({ process, onUpdate, canManage }: ProcessAccess
             <CardTitle className="text-base">Services autorisés</CardTitle>
           </CardHeader>
           <CardContent>
+            <div className="space-y-2 mb-3">
+              <Label htmlFor="department-search" className="text-sm">
+                Rechercher
+              </Label>
+              <Input
+                id="department-search"
+                value={departmentSearchQuery}
+                onChange={(e) => setDepartmentSearchQuery(e.target.value)}
+                placeholder="Ex: R&D, Support, ... "
+              />
+            </div>
             <ScrollArea className="h-[200px]">
               <div className="space-y-2">
-                {departments.map((dept) => (
+                {departments
+                  .filter((dept) => {
+                    const q = departmentSearchQuery.trim().toLowerCase();
+                    if (!q) return true;
+                    return (dept.name || '').toLowerCase().includes(q);
+                  })
+                  .map((dept) => (
                   <div
                     key={dept.id}
                     className="flex items-center space-x-2 p-2 rounded hover:bg-muted/50"
@@ -287,14 +354,57 @@ export function ProcessAccessTab({ process, onUpdate, canManage }: ProcessAccess
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Utilisateurs autorisés</CardTitle>
-            <CardDescription>
-              Cette fonctionnalité sera disponible prochainement
-            </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">
-              La gestion nominative des accès utilisateur est en cours de développement.
-            </p>
+            <div className="space-y-2 mb-3">
+              <Label htmlFor="user-search" className="text-sm">
+                Rechercher
+              </Label>
+              <Input
+                id="user-search"
+                value={userSearchQuery}
+                onChange={(e) => setUserSearchQuery(e.target.value)}
+                placeholder="Ex: Dupont, IT, Manager..."
+              />
+            </div>
+
+            <ScrollArea className="h-[240px]">
+              <div className="space-y-2">
+                {profiles
+                  .filter((profile) => {
+                    const q = userSearchQuery.trim().toLowerCase();
+                    if (!q) return true;
+                    const label = (profile.display_name || '').toLowerCase();
+                    return label.includes(q);
+                  })
+                  .map((profile) => (
+                  <div
+                    key={profile.id}
+                    className="flex items-center space-x-2 p-2 rounded hover:bg-muted/50"
+                  >
+                    <Checkbox
+                      id={`user-${profile.id}`}
+                      checked={selectedUsers.includes(profile.id)}
+                      onCheckedChange={() => canManage && toggleUser(profile.id)}
+                      disabled={!canManage}
+                    />
+                    <Label htmlFor={`user-${profile.id}`} className="cursor-pointer flex-1">
+                      {profile.display_name || 'Sans nom'}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+            <div className="mt-3 flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                {selectedUsers.length} utilisateur(s) autorisé(s)
+              </p>
+              {selectedUsers.length === 0 && (
+                <Badge variant="outline" className="text-xs">
+                  Aucun sélectionné
+                </Badge>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}

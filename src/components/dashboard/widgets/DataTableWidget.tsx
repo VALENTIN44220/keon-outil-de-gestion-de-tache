@@ -146,6 +146,17 @@ export function DataTableWidget({ tasks, onTaskClick, processId }: DataTableWidg
     setLoadingChildren(false);
   }, [expandedRequestId]);
 
+  // Keep expanded child tasks in sync with parent `tasks` prop (which updates via status changes).
+  useEffect(() => {
+    if (!expandedRequestId) return;
+    setChildTasks((prev) =>
+      prev.map((ct) => {
+        const fresh = tasks.find((t) => t.id === ct.id);
+        return fresh ? { ...ct, ...fresh } : ct;
+      })
+    );
+  }, [tasks, expandedRequestId]);
+
   return (
     <div className="overflow-auto h-full flex flex-col">
       {/* Column selector toolbar */}
@@ -253,7 +264,10 @@ function RequestRowGroup({
     <>
       {/* Request row */}
       <TableRow
-        className="cursor-pointer hover:bg-muted/50 transition-colors"
+        className={cn(
+          "cursor-pointer hover:bg-muted/50 transition-colors",
+          request.status === 'cancelled' && "opacity-60 grayscale"
+        )}
         onClick={() => onTaskClick?.(request)}
       >
         <TableCell className="w-8 px-1">

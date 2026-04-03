@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils';
 
 interface BEProjectCardProps {
   project: BEProject;
+  isSpv?: boolean;
   stats?: {
     totalTasks: number;
     overdueTasks: number;
@@ -40,6 +41,7 @@ const statusConfig: Record<string, { label: string; className: string }> = {
 
 export function BEProjectCard({ 
   project, 
+  isSpv = false,
   stats,
   canEdit, 
   canDelete, 
@@ -47,6 +49,7 @@ export function BEProjectCard({
   onDelete 
 }: BEProjectCardProps) {
   const navigate = useNavigate();
+  const hubBasePath = isSpv ? '/spv/projects' : '/be/projects';
 
   const milestones = useMemo(() => {
     return [
@@ -62,7 +65,7 @@ export function BEProjectCard({
   return (
     <Card 
       className="group cursor-pointer transition-all duration-200 hover:shadow-premium-lg hover:-translate-y-0.5 border-border/50"
-      onClick={() => navigate(`/be/projects/${project.code_projet}/overview`)}
+      onClick={() => navigate(`${hubBasePath}/${project.code_projet}/overview`)}
     >
       <CardContent className="p-5">
         {/* Header */}
@@ -98,7 +101,7 @@ export function BEProjectCard({
               variant="ghost"
               size="icon"
               className="h-8 w-8"
-              onClick={() => navigate(`/be/projects/${project.code_projet}/overview`)}
+              onClick={() => navigate(`${hubBasePath}/${project.code_projet}/overview`)}
               title="Ouvrir le HUB"
             >
               <LayoutDashboard className="h-4 w-4" />

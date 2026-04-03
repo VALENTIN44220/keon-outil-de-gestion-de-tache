@@ -1,4 +1,4 @@
-import { useMemo, useRef, useEffect, useState, useCallback } from 'react';
+import { useMemo, useRef, useEffect, useLayoutEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -67,8 +67,6 @@ const getWidgetHeightPx = (widget: WidgetConfig): number => HEIGHT_PRESET_PX[get
 // Pour les widgets en fit-content, la hauteur réelle diffère de HEIGHT_PRESET_PX.
 // Cette valeur est utilisée dans le calcul du grid layout pour éviter les espaces vides.
 const KPI_BAND_AUTO_HEIGHT_PX = 185;
-const getEffectiveHeightPx = (widget: WidgetConfig): number =>
-  widget.id === 'kpis' ? KPI_BAND_AUTO_HEIGHT_PX : getWidgetHeightPx(widget);
 const isFullWidth = (widget: WidgetConfig) => widget.size.w >= 3;
 
 // --- Utility functions ---
@@ -108,6 +106,43 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
   const [isEditing, setIsEditing] = useState(false);
   const [draggedWidget, setDraggedWidget] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
+
+  // Measure KPI band real height (it wraps on medium widths, causing overlap if we reserve a fixed height).
+  const kpiBandOuterRef = useRef<HTMLDivElement | null>(null);
+  const [kpiBandNode, setKpiBandNode] = useState<HTMLDivElement | null>(null);
+  const [kpiBandMeasuredPx, setKpiBandMeasuredPx] = useState(0);
+  const kpiBandRef = useCallback((node: HTMLDivElement | null) => {
+    kpiBandOuterRef.current = node;
+    setKpiBandNode(node);
+  }, []);
+
+  useLayoutEffect(() => {
+    if (isMobileViewport) {
+      setKpiBandMeasuredPx(0);
+      return;
+    }
+    const el = kpiBandNode;
+    if (!el) return;
+
+    const apply = () => {
+      const h = Math.ceil(el.getBoundingClientRect().height);
+      setKpiBandMeasuredPx((prev) => (prev !== h ? h : prev));
+    };
+
+    // Measure after layout settles (first paint + potential font/layout adjustments).
+    requestAnimationFrame(() => {
+      apply();
+      requestAnimationFrame(apply);
+    });
+    const ro = new ResizeObserver(() => apply());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [isMobileViewport, kpiBandNode]);
+
+  const getEffectiveHeightPx = useCallback((widget: WidgetConfig): number => {
+    if (widget.id !== 'kpis') return getWidgetHeightPx(widget);
+    return kpiBandMeasuredPx > 0 ? kpiBandMeasuredPx : KPI_BAND_AUTO_HEIGHT_PX;
+  }, [kpiBandMeasuredPx]);
 
   // Persist to localStorage
   useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(widgets)); }, [widgets]);
@@ -390,7 +425,7 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
       }
     }
     return { placements, totalHeight: Math.max(colHeights[0], colHeights[1]) };
-  }, [widgets]);
+  }, [widgets, getEffectiveHeightPx]);
 
   // --- Widget content renderers ---
   const renderWidgetContent = useCallback((widget: WidgetConfig, layout: 'desktop' | 'mobile') => {
@@ -535,7 +570,8 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
           'relative',
           isEditing && 'rounded-xl border-2 border-dashed border-primary/30 p-4'
         )}
-        style={{ minHeight: gridLayout.totalHeight || 'auto' }}
+        // On mobile we render a stacked flow layout; the bin-packing "totalHeight" is only meaningful for desktop absolute positioning.
+        style={{ minHeight: isMobileViewport ? 'auto' : (gridLayout.totalHeight || 'auto') }}
       >
         {/* Grid overlay in edit mode */}
         {isEditing && (
@@ -568,6 +604,7 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
                     width: isFull ? '100%' : 'calc(50% - 8px)',
                     height: autoHeight ? 'fit-content' : heightPx,
                   }}
+                  ref={widget.id === 'kpis' ? kpiBandRef : undefined}
                   draggable={isEditing}
                   onDragStart={() => handleDragStart(widget.id)}
                   onDragOver={(e) => handleDragOver(e, widget.id)}

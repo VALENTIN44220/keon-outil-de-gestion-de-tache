@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { CategorySelect } from '@/components/templates/CategorySelect';
 import { useCategories } from '@/hooks/useCategories';
 import { supabase } from '@/integrations/supabase/client';
@@ -72,6 +73,14 @@ export function AddTaskDialog({ open, onClose, onAdd }: AddTaskDialogProps) {
       setProfiles(data);
     }
   };
+
+  const profileOptions = [
+    { value: 'none', label: 'Non défini' },
+    ...profiles.map((profile) => ({
+      value: profile.id,
+      label: `${profile.display_name || 'Sans nom'}${profile.job_title ? ` - ${profile.job_title}` : ''}`,
+    })),
+  ];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -256,65 +265,35 @@ export function AddTaskDialog({ open, onClose, onAdd }: AddTaskDialogProps) {
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label>Demandeur (qui crée l'action)</Label>
-                <Select 
-                  value={requesterId || 'none'} 
+                <SearchableSelect
+                  value={requesterId || 'none'}
                   onValueChange={(v) => setRequesterId(v === 'none' ? null : v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner le demandeur" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Non défini</SelectItem>
-                    {profiles.map(profile => (
-                      <SelectItem key={profile.id} value={profile.id}>
-                        {profile.display_name || 'Sans nom'} 
-                        {profile.job_title && ` - ${profile.job_title}`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  options={profileOptions}
+                  placeholder="Sélectionner le demandeur"
+                  searchPlaceholder="Rechercher un utilisateur..."
+                />
               </div>
 
               <div className="space-y-2">
                 <Label>Exécutant (qui fait l'action)</Label>
-                <Select 
-                  value={assigneeId || 'none'} 
+                <SearchableSelect
+                  value={assigneeId || 'none'}
                   onValueChange={(v) => setAssigneeId(v === 'none' ? null : v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner l'exécutant" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Non défini</SelectItem>
-                    {profiles.map(profile => (
-                      <SelectItem key={profile.id} value={profile.id}>
-                        {profile.display_name || 'Sans nom'} 
-                        {profile.job_title && ` - ${profile.job_title}`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  options={profileOptions}
+                  placeholder="Sélectionner l'exécutant"
+                  searchPlaceholder="Rechercher un utilisateur..."
+                />
               </div>
 
               <div className="space-y-2">
                 <Label>Rapporteur (à qui rapporter l'action)</Label>
-                <Select 
-                  value={reporterId || 'none'} 
+                <SearchableSelect
+                  value={reporterId || 'none'}
                   onValueChange={(v) => setReporterId(v === 'none' ? null : v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner le rapporteur" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Non défini</SelectItem>
-                    {profiles.map(profile => (
-                      <SelectItem key={profile.id} value={profile.id}>
-                        {profile.display_name || 'Sans nom'} 
-                        {profile.job_title && ` - ${profile.job_title}`}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  options={profileOptions}
+                  placeholder="Sélectionner le rapporteur"
+                  searchPlaceholder="Rechercher un utilisateur..."
+                />
               </div>
             </div>
           </div>

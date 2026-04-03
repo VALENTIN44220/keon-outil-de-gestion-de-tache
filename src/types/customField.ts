@@ -18,8 +18,8 @@ export type CustomFieldType =
   | 'repeatable_table';
 
 export const FIELD_TYPE_LABELS: Record<CustomFieldType, string> = {
-  text: 'Texte court',
-  textarea: 'Texte long',
+  text: 'Titre / Objet',
+  textarea: 'Description / Détails',
   number: 'Nombre',
   date: 'Date',
   datetime: 'Date et heure',

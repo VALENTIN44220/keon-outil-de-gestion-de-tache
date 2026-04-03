@@ -72,6 +72,14 @@ export function BEProjectsView() {
   const [syntheseWidgets, setSyntheseWidgets] = useState<WidgetConfig[]>(loadWidgetConfig);
   const { qstData, keonProjectIds, getDistinctValues: getQstDistinctValues } = useQuestionnaireProjectData(projects);
 
+  const getProjectHubOverviewPath = useMemo(() => {
+    return (project: BEProject) => {
+      const spvValue = (qstData[project.id]?.['02_GEN_spv_cree'] || '').toUpperCase().trim();
+      const base = spvValue === 'OUI' ? '/spv/projects' : '/be/projects';
+      return `${base}/${project.code_projet}/overview`;
+    };
+  }, [qstData]);
+
   // Sync questionnaire data to filter hook for questionnaire-based filtering
   useEffect(() => {
     setQuestionnaireData(qstData);
@@ -344,6 +352,7 @@ export function BEProjectsView() {
       {currentView === 'cards' && (
         <BEProjectCardsView
           projects={filteredProjects}
+          qstData={qstData}
           canEdit={canEdit}
           canDelete={canDelete}
           onEdit={handleEditProject}
@@ -402,7 +411,7 @@ export function BEProjectsView() {
                       <TableRow 
                         key={project.id} 
                         className="group cursor-pointer hover:bg-muted/30"
-                        onClick={() => navigate(`/be/projects/${project.code_projet}/overview`)}
+                        onClick={() => navigate(getProjectHubOverviewPath(project))}
                       >
                         {orderedVisibleColumns.map(col => (
                           <TableCell 
@@ -423,7 +432,7 @@ export function BEProjectsView() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-8 w-8"
-                                onClick={() => navigate(`/be/projects/${project.code_projet}/overview`)}
+                                onClick={() => navigate(getProjectHubOverviewPath(project))}
                                 title="Ouvrir le HUB projet"
                               >
                                 <LayoutDashboard className="h-4 w-4" />

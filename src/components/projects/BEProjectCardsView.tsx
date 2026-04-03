@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 interface BEProjectCardsViewProps {
   projects: BEProject[];
+  qstData?: Record<string, Record<string, any>>;
   canEdit: boolean;
   canDelete: boolean;
   onEdit: (project: BEProject) => void;
@@ -15,6 +16,7 @@ interface BEProjectCardsViewProps {
 
 export function BEProjectCardsView({ 
   projects, 
+  qstData,
   canEdit, 
   canDelete, 
   onEdit, 
@@ -75,15 +77,22 @@ export function BEProjectCardsView({
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {projects.map(project => (
+        (() => {
+          const spvValue = (qstData?.[project.id]?.['02_GEN_spv_cree'] || '').toUpperCase().trim();
+          const isSpv = spvValue === 'OUI';
+          return (
         <BEProjectCard
           key={project.id}
           project={project}
+          isSpv={isSpv}
           stats={isLoading ? undefined : projectStats[project.id]}
           canEdit={canEdit}
           canDelete={canDelete}
           onEdit={() => onEdit(project)}
           onDelete={() => onDelete(project)}
         />
+          );
+        })()
       ))}
     </div>
   );

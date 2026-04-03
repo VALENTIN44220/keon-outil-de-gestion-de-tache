@@ -1,4 +1,4 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { useBEProjectByCode, useBEProjectTasks, useBEProjectStats } from '@/hooks/useBEProjectHub';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -11,6 +11,7 @@ import { BEProjectDialog } from '@/components/projects/BEProjectDialog';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useQuestionnaireProjectData } from '@/hooks/useQuestionnaireProjectData';
 
 interface BEProjectHubLayoutProps {
   children: ReactNode;
@@ -30,6 +31,31 @@ export function BEProjectHubLayout({ children }: BEProjectHubLayoutProps) {
   const { data: tasks = [], isLoading: tasksLoading } = useBEProjectTasks(project?.id);
   
   const stats = useBEProjectStats(project?.id, tasks);
+  const projectsArray = useMemo(() => (project ? [project] : []), [project]);
+  const { qstData } = useQuestionnaireProjectData(projectsArray);
+
+  // Canonicalize URL namespace based on project SPV flag (prevents /be and /spv duplicates).
+  useEffect(() => {
+    if (!project) return;
+    const rawSpv = qstData[project.id]?.['02_GEN_spv_cree'];
+    // Avoid oscillation: don't redirect until the SPV field is actually known.
+    // (qstData loads async; initial empty map would otherwise force a wrong redirect first.)
+    if (!rawSpv || String(rawSpv).trim() === '') return;
+
+    const spvValue = String(rawSpv).toUpperCase().trim();
+    const shouldBeSpv = spvValue === 'OUI';
+    const desiredBase = shouldBeSpv ? '/spv/projects' : '/be/projects';
+    const currentIsSpv = location.pathname.startsWith('/spv/projects/');
+    const currentIsBe = location.pathname.startsWith('/be/projects/');
+    if (!currentIsSpv && !currentIsBe) return;
+
+    const parts = location.pathname.split('/').filter(Boolean);
+    const activeTab = parts[parts.length - 1] || 'overview';
+    const desiredPath = `${desiredBase}/${project.code_projet}/${activeTab}`;
+    if (location.pathname !== desiredPath) {
+      navigate(desiredPath, { replace: true });
+    }
+  }, [project, qstData, location.pathname, navigate]);
 
   const handleSaveProject = async (data: any) => {
     if (!project) return;

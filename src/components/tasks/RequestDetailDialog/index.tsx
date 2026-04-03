@@ -89,6 +89,10 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange }: Req
   // Cancel request dialog state
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+
+  // Complete request dialog state
+  const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false);
+  const [isCompleting, setIsCompleting] = useState(false);
   
   // Child task editing state
   const [selectedChildTask, setSelectedChildTask] = useState<Task | null>(null);
@@ -397,6 +401,73 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange }: Req
       toast.error('Erreur lors de l\'annulation de la demande');
     } finally {
       setIsCancelling(false);
+    }
+  };
+
+  // Complete request and all child tasks
+  const handleCompleteRequest = async () => {
+    if (!task) return;
+    setIsCompleting(true);
+    try {
+      // 1) Complete all child tasks (leave cancelled as-is)
+      if (childTasks.length > 0) {
+        const childTaskIds = childTasks.filter(t => t.status !== 'cancelled').map(t => t.id);
+        if (childTaskIds.length > 0) {
+          const { error: childError } = await supabase
+            .from('tasks')
+            .update({
+              status: 'done' as TaskStatus,
+              updated_at: new Date().toISOString(),
+            })
+            .in('id', childTaskIds);
+          if (childError) throw childError;
+        }
+      }
+
+      // 2) Mark related request_sub_processes as completed (best-effort)
+      const { error: subProcessError } = await supabase
+        .from('request_sub_processes')
+        .update({
+          status: 'completed',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('request_id', task.id);
+      if (subProcessError) {
+        console.error('Error completing sub-processes:', subProcessError);
+      }
+
+      // 3) Complete the main request
+      const { error: requestError } = await supabase
+        .from('tasks')
+        .update({
+          status: 'done' as TaskStatus,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', task.id);
+      if (requestError) throw requestError;
+
+      // 4) Emit workflow event (best-effort)
+      await supabase.from('workflow_events').insert({
+        event_type: 'task_status_changed',
+        entity_type: 'request',
+        entity_id: task.id,
+        payload: {
+          from_status: task.status,
+          to_status: 'done',
+          task_title: task.title,
+          completed_tasks_count: childTasks.length,
+        },
+      });
+
+      onStatusChange(task.id, 'done');
+      toast.success('Demande marquée comme complétée');
+      setIsCompleteDialogOpen(false);
+      onClose();
+    } catch (error) {
+      console.error('Error completing request:', error);
+      toast.error("Erreur lors de la clôture de la demande");
+    } finally {
+      setIsCompleting(false);
     }
   };
 
@@ -816,11 +887,11 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange }: Req
               Annuler la demande
             </Button>
           )}
-          {/* Complete button - only for non-process requests */}
-          {!isProcessRequest && task.status !== 'done' && task.status !== 'validated' && task.status !== 'cancelled' && (
-            <Button onClick={() => { onStatusChange(task.id, 'done'); onClose(); }}>
+          {/* Complete button - marks request + children as done */}
+          {task.status !== 'done' && task.status !== 'validated' && task.status !== 'cancelled' && (
+            <Button onClick={() => setIsCompleteDialogOpen(true)}>
               <CheckCircle2 className="h-4 w-4 mr-2" />
-              Marquer terminé
+              Marquer comme complétée
             </Button>
           )}
         </div>
@@ -855,6 +926,35 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange }: Req
                   <Ban className="h-4 w-4 mr-2" />
                 )}
                 Confirmer l'annulation
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Complete Confirmation Dialog */}
+        <AlertDialog open={isCompleteDialogOpen} onOpenChange={setIsCompleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Marquer cette demande comme complétée ?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Cette action va clôturer la demande et marquer les tâches associées comme terminées.
+                <ul className="list-disc pl-5 mt-2 space-y-1">
+                  <li>{childTasks.length} tâche(s) seront marquée(s) comme terminée(s)</li>
+                </ul>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isCompleting}>Retour</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleCompleteRequest}
+                disabled={isCompleting}
+              >
+                {isCompleting ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                )}
+                Confirmer
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

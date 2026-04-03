@@ -15,8 +15,8 @@ import { useAddCustomField, type NewCustomFieldInput } from '@/hooks/useQuestion
 import type { ChampType, PilierCode } from '@/config/questionnaireConfig';
 
 const TYPE_LABELS: Record<ChampType, string> = {
-  text:       'Texte court',
-  textarea:   'Texte long',
+  text:       'Titre / Objet',
+  textarea:   'Description / Détails',
   select:     'Liste de choix',
   number:     'Nombre',
   percentage: 'Pourcentage (%)',

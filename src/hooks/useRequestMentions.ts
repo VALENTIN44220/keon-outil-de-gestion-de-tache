@@ -29,7 +29,7 @@ export function useRequestMentions() {
       const { data, error } = await (supabase as any)
         .from('tasks')
         .select('id, request_number, title, status')
-        .eq('task_type', 'request')
+        .eq('type', 'request')
         .not('request_number', 'is', null)
         .or(`request_number.ilike.%${searchTerm}%,title.ilike.%${query}%`)
         .order('created_at', { ascending: false })

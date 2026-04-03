@@ -19,7 +19,10 @@ import {
 } from '@/components/ui/select';
 import { RecurrenceConfig, RecurrenceData } from './RecurrenceConfig';
 
-// Department interface removed - target_department_id is now set at sub-process level
+interface Department {
+  id: string;
+  name: string;
+}
 
 interface AddProcessDialogProps {
   open: boolean;
@@ -51,6 +54,8 @@ export function AddProcessDialog({ open, onClose, onAdd }: AddProcessDialogProps
   const [description, setDescription] = useState('');
   const [company, setCompany] = useState('');
   const [department, setDepartment] = useState('');
+  const [targetDepartmentId, setTargetDepartmentId] = useState<string | null>(null);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [visibilityLevel, setVisibilityLevel] = useState<TemplateVisibility>('public');
   const [visibilityCompanyIds, setVisibilityCompanyIds] = useState<string[]>([]);
   const [visibilityDepartmentIds, setVisibilityDepartmentIds] = useState<string[]>([]);
@@ -74,6 +79,14 @@ export function AddProcessDialog({ open, onClose, onAdd }: AddProcessDialogProps
       if (data) setServiceGroups(data);
     })();
   }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    (async () => {
+      const { data } = await supabase.from('departments').select('id, name').order('name');
+      if (data) setDepartments(data as any);
+    })();
+  }, [open]);
 
   const isValidVisibility = () => {
     if (visibilityLevel === 'internal_company' && visibilityCompanyIds.length === 0) return false;
@@ -100,7 +113,7 @@ export function AddProcessDialog({ open, onClose, onAdd }: AddProcessDialogProps
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!name.trim() || !isValidVisibility()) return;
+    if (!name.trim() || !isValidVisibility() || !targetDepartmentId) return;
 
     onAdd(
       {
@@ -114,7 +127,7 @@ export function AddProcessDialog({ open, onClose, onAdd }: AddProcessDialogProps
         category_id: categoryId,
         subcategory_id: subcategoryId,
         target_company_id: null,
-        target_department_id: null,
+        target_department_id: targetDepartmentId,
         service_group_id: serviceGroupId,
         recurrence_enabled: recurrence.enabled,
         recurrence_interval: recurrence.enabled ? recurrence.interval : null,
@@ -145,6 +158,7 @@ export function AddProcessDialog({ open, onClose, onAdd }: AddProcessDialogProps
     setVisibilityUserIds([]);
     setCategoryId(null);
     setSubcategoryId(null);
+    setTargetDepartmentId(null);
     setServiceGroupId(null);
     setRecurrence({ enabled: false, interval: 1, unit: 'months', delayDays: 7, startDate: new Date().toISOString().split('T')[0] });
   };
@@ -190,6 +204,28 @@ export function AddProcessDialog({ open, onClose, onAdd }: AddProcessDialogProps
             onAddCategory={handleAddCategory}
             onAddSubcategory={handleAddSubcategory}
           />
+
+          <div className="space-y-2">
+            <Label>Service cible *</Label>
+            <Select
+              value={targetDepartmentId || ''}
+              onValueChange={(v) => setTargetDepartmentId(v || null)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Sélectionner un service" />
+              </SelectTrigger>
+              <SelectContent>
+                {departments.map((d) => (
+                  <SelectItem key={d.id} value={d.id}>
+                    {d.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Obligatoire. C’est le service auquel la demande sera adressée par défaut.
+            </p>
+          </div>
 
           <div className="space-y-2">
             <Label>Groupe de services</Label>
@@ -255,7 +291,7 @@ export function AddProcessDialog({ open, onClose, onAdd }: AddProcessDialogProps
             <Button type="button" variant="outline" onClick={onClose}>
               Annuler
             </Button>
-            <Button type="submit" disabled={!name.trim() || !isValidVisibility()}>
+            <Button type="submit" disabled={!name.trim() || !isValidVisibility() || !targetDepartmentId}>
               Créer le processus
             </Button>
           </DialogFooter>

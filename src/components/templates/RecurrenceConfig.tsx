@@ -36,7 +36,7 @@ export function RecurrenceConfig({ value, onChange }: RecurrenceConfigProps) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <RefreshCw className="h-4 w-4 text-primary" />
-          <Label className="font-medium">Récurrence automatique</Label>
+          <Label className="font-medium">Récurrence de la demande (automatique)</Label>
         </div>
         <Switch
           checked={value.enabled}

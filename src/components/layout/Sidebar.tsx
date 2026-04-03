@@ -6,7 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSimulation } from '@/contexts/SimulationContext';
 import { useState, useEffect, useMemo } from 'react';
 import { cn } from '@/lib/utils';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { usePageDeviceVisibility } from '@/hooks/usePageDeviceVisibility';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -124,6 +124,7 @@ export function Sidebar({
     return saved === 'right';
   });
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAdmin } = useUserRole();
   const { effectivePermissions, canAccessScreen } = useEffectivePermissions();
   const { profile: authProfile } = useAuth();
@@ -170,6 +171,23 @@ export function Sidebar({
     
     return groups;
   }, [effectivePermissions, isAdmin, canAccessScreen, isPageVisibleOnDevice, currentDevice]);
+
+  // Derive active menu item from URL to avoid desync when navigation happens outside the sidebar.
+  const derivedActiveView = useMemo(() => {
+    const pathname = location.pathname || '/';
+    const allItems = filteredGroups.flatMap(g => g.items);
+
+    let best: { id: string; path: string } | null = null;
+    for (const item of allItems) {
+      const p = item.path;
+      const isMatch = p === '/'
+        ? pathname === '/'
+        : (pathname === p || pathname.startsWith(p + '/') || pathname.startsWith(p));
+      if (!isMatch) continue;
+      if (!best || p.length > best.path.length) best = { id: item.id, path: p };
+    }
+    return best?.id ?? activeView;
+  }, [location.pathname, filteredGroups, activeView]);
 
   const collapsed = !isMobile && manualCollapsed;
 
@@ -306,7 +324,7 @@ export function Sidebar({
                 <div className="space-y-0.5">
                   {group.items.map((item) => {
                     const Icon = item.icon;
-                    const isActive = activeView === item.id;
+                    const isActive = derivedActiveView === item.id;
                     const gc = groupColors[getGroupColorIndex(group.label)];
                     return (
                       <button
@@ -452,7 +470,7 @@ export function Sidebar({
             <div className="space-y-0.5">
               {group.items.map((item) => {
                 const Icon = item.icon;
-                const isActive = activeView === item.id;
+                const isActive = derivedActiveView === item.id;
                 const gc = groupColors[getGroupColorIndex(group.label)];
                 
                 return (

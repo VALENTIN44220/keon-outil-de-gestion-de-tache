@@ -26,7 +26,9 @@ import { SectionedCustomFieldsRenderer } from './SectionedCustomFieldsRenderer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserRole } from '@/hooks/useUserRole';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Info, ArrowRight, Workflow, FormInput, CheckSquare, FileText, 
   Calendar, AlertCircle, Folder, Package, Monitor
@@ -49,6 +51,11 @@ import {
 } from './request-dialog';
 
 interface Department {
+  id: string;
+  name: string;
+}
+
+interface ServiceGroup {
   id: string;
   name: string;
 }
@@ -91,6 +98,7 @@ interface NewRequestDialogProps {
 
 export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initialProcessTemplateId, initialSubProcessTemplateId }: NewRequestDialogProps) {
   const { profile: currentUser } = useAuth();
+  const { isAdmin } = useUserRole();
   const { generatePendingAssignments, getProcessTemplateForSubcategory } = useRequestWorkflow();
   
   // Form state
@@ -110,6 +118,10 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
   
   // Process/sub-process state
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [serviceGroups, setServiceGroups] = useState<ServiceGroup[]>([]);
+  const [serviceGroupId, setServiceGroupId] = useState<string | null>(null);
+  const [notifyTargetDepartment, setNotifyTargetDepartment] = useState(false);
+  const [notifyServiceGroup, setNotifyServiceGroup] = useState(false);
   const [linkedProcessId, setLinkedProcessId] = useState<string | null>(null);
   const [linkedProcessName, setLinkedProcessName] = useState<string | null>(null);
   const [availableSubProcesses, setAvailableSubProcesses] = useState<SubProcessTemplate[]>([]);
@@ -238,6 +250,11 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
       if (!subcategoryId) {
         setLinkedProcessId(null);
         setLinkedProcessName(null);
+        setAvailableSubProcesses([]);
+        setSelectedSubProcessIds([]);
+        setLinkedSubProcessId(null);
+        setLinkedSubProcessName(null);
+        setHasMultipleSubProcesses(false);
         return;
       }
 
@@ -245,6 +262,8 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
       setLinkedProcessId(processId);
 
       if (processId) {
+        // Name and other fields are hydrated by the linkedProcessId effect below.
+        // Keep a best-effort name here for immediate UI feedback.
         const { data } = await supabase
           .from('process_templates')
           .select('name')
@@ -256,6 +275,70 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
 
     checkLinkedProcess();
   }, [subcategoryId, getProcessTemplateForSubcategory]);
+
+  // When a process is linked (e.g. via subcategory mapping), hydrate its details:
+  // - linkedProcessName
+  // - available sub-process templates
+  // - target department (service) from process_templates.target_department_id (or legacy department name)
+  useEffect(() => {
+    if (!open) return;
+    if (!linkedProcessId) {
+      setAvailableSubProcesses([]);
+      setSelectedSubProcessIds([]);
+      setLinkedSubProcessId(null);
+      setLinkedSubProcessName(null);
+      setHasMultipleSubProcesses(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      const { data: pt } = await supabase
+        .from('process_templates')
+        .select('id, name, department, target_department_id')
+        .eq('id', linkedProcessId)
+        .single();
+
+      if (cancelled) return;
+      if (pt) {
+        setLinkedProcessName(pt.name || null);
+
+        if (pt.target_department_id) {
+          setTargetDepartmentId((prev) => (prev ? prev : pt.target_department_id));
+        } else if (pt.department) {
+          const { data: deptData } = await supabase
+            .from('departments')
+            .select('id')
+            .eq('name', pt.department)
+            .single();
+          if (cancelled) return;
+          if (deptData?.id) {
+            setTargetDepartmentId((prev) => (prev ? prev : deptData.id));
+          }
+        }
+      }
+
+      const { data: subProcessData } = await supabase
+        .from('sub_process_templates')
+        .select('id, name, process_template_id, description, target_manager_id, target_department_id, assignment_type, form_schema')
+        .eq('process_template_id', linkedProcessId)
+        .order('order_index', { ascending: true });
+
+      if (cancelled) return;
+      if (subProcessData && subProcessData.length > 0) {
+        setAvailableSubProcesses(subProcessData);
+        setHasMultipleSubProcesses(true);
+      } else {
+        setAvailableSubProcesses([]);
+        setHasMultipleSubProcesses(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, linkedProcessId]);
 
   // Load initial process/sub-process template if provided
   useEffect(() => {
@@ -368,6 +451,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
 
     if (open) {
       fetchDepartments();
+      fetchServiceGroups();
       loadInitialTemplates();
     }
   }, [open, initialProcessTemplateId, initialSubProcessTemplateId]);
@@ -435,10 +519,19 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
     const deptId =
       matchingRule && matchingRule.auto_assign ? matchingRule.target_department_id : null;
 
-    if (deptId) {
+    // Do not override an already resolved service (from process/subprocess or manual selection).
+    if (deptId && !targetDepartmentId) {
       setTargetDepartmentId(prev => prev !== deptId ? deptId : prev);
     }
-  }, [matchingRule?.id, matchingRule?.auto_assign, matchingRule?.target_department_id]);
+  }, [matchingRule?.id, matchingRule?.auto_assign, matchingRule?.target_department_id, targetDepartmentId]);
+
+  // Admin-only field safety: if user isn't admin, clear any IT project association.
+  useEffect(() => {
+    if (isAdmin) return;
+    if (!itProjectId && !itProjectPhase) return;
+    if (itProjectId) setItProjectId(null);
+    if (itProjectPhase) setItProjectPhase(null);
+  }, [isAdmin, itProjectId, itProjectPhase]);
 
   const fetchDepartments = async () => {
     const { data } = await supabase
@@ -447,6 +540,38 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
       .order('name');
     if (data) setDepartments(data);
   };
+
+  const fetchServiceGroups = async () => {
+    const { data } = await (supabase as any)
+      .from('service_groups')
+      .select('id, name')
+      .order('name');
+    if (data) setServiceGroups(data);
+  };
+
+  // If user selects a service group and it maps to exactly one department, auto-fill "Service cible".
+  useEffect(() => {
+    if (!open) return;
+    if (!serviceGroupId) return;
+    if (targetDepartmentId) return;
+
+    let cancelled = false;
+    (async () => {
+      const { data } = await (supabase as any)
+        .from('service_group_departments')
+        .select('department_id')
+        .eq('service_group_id', serviceGroupId);
+      if (cancelled) return;
+      const deptIds = (data || []).map((r: any) => r.department_id).filter(Boolean);
+      if (deptIds.length === 1) {
+        setTargetDepartmentId(deptIds[0]);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, serviceGroupId, targetDepartmentId]);
 
   const toggleSubProcess = (subProcessId: string) => {
     if (subprocessSelectionMode === 'single') {
@@ -543,8 +668,16 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
       return;
     }
 
-    if (!targetDepartmentId) {
+    if (!notifyTargetDepartment && !notifyServiceGroup) {
+      toast.error("Veuillez activer au moins une option d'affectation");
+      return;
+    }
+    if (notifyTargetDepartment && !targetDepartmentId) {
       toast.error('Veuillez sélectionner un service cible');
+      return;
+    }
+    if (notifyServiceGroup && !serviceGroupId) {
+      toast.error('Veuillez sélectionner un groupe de services');
       return;
     }
 
@@ -576,6 +709,22 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
       const userId = (await supabase.auth.getUser()).data.user?.id;
       if (!userId) throw new Error('Utilisateur non connecté');
 
+      // Ensure we always have a profile id for requester_id (AuthContext profile may still be loading).
+      let requesterProfileId = currentUser?.id || null;
+      let requesterManagerId = currentUser?.manager_id || null;
+      let requesterDisplayName = currentUser?.display_name || null;
+      if (!requesterProfileId) {
+        const { data: profileRow, error: profileErr } = await supabase
+          .from('profiles')
+          .select('id, manager_id, display_name')
+          .eq('user_id', userId)
+          .single();
+        if (profileErr) throw profileErr;
+        requesterProfileId = profileRow?.id || null;
+        requesterManagerId = profileRow?.manager_id || null;
+        requesterDisplayName = profileRow?.display_name || null;
+      }
+
       const selectedCategory = categories.find(c => c.id === categoryId);
 
       // Check if process has request validation enabled
@@ -599,7 +748,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
         if (hasRequestValidation) {
           validatorType1 = requestValidationConfig.level_1?.type || null;
           if (validatorType1 === 'manager') {
-            validatorId1 = currentUser?.manager_id || null;
+            validatorId1 = requesterManagerId || null;
           } else {
             validatorId1 = requestValidationConfig.level_1?.target_id || null;
           }
@@ -607,7 +756,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
           if (requestValidationConfig.level_2?.enabled) {
             validatorType2 = requestValidationConfig.level_2.type || null;
             if (validatorType2 === 'manager') {
-              validatorId2 = currentUser?.manager_id || null;
+              validatorId2 = requesterManagerId || null;
             } else {
               validatorId2 = requestValidationConfig.level_2.target_id || null;
             }
@@ -615,7 +764,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
         }
       }
 
-      const initialStatus = hasRequestValidation ? 'todo' : 'todo';
+      const initialStatus: TaskStatus = 'todo';
       const requestValidationStatus = hasRequestValidation ? 'pending_level_1' : 'none';
 
       const { data: requestData, error: requestError } = await (supabase as any)
@@ -632,9 +781,9 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
           due_date: dueDate || null,
           user_id: userId,
           assignee_id: matchingRule?.target_assignee_id || null,
-          requester_id: currentUser?.id || null,
+          requester_id: requesterProfileId,
           reporter_id: null,
-          target_department_id: targetDepartmentId,
+          target_department_id: notifyTargetDepartment ? targetDepartmentId : null,
           validator_id: null,
           validation_requested_at: null,
           validated_at: null,
@@ -661,17 +810,18 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
       if (requestError) throw requestError;
 
       if (checklistItems.length > 0) {
-        await supabase.from('task_checklists').insert(
+        const { error: checklistError } = await supabase.from('task_checklists').insert(
           checklistItems.map(item => ({
             task_id: requestData.id,
             title: item.title,
             order_index: item.order_index,
           }))
         );
+        if (checklistError) throw checklistError;
       }
 
       if (links.length > 0) {
-        await supabase.from('task_attachments').insert(
+        const { error: attachmentError } = await supabase.from('task_attachments').insert(
           links.map(link => ({
             task_id: requestData.id,
             name: link.name,
@@ -680,6 +830,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
             uploaded_by: currentUser?.id || null,
           }))
         );
+        if (attachmentError) throw attachmentError;
       }
 
       const fieldValuesToInsert = Object.entries(customFieldValues)
@@ -711,7 +862,9 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
               request_id: requestData.id,
               sub_process_template_id: subProcessId,
               order_index: i,
-              status: hasRequestValidation ? 'waiting_validation' : 'pending',
+              // DB constraint: request_sub_processes.status ∈ {pending,running,completed,failed,cancelled}.
+              // Use 'pending' even when request-level validation is enabled; request_validation_status already captures that state.
+              status: 'pending',
             });
 
           if (linkErr) throw linkErr;
@@ -776,19 +929,13 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
 
       // Persist material request lines
       if (hasMaterialSubProcess && materialLines.length > 0) {
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('id, display_name')
-          .eq('user_id', (await supabase.auth.getUser()).data.user?.id || '')
-          .single();
-
         const materialRows = materialLines
           .filter(l => l.article !== null)
           .map(l => ({
             request_id: requestData.id,
             request_number: requestData.request_number || null,
-            demandeur_id: profileData?.id || null,
-            demandeur_nom: profileData?.display_name || null,
+            demandeur_id: requesterProfileId,
+            demandeur_nom: requesterDisplayName,
             article_id: l.article!.id,
             ref: l.article!.ref,
             des: l.article!.des,
@@ -821,6 +968,9 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
     setSubcategoryId(null);
     setDueDate('');
     setTargetDepartmentId(null);
+    setServiceGroupId(null);
+    setNotifyTargetDepartment(false);
+    setNotifyServiceGroup(false);
     setChecklistItems([]);
     setLinks([]);
     setLinkedProcessId(null);
@@ -877,7 +1027,9 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
 
   const isFormDisabled =
     !title.trim() ||
-    !targetDepartmentId ||
+    (!notifyTargetDepartment && !notifyServiceGroup) ||
+    (notifyTargetDepartment && !targetDepartmentId) ||
+    (notifyServiceGroup && !serviceGroupId) ||
     (!dueDate && (!commonFieldsConfig || commonFieldsConfig.due_date?.visible !== false)) ||
     isSubmitting ||
     !materialValid ||
@@ -1051,26 +1203,30 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                     </div>
                   )}
 
-                  {/* IT Project Selection */}
-                  <div className="space-y-2.5">
-                    <Label className="text-sm font-semibold flex items-center gap-2 text-foreground">
-                      <div className="p-1.5 rounded-lg bg-violet-500/10">
-                        <Monitor className="h-4 w-4 text-violet-600" />
+                  {/* IT Project Selection (admin only) */}
+                  {isAdmin && (
+                    <>
+                      <div className="space-y-2.5">
+                        <Label className="text-sm font-semibold flex items-center gap-2 text-foreground">
+                          <div className="p-1.5 rounded-lg bg-violet-500/10">
+                            <Monitor className="h-4 w-4 text-violet-600" />
+                          </div>
+                          Projet IT associé
+                        </Label>
+                        <ITProjectSelect
+                          value={itProjectId}
+                          onChange={(v) => { setItProjectId(v); if (!v) setItProjectPhase(null); }}
+                        />
                       </div>
-                      Projet IT associé
-                    </Label>
-                    <ITProjectSelect
-                      value={itProjectId}
-                      onChange={(v) => { setItProjectId(v); if (!v) setItProjectPhase(null); }}
-                    />
-                  </div>
-                  {itProjectId && (
-                    <div className="space-y-1.5">
-                      <Label className="text-sm font-semibold flex items-center gap-2 text-foreground">
-                        Phase du projet IT
-                      </Label>
-                      <ITProjectPhaseSelect value={itProjectPhase} onChange={setItProjectPhase} />
-                    </div>
+                      {itProjectId && (
+                        <div className="space-y-1.5">
+                          <Label className="text-sm font-semibold flex items-center gap-2 text-foreground">
+                            Phase du projet IT
+                          </Label>
+                          <ITProjectPhaseSelect value={itProjectPhase} onChange={setItProjectPhase} />
+                        </div>
+                      )}
+                    </>
                   )}
 
                   {/* Process Info Banner */}
@@ -1129,32 +1285,100 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                     </div>
                   )}
 
-                  {/* Priority and Service */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    {!linkedProcessId && (
-                      <div className="space-y-2.5">
-                        <Label className="text-sm font-semibold flex items-center gap-1.5 text-foreground">
-                          Service cible
-                          <span className="text-destructive text-lg leading-none">*</span>
-                        </Label>
-                        <Select 
-                          value={targetDepartmentId || ''} 
-                          onValueChange={(v) => setTargetDepartmentId(v || null)}
-                          disabled={matchingRule?.auto_assign && matchingRule?.target_department_id ? true : false}
-                        >
-                          <SelectTrigger className="h-12 rounded-xl border-2 focus:ring-primary/20 focus:border-primary transition-all">
-                            <SelectValue placeholder="Sélectionner un service" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-white z-50 rounded-xl border-2">
-                            {departments.map(dept => (
-                              <SelectItem key={dept.id} value={dept.id} className="rounded-lg">
-                                {dept.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                  {/* Priority and Routing */}
+                  <div className="space-y-4">
+                    <div className="rounded-2xl border-2 border-border/60 bg-white/70 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-bold text-foreground">Affectation</p>
+                        <p className="text-xs text-muted-foreground">
+                          <span className="text-destructive font-semibold">*</span> au moins un des deux
+                        </p>
                       </div>
-                    )}
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mt-4">
+                        <div className="space-y-2.5">
+                          <Label className="text-sm font-semibold flex items-center gap-1.5 text-foreground">
+                            Service cible
+                            {linkedProcessId && (
+                              <span className="text-xs text-muted-foreground ml-1">(prérempli si possible)</span>
+                            )}
+                          </Label>
+                          <div className="flex items-center gap-2">
+                            <Checkbox
+                              checked={notifyTargetDepartment}
+                              onCheckedChange={(v) => setNotifyTargetDepartment(Boolean(v))}
+                              disabled={isSubmitting}
+                              id="notifyTargetDepartment"
+                            />
+                            <Label
+                              htmlFor="notifyTargetDepartment"
+                              className="text-sm text-muted-foreground cursor-pointer select-none"
+                            >
+                              Avertir un service
+                            </Label>
+                          </div>
+                          <Select
+                            value={targetDepartmentId || '__none__'}
+                            onValueChange={(v) => setTargetDepartmentId(v === '__none__' ? null : v)}
+                            disabled={isSubmitting || !notifyTargetDepartment}
+                          >
+                            <SelectTrigger className="h-12 rounded-xl border-2 focus:ring-primary/20 focus:border-primary transition-all">
+                              <SelectValue placeholder="Non spécifié" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-white z-50 rounded-xl border-2">
+                              <SelectItem value="__none__" className="rounded-lg">
+                                Non spécifié
+                              </SelectItem>
+                              {departments.map(dept => (
+                                <SelectItem key={dept.id} value={dept.id} className="rounded-lg">
+                                  {dept.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2.5">
+                          <Label className="text-sm font-semibold flex items-center gap-1.5 text-foreground">
+                            Groupe de services
+                            <span className="text-xs text-muted-foreground ml-1">(optionnel)</span>
+                          </Label>
+                          <div className="flex items-center gap-2">
+                            <Checkbox
+                              checked={notifyServiceGroup}
+                              onCheckedChange={(v) => setNotifyServiceGroup(Boolean(v))}
+                              disabled={isSubmitting}
+                              id="notifyServiceGroup"
+                            />
+                            <Label
+                              htmlFor="notifyServiceGroup"
+                              className="text-sm text-muted-foreground cursor-pointer select-none"
+                            >
+                              Avertir un groupe
+                            </Label>
+                          </div>
+                          <Select
+                            value={serviceGroupId || '__none__'}
+                            onValueChange={(v) => setServiceGroupId(v === '__none__' ? null : v)}
+                            disabled={isSubmitting || !notifyServiceGroup}
+                          >
+                            <SelectTrigger className="h-12 rounded-xl border-2 focus:ring-primary/20 focus:border-primary transition-all">
+                              <SelectValue placeholder="Non spécifié" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-white z-50 rounded-xl border-2">
+                              <SelectItem value="__none__" className="rounded-lg">
+                                Non spécifié
+                              </SelectItem>
+                              {serviceGroups.map((g) => (
+                                <SelectItem key={g.id} value={g.id} className="rounded-lg">
+                                  {g.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
 
                     {(!commonFieldsConfig || commonFieldsConfig.priority?.visible !== false) && (
                     <div className="space-y-2.5">

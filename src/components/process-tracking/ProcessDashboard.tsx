@@ -200,6 +200,7 @@ export function ProcessDashboard({ processId, departmentId, departmentIds, proce
           globalProgress={globalProgress}
           processId={effectiveProcessId}
           canEdit={canWrite}
+          crossFiltersDefaultCollapsed={true}
           onTaskClick={(task) => {
             setSelectedTask(task);
           }}

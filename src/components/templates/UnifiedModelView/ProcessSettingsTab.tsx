@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -30,6 +30,11 @@ interface ProcessSettingsTabProps {
   canManage: boolean;
 }
 
+interface Department {
+  id: string;
+  name: string;
+}
+
 export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSettingsTabProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -37,8 +42,10 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
     name: process.name,
     description: process.description || '',
     service_group_id: (process as any).service_group_id || '',
+    target_department_id: ((process as any).target_department_id as string | null) || '',
   });
   const [serviceGroups, setServiceGroups] = useState<{ id: string; name: string }[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
 
   // Common fields config
   const [commonFieldsConfig, setCommonFieldsConfig] = useState<CommonFieldsConfig>(
@@ -73,12 +80,20 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
     })();
   }, []);
 
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.from('departments').select('id, name').order('name');
+      if (data) setDepartments(data as any);
+    })();
+  }, []);
+
   // Sync formData when process prop changes
   useEffect(() => {
     setFormData({
       name: process.name,
       description: process.description || '',
       service_group_id: (process as any).service_group_id || '',
+      target_department_id: ((process as any).target_department_id as string | null) || '',
     });
 
     // Load common fields config from settings
@@ -119,6 +134,10 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
   }, []);
 
   const handleSave = async () => {
+    if (!formData.target_department_id) {
+      toast.error('Le service cible est obligatoire');
+      return;
+    }
     setIsSaving(true);
     try {
       const { error } = await supabase
@@ -127,6 +146,7 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
           name: formData.name,
           description: formData.description || null,
           service_group_id: formData.service_group_id || null,
+          target_department_id: formData.target_department_id || null,
         })
         .eq('id', process.id);
 
@@ -236,6 +256,11 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
 
   const fieldKeys = Object.keys(commonFieldsConfig) as (keyof CommonFieldsConfig)[];
 
+  const targetDepartmentName = useMemo(() => {
+    if (!formData.target_department_id) return null;
+    return departments.find((d) => d.id === formData.target_department_id)?.name || null;
+  }, [departments, formData.target_department_id]);
+
   return (
     <div className="space-y-6">
       <Card>
@@ -257,6 +282,40 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
               />
             ) : (
               <p className="text-sm font-medium">{formData.name}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Service cible *</Label>
+            {isEditing ? (
+              <Select
+                value={formData.target_department_id || '__none__'}
+                onValueChange={(v) =>
+                  setFormData({ ...formData, target_department_id: v === '__none__' ? '' : v })
+                }
+                disabled={!canManage}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner un service" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Sélectionner…</SelectItem>
+                  {departments.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <p className={cn('text-sm font-medium', !targetDepartmentName && 'text-destructive')}>
+                {targetDepartmentName || 'Non renseigné'}
+              </p>
+            )}
+            {!isEditing && !targetDepartmentName && (
+              <p className="text-xs text-muted-foreground">
+                À renseigner pour pré-remplir le “Service cible” lors de la création de demande et l’afficher sur les cartes.
+              </p>
             )}
           </div>
 
@@ -312,6 +371,7 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
                   name: process.name,
                   description: process.description || '',
                   service_group_id: (process as any).service_group_id || '',
+                  target_department_id: ((process as any).target_department_id as string | null) || '',
                 });
               }}>
                 Annuler

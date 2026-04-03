@@ -116,7 +116,7 @@ export const QUESTIONS: Question[] = [
   // PILIER 04 — FONCIER
   { champ_id: '04_GEN_pays', pilier: '04', section: 'GENERALITES', sous_section: 'Localisation', label: 'Pays', type: 'text' },
   { champ_id: '04_GEN_region', pilier: '04', section: 'GENERALITES', sous_section: 'Localisation', label: 'Région', type: 'text' },
-  { champ_id: '04_GEN_departement_nom', pilier: '04', section: 'GENERALITES', sous_section: 'Localisation', label: 'Département — Nom', type: 'text', note: 'Si France : liste des départements. Sinon texte court.' },
+  { champ_id: '04_GEN_departement_nom', pilier: '04', section: 'GENERALITES', sous_section: 'Localisation', label: 'Département — Nom', type: 'text', note: 'Si France : liste des départements. Sinon titre / objet.' },
   { champ_id: '04_GEN_departement_num', pilier: '04', section: 'GENERALITES', sous_section: 'Localisation', label: 'Département — N°', type: 'text' },
   { champ_id: '04_GEN_commune', pilier: '04', section: 'GENERALITES', sous_section: 'Localisation', label: 'Commune', type: 'text' },
   { champ_id: '04_GEN_code_postal', pilier: '04', section: 'GENERALITES', sous_section: 'Localisation', label: 'Code postal', type: 'text' },

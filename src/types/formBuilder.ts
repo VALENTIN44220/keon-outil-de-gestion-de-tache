@@ -210,7 +210,7 @@ export const FIELD_TYPE_CONFIGS: FieldTypeConfig[] = [
   // Basic fields
   {
     type: 'text',
-    label: 'Texte court',
+    label: 'Titre / Objet',
     icon: 'Type',
     category: 'basic',
     description: 'Champ de texte simple sur une ligne',
@@ -218,7 +218,7 @@ export const FIELD_TYPE_CONFIGS: FieldTypeConfig[] = [
   },
   {
     type: 'textarea',
-    label: 'Texte long',
+    label: 'Description / Détails',
     icon: 'AlignLeft',
     category: 'basic',
     description: 'Zone de texte multi-lignes',

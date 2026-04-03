@@ -194,7 +194,10 @@ export function TaskTableWidget({ tasks, onTaskClick, processId }: TaskTableWidg
             {displayTasks.map((task) => (
               <TableRow
                 key={task.id}
-                className="cursor-pointer hover:bg-muted/50 transition-colors"
+                className={cn(
+                  "cursor-pointer hover:bg-muted/50 transition-colors",
+                  task.status === 'cancelled' && "opacity-60 grayscale"
+                )}
                 onClick={() => onTaskClick?.(task)}
               >
                 {activeColumns.map(col => (

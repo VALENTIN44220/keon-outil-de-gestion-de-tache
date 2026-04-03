@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
+import { useMemo, useState, useCallback, useRef, useEffect, useLayoutEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as L from 'leaflet';
@@ -92,6 +92,15 @@ const getHeightPreset = (w: WidgetConfig): HeightPreset => {
 };
 
 const getHeightPx = (w: WidgetConfig): number => HEIGHT_PRESET_PX[getHeightPreset(w)];
+
+/**
+ * Hauteur réservée dans le bin-packing pour le KPI strip (alignée sur la grille :
+ * `lg:grid-cols-8` → 1 ligne, `sm:grid-cols-4` (md–lg) → 2 lignes).
+ * Évite le vide excessif sous le strip quand une seule ligne suffit.
+ */
+/** Secours avant mesure ResizeObserver (éviter chevauchement 1 frame si besoin) */
+const KPI_STRIP_LAYOUT_LG_ONE_ROW_PX = 300;
+const KPI_STRIP_LAYOUT_MD_TWO_ROWS_PX = 400;
 
 // ─── Count-up hook ────────────────────────────────────────────────────────────
 function useCountUp(target: number, duration = 800) {
@@ -263,6 +272,7 @@ function ProjectMapCard({ projects, allProjectStats = {} }: { projects: BEProjec
   useEffect(() => {
     // Expose navigate for popup buttons
     (window as any).__navigateToProject = (code: string) => {
+      // Default to BE namespace; per-project buttons below pick SPV when relevant.
       navigate(`/be/projects/${code}/overview`);
     };
 
@@ -483,6 +493,26 @@ export function BEProjectsSyntheseView({ projects, qstData, widgets: externalWid
   const [draggedWidget, setDraggedWidget] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
 
+  /** Réservation verticale du KPI strip selon le breakpoint (cohérent avec lg:grid-cols-8 vs 2 lignes) */
+  const [kpiStripLayoutReservePx, setKpiStripLayoutReservePx] = useState(() => {
+    if (typeof window === 'undefined') return KPI_STRIP_LAYOUT_MD_TWO_ROWS_PX;
+    return window.matchMedia('(min-width: 1024px)').matches
+      ? KPI_STRIP_LAYOUT_LG_ONE_ROW_PX
+      : KPI_STRIP_LAYOUT_MD_TWO_ROWS_PX;
+  });
+
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const sync = () => {
+      setKpiStripLayoutReservePx(
+        mq.matches ? KPI_STRIP_LAYOUT_LG_ONE_ROW_PX : KPI_STRIP_LAYOUT_MD_TWO_ROWS_PX
+      );
+    };
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
+
   // Fetch task stats for all projects (batch)
   const projectIds = useMemo(() => projects.map(p => p.id), [projects]);
 
@@ -699,14 +729,45 @@ export function BEProjectsSyntheseView({ projects, qstData, widgets: externalWid
   const visibleWidgets = useMemo(() => widgets.filter(w => w.visible), [widgets]);
   const hiddenCount = widgets.length - visibleWidgets.length;
 
+  /** Mesure la hauteur réelle du bloc KPI pour le bin-packing (évite l’écart vide entre wrappers) */
+  const kpiStripOuterRef = useRef<HTMLDivElement | null>(null);
+  const [kpiStripMeasuredPx, setKpiStripMeasuredPx] = useState(0);
+  const hasKpiStrip = useMemo(() => visibleWidgets.some((w) => w.id === 'kpi_strip'), [visibleWidgets]);
+
+  useLayoutEffect(() => {
+    if (!hasKpiStrip) {
+      setKpiStripMeasuredPx(0);
+      return;
+    }
+    const el = kpiStripOuterRef.current;
+    if (!el) return;
+
+    const apply = () => {
+      const h = Math.ceil(el.getBoundingClientRect().height);
+      setKpiStripMeasuredPx((prev) => (prev !== h ? h : prev));
+    };
+
+    apply();
+
+    const ro = new ResizeObserver(() => apply());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [hasKpiStrip, visibleWidgets, kpiStripLayoutReservePx]);
+
   // ── 2-column bin-packing layout ─────────────────────────────────────────
   const gridLayout = useMemo(() => {
-    const GAP = 16;
+    const GAP = 10;
     const colHeights = [0, 0];
     const placements: { widget: WidgetConfig; col: 0 | 1 | 'full'; top: number }[] = [];
 
+    const layoutH = (w: WidgetConfig) => {
+      if (w.id !== 'kpi_strip') return getHeightPx(w);
+      if (kpiStripMeasuredPx > 0) return kpiStripMeasuredPx;
+      return kpiStripLayoutReservePx;
+    };
+
     for (const w of visibleWidgets) {
-      const h = getHeightPx(w);
+      const h = layoutH(w);
       if (w.size.w >= 2) {
         const top = Math.max(colHeights[0], colHeights[1]);
         placements.push({ widget: w, col: 'full', top });
@@ -723,7 +784,7 @@ export function BEProjectsSyntheseView({ projects, qstData, widgets: externalWid
 
     const totalHeight = Math.max(colHeights[0], colHeights[1]);
     return { placements, totalHeight };
-  }, [visibleWidgets]);
+  }, [visibleWidgets, kpiStripLayoutReservePx, kpiStripMeasuredPx]);
 
   // ── Render widget content by id ─────────────────────────────────────────
   const renderWidgetContent = useCallback((widget: WidgetConfig) => {
@@ -732,7 +793,7 @@ export function BEProjectsSyntheseView({ projects, qstData, widgets: externalWid
     switch (widget.id) {
       case 'kpi_strip':
         return (
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 h-full">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4 h-full">
             {[
               { icon: FolderOpen,    label: 'Total projets',  value: kpis.total,       color: 'text-primary',      accent: '#1E5EFF' },
               { icon: Activity,      label: 'Actifs',         value: kpis.active,      color: 'text-emerald-500',  accent: '#10b981' },
@@ -744,15 +805,14 @@ export function BEProjectsSyntheseView({ projects, qstData, widgets: externalWid
               { icon: TrendingUp,    label: 'Avancement moy.', value: kpis.avgProgress, color: 'text-violet-500',  accent: '#8b5cf6', suffix: '%' },
             ].map(({ icon: Icon, label, value, color, accent, suffix }) => (
               <Card key={label}
-                className="border-border/50 hover:shadow-md transition-all duration-300 overflow-hidden"
-                style={{ borderLeft: `3px solid ${accent}` }}
+                className="border-border/50"
               >
-                <CardContent className="p-3 flex flex-col gap-1">
-                  <Icon className={cn('h-4 w-4', color)} />
-                  <div className={cn('text-xl font-bold tabular-nums', color)}>
+                <CardContent className="p-4 flex flex-col items-center justify-center gap-1.5 text-center">
+                  <Icon className={cn('h-5 w-5', color)} />
+                  <span className="text-xs text-muted-foreground font-medium">{label}</span>
+                  <span className={cn('text-xl font-bold text-foreground tabular-nums', color)}>
                     <AnimatedNumber value={typeof value === 'number' ? value : 0} suffix={suffix} />
-                  </div>
-                  <div className="text-[10px] text-muted-foreground leading-tight">{label}</div>
+                  </span>
                 </CardContent>
               </Card>
             ))}
@@ -852,7 +912,11 @@ export function BEProjectsSyntheseView({ projects, qstData, widgets: externalWid
               const st = allProjectStats[p.id];
               return (
                 <button key={p.id}
-                  onClick={() => navigate(`/be/projects/${p.code_projet}/overview`)}
+                  onClick={() => {
+                    const spvValue = (qstData[p.id]?.['02_GEN_spv_cree'] || '').toUpperCase().trim();
+                    const base = spvValue === 'OUI' ? '/spv/projects' : '/be/projects';
+                    navigate(`${base}/${p.code_projet}/overview`);
+                  }}
                   className="w-full text-left rounded-lg border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 px-3 py-2 transition-colors">
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-mono text-xs text-primary">{p.code_projet}</span>
@@ -879,7 +943,11 @@ export function BEProjectsSyntheseView({ projects, qstData, widgets: externalWid
               const color = prog >= 80 ? '#10b981' : prog >= 40 ? '#f59e0b' : '#6b7280';
               return (
                 <button key={p.id}
-                  onClick={() => navigate(`/be/projects/${p.code_projet}/overview`)}
+                  onClick={() => {
+                    const spvValue = (qstData[p.id]?.['02_GEN_spv_cree'] || '').toUpperCase().trim();
+                    const base = spvValue === 'OUI' ? '/spv/projects' : '/be/projects';
+                    navigate(`${base}/${p.code_projet}/overview`);
+                  }}
                   className="w-full text-left rounded-lg border border-border/50 hover:bg-muted/30 px-3 py-2 transition-colors">
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-mono text-xs text-primary">{p.code_projet}</span>
@@ -1005,6 +1073,7 @@ export function BEProjectsSyntheseView({ projects, qstData, widgets: externalWid
         <div className="hidden md:block relative" style={{ height: gridLayout.totalHeight || 'auto' }}>
           {gridLayout.placements.map(({ widget, col, top }) => {
             const heightPx = getHeightPx(widget);
+            const isKpiStrip = widget.id === 'kpi_strip';
             const isFull = col === 'full';
             return (
               <div
@@ -1019,7 +1088,7 @@ export function BEProjectsSyntheseView({ projects, qstData, widgets: externalWid
                   top,
                   left: isFull ? 0 : col === 0 ? 0 : 'calc(50% + 8px)',
                   width: isFull ? '100%' : 'calc(50% - 8px)',
-                  height: heightPx,
+                  height: isKpiStrip ? 'auto' : heightPx,
                 }}
                 draggable={isEditing}
                 onDragStart={() => handleDragStart(widget.id)}
@@ -1027,9 +1096,11 @@ export function BEProjectsSyntheseView({ projects, qstData, widgets: externalWid
                 onDrop={(e) => handleDropEnhanced(e, widget.id)}
                 onDragEnd={handleDragEnd}
                 onDragLeave={() => setDropTargetId(null)}
+                ref={isKpiStrip ? kpiStripOuterRef : undefined}
               >
                 <WidgetWrapper
                   title={widget.label}
+                  autoHeight={isKpiStrip}
                   onRemove={isEditing ? () => handleRemoveWidget(widget.id) : undefined}
                   isDragging={draggedWidget === widget.id}
                   showDragHandle={isEditing}
@@ -1050,7 +1121,7 @@ export function BEProjectsSyntheseView({ projects, qstData, widgets: externalWid
           {visibleWidgets.map(widget => (
             <div
               key={widget.id}
-              style={{ height: getHeightPx(widget) }}
+              style={{ height: widget.id === 'kpi_strip' ? 'auto' : getHeightPx(widget) }}
               draggable={isEditing}
               onDragStart={() => handleDragStart(widget.id)}
               onDragOver={(e) => handleDragOverEnhanced(e, widget.id)}
@@ -1059,6 +1130,7 @@ export function BEProjectsSyntheseView({ projects, qstData, widgets: externalWid
             >
               <WidgetWrapper
                 title={widget.label}
+                autoHeight={widget.id === 'kpi_strip'}
                 onRemove={isEditing ? () => handleRemoveWidget(widget.id) : undefined}
                 isDragging={draggedWidget === widget.id}
                 showDragHandle={isEditing}

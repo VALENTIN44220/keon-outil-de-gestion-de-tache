@@ -23,6 +23,7 @@ import { ITProjectSelect } from '@/components/it/ITProjectSelect';
 import { ITProjectPhaseSelect } from '@/components/it/ITProjectPhaseSelect';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserRole } from '@/hooks/useUserRole';
 import { useRequestWorkflow } from '@/hooks/useRequestWorkflow';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -90,6 +91,7 @@ export function BERequestDialog({
   processTemplateId,
 }: BERequestDialogProps) {
   const { profile: currentUser } = useAuth();
+  const { isAdmin } = useUserRole();
   const { generatePendingAssignments } = useRequestWorkflow();
 
   // Form state - Général
@@ -100,6 +102,14 @@ export function BERequestDialog({
   const [beProjectId, setBeProjectId] = useState<string | null>(null);
   const [itProjectId, setItProjectId] = useState<string | null>(null);
   const [itProjectPhase, setItProjectPhase] = useState<string | null>(null);
+
+  // Admin-only field safety: if user isn't admin, clear any IT project association.
+  useEffect(() => {
+    if (isAdmin) return;
+    if (!itProjectId && !itProjectPhase) return;
+    if (itProjectId) setItProjectId(null);
+    if (itProjectPhase) setItProjectPhase(null);
+  }, [isAdmin, itProjectId, itProjectPhase]);
 
   // Form state - Détails BE
   const [codeAffaire, setCodeAffaire] = useState('');
@@ -540,18 +550,22 @@ export function BERequestDialog({
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-1.5">
-                    <Monitor className="h-3.5 w-3.5 text-violet-600" />
-                    Projet IT associé
-                  </Label>
-                  <ITProjectSelect value={itProjectId} onChange={(v) => { setItProjectId(v); if (!v) setItProjectPhase(null); }} />
-                </div>
-                {itProjectId && (
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-1.5">Phase du projet IT</Label>
-                    <ITProjectPhaseSelect value={itProjectPhase} onChange={setItProjectPhase} />
-                  </div>
+                {isAdmin && (
+                  <>
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-1.5">
+                        <Monitor className="h-3.5 w-3.5 text-violet-600" />
+                        Projet IT associé
+                      </Label>
+                      <ITProjectSelect value={itProjectId} onChange={(v) => { setItProjectId(v); if (!v) setItProjectPhase(null); }} />
+                    </div>
+                    {itProjectId && (
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-1.5">Phase du projet IT</Label>
+                        <ITProjectPhaseSelect value={itProjectPhase} onChange={setItProjectPhase} />
+                      </div>
+                    )}
+                  </>
                 )}
 
                 <div className="space-y-2">

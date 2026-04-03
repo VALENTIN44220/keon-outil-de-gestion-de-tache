@@ -126,9 +126,17 @@ export default function ProcessTracking() {
 
       if (countData) {
         const counts = new Map<string, number>();
-        (countData as any[]).forEach(row => {
-          const pid = row.process_template_id || row.source_process_template_id;
-          if (pid) counts.set(pid, (counts.get(pid) || 0) + 1);
+        (countData as any[]).forEach((row) => {
+          const touched = new Set<string>();
+          if (row.process_template_id && ids.includes(row.process_template_id)) {
+            touched.add(row.process_template_id);
+          }
+          if (row.source_process_template_id && ids.includes(row.source_process_template_id)) {
+            touched.add(row.source_process_template_id);
+          }
+          touched.forEach((pid) => {
+            counts.set(pid, (counts.get(pid) || 0) + 1);
+          });
         });
         processList = processList.map(p => ({ ...p, task_count: counts.get(p.id) || 0 }));
       }
