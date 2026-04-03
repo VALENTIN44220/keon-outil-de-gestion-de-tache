@@ -92,20 +92,9 @@ Deno.serve(async (req) => {
 
     if (!targetProfile) return json({ error: 'target_not_authorised' }, 403);
 
-    // ── 6. Target must not already have an azure identity ────────────────────
-    const { data: targetIdentities } = await admin
-      .schema('auth')
-      .from('identities')
-      .select('provider')
-      .eq('user_id', targetUserId)
-      .eq('provider', 'azure')
-      .limit(1);
+    // ── 6. Transfer identity (RPC removes any existing Azure row on target first)
 
-    if (targetIdentities && targetIdentities.length > 0) {
-      return json({ error: 'target_already_has_azure' }, 409);
-    }
-
-    // ── 7. Atomically transfer identity + patch profile ──────────────────────
+    // ── 7. Atomically replace target Azure if present, move temp identity, patch profile ─
     const microsoftEmail = currentUser.email ?? '';
 
     const { error: transferErr } = await admin.rpc('transfer_azure_identity', {
