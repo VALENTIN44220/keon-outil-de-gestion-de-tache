@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { FunctionsHttpError } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog,
@@ -23,10 +24,35 @@ interface Props {
 
 type Phase = 'form' | 'linking' | 'success' | 'denied';
 
+type LinkMicrosoftResponse = {
+  success?: boolean;
+  error?: string;
+  detail?: string;
+};
+
+/** Edge Function errors are returned as JSON with non-2xx status; invoke() then sets data=null. */
+async function resolveLinkMicrosoftPayload(
+  data: LinkMicrosoftResponse | null,
+  error: unknown,
+): Promise<LinkMicrosoftResponse | null> {
+  if (data && typeof data === 'object') return data;
+  if (error instanceof FunctionsHttpError) {
+    try {
+      const parsed = (await error.context.clone().json()) as LinkMicrosoftResponse;
+      if (parsed && typeof parsed === 'object') return parsed;
+    } catch {
+      /* not JSON */
+    }
+  }
+  return null;
+}
+
 const ERROR_MESSAGES: Record<string, string> = {
   target_not_found:       "Aucun compte ne correspond à cet email. Vérifiez l'adresse ou contactez votre administrateur.",
   target_not_authorised:  "Ce compte n'est pas autorisé à accéder à l'application.",
   target_already_has_azure: "Un compte Microsoft est déjà associé à cet email.",
+  already_has_profile:    "Un profil existe déjà pour cette session Microsoft. Déconnectez-vous, puis demandez à un admin de supprimer le profil fantôme créé avant la mise à jour, ou contactez le support.",
+  not_an_azure_user:      "Cette session n'est pas une connexion Microsoft valide pour la liaison.",
   transfer_failed:        "La liaison a échoué côté serveur. Réessayez ou contactez votre administrateur.",
   internal_error:         "Erreur interne. Réessayez dans quelques instants.",
 };
@@ -47,17 +73,29 @@ export function MicrosoftAccountLinkingDialog({ open, microsoftEmail, onLinked, 
       const token = sessionData.session?.access_token;
       if (!token) throw new Error('no_session');
 
-      const { data, error } = await supabase.functions.invoke('link-microsoft-account', {
-        headers: { Authorization: `Bearer ${token}` },
-        body: { targetEmail: email.trim() },
-      });
+      const { data, error } = await supabase.functions.invoke<LinkMicrosoftResponse>(
+        'link-microsoft-account',
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          body: { targetEmail: email.trim() },
+        },
+      );
 
-      if (error || !data?.success) {
-        const code = data?.error ?? error?.message ?? 'internal_error';
+      const payload = await resolveLinkMicrosoftPayload(data ?? null, error);
+
+      if (!payload?.success) {
+        const raw =
+          (typeof payload?.error === 'string' ? payload.error : null) ??
+          (error instanceof FunctionsHttpError ? null : error instanceof Error ? error.message : null) ??
+          'internal_error';
+        const code = typeof raw === 'string' ? raw.split(':')[0].trim() : 'internal_error';
         if (code === 'target_not_found' || code === 'target_not_authorised') {
           setPhase('denied');
         } else {
-          setErrorMsg(ERROR_MESSAGES[code] ?? ERROR_MESSAGES['internal_error']);
+          const hint = typeof payload?.detail === 'string' ? ` (${payload.detail})` : '';
+          setErrorMsg(
+            (ERROR_MESSAGES[code] ?? ERROR_MESSAGES['internal_error']) + hint,
+          );
           setPhase('form');
         }
         return;

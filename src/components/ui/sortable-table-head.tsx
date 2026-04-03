@@ -10,6 +10,8 @@ interface SortableTableHeadProps extends React.ThHTMLAttributes<HTMLTableCellEle
   currentDirection: SortDirection;
   onSort: (key: string) => void;
   children: React.ReactNode;
+  /** Poignée de redimensionnement de colonne (ne déclenche pas le tri). */
+  onColumnResizeMouseDown?: (e: React.MouseEvent) => void;
 }
 
 export function SortableTableHead({
@@ -19,6 +21,7 @@ export function SortableTableHead({
   onSort,
   children,
   className,
+  onColumnResizeMouseDown,
   ...props
 }: SortableTableHeadProps) {
   const isActive = currentSortKey === sortKey && currentDirection !== null;
@@ -26,15 +29,15 @@ export function SortableTableHead({
   return (
     <TableHead
       className={cn(
-        'cursor-pointer select-none transition-colors hover:bg-muted/50',
+        'relative cursor-pointer select-none transition-colors hover:bg-muted/50',
         isActive && 'bg-muted/30',
         className
       )}
       onClick={() => onSort(sortKey)}
       {...props}
     >
-      <div className="flex items-center gap-1.5">
-        <span>{children}</span>
+      <div className={cn('flex items-center gap-1.5', onColumnResizeMouseDown && 'pr-2')}>
+        <span className="min-w-0 flex-1 truncate">{children}</span>
         <span className="shrink-0">
           {isActive ? (
             currentDirection === 'asc' ? (
@@ -47,6 +50,20 @@ export function SortableTableHead({
           )}
         </span>
       </div>
+      {onColumnResizeMouseDown && (
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Redimensionner la colonne"
+          className="absolute right-0 top-0 bottom-0 z-20 w-1.5 cursor-col-resize hover:bg-primary/40 active:bg-primary/55"
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            onColumnResizeMouseDown(e);
+          }}
+        />
+      )}
     </TableHead>
   );
 }

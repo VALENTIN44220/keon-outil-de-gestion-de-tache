@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { SupplierFilters } from './useSupplierEnrichment';
+import { hasSupplierVisibleColumnsInStorage } from '@/lib/supplierVisibleColumnsStorage';
 
 export interface SupplierFilterPreset {
   id: string;
@@ -69,7 +70,12 @@ export function useSupplierFilterPresets(
       const toApply = globalDefault || userDefault;
       if (toApply) {
         setFilters({ ...defaultFilters, ...toApply.filters });
-        if (toApply.visible_columns?.length && setVisibleColumns) {
+        // Ne pas écraser les colonnes déjà mémorisées dans le navigateur
+        if (
+          toApply.visible_columns?.length &&
+          setVisibleColumns &&
+          !hasSupplierVisibleColumnsInStorage()
+        ) {
           setVisibleColumns(toApply.visible_columns);
         }
         if (toApply.prefix_filter && setPrefixFilter) {

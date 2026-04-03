@@ -26,10 +26,10 @@ function displayNameFromUser(user: User) {
 /** Returns true when the current Supabase session was initiated via Microsoft (azure). */
 function isAzureSession(user: User): boolean {
   const meta = user.app_metadata ?? {};
-  return (
-    meta.provider === 'azure' ||
-    (meta.providers as string[] | undefined)?.includes('azure') === true
-  );
+  if (meta.provider === 'azure') return true;
+  const provs = meta.providers;
+  if (Array.isArray(provs) && provs.includes('azure')) return true;
+  return (user.identities ?? []).some((i) => i.provider === 'azure');
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
@@ -90,7 +90,14 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
           return;
         }
 
-        // No row in public.profiles for this auth user (trigger skipped, import, etc.).
+        // No row in public.profiles for this auth user.
+        // Microsoft OAuth: never client-insert a stub profile — forces link-microsoft-account flow.
+        if (isAzureSession(sessionUser)) {
+          setHasProfile(false);
+          setShowLinkingDialog(true);
+          return;
+        }
+
         // RLS: "Users can insert their own profile" WITH CHECK (auth.uid() = user_id).
         const insertRow: Record<string, unknown> = {
           user_id: sessionUser.id,
@@ -119,14 +126,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
         console.error('Profile bootstrap failed:', insertError);
         setHasProfile(false);
-
-        // If the user logged in via Microsoft but the email doesn't match any
-        // existing profile, offer account linking instead of a plain "access denied".
-        if (isAzureSession(sessionUser)) {
-          setShowLinkingDialog(true);
-        } else {
-          setShowAccessDenied(true);
-        }
+        setShowAccessDenied(true);
       } catch (error) {
         console.error('Error checking profile:', error);
         setHasProfile(false);

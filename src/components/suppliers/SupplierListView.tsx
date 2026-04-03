@@ -1,5 +1,5 @@
 // SupplierListView.tsx
-import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef, type CSSProperties } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +23,10 @@ import { fr } from 'date-fns/locale';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
+import {
+  readSupplierVisibleColumnsFromStorage,
+  SUPPLIER_VISIBLE_COLUMNS_STORAGE_KEY,
+} from '@/lib/supplierVisibleColumnsStorage';
 import {
   Popover,
   PopoverContent,
@@ -73,6 +77,66 @@ function safeFormatDate(iso?: string | null) {
 function extractTiersPrefix(tiers: string): string {
   const match = tiers.match(/^([A-Za-z]+)/);
   return match ? match[1].toUpperCase() : '';
+}
+
+/** Colonnes figées au défilement horizontal : TIERS + référentiel fournisseur (nom / n° côté métier). */
+const HORIZONTAL_STICKY_SUPPLIER_KEYS = ['tiers', 'nomfournisseur'] as const;
+
+const MIN_SUPPLIER_COL_WIDTH = 72;
+const MAX_SUPPLIER_COL_WIDTH = 520;
+const SUPPLIER_COL_WIDTHS_STORAGE_KEY = 'keon-supplier-table-col-widths-v1';
+
+/** Rempli juste après la définition de ALL_COLUMNS. */
+let DEFAULT_SUPPLIER_COLUMN_WIDTHS: Record<string, number> = {};
+
+function colWidthPx(key: string, widths: Record<string, number>): number {
+  const w = widths[key] ?? DEFAULT_SUPPLIER_COLUMN_WIDTHS[key];
+  if (typeof w === 'number') return w;
+  return 170;
+}
+
+/** Positions `left` des colonnes sticky (largeurs = état utilisateur). */
+function getSupplierStickyColumnLayout(
+  activeColumns: SupplierColumnDef[],
+  canEdit: boolean,
+  widths: Record<string, number>,
+): { leftByKey: Map<string, number>; order: string[] } {
+  const leftByKey = new Map<string, number>();
+  const order: string[] = [];
+  let left = canEdit ? 52 : 0;
+  for (const key of HORIZONTAL_STICKY_SUPPLIER_KEYS) {
+    if (!activeColumns.some((c) => c.key === key)) continue;
+    leftByKey.set(key, left);
+    order.push(key);
+    left += colWidthPx(key, widths);
+  }
+  return { leftByKey, order };
+}
+
+function stickySupplierCellStyle(
+  colKey: string,
+  leftByKey: Map<string, number>,
+  order: string[],
+  baseZ: number,
+): CSSProperties | undefined {
+  const left = leftByKey.get(colKey);
+  if (left === undefined) return undefined;
+  const idx = order.indexOf(colKey);
+  return {
+    left,
+    zIndex: baseZ + Math.max(0, idx),
+    boxSizing: 'border-box',
+  };
+}
+
+function mergeColSize(stickyPart: CSSProperties | undefined, widthPx: number): CSSProperties {
+  return {
+    ...(stickyPart ?? {}),
+    width: widthPx,
+    minWidth: widthPx,
+    maxWidth: widthPx,
+    boxSizing: 'border-box',
+  };
 }
 
 // All available columns definition
@@ -132,7 +196,23 @@ const ALL_COLUMNS: SupplierColumnDef[] = [
   { key: 'updated_at', label: 'Mise à jour', defaultVisible: true, render: (s) => <span className="text-muted-foreground text-sm">{safeFormatDate(s.updated_at)}</span> },
 ];
 
+function buildDefaultSupplierColumnWidths(): Record<string, number> {
+  const m: Record<string, number> = {};
+  for (const col of ALL_COLUMNS) {
+    if (col.key === 'tiers') m[col.key] = 128;
+    else if (col.key === 'nomfournisseur') m[col.key] = 260;
+    else if (col.key === 'completeness_score') m[col.key] = 160;
+    else if (col.key === 'validite_prix' || col.key === 'validite_du_contrat') m[col.key] = 140;
+    else m[col.key] = 170;
+  }
+  return m;
+}
+
+DEFAULT_SUPPLIER_COLUMN_WIDTHS = buildDefaultSupplierColumnWidths();
+
 const DEFAULT_VISIBLE_COLUMNS = ALL_COLUMNS.filter(c => c.defaultVisible).map(c => c.key);
+
+const SUPPLIER_VALID_COLUMN_KEYS = new Set(ALL_COLUMNS.map((c) => c.key));
 
 export const DEFAULT_SUPPLIER_FILTERS: SupplierFilters = {
   search: '',
@@ -176,7 +256,89 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
   const [page, setPage] = useState(0);
   const [filters, setFilters] = useState<SupplierFilters>(DEFAULT_SUPPLIER_FILTERS);
   const [prefixFilter, setPrefixFilter] = useState('all');
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(DEFAULT_VISIBLE_COLUMNS);
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return DEFAULT_VISIBLE_COLUMNS;
+    return (
+      readSupplierVisibleColumnsFromStorage(SUPPLIER_VALID_COLUMN_KEYS) ?? DEFAULT_VISIBLE_COLUMNS
+    );
+  });
+  const skipNextVisibleColumnsPersist = useRef(true);
+
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
+    if (typeof window === 'undefined') return { ...DEFAULT_SUPPLIER_COLUMN_WIDTHS };
+    try {
+      const raw = localStorage.getItem(SUPPLIER_COL_WIDTHS_STORAGE_KEY);
+      if (!raw) return { ...DEFAULT_SUPPLIER_COLUMN_WIDTHS };
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      const merged = { ...DEFAULT_SUPPLIER_COLUMN_WIDTHS };
+      for (const k of Object.keys(merged)) {
+        const v = parsed[k];
+        if (typeof v === 'number' && v >= MIN_SUPPLIER_COL_WIDTH && v <= MAX_SUPPLIER_COL_WIDTH) {
+          merged[k] = v;
+        }
+      }
+      return merged;
+    } catch {
+      return { ...DEFAULT_SUPPLIER_COLUMN_WIDTHS };
+    }
+  });
+
+  const resizeDragRef = useRef<{ key: string; startX: number; startW: number } | null>(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SUPPLIER_COL_WIDTHS_STORAGE_KEY, JSON.stringify(columnWidths));
+    } catch {
+      /* ignore */
+    }
+  }, [columnWidths]);
+
+  useEffect(() => {
+    if (skipNextVisibleColumnsPersist.current) {
+      skipNextVisibleColumnsPersist.current = false;
+      return;
+    }
+    try {
+      localStorage.setItem(SUPPLIER_VISIBLE_COLUMNS_STORAGE_KEY, JSON.stringify(visibleColumns));
+    } catch {
+      /* ignore */
+    }
+  }, [visibleColumns]);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      const d = resizeDragRef.current;
+      if (!d) return;
+      const next = Math.min(
+        MAX_SUPPLIER_COL_WIDTH,
+        Math.max(MIN_SUPPLIER_COL_WIDTH, d.startW + e.clientX - d.startX),
+      );
+      setColumnWidths((prev) => (prev[d.key] === next ? prev : { ...prev, [d.key]: next }));
+    };
+    const onUp = () => {
+      if (resizeDragRef.current) {
+        resizeDragRef.current = null;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, []);
+
+  const onColumnResizeStart = useCallback((colKey: string, clientX: number) => {
+    resizeDragRef.current = {
+      key: colKey,
+      startX: clientX,
+      startW: colWidthPx(colKey, columnWidths),
+    };
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [columnWidths]);
 
   const updateFilters = (patch: Partial<SupplierFilters>) => {
     setFilters(prev => ({ ...prev, ...patch }));
@@ -275,7 +437,19 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
     ALL_COLUMNS.filter(c => visibleColumns.includes(c.key)),
     [visibleColumns]
   );
-  const tableWidthPx = useMemo(() => Math.max((activeColumns.length + 1) * 180, 2200), [activeColumns.length]);
+  const stickyLayout = useMemo(
+    () => getSupplierStickyColumnLayout(activeColumns, canEdit, columnWidths),
+    [activeColumns, canEdit, columnWidths],
+  );
+  /** Fond opaque (carte / muted au survol de ligne) — pas de transparence. */
+  const stickyColClass =
+    'sticky border-r border-border bg-card shadow-[4px_0_8px_-6px_rgba(0,0,0,0.14)] group-hover:bg-muted';
+  const stickyHeadColClass =
+    'sticky border-r border-border bg-card shadow-[4px_0_8px_-6px_rgba(0,0,0,0.14)] hover:!bg-muted';
+  const tableWidthPx = useMemo(() => {
+    const sum = activeColumns.reduce((acc, c) => acc + colWidthPx(c.key, columnWidths), 0);
+    return Math.max(sum + (canEdit ? 52 : 0), 800);
+  }, [activeColumns, columnWidths, canEdit]);
   const tableScrollRef = useRef<HTMLDivElement | null>(null);
   const stickyScrollbarRef = useRef<HTMLDivElement | null>(null);
   const stickyScrollbarContentRef = useRef<HTMLDivElement | null>(null);
@@ -319,7 +493,7 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
       sticky.removeEventListener('scroll', onStickyScroll);
       window.removeEventListener('resize', syncMetrics);
     };
-  }, [viewMode, tableWidthPx, filteredSuppliers.length, isLoading]);
+  }, [viewMode, tableWidthPx, filteredSuppliers.length, isLoading, columnWidths]);
 
   const toggleColumn = (key: string) => {
     setVisibleColumns(prev =>
@@ -703,11 +877,30 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
                 <TableHeader>
                   <TableRow>
                     {canEdit && <TableHead className="w-[50px]"></TableHead>}
-                    {activeColumns.map(col => (
-                      <SortableTableHead key={col.key} sortKey={col.key} currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort} className={col.className}>
-                        {col.label}
-                      </SortableTableHead>
-                    ))}
+                    {activeColumns.map((col) => {
+                      const w = colWidthPx(col.key, columnWidths);
+                      const stickyPart = stickySupplierCellStyle(
+                        col.key,
+                        stickyLayout.leftByKey,
+                        stickyLayout.order,
+                        52,
+                      );
+                      const isSticky = !!stickyPart;
+                      return (
+                        <SortableTableHead
+                          key={col.key}
+                          sortKey={col.key}
+                          currentSortKey={sortConfig.key}
+                          currentDirection={sortConfig.direction}
+                          onSort={handleSort}
+                          className={cn(col.className, isSticky && stickyHeadColClass)}
+                          style={mergeColSize(stickyPart, w)}
+                          onColumnResizeMouseDown={(e) => onColumnResizeStart(col.key, e.clientX)}
+                        >
+                          {col.label}
+                        </SortableTableHead>
+                      );
+                    })}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -715,7 +908,21 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
                      Array.from({ length: 8 }).map((_, i) => (
                       <TableRow key={i}>
                         {canEdit && <TableCell><Skeleton className="h-4 w-8" /></TableCell>}
-                        {activeColumns.map((_, j) => <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>)}
+                        {activeColumns.map((col, j) => {
+                          const w = colWidthPx(col.key, columnWidths);
+                          const stickyPart = stickySupplierCellStyle(
+                            col.key,
+                            stickyLayout.leftByKey,
+                            stickyLayout.order,
+                            40,
+                          );
+                          const isSticky = !!stickyPart;
+                          return (
+                            <TableCell key={j} className={cn(isSticky && stickyColClass)} style={mergeColSize(stickyPart, w)}>
+                              <Skeleton className="h-4 w-full" />
+                            </TableCell>
+                          );
+                        })}
                       </TableRow>
                     ))
                   ) : filteredSuppliers.length === 0 ? (
@@ -724,7 +931,7 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
                     </TableRow>
                   ) : (
                     filteredSuppliers.map((supplier) => (
-                      <TableRow key={supplier.id} className="cursor-pointer hover:bg-muted/50" onClick={() => onViewSupplier(supplier.id)}>
+                      <TableRow key={supplier.id} className="group cursor-pointer hover:bg-muted/50" onClick={() => onViewSupplier(supplier.id)}>
                         {canEdit && (
                           <TableCell>
                             <Button variant="ghost" size="icon" title="Modifier" onClick={(e) => { e.stopPropagation(); onOpenSupplier(supplier.id); }}>
@@ -732,18 +939,32 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
                             </Button>
                           </TableCell>
                         )}
-                        {activeColumns.map(col => (
-                          <TableCell key={col.key}>
-                            {col.key === 'completeness_score' ? (
-                              <div className="flex items-center gap-2">
-                                <Progress value={supplier.completeness_score ?? 0} className="h-2 flex-1" />
-                                <Badge className={supplier.status ? (statusConfig[supplier.status]?.color ?? 'bg-muted text-muted-foreground') : 'bg-muted text-muted-foreground'}>
-                                  {supplier.completeness_score ?? 0}%
-                                </Badge>
-                              </div>
-                            ) : col.render(supplier)}
-                          </TableCell>
-                        ))}
+                        {activeColumns.map((col) => {
+                          const w = colWidthPx(col.key, columnWidths);
+                          const stickyPart = stickySupplierCellStyle(
+                            col.key,
+                            stickyLayout.leftByKey,
+                            stickyLayout.order,
+                            40,
+                          );
+                          const isSticky = !!stickyPart;
+                          return (
+                            <TableCell key={col.key} className={cn(isSticky && stickyColClass)} style={mergeColSize(stickyPart, w)}>
+                              {col.key === 'completeness_score' ? (
+                                <div className="flex items-center gap-2">
+                                  <Progress value={supplier.completeness_score ?? 0} className="h-2 flex-1" />
+                                  <Badge className={supplier.status ? (statusConfig[supplier.status]?.color ?? 'bg-muted text-muted-foreground') : 'bg-muted text-muted-foreground'}>
+                                    {supplier.completeness_score ?? 0}%
+                                  </Badge>
+                                </div>
+                              ) : isSticky ? (
+                                <div className="min-w-0 truncate">{col.render(supplier)}</div>
+                              ) : (
+                                col.render(supplier)
+                              )}
+                            </TableCell>
+                          );
+                        })}
                       </TableRow>
                     ))
                   )}
