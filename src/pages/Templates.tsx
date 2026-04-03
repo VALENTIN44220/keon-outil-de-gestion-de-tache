@@ -15,8 +15,6 @@ import { BulkTaskTemplateImportDialog } from '@/components/templates/BulkTaskTem
 import { useProcessTemplates } from '@/hooks/useProcessTemplates';
 import { useAllSubProcessTemplates } from '@/hooks/useAllSubProcessTemplates';
 import { useAllTaskTemplates } from '@/hooks/useAllTaskTemplates';
-import { useNotifications } from '@/hooks/useNotifications';
-import { useTasks } from '@/hooks/useTasks';
 import { useAuth } from '@/contexts/AuthContext';
 import { Loader2, Layers, GitBranch, ListTodo, Plus, FormInput, Upload } from 'lucide-react';
 import { ProcessWithTasks } from '@/types/template';
@@ -63,8 +61,6 @@ const Templates = () => {
   } = useAllTaskTemplates();
 
   const { user } = useAuth();
-  const { allTasks } = useTasks();
-  const { notifications, unreadCount, hasUrgent } = useNotifications(allTasks);
 
   const canCreateProcess = Boolean(user);
 
@@ -188,10 +184,6 @@ const Templates = () => {
           onSearchChange={setSearchQuery}
           onAddTask={canCreateProcess ? getAddButtonAction() : undefined}
           addButtonLabel={getAddButtonLabel()}
-          notifications={notifications}
-          unreadCount={unreadCount}
-          hasUrgent={hasUrgent}
-          onNotificationClick={() => {}}
         />
 
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-6">

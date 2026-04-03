@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { DashboardToolbar, KanbanGroupMode } from '@/components/dashboard/DashboardToolbar';
@@ -21,8 +22,6 @@ import { PlannerSyncPanel } from '@/components/planner/PlannerSyncPanel';
 import { useTasks } from '@/hooks/useTasks';
 import { useTaskScope, TaskScope } from '@/hooks/useTaskScope';
 import { useTasksProgress } from '@/hooks/useChecklists';
-import { useNotifications } from '@/hooks/useNotifications';
-import { useCommentNotifications } from '@/hooks/useCommentNotifications';
 import { useUnassignedTasks } from '@/hooks/useUnassignedTasks';
 import { usePendingAssignments } from '@/hooks/usePendingAssignments';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
@@ -46,6 +45,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 const Index = () => {
   const { profile } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeView, setActiveView] = useState('dashboard');
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const [taskView, setTaskView] = useState<TaskView>('table');
@@ -93,8 +93,6 @@ const Index = () => {
   } = useTasks(scope);
 
   const { categories } = useCategories();
-  const { notifications, unreadCount, hasUrgent } = useNotifications(allTasks);
-  const { commentNotifications, markAsRead: markCommentAsRead } = useCommentNotifications();
   const { count: unassignedCount, refetch: refetchUnassigned } = useUnassignedTasks();
   const { getPendingCount, refetch: refetchPending } = usePendingAssignments();
   const { canAssignToTeam } = useUserPermissions();
@@ -262,24 +260,63 @@ const Index = () => {
     return map;
   }, [profilesMap]);
 
+  const openTaskOrRequestFromId = useCallback(
+    async (taskId: string) => {
+      let task = allTasks.find((t) => t.id === taskId);
+      if (!task) {
+        const { data, error } = await supabase.from('tasks').select('*').eq('id', taskId).maybeSingle();
+        if (error || !data) {
+          toast.error('Élément introuvable ou inaccessible');
+          return false;
+        }
+        task = data as Task;
+      }
+      if (task.type === 'request') {
+        setSelectedRequest(task);
+        setIsRequestDetailOpen(true);
+      } else {
+        setSelectedTaskForComment(task);
+        setIsCommentDetailOpen(true);
+      }
+      return true;
+    },
+    [allTasks]
+  );
+
   const handleNotificationClick = (taskId: string) => {
-    const task = allTasks.find(t => t.id === taskId);
-    if (task) {
-      setSearchQuery(task.title);
-      toast.info(`Tâche sélectionnée: ${task.title}`);
-    }
+    void openTaskOrRequestFromId(taskId);
   };
 
-  const handleCommentNotificationClick = useCallback((taskId: string, notificationId: string) => {
-    markCommentAsRead(notificationId);
-    const task = allTasks.find(t => t.id === taskId);
-    if (task) {
-      setSelectedTaskForComment(task);
-      setIsCommentDetailOpen(true);
-    } else {
-      toast.info('Ouverture de la demande...');
-    }
-  }, [allTasks, markCommentAsRead]);
+  const handleCommentNotificationClick = useCallback(
+    (taskId: string, _notificationId: string) => {
+      void openTaskOrRequestFromId(taskId);
+    },
+    [openTaskOrRequestFromId]
+  );
+
+  // Deep link: /?openTask=<uuid> (used when notification is clicked from pages without local handlers)
+  const openTaskParam = searchParams.get('openTask');
+  useEffect(() => {
+    if (!openTaskParam || !profile?.id) return;
+
+    let cancelled = false;
+    (async () => {
+      await openTaskOrRequestFromId(openTaskParam);
+      if (cancelled) return;
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete('openTask');
+          return next;
+        },
+        { replace: true }
+      );
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [openTaskParam, profile?.id, openTaskOrRequestFromId, setSearchParams]);
 
   const handleScopeChange = (newScope: TaskScope) => {
     setScope(newScope);
@@ -583,10 +620,7 @@ const Index = () => {
           title={getTitle()}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
-          notifications={notifications}
-          commentNotifications={commentNotifications}
-          unreadCount={unreadCount}
-          hasUrgent={hasUrgent}
+          notificationTasks={allTasks}
           onNotificationClick={handleNotificationClick}
           onCommentNotificationClick={handleCommentNotificationClick}
           pendingValidations={pendingValidations}

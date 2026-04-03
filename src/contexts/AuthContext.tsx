@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
+import { createContext, useContext, useCallback, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -29,6 +29,8 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   updateProfile: (data: Partial<Profile>) => Promise<{ error: Error | null }>;
+  /** Refetch profile for the current user (e.g. after bootstrap insert). */
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -148,7 +150,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email,
       password,
       options: {
-        emailRedirectTo: window.location.origin,
+        // Same route as Azure OAuth: PKCE ?code= must be exchanged in AuthCallback (detectSessionInUrl is off).
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
         data: {
           display_name: displayName || email,
         },
@@ -187,6 +190,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error as Error | null };
   };
 
+  const refreshProfile = useCallback(async () => {
+    if (!user) return;
+    const next = await fetchProfile(user.id);
+    setProfile(next);
+    lastProfileUserIdRef.current = user.id;
+  }, [user]);
+
   const value = useMemo(
     () => ({
       user,
@@ -197,8 +207,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signIn,
       signOut,
       updateProfile,
+      refreshProfile,
     }),
-    [user, profile, session, isLoading]
+    [user, profile, session, isLoading, refreshProfile]
   );
 
   return (

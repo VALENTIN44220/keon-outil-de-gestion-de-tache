@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
+import type { User } from '@supabase/supabase-js';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
@@ -9,8 +10,20 @@ interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
+function displayNameFromUser(user: User) {
+  const meta = user.user_metadata ?? {};
+  return (
+    (typeof meta.full_name === 'string' && meta.full_name) ||
+    (typeof meta.name === 'string' && meta.name) ||
+    (typeof meta.display_name === 'string' && meta.display_name) ||
+    (typeof meta.preferred_username === 'string' && meta.preferred_username) ||
+    (user.email ? user.email.split('@')[0] : null) ||
+    'Utilisateur'
+  );
+}
+
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, refreshProfile } = useAuth();
   const [isCheckingProfile, setIsCheckingProfile] = useState(false);
   const [hasProfile, setHasProfile] = useState<boolean | null>(null);
   const [showAccessDenied, setShowAccessDenied] = useState(false);
@@ -24,32 +37,88 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
       setIsCheckingProfile(true);
       try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id, lovable_status')
-          .eq('user_id', user.id)
-          .maybeSingle();
+        // After OAuth redirect, ensure the client has loaded the session into memory
+        // before RLS evaluates auth.uid() on profiles.
+        const { data: sessionData } = await supabase.auth.getSession();
+        const sessionUser = sessionData.session?.user ?? user;
+
+        const fetchMyProfileRow = async () =>
+          supabase
+            .from('profiles')
+            .select('id, lovable_status')
+            .eq('user_id', sessionUser.id)
+            .maybeSingle();
+
+        let data: { id: string; lovable_status: string | null } | null = null;
+        let error: { message: string; code?: string } | null = null;
+
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const res = await fetchMyProfileRow();
+          if (res.data) {
+            data = res.data;
+            error = null;
+            break;
+          }
+          if (res.error) {
+            error = res.error;
+            break;
+          }
+          await new Promise((r) => setTimeout(r, 120 * (attempt + 1)));
+        }
 
         if (error) {
           console.error('Error checking profile:', error);
           setHasProfile(false);
-        } else if (!data) {
-          // User authenticated but no profile - not invited
-          setHasProfile(false);
           setShowAccessDenied(true);
-        } else {
-          setHasProfile(true);
+          return;
         }
+
+        if (data) {
+          setHasProfile(true);
+          return;
+        }
+
+        // No row in public.profiles for this auth user (trigger skipped, import, etc.).
+        // RLS: "Users can insert their own profile" WITH CHECK (auth.uid() = user_id).
+        const insertRow: Record<string, unknown> = {
+          user_id: sessionUser.id,
+          display_name: displayNameFromUser(sessionUser),
+        };
+        if (sessionUser.email) {
+          insertRow.lovable_email = sessionUser.email;
+        }
+
+        const { error: insertError } = await supabase.from('profiles').insert(insertRow);
+
+        if (!insertError) {
+          await refreshProfile();
+          setHasProfile(true);
+          return;
+        }
+
+        if (insertError.code === '23505') {
+          const { data: afterRace } = await fetchMyProfileRow();
+          if (afterRace) {
+            await refreshProfile();
+            setHasProfile(true);
+            return;
+          }
+        }
+
+        console.error('Profile bootstrap failed:', insertError);
+        setHasProfile(false);
+        setShowAccessDenied(true);
       } catch (error) {
         console.error('Error checking profile:', error);
         setHasProfile(false);
+        setShowAccessDenied(true);
       } finally {
         setIsCheckingProfile(false);
       }
     }
 
     checkProfile();
-  }, [user]);
+  }, [user, refreshProfile]);
 
   if (isLoading || isCheckingProfile) {
     return (
@@ -67,12 +136,12 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   if (hasProfile === false) {
     return (
       <>
-        <AccessRestrictedDialog 
-          open={showAccessDenied} 
+        <AccessRestrictedDialog
+          open={showAccessDenied}
           onClose={async () => {
             setShowAccessDenied(false);
             await supabase.auth.signOut();
-          }} 
+          }}
         />
         <div className="min-h-screen flex items-center justify-center bg-background">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />

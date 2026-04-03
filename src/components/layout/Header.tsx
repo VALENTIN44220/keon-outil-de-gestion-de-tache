@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,8 +14,9 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { ValidationNotificationBell } from '@/components/notifications/ValidationNotificationBell';
-import { TaskNotification } from '@/hooks/useNotifications';
-import { CommentNotification } from '@/hooks/useCommentNotifications';
+import { useNotifications } from '@/hooks/useNotifications';
+import { useCommentNotifications } from '@/hooks/useCommentNotifications';
+import { supabase } from '@/integrations/supabase/client';
 import { Task } from '@/types/task';
 import keonTaskLogo from '@/assets/keon-task-logo.png';
 
@@ -24,10 +26,11 @@ interface HeaderProps {
   onSearchChange: (query: string) => void;
   onAddTask?: () => void;
   addButtonLabel?: string;
-  notifications?: TaskNotification[];
-  commentNotifications?: CommentNotification[];
-  unreadCount?: number;
-  hasUrgent?: boolean;
+  /**
+   * When provided, deadline notifications are computed from these tasks (e.g. dashboard scope).
+   * Otherwise the header loads the current user's assigned tasks with a due date.
+   */
+  notificationTasks?: Task[];
   onNotificationClick?: (taskId: string) => void;
   onCommentNotificationClick?: (taskId: string, notificationId: string) => void;
   pendingValidations?: Task[];
@@ -36,15 +39,12 @@ interface HeaderProps {
 }
 
 export function Header({
-  title,
+  title: _title,
   searchQuery,
   onSearchChange,
   onAddTask,
   addButtonLabel = 'Nouvelle tâche',
-  notifications = [],
-  commentNotifications = [],
-  unreadCount = 0,
-  hasUrgent = false,
+  notificationTasks: notificationTasksOverride,
   onNotificationClick,
   onCommentNotificationClick,
   pendingValidations = [],
@@ -53,11 +53,58 @@ export function Header({
 }: HeaderProps) {
   const { user, profile, signOut } = useAuth();
   const navigate = useNavigate();
+  const { commentNotifications, markAsRead: markCommentNotificationRead } = useCommentNotifications();
+
+  /** When pages do not pass handlers, open the item from the dashboard (deep link). */
+  const defaultOpenTask = (taskId: string) => {
+    navigate(`/?openTask=${encodeURIComponent(taskId)}`);
+  };
+
+  const { data: defaultDeadlineTasks = [] } = useQuery({
+    queryKey: ['header-deadline-tasks', profile?.id],
+    queryFn: async () => {
+      if (!profile?.id) return [];
+      // Align with comment notifications: any row the user is involved in (not only assignee + type=task).
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('id, title, status, due_date, priority, type')
+        .not('due_date', 'is', null)
+        .or(
+          `assignee_id.eq.${profile.id},requester_id.eq.${profile.id},user_id.eq.${profile.id}`
+        );
+      if (error) throw error;
+      return (data || []) as Task[];
+    },
+    enabled: !!profile?.id,
+    staleTime: 60 * 1000,
+  });
+
+  const tasksForDeadlineNotifs =
+    notificationTasksOverride !== undefined ? notificationTasksOverride : defaultDeadlineTasks;
+
+  const { notifications, unreadCount, hasUrgent } = useNotifications(tasksForDeadlineNotifs);
+
+  const handleCommentNotificationClick = (taskId: string, notificationId: string) => {
+    markCommentNotificationRead(notificationId);
+    if (onCommentNotificationClick) {
+      onCommentNotificationClick(taskId, notificationId);
+    } else {
+      defaultOpenTask(taskId);
+    }
+  };
+
+  const handleDeadlineNotificationClick = (taskId: string) => {
+    if (onNotificationClick) {
+      onNotificationClick(taskId);
+    } else {
+      defaultOpenTask(taskId);
+    }
+  };
 
   const displayName = profile?.display_name || user?.email || 'Utilisateur';
   const initials = displayName
     .split(' ')
-    .map(n => n[0])
+    .map((n) => n[0])
     .join('')
     .toUpperCase()
     .slice(0, 2);
@@ -66,19 +113,20 @@ export function Header({
     <header className="bg-muted/50 border-b border-border px-3 sm:px-6 py-3 sm:py-4 sticky top-0 z-30">
       <div className="flex items-center justify-between gap-2 sm:gap-4">
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          <img 
-            src={keonTaskLogo} 
-            alt="KEON Task Manager" 
-            className="h-8 w-8 sm:h-10 sm:w-10 object-contain" 
+          <img
+            src={keonTaskLogo}
+            alt="KEON Task Manager"
+            className="h-8 w-8 sm:h-10 sm:w-10 object-contain"
           />
           <div className="flex flex-col leading-tight hidden sm:flex">
             <span className="text-base font-body font-bold tracking-wide text-foreground">KEON</span>
-            <span className="text-xs font-display font-semibold tracking-wider text-muted-foreground uppercase">Task Manager</span>
+            <span className="text-xs font-display font-semibold tracking-wider text-muted-foreground uppercase">
+              Task Manager
+            </span>
           </div>
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-3 flex-1 justify-end min-w-0">
-          {/* Search with icon integrated */}
           <div className="relative group flex-1 max-w-[200px] sm:max-w-[260px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
             <Input
@@ -90,24 +138,21 @@ export function Header({
             />
           </div>
 
-          {/* Validation Notifications */}
           <ValidationNotificationBell
             pendingValidations={pendingValidations}
             count={pendingValidationCount}
             onValidationClick={onValidationClick}
           />
 
-          {/* Notifications */}
           <NotificationBell
             notifications={notifications}
             commentNotifications={commentNotifications}
             unreadCount={unreadCount}
             hasUrgent={hasUrgent}
-            onNotificationClick={onNotificationClick}
-            onCommentNotificationClick={onCommentNotificationClick}
+            onNotificationClick={handleDeadlineNotificationClick}
+            onCommentNotificationClick={handleCommentNotificationClick}
           />
 
-          {/* Add Task Button */}
           {onAddTask && (
             <Button onClick={onAddTask} size="sm" className="gap-1.5 hidden sm:flex">
               <Plus className="w-4 h-4" />
@@ -120,10 +165,12 @@ export function Header({
             </Button>
           )}
 
-          {/* User Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-11 w-11 rounded-full p-0 ring-2 ring-border hover:ring-primary/30 transition-all">
+              <Button
+                variant="ghost"
+                className="relative h-11 w-11 rounded-full p-0 ring-2 ring-border hover:ring-primary/30 transition-all"
+              >
                 <Avatar className="h-11 w-11">
                   <AvatarImage src={profile?.avatar_url || undefined} alt={displayName} />
                   <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-white font-semibold">
@@ -151,7 +198,10 @@ export function Header({
                 Profil
               </DropdownMenuItem>
               <DropdownMenuSeparator className="bg-border" />
-              <DropdownMenuItem onClick={signOut} className="text-destructive cursor-pointer focus:text-destructive">
+              <DropdownMenuItem
+                onClick={signOut}
+                className="text-destructive cursor-pointer focus:text-destructive"
+              >
                 <LogOut className="mr-2 h-4 w-4" />
                 Déconnexion
               </DropdownMenuItem>

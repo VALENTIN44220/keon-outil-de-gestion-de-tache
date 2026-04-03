@@ -24,10 +24,23 @@ export default function ResetPassword() {
   const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
-    // Si l'URL avait un code de recovery, on n'a pas besoin d'attendre l'événement
-    if (_hasRecoveryInUrl) {
-      setIsChecking(false);
-    }
+    let cancelled = false;
+
+    // Avec detectSessionInUrl: false, l'échange PKCE du lien de reset doit être explicite.
+    void (async () => {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('code');
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) {
+          console.error('Recovery PKCE exchange failed:', error);
+        }
+      }
+      if (cancelled) return;
+      if (_hasRecoveryInUrl) {
+        setIsChecking(false);
+      }
+    })();
 
     // Écoute également l'événement PASSWORD_RECOVERY pour les flux alternatifs
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
@@ -44,6 +57,7 @@ export default function ResetPassword() {
     const timeout = setTimeout(() => setIsChecking(false), 3000);
 
     return () => {
+      cancelled = true;
       subscription.unsubscribe();
       clearTimeout(timeout);
     };

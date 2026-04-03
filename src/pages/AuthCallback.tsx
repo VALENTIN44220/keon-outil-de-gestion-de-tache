@@ -8,6 +8,9 @@ import { Button } from '@/components/ui/button';
 
 type CallbackStatus = 'processing' | 'success' | 'error';
 
+/** PKCE codes are one-shot; React Strict Mode runs effects twice — never exchange twice. */
+const consumedOAuthCodes = new Set<string>();
+
 const AuthCallback = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -29,40 +32,49 @@ const AuthCallback = () => {
         return;
       }
 
-      // Supabase Auth redirect does not always include `code` here.
-      // If there's already a session, just redirect the user.
-      if (!code) {
-        try {
-          const { data } = await supabase.auth.getSession();
-          if (data.session) {
-            setStatus('success');
-            setTimeout(() => navigate('/'), 300);
-            return;
-          }
-        } catch {
-          // ignore and show error below
-        }
+      const finishWithSession = () => {
+        setStatus('success');
+        toast.success('Connexion réussie');
+        setTimeout(() => navigate('/', { replace: true }), 400);
+      };
 
+      try {
+        const { data: existing } = await supabase.auth.getSession();
+        if (existing.session) {
+          finishWithSession();
+          return;
+        }
+      } catch {
+        // continue
+      }
+
+      if (!code) {
         setStatus('error');
         setErrorMessage("Connexion incomplète (session introuvable). Réessayez.");
         return;
       }
 
+      if (consumedOAuthCodes.has(code)) {
+        const { data: again } = await supabase.auth.getSession();
+        if (again.session) {
+          finishWithSession();
+          return;
+        }
+        setStatus('error');
+        setErrorMessage('Session introuvable après la connexion. Réessayez.');
+        return;
+      }
+      consumedOAuthCodes.add(code);
+
       try {
-        // Supabase PKCE flow: exchange the authorization code for a session.
         const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
         if (exchangeError) throw exchangeError;
-
-        setStatus('success');
-        toast.success('Connexion réussie');
-
-        setTimeout(() => {
-          navigate('/');
-        }, 800);
+        finishWithSession();
       } catch (err: any) {
         console.error('Callback error:', err);
+        consumedOAuthCodes.delete(code);
         setStatus('error');
-        setErrorMessage(err.message || 'Erreur lors de l\'échange du code');
+        setErrorMessage(err.message || "Erreur lors de l'échange du code");
         toast.error(`Erreur: ${err.message}`);
       }
     };

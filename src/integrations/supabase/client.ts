@@ -13,5 +13,9 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
-  }
+    flowType: 'pkce',
+    // Manual PKCE exchange in AuthCallback / ResetPassword only. Leaving this true races with
+    // exchangeCodeForSession() and can consume the auth ?code= twice (broken OAuth / recovery).
+    detectSessionInUrl: false,
+  },
 });

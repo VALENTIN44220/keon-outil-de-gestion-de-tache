@@ -6,8 +6,6 @@ import { AddTaskDialog } from '@/components/tasks/AddTaskDialog';
 import { NewTaskDialog } from '@/components/tasks/NewTaskDialog';
 import { RequestDetailDialog } from '@/components/tasks/RequestDetailDialog';
 import { ConfigurableDashboard } from '@/components/dashboard/ConfigurableDashboard';
-import { useNotifications } from '@/hooks/useNotifications';
-import { useCommentNotifications } from '@/hooks/useCommentNotifications';
 import { useTasksProgress } from '@/hooks/useChecklists';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { usePendingAssignments } from '@/hooks/usePendingAssignments';
@@ -25,6 +23,7 @@ import { ServiceProcessCard } from '@/components/tasks/ServiceProcessCard';
 import { DraggableActionCards } from '@/components/requests/DraggableActionCards';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 interface ProcessTemplate {
   id: string;
@@ -71,8 +70,6 @@ const Requests = () => {
     refetch,
   } = useTasks();
 
-  const { notifications, unreadCount, hasUrgent } = useNotifications(allTasks);
-  const { commentNotifications, markAsRead: markCommentAsRead } = useCommentNotifications();
   const { getPendingCount, refetch: refetchPending } = usePendingAssignments();
   const { canAssignToTeam, isManager } = useUserPermissions();
 
@@ -199,22 +196,33 @@ const Requests = () => {
 
   const globalProgress = dashboardStats.completionRate;
 
-  const handleNotificationClick = (taskId: string) => {
-    const task = requests.find(r => r.id === taskId);
-    if (task) {
+  const openNotificationTarget = useCallback(
+    async (taskId: string) => {
+      let task = requests.find((r) => r.id === taskId) || allTasks.find((t) => t.id === taskId);
+      if (!task) {
+        const { data, error } = await supabase.from('tasks').select('*').eq('id', taskId).maybeSingle();
+        if (error || !data) {
+          toast.error('Élément introuvable ou inaccessible');
+          return;
+        }
+        task = data as Task;
+      }
       setSelectedRequest(task);
       setIsDetailOpen(true);
-    }
+    },
+    [requests, allTasks]
+  );
+
+  const handleNotificationClick = (taskId: string) => {
+    void openNotificationTarget(taskId);
   };
 
-  const handleCommentNotificationClick = useCallback((taskId: string, notificationId: string) => {
-    markCommentAsRead(notificationId);
-    const task = requests.find(r => r.id === taskId) || allTasks.find(t => t.id === taskId);
-    if (task) {
-      setSelectedRequest(task);
-      setIsDetailOpen(true);
-    }
-  }, [requests, allTasks, markCommentAsRead]);
+  const handleCommentNotificationClick = useCallback(
+    (taskId: string, _notificationId: string) => {
+      void openNotificationTarget(taskId);
+    },
+    [openNotificationTarget]
+  );
 
   const handleRefresh = () => {
     fetchRequests();
@@ -362,10 +370,7 @@ const Requests = () => {
           title="Demandes"
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
-          notifications={notifications}
-          commentNotifications={commentNotifications}
-          unreadCount={unreadCount}
-          hasUrgent={hasUrgent}
+          notificationTasks={allTasks}
           onNotificationClick={handleNotificationClick}
           onCommentNotificationClick={handleCommentNotificationClick}
         />
