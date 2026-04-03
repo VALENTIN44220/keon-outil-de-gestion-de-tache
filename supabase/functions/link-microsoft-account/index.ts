@@ -32,12 +32,12 @@ Deno.serve(async (req) => {
 
     // ── 2. Validate: current user must have an azure identity ────────────────
     const { data: identities } = await admin
-      .from('identities' as any)
+      .schema('auth')
+      .from('identities')
       .select('provider')
       .eq('user_id', currentUser.id)
       .eq('provider', 'azure')
-      .limit(1)
-      .schema('auth');
+      .limit(1);
 
     // Fallback: check user metadata if direct query unavailable
     const hasAzure =
@@ -94,12 +94,12 @@ Deno.serve(async (req) => {
 
     // ── 6. Target must not already have an azure identity ────────────────────
     const { data: targetIdentities } = await admin
-      .from('identities' as any)
+      .schema('auth')
+      .from('identities')
       .select('provider')
       .eq('user_id', targetUserId)
       .eq('provider', 'azure')
-      .limit(1)
-      .schema('auth');
+      .limit(1);
 
     if (targetIdentities && targetIdentities.length > 0) {
       return json({ error: 'target_already_has_azure' }, 409);
