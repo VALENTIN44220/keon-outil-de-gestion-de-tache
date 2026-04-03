@@ -54,7 +54,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   target_not_found:       "Aucun compte ne correspond à cet email. Vérifiez l'adresse ou contactez votre administrateur.",
   target_not_authorised:  "Ce compte n'est pas autorisé à accéder à l'application.",
   target_already_has_azure: "Un compte Microsoft est déjà associé à cet email.",
-  already_has_profile:    "Un profil existe déjà pour cette session Microsoft. Déconnectez-vous, puis demandez à un admin de supprimer le profil fantôme créé avant la mise à jour, ou contactez le support.",
+  already_has_profile:    "Cette session Microsoft a déjà un profil dans l'application. Déconnectez-vous et reconnectez-vous directement avec Microsoft.",
   not_an_azure_user:      "Cette session n'est pas une connexion Microsoft valide pour la liaison.",
   transfer_failed:        "La liaison a échoué côté serveur. Réessayez ou contactez votre administrateur.",
   internal_error:         "Erreur interne. Réessayez dans quelques instants.",
