@@ -30,6 +30,9 @@ type LinkMicrosoftResponse = {
   detail?: string;
 };
 
+const AUTH_GATE_DEBUG =
+  import.meta.env.DEV || import.meta.env.VITE_AUTH_GATE_DEBUG === 'true';
+
 /** Edge Function errors are returned as JSON with non-2xx status; invoke() then sets data=null. */
 async function resolveLinkMicrosoftPayload(
   data: LinkMicrosoftResponse | null,
@@ -82,6 +85,15 @@ export function MicrosoftAccountLinkingDialog({ open, microsoftEmail, onLinked, 
       );
 
       const payload = await resolveLinkMicrosoftPayload(data ?? null, error);
+
+      if (AUTH_GATE_DEBUG) {
+        console.info('[auth/gate] link-microsoft-account réponse', {
+          success: payload?.success ?? false,
+          errorCode: payload?.error ?? (error instanceof Error ? error.name : null),
+          hasFunctionsHttpError: error instanceof FunctionsHttpError,
+          targetEmailDomain: email.trim().split('@')[1] ?? null,
+        });
+      }
 
       if (!payload?.success) {
         const raw =
