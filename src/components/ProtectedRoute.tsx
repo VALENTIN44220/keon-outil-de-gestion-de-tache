@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import type { User } from '@supabase/supabase-js';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
 import { AccessRestrictedDialog } from './auth/AccessRestrictedDialog';
+import { MicrosoftAccountLinkingDialog } from './auth/MicrosoftAccountLinkingDialog';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -22,11 +23,22 @@ function displayNameFromUser(user: User) {
   );
 }
 
+/** Returns true when the current Supabase session was initiated via Microsoft (azure). */
+function isAzureSession(user: User): boolean {
+  const meta = user.app_metadata ?? {};
+  return (
+    meta.provider === 'azure' ||
+    (meta.providers as string[] | undefined)?.includes('azure') === true
+  );
+}
+
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { user, isLoading, refreshProfile } = useAuth();
+  const navigate = useNavigate();
   const [isCheckingProfile, setIsCheckingProfile] = useState(false);
   const [hasProfile, setHasProfile] = useState<boolean | null>(null);
   const [showAccessDenied, setShowAccessDenied] = useState(false);
+  const [showLinkingDialog, setShowLinkingDialog] = useState(false);
 
   useEffect(() => {
     async function checkProfile() {
@@ -107,7 +119,14 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
         console.error('Profile bootstrap failed:', insertError);
         setHasProfile(false);
-        setShowAccessDenied(true);
+
+        // If the user logged in via Microsoft but the email doesn't match any
+        // existing profile, offer account linking instead of a plain "access denied".
+        if (isAzureSession(sessionUser)) {
+          setShowLinkingDialog(true);
+        } else {
+          setShowAccessDenied(true);
+        }
       } catch (error) {
         console.error('Error checking profile:', error);
         setHasProfile(false);
@@ -136,6 +155,25 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   if (hasProfile === false) {
     return (
       <>
+        {/* Microsoft login → no profile match → offer account linking */}
+        <MicrosoftAccountLinkingDialog
+          open={showLinkingDialog}
+          microsoftEmail={user?.email ?? null}
+          onLinked={async () => {
+            // After linking the identity is transferred; ask the user to re-authenticate
+            // with Microsoft — the new session will resolve to the original account.
+            setShowLinkingDialog(false);
+            // The dialog already signed out before calling onLinked.
+            navigate('/auth', { replace: true });
+          }}
+          onDenied={async () => {
+            setShowLinkingDialog(false);
+            setShowAccessDenied(true);
+            await supabase.auth.signOut();
+          }}
+        />
+
+        {/* Classic "not invited" gate */}
         <AccessRestrictedDialog
           open={showAccessDenied}
           onClose={async () => {

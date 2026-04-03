@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.get-table-schema]
 verify_jwt = false
+
+[functions.link-microsoft-account]
+verify_jwt = false
