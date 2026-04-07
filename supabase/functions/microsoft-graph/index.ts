@@ -329,31 +329,51 @@ async function resolveGraphUsers(accessToken: string, userIds: string[]): Promis
 // Match a Microsoft user email to a local profile
 async function matchEmailToProfile(supabase: any, email: string): Promise<string | null> {
   if (!email) return null;
-  
+  const normalized = email.trim().toLowerCase();
+
   // Try matching via microsoft connection email first
   const { data: msConn } = await supabase
     .from('user_microsoft_connections')
     .select('profile_id')
-    .ilike('email', email)
-    .single();
-  
+    .ilike('email', normalized)
+    .maybeSingle();
+
   if (msConn?.profile_id) return msConn.profile_id;
 
-  // Fallback: match via auth user email -> profile
-  const { data: authUsers } = await supabase.auth.admin.listUsers();
-  const matchedUser = (authUsers?.users || []).find(
-    (u: any) => u.email?.toLowerCase() === email.toLowerCase()
-  );
-  
-  if (matchedUser) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('user_id', matchedUser.id)
-      .single();
-    return profile?.id || null;
+  // Match profile emails stored on app (avoids auth.admin.listUsers pagination/cost)
+  const { data: byLovable } = await supabase
+    .from('profiles')
+    .select('id')
+    .ilike('lovable_email', normalized)
+    .maybeSingle();
+  if (byLovable?.id) return byLovable.id;
+
+  const { data: bySecondary } = await supabase
+    .from('profiles')
+    .select('id')
+    .ilike('secondary_email', normalized)
+    .maybeSingle();
+  if (bySecondary?.id) return bySecondary.id;
+
+  // Last resort: scan auth users (can be expensive; only when no profile email match)
+  let page = 1;
+  const perPage = 1000;
+  for (;;) {
+    const { data: authData } = await supabase.auth.admin.listUsers({ page, perPage });
+    const users = authData?.users || [];
+    const matchedUser = users.find((u: any) => (u.email || '').toLowerCase() === normalized);
+    if (matchedUser) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', matchedUser.id)
+        .maybeSingle();
+      return profile?.id || null;
+    }
+    if (users.length < perPage) break;
+    page++;
   }
-  
+
   return null;
 }
 
@@ -389,8 +409,22 @@ async function createPlannerTask(accessToken: string, planId: string, task: any)
   return await resp.json();
 }
 
-// Update a task in Planner
-async function updatePlannerTask(accessToken: string, taskId: string, etag: string, updates: any): Promise<any> {
+async function fetchPlannerTaskEtag(accessToken: string, taskId: string): Promise<string | undefined> {
+  const resp = await fetch(`${MICROSOFT_GRAPH_URL}/planner/tasks/${taskId}?$select=id`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!resp.ok) return undefined;
+  const body = await resp.json();
+  return body?.['@odata.etag'];
+}
+
+// Update a task in Planner. Returns new etag when Graph provides it (required after PATCH for If-Match on later updates).
+async function updatePlannerTask(
+  accessToken: string,
+  taskId: string,
+  etag: string,
+  updates: any,
+): Promise<{ success: true; etag?: string }> {
   const resp = await fetch(`${MICROSOFT_GRAPH_URL}/planner/tasks/${taskId}`, {
     method: 'PATCH',
     headers: {
@@ -404,9 +438,17 @@ async function updatePlannerTask(accessToken: string, taskId: string, etag: stri
     const errText = await resp.text();
     throw new Error(`Failed to update planner task: ${resp.status} - ${errText}`);
   }
-  // PATCH returns 204 No Content on success
-  if (resp.status === 204) return { success: true };
-  return await resp.json();
+
+  const headerEtag = resp.headers.get('ETag') || resp.headers.get('etag') || undefined;
+  if (resp.status === 204) {
+    if (headerEtag) return { success: true, etag: headerEtag };
+    const refetched = await fetchPlannerTaskEtag(accessToken, taskId);
+    return { success: true, etag: refetched };
+  }
+
+  const body = await resp.json();
+  const bodyEtag = body?.['@odata.etag'] || headerEtag;
+  return { success: true, etag: bodyEtag };
 }
 
 // Map Planner percentComplete to app status
@@ -976,6 +1018,9 @@ Deno.serve(async (req) => {
               planner_assignee_name: assigneeInfo.displayName || null,
             });
 
+            linkedPlannerIds.add(pt.id);
+            linkedLocalIds.add(newTask.id);
+
             tasksPulled++;
           } catch (err: any) {
             errors.push({ plannerTaskId: pt.id, error: err.message });
@@ -983,18 +1028,28 @@ Deno.serve(async (req) => {
         }
       }
 
-      // UPDATE: Sync existing linked tasks
+      // UPDATE: Sync existing linked tasks (only rows that were linked at sync start; PULL additions are handled next run).
+      // Order for `both`: Planner → local first, then local → Planner for percent/priority/due so app changes to those fields win.
       for (const link of (existingLinks || [])) {
         const plannerTask = plannerTasks.find(t => t.id === link.planner_task_id);
         if (!plannerTask) continue;
 
         try {
-          // Get local task from prefetched map
           const localTask = localTasksById.get(link.local_task_id);
           if (!localTask) continue;
 
+          let etagForLink = plannerTask['@odata.etag'] as string;
+
           // Pull updates from Planner
           if (mapping.sync_direction === 'from_planner' || mapping.sync_direction === 'both') {
+            let plannerNotesDescription: string | null = null;
+            try {
+              const details = await getPlannerTaskDetails(accessToken, plannerTask.id);
+              plannerNotesDescription = details.description ?? null;
+            } catch {
+              plannerNotesDescription = null;
+            }
+
             const plannerStatus = plannerPercentToStatus(plannerTask.percentComplete || 0);
             const plannerPriority = plannerPriorityToApp(plannerTask.priority || 5);
 
@@ -1036,9 +1091,8 @@ Deno.serve(async (req) => {
               updates.planner_labels = newLabels.length > 0 ? newLabels : null;
             }
 
-            // Update description from Planner notes
-            if (plannerTask._description && plannerTask._description !== (localTask.description || '')) {
-              updates.description = plannerTask._description;
+            if (plannerNotesDescription !== null && plannerNotesDescription !== (localTask.description || '')) {
+              updates.description = plannerNotesDescription;
             }
 
             if (Object.keys(updates).length > 0) {
@@ -1085,19 +1139,26 @@ Deno.serve(async (req) => {
 
           // Push updates to Planner
           if (mapping.sync_direction === 'to_planner' || mapping.sync_direction === 'both') {
-            const localPercent = statusToPlannerPercent(localTask.status);
-            const localPlannerPriority = appPriorityToPlanner(localTask.priority || 'medium');
+            const localForPush = localTasksById.get(link.local_task_id) ?? localTask;
+            const localPercent = statusToPlannerPercent(localForPush.status);
+            const localPlannerPriority = appPriorityToPlanner(localForPush.priority || 'medium');
 
             const plannerUpdates: any = {};
             if (localPercent !== (plannerTask.percentComplete || 0)) plannerUpdates.percentComplete = localPercent;
             if (localPlannerPriority !== (plannerTask.priority || 5)) plannerUpdates.priority = localPlannerPriority;
-            if (localTask.due_date && localTask.due_date !== (plannerTask.dueDateTime || '').substring(0, 10)) {
-              plannerUpdates.dueDateTime = localTask.due_date + 'T00:00:00Z';
+            if (localForPush.due_date && localForPush.due_date !== (plannerTask.dueDateTime || '').substring(0, 10)) {
+              plannerUpdates.dueDateTime = localForPush.due_date + 'T00:00:00Z';
             }
 
             if (Object.keys(plannerUpdates).length > 0) {
               try {
-                await updatePlannerTask(accessToken, plannerTask.id, plannerTask['@odata.etag'], plannerUpdates);
+                const patchResult = await updatePlannerTask(
+                  accessToken,
+                  plannerTask.id,
+                  etagForLink,
+                  plannerUpdates,
+                );
+                if (patchResult.etag) etagForLink = patchResult.etag;
                 tasksUpdated++;
               } catch (err: any) {
                 errors.push({ plannerTaskId: plannerTask.id, error: err.message });
@@ -1107,7 +1168,7 @@ Deno.serve(async (req) => {
 
           // Update link
           await supabase.from('planner_task_links').update({
-            planner_etag: plannerTask['@odata.etag'],
+            planner_etag: etagForLink,
             last_synced_at: new Date().toISOString(),
             sync_status: 'synced',
           }).eq('id', link.id);
@@ -1142,6 +1203,8 @@ Deno.serve(async (req) => {
               planner_etag: created['@odata.etag'],
               sync_status: 'synced',
             });
+
+            linkedLocalIds.add(lt.id);
 
             tasksPushed++;
           } catch (err: any) {
