@@ -250,12 +250,23 @@ function isFilterActive(value: string | undefined, defaultValue = 'all'): boolea
   return !!value && value !== defaultValue;
 }
 
+const SUPPLIER_SESSION_KEY = 'keon-supplier-session-filters';
+
+function readSessionFilters(): { filters: SupplierFilters; prefixFilter: string; page: number; viewMode: SupplierViewMode; sortConfig: SupplierSortConfig } | null {
+  try {
+    const raw = sessionStorage.getItem(SUPPLIER_SESSION_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch { return null; }
+}
+
 export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = false, isAdmin = false }: SupplierListViewProps) {
   const pageSize = 200;
-  const [viewMode, setViewMode] = useState<SupplierViewMode>('table');
-  const [page, setPage] = useState(0);
-  const [filters, setFilters] = useState<SupplierFilters>(DEFAULT_SUPPLIER_FILTERS);
-  const [prefixFilter, setPrefixFilter] = useState('all');
+  const sessionState = useMemo(() => readSessionFilters(), []);
+  const [viewMode, setViewMode] = useState<SupplierViewMode>(sessionState?.viewMode ?? 'table');
+  const [page, setPage] = useState(sessionState?.page ?? 0);
+  const [filters, setFilters] = useState<SupplierFilters>(sessionState?.filters ?? DEFAULT_SUPPLIER_FILTERS);
+  const [prefixFilter, setPrefixFilter] = useState(sessionState?.prefixFilter ?? 'all');
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
     if (typeof window === 'undefined') return DEFAULT_VISIBLE_COLUMNS;
     return (
