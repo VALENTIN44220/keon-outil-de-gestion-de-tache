@@ -1,0 +1,2 @@
+# SPA fallback — static files under /assets still win over this rule.
+/*    /index.html   200

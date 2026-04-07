@@ -19,6 +19,9 @@ export default defineConfig(({ mode }) => {
   }
 
   return {
+    build: {
+      manifest: true,
+    },
     server: {
       host: "::",
       port: 8080,

@@ -1,0 +1,20 @@
+# Cloudflare Pages: avoid stale index.html referencing old hashed chunks, and serve JS with explicit types.
+# https://developers.cloudflare.com/pages/configuration/headers/
+
+/assets/*
+  X-Content-Type-Options: nosniff
+
+/assets/*.js
+  Content-Type: application/javascript; charset=utf-8
+  Cache-Control: public, max-age=31536000, immutable
+
+/assets/*.css
+  Content-Type: text/css; charset=utf-8
+  Cache-Control: public, max-age=31536000, immutable
+
+/assets/*.woff2
+  Cache-Control: public, max-age=31536000, immutable
+
+# HTML entry: always revalidate so deploys don’t pair a new manifest with cached old index (or the inverse).
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate
