@@ -196,7 +196,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
         }
 
         // RLS: "Users can insert their own profile" WITH CHECK (auth.uid() = user_id).
-        const insertRow: Record<string, unknown> = {
+        const insertRow: { user_id: string; display_name: string; lovable_email?: string } = {
           user_id: sessionUser.id,
           display_name: displayNameFromUser(sessionUser),
         };
@@ -206,7 +206,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
         authGateLog('tentative bootstrap profil (connexion email / non-OAuth)', { userId: sessionUser.id });
 
-        const { error: insertError } = await supabase.from('profiles').insert(insertRow);
+        const { error: insertError } = await supabase.from('profiles').insert(insertRow as any);
 
         if (!insertError) {
           authGateLog('insert profil bootstrap OK → accès', { userId: sessionUser.id });
