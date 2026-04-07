@@ -190,51 +190,116 @@ async function getUserProfile(accessToken: string): Promise<any> {
 
 // ====== PLANNER API FUNCTIONS ======
 
-// Get all plans the user is member of
+// Collect Planner plans: group-owned plans + recent/favorites (covers shared plans & Teams where memberOf filter was too strict).
 async function getPlannerPlans(accessToken: string): Promise<any[]> {
-  const allPlans: any[] = [];
+  const byPlanId = new Map<
+    string,
+    { id: string; title: string; groupId: string; groupName: string; createdDateTime?: string }
+  >();
+  const groupDisplayName = new Map<string, string>();
 
-  // Get groups the user is member of
-  let groupUrl: string | null = `${MICROSOFT_GRAPH_URL}/me/memberOf/microsoft.graph.group?$filter=groupTypes/any(g:g eq 'Unified')&$select=id,displayName&$top=100`;
-
-  const groups: any[] = [];
-  while (groupUrl) {
-    const resp: Response = await fetch(groupUrl, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    if (!resp.ok) {
-      console.error('Failed to fetch groups:', resp.status);
-      break;
-    }
-    const data: any = await resp.json();
-    groups.push(...(data.value || []));
-    groupUrl = data['@odata.nextLink'] || null;
-  }
-
-  // For each group, get its plans
-  for (const group of groups) {
+  async function resolveGroupName(groupId: string): Promise<string> {
+    if (!groupId) return 'Groupe';
+    const cached = groupDisplayName.get(groupId);
+    if (cached) return cached;
     try {
-      const resp = await fetch(`${MICROSOFT_GRAPH_URL}/groups/${group.id}/planner/plans`, {
+      const resp = await fetch(`${MICROSOFT_GRAPH_URL}/groups/${groupId}?$select=displayName`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (resp.ok) {
-        const data = await resp.json();
-        for (const plan of (data.value || [])) {
-          allPlans.push({
-            id: plan.id,
-            title: plan.title,
-            groupId: group.id,
-            groupName: group.displayName,
-            createdDateTime: plan.createdDateTime,
-          });
-        }
+        const j = await resp.json();
+        const name = j.displayName || 'Groupe';
+        groupDisplayName.set(groupId, name);
+        return name;
       }
     } catch (e) {
-      console.error(`Error fetching plans for group ${group.id}:`, e);
+      console.error('getPlannerPlans: resolveGroupName', groupId, e);
+    }
+    return 'Groupe';
+  }
+
+  function addPlan(plan: any, groupId: string, groupName: string) {
+    if (!plan?.id) return;
+    if (byPlanId.has(plan.id)) return;
+    byPlanId.set(plan.id, {
+      id: plan.id,
+      title: plan.title ?? 'Sans titre',
+      groupId,
+      groupName: groupName || 'Groupe',
+      createdDateTime: plan.createdDateTime,
+    });
+  }
+
+  // 1) All group memberships (not only Unified). Non–Planner-capable groups return 403/empty — skipped.
+  let groupUrl: string | null =
+    `${MICROSOFT_GRAPH_URL}/me/memberOf/microsoft.graph.group?$select=id,displayName&$top=100`;
+  while (groupUrl) {
+    const resp = await fetch(groupUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+    if (!resp.ok) {
+      console.error('getPlannerPlans: memberOf failed', resp.status, await resp.text());
+      break;
+    }
+    const data: any = await resp.json();
+    for (const g of data.value || []) {
+      if (!g?.id) continue;
+      groupDisplayName.set(g.id, g.displayName || 'Groupe');
+    }
+    groupUrl = data['@odata.nextLink'] || null;
+  }
+
+  // 2) Teams — underlying id is the Microsoft 365 group id (fills gaps when memberOf differs from Teams UX).
+  let teamsUrl: string | null = `${MICROSOFT_GRAPH_URL}/me/joinedTeams?$select=id,displayName&$top=100`;
+  while (teamsUrl) {
+    const resp = await fetch(teamsUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+    if (!resp.ok) {
+      console.error('getPlannerPlans: joinedTeams failed', resp.status);
+      break;
+    }
+    const data: any = await resp.json();
+    for (const t of data.value || []) {
+      if (!t?.id) continue;
+      if (!groupDisplayName.has(t.id)) groupDisplayName.set(t.id, t.displayName || 'Équipe');
+    }
+    teamsUrl = data['@odata.nextLink'] || null;
+  }
+
+  for (const [gid, gname] of groupDisplayName) {
+    try {
+      const resp = await fetch(`${MICROSOFT_GRAPH_URL}/groups/${gid}/planner/plans`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      for (const plan of data.value || []) addPlan(plan, gid, gname);
+    } catch (e) {
+      console.error(`getPlannerPlans: groups/${gid}/planner/plans`, e);
     }
   }
 
-  return allPlans;
+  // 3) Plans the user actually uses in Planner (includes many “shared with me” cases).
+  async function ingestPlannerPlanCollection(startUrl: string) {
+    let next: string | null = startUrl;
+    while (next) {
+      const resp = await fetch(next, { headers: { Authorization: `Bearer ${accessToken}` } });
+      if (!resp.ok) {
+        const hint = await resp.text();
+        console.error('getPlannerPlans: planner collection failed', startUrl, resp.status, hint.slice(0, 500));
+        break;
+      }
+      const data: any = await resp.json();
+      for (const plan of data.value || []) {
+        const owner = typeof plan.owner === 'string' ? plan.owner : '';
+        const gname = owner ? await resolveGroupName(owner) : 'Groupe';
+        addPlan(plan, owner, gname);
+      }
+      next = data['@odata.nextLink'] || null;
+    }
+  }
+
+  await ingestPlannerPlanCollection(`${MICROSOFT_GRAPH_URL}/me/planner/recentPlans`);
+  await ingestPlannerPlanCollection(`${MICROSOFT_GRAPH_URL}/me/planner/favoritePlans`);
+
+  return Array.from(byPlanId.values());
 }
 
 // Get buckets from a specific plan

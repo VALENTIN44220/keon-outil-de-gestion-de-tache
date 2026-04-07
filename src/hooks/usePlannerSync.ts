@@ -70,10 +70,14 @@ export function usePlannerSync() {
         body: { action: 'planner-get-plans' },
       });
       if (error) throw error;
-      if (data.plans) setPlans(data.plans);
+      if (data && data.success === false && data.error) {
+        throw new Error(data.error);
+      }
+      setPlans(Array.isArray(data?.plans) ? data.plans : []);
     } catch (error: any) {
       console.error('Error fetching Planner plans:', error);
       toast.error(`Erreur chargement plans: ${error.message}`);
+      setPlans([]);
     } finally {
       setIsLoadingPlans(false);
     }

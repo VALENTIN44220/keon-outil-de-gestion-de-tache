@@ -99,6 +99,7 @@ export function PlannerSyncPanel() {
   };
 
   const unmappedPlans = plans.filter(p => !mappings.some(m => m.planner_plan_id === p.id));
+  const allPlansAlreadyMapped = plans.length > 0 && unmappedPlans.length === 0;
 
   return (
     <div className="space-y-4">
@@ -154,8 +155,15 @@ export function PlannerSyncPanel() {
                 <Loader2 className="h-5 w-5 animate-spin" />
                 <span className="text-sm text-muted-foreground">Chargement des plans depuis Microsoft Teams...</span>
               </div>
-            ) : unmappedPlans.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Aucun nouveau plan disponible. Tous vos plans sont déjà configurés.</p>
+            ) : plans.length === 0 ? (
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>Microsoft Graph n’a renvoyé aucun plan Planner pour ce compte.</p>
+                <p className="text-xs">
+                  Vérifiez que la connexion Microsoft est à jour, que les plans sont bien dans Teams / Planner pour ce même compte, puis ressayez. Si le problème continue, il peut manquer un consentement administrateur pour les groupes ou équipes.
+                </p>
+              </div>
+            ) : allPlansAlreadyMapped ? (
+              <p className="text-sm text-muted-foreground">Aucun nouveau plan disponible. Tous vos plans détectés sont déjà configurés.</p>
             ) : (
               <>
                 <div className="space-y-2">
