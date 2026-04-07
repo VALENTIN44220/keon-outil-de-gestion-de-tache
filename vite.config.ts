@@ -21,6 +21,14 @@ export default defineConfig(({ mode }) => {
   return {
     build: {
       manifest: true,
+      // Cloudflare Pages (and some CDN/browser combos) intermittently corrupt or mis-serve
+      // lazy chunks (Firefox: NS_ERROR_CORRUPTED_CONTENT). One JS artifact per deploy avoids
+      // that class of failures at the cost of a larger initial download.
+      rollupOptions: {
+        output: {
+          inlineDynamicImports: true,
+        },
+      },
     },
     server: {
       host: "::",
