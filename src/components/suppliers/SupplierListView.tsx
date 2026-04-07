@@ -377,8 +377,14 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
   const [newPresetName, setNewPresetName] = useState('');
 
   // Server-side sort config
-  const [sortConfig, setSortConfig] = useState<SupplierSortConfig>({ key: 'updated_at', direction: 'desc' });
+  const [sortConfig, setSortConfig] = useState<SupplierSortConfig>(sessionState?.sortConfig ?? { key: 'updated_at', direction: 'desc' });
 
+  // Persist filters/page/view/sort to sessionStorage
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(SUPPLIER_SESSION_KEY, JSON.stringify({ filters, prefixFilter, page, viewMode, sortConfig }));
+    } catch { /* ignore */ }
+  }, [filters, prefixFilter, page, viewMode, sortConfig]);
   const handleSort = useCallback((key: string) => {
     setSortConfig((current) => {
       if (current.key === key) {
