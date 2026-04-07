@@ -3,6 +3,7 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import type { Session, User } from '@supabase/supabase-js';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
 import { Loader2 } from 'lucide-react';
 import { AccessRestrictedDialog } from './auth/AccessRestrictedDialog';
 import { MicrosoftAccountLinkingDialog } from './auth/MicrosoftAccountLinkingDialog';
@@ -196,7 +197,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
         }
 
         // RLS: "Users can insert their own profile" WITH CHECK (auth.uid() = user_id).
-        const insertRow: { user_id: string; display_name: string; lovable_email?: string } = {
+        const insertRow: Database['public']['Tables']['profiles']['Insert'] = {
           user_id: sessionUser.id,
           display_name: displayNameFromUser(sessionUser),
         };
@@ -206,7 +207,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
         authGateLog('tentative bootstrap profil (connexion email / non-OAuth)', { userId: sessionUser.id });
 
-        const { error: insertError } = await supabase.from('profiles').insert(insertRow as any);
+        const { error: insertError } = await supabase.from('profiles').insert(insertRow);
 
         if (!insertError) {
           authGateLog('insert profil bootstrap OK → accès', { userId: sessionUser.id });

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Task } from '@/types/task';
 import { ITProjectPhase, IT_PHASE_BADGE_CONFIG } from '@/types/itProject';
+import { useSessionStorageState } from '@/hooks/useSessionStorageState';
 
 const STATUS_LABELS: Record<string, { label: string; className: string }> = {
   'to_assign': { label: 'À assigner', className: 'bg-slate-500/10 text-slate-600 border-slate-500/20' },
@@ -27,7 +28,11 @@ interface Props {
 }
 
 export function ITPhaseAssignDialog({ open, onOpenChange, phase, projectTasks, onDone }: Props) {
-  const [search, setSearch] = useState('');
+  const [search, setSearch, clearSearch] = useSessionStorageState<string>(
+    `itPhaseAssignDialog:search:${phase}`,
+    '',
+    { serialize: (v) => v, parse: (raw) => raw },
+  );
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
 
@@ -63,7 +68,7 @@ export function ITPhaseAssignDialog({ open, onOpenChange, phase, projectTasks, o
       }
       toast.success(`${ids.length} tâche(s) rattachée(s) à la phase ${phaseConf.label}`);
       setSelected(new Set());
-      setSearch('');
+      clearSearch();
       onDone();
       onOpenChange(false);
     } catch (e: any) {

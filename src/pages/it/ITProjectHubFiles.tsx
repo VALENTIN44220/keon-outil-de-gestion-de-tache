@@ -22,6 +22,7 @@ import { fr } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { useSessionStorageState } from '@/hooks/useSessionStorageState';
 
 const getFileIcon = (mimeType: string) => {
   if (mimeType.startsWith('image/')) return Image;
@@ -63,7 +64,11 @@ export default function ITProjectHubFiles() {
 
   const { data: files = [], isLoading: filesLoading } = useITProjectFiles(project?.id, taskIds, conversationIds);
 
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useSessionStorageState<string>(
+    `itProjectHubFiles:search:${code ?? 'unknown'}`,
+    '',
+    { serialize: (v) => v, parse: (raw) => raw },
+  );
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all');
   const [typeFilter, setTypeFilter] = useState<FilterType>('all');
   const [previewFile, setPreviewFile] = useState<{ url: string; name: string; type: string } | null>(null);

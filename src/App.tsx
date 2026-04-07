@@ -11,6 +11,7 @@ import { TeamHierarchyProvider } from "@/contexts/TeamHierarchyContext";
 import { SimulationBanner } from "@/components/layout/SimulationBanner";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ForcePasswordChange } from "@/components/auth/ForcePasswordChange";
+import { PersistentRoutes } from "@/components/routing/PersistentRoutes";
 
 // Route-level code splitting: only load screens when visited.
 const Index = lazy(() => import("./pages/Index"));
@@ -76,252 +77,99 @@ const App = () => (
                 </div>
               }
             >
+            <PersistentRoutes
+              routes={[
+                // Keep ALL main app sections mounted to preserve React state across navigation.
+                { path: "/", end: true, element: <ProtectedRoute><Index /></ProtectedRoute> },
+                { path: "/profile", end: true, element: <ProtectedRoute><Profile /></ProtectedRoute> },
+
+                { path: "/templates", end: true, element: <ProtectedRoute><Templates /></ProtectedRoute> },
+                { path: "/templates/process/:processId", end: true, element: <ProtectedRoute><ProcessSettings /></ProtectedRoute> },
+                { path: "/templates/subprocess/:subProcessId", end: true, element: <ProtectedRoute><SubProcessSettings /></ProtectedRoute> },
+
+                { path: "/projects", end: true, element: <ProtectedRoute><Projects /></ProtectedRoute> },
+                { path: "/admin", end: true, element: <ProtectedRoute><Admin /></ProtectedRoute> },
+                { path: "/workload", end: true, element: <ProtectedRoute><Workload /></ProtectedRoute> },
+                { path: "/requests", end: true, element: <ProtectedRoute><Requests /></ProtectedRoute> },
+                { path: "/calendar", end: true, element: <ProtectedRoute><CalendarPage /></ProtectedRoute> },
+                { path: "/chat", end: true, element: <ProtectedRoute><Chat /></ProtectedRoute> },
+                { path: "/suppliers", end: true, element: <ProtectedRoute><SupplierReference /></ProtectedRoute> },
+                { path: "/process-tracking", end: true, element: <ProtectedRoute><ProcessTracking /></ProtectedRoute> },
+
+                { path: "/innovation", end: true, element: <ProtectedRoute><Innovation /></ProtectedRoute> },
+                { path: "/innovation/requests", end: true, element: <ProtectedRoute><InnovationRequests /></ProtectedRoute> },
+                { path: "/innovation/requests/:id", end: true, element: <ProtectedRoute><InnovationRequests /></ProtectedRoute> },
+
+                // SPV + BE project hubs
+                { path: "/spv", end: true, element: <ProtectedRoute><KeonDashboard /></ProtectedRoute> },
+                { path: "/be/projects/:code/overview", end: true, element: <ProtectedRoute><BEProjectHubOverview /></ProtectedRoute> },
+                { path: "/be/projects/:code/questionnaire", end: true, element: <ProtectedRoute><BEProjectHubQuestionnaire /></ProtectedRoute> },
+                { path: "/be/projects/:code/keon-synthese", end: true, element: <ProtectedRoute><BEProjectHubKeonSynthese /></ProtectedRoute> },
+                { path: "/be/projects/:code/timeline", end: true, element: <ProtectedRoute><BEProjectHubTimeline /></ProtectedRoute> },
+                { path: "/be/projects/:code/discussions", end: true, element: <ProtectedRoute><BEProjectHubDiscussions /></ProtectedRoute> },
+                { path: "/be/projects/:code/files", end: true, element: <ProtectedRoute><BEProjectHubFiles /></ProtectedRoute> },
+
+                { path: "/spv/projects/:code/overview", end: true, element: <ProtectedRoute><BEProjectHubOverview /></ProtectedRoute> },
+                { path: "/spv/projects/:code/questionnaire", end: true, element: <ProtectedRoute><BEProjectHubQuestionnaire /></ProtectedRoute> },
+                { path: "/spv/projects/:code/keon-synthese", end: true, element: <ProtectedRoute><BEProjectHubKeonSynthese /></ProtectedRoute> },
+                { path: "/spv/projects/:code/timeline", end: true, element: <ProtectedRoute><BEProjectHubTimeline /></ProtectedRoute> },
+                { path: "/spv/projects/:code/discussions", end: true, element: <ProtectedRoute><BEProjectHubDiscussions /></ProtectedRoute> },
+                { path: "/spv/projects/:code/files", end: true, element: <ProtectedRoute><BEProjectHubFiles /></ProtectedRoute> },
+
+                // IT project hub
+                { path: "/it/projects", end: true, element: <ProtectedRoute><ITProjects /></ProtectedRoute> },
+                { path: "/it/projects/import-fdr", end: true, element: <ProtectedRoute><ITProjectImportFDR /></ProtectedRoute> },
+                { path: "/it/projects/:code/overview", end: true, element: <ProtectedRoute><ITProjectHubOverview /></ProtectedRoute> },
+                { path: "/it/projects/:code/tasks", end: true, element: <ProtectedRoute><ITProjectHubTasks /></ProtectedRoute> },
+                { path: "/it/projects/:code/timeline", end: true, element: <ProtectedRoute><ITProjectHubTimeline /></ProtectedRoute> },
+                { path: "/it/projects/:code/sync", end: true, element: <ProtectedRoute><ITProjectHubSync /></ProtectedRoute> },
+                { path: "/it/projects/:code/discussions", end: true, element: <ProtectedRoute><ITProjectHubDiscussions /></ProtectedRoute> },
+                { path: "/it/projects/:code/files", end: true, element: <ProtectedRoute><ITProjectHubFiles /></ProtectedRoute> },
+              ]}
+            />
             <Routes>
               <Route path="/auth" element={<Auth />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/reset-password" element={<ResetPassword />} />
-            <Route
-              path="/"
-              element={
-                <ProtectedRoute>
-                  <Index />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/profile"
-              element={
-                <ProtectedRoute>
-                  <Profile />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/templates"
-              element={
-                <ProtectedRoute>
-                  <Templates />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/templates/process/:processId"
-              element={
-                <ProtectedRoute>
-                  <ProcessSettings />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/templates/subprocess/:subProcessId"
-              element={
-                <ProtectedRoute>
-                  <SubProcessSettings />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/projects"
-              element={
-                <ProtectedRoute>
-                  <Projects />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin"
-              element={
-                <ProtectedRoute>
-                  <Admin />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/workload"
-              element={
-                <ProtectedRoute>
-                  <Workload />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/requests"
-              element={
-                <ProtectedRoute>
-                  <Requests />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/calendar"
-              element={
-                <ProtectedRoute>
-                  <CalendarPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/chat"
-              element={
-                <ProtectedRoute>
-                  <Chat />
-                </ProtectedRoute>
-              }
-            />
+            {/* Persistent route placeholders (real screens are mounted by <PersistentRoutes />) */}
+            <Route path="/" element={<></>} />
+            <Route path="/profile" element={<></>} />
+            <Route path="/templates" element={<></>} />
+            <Route path="/templates/process/:processId" element={<></>} />
+            <Route path="/templates/subprocess/:subProcessId" element={<></>} />
+            <Route path="/projects" element={<></>} />
+            <Route path="/admin" element={<></>} />
+            <Route path="/workload" element={<></>} />
+            <Route path="/requests" element={<></>} />
+            <Route path="/calendar" element={<></>} />
+            <Route path="/chat" element={<></>} />
+            <Route path="/suppliers" element={<></>} />
+            <Route path="/process-tracking" element={<></>} />
+            <Route path="/innovation" element={<></>} />
+            <Route path="/innovation/requests" element={<></>} />
+            <Route path="/innovation/requests/:id" element={<></>} />
+            <Route path="/spv" element={<></>} />
+            <Route path="/be/projects/:code/overview" element={<></>} />
+            <Route path="/be/projects/:code/questionnaire" element={<></>} />
+            <Route path="/be/projects/:code/keon-synthese" element={<></>} />
+            <Route path="/be/projects/:code/timeline" element={<></>} />
+            <Route path="/be/projects/:code/discussions" element={<></>} />
+            <Route path="/be/projects/:code/files" element={<></>} />
+            <Route path="/spv/projects/:code/overview" element={<></>} />
+            <Route path="/spv/projects/:code/questionnaire" element={<></>} />
+            <Route path="/spv/projects/:code/keon-synthese" element={<></>} />
+            <Route path="/spv/projects/:code/timeline" element={<></>} />
+            <Route path="/spv/projects/:code/discussions" element={<></>} />
+            <Route path="/spv/projects/:code/files" element={<></>} />
+            <Route path="/it/projects" element={<></>} />
+            <Route path="/it/projects/import-fdr" element={<></>} />
+            <Route path="/it/projects/:code/overview" element={<></>} />
+            <Route path="/it/projects/:code/tasks" element={<></>} />
+            <Route path="/it/projects/:code/timeline" element={<></>} />
+            <Route path="/it/projects/:code/sync" element={<></>} />
+            <Route path="/it/projects/:code/discussions" element={<></>} />
+            <Route path="/it/projects/:code/files" element={<></>} />
             <Route path="/design-system" element={<DesignSystem />} />
-            {/* Old workflow editor routes removed — config is now in SubProcessSettings */}
-            {/* BE Project Hub routes */}
-            <Route
-              path="/be/projects/:code/overview"
-              element={
-                <ProtectedRoute>
-                  <BEProjectHubOverview />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/be/projects/:code/questionnaire"
-              element={
-                <ProtectedRoute>
-                  <BEProjectHubQuestionnaire />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/be/projects/:code/keon-synthese"
-              element={
-                <ProtectedRoute>
-                  <BEProjectHubKeonSynthese />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/be/projects/:code/timeline"
-              element={
-                <ProtectedRoute>
-                  <BEProjectHubTimeline />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/be/projects/:code/discussions"
-              element={
-                <ProtectedRoute>
-                  <BEProjectHubDiscussions />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/be/projects/:code/files"
-              element={
-                <ProtectedRoute>
-                  <BEProjectHubFiles />
-                </ProtectedRoute>
-              }
-            />
-            {/* SPV Project Hub routes (same pages, SPV URL namespace) */}
-            <Route
-              path="/spv/projects/:code/overview"
-              element={
-                <ProtectedRoute>
-                  <BEProjectHubOverview />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/spv/projects/:code/questionnaire"
-              element={
-                <ProtectedRoute>
-                  <BEProjectHubQuestionnaire />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/spv/projects/:code/keon-synthese"
-              element={
-                <ProtectedRoute>
-                  <BEProjectHubKeonSynthese />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/spv/projects/:code/timeline"
-              element={
-                <ProtectedRoute>
-                  <BEProjectHubTimeline />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/spv/projects/:code/discussions"
-              element={
-                <ProtectedRoute>
-                  <BEProjectHubDiscussions />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/spv/projects/:code/files"
-              element={
-                <ProtectedRoute>
-                  <BEProjectHubFiles />
-                </ProtectedRoute>
-              }
-            />
-            {/* Supplier Reference */}
-            <Route
-              path="/suppliers"
-              element={
-                <ProtectedRoute>
-                  <SupplierReference />
-                </ProtectedRoute>
-              }
-            />
-            {/* Process Tracking */}
-            <Route
-              path="/process-tracking"
-              element={
-                <ProtectedRoute>
-                  <ProcessTracking />
-                </ProtectedRoute>
-              }
-            />
-            {/* Innovation */}
-            <Route
-              path="/innovation"
-              element={
-                <ProtectedRoute>
-                  <Innovation />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/innovation/requests"
-              element={
-                <ProtectedRoute>
-                  <InnovationRequests />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/innovation/requests/:id"
-              element={
-                <ProtectedRoute>
-                  <InnovationRequests />
-                </ProtectedRoute>
-              }
-            />
-              {/* SPV Dashboard */}
-              <Route path="/spv" element={<ProtectedRoute><KeonDashboard /></ProtectedRoute>} />
-              {/* IT Projects routes */}
-              <Route path="/it/projects" element={<ProtectedRoute><ITProjects /></ProtectedRoute>} />
-              <Route path="/it/projects/import-fdr" element={<ProtectedRoute><ITProjectImportFDR /></ProtectedRoute>} />
-              <Route path="/it/projects/:code/overview" element={<ProtectedRoute><ITProjectHubOverview /></ProtectedRoute>} />
-              <Route path="/it/projects/:code/tasks" element={<ProtectedRoute><ITProjectHubTasks /></ProtectedRoute>} />
-              <Route path="/it/projects/:code/timeline" element={<ProtectedRoute><ITProjectHubTimeline /></ProtectedRoute>} />
-              <Route path="/it/projects/:code/sync" element={<ProtectedRoute><ITProjectHubSync /></ProtectedRoute>} />
-              <Route path="/it/projects/:code/discussions" element={<ProtectedRoute><ITProjectHubDiscussions /></ProtectedRoute>} />
-              <Route path="/it/projects/:code/files" element={<ProtectedRoute><ITProjectHubFiles /></ProtectedRoute>} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

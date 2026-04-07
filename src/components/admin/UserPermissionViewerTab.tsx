@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { SCREEN_PERMISSIONS, SCREEN_LABELS, FEATURE_PERMISSIONS } from '@/types/permissions';
 import type { UserProfile, PermissionProfile } from '@/types/admin';
+import { useSessionStorageState } from '@/hooks/useSessionStorageState';
 
 const FEATURE_LABELS: Record<string, string> = {
   can_manage_users: 'Gérer les utilisateurs',
@@ -40,7 +41,11 @@ interface TrackingAccess {
 
 export function UserPermissionViewerTab({ users, permissionProfiles }: UserPermissionViewerTabProps) {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const [userSearch, setUserSearch] = useState('');
+  const [userSearch, setUserSearch, clearUserSearch] = useSessionStorageState<string>(
+    'admin:user-permission-viewer:userSearch',
+    '',
+    { serialize: (v) => v, parse: (raw) => raw },
+  );
   const [overrides, setOverrides] = useState<Record<string, boolean | null>>({});
   const [trackingAccess, setTrackingAccess] = useState<TrackingAccess[]>([]);
   const [processTemplates, setProcessTemplates] = useState<{ id: string; name: string }[]>([]);
@@ -229,7 +234,13 @@ export function UserPermissionViewerTab({ users, permissionProfiles }: UserPermi
               <Badge variant="secondary">{selectedUser?.display_name}</Badge>
               {userProfile && <Badge variant="outline" className="gap-1"><Shield className="h-3 w-3" />{userProfile.name}</Badge>}
               {serviceGroupProfile && <Badge variant="outline" className="gap-1 border-primary/40 text-primary"><Shield className="h-3 w-3" />{serviceGroupProfile.name} (groupe)</Badge>}
-              <button className="text-xs text-muted-foreground hover:underline" onClick={() => { setSelectedUserId(null); setUserSearch(''); }}>
+              <button
+                className="text-xs text-muted-foreground hover:underline"
+                onClick={() => {
+                  setSelectedUserId(null);
+                  clearUserSearch();
+                }}
+              >
                 Changer
               </button>
             </div>
