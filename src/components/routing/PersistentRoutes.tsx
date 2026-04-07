@@ -1,4 +1,4 @@
-import { ReactNode, useMemo } from 'react';
+import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { matchPath, useLocation } from 'react-router-dom';
 
 type PersistentRoute = {
@@ -30,10 +30,26 @@ export function PersistentRoutes({ routes }: { routes: PersistentRoute[] }) {
     );
   }, [activePath, routes]);
 
+  // Cache visited routes to avoid mounting every page on first load.
+  // Once visited, the screen stays mounted and preserves its React state.
+  const [visited, setVisited] = useState<boolean[]>(() => routes.map(() => false));
+
+  useEffect(() => {
+    if (activeIndex < 0) return;
+    setVisited((prev) => {
+      if (prev[activeIndex]) return prev;
+      const next = [...prev];
+      next[activeIndex] = true;
+      return next;
+    });
+  }, [activeIndex]);
+
   return (
     <>
       {routes.map((r, idx) => {
         const isActive = idx === activeIndex;
+        const isVisited = visited[idx];
+        if (!isVisited && !isActive) return null;
         return (
           <div
             key={r.path}
