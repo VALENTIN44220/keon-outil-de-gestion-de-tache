@@ -1152,7 +1152,7 @@ export function SupplierListView({
                                 {col.key === 'completeness_score' ? (
                                   <div className="flex items-center gap-2">
                                     <Progress value={supplier.completeness_score ?? 0} className="h-2 flex-1" />
-                                    <Badge className={supplier.status ? (statusConfig[supplier.status]?.color ?? 'bg-muted text-muted-foreground') : 'bg-muted text-muted-foreground')}>
+                                    <Badge className={supplier.status ? (statusConfig[supplier.status]?.color ?? 'bg-muted text-muted-foreground') : 'bg-muted text-muted-foreground'}>
                                       {supplier.completeness_score ?? 0}%
                                     </Badge>
                                   </div>
