@@ -893,7 +893,7 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
               <table className="caption-bottom text-sm" style={{ width: `${tableWidthPx}px` }}>
                 <TableHeader>
                   <TableRow>
-                    {canEdit && <TableHead className="w-[50px]"></TableHead>}
+                    {canEdit && <TableHead className={cn("w-[50px]", stickyHeadColClass)} style={{ left: 0, zIndex: 53, width: 52, minWidth: 52, maxWidth: 52 }}></TableHead>}
                     {activeColumns.map((col) => {
                       const w = colWidthPx(col.key, columnWidths);
                       const stickyPart = stickySupplierCellStyle(
@@ -924,7 +924,7 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
                   {isLoading ? (
                      Array.from({ length: 8 }).map((_, i) => (
                       <TableRow key={i}>
-                        {canEdit && <TableCell><Skeleton className="h-4 w-8" /></TableCell>}
+                        {canEdit && <TableCell className={stickyColClass} style={{ left: 0, zIndex: 41, width: 52, minWidth: 52, maxWidth: 52 }}><Skeleton className="h-4 w-8" /></TableCell>}
                         {activeColumns.map((col, j) => {
                           const w = colWidthPx(col.key, columnWidths);
                           const stickyPart = stickySupplierCellStyle(
@@ -950,7 +950,7 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
                     filteredSuppliers.map((supplier) => (
                       <TableRow key={supplier.id} className="group cursor-pointer hover:bg-muted/50" onClick={() => onViewSupplier(supplier.id)}>
                         {canEdit && (
-                          <TableCell>
+                          <TableCell className={stickyColClass} style={{ left: 0, zIndex: 41, width: 52, minWidth: 52, maxWidth: 52 }}>
                             <Button variant="ghost" size="icon" title="Modifier" onClick={(e) => { e.stopPropagation(); onOpenSupplier(supplier.id); }}>
                               <Pencil className="h-4 w-4" />
                             </Button>
