@@ -80,14 +80,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('Error fetching profile:', error);
       return null;
     }
-    if (!data) return null;
-    // Cast Json → string[] for suppliers_list_column_order
-    return {
-      ...data,
-      suppliers_list_column_order: Array.isArray(data.suppliers_list_column_order)
-        ? (data.suppliers_list_column_order as string[])
-        : null,
-    } as Profile;
+    // Cast to Profile – handles Json ↔ string[] differences and extra DB columns
+    return data as unknown as Profile;
   };
 
   useEffect(() => {
