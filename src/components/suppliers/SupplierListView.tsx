@@ -910,7 +910,7 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
                           currentSortKey={sortConfig.key}
                           currentDirection={sortConfig.direction}
                           onSort={handleSort}
-                          className={cn(col.className, isSticky && stickyHeadColClass)}
+                          className={cn(col.className, 'bg-card', isSticky && stickyHeadColClass)}
                           style={mergeColSize(stickyPart, w)}
                           onColumnResizeMouseDown={(e) => onColumnResizeStart(col.key, e.clientX)}
                         >
