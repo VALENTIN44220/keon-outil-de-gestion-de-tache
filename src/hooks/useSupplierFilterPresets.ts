@@ -23,6 +23,8 @@ export function useSupplierFilterPresets(
   defaultFilters: SupplierFilters,
   visibleColumns?: string[],
   setVisibleColumns?: (cols: string[]) => void,
+  /** Si fourni, filtre les clés de colonnes obsolètes ou invalides (presets / imports). */
+  validSupplierColumnKeys?: ReadonlySet<string>,
 ) {
   const { user } = useAuth();
   const [presets, setPresets] = useState<SupplierFilterPreset[]>([]);
@@ -72,13 +74,16 @@ export function useSupplierFilterPresets(
           setVisibleColumns &&
           !hasSupplierVisibleColumnsInStorage()
         ) {
-          setVisibleColumns(toApply.visible_columns);
+          const cols = validSupplierColumnKeys
+            ? toApply.visible_columns.filter((k) => validSupplierColumnKeys.has(k))
+            : toApply.visible_columns;
+          if (cols.length) setVisibleColumns(cols);
         }
         // prefix_filter intentionally ignored: suppliers TIERS is now enforced globally (F*, excluding FY).
       }
       setLoaded(true);
     })();
-  }, [user]);
+  }, [user, validSupplierColumnKeys]);
 
   const savePreset = useCallback(async (name: string) => {
     if (!user) return;
@@ -191,10 +196,13 @@ export function useSupplierFilterPresets(
     setFilters({ ...defaultFilters, ...preset.filters });
     if (setVisibleColumns) {
       if (preset.visible_columns && preset.visible_columns.length > 0) {
-        setVisibleColumns(preset.visible_columns);
+        const cols = validSupplierColumnKeys
+          ? preset.visible_columns.filter((k) => validSupplierColumnKeys.has(k))
+          : preset.visible_columns;
+        if (cols.length) setVisibleColumns(cols);
       }
     }
-  }, [defaultFilters, setFilters, setVisibleColumns]);
+  }, [defaultFilters, setFilters, setVisibleColumns, validSupplierColumnKeys]);
 
   return { presets, loaded, savePreset, overwritePreset, deletePreset, toggleDefault, toggleGlobal, loadPreset };
 }

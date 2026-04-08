@@ -61,6 +61,7 @@ export default function SupplierReference() {
           onViewSupplier={handleViewSupplier}
           canEdit={supplierPermissions.canEdit}
           isAdmin={isAdmin}
+          persistColumnOrderToProfile
         />
       </main>
 

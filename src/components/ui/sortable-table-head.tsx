@@ -10,24 +10,32 @@ interface SortableTableHeadProps extends React.ThHTMLAttributes<HTMLTableCellEle
   currentDirection: SortDirection;
   onSort: (key: string) => void;
   children: React.ReactNode;
+  /** Contenu avant le libellé (ex. poignée de glisser-déposer). */
+  headerStart?: React.ReactNode;
   /** Poignée de redimensionnement de colonne (ne déclenche pas le tri). */
   onColumnResizeMouseDown?: (e: React.MouseEvent) => void;
 }
 
-export function SortableTableHead({
-  sortKey,
-  currentSortKey,
-  currentDirection,
-  onSort,
-  children,
-  className,
-  onColumnResizeMouseDown,
-  ...props
-}: SortableTableHeadProps) {
+export const SortableTableHead = React.forwardRef<HTMLTableCellElement, SortableTableHeadProps>(
+  function SortableTableHead(
+    {
+      sortKey,
+      currentSortKey,
+      currentDirection,
+      onSort,
+      children,
+      className,
+      headerStart,
+      onColumnResizeMouseDown,
+      ...props
+    },
+    ref,
+  ) {
   const isActive = currentSortKey === sortKey && currentDirection !== null;
 
   return (
     <TableHead
+      ref={ref}
       className={cn(
         'relative cursor-pointer select-none transition-colors hover:bg-muted/50',
         isActive && 'bg-muted/30',
@@ -37,6 +45,7 @@ export function SortableTableHead({
       {...props}
     >
       <div className={cn('flex items-center gap-1.5', onColumnResizeMouseDown && 'pr-2')}>
+        {headerStart}
         <span className="min-w-0 flex-1 truncate">{children}</span>
         <span className="shrink-0">
           {isActive ? (
@@ -66,4 +75,6 @@ export function SortableTableHead({
       )}
     </TableHead>
   );
-}
+});
+
+SortableTableHead.displayName = 'SortableTableHead';

@@ -18,6 +18,8 @@ interface Profile {
   permission_profile?: Record<string, any> | null;
   hierarchy_level_id: string | null;
   must_change_password: boolean;
+  /** Ordre des colonnes du tableau fournisseurs (/suppliers), ou null pour l’ordre par défaut. */
+  suppliers_list_column_order?: string[] | null;
 }
 
 interface AuthContextType {

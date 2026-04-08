@@ -42,7 +42,6 @@ export interface SupplierEnrichment {
   commentaires: string | null;
   commentaires_date_contrat: string | null;
   commentaires_type_de_contrat: string | null;
-  detail_par_entite: string | null;
   site_web: string | null;
 
   ca_estime: number | null;

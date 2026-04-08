@@ -17,7 +17,25 @@ import {
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { useSupplierEnrichment, SupplierFilters, SupplierSortConfig, SupplierEnrichment } from '@/hooks/useSupplierEnrichment';
 import { useSupplierFilterPresets, SupplierFilterPreset } from '@/hooks/useSupplierFilterPresets';
-import { Search, Building2, Filter, ExternalLink, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LayoutGrid, List, Save, Star, Trash2, FolderOpen, RotateCcw, Columns3, Pencil, Globe } from 'lucide-react';
+import { Search, Building2, Filter, ExternalLink, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LayoutGrid, List, Save, Star, Trash2, FolderOpen, RotateCcw, Columns3, Pencil, Globe, GripVertical } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  horizontalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { useAuth } from '@/contexts/AuthContext';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -40,6 +58,8 @@ interface SupplierListViewProps {
   onViewSupplier: (id: string) => void;
   canEdit?: boolean;
   isAdmin?: boolean;
+  /** Si vrai (route /suppliers uniquement), ordre des colonnes persisté sur le profil et en-têtes réordonnables. */
+  persistColumnOrderToProfile?: boolean;
 }
 
 type DateTone = 'past' | 'soon' | 'future' | 'none';
@@ -133,6 +153,44 @@ function mergeColSize(stickyPart: CSSProperties | undefined, widthPx: number): C
   };
 }
 
+function normalizeSupplierColumnOrder(
+  raw: unknown,
+  validKeys: ReadonlySet<string>,
+  defaultOrder: readonly string[],
+): string[] {
+  if (!Array.isArray(raw)) return [...defaultOrder];
+  const seen = new Set<string>();
+  const ordered: string[] = [];
+  for (const item of raw) {
+    if (typeof item !== 'string' || !validKeys.has(item) || seen.has(item)) continue;
+    seen.add(item);
+    ordered.push(item);
+  }
+  for (const k of defaultOrder) {
+    if (!seen.has(k)) ordered.push(k);
+  }
+  return ordered;
+}
+
+function mergeVisibleColumnReorder(
+  fullOrder: string[],
+  visibleSet: Set<string>,
+  newVisibleOrder: string[],
+): string[] {
+  const vis = newVisibleOrder.filter((k) => visibleSet.has(k));
+  const result: string[] = [];
+  let vi = 0;
+  for (const k of fullOrder) {
+    if (visibleSet.has(k)) {
+      if (vi < vis.length) result.push(vis[vi++]);
+    } else {
+      result.push(k);
+    }
+  }
+  while (vi < vis.length) result.push(vis[vi++]);
+  return result;
+}
+
 // All available columns definition
 export interface SupplierColumnDef {
   key: string;
@@ -178,7 +236,6 @@ const ALL_COLUMNS: SupplierColumnDef[] = [
   { key: 'adresse_mail', label: 'Email', defaultVisible: false, render: (s) => s.adresse_mail || '—' },
   { key: 'telephone', label: 'Téléphone', defaultVisible: false, render: (s) => s.telephone || '—' },
   { key: 'commentaires', label: 'Commentaires', defaultVisible: false, render: (s) => <span title={s.commentaires || ''} className="max-w-[300px] block whitespace-pre-wrap">{s.commentaires || '—'}</span> },
-  { key: 'detail_par_entite', label: 'Détail par entité', defaultVisible: false, render: (s) => <span title={s.detail_par_entite || ''} className="max-w-[300px] block whitespace-pre-wrap">{s.detail_par_entite || '—'}</span> },
   { key: 'site_web', label: 'Site web', defaultVisible: false, render: (s) => s.site_web || '—' },
   { key: 'siret', label: 'SIRET', defaultVisible: false, render: (s) => s.siret || '—' },
   { key: 'tva', label: 'TVA', defaultVisible: false, render: (s) => s.tva || '—' },
@@ -204,9 +261,12 @@ function buildDefaultSupplierColumnWidths(): Record<string, number> {
 
 DEFAULT_SUPPLIER_COLUMN_WIDTHS = buildDefaultSupplierColumnWidths();
 
+/** Ordre par défaut des colonnes (= définition actuelle du tableau). Exporté pour aligner les presets. */
+export const SUPPLIER_TABLE_DEFAULT_COLUMN_ORDER: string[] = ALL_COLUMNS.map((c) => c.key);
+
 const DEFAULT_VISIBLE_COLUMNS = ALL_COLUMNS.filter(c => c.defaultVisible).map(c => c.key);
 
-const SUPPLIER_VALID_COLUMN_KEYS = new Set(ALL_COLUMNS.map((c) => c.key));
+export const SUPPLIER_VALID_COLUMN_KEYS = new Set(ALL_COLUMNS.map((c) => c.key));
 
 export const DEFAULT_SUPPLIER_FILTERS: SupplierFilters = {
   search: '',
@@ -255,7 +315,73 @@ function readSessionFilters(): { filters: SupplierFilters; page: number; viewMod
   } catch { return null; }
 }
 
-export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = false, isAdmin = false }: SupplierListViewProps) {
+function SortableSupplierColumnHead({
+  column,
+  sortConfig,
+  onSort,
+  columnWidths,
+  onColumnResizeStart,
+  stickyPart,
+  stickyHeadColClass,
+  widthPx,
+  dragEnabled,
+}: {
+  column: SupplierColumnDef;
+  sortConfig: SupplierSortConfig;
+  onSort: (k: string) => void;
+  columnWidths: Record<string, number>;
+  onColumnResizeStart: (key: string, clientX: number) => void;
+  stickyPart: CSSProperties | undefined;
+  stickyHeadColClass: string;
+  widthPx: number;
+  dragEnabled: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: column.key,
+    disabled: !dragEnabled,
+  });
+  const stickyStyle = mergeColSize(stickyPart, widthPx);
+  return (
+    <SortableTableHead
+      ref={setNodeRef}
+      sortKey={column.key}
+      currentSortKey={sortConfig.key}
+      currentDirection={sortConfig.direction}
+      onSort={onSort}
+      className={cn(column.className, 'bg-card', !!stickyPart && stickyHeadColClass, isDragging && 'z-20')}
+      style={{
+        ...stickyStyle,
+        transform: dragEnabled ? CSS.Transform.toString(transform) : undefined,
+        transition,
+      }}
+      onColumnResizeMouseDown={(e) => onColumnResizeStart(column.key, e.clientX)}
+      headerStart={
+        dragEnabled ? (
+          <button
+            type="button"
+            className="cursor-grab active:cursor-grabbing touch-none text-muted-foreground hover:text-foreground shrink-0 rounded-sm p-0.5 -ml-1"
+            aria-label="Réordonner la colonne"
+            onClick={(e) => e.stopPropagation()}
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="h-3.5 w-3.5" />
+          </button>
+        ) : undefined
+      }
+    >
+      {column.label}
+    </SortableTableHead>
+  );
+}
+
+export function SupplierListView({
+  onOpenSupplier,
+  onViewSupplier,
+  canEdit = false,
+  isAdmin = false,
+  persistColumnOrderToProfile = false,
+}: SupplierListViewProps) {
   const pageSize = 200;
   const sessionState = useMemo(() => readSessionFilters(), []);
   const [viewMode, setViewMode] = useState<SupplierViewMode>(sessionState?.viewMode ?? 'table');
@@ -268,6 +394,50 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
     );
   });
   const skipNextVisibleColumnsPersist = useRef(true);
+
+  const { profile, updateProfile } = useAuth();
+  const [columnOrderKeys, setColumnOrderKeys] = useState<string[]>(() => [...SUPPLIER_TABLE_DEFAULT_COLUMN_ORDER]);
+  const columnOrderHydratedRef = useRef(false);
+  const lastPersistedOrderJsonRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!persistColumnOrderToProfile) return;
+    columnOrderHydratedRef.current = false;
+    lastPersistedOrderJsonRef.current = null;
+  }, [persistColumnOrderToProfile, profile?.id]);
+
+  useEffect(() => {
+    if (!persistColumnOrderToProfile || !profile || columnOrderHydratedRef.current) return;
+    columnOrderHydratedRef.current = true;
+    const next = normalizeSupplierColumnOrder(
+      profile.suppliers_list_column_order,
+      SUPPLIER_VALID_COLUMN_KEYS,
+      SUPPLIER_TABLE_DEFAULT_COLUMN_ORDER,
+    );
+    setColumnOrderKeys(next);
+    lastPersistedOrderJsonRef.current = JSON.stringify(next);
+  }, [persistColumnOrderToProfile, profile]);
+
+  useEffect(() => {
+    if (!persistColumnOrderToProfile || !profile) return;
+    if (!columnOrderHydratedRef.current) return;
+    const json = JSON.stringify(columnOrderKeys);
+    if (json === lastPersistedOrderJsonRef.current) return;
+    const t = window.setTimeout(() => {
+      void (async () => {
+        const { error } = await updateProfile({ suppliers_list_column_order: columnOrderKeys });
+        if (!error) lastPersistedOrderJsonRef.current = json;
+      })();
+    }, 400);
+    return () => clearTimeout(t);
+  }, [persistColumnOrderToProfile, profile, columnOrderKeys, updateProfile]);
+
+  const displayColumnOrderKeys = persistColumnOrderToProfile ? columnOrderKeys : SUPPLIER_TABLE_DEFAULT_COLUMN_ORDER;
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
     if (typeof window === 'undefined') return { ...DEFAULT_SUPPLIER_COLUMN_WIDTHS };
@@ -365,7 +535,14 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
     toggleDefault,
     toggleGlobal,
     loadPreset,
-  } = useSupplierFilterPresets(filters, setFilters, DEFAULT_SUPPLIER_FILTERS, visibleColumns, setVisibleColumns);
+  } = useSupplierFilterPresets(
+    filters,
+    setFilters,
+    DEFAULT_SUPPLIER_FILTERS,
+    visibleColumns,
+    setVisibleColumns,
+    SUPPLIER_VALID_COLUMN_KEYS,
+  );
   const [showPresetPopover, setShowPresetPopover] = useState(false);
   const [newPresetName, setNewPresetName] = useState('');
 
@@ -427,10 +604,29 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
     }
   }, [famillesList.join('|')]);
 
-  // Visible columns for table
-  const activeColumns = useMemo(() =>
-    ALL_COLUMNS.filter(c => visibleColumns.includes(c.key)),
-    [visibleColumns]
+  // Visible columns for table (ordre = displayColumnOrderKeys quand /suppliers avec persistance)
+  const activeColumns = useMemo(() => {
+    const visible = new Set(visibleColumns);
+    return displayColumnOrderKeys
+      .filter((k) => visible.has(k))
+      .map((k) => ALL_COLUMNS.find((c) => c.key === k))
+      .filter((c): c is SupplierColumnDef => c != null);
+  }, [displayColumnOrderKeys, visibleColumns]);
+
+  const handleColumnDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      if (!persistColumnOrderToProfile) return;
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
+      const visibleKeys = activeColumns.map((c) => c.key);
+      const oldIndex = visibleKeys.indexOf(String(active.id));
+      const newIndex = visibleKeys.indexOf(String(over.id));
+      if (oldIndex < 0 || newIndex < 0) return;
+      const newVisibleOrder = arrayMove(visibleKeys, oldIndex, newIndex);
+      const visibleSet = new Set(visibleColumns);
+      setColumnOrderKeys((prev) => mergeVisibleColumnReorder(prev, visibleSet, newVisibleOrder));
+    },
+    [persistColumnOrderToProfile, activeColumns, visibleColumns],
   );
   const stickyLayout = useMemo(
     () => getSupplierStickyColumnLayout(activeColumns, canEdit, columnWidths),
@@ -770,7 +966,10 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
             <PopoverContent className="w-64 max-h-[400px] overflow-y-auto" align="end">
               <div className="space-y-1">
                 <div className="text-sm font-medium mb-2">Colonnes visibles</div>
-                {ALL_COLUMNS.map(col => (
+                {displayColumnOrderKeys.map((key) => {
+                  const col = ALL_COLUMNS.find((c) => c.key === key);
+                  if (!col) return null;
+                  return (
                   <label key={col.key} className="flex items-center gap-2 py-1 px-1 rounded hover:bg-muted/50 cursor-pointer text-sm">
                     <Checkbox
                       checked={visibleColumns.includes(col.key)}
@@ -778,7 +977,8 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
                     />
                     {col.label}
                   </label>
-                ))}
+                  );
+                })}
                 <div className="border-t pt-2 mt-2 flex gap-2">
                   <Button variant="ghost" size="sm" className="h-7 text-xs flex-1" onClick={() => setVisibleColumns(ALL_COLUMNS.map(c => c.key))}>
                     Tout afficher
@@ -863,9 +1063,11 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
             >
               <div className="min-w-max" style={{ position: 'relative' }}>
                 <table className="caption-bottom text-sm" style={{ width: `${tableWidthPx}px` }}>
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleColumnDragEnd}>
                 <TableHeader className="sticky top-0 z-[10] bg-card [&_tr]:border-b shadow-[0_1px_3px_-1px_rgba(0,0,0,0.1)]">
                   <TableRow>
                     {canEdit && <TableHead className={cn("w-[50px] bg-card", stickyHeadColClass)} style={{ left: 0, zIndex: 12, width: 52, minWidth: 52, maxWidth: 52 }}></TableHead>}
+                    <SortableContext items={activeColumns.map((c) => c.key)} strategy={horizontalListSortingStrategy}>
                     {activeColumns.map((col) => {
                       const w = colWidthPx(col.key, columnWidths);
                       const stickyPart = stickySupplierCellStyle(
@@ -874,22 +1076,22 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
                         stickyLayout.order,
                         11,
                       );
-                      const isSticky = !!stickyPart;
                       return (
-                        <SortableTableHead
+                        <SortableSupplierColumnHead
                           key={col.key}
-                          sortKey={col.key}
-                          currentSortKey={sortConfig.key}
-                          currentDirection={sortConfig.direction}
+                          column={col}
+                          sortConfig={sortConfig}
                           onSort={handleSort}
-                          className={cn(col.className, 'bg-card', isSticky && stickyHeadColClass)}
-                          style={mergeColSize(stickyPart, w)}
-                          onColumnResizeMouseDown={(e) => onColumnResizeStart(col.key, e.clientX)}
-                        >
-                          {col.label}
-                        </SortableTableHead>
+                          columnWidths={columnWidths}
+                          onColumnResizeStart={onColumnResizeStart}
+                          stickyPart={stickyPart}
+                          stickyHeadColClass={stickyHeadColClass}
+                          widthPx={w}
+                          dragEnabled={persistColumnOrderToProfile}
+                        />
                       );
                     })}
+                    </SortableContext>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -958,6 +1160,7 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
                     ))
                   )}
                 </TableBody>
+                </DndContext>
                 </table>
               </div>
             </div>
