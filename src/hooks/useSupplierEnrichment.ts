@@ -92,6 +92,12 @@ type FilterOptions = {
   };
 };
 
+function applyFixedTiersConstraint(q: any) {
+  // Business rule: Fournisseurs must always be restricted to TIERS starting with 'F'
+  // and explicitly exclude 'FY...' codes.
+  return q.ilike('tiers', 'F%').not('tiers', 'ilike', 'FY%');
+}
+
 function applyFilters(q: any, filters: SupplierFilters, opts?: { excludeStatus?: boolean }) {
   let query = q;
 
@@ -143,6 +149,7 @@ export function useSupplierEnrichment(filters: SupplierFilters, page = 0, pageSi
       const ascending = sortConfig?.key && sortConfig?.direction ? sortConfig.direction === 'asc' : false;
       q = q.order(sortKey, { ascending, nullsFirst: false });
 
+      q = applyFixedTiersConstraint(q);
       q = applyFilters(q, filters);
 
       const { data, error, count } = await q.range(from, to);
@@ -191,6 +198,8 @@ export function useSupplierEnrichment(filters: SupplierFilters, page = 0, pageSi
         .from('supplier_purchase_enrichment')
         .select('entite,segment,sous_segment,status,categorie,famille');
 
+      dimQ = applyFixedTiersConstraint(dimQ);
+
       // On cascade sur categorie/famille/segment pour que les listes restent cohérentes
       if (filters.categorie && filters.categorie !== 'all') dimQ = dimQ.eq('categorie', filters.categorie);
       if (filters.famille && filters.famille !== 'all') dimQ = dimQ.eq('famille', filters.famille);
@@ -207,7 +216,9 @@ export function useSupplierEnrichment(filters: SupplierFilters, page = 0, pageSi
       // 3) Stats (count exact) en réappliquant les filtres SAUF status
       const baseCountQuery = () =>
         applyFilters(
-          supabase.from('supplier_purchase_enrichment').select('id', { count: 'exact', head: true }),
+          applyFixedTiersConstraint(
+            supabase.from('supplier_purchase_enrichment').select('id', { count: 'exact', head: true }),
+          ),
           filters,
           { excludeStatus: true }
         );

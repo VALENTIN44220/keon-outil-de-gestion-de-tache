@@ -10,7 +10,6 @@ export interface SupplierFilterPreset {
   name: string;
   filters: SupplierFilters;
   visible_columns?: string[];
-  prefix_filter?: string;
   is_default: boolean;
   is_global: boolean;
   user_id: string;
@@ -24,8 +23,6 @@ export function useSupplierFilterPresets(
   defaultFilters: SupplierFilters,
   visibleColumns?: string[],
   setVisibleColumns?: (cols: string[]) => void,
-  prefixFilter?: string,
-  setPrefixFilter?: (val: string) => void,
 ) {
   const { user } = useAuth();
   const [presets, setPresets] = useState<SupplierFilterPreset[]>([]);
@@ -57,7 +54,6 @@ export function useSupplierFilterPresets(
         name: p.name,
         filters: (p.filters?.filters ?? p.filters) as SupplierFilters,
         visible_columns: p.visible_columns ?? p.filters?.visible_columns,
-        prefix_filter: p.filters?.prefix_filter ?? undefined,
         is_default: p.is_default,
         is_global: p.is_global ?? false,
         user_id: p.user_id,
@@ -78,9 +74,7 @@ export function useSupplierFilterPresets(
         ) {
           setVisibleColumns(toApply.visible_columns);
         }
-        if (toApply.prefix_filter && setPrefixFilter) {
-          setPrefixFilter(toApply.prefix_filter);
-        }
+        // prefix_filter intentionally ignored: suppliers TIERS is now enforced globally (F*, excluding FY).
       }
       setLoaded(true);
     })();
@@ -88,7 +82,7 @@ export function useSupplierFilterPresets(
 
   const savePreset = useCallback(async (name: string) => {
     if (!user) return;
-    const payload = { filters, visible_columns: visibleColumns, prefix_filter: prefixFilter ?? 'all' };
+    const payload = { filters, visible_columns: visibleColumns };
     const { data, error } = await (supabase as any)
       .from('user_filter_presets')
       .insert({
@@ -106,25 +100,24 @@ export function useSupplierFilterPresets(
       id: data.id, name: data.name,
       filters: data.filters?.filters ?? data.filters,
       visible_columns: data.visible_columns ?? data.filters?.visible_columns,
-      prefix_filter: data.filters?.prefix_filter,
       is_default: false,
       is_global: false,
       user_id: data.user_id,
     }]);
     toast.success('Contexte sauvegardé');
-  }, [user, filters, visibleColumns, prefixFilter]);
+  }, [user, filters, visibleColumns]);
 
   const overwritePreset = useCallback(async (presetId: string) => {
-    const payload = { filters, visible_columns: visibleColumns, prefix_filter: prefixFilter ?? 'all' };
+    const payload = { filters, visible_columns: visibleColumns };
     const { error } = await (supabase as any)
       .from('user_filter_presets')
       .update({ filters: payload, visible_columns: visibleColumns ? JSON.parse(JSON.stringify(visibleColumns)) : null })
       .eq('id', presetId);
 
     if (error) { toast.error('Erreur lors de la mise à jour'); return; }
-    setPresets(prev => prev.map(p => p.id === presetId ? { ...p, filters, visible_columns: visibleColumns, prefix_filter: prefixFilter } : p));
+    setPresets(prev => prev.map(p => p.id === presetId ? { ...p, filters, visible_columns: visibleColumns } : p));
     toast.success('Contexte mis à jour');
-  }, [filters, visibleColumns, prefixFilter]);
+  }, [filters, visibleColumns]);
 
   const deletePreset = useCallback(async (presetId: string) => {
     await (supabase as any).from('user_filter_presets').delete().eq('id', presetId);
@@ -201,10 +194,7 @@ export function useSupplierFilterPresets(
         setVisibleColumns(preset.visible_columns);
       }
     }
-    if (setPrefixFilter) {
-      setPrefixFilter(preset.prefix_filter ?? 'all');
-    }
-  }, [defaultFilters, setFilters, setVisibleColumns, setPrefixFilter]);
+  }, [defaultFilters, setFilters, setVisibleColumns]);
 
   return { presets, loaded, savePreset, overwritePreset, deletePreset, toggleDefault, toggleGlobal, loadPreset };
 }
