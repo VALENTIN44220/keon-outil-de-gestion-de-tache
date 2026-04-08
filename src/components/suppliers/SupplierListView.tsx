@@ -883,7 +883,7 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
 
       {/* Table View */}
       {viewMode === 'table' && (
-        <Card>
+        <Card className="isolate overflow-hidden">
           <div
             ref={tableScrollRef}
             className="w-full overflow-x-auto overflow-y-auto max-h-[calc(100vh-340px)] pb-2 [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/40 [&::-webkit-scrollbar-track]:bg-muted/20 [&::-webkit-scrollbar-thumb]:min-h-[40px]"
@@ -891,7 +891,7 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
           >
             <div className="min-w-max" style={{ position: 'relative' }}>
               <table className="caption-bottom text-sm" style={{ width: `${tableWidthPx}px` }}>
-                <TableHeader className="sticky top-0 z-[60] bg-card [&_tr]:border-b shadow-[0_1px_3px_-1px_rgba(0,0,0,0.1)]">
+                <TableHeader className="sticky top-0 z-[10] bg-card [&_tr]:border-b shadow-[0_1px_3px_-1px_rgba(0,0,0,0.1)]">
                   <TableRow>
                     {canEdit && <TableHead className={cn("w-[50px] bg-card", stickyHeadColClass)} style={{ left: 0, zIndex: 65, width: 52, minWidth: 52, maxWidth: 52 }}></TableHead>}
                     {activeColumns.map((col) => {
