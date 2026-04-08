@@ -2931,7 +2931,6 @@ export type Database = {
           permission_profile_id: string | null
           secondary_email: string | null
           status: string
-          suppliers_list_column_order: Json | null
           updated_at: string
           user_id: string
         }
@@ -2956,7 +2955,6 @@ export type Database = {
           permission_profile_id?: string | null
           secondary_email?: string | null
           status?: string
-          suppliers_list_column_order?: Json | null
           updated_at?: string
           user_id: string
         }
@@ -2981,7 +2979,6 @@ export type Database = {
           permission_profile_id?: string | null
           secondary_email?: string | null
           status?: string
-          suppliers_list_column_order?: Json | null
           updated_at?: string
           user_id?: string
         }
@@ -4165,6 +4162,7 @@ export type Database = {
           delai_de_paiement: string | null
           delais_de_paiement_commentaires: string | null
           description: string | null
+          detail_par_entite: string | null
           echeances_de_paiement: string | null
           entite: string | null
           evolution_tarif_2026: string | null
@@ -4209,6 +4207,7 @@ export type Database = {
           delai_de_paiement?: string | null
           delais_de_paiement_commentaires?: string | null
           description?: string | null
+          detail_par_entite?: string | null
           echeances_de_paiement?: string | null
           entite?: string | null
           evolution_tarif_2026?: string | null
@@ -4253,6 +4252,7 @@ export type Database = {
           delai_de_paiement?: string | null
           delais_de_paiement_commentaires?: string | null
           description?: string | null
+          detail_par_entite?: string | null
           echeances_de_paiement?: string | null
           entite?: string | null
           evolution_tarif_2026?: string | null
