@@ -97,17 +97,7 @@ function applyFilters(q: any, filters: SupplierFilters, opts?: { excludeStatus?:
 
   const search = (filters.search || '').trim();
   if (search) {
-    query = query.or(
-      [
-        `tiers.ilike.%${search}%`,
-        `nomfournisseur.ilike.%${search}%`,
-        `categorie.ilike.%${search}%`,
-        `famille.ilike.%${search}%`,
-        `segment.ilike.%${search}%`,
-        `sous_segment.ilike.%${search}%`,
-        `entite.ilike.%${search}%`,
-      ].join(',')
-    );
+    query = query.ilike('nomfournisseur', `%${search}%`);
   }
 
   if (!opts?.excludeStatus && filters.status && filters.status !== 'all') {
