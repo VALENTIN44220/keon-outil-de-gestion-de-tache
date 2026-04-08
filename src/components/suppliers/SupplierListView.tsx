@@ -950,7 +950,7 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
                     filteredSuppliers.map((supplier) => (
                       <TableRow key={supplier.id} className="group cursor-pointer hover:bg-muted/50" onClick={() => onViewSupplier(supplier.id)}>
                         {canEdit && (
-                          <TableCell>
+                          <TableCell className={stickyColClass} style={{ left: 0, zIndex: 41, width: 52, minWidth: 52, maxWidth: 52 }}>
                             <Button variant="ghost" size="icon" title="Modifier" onClick={(e) => { e.stopPropagation(); onOpenSupplier(supplier.id); }}>
                               <Pencil className="h-4 w-4" />
                             </Button>
