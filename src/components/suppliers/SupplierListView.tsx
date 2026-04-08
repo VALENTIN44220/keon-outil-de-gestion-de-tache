@@ -962,7 +962,7 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
                             col.key,
                             stickyLayout.leftByKey,
                             stickyLayout.order,
-                            40,
+                            2,
                           );
                           const isSticky = !!stickyPart;
                           return (
