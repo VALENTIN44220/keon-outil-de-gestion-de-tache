@@ -883,7 +883,7 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
 
       {/* Table View */}
       {viewMode === 'table' && (
-        <Card>
+        <Card className="isolate overflow-hidden">
           <div
             ref={tableScrollRef}
             className="w-full overflow-x-auto overflow-y-auto max-h-[calc(100vh-340px)] pb-2 [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/40 [&::-webkit-scrollbar-track]:bg-muted/20 [&::-webkit-scrollbar-thumb]:min-h-[40px]"
@@ -891,16 +891,16 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
           >
             <div className="min-w-max" style={{ position: 'relative' }}>
               <table className="caption-bottom text-sm" style={{ width: `${tableWidthPx}px` }}>
-                <TableHeader className="sticky top-0 z-[60] bg-card [&_tr]:border-b shadow-[0_1px_3px_-1px_rgba(0,0,0,0.1)]">
+                <TableHeader className="sticky top-0 z-[10] bg-card [&_tr]:border-b shadow-[0_1px_3px_-1px_rgba(0,0,0,0.1)]">
                   <TableRow>
-                    {canEdit && <TableHead className={cn("w-[50px] bg-card", stickyHeadColClass)} style={{ left: 0, zIndex: 65, width: 52, minWidth: 52, maxWidth: 52 }}></TableHead>}
+                    {canEdit && <TableHead className={cn("w-[50px] bg-card", stickyHeadColClass)} style={{ left: 0, zIndex: 12, width: 52, minWidth: 52, maxWidth: 52 }}></TableHead>}
                     {activeColumns.map((col) => {
                       const w = colWidthPx(col.key, columnWidths);
                       const stickyPart = stickySupplierCellStyle(
                         col.key,
                         stickyLayout.leftByKey,
                         stickyLayout.order,
-                        52,
+                        11,
                       );
                       const isSticky = !!stickyPart;
                       return (
@@ -924,14 +924,14 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
                   {isLoading ? (
                      Array.from({ length: 8 }).map((_, i) => (
                       <TableRow key={i}>
-                        {canEdit && <TableCell className={stickyColClass} style={{ left: 0, zIndex: 41, width: 52, minWidth: 52, maxWidth: 52 }}><Skeleton className="h-4 w-8" /></TableCell>}
+                        {canEdit && <TableCell className={stickyColClass} style={{ left: 0, zIndex: 3, width: 52, minWidth: 52, maxWidth: 52 }}><Skeleton className="h-4 w-8" /></TableCell>}
                         {activeColumns.map((col, j) => {
                           const w = colWidthPx(col.key, columnWidths);
                           const stickyPart = stickySupplierCellStyle(
                             col.key,
                             stickyLayout.leftByKey,
                             stickyLayout.order,
-                            40,
+                            2,
                           );
                           const isSticky = !!stickyPart;
                           return (
@@ -950,7 +950,7 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
                     filteredSuppliers.map((supplier) => (
                       <TableRow key={supplier.id} className="group cursor-pointer hover:bg-muted/50" onClick={() => onViewSupplier(supplier.id)}>
                         {canEdit && (
-                          <TableCell className={stickyColClass} style={{ left: 0, zIndex: 41, width: 52, minWidth: 52, maxWidth: 52 }}>
+                          <TableCell className={stickyColClass} style={{ left: 0, zIndex: 3, width: 52, minWidth: 52, maxWidth: 52 }}>
                             <Button variant="ghost" size="icon" title="Modifier" onClick={(e) => { e.stopPropagation(); onOpenSupplier(supplier.id); }}>
                               <Pencil className="h-4 w-4" />
                             </Button>
@@ -962,7 +962,7 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
                             col.key,
                             stickyLayout.leftByKey,
                             stickyLayout.order,
-                            40,
+                            2,
                           );
                           const isSticky = !!stickyPart;
                           return (
