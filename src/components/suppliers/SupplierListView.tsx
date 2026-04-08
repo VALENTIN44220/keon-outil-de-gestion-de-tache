@@ -636,7 +636,7 @@ export function SupplierListView({
   const stickyColClass =
     'sticky border-r border-border bg-card shadow-[4px_0_8px_-6px_rgba(0,0,0,0.14)] group-hover:bg-muted';
   const stickyHeadColClass =
-    'sticky border-r border-border bg-card shadow-[4px_0_8px_-6px_rgba(0,0,0,0.14)] hover:!bg-muted';
+    'sticky top-0 border-r border-border bg-card shadow-[4px_0_8px_-6px_rgba(0,0,0,0.14),0_1px_3px_-1px_rgba(0,0,0,0.1)] hover:!bg-muted';
   const tableWidthPx = useMemo(() => {
     const sum = activeColumns.reduce((acc, c) => acc + colWidthPx(c.key, columnWidths), 0);
     return Math.max(sum + (canEdit ? 52 : 0), 800);
