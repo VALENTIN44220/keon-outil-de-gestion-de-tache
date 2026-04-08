@@ -73,12 +73,6 @@ function safeFormatDate(iso?: string | null) {
   return format(d, 'dd/MM/yyyy', { locale: fr });
 }
 
-// Extract prefix (letters before digits) from tiers code
-function extractTiersPrefix(tiers: string): string {
-  const match = tiers.match(/^([A-Za-z]+)/);
-  return match ? match[1].toUpperCase() : '';
-}
-
 /** Colonnes figées au défilement horizontal : TIERS + référentiel fournisseur (nom / n° côté métier). */
 const HORIZONTAL_STICKY_SUPPLIER_KEYS = ['tiers', 'nomfournisseur'] as const;
 
@@ -229,7 +223,7 @@ export const DEFAULT_SUPPLIER_FILTERS: SupplierFilters = {
 };
 
 // Check if any filter is active (not default)
-function hasActiveFilters(filters: SupplierFilters, prefixFilter: string): boolean {
+function hasActiveFilters(filters: SupplierFilters): boolean {
   return (
     filters.search !== '' ||
     filters.status !== 'all' ||
@@ -241,8 +235,7 @@ function hasActiveFilters(filters: SupplierFilters, prefixFilter: string): boole
     !!filters.validite_prix_from ||
     !!filters.validite_prix_to ||
     !!filters.validite_contrat_from ||
-    !!filters.validite_contrat_to ||
-    prefixFilter !== 'all'
+    !!filters.validite_contrat_to
   );
 }
 
@@ -252,11 +245,13 @@ function isFilterActive(value: string | undefined, defaultValue = 'all'): boolea
 
 const SUPPLIER_SESSION_KEY = 'keon-supplier-session-filters';
 
-function readSessionFilters(): { filters: SupplierFilters; prefixFilter: string; page: number; viewMode: SupplierViewMode; sortConfig: SupplierSortConfig } | null {
+function readSessionFilters(): { filters: SupplierFilters; page: number; viewMode: SupplierViewMode; sortConfig: SupplierSortConfig } | null {
   try {
     const raw = sessionStorage.getItem(SUPPLIER_SESSION_KEY);
     if (!raw) return null;
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if (!parsed?.filters) return null;
+    return parsed;
   } catch { return null; }
 }
 
@@ -266,7 +261,6 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
   const [viewMode, setViewMode] = useState<SupplierViewMode>(sessionState?.viewMode ?? 'table');
   const [page, setPage] = useState(sessionState?.page ?? 0);
   const [filters, setFilters] = useState<SupplierFilters>(sessionState?.filters ?? DEFAULT_SUPPLIER_FILTERS);
-  const [prefixFilter, setPrefixFilter] = useState(sessionState?.prefixFilter ?? 'all');
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
     if (typeof window === 'undefined') return DEFAULT_VISIBLE_COLUMNS;
     return (
@@ -358,7 +352,6 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
 
   const resetFilters = () => {
     setFilters(DEFAULT_SUPPLIER_FILTERS);
-    setPrefixFilter('all');
     setPage(0);
   };
 
@@ -372,7 +365,7 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
     toggleDefault,
     toggleGlobal,
     loadPreset,
-  } = useSupplierFilterPresets(filters, setFilters, DEFAULT_SUPPLIER_FILTERS, visibleColumns, setVisibleColumns, prefixFilter, setPrefixFilter);
+  } = useSupplierFilterPresets(filters, setFilters, DEFAULT_SUPPLIER_FILTERS, visibleColumns, setVisibleColumns);
   const [showPresetPopover, setShowPresetPopover] = useState(false);
   const [newPresetName, setNewPresetName] = useState('');
 
@@ -382,9 +375,9 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
   // Persist filters/page/view/sort to sessionStorage
   useEffect(() => {
     try {
-      sessionStorage.setItem(SUPPLIER_SESSION_KEY, JSON.stringify({ filters, prefixFilter, page, viewMode, sortConfig }));
+      sessionStorage.setItem(SUPPLIER_SESSION_KEY, JSON.stringify({ filters, page, viewMode, sortConfig }));
     } catch { /* ignore */ }
-  }, [filters, prefixFilter, page, viewMode, sortConfig]);
+  }, [filters, page, viewMode, sortConfig]);
   const handleSort = useCallback((key: string) => {
     setSortConfig((current) => {
       if (current.key === key) {
@@ -398,23 +391,8 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
 
   const { suppliers, total, isLoading, filterOptions } = useSupplierEnrichment(filters, page, pageSize, sortConfig);
 
-  // Compute unique prefixes from loaded suppliers for filter dropdown
-  const availablePrefixes = useMemo(() => {
-    const prefixes = new Set<string>();
-    suppliers.forEach(s => {
-      const p = extractTiersPrefix(s.tiers);
-      if (p) prefixes.add(p);
-    });
-    return Array.from(prefixes).sort();
-  }, [suppliers]);
-
-  // Client-side prefix filtering
-  const filteredSuppliers = useMemo(() => {
-    if (prefixFilter === 'all') return suppliers;
-    return suppliers.filter(s => extractTiersPrefix(s.tiers) === prefixFilter);
-  }, [suppliers, prefixFilter]);
-
-  const displayTotal = prefixFilter === 'all' ? total : filteredSuppliers.length;
+  // `useSupplierEnrichment` is already constrained to TIERS starting with F (and excluding FY).
+  const filteredSuppliers = suppliers;
   const totalPages = useMemo(() => Math.max(1, Math.ceil((total || 0) / pageSize)), [total, pageSize]);
 
   useEffect(() => {
@@ -518,7 +496,7 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
     );
   };
 
-  const filtersActive = hasActiveFilters(filters, prefixFilter);
+  const filtersActive = hasActiveFilters(filters);
 
   // Helper for highlight ring on active filters
   const activeRing = (active: boolean) =>
@@ -588,16 +566,7 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
             <Filter className={cn("h-4 w-4", filtersActive ? "text-primary" : "text-muted-foreground")} />
 
             {/* Prefix filter */}
-            <SearchableSelect
-              value={prefixFilter}
-              onValueChange={(value) => { setPrefixFilter(value); setPage(0); }}
-              options={[
-                { value: 'all', label: 'Tous préfixes' },
-                ...availablePrefixes.map((p) => ({ value: p, label: p })),
-              ]}
-              placeholder="Préfixe tiers"
-              triggerClassName={cn("w-[140px]", activeRing(isFilterActive(prefixFilter)))}
-            />
+            {/* Removed: prefix selection. Business rule forces TIERS starting with 'F' (excluding FY). */}
 
             <SearchableSelect
               value={filters.status}
@@ -885,12 +854,15 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
       {viewMode === 'table' && (
         <Card className="isolate overflow-hidden">
           <div
-            ref={tableScrollRef}
-            className="w-full overflow-x-auto overflow-y-auto max-h-[calc(100vh-340px)] pb-2 [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/40 [&::-webkit-scrollbar-track]:bg-muted/20 [&::-webkit-scrollbar-thumb]:min-h-[40px]"
+            className="w-full overflow-x-hidden overflow-y-auto max-h-[calc(100vh-340px)] [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/40 [&::-webkit-scrollbar-track]:bg-muted/20 [&::-webkit-scrollbar-thumb]:min-h-[40px]"
             style={{ overscrollBehavior: 'contain' }}
           >
-            <div className="min-w-max" style={{ position: 'relative' }}>
-              <table className="caption-bottom text-sm" style={{ width: `${tableWidthPx}px` }}>
+            <div
+              ref={tableScrollRef}
+              className="w-full overflow-x-auto overflow-y-hidden pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:h-0"
+            >
+              <div className="min-w-max" style={{ position: 'relative' }}>
+                <table className="caption-bottom text-sm" style={{ width: `${tableWidthPx}px` }}>
                 <TableHeader className="sticky top-0 z-[10] bg-card [&_tr]:border-b shadow-[0_1px_3px_-1px_rgba(0,0,0,0.1)]">
                   <TableRow>
                     {canEdit && <TableHead className={cn("w-[50px] bg-card", stickyHeadColClass)} style={{ left: 0, zIndex: 12, width: 52, minWidth: 52, maxWidth: 52 }}></TableHead>}
@@ -986,7 +958,8 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
                     ))
                   )}
                 </TableBody>
-              </table>
+                </table>
+              </div>
             </div>
           </div>
 
