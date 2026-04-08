@@ -924,7 +924,7 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
                   {isLoading ? (
                      Array.from({ length: 8 }).map((_, i) => (
                       <TableRow key={i}>
-                        {canEdit && <TableCell className={stickyColClass} style={{ left: 0, zIndex: 41, width: 52, minWidth: 52, maxWidth: 52 }}><Skeleton className="h-4 w-8" /></TableCell>}
+                        {canEdit && <TableCell className={stickyColClass} style={{ left: 0, zIndex: 3, width: 52, minWidth: 52, maxWidth: 52 }}><Skeleton className="h-4 w-8" /></TableCell>}
                         {activeColumns.map((col, j) => {
                           const w = colWidthPx(col.key, columnWidths);
                           const stickyPart = stickySupplierCellStyle(
