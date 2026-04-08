@@ -348,9 +348,15 @@ function SortableSupplierColumnHead({
       currentSortKey={sortConfig.key}
       currentDirection={sortConfig.direction}
       onSort={onSort}
-      className={cn(column.className, 'bg-card', !!stickyPart && stickyHeadColClass, isDragging && 'z-20')}
+      className={cn(
+        column.className,
+        'sticky top-0 z-[8] bg-card',
+        !!stickyPart && stickyHeadColClass,
+        isDragging && 'z-20',
+      )}
       style={{
         ...stickyStyle,
+        top: 0,
         transform: dragEnabled ? CSS.Transform.toString(transform) : undefined,
         transition,
       }}
