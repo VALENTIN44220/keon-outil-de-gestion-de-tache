@@ -893,7 +893,7 @@ export function SupplierListView({ onOpenSupplier, onViewSupplier, canEdit = fal
               <table className="caption-bottom text-sm" style={{ width: `${tableWidthPx}px` }}>
                 <TableHeader className="sticky top-0 z-[10] bg-card [&_tr]:border-b shadow-[0_1px_3px_-1px_rgba(0,0,0,0.1)]">
                   <TableRow>
-                    {canEdit && <TableHead className={cn("w-[50px] bg-card", stickyHeadColClass)} style={{ left: 0, zIndex: 65, width: 52, minWidth: 52, maxWidth: 52 }}></TableHead>}
+                    {canEdit && <TableHead className={cn("w-[50px] bg-card", stickyHeadColClass)} style={{ left: 0, zIndex: 12, width: 52, minWidth: 52, maxWidth: 52 }}></TableHead>}
                     {activeColumns.map((col) => {
                       const w = colWidthPx(col.key, columnWidths);
                       const stickyPart = stickySupplierCellStyle(
