@@ -3027,6 +3027,64 @@ export type Database = {
           },
         ]
       }
+      project_field_values: {
+        Row: {
+          created_at: string
+          field_def_id: string
+          id: string
+          project_id: string
+          updated_at: string
+          updated_by: string | null
+          valeur: string | null
+          valeur_evaluation: string | null
+          valeur_jsonb: Json | null
+        }
+        Insert: {
+          created_at?: string
+          field_def_id: string
+          id?: string
+          project_id: string
+          updated_at?: string
+          updated_by?: string | null
+          valeur?: string | null
+          valeur_evaluation?: string | null
+          valeur_jsonb?: Json | null
+        }
+        Update: {
+          created_at?: string
+          field_def_id?: string
+          id?: string
+          project_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          valeur?: string | null
+          valeur_evaluation?: string | null
+          valeur_jsonb?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_field_values_field_def_id_fkey"
+            columns: ["field_def_id"]
+            isOneToOne: false
+            referencedRelation: "questionnaire_field_definitions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_field_values_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "be_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_field_values_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_questionnaire: {
         Row: {
           champ_id: string
@@ -3137,6 +3195,77 @@ export type Database = {
           visible_columns?: string[]
         }
         Relationships: []
+      }
+      questionnaire_field_definitions: {
+        Row: {
+          champ_id: string
+          created_at: string
+          created_by: string | null
+          has_evaluation_risque: boolean
+          id: string
+          is_active: boolean
+          is_builtin: boolean
+          label: string
+          note: string | null
+          options: string[] | null
+          order_index: number
+          pilier_code: string
+          required: boolean
+          section: string
+          sous_section: string | null
+          spreadsheet_template: Json | null
+          type_champ: string
+          updated_at: string
+        }
+        Insert: {
+          champ_id: string
+          created_at?: string
+          created_by?: string | null
+          has_evaluation_risque?: boolean
+          id?: string
+          is_active?: boolean
+          is_builtin?: boolean
+          label: string
+          note?: string | null
+          options?: string[] | null
+          order_index?: number
+          pilier_code: string
+          required?: boolean
+          section: string
+          sous_section?: string | null
+          spreadsheet_template?: Json | null
+          type_champ?: string
+          updated_at?: string
+        }
+        Update: {
+          champ_id?: string
+          created_at?: string
+          created_by?: string | null
+          has_evaluation_risque?: boolean
+          id?: string
+          is_active?: boolean
+          is_builtin?: boolean
+          label?: string
+          note?: string | null
+          options?: string[] | null
+          order_index?: number
+          pilier_code?: string
+          required?: boolean
+          section?: string
+          sous_section?: string | null
+          spreadsheet_template?: Json | null
+          type_champ?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "questionnaire_field_definitions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       recurrence_runs: {
         Row: {
