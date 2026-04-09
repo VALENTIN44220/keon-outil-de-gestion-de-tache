@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
 import { BEProjectHubLayout } from '@/components/be/BEProjectHubLayout';
 import { useBEProjectByCode, useBEProjectTasks } from '@/hooks/useBEProjectHub';
+import { useBEProjectHubCode } from '@/hooks/useBEProjectHubCode';
 import { BEProjectGantt } from '@/components/be/gantt/BEProjectGantt';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -13,7 +13,7 @@ type ZoomLevel = 'week' | 'month' | 'quarter' | 'year';
 type PeriodMode = 'all' | 'current_year' | 'custom';
 
 export default function BEProjectHubTimeline() {
-  const { code } = useParams<{ code: string }>();
+  const code = useBEProjectHubCode();
   const { data: project, isLoading: projectLoading } = useBEProjectByCode(code);
   const { data: tasks = [], isLoading: tasksLoading } = useBEProjectTasks(project?.id);
 

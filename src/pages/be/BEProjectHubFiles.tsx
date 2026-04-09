@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
 import { BEProjectHubLayout } from '@/components/be/BEProjectHubLayout';
+import { useBEProjectHubCode } from '@/hooks/useBEProjectHubCode';
 import { 
   useBEProjectByCode, 
   useBEProjectTasks,
@@ -62,7 +62,7 @@ type FilterType = 'all' | 'image' | 'document' | 'video' | 'audio';
 type SourceFilter = 'all' | 'task' | 'chat';
 
 export default function BEProjectHubFiles() {
-  const { code } = useParams<{ code: string }>();
+  const code = useBEProjectHubCode();
   
   const { data: project, isLoading: projectLoading } = useBEProjectByCode(code);
   const { data: tasks = [], isLoading: tasksLoading } = useBEProjectTasks(project?.id);

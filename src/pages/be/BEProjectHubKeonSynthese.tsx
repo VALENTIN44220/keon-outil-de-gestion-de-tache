@@ -1,13 +1,13 @@
-import { useParams } from 'react-router-dom';
 import { BEProjectHubLayout } from '@/components/be/BEProjectHubLayout';
 import { BEProjectKeonSyntheseTab } from '@/components/projects/BEProjectKeonSyntheseTab';
 import { useBEProjectByCode } from '@/hooks/useBEProjectHub';
+import { useBEProjectHubCode } from '@/hooks/useBEProjectHubCode';
 import { useQuestionnaireProjectData } from '@/hooks/useQuestionnaireProjectData';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useMemo } from 'react';
 
 export default function BEProjectHubKeonSynthese() {
-  const { code } = useParams<{ code: string }>();
+  const code = useBEProjectHubCode();
   const { data: project, isLoading } = useBEProjectByCode(code);
 
   const projectsArray = useMemo(() => (project ? [project] : []), [project]);

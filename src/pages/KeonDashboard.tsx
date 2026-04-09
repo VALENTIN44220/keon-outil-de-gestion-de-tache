@@ -81,11 +81,13 @@ export default function KeonDashboard() {
   const canEdit = permissionProfile?.can_edit_be_projects ?? false;
   const canDelete = permissionProfile?.can_delete_be_projects ?? false;
 
-  // Filter to KEON projects only, then apply multi-filters and search
-  const keonProjects = useMemo(
-    () => projects.filter(p => keonProjectIds.has(p.id)),
-    [projects, keonProjectIds]
-  );
+  // Filter to KEON projects only (based on questionnaire linkage).
+  // If questionnaire data is not readable for the current user (RLS/permissions),
+  // `keonProjectIds` can be empty; in that case, keep projects visible rather than hiding everything.
+  const keonProjects = useMemo(() => {
+    if (keonProjectIds.size === 0) return projects;
+    return projects.filter((p) => keonProjectIds.has(p.id));
+  }, [projects, keonProjectIds]);
 
   const filteredProjects = useMemo(() => {
     let result = applyMultiFilters(keonProjects);

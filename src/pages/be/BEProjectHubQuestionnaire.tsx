@@ -1,11 +1,11 @@
-import { useParams } from 'react-router-dom';
 import { BEProjectHubLayout } from '@/components/be/BEProjectHubLayout';
 import { ProjectQuestionnairePage } from '@/components/project/questionnaire/ProjectQuestionnairePage';
 import { useBEProjectByCode } from '@/hooks/useBEProjectHub';
+import { useBEProjectHubCode } from '@/hooks/useBEProjectHubCode';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function BEProjectHubQuestionnaire() {
-  const { code } = useParams<{ code: string }>();
+  const code = useBEProjectHubCode();
   const { data: project, isLoading } = useBEProjectByCode(code);
 
   return (

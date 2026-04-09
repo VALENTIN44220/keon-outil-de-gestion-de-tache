@@ -1,5 +1,4 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
 import { BEProjectHubLayout } from '@/components/be/BEProjectHubLayout';
 import { 
   useBEProjectByCode, 
@@ -7,6 +6,7 @@ import {
   useBEProjectConversations,
   ProjectConversation
 } from '@/hooks/useBEProjectHub';
+import { useBEProjectHubCode } from '@/hooks/useBEProjectHubCode';
 import { useChatMessages } from '@/hooks/useChatMessages';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,7 +20,7 @@ import { Search, MessageSquare, FileText, Users, Hash } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function BEProjectHubDiscussions() {
-  const { code } = useParams<{ code: string }>();
+  const code = useBEProjectHubCode();
   const { profile } = useAuth();
   const initRef = useRef(false);
   

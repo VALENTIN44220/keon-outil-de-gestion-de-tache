@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, useMemo, useState } from 'react';
-import { useLocation, useParams } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { useBEProjectByCode, useBEProjectTasks, useBEProjectStats } from '@/hooks/useBEProjectHub';
+import { useBEProjectHubCode } from '@/hooks/useBEProjectHubCode';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -18,7 +19,8 @@ interface BEProjectHubLayoutProps {
 }
 
 export function BEProjectHubLayout({ children }: BEProjectHubLayoutProps) {
-  const { code } = useParams<{ code: string }>();
+  const code = useBEProjectHubCode();
+  const rawCode = code ?? '';
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -56,6 +58,15 @@ export function BEProjectHubLayout({ children }: BEProjectHubLayoutProps) {
       navigate(desiredPath, { replace: true });
     }
   }, [project, qstData, location.pathname, navigate]);
+
+  // URL du type /spv/projects//… (segment code vide) : retour liste
+  useEffect(() => {
+    if (code) return;
+    if (!/^\/(?:spv|be)\/projects\//.test(location.pathname)) return;
+    const m = location.pathname.match(/^\/(?:spv|be)\/projects\/([^/]+)(?:\/|$)/);
+    if (m?.[1]) return;
+    navigate(projectsListPath, { replace: true });
+  }, [code, location.pathname, navigate, projectsListPath]);
 
   const handleSaveProject = async (data: any) => {
     if (!project) return;
@@ -99,7 +110,7 @@ export function BEProjectHubLayout({ children }: BEProjectHubLayoutProps) {
             </div>
             <h2 className="text-xl font-semibold">Projet non trouvé</h2>
             <p className="text-muted-foreground">
-              Le projet avec le code "{code}" n'existe pas.
+              Le projet avec le code "{rawCode ?? ''}" n'existe pas.
             </p>
             <Button onClick={() => navigate(projectsListPath)} variant="outline" className="gap-2">
               <ArrowLeft className="h-4 w-4" />

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useBEProjectHubCode } from '@/hooks/useBEProjectHubCode';
 import { useQueryClient } from '@tanstack/react-query';
 import { BEProjectHubLayout } from '@/components/be/BEProjectHubLayout';
 import { 
@@ -67,7 +67,7 @@ function DescriptionItem({ label, value, mono }: DescriptionItemProps) {
 }
 
 export default function BEProjectHubOverview() {
-  const { code } = useParams<{ code: string }>();
+  const code = useBEProjectHubCode();
   const queryClient = useQueryClient();
   const { data: project, isLoading: projectLoading } = useBEProjectByCode(code);
   const { data: tasks = [], isLoading: tasksLoading } = useBEProjectTasks(project?.id);

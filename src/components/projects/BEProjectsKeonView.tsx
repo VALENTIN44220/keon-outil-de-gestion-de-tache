@@ -157,7 +157,11 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
   }, []);
 
   // --- Data computations ---
-  const keonProjects = useMemo(() => projects.filter(p => keonProjectIds.has(p.id)), [projects, keonProjectIds]);
+  // If questionnaire linkage is not readable for the current user, don't hide all projects.
+  const keonProjects = useMemo(() => {
+    if (keonProjectIds.size === 0) return projects;
+    return projects.filter((p) => keonProjectIds.has(p.id));
+  }, [projects, keonProjectIds]);
 
   const kpis = useMemo(() => {
     let spvCount = 0, gisementSum = 0, cmasValues: number[] = [], ksSum = 0, ksCount = 0, completeCount = 0;
