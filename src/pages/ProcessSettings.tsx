@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { useMatchedRouteParam } from '@/hooks/useMatchedRouteParam';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -37,7 +38,7 @@ import { useTasks } from '@/hooks/useTasks';
 
 
 export default function ProcessSettings() {
-  const { processId } = useParams<{ processId: string }>();
+  const processId = useMatchedRouteParam('processId', '/templates/process/:processId');
   const navigate = useNavigate();
   const { user } = useAuth();
   const { allTasks } = useTasks();
@@ -52,8 +53,11 @@ export default function ProcessSettings() {
   const [customFieldCount, setCustomFieldCount] = useState(0);
 
   const fetchProcess = async () => {
-    if (!processId) return;
-    
+    if (!processId) {
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
       const { data, error } = await supabase

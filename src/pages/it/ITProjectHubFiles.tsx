@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { useITProjectHubCode } from '@/hooks/useITProjectHubCode';
 import { Layout } from '@/components/layout/Layout';
 import { ITProjectHubHeader } from '@/components/it/ITProjectHubHeader';
 import {
@@ -51,7 +51,7 @@ type FilterType = 'all' | 'image' | 'document' | 'video' | 'audio';
 type SourceFilter = 'all' | 'task' | 'chat';
 
 export default function ITProjectHubFiles() {
-  const { code } = useParams<{ code: string }>();
+  const code = useITProjectHubCode();
 
   const { data: project, isLoading: projectLoading } = useITProject(code);
   const { data: tasks = [], isLoading: tasksLoading } = useITProjectTasks(project?.id);

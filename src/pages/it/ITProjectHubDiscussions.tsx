@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useITProjectHubCode } from '@/hooks/useITProjectHubCode';
 import { Layout } from '@/components/layout/Layout';
 import { ITProjectHubHeader } from '@/components/it/ITProjectHubHeader';
 import { useITProject, useITProjectTasks, useITProjectStats, useITProjectConversations, ITProjectConversation } from '@/hooks/useITProjectHub';
@@ -16,7 +16,7 @@ import { Search, MessageSquare, FileText, Hash } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function ITProjectHubDiscussions() {
-  const { code } = useParams<{ code: string }>();
+  const code = useITProjectHubCode();
   const { profile } = useAuth();
   const initRef = useRef(false);
 

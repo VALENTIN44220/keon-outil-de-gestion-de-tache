@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useParams } from 'react-router-dom';
+import { useITProjectHubCode } from '@/hooks/useITProjectHubCode';
 import { Layout } from '@/components/layout/Layout';
 import { ITProjectHubHeader } from '@/components/it/ITProjectHubHeader';
 import { useITProject, useITProjectTasks, useITProjectStats, useITProjectMilestones } from '@/hooks/useITProjectHub';
@@ -40,7 +40,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 export default function ITProjectHubOverview() {
-  const { code } = useParams<{ code: string }>();
+  const code = useITProjectHubCode();
   const { data: project, isLoading, refetch } = useITProject(code);
   const { data: tasks = [] } = useITProjectTasks(project?.id);
   const { data: milestones = [] } = useITProjectMilestones(project?.id);

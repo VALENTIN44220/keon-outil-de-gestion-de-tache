@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useITProjectHubCode } from '@/hooks/useITProjectHubCode';
 import { Layout } from '@/components/layout/Layout';
 import { ITProjectHubHeader } from '@/components/it/ITProjectHubHeader';
 import { useITProject, useITProjectTasks, useITProjectStats, useITProjectMilestones } from '@/hooks/useITProjectHub';
@@ -54,7 +54,7 @@ const MILESTONE_STATUSES: { value: MilestoneStatus; label: string }[] = [
 ];
 
 export default function ITProjectHubTimeline() {
-  const { code } = useParams<{ code: string }>();
+  const code = useITProjectHubCode();
   const { data: project, isLoading } = useITProject(code);
   const { data: tasks = [] } = useITProjectTasks(project?.id);
   const { data: milestones = [], addMilestone, updateMilestone, deleteMilestone } = useITProjectMilestones(project?.id);

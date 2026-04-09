@@ -99,8 +99,65 @@ export function validateSingleField(
   const strValue = value != null ? String(value).trim() : '';
   const isEmpty = strValue === '' || value === null || value === undefined;
 
-  // Required check
-  if (field.is_required && isEmpty) {
+  const isRequired = Boolean((field as TemplateCustomField).is_required);
+
+  // Required — case à cocher (UI : chaîne 'true' / false ou bool true)
+  if (isRequired && field.field_type === 'checkbox') {
+    const checked = value === true || value === 'true';
+    if (!checked) {
+      return {
+        valid: false,
+        message: VALIDATION_MESSAGES.required,
+        fieldId: field.id,
+      };
+    }
+    return { valid: true, fieldId: field.id };
+  }
+
+  if (isRequired && field.field_type === 'multiselect') {
+    let items: string[] = [];
+    if (Array.isArray(value)) items = value.map((x) => String(x).trim()).filter(Boolean);
+    else if (typeof value === 'string') items = value.split(',').map((s) => s.trim()).filter(Boolean);
+    if (items.length === 0) {
+      return {
+        valid: false,
+        message: VALIDATION_MESSAGES.required,
+        fieldId: field.id,
+      };
+    }
+  }
+
+  if (isRequired && field.field_type === 'repeatable_table') {
+    if (!Array.isArray(value) || value.length === 0) {
+      return {
+        valid: false,
+        message: VALIDATION_MESSAGES.required,
+        fieldId: field.id,
+      };
+    }
+  }
+
+  if (isRequired && field.field_type === 'file') {
+    const emptyFile =
+      value === undefined ||
+      value === null ||
+      value === '' ||
+      (typeof value === 'object' &&
+        value !== null &&
+        !(value as { name?: string; file?: unknown; url?: string }).name &&
+        !(value as { file?: unknown }).file &&
+        !(value as { url?: string }).url);
+    if (emptyFile) {
+      return {
+        valid: false,
+        message: VALIDATION_MESSAGES.required,
+        fieldId: field.id,
+      };
+    }
+  }
+
+  // Required check (texte, nombre, liste simple, etc.)
+  if (isRequired && isEmpty) {
     return {
       valid: false,
       message: VALIDATION_MESSAGES.required,

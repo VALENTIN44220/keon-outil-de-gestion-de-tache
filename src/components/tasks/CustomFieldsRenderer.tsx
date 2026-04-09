@@ -15,6 +15,11 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
+import { validateSingleField } from '@/hooks/useFieldValidation';
+import {
+  getEffectiveCustomFieldValue,
+  isCustomFieldVisible,
+} from '@/lib/customFieldVisibility';
 import {
   Type,
   AlignLeft,
@@ -581,96 +586,20 @@ export function CustomFieldsRenderer({
   );
 }
 
-// Validation helper
+// Validation helper (soumission : mêmes règles que le renderer + useFieldValidation)
 export function validateCustomFields(
   fields: TemplateCustomField[],
-  values: Record<string, any>
+  values: Record<string, any>,
 ): { isValid: boolean; errors: Record<string, string> } {
   const errors: Record<string, string> = {};
 
-  // Helper to check if a field is visible based on conditions
-  const isFieldVisible = (field: TemplateCustomField): boolean => {
-    if (!field.condition_field_id) return true;
-    const conditionValue = values[field.condition_field_id];
-    switch (field.condition_operator) {
-      case 'equals':
-        return conditionValue === field.condition_value;
-      case 'not_equals':
-        return conditionValue !== field.condition_value;
-      case 'contains':
-        return typeof conditionValue === 'string' &&
-               conditionValue.toLowerCase().includes((field.condition_value || '').toLowerCase());
-      case 'not_empty':
-        return Boolean(conditionValue && conditionValue !== '');
-      default:
-        return true;
-    }
-  };
-
   for (const field of fields) {
-    // Skip validation for conditionally hidden fields
-    if (!isFieldVisible(field)) continue;
+    if (!isCustomFieldVisible(field, values)) continue;
 
-    const value = values[field.id];
-
-    // Check required fields
-    if (field.is_required) {
-      // For file fields, value is an object with { name, file, ... }
-      const isEmpty = value === undefined || value === null || value === '' ||
-        (field.field_type === 'file' && (!value || (typeof value === 'object' && !value.name && !value.file)));
-      if (isEmpty) {
-        errors[field.id] = 'Merci de remplir tous les champs obligatoires';
-        continue;
-      }
-    }
-
-    // Skip validation if empty and not required
-    if (!value && !field.is_required) continue;
-
-    // Validate by field type
-    switch (field.field_type) {
-      case 'email':
-        if (value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-          errors[field.id] = 'Email invalide';
-        }
-        break;
-      case 'url':
-        if (value && !/^https?:\/\/.+/.test(value)) {
-          errors[field.id] = 'URL invalide (doit commencer par http:// ou https://)';
-        }
-        break;
-      case 'number':
-        if (value) {
-          const num = parseFloat(value);
-          if (isNaN(num)) {
-            errors[field.id] = 'Valeur numérique invalide';
-          } else {
-            if (field.min_value !== null && num < field.min_value) {
-              errors[field.id] = `La valeur doit être supérieure à ${field.min_value}`;
-            }
-            if (field.max_value !== null && num > field.max_value) {
-              errors[field.id] = `La valeur doit être inférieure à ${field.max_value}`;
-            }
-          }
-        }
-        break;
-      case 'phone':
-        if (value && !/^[\d\s+\-().]+$/.test(value)) {
-          errors[field.id] = 'Numéro de téléphone invalide';
-        }
-        break;
-    }
-
-    // Custom regex validation
-    if (field.validation_regex && value) {
-      try {
-        const regex = new RegExp(field.validation_regex);
-        if (!regex.test(value)) {
-          errors[field.id] = 'Format invalide';
-        }
-      } catch {
-        // Invalid regex, skip validation
-      }
+    const effectiveValue = getEffectiveCustomFieldValue(field, values);
+    const result = validateSingleField(effectiveValue, field);
+    if (!result.valid && result.message) {
+      errors[field.id] = result.message;
     }
   }
 

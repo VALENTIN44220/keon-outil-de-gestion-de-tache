@@ -699,7 +699,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
     const { isValid, errors } = validateCustomFields(allFieldsFlat, customFieldValues);
     if (!isValid) {
       setFieldErrors(errors);
-      toast.error('Veuillez corriger les erreurs dans les champs personnalisés');
+      toast.error('Veuillez compléter tous les champs obligatoires dans « Détails de la demande »');
       return;
     }
 
@@ -1025,6 +1025,11 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
     materialLines.length > 0 && materialLines.every(l => l.article !== null && l.quantite > 0)
   );
 
+  const customFieldsSubmitState = useMemo(
+    () => validateCustomFields(allFieldsFlat, customFieldValues),
+    [allFieldsFlat, customFieldValues],
+  );
+
   const isFormDisabled =
     !title.trim() ||
     (!notifyTargetDepartment && !notifyServiceGroup) ||
@@ -1033,7 +1038,8 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
     (!dueDate && (!commonFieldsConfig || commonFieldsConfig.due_date?.visible !== false)) ||
     isSubmitting ||
     !materialValid ||
-    (hasMultipleSubProcesses && selectedSubProcessIds.length === 0);
+    (hasMultipleSubProcesses && selectedSubProcessIds.length === 0) ||
+    !customFieldsSubmitState.isValid;
 
   const handleDialogOpenChange = useCallback(
     (nextOpen: boolean) => {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useITProjectHubCode } from '@/hooks/useITProjectHubCode';
 import { Layout } from '@/components/layout/Layout';
 import { ITProjectHubHeader } from '@/components/it/ITProjectHubHeader';
 import { useITProject, useITProjectTasks, useITProjectStats } from '@/hooks/useITProjectHub';
@@ -14,7 +14,7 @@ import { Link2, ExternalLink, Info, Save, RefreshCw, CheckCircle2, MessageSquare
 import { cn } from '@/lib/utils';
 
 export default function ITProjectHubSync() {
-  const { code } = useParams<{ code: string }>();
+  const code = useITProjectHubCode();
   const { data: project, isLoading, refetch } = useITProject(code);
   const { data: tasks = [] } = useITProjectTasks(project?.id);
   const stats = useITProjectStats(tasks, project);

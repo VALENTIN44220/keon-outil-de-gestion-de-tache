@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
+import { useITProjectHubCode } from '@/hooks/useITProjectHubCode';
 import { Layout } from '@/components/layout/Layout';
 import { ITProjectHubHeader } from '@/components/it/ITProjectHubHeader';
 import { useITProject, useITProjectStats } from '@/hooks/useITProjectHub';
@@ -54,7 +54,7 @@ function isOverdue(task: Task): boolean {
 }
 
 export default function ITProjectHubTasks() {
-  const { code } = useParams<{ code: string }>();
+  const code = useITProjectHubCode();
   const { data: project, isLoading } = useITProject(code);
   const queryClient = useQueryClient();
 

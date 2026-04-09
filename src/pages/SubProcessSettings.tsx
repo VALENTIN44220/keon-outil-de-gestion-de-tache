@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { useMatchedRouteParam } from '@/hooks/useMatchedRouteParam';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -143,7 +144,10 @@ export default function SubProcessSettings() {
   });
 
   const fetchData = useCallback(async () => {
-    if (!subProcessId) return;
+    if (!subProcessId) {
+      setIsLoading(false);
+      return;
+    }
 
     setIsLoading(true);
     try {
