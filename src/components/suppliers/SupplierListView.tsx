@@ -1061,7 +1061,7 @@ export function SupplierListView({
         <Card className="overflow-hidden">
           <div
             ref={tableScrollRef}
-            className="w-full overflow-x-scroll overflow-y-auto max-h-[calc(100vh-340px)] pb-2 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-horizontal]:h-0 [&::-webkit-scrollbar-horizontal]:appearance-none [scrollbar-width:none] [&]:scrollbar-width-x-none [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/40 [&::-webkit-scrollbar-track]:bg-muted/20 [&::-webkit-scrollbar-thumb]:min-h-[40px]"
+            className="supplier-table-scroll w-full overflow-x-scroll overflow-y-auto max-h-[calc(100vh-340px)] pb-2 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/40 [&::-webkit-scrollbar-track]:bg-muted/20 [&::-webkit-scrollbar-thumb]:min-h-[40px]"
             style={{ overscrollBehavior: 'contain' }}
           >
             <div className="min-w-max" style={{ position: 'relative' }}>
