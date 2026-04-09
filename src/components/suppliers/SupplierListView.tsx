@@ -643,51 +643,6 @@ export function SupplierListView({
     const sum = activeColumns.reduce((acc, c) => acc + colWidthPx(c.key, columnWidths), 0);
     return Math.max(sum + (canEdit ? 52 : 0), 800);
   }, [activeColumns, columnWidths, canEdit]);
-  const tableScrollRef = useRef<HTMLDivElement | null>(null);
-  const stickyScrollbarRef = useRef<HTMLDivElement | null>(null);
-  const stickyScrollbarContentRef = useRef<HTMLDivElement | null>(null);
-  const syncingSourceRef = useRef<'table' | 'sticky' | null>(null);
-
-  useEffect(() => {
-    const table = tableScrollRef.current;
-    const sticky = stickyScrollbarRef.current;
-    const stickyContent = stickyScrollbarContentRef.current;
-
-    if (!table || !sticky || !stickyContent || viewMode !== 'table') return;
-
-    const syncMetrics = () => {
-      const needsHorizontalScroll = table.scrollWidth > table.clientWidth + 1;
-      stickyContent.style.width = `${table.scrollWidth}px`;
-      sticky.style.display = needsHorizontalScroll ? 'block' : 'none';
-      if (needsHorizontalScroll) sticky.scrollLeft = table.scrollLeft;
-    };
-
-    const onTableScroll = () => {
-      if (syncingSourceRef.current === 'sticky') return;
-      syncingSourceRef.current = 'table';
-      sticky.scrollLeft = table.scrollLeft;
-      syncingSourceRef.current = null;
-    };
-
-    const onStickyScroll = () => {
-      if (syncingSourceRef.current === 'table') return;
-      syncingSourceRef.current = 'sticky';
-      table.scrollLeft = sticky.scrollLeft;
-      syncingSourceRef.current = null;
-    };
-
-    table.addEventListener('scroll', onTableScroll, { passive: true });
-    sticky.addEventListener('scroll', onStickyScroll, { passive: true });
-    window.addEventListener('resize', syncMetrics);
-    syncMetrics();
-
-    return () => {
-      table.removeEventListener('scroll', onTableScroll);
-      sticky.removeEventListener('scroll', onStickyScroll);
-      window.removeEventListener('resize', syncMetrics);
-    };
-  }, [viewMode, tableWidthPx, filteredSuppliers.length, isLoading, columnWidths]);
-
   const toggleColumn = (key: string) => {
     setVisibleColumns(prev =>
       prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
@@ -1047,8 +1002,7 @@ export function SupplierListView({
         <Card className="isolate overflow-hidden">
           {/* Scroll H+V sur le même nœud : sinon un ancêtre `overflow-y-hidden` casse le sticky du thead. */}
           <div
-            ref={tableScrollRef}
-            className="w-full overflow-auto max-h-[calc(100vh-340px)] pb-2 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar:horizontal]:h-0 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/40 [&::-webkit-scrollbar-track]:bg-muted/20 [&::-webkit-scrollbar-thumb]:min-h-[40px]"
+            className="w-full max-h-[calc(100vh-340px)] overflow-auto pb-2 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:min-h-[40px] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/40 [&::-webkit-scrollbar-track]:bg-muted/20"
             style={{ overscrollBehavior: 'contain' }}
           >
               <div className="min-w-max" style={{ position: 'relative' }}>
@@ -1153,16 +1107,6 @@ export function SupplierListView({
                 </DndContext>
                 </table>
               </div>
-          </div>
-
-          <div className="sticky bottom-0 z-20 border-t bg-background/95 px-2 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-            <div
-              ref={stickyScrollbarRef}
-              className="w-full overflow-x-auto overflow-y-hidden [scrollbar-width:thin] [&::-webkit-scrollbar]:h-3 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/50 [&::-webkit-scrollbar-track]:bg-muted/30"
-              aria-label="Barre de défilement horizontale"
-            >
-              <div ref={stickyScrollbarContentRef} className="h-px min-w-full" />
-            </div>
           </div>
 
           {/* Bottom Pagination */}
