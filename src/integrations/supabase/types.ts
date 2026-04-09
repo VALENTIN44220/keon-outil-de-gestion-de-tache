@@ -2931,6 +2931,7 @@ export type Database = {
           permission_profile_id: string | null
           secondary_email: string | null
           status: string
+          suppliers_list_column_order: Json | null
           updated_at: string
           user_id: string
         }
@@ -2955,6 +2956,7 @@ export type Database = {
           permission_profile_id?: string | null
           secondary_email?: string | null
           status?: string
+          suppliers_list_column_order?: Json | null
           updated_at?: string
           user_id: string
         }
@@ -2979,6 +2981,7 @@ export type Database = {
           permission_profile_id?: string | null
           secondary_email?: string | null
           status?: string
+          suppliers_list_column_order?: Json | null
           updated_at?: string
           user_id?: string
         }
@@ -3023,64 +3026,6 @@ export type Database = {
             columns: ["permission_profile_id"]
             isOneToOne: false
             referencedRelation: "permission_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      project_field_values: {
-        Row: {
-          created_at: string
-          field_def_id: string
-          id: string
-          project_id: string
-          updated_at: string
-          updated_by: string | null
-          valeur: string | null
-          valeur_evaluation: string | null
-          valeur_jsonb: Json | null
-        }
-        Insert: {
-          created_at?: string
-          field_def_id: string
-          id?: string
-          project_id: string
-          updated_at?: string
-          updated_by?: string | null
-          valeur?: string | null
-          valeur_evaluation?: string | null
-          valeur_jsonb?: Json | null
-        }
-        Update: {
-          created_at?: string
-          field_def_id?: string
-          id?: string
-          project_id?: string
-          updated_at?: string
-          updated_by?: string | null
-          valeur?: string | null
-          valeur_evaluation?: string | null
-          valeur_jsonb?: Json | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "project_field_values_field_def_id_fkey"
-            columns: ["field_def_id"]
-            isOneToOne: false
-            referencedRelation: "questionnaire_field_definitions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "project_field_values_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "be_projects"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "project_field_values_updated_by_fkey"
-            columns: ["updated_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -3195,77 +3140,6 @@ export type Database = {
           visible_columns?: string[]
         }
         Relationships: []
-      }
-      questionnaire_field_definitions: {
-        Row: {
-          champ_id: string
-          created_at: string
-          created_by: string | null
-          has_evaluation_risque: boolean
-          id: string
-          is_active: boolean
-          is_builtin: boolean
-          label: string
-          note: string | null
-          options: string[] | null
-          order_index: number
-          pilier_code: string
-          required: boolean
-          section: string
-          sous_section: string | null
-          spreadsheet_template: Json | null
-          type_champ: string
-          updated_at: string
-        }
-        Insert: {
-          champ_id: string
-          created_at?: string
-          created_by?: string | null
-          has_evaluation_risque?: boolean
-          id?: string
-          is_active?: boolean
-          is_builtin?: boolean
-          label: string
-          note?: string | null
-          options?: string[] | null
-          order_index?: number
-          pilier_code: string
-          required?: boolean
-          section: string
-          sous_section?: string | null
-          spreadsheet_template?: Json | null
-          type_champ?: string
-          updated_at?: string
-        }
-        Update: {
-          champ_id?: string
-          created_at?: string
-          created_by?: string | null
-          has_evaluation_risque?: boolean
-          id?: string
-          is_active?: boolean
-          is_builtin?: boolean
-          label?: string
-          note?: string | null
-          options?: string[] | null
-          order_index?: number
-          pilier_code?: string
-          required?: boolean
-          section?: string
-          sous_section?: string | null
-          spreadsheet_template?: Json | null
-          type_champ?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "questionnaire_field_definitions_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       recurrence_runs: {
         Row: {
@@ -4291,7 +4165,6 @@ export type Database = {
           delai_de_paiement: string | null
           delais_de_paiement_commentaires: string | null
           description: string | null
-          detail_par_entite: string | null
           echeances_de_paiement: string | null
           entite: string | null
           evolution_tarif_2026: string | null
@@ -4336,7 +4209,6 @@ export type Database = {
           delai_de_paiement?: string | null
           delais_de_paiement_commentaires?: string | null
           description?: string | null
-          detail_par_entite?: string | null
           echeances_de_paiement?: string | null
           entite?: string | null
           evolution_tarif_2026?: string | null
@@ -4381,7 +4253,6 @@ export type Database = {
           delai_de_paiement?: string | null
           delais_de_paiement_commentaires?: string | null
           description?: string | null
-          detail_par_entite?: string | null
           echeances_de_paiement?: string | null
           entite?: string | null
           evolution_tarif_2026?: string | null

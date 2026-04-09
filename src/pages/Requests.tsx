@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { NewRequestDialog } from '@/components/tasks/NewRequestDialog';
@@ -24,6 +25,10 @@ import { DraggableActionCards } from '@/components/requests/DraggableActionCards
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import {
+  SUPPLIER_NEW_REQUEST_PROCESS_TEMPLATE_ID,
+  SUPPLIER_REQUEST_QUERY_PARAM,
+} from '@/lib/supplierRequestFlow';
 
 interface ProcessTemplate {
   id: string;
@@ -47,6 +52,7 @@ interface ProcessWithSubProcesses extends ProcessTemplate {
 
 const Requests = () => {
   const { profile, user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeView, setActiveView] = useState('requests');
   const [mainTab, setMainTab] = useState('create');
   const [isNewRequestOpen, setIsNewRequestOpen] = useState(false);
@@ -77,6 +83,18 @@ const Requests = () => {
   useEffect(() => {
     fetchProcesses();
   }, []);
+
+  // Redirection depuis /suppliers : ouvrir le formulaire « Demande de nouveau fournisseur »
+  useEffect(() => {
+    if (searchParams.get(SUPPLIER_REQUEST_QUERY_PARAM) !== '1') return;
+    setMainTab('create');
+    setSelectedProcessTemplateId(SUPPLIER_NEW_REQUEST_PROCESS_TEMPLATE_ID);
+    setSelectedSubProcessTemplateId(undefined);
+    setIsNewRequestOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete(SUPPLIER_REQUEST_QUERY_PARAM);
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   const fetchProcesses = async () => {
     const { data: processData } = await supabase

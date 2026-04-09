@@ -17,7 +17,7 @@ import {
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { useSupplierEnrichment, SupplierFilters, SupplierSortConfig, SupplierEnrichment } from '@/hooks/useSupplierEnrichment';
 import { useSupplierFilterPresets, SupplierFilterPreset } from '@/hooks/useSupplierFilterPresets';
-import { Search, Building2, Filter, ExternalLink, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LayoutGrid, List, Save, Star, Trash2, FolderOpen, RotateCcw, Columns3, Pencil, Globe, GripVertical } from 'lucide-react';
+import { Search, Filter, ExternalLink, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LayoutGrid, List, Save, Star, Trash2, FolderOpen, RotateCcw, Columns3, Pencil, Globe, GripVertical } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -348,17 +348,13 @@ function SortableSupplierColumnHead({
       currentSortKey={sortConfig.key}
       currentDirection={sortConfig.direction}
       onSort={onSort}
-      className={cn(
-        column.className,
-        'sticky top-0 z-[8] bg-card',
-        !!stickyPart && stickyHeadColClass,
-        isDragging && 'z-20',
-      )}
+      className={cn(column.className, 'bg-card', !!stickyPart && stickyHeadColClass, isDragging && 'z-20')}
       style={{
         ...stickyStyle,
-        top: 0,
-        transform: dragEnabled ? CSS.Transform.toString(transform) : undefined,
-        transition,
+        // Important: `transform` can break `position: sticky` in some browsers.
+        // Only apply it while dragging.
+        transform: isDragging ? CSS.Transform.toString(transform) : undefined,
+        transition: isDragging ? transition : undefined,
       }}
       onColumnResizeMouseDown={(e) => onColumnResizeStart(column.key, e.clientX)}
       headerStart={
@@ -642,11 +638,55 @@ export function SupplierListView({
   const stickyColClass =
     'sticky border-r border-border bg-card shadow-[4px_0_8px_-6px_rgba(0,0,0,0.14)] group-hover:bg-muted';
   const stickyHeadColClass =
-    'sticky top-0 border-r border-border bg-card shadow-[4px_0_8px_-6px_rgba(0,0,0,0.14),0_1px_3px_-1px_rgba(0,0,0,0.1)] hover:!bg-muted';
+    'sticky border-r border-border bg-card shadow-[4px_0_8px_-6px_rgba(0,0,0,0.14)] hover:!bg-muted';
   const tableWidthPx = useMemo(() => {
     const sum = activeColumns.reduce((acc, c) => acc + colWidthPx(c.key, columnWidths), 0);
     return Math.max(sum + (canEdit ? 52 : 0), 800);
   }, [activeColumns, columnWidths, canEdit]);
+  const tableScrollRef = useRef<HTMLDivElement | null>(null);
+  const stickyScrollbarRef = useRef<HTMLDivElement | null>(null);
+  const stickyScrollbarContentRef = useRef<HTMLDivElement | null>(null);
+  const syncingSourceRef = useRef<'table' | 'sticky' | null>(null);
+
+  useEffect(() => {
+    const table = tableScrollRef.current;
+    const sticky = stickyScrollbarRef.current;
+    const stickyContent = stickyScrollbarContentRef.current;
+
+    if (!table || !sticky || !stickyContent || viewMode !== 'table') return;
+
+    const syncMetrics = () => {
+      const needsHorizontalScroll = table.scrollWidth > table.clientWidth + 1;
+      stickyContent.style.width = `${table.scrollWidth}px`;
+      sticky.style.display = needsHorizontalScroll ? 'block' : 'none';
+      if (needsHorizontalScroll) sticky.scrollLeft = table.scrollLeft;
+    };
+
+    const onTableScroll = () => {
+      if (syncingSourceRef.current === 'sticky') return;
+      syncingSourceRef.current = 'table';
+      sticky.scrollLeft = table.scrollLeft;
+      syncingSourceRef.current = null;
+    };
+
+    const onStickyScroll = () => {
+      if (syncingSourceRef.current === 'table') return;
+      syncingSourceRef.current = 'sticky';
+      table.scrollLeft = sticky.scrollLeft;
+      syncingSourceRef.current = null;
+    };
+
+    table.addEventListener('scroll', onTableScroll, { passive: true });
+    sticky.addEventListener('scroll', onStickyScroll, { passive: true });
+    window.addEventListener('resize', syncMetrics);
+    syncMetrics();
+
+    return () => {
+      table.removeEventListener('scroll', onTableScroll);
+      sticky.removeEventListener('scroll', onStickyScroll);
+      window.removeEventListener('resize', syncMetrics);
+    };
+  }, [viewMode, tableWidthPx, filteredSuppliers.length, isLoading, columnWidths]);
 
   const toggleColumn = (key: string) => {
     setVisibleColumns(prev =>
@@ -662,18 +702,8 @@ export function SupplierListView({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-3 rounded-xl bg-primary/10">
-            <Building2 className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Référentiel Fournisseurs</h1>
-            <p className="text-muted-foreground">Service Achats</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-1 p-1 bg-muted/50 rounded-lg">
+      <div className="flex justify-end">
+        <div className="flex items-center gap-1 rounded-lg bg-muted/50 p-1">
           <Button variant={viewMode === 'grid' ? 'default' : 'ghost'} size="sm" className={cn('h-8 px-3 gap-2', viewMode === 'grid' && 'shadow-sm')} onClick={() => setViewMode('grid')}>
             <LayoutGrid className="h-4 w-4" />
             <span className="hidden sm:inline">Grille</span>
@@ -1014,120 +1044,126 @@ export function SupplierListView({
 
       {/* Table View */}
       {viewMode === 'table' && (
-        <Card className="overflow-hidden">
+        <Card className="isolate overflow-hidden">
+          {/* Scroll H+V sur le même nœud : sinon un ancêtre `overflow-y-hidden` casse le sticky du thead. */}
           <div
-            className="w-full overflow-x-auto overflow-y-auto max-h-[calc(100vh-340px)] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar]:h-3 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/40 [&::-webkit-scrollbar-track]:bg-muted/20 [&::-webkit-scrollbar-thumb]:min-h-[40px]"
+            ref={tableScrollRef}
+            className="w-full overflow-auto max-h-[calc(100vh-340px)] pb-2 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar:horizontal]:h-0 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/40 [&::-webkit-scrollbar-track]:bg-muted/20 [&::-webkit-scrollbar-thumb]:min-h-[40px]"
             style={{ overscrollBehavior: 'contain' }}
           >
-            <div className="min-w-max" style={{ position: 'relative' }}>
-              <table className="caption-bottom text-sm" style={{ width: `${tableWidthPx}px`, borderCollapse: 'separate', borderSpacing: 0 }}>
+              <div className="min-w-max" style={{ position: 'relative' }}>
+                <table className="caption-bottom text-sm" style={{ width: `${tableWidthPx}px` }}>
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleColumnDragEnd}>
-                  <TableHeader className="[&_tr]:border-b">
+                <TableHeader className="sticky top-0 z-[10] bg-card [&_tr]:border-b shadow-[0_1px_3px_-1px_rgba(0,0,0,0.1)]">
+                  <TableRow>
+                    {canEdit && <TableHead className={cn("w-[50px] bg-card", stickyHeadColClass)} style={{ left: 0, zIndex: 12, width: 52, minWidth: 52, maxWidth: 52 }}></TableHead>}
+                    <SortableContext items={activeColumns.map((c) => c.key)} strategy={horizontalListSortingStrategy}>
+                    {activeColumns.map((col) => {
+                      const w = colWidthPx(col.key, columnWidths);
+                      const stickyPart = stickySupplierCellStyle(
+                        col.key,
+                        stickyLayout.leftByKey,
+                        stickyLayout.order,
+                        11,
+                      );
+                      return (
+                        <SortableSupplierColumnHead
+                          key={col.key}
+                          column={col}
+                          sortConfig={sortConfig}
+                          onSort={handleSort}
+                          columnWidths={columnWidths}
+                          onColumnResizeStart={onColumnResizeStart}
+                          stickyPart={stickyPart}
+                          stickyHeadColClass={stickyHeadColClass}
+                          widthPx={w}
+                          dragEnabled={persistColumnOrderToProfile}
+                        />
+                      );
+                    })}
+                    </SortableContext>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                     Array.from({ length: 8 }).map((_, i) => (
+                      <TableRow key={i}>
+                        {canEdit && <TableCell className={stickyColClass} style={{ left: 0, zIndex: 3, width: 52, minWidth: 52, maxWidth: 52 }}><Skeleton className="h-4 w-8" /></TableCell>}
+                        {activeColumns.map((col, j) => {
+                          const w = colWidthPx(col.key, columnWidths);
+                          const stickyPart = stickySupplierCellStyle(
+                            col.key,
+                            stickyLayout.leftByKey,
+                            stickyLayout.order,
+                            2,
+                          );
+                          const isSticky = !!stickyPart;
+                          return (
+                            <TableCell key={j} className={cn(isSticky && stickyColClass)} style={mergeColSize(stickyPart, w)}>
+                              <Skeleton className="h-4 w-full" />
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    ))
+                  ) : filteredSuppliers.length === 0 ? (
                     <TableRow>
-                      {canEdit && (
-                        <TableHead
-                          className={cn("w-[50px] bg-card", stickyHeadColClass)}
-                          style={{ top: 0, left: 0, zIndex: 12, width: 52, minWidth: 52, maxWidth: 52 }}
-                        ></TableHead>
-                      )}
-                      <SortableContext items={activeColumns.map((c) => c.key)} strategy={horizontalListSortingStrategy}>
+                      <TableCell colSpan={activeColumns.length + (canEdit ? 1 : 0)} className="text-center py-8 text-muted-foreground">Aucun fournisseur trouvé</TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredSuppliers.map((supplier) => (
+                      <TableRow key={supplier.id} className="group cursor-pointer hover:bg-muted/50" onClick={() => onViewSupplier(supplier.id)}>
+                        {canEdit && (
+                          <TableCell className={stickyColClass} style={{ left: 0, zIndex: 3, width: 52, minWidth: 52, maxWidth: 52 }}>
+                            <Button variant="ghost" size="icon" title="Modifier" onClick={(e) => { e.stopPropagation(); onOpenSupplier(supplier.id); }}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        )}
                         {activeColumns.map((col) => {
                           const w = colWidthPx(col.key, columnWidths);
                           const stickyPart = stickySupplierCellStyle(
                             col.key,
                             stickyLayout.leftByKey,
                             stickyLayout.order,
-                            11,
+                            2,
                           );
+                          const isSticky = !!stickyPart;
                           return (
-                            <SortableSupplierColumnHead
-                              key={col.key}
-                              column={col}
-                              sortConfig={sortConfig}
-                              onSort={handleSort}
-                              columnWidths={columnWidths}
-                              onColumnResizeStart={onColumnResizeStart}
-                              stickyPart={stickyPart}
-                              stickyHeadColClass={stickyHeadColClass}
-                              widthPx={w}
-                              dragEnabled={persistColumnOrderToProfile}
-                            />
+                            <TableCell key={col.key} className={cn(isSticky && stickyColClass)} style={mergeColSize(stickyPart, w)}>
+                              {col.key === 'completeness_score' ? (
+                                <div className="flex items-center gap-2">
+                                  <Progress value={supplier.completeness_score ?? 0} className="h-2 flex-1" />
+                                  <Badge className={supplier.status ? (statusConfig[supplier.status]?.color ?? 'bg-muted text-muted-foreground') : 'bg-muted text-muted-foreground'}>
+                                    {supplier.completeness_score ?? 0}%
+                                  </Badge>
+                                </div>
+                              ) : isSticky ? (
+                                <div className="min-w-0 truncate">{col.render(supplier)}</div>
+                              ) : (
+                                col.render(supplier)
+                              )}
+                            </TableCell>
                           );
                         })}
-                      </SortableContext>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {isLoading ? (
-                      Array.from({ length: 8 }).map((_, i) => (
-                        <TableRow key={i}>
-                          {canEdit && <TableCell className={stickyColClass} style={{ left: 0, zIndex: 3, width: 52, minWidth: 52, maxWidth: 52 }}><Skeleton className="h-4 w-8" /></TableCell>}
-                          {activeColumns.map((col, j) => {
-                            const w = colWidthPx(col.key, columnWidths);
-                            const stickyPart = stickySupplierCellStyle(
-                              col.key,
-                              stickyLayout.leftByKey,
-                              stickyLayout.order,
-                              2,
-                            );
-                            const isSticky = !!stickyPart;
-                            return (
-                              <TableCell key={j} className={cn(isSticky && stickyColClass)} style={mergeColSize(stickyPart, w)}>
-                                <Skeleton className="h-4 w-full" />
-                              </TableCell>
-                            );
-                          })}
-                        </TableRow>
-                      ))
-                    ) : filteredSuppliers.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={activeColumns.length + (canEdit ? 1 : 0)} className="text-center py-8 text-muted-foreground">Aucun fournisseur trouvé</TableCell>
                       </TableRow>
-                    ) : (
-                      filteredSuppliers.map((supplier) => (
-                        <TableRow key={supplier.id} className="group cursor-pointer hover:bg-muted/50" onClick={() => onViewSupplier(supplier.id)}>
-                          {canEdit && (
-                            <TableCell className={stickyColClass} style={{ left: 0, zIndex: 3, width: 52, minWidth: 52, maxWidth: 52 }}>
-                              <Button variant="ghost" size="icon" title="Modifier" onClick={(e) => { e.stopPropagation(); onOpenSupplier(supplier.id); }}>
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                            </TableCell>
-                          )}
-                          {activeColumns.map((col) => {
-                            const w = colWidthPx(col.key, columnWidths);
-                            const stickyPart = stickySupplierCellStyle(
-                              col.key,
-                              stickyLayout.leftByKey,
-                              stickyLayout.order,
-                              2,
-                            );
-                            const isSticky = !!stickyPart;
-                            return (
-                              <TableCell key={col.key} className={cn(isSticky && stickyColClass)} style={mergeColSize(stickyPart, w)}>
-                                {col.key === 'completeness_score' ? (
-                                  <div className="flex items-center gap-2">
-                                    <Progress value={supplier.completeness_score ?? 0} className="h-2 flex-1" />
-                                    <Badge className={supplier.status ? (statusConfig[supplier.status]?.color ?? 'bg-muted text-muted-foreground') : 'bg-muted text-muted-foreground'}>
-                                      {supplier.completeness_score ?? 0}%
-                                    </Badge>
-                                  </div>
-                                ) : isSticky ? (
-                                  <div className="min-w-0 truncate">{col.render(supplier)}</div>
-                                ) : (
-                                  col.render(supplier)
-                                )}
-                              </TableCell>
-                            );
-                          })}
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
+                    ))
+                  )}
+                </TableBody>
                 </DndContext>
-              </table>
-            </div>
+                </table>
+              </div>
           </div>
 
+          <div className="sticky bottom-0 z-20 border-t bg-background/95 px-2 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+            <div
+              ref={stickyScrollbarRef}
+              className="w-full overflow-x-auto overflow-y-hidden [scrollbar-width:thin] [&::-webkit-scrollbar]:h-3 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/50 [&::-webkit-scrollbar-track]:bg-muted/30"
+              aria-label="Barre de défilement horizontale"
+            >
+              <div ref={stickyScrollbarContentRef} className="h-px min-w-full" />
+            </div>
+          </div>
 
           {/* Bottom Pagination */}
           <div className="px-4 py-3 border-t">

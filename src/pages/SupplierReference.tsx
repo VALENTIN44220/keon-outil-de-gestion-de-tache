@@ -1,15 +1,20 @@
 import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
 import { useSupplierAccess } from '@/hooks/useSupplierAccess';
 import { useUserRole } from '@/hooks/useUserRole';
 import { SupplierListView } from '@/components/suppliers/SupplierListView';
 import { SupplierDetailDrawer } from '@/components/suppliers/SupplierDetailDrawer';
 import { SupplierSynthesisModal } from '@/components/suppliers/SupplierSynthesisModal';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Sparkles, ChevronRight } from 'lucide-react';
 import { Sidebar } from '@/components/layout/Sidebar';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { SUPPLIER_REQUEST_QUERY_PARAM } from '@/lib/supplierRequestFlow';
 
 export default function SupplierReference() {
+  const navigate = useNavigate();
   const { effectivePermissions, isLoading: permLoading } = useEffectivePermissions();
   const { supplierPermissions, isLoading: accessLoading } = useSupplierAccess();
   const { isAdmin } = useUserRole();
@@ -55,15 +60,33 @@ export default function SupplierReference() {
   return (
     <div className="flex h-screen bg-background">
       <Sidebar activeView={activeView} onViewChange={setActiveView} />
-      <main className="flex-1 overflow-auto p-6">
-        <SupplierListView
-          onOpenSupplier={handleOpenSupplier}
-          onViewSupplier={handleViewSupplier}
-          canEdit={supplierPermissions.canEdit}
-          isAdmin={isAdmin}
-          persistColumnOrderToProfile
-        />
-      </main>
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <PageHeader title="Référentiel Fournisseurs" subtitle="Service Achats">
+          {effectivePermissions.can_access_requests && (
+            <Button
+              className={cn(
+                'w-full sm:w-auto min-w-[280px] h-10 font-medium shadow-md transition-all',
+                'hover:shadow-lg hover:scale-[1.02]',
+                'bg-violet-500 hover:bg-violet-600 text-white',
+              )}
+              onClick={() => navigate(`/requests?${SUPPLIER_REQUEST_QUERY_PARAM}=1`)}
+            >
+              <Sparkles className="h-4 w-4 mr-2 shrink-0" />
+              Demande de nouveau fournisseur
+              <ChevronRight className="h-4 w-4 ml-auto shrink-0" />
+            </Button>
+          )}
+        </PageHeader>
+        <main className="min-h-0 flex-1 overflow-y-auto p-6">
+          <SupplierListView
+            onOpenSupplier={handleOpenSupplier}
+            onViewSupplier={handleViewSupplier}
+            canEdit={supplierPermissions.canEdit}
+            isAdmin={isAdmin}
+            persistColumnOrderToProfile
+          />
+        </main>
+      </div>
 
       <SupplierDetailDrawer
         supplierId={selectedSupplierId}

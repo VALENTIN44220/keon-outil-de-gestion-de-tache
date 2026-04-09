@@ -80,8 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('Error fetching profile:', error);
       return null;
     }
-    // Cast to Profile – handles Json ↔ string[] differences and extra DB columns
-    return data as unknown as Profile;
+    return data;
   };
 
   useEffect(() => {
