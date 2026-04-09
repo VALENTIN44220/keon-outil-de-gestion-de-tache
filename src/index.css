@@ -886,3 +886,12 @@
     box-shadow: 0 0 20px hsl(var(--keon-primary) / 0.4);
   }
 }
+
+/* Hide horizontal scrollbar on supplier table (sticky scrollbar replaces it) */
+.supplier-table-scroll {
+  scrollbar-width: thin;
+}
+.supplier-table-scroll::-webkit-scrollbar:horizontal {
+  height: 0;
+  display: none;
+}
