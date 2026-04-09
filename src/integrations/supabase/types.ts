@@ -2090,6 +2090,7 @@ export type Database = {
           can_access_team: boolean
           can_access_templates: boolean
           can_access_workload: boolean
+          can_access_it_projects: boolean
           can_assign_to_all: boolean
           can_assign_to_subordinates: boolean
           can_create_be_projects: boolean | null
@@ -2143,6 +2144,7 @@ export type Database = {
           can_access_team?: boolean
           can_access_templates?: boolean
           can_access_workload?: boolean
+          can_access_it_projects?: boolean
           can_assign_to_all?: boolean
           can_assign_to_subordinates?: boolean
           can_create_be_projects?: boolean | null
@@ -2196,6 +2198,7 @@ export type Database = {
           can_access_team?: boolean
           can_access_templates?: boolean
           can_access_workload?: boolean
+          can_access_it_projects?: boolean
           can_assign_to_all?: boolean
           can_assign_to_subordinates?: boolean
           can_create_be_projects?: boolean | null
@@ -5841,6 +5844,7 @@ export type Database = {
           can_access_team: boolean | null
           can_access_templates: boolean | null
           can_access_workload: boolean | null
+          can_access_it_projects: boolean | null
           can_assign_to_all: boolean | null
           can_assign_to_subordinates: boolean | null
           can_create_be_projects: boolean | null
@@ -5877,6 +5881,7 @@ export type Database = {
           can_access_team?: boolean | null
           can_access_templates?: boolean | null
           can_access_workload?: boolean | null
+          can_access_it_projects?: boolean | null
           can_assign_to_all?: boolean | null
           can_assign_to_subordinates?: boolean | null
           can_create_be_projects?: boolean | null
@@ -5913,6 +5918,7 @@ export type Database = {
           can_access_team?: boolean | null
           can_access_templates?: boolean | null
           can_access_workload?: boolean | null
+          can_access_it_projects?: boolean | null
           can_assign_to_all?: boolean | null
           can_assign_to_subordinates?: boolean | null
           can_create_be_projects?: boolean | null

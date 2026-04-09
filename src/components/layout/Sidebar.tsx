@@ -52,7 +52,13 @@ const menuGroups: MenuGroup[] = [
     items: [
       { id: 'projects', label: 'Bureau d\'études', icon: FolderOpen, path: '/projects', permissionKey: 'can_access_projects' },
       { id: 'spv', label: 'Projets SPV', icon: Leaf, path: '/spv', permissionKey: 'can_access_projects' },
-      { id: 'it-projects', label: 'Projets IT', icon: Monitor, path: '/it/projects', permissionKey: 'can_access_projects' },
+      {
+        id: 'it-projects',
+        label: 'Projets IT',
+        icon: Monitor,
+        path: '/it/projects',
+        permissionKey: 'can_access_it_projects',
+      },
       { id: 'innovation', label: 'Projets INNO', icon: Lightbulb, path: '/innovation/requests', permissionKey: 'can_access_dashboard' },
     ],
   },
@@ -153,9 +159,10 @@ export function Sidebar({
     const groups: MenuGroup[] = menuGroups
       .map(group => ({
         label: group.label,
-        items: group.items.filter(item =>
-          (!item.permissionKey || canAccessScreen(item.permissionKey)) && isPageVisibleOnDevice(item.id, currentDevice)
-        ),
+        items: group.items.filter((item) => {
+          const screenOk = !item.permissionKey || canAccessScreen(item.permissionKey);
+          return screenOk && isPageVisibleOnDevice(item.id, currentDevice);
+        }),
       }))
       .filter(group => group.items.length > 0);
     

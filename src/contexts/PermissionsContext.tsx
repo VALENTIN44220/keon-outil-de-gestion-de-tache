@@ -25,6 +25,7 @@ const DEFAULT_PERMISSIONS: EffectivePermissions = {
   can_access_workload: true,
   can_access_calendar: true,
   can_access_projects: true,
+  can_access_it_projects: false,
   can_access_team: true,
   can_access_suppliers: false,
   can_access_process_tracking: true,
@@ -127,14 +128,19 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
     const result = { ...DEFAULT_PERMISSIONS };
 
     if (permissionProfile) {
+      const raw = permissionProfile as Record<string, unknown>;
       (SCREEN_PERMISSIONS as readonly ScreenPermissionKey[]).forEach(key => {
-        const v = (permissionProfile as any)[key];
-        if (v !== undefined && v !== null) result[key] = v;
+        const v = raw[key];
+        if (v !== undefined && v !== null) result[key] = v as boolean;
       });
       (FEATURE_PERMISSIONS as readonly FeaturePermissionKey[]).forEach(key => {
-        const v = (permissionProfile as any)[key];
-        if (v !== undefined && v !== null) result[key] = v;
+        const v = raw[key];
+        if (v !== undefined && v !== null) result[key] = v as boolean;
       });
+      // Ancienne base sans colonne : l’écran IT suivait implicitement Projets + Voir IT.
+      if (raw.can_access_it_projects == null) {
+        result.can_access_it_projects = Boolean(raw.can_access_projects) && Boolean(raw.can_view_it_projects);
+      }
     }
 
     if (userOverrides) {

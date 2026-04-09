@@ -151,6 +151,7 @@ const DEFAULT_PERMISSIONS: Record<string, boolean> = {
   can_access_workload: true,
   can_access_calendar: true,
   can_access_projects: true,
+  can_access_it_projects: false,
   can_access_team: true,
   can_access_suppliers: false,
   can_access_process_tracking: false,

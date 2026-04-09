@@ -11,7 +11,7 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { SUPPLIER_REQUEST_QUERY_PARAM } from '@/lib/supplierRequestFlow';
+import { SERVICE_ACHAT_NOUVEAU_FOURNISSEUR_PATH } from '@/lib/supplierRequestFlow';
 
 export default function SupplierReference() {
   const navigate = useNavigate();
@@ -69,7 +69,7 @@ export default function SupplierReference() {
                 'hover:shadow-lg hover:scale-[1.02]',
                 'bg-violet-500 hover:bg-violet-600 text-white',
               )}
-              onClick={() => navigate(`/requests?${SUPPLIER_REQUEST_QUERY_PARAM}=1`)}
+              onClick={() => navigate(SERVICE_ACHAT_NOUVEAU_FOURNISSEUR_PATH)}
             >
               <Sparkles className="h-4 w-4 mr-2 shrink-0" />
               Demande de nouveau fournisseur

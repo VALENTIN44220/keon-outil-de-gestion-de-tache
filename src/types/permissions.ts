@@ -7,6 +7,7 @@ export const SCREEN_PERMISSIONS = [
   'can_access_workload',
   'can_access_calendar',
   'can_access_projects',
+  'can_access_it_projects',
   'can_access_team',
   'can_access_suppliers',
   'can_access_process_tracking',
@@ -55,6 +56,7 @@ export const SCREEN_LABELS: Record<ScreenPermissionKey, string> = {
   can_access_workload: 'Plan de charge',
   can_access_calendar: 'Calendrier',
   can_access_projects: 'Projets',
+  can_access_it_projects: 'Projets IT',
   can_access_team: 'Équipe',
   can_access_suppliers: 'Fournisseurs',
   can_access_process_tracking: 'Suivi processus',
@@ -74,6 +76,7 @@ export interface UserPermissionOverride {
   can_access_workload: boolean | null;
   can_access_calendar: boolean | null;
   can_access_projects: boolean | null;
+  can_access_it_projects: boolean | null;
   can_access_team: boolean | null;
   can_access_suppliers: boolean | null;
   can_access_process_tracking: boolean | null;
@@ -136,6 +139,7 @@ export interface EffectivePermissions {
   can_access_workload: boolean;
   can_access_calendar: boolean;
   can_access_projects: boolean;
+  can_access_it_projects: boolean;
   can_access_team: boolean;
   can_access_suppliers: boolean;
   can_access_process_tracking: boolean;

@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useSearchParams, useNavigate, useLocation, matchPath } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { NewRequestDialog } from '@/components/tasks/NewRequestDialog';
@@ -27,7 +27,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import {
   SUPPLIER_NEW_REQUEST_PROCESS_TEMPLATE_ID,
+  SUPPLIER_NEW_REQUEST_SUB_PROCESS_TEMPLATE_ID,
   SUPPLIER_REQUEST_QUERY_PARAM,
+  SERVICE_ACHAT_NOUVEAU_FOURNISSEUR_PATH,
 } from '@/lib/supplierRequestFlow';
 
 interface ProcessTemplate {
@@ -52,7 +54,10 @@ interface ProcessWithSubProcesses extends ProcessTemplate {
 
 const Requests = () => {
   const { profile, user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
+  const supplierServiceAchatPathHandledRef = useRef(false);
   const [activeView, setActiveView] = useState('requests');
   const [mainTab, setMainTab] = useState('create');
   const [isNewRequestOpen, setIsNewRequestOpen] = useState(false);
@@ -84,17 +89,44 @@ const Requests = () => {
     fetchProcesses();
   }, []);
 
-  // Redirection depuis /suppliers : ouvrir le formulaire « Demande de nouveau fournisseur »
+  // Ancien lien ?supplierRequest=1 — même flux que la route Service achat (sous-processus ciblé).
   useEffect(() => {
     if (searchParams.get(SUPPLIER_REQUEST_QUERY_PARAM) !== '1') return;
     setMainTab('create');
     setSelectedProcessTemplateId(SUPPLIER_NEW_REQUEST_PROCESS_TEMPLATE_ID);
-    setSelectedSubProcessTemplateId(undefined);
+    setSelectedSubProcessTemplateId(SUPPLIER_NEW_REQUEST_SUB_PROCESS_TEMPLATE_ID);
     setIsNewRequestOpen(true);
     const next = new URLSearchParams(searchParams);
     next.delete(SUPPLIER_REQUEST_QUERY_PARAM);
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
+
+  // Route dédiée : formulaire « nouveau fournisseur » (processus DEMANDE SERVICE ACHAT), pas l’accueil générique.
+  useEffect(() => {
+    const onServiceAchatPath = matchPath(
+      { path: SERVICE_ACHAT_NOUVEAU_FOURNISSEUR_PATH, end: true },
+      location.pathname,
+    );
+    if (!onServiceAchatPath) {
+      supplierServiceAchatPathHandledRef.current = false;
+      return;
+    }
+    if (supplierServiceAchatPathHandledRef.current) return;
+    supplierServiceAchatPathHandledRef.current = true;
+    setMainTab('create');
+    setSelectedProcessTemplateId(SUPPLIER_NEW_REQUEST_PROCESS_TEMPLATE_ID);
+    setSelectedSubProcessTemplateId(SUPPLIER_NEW_REQUEST_SUB_PROCESS_TEMPLATE_ID);
+    setIsNewRequestOpen(true);
+  }, [location.pathname]);
+
+  const handleCloseNewRequestDialog = useCallback(() => {
+    setIsNewRequestOpen(false);
+    if (
+      matchPath({ path: SERVICE_ACHAT_NOUVEAU_FOURNISSEUR_PATH, end: true }, location.pathname)
+    ) {
+      navigate('/requests', { replace: true });
+    }
+  }, [location.pathname, navigate]);
 
   const fetchProcesses = async () => {
     const { data: processData } = await supabase
@@ -414,7 +446,7 @@ const Requests = () => {
       
       <NewRequestDialog
         open={isNewRequestOpen}
-        onClose={() => setIsNewRequestOpen(false)}
+        onClose={handleCloseNewRequestDialog}
         onAdd={addTask}
         initialProcessTemplateId={selectedProcessTemplateId}
         initialSubProcessTemplateId={selectedSubProcessTemplateId}

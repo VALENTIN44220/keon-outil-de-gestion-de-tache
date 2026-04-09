@@ -12,6 +12,7 @@ import { SimulationBanner } from "@/components/layout/SimulationBanner";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { ForcePasswordChange } from "@/components/auth/ForcePasswordChange";
 import { PersistentRoutes } from "@/components/routing/PersistentRoutes";
+import { ITProjectsAccessGate } from "@/components/it/ITProjectsAccessGate";
 
 // Route-level code splitting: only load screens when visited.
 const Index = lazy(() => import("./pages/Index"));
@@ -90,7 +91,7 @@ const App = () => (
                 { path: "/projects", end: true, element: <ProtectedRoute><Projects /></ProtectedRoute> },
                 { path: "/admin", end: true, element: <ProtectedRoute><Admin /></ProtectedRoute> },
                 { path: "/workload", end: true, element: <ProtectedRoute><Workload /></ProtectedRoute> },
-                { path: "/requests", end: true, element: <ProtectedRoute><Requests /></ProtectedRoute> },
+                { path: "/requests", end: false, element: <ProtectedRoute><Requests /></ProtectedRoute> },
                 { path: "/calendar", end: true, element: <ProtectedRoute><CalendarPage /></ProtectedRoute> },
                 { path: "/chat", end: true, element: <ProtectedRoute><Chat /></ProtectedRoute> },
                 { path: "/suppliers", end: true, element: <ProtectedRoute><SupplierReference /></ProtectedRoute> },
@@ -116,15 +117,15 @@ const App = () => (
                 { path: "/spv/projects/:code/discussions", end: true, element: <ProtectedRoute><BEProjectHubDiscussions /></ProtectedRoute> },
                 { path: "/spv/projects/:code/files", end: true, element: <ProtectedRoute><BEProjectHubFiles /></ProtectedRoute> },
 
-                // IT project hub
-                { path: "/it/projects", end: true, element: <ProtectedRoute><ITProjects /></ProtectedRoute> },
-                { path: "/it/projects/import-fdr", end: true, element: <ProtectedRoute><ITProjectImportFDR /></ProtectedRoute> },
-                { path: "/it/projects/:code/overview", end: true, element: <ProtectedRoute><ITProjectHubOverview /></ProtectedRoute> },
-                { path: "/it/projects/:code/tasks", end: true, element: <ProtectedRoute><ITProjectHubTasks /></ProtectedRoute> },
-                { path: "/it/projects/:code/timeline", end: true, element: <ProtectedRoute><ITProjectHubTimeline /></ProtectedRoute> },
-                { path: "/it/projects/:code/sync", end: true, element: <ProtectedRoute><ITProjectHubSync /></ProtectedRoute> },
-                { path: "/it/projects/:code/discussions", end: true, element: <ProtectedRoute><ITProjectHubDiscussions /></ProtectedRoute> },
-                { path: "/it/projects/:code/files", end: true, element: <ProtectedRoute><ITProjectHubFiles /></ProtectedRoute> },
+                // IT project hub (écran dédié + voir projet IT)
+                { path: "/it/projects", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjects /></ITProjectsAccessGate></ProtectedRoute> },
+                { path: "/it/projects/import-fdr", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectImportFDR /></ITProjectsAccessGate></ProtectedRoute> },
+                { path: "/it/projects/:code/overview", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubOverview /></ITProjectsAccessGate></ProtectedRoute> },
+                { path: "/it/projects/:code/tasks", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubTasks /></ITProjectsAccessGate></ProtectedRoute> },
+                { path: "/it/projects/:code/timeline", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubTimeline /></ITProjectsAccessGate></ProtectedRoute> },
+                { path: "/it/projects/:code/sync", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubSync /></ITProjectsAccessGate></ProtectedRoute> },
+                { path: "/it/projects/:code/discussions", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubDiscussions /></ITProjectsAccessGate></ProtectedRoute> },
+                { path: "/it/projects/:code/files", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubFiles /></ITProjectsAccessGate></ProtectedRoute> },
               ]}
             />
             <Routes>
@@ -140,7 +141,7 @@ const App = () => (
             <Route path="/projects" element={<></>} />
             <Route path="/admin" element={<></>} />
             <Route path="/workload" element={<></>} />
-            <Route path="/requests" element={<></>} />
+            <Route path="/requests/*" element={<></>} />
             <Route path="/calendar" element={<></>} />
             <Route path="/chat" element={<></>} />
             <Route path="/suppliers" element={<></>} />
