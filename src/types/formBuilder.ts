@@ -186,7 +186,7 @@ export type FormBuilderAction =
   | { type: 'ADD_FIELD'; payload: FormField }
   | { type: 'UPDATE_FIELD'; payload: Partial<FormField> & { id: string } }
   | { type: 'DELETE_FIELD'; payload: string }
-  | { type: 'MOVE_FIELD'; payload: { fieldId: string; targetSectionId: string | null; targetIndex: number } }
+  | { type: 'MOVE_FIELD'; payload: { updatedFields: FormField[] } }
   | { type: 'REORDER_SECTIONS'; payload: string[] }
   | { type: 'SET_DRAGGING'; payload: boolean }
   | { type: 'TOGGLE_PREVIEW'; payload?: boolean }

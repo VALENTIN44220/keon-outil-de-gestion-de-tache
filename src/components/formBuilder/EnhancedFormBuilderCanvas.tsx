@@ -1,4 +1,4 @@
-import { memo, useCallback, useState, useRef } from 'react';
+import { memo, useCallback, useState, useRef, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -86,6 +86,14 @@ const FIELD_ICONS: Record<CustomFieldType, string> = {
   repeatable_table: '📊',
 };
 
+/** Row-major order (must match useFormBuilder `sortFieldsForLayout`). */
+function layoutSortFields(a: FormField, b: FormField) {
+  const ar = a.row_index ?? a.order_index;
+  const br = b.row_index ?? b.order_index;
+  if (ar !== br) return ar - br;
+  return (a.column_index ?? 0) - (b.column_index ?? 0);
+}
+
 export const EnhancedFormBuilderCanvas = memo(function EnhancedFormBuilderCanvas({
   sections,
   fields,
@@ -109,6 +117,11 @@ export const EnhancedFormBuilderCanvas = memo(function EnhancedFormBuilderCanvas
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const [draggedFieldId, setDraggedFieldId] = useState<string | null>(null);
   const [dropTargetSectionId, setDropTargetSectionId] = useState<string | null>(null);
+  const [fieldDropIndicator, setFieldDropIndicator] = useState<{
+    sectionId: string | null;
+    fieldId: string;
+    placement: 'before' | 'after';
+  } | null>(null);
   const dragCounterRef = useRef(0);
 
   // Toggle section collapse
@@ -124,15 +137,18 @@ export const EnhancedFormBuilderCanvas = memo(function EnhancedFormBuilderCanvas
     });
   };
 
-  // Get fields not in any section
-  const orphanFields = fields.filter((f) => !f.section_id);
+  // Get fields not in any section (same order as reorder / useFormBuilder)
+  const orphanFields = useMemo(
+    () => [...fields.filter((f) => !f.section_id)].sort(layoutSortFields),
+    [fields]
+  );
 
   // Get fields for a specific section
   const getFieldsForSection = useCallback(
     (sectionId: string) => {
       return fields
         .filter((f) => f.section_id === sectionId)
-        .sort((a, b) => a.order_index - b.order_index);
+        .sort(layoutSortFields);
     },
     [fields]
   );
@@ -165,6 +181,7 @@ export const EnhancedFormBuilderCanvas = memo(function EnhancedFormBuilderCanvas
   const handleDragEnd = () => {
     setDraggedFieldId(null);
     setDropTargetSectionId(null);
+    setFieldDropIndicator(null);
     dragCounterRef.current = 0;
   };
 
@@ -189,14 +206,35 @@ export const EnhancedFormBuilderCanvas = memo(function EnhancedFormBuilderCanvas
     e.dataTransfer.dropEffect = draggedFieldId ? 'move' : 'copy';
   };
 
+  /** Insert index in target section, excluding the dragged field from the peer list. */
+  const insertIndexBeforeOrAfterField = (
+    targetSectionId: string | null,
+    hoverFieldId: string,
+    before: boolean,
+    dragFieldId: string
+  ) => {
+    const inSection = targetSectionId
+      ? fields.filter((f) => f.section_id === targetSectionId)
+      : fields.filter((f) => !f.section_id);
+    const ordered = [...inSection].sort(layoutSortFields);
+    const peersWithout = ordered.filter((f) => f.id !== dragFieldId);
+    const idx = peersWithout.findIndex((f) => f.id === hoverFieldId);
+    if (idx < 0) return peersWithout.length;
+    return before ? idx : idx + 1;
+  };
+
   const handleDrop = (e: React.DragEvent, targetSectionId: string | null) => {
     e.preventDefault();
     if (!canManage) return;
 
     const fieldId = e.dataTransfer.getData('text/plain');
     if (fieldId && draggedFieldId) {
-      const sectionFields = targetSectionId ? getFieldsForSection(targetSectionId) : orphanFields;
-      onMoveField(fieldId, targetSectionId, sectionFields.length);
+      const inSection = targetSectionId
+        ? fields.filter((f) => f.section_id === targetSectionId)
+        : fields.filter((f) => !f.section_id);
+      const ordered = [...inSection].sort(layoutSortFields);
+      const insertAt = ordered.filter((f) => f.id !== fieldId).length;
+      onMoveField(fieldId, targetSectionId, insertAt);
     }
 
     // Check for new field from palette
@@ -214,13 +252,22 @@ export const EnhancedFormBuilderCanvas = memo(function EnhancedFormBuilderCanvas
 
     setDraggedFieldId(null);
     setDropTargetSectionId(null);
+    setFieldDropIndicator(null);
     dragCounterRef.current = 0;
   };
 
   const renderFieldCard = useCallback(
-    (field: FormField) => {
+    (field: FormField, sectionId: string | null) => {
       const isSelected = selectedFieldId === field.id;
       const isDragging = draggedFieldId === field.id;
+      const showBeforeLine =
+        fieldDropIndicator?.fieldId === field.id &&
+        fieldDropIndicator?.sectionId === sectionId &&
+        fieldDropIndicator.placement === 'before';
+      const showAfterLine =
+        fieldDropIndicator?.fieldId === field.id &&
+        fieldDropIndicator?.sectionId === sectionId &&
+        fieldDropIndicator.placement === 'after';
 
       return (
         <div
@@ -228,6 +275,43 @@ export const EnhancedFormBuilderCanvas = memo(function EnhancedFormBuilderCanvas
           draggable={canManage}
           onDragStart={(e) => handleDragStart(e, field.id)}
           onDragEnd={handleDragEnd}
+          onDragOver={(e) => {
+            if (!canManage || !draggedFieldId) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+            const before = e.clientY < rect.top + rect.height / 2;
+            setFieldDropIndicator({
+              sectionId,
+              fieldId: field.id,
+              placement: before ? 'before' : 'after',
+            });
+          }}
+          onDragLeave={(e) => {
+            const next = e.relatedTarget as Node | null;
+            if (!next || !e.currentTarget.contains(next)) {
+              setFieldDropIndicator(null);
+            }
+          }}
+          onDrop={(e) => {
+            if (!canManage) return;
+            e.preventDefault();
+            const paletteData = e.dataTransfer.getData('application/json');
+            if (!draggedFieldId && paletteData) {
+              return;
+            }
+            e.stopPropagation();
+            const moveId = e.dataTransfer.getData('text/plain');
+            if (!moveId || !draggedFieldId) return;
+            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+            const before = e.clientY < rect.top + rect.height / 2;
+            const insertIndex = insertIndexBeforeOrAfterField(sectionId, field.id, before, moveId);
+            onMoveField(moveId, sectionId, insertIndex);
+            setDraggedFieldId(null);
+            setDropTargetSectionId(null);
+            setFieldDropIndicator(null);
+            dragCounterRef.current = 0;
+          }}
           onClick={(e) => {
             e.stopPropagation();
             onSelectField(field.id);
@@ -235,6 +319,8 @@ export const EnhancedFormBuilderCanvas = memo(function EnhancedFormBuilderCanvas
           className={cn(
             'group relative flex items-start gap-2 p-3 rounded-lg border-2 cursor-pointer transition-all',
             'hover:border-primary/50 hover:shadow-sm',
+            showBeforeLine && 'border-t-2 border-t-primary shadow-[inset_0_2px_0_0_hsl(var(--primary))]',
+            showAfterLine && 'border-b-2 border-b-primary shadow-[inset_0_-2px_0_0_hsl(var(--primary))]',
             isSelected
               ? 'border-primary bg-primary/5 shadow-md ring-2 ring-primary/20'
               : 'border-border bg-card',
@@ -325,7 +411,19 @@ export const EnhancedFormBuilderCanvas = memo(function EnhancedFormBuilderCanvas
         </div>
       );
     },
-    [selectedFieldId, draggedFieldId, previewMode, gridColumns, canManage, onSelectField, onDuplicateField, onDeleteField]
+    [
+      selectedFieldId,
+      draggedFieldId,
+      fieldDropIndicator,
+      previewMode,
+      gridColumns,
+      canManage,
+      onSelectField,
+      onDuplicateField,
+      onDeleteField,
+      onMoveField,
+      fields,
+    ]
   );
 
   const renderSection = useCallback(
@@ -456,7 +554,7 @@ export const EnhancedFormBuilderCanvas = memo(function EnhancedFormBuilderCanvas
                         gridColumns === 4 && 'grid-cols-4'
                       )}
                     >
-                      {rowFields.map(renderFieldCard)}
+                      {rowFields.map((f) => renderFieldCard(f, section.id))}
                     </div>
                   ))}
                 </div>
@@ -570,7 +668,7 @@ export const EnhancedFormBuilderCanvas = memo(function EnhancedFormBuilderCanvas
                       gridColumns === 4 && 'grid-cols-4'
                     )}
                   >
-                    {orphanFields.map(renderFieldCard)}
+                    {orphanFields.map((f) => renderFieldCard(f, null))}
                   </div>
                 </CardContent>
               </Card>

@@ -1,4 +1,4 @@
-import { useReducer, useCallback, useEffect } from 'react';
+import { useReducer, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type {
@@ -103,15 +103,7 @@ function formBuilderReducer(
     case 'MOVE_FIELD':
       return {
         ...state,
-        fields: state.fields.map((f) =>
-          f.id === action.payload.fieldId
-            ? {
-                ...f,
-                section_id: action.payload.targetSectionId,
-                order_index: action.payload.targetIndex,
-              }
-            : f
-        ),
+        fields: action.payload.updatedFields,
       };
 
     case 'REORDER_SECTIONS':
@@ -148,9 +140,24 @@ interface UseFormBuilderOptions {
   subProcessTemplateId?: string | null;
 }
 
+function normFieldSectionId(id: string | null | undefined): string | null {
+  return id === undefined || id === null ? null : id;
+}
+
+function sortFieldsForLayout(peers: FormField[]): FormField[] {
+  return [...peers].sort((a, b) => {
+    const ar = a.row_index ?? a.order_index;
+    const br = b.row_index ?? b.order_index;
+    if (ar !== br) return ar - br;
+    return (a.column_index ?? 0) - (b.column_index ?? 0);
+  });
+}
+
 export function useFormBuilder(options: UseFormBuilderOptions = {}) {
   const { processTemplateId, subProcessTemplateId } = options;
   const [state, dispatch] = useReducer(formBuilderReducer, initialState);
+  const fieldsRef = useRef<FormField[]>(initialState.fields);
+  fieldsRef.current = state.fields;
 
   // Load sections and fields
   const loadData = useCallback(async () => {
@@ -381,29 +388,112 @@ export function useFormBuilder(options: UseFormBuilderOptions = {}) {
       targetIndex: number
     ) => {
       try {
-        // Optimistically update local state first
+        const fields = fieldsRef.current;
+        const field = fields.find((f) => f.id === fieldId);
+        if (!field) return false;
+
+        const oldS = normFieldSectionId(field.section_id);
+        const tgtS = normFieldSectionId(targetSectionId);
+
+        const targetPeers = sortFieldsForLayout(
+          fields.filter((f) => normFieldSectionId(f.section_id) === tgtS && f.id !== fieldId)
+        );
+
+        const clampedIndex = Math.max(0, Math.min(targetIndex, targetPeers.length));
+
+        const mergedTarget: FormField[] = [
+          ...targetPeers.slice(0, clampedIndex),
+          { ...field, section_id: targetSectionId } as FormField,
+          ...targetPeers.slice(clampedIndex),
+        ].map((f, i) => ({
+          ...f,
+          section_id: tgtS,
+          order_index: i,
+          row_index: i,
+          column_index: 0,
+        }));
+
+        const newFieldsMap = new Map(fields.map((f) => [f.id, { ...f } as FormField]));
+
+        for (const f of mergedTarget) {
+          const cur = newFieldsMap.get(f.id)!;
+          Object.assign(cur, {
+            section_id: f.section_id,
+            order_index: f.order_index,
+            row_index: f.row_index,
+            column_index: f.column_index,
+          });
+        }
+
+        if (oldS !== tgtS) {
+          const srcPeers = sortFieldsForLayout(
+            fields.filter((f) => normFieldSectionId(f.section_id) === oldS && f.id !== fieldId)
+          );
+          srcPeers.forEach((f, i) => {
+            const cur = newFieldsMap.get(f.id)!;
+            Object.assign(cur, {
+              order_index: i,
+              row_index: i,
+              column_index: 0,
+            });
+          });
+        }
+
+        const newFields = Array.from(newFieldsMap.values());
+
         dispatch({
           type: 'MOVE_FIELD',
-          payload: { fieldId, targetSectionId, targetIndex },
+          payload: { updatedFields: newFields },
         });
 
-        const { error } = await supabase
-          .from('template_custom_fields')
-          .update({
-            section_id: targetSectionId,
-            order_index: targetIndex,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', fieldId);
+        const now = new Date().toISOString();
 
-        if (error) throw error;
+        type Patch = Record<string, unknown>;
+        const toPersist: Array<{ id: string; patch: Patch }> = [];
+
+        for (const f of mergedTarget) {
+          toPersist.push({
+            id: f.id,
+            patch: {
+              section_id: tgtS,
+              order_index: f.order_index,
+              row_index: f.row_index,
+              column_index: 0,
+              updated_at: now,
+            },
+          });
+        }
+
+        if (oldS !== tgtS) {
+          const srcPeers = sortFieldsForLayout(
+            fields.filter((f) => normFieldSectionId(f.section_id) === oldS && f.id !== fieldId)
+          );
+          srcPeers.forEach((f, i) => {
+            toPersist.push({
+              id: f.id,
+              patch: {
+                order_index: i,
+                row_index: i,
+                column_index: 0,
+                updated_at: now,
+              },
+            });
+          });
+        }
+
+        for (const { id, patch } of toPersist) {
+          const { error } = await supabase
+            .from('template_custom_fields')
+            .update(patch)
+            .eq('id', id);
+          if (error) throw error;
+        }
 
         toast.success('Champ déplacé');
         return true;
       } catch (error: any) {
         console.error('Error moving field:', error);
         toast.error(error.message || 'Erreur lors du déplacement');
-        // Reload data to revert optimistic update
         await loadData();
         return false;
       }
