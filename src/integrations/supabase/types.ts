@@ -4315,6 +4315,188 @@ export type Database = {
         }
         Relationships: []
       }
+      supplier_waiting_approval: {
+        Row: {
+          adresse_mail: string | null
+          avenants: string | null
+          ca_estime: number | null
+          categorie: string | null
+          commentaires: string | null
+          commentaires_date_contrat: string | null
+          commentaires_type_de_contrat: string | null
+          completeness_score: number | null
+          created_at: string | null
+          date_premiere_signature: string | null
+          delai_de_paiement: string | null
+          delais_de_paiement_commentaires: string | null
+          description: string | null
+          echeances_de_paiement: string | null
+          entite: string | null
+          evolution_tarif_2026: string | null
+          exclusivite_non_sollicitation: string | null
+          famille: string | null
+          famille_source_initiale: string | null
+          garanties_bancaire_et_equipement: string | null
+          id: string
+          incoterm: string | null
+          line_index: string
+          nom_contact: string | null
+          nomfournisseur: string | null
+          pays: string | null
+          penalites: string | null
+          poste: string | null
+          remise: string | null
+          rfa: string | null
+          segment: string | null
+          siret: string | null
+          site_web: string | null
+          sous_segment: string | null
+          status: string | null
+          telephone: string | null
+          tiers: string | null
+          transport: string | null
+          tva: string | null
+          type_de_contrat: string | null
+          updated_at: string | null
+          updated_by: string | null
+          validite_du_contrat: string | null
+          validite_prix: string | null
+        }
+        Insert: {
+          adresse_mail?: string | null
+          avenants?: string | null
+          ca_estime?: number | null
+          categorie?: string | null
+          commentaires?: string | null
+          commentaires_date_contrat?: string | null
+          commentaires_type_de_contrat?: string | null
+          completeness_score?: number | null
+          created_at?: string | null
+          date_premiere_signature?: string | null
+          delai_de_paiement?: string | null
+          delais_de_paiement_commentaires?: string | null
+          description?: string | null
+          echeances_de_paiement?: string | null
+          entite?: string | null
+          evolution_tarif_2026?: string | null
+          exclusivite_non_sollicitation?: string | null
+          famille?: string | null
+          famille_source_initiale?: string | null
+          garanties_bancaire_et_equipement?: string | null
+          id?: string
+          incoterm?: string | null
+          line_index: string
+          nom_contact?: string | null
+          nomfournisseur?: string | null
+          pays?: string | null
+          penalites?: string | null
+          poste?: string | null
+          remise?: string | null
+          rfa?: string | null
+          segment?: string | null
+          siret?: string | null
+          site_web?: string | null
+          sous_segment?: string | null
+          status?: string | null
+          telephone?: string | null
+          tiers?: string | null
+          transport?: string | null
+          tva?: string | null
+          type_de_contrat?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+          validite_du_contrat?: string | null
+          validite_prix?: string | null
+        }
+        Update: {
+          adresse_mail?: string | null
+          avenants?: string | null
+          ca_estime?: number | null
+          categorie?: string | null
+          commentaires?: string | null
+          commentaires_date_contrat?: string | null
+          commentaires_type_de_contrat?: string | null
+          completeness_score?: number | null
+          created_at?: string | null
+          date_premiere_signature?: string | null
+          delai_de_paiement?: string | null
+          delais_de_paiement_commentaires?: string | null
+          description?: string | null
+          echeances_de_paiement?: string | null
+          entite?: string | null
+          evolution_tarif_2026?: string | null
+          exclusivite_non_sollicitation?: string | null
+          famille?: string | null
+          famille_source_initiale?: string | null
+          garanties_bancaire_et_equipement?: string | null
+          id?: string
+          incoterm?: string | null
+          line_index?: string
+          nom_contact?: string | null
+          nomfournisseur?: string | null
+          pays?: string | null
+          penalites?: string | null
+          poste?: string | null
+          remise?: string | null
+          rfa?: string | null
+          segment?: string | null
+          siret?: string | null
+          site_web?: string | null
+          sous_segment?: string | null
+          status?: string | null
+          telephone?: string | null
+          tiers?: string | null
+          transport?: string | null
+          tva?: string | null
+          type_de_contrat?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+          validite_du_contrat?: string | null
+          validite_prix?: string | null
+        }
+        Relationships: []
+      }
+      supplier_waiting_approval_attachments: {
+        Row: {
+          id: string
+          waiting_approval_id: string
+          attachment_kind: string
+          file_name: string
+          file_url: string
+          storage_path: string
+          uploaded_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          waiting_approval_id: string
+          attachment_kind: string
+          file_name: string
+          file_url: string
+          storage_path: string
+          uploaded_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          waiting_approval_id?: string
+          attachment_kind?: string
+          file_name?: string
+          file_url?: string
+          storage_path?: string
+          uploaded_by?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_waiting_approval_attachments_waiting_approval_id_fkey"
+            columns: ["waiting_approval_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_waiting_approval"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       supplier_taxonomy: {
         Row: {
           active: boolean

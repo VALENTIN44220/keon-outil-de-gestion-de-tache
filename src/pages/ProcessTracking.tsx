@@ -10,6 +10,7 @@ import { Loader2, ShieldX, ChevronRight, ChevronLeft } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { TERMINAL_STATUSES } from '@/services/taskStatusService';
 
 const ProcessDashboard = lazy(() =>
   import('@/components/process-tracking/ProcessDashboard')
@@ -116,13 +117,15 @@ export default function ProcessTracking() {
       }
     }
 
-    // Fetch task counts
+    // Fetch task counts (tâches encore actives : hors terminées / annulées / validées)
     if (processList.length > 0) {
       const ids = processList.map(p => p.id);
+      const terminalInList = `(${TERMINAL_STATUSES.map((s) => `"${s}"`).join(',')})`;
       const { data: countData } = await (supabase as any)
         .from('tasks')
         .select('process_template_id, source_process_template_id')
-        .or(ids.map(id => `process_template_id.eq.${id},source_process_template_id.eq.${id}`).join(','));
+        .or(ids.map(id => `process_template_id.eq.${id},source_process_template_id.eq.${id}`).join(','))
+        .not('status', 'in', terminalInList);
 
       if (countData) {
         const counts = new Map<string, number>();
@@ -154,6 +157,22 @@ export default function ProcessTracking() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'process_templates' }, () => { loadData(); })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
+  }, [loadData]);
+
+  // Recompter les tâches à traiter quand une tâche change (statut, annulation, etc.)
+  useEffect(() => {
+    let debounce: ReturnType<typeof setTimeout>;
+    const channel = supabase
+      .channel('process-tracking-sidebar-task-counts')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
+        clearTimeout(debounce);
+        debounce = setTimeout(() => loadData(), 350);
+      })
+      .subscribe();
+    return () => {
+      clearTimeout(debounce);
+      supabase.removeChannel(channel);
+    };
   }, [loadData]);
 
   // Group processes by service group
@@ -363,7 +382,7 @@ export default function ProcessTracking() {
                                   {group.name}
                                 </span>
                                 <span className="text-xs text-muted-foreground">
-                                  {group.totalTasks} tâche{group.totalTasks !== 1 ? 's' : ''}
+                                  {group.totalTasks} tâche{group.totalTasks !== 1 ? 's' : ''} à traiter
                                 </span>
                               </div>
                             </button>
@@ -394,7 +413,9 @@ export default function ProcessTracking() {
                                       >
                                         <span className="block truncate">{p.name}</span>
                                         {typeof p.task_count === 'number' && (
-                                          <span className="text-[10px] opacity-70">{p.task_count} tâche{p.task_count !== 1 ? 's' : ''}</span>
+                                          <span className="text-[10px] opacity-70">
+                                            {p.task_count} tâche{p.task_count !== 1 ? 's' : ''} à traiter
+                                          </span>
                                         )}
                                       </button>
                                     </TooltipTrigger>
