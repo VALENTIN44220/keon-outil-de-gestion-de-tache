@@ -12,7 +12,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { BEProjectSelect } from '@/components/be/BEProjectSelect';
 import { ITProjectSelect } from '@/components/it/ITProjectSelect';
-import { RequestWizardData, RequestType } from './types';
+import { RequestWizardData, RequestWizardDataPatch, RequestType } from './types';
 import { CommonFieldsConfig, DEFAULT_COMMON_FIELDS_CONFIG, resolveTitlePattern } from '@/types/commonFieldsConfig';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -52,7 +52,7 @@ const PRIORITY_LABELS: Record<string, string> = {
 interface StepDetailsFormProps {
   data: RequestWizardData;
   requestType: RequestType;
-  onDataChange: (updates: Partial<RequestWizardData>) => void;
+  onDataChange: (updates: RequestWizardDataPatch) => void;
   commonFieldsConfig?: CommonFieldsConfig;
 }
 

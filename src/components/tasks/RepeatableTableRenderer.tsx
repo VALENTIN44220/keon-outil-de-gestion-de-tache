@@ -21,6 +21,7 @@ import { Plus, Trash2, Table2 } from 'lucide-react';
 import { TemplateCustomField, FieldOption } from '@/types/customField';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { supabase } from '@/integrations/supabase/client';
+import { dedupeTableLookupOptions } from '@/lib/tableLookupOptions';
 
 interface RepeatableTableRow {
   id: string;
@@ -171,9 +172,8 @@ export function RepeatableTableRenderer({
   const handleLookupSelect = useCallback(
     (rowId: string, col: FieldOption, selectedValue: string) => {
       const data = lookupData[col.value] || [];
-      const selectedRow = data.find(
-        r => String(r[col.lookupLabelColumn || '']) === selectedValue
-      );
+      const valueCol = col.lookupValueColumn || col.lookupLabelColumn || '';
+      const selectedRow = data.find((r) => String(r[valueCol]) === selectedValue);
 
       const updates: Record<string, string> = {
         [col.value]: selectedValue,
@@ -222,10 +222,14 @@ export function RepeatableTableRenderer({
     if (dc.type === 'lookup_search') {
       const col = dc.sourceCol;
       const data = lookupData[col.value] || [];
-      const options = data.map(r => ({
-        value: String(r[col.lookupLabelColumn || '']),
-        label: String(r[col.lookupLabelColumn || '']),
-      }));
+      const valueCol = col.lookupValueColumn || col.lookupLabelColumn || '';
+      const labelCol = col.lookupLabelColumn || col.lookupValueColumn || '';
+      const options = dedupeTableLookupOptions(
+        data.map((r) => ({
+          id: String(r[valueCol] ?? ''),
+          label: String(r[labelCol] ?? r[valueCol] ?? ''),
+        }))
+      ).map((o) => ({ value: o.id, label: o.label }));
 
       return (
         <SearchableSelect

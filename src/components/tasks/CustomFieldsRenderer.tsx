@@ -16,6 +16,14 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { validateSingleField } from '@/hooks/useFieldValidation';
+import { toast } from 'sonner';
+import {
+  CUSTOM_FIELD_FILE_ACCEPT,
+  CUSTOM_FIELD_FILE_TYPE_ERROR_FR,
+  CUSTOM_FIELD_FILE_TYPE_HINT_FR,
+  isCustomFieldUploadAllowed,
+} from '@/lib/customFieldFileUpload';
+import { dedupeTableLookupOptions } from '@/lib/tableLookupOptions';
 import {
   getEffectiveCustomFieldValue,
   isCustomFieldVisible,
@@ -151,10 +159,12 @@ export function CustomFieldsRenderer({
         .order(labelColumn)
         .then(({ data, error }) => {
           if (!error && data) {
-            const options = data.map((row: any) => ({
-              id: String(row[valueColumn]),
-              label: String(row[labelColumn] || row[valueColumn]),
-            }));
+            const options = dedupeTableLookupOptions(
+              data.map((row: any) => ({
+                id: String(row[valueColumn] ?? ''),
+                label: String(row[labelColumn] ?? row[valueColumn] ?? ''),
+              }))
+            );
             setTableLookupData(prev => ({ ...prev, [fieldKey]: options }));
           }
           setLoadingTableLookup(prev => ({ ...prev, [fieldKey]: false }));
@@ -475,20 +485,25 @@ export function CustomFieldsRenderer({
       case 'file':
         return (
           <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">{CUSTOM_FIELD_FILE_TYPE_HINT_FR}</p>
             <Input
               id={field.id}
               type="file"
+              accept={CUSTOM_FIELD_FILE_ACCEPT}
               onChange={(e) => {
                 const file = e.target.files?.[0];
-                if (file) {
-                  // Store file info for later upload
-                  handleChange({
-                    name: file.name,
-                    size: file.size,
-                    type: file.type,
-                    file: file,
-                  });
+                if (!file) return;
+                if (!isCustomFieldUploadAllowed(file)) {
+                  e.target.value = '';
+                  toast.error(CUSTOM_FIELD_FILE_TYPE_ERROR_FR);
+                  return;
                 }
+                handleChange({
+                  name: file.name,
+                  size: file.size,
+                  type: file.type,
+                  file: file,
+                });
               }}
               disabled={disabled}
               className={baseClass}

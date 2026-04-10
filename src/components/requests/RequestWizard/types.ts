@@ -71,6 +71,14 @@ export interface RequestWizardData {
   materialLines: MaterialLineData[];
 }
 
+/**
+ * Pass a function to merge from the latest wizard state (avoids losing keys when several
+ * custom fields update in one frame — e.g. multiple file inputs).
+ */
+export type RequestWizardDataPatch =
+  | Partial<RequestWizardData>
+  | ((prev: RequestWizardData) => Partial<RequestWizardData>);
+
 export const defaultWizardData: RequestWizardData = {
   requestType: null,
   title: '',

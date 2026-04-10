@@ -1,12 +1,12 @@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Package } from 'lucide-react';
 import { MaterialRequestLines } from '@/components/maintenance/MaterialRequestLines';
-import { RequestWizardData, MaterialLineData } from './types';
+import { RequestWizardData, RequestWizardDataPatch, MaterialLineData } from './types';
 import { ArticleFilterConfig } from '@/components/maintenance/ArticleSearchSelect';
 
 interface StepMaterialLinesProps {
   data: RequestWizardData;
-  onDataChange: (updates: Partial<RequestWizardData>) => void;
+  onDataChange: (updates: RequestWizardDataPatch) => void;
   articleFilterConfig?: ArticleFilterConfig;
 }
 

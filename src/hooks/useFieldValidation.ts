@@ -1,5 +1,9 @@
 import { useState, useCallback, useMemo, useRef } from 'react';
 import type { TemplateCustomField } from '@/types/customField';
+import {
+  isCustomFieldUploadAllowed,
+  CUSTOM_FIELD_FILE_TYPE_ERROR_FR,
+} from '@/lib/customFieldFileUpload';
 import type { ValidationType, FormField } from '@/types/formBuilder';
 
 // =====================
@@ -151,6 +155,18 @@ export function validateSingleField(
       return {
         valid: false,
         message: VALIDATION_MESSAGES.required,
+        fieldId: field.id,
+      };
+    }
+  }
+
+  // Fichier : types autorisés (images, PDF, tableurs)
+  if (field.field_type === 'file' && value && typeof value === 'object') {
+    const f = (value as { file?: File }).file;
+    if (f instanceof File && !isCustomFieldUploadAllowed(f)) {
+      return {
+        valid: false,
+        message: CUSTOM_FIELD_FILE_TYPE_ERROR_FR,
         fieldId: field.id,
       };
     }

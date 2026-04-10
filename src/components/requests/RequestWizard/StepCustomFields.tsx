@@ -6,12 +6,12 @@ import { FormInput, Layers, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { ValidatedCustomFieldsRenderer } from "@/components/tasks/ValidatedCustomFieldsRenderer";
 import { TemplateCustomField } from "@/types/customField";
-import { RequestWizardData } from "./types";
+import { RequestWizardData, RequestWizardDataPatch } from "./types";
 import type { FormSection } from "@/types/formBuilder";
 
 interface StepCustomFieldsProps {
   data: RequestWizardData;
-  onDataChange: (updates: Partial<RequestWizardData>) => void;
+  onDataChange: (updates: RequestWizardDataPatch) => void;
 }
 
 interface FieldSectionGroup {
@@ -154,12 +154,12 @@ export function StepCustomFields({ data, onDataChange }: StepCustomFieldsProps) 
   const defaultTab = fieldSections[0]?.id || "default";
 
   const handleFieldChange = (fieldId: string, value: any) => {
-    onDataChange({
+    onDataChange((prev) => ({
       customFieldValues: {
-        ...data.customFieldValues,
+        ...prev.customFieldValues,
         [fieldId]: value,
       },
-    });
+    }));
   };
 
   const totalFieldCount = allFields.length;

@@ -193,7 +193,7 @@ export function SectionedCustomFieldsRenderer({
 
       {fieldSections.map((section) => (
         <TabsContent key={section.id} value={section.id} className="mt-4">
-          <ScrollArea className="h-[300px] pr-4">
+          <ScrollArea className="h-[min(40rem,calc(100dvh-14rem))] pr-4">
             <ValidatedCustomFieldsRenderer
               fields={section.fields}
               values={values}

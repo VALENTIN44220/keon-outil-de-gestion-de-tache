@@ -15,7 +15,7 @@ import { StepDetailsForm } from "./StepDetailsForm";
 import { StepCustomFields } from "./StepCustomFields";
 import { StepMaterialLines } from "./StepMaterialLines";
 import { StepSummary } from "./StepSummary";
-import { RequestType, RequestWizardData, defaultWizardData, WIZARD_STEPS, SubProcessSelection } from "./types";
+import { RequestType, RequestWizardData, RequestWizardDataPatch, defaultWizardData, WIZARD_STEPS, SubProcessSelection } from "./types";
 import { mergeCommonFieldsConfig } from "@/types/commonFieldsConfig";
 
 interface RequestWizardDialogProps {
@@ -166,8 +166,11 @@ export function RequestWizardDialog({ open, onClose, onSuccess, initialProcessId
     }
   }, [data.targetPersonId]);
 
-  const updateData = useCallback((updates: Partial<RequestWizardData>) => {
-    setData((prev) => ({ ...prev, ...updates }));
+  const updateData = useCallback((updates: RequestWizardDataPatch) => {
+    setData((prev) => {
+      const patch = typeof updates === "function" ? updates(prev) : updates;
+      return { ...prev, ...patch };
+    });
   }, []);
 
   const handleTypeSelect = (type: RequestType) => {
