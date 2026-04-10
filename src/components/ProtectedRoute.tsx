@@ -8,19 +8,6 @@ import { Loader2 } from 'lucide-react';
 import { AccessRestrictedDialog } from './auth/AccessRestrictedDialog';
 import { MicrosoftAccountLinkingDialog } from './auth/MicrosoftAccountLinkingDialog';
 
-const AUTH_GATE_DEBUG =
-  import.meta.env.DEV || import.meta.env.VITE_AUTH_GATE_DEBUG === 'true';
-
-/** Logs décrivant pourquoi l’accès est accordé / refusé. Activez `VITE_AUTH_GATE_DEBUG=true` en prod si besoin. */
-function authGateLog(message: string, details?: Record<string, unknown>) {
-  if (!AUTH_GATE_DEBUG) return;
-  if (details && Object.keys(details).length > 0) {
-    console.info(`[auth/gate] ${message}`, details);
-  } else {
-    console.info(`[auth/gate] ${message}`);
-  }
-}
-
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
@@ -136,11 +123,6 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
         if (error) {
           console.error('Error checking profile:', error);
-          authGateLog('lecture profiles en erreur → accès refusé', {
-            code: error.code,
-            message: error.message,
-            userId: sessionUser.id,
-          });
           setHasProfile(false);
           setShowAccessDenied(true);
           return;
@@ -151,36 +133,14 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
         const session = sessionData.session ?? null;
         const needsLink = needsMicrosoftAccountLinking(session, userForLink);
 
-        authGateLog('contrôle session', {
-          userId: sessionUser.id,
-          sessionEmailSuffix: sessionUser.email?.split('@')[1] ?? null,
-          hasProviderToken: Boolean(session?.provider_token),
-          appProvider: userForLink.app_metadata?.provider ?? null,
-          appProviders: userForLink.app_metadata?.providers ?? null,
-          identityProviders: (userForLink.identities ?? []).map((i) => i.provider),
-          needsMicrosoftLinking: needsLink,
-          profileRowFound: Boolean(data),
-          profileProvisioned: data ? isKeonProvisionedProfile(data) : null,
-          permissionProfileId: data?.permission_profile_id ?? null,
-          idLucca: data?.id_lucca ?? null,
-        });
-
         if (data) {
           // Session Microsoft OAuth mais profil “fantôme” (trigger ancien ou insert minimal) : pas d’accès tant que la liaison n’est pas faite avec un compte provisionné.
           if (needsLink && !isKeonProvisionedProfile(data)) {
-            authGateLog(
-              'session Microsoft + profil non provisionné (pas permission_profile_id ni id_lucca) → modale de liaison obligatoire',
-              { profileId: data.id, userId: sessionUser.id },
-            );
             setHasProfile(false);
             setShowLinkingDialog(true);
             return;
           }
 
-          authGateLog('profil trouvé et autorisé → accès', {
-            profileId: data.id,
-            provisioned: isKeonProvisionedProfile(data),
-          });
           setHasProfile(true);
           return;
         }
@@ -188,9 +148,6 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
         // No row in public.profiles for this auth user.
         // Microsoft OAuth: never client-insert a stub profile — forces link-microsoft-account flow.
         if (needsLink) {
-          authGateLog('pas de ligne profiles + session Microsoft/OAuth → modale de liaison', {
-            userId: sessionUser.id,
-          });
           setHasProfile(false);
           setShowLinkingDialog(true);
           return;
@@ -205,12 +162,9 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
           insertRow.lovable_email = sessionUser.email;
         }
 
-        authGateLog('tentative bootstrap profil (connexion email / non-OAuth)', { userId: sessionUser.id });
-
         const { error: insertError } = await supabase.from('profiles').insert(insertRow);
 
         if (!insertError) {
-          authGateLog('insert profil bootstrap OK → accès', { userId: sessionUser.id });
           await refreshProfile();
           setHasProfile(true);
           return;
@@ -226,11 +180,6 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
         }
 
         console.error('Profile bootstrap failed:', insertError);
-        authGateLog('insert profil bootstrap refusé → accès refusé', {
-          code: insertError.code,
-          message: insertError.message,
-          userId: sessionUser.id,
-        });
         setHasProfile(false);
         setShowAccessDenied(true);
       } catch (error) {
