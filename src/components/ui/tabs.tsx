@@ -46,16 +46,11 @@ TabsTrigger.displayName = TabsPrimitive.Trigger.displayName;
 const TabsContent = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>
->(({ className, forceMount, ...props }, ref) => (
+>(({ className, ...props }, ref) => (
   <TabsPrimitive.Content
     ref={ref}
-    // Keep inactive tab panels mounted by default so local component state
-    // (inputs, scroll position, etc.) does not reset when switching tabs.
-    // Can be overridden by passing `forceMount={false}` explicitly.
-    forceMount={forceMount ?? true}
     className={cn(
-      "mt-4 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 animate-fade-in",
-      "data-[state=inactive]:hidden",
+      "mt-4 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 data-[state=inactive]:hidden",
       className,
     )}
     {...props}

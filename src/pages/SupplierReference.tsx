@@ -93,6 +93,7 @@ export default function SupplierReference() {
         open={drawerOpen}
         onClose={handleCloseDrawer}
         canEdit={supplierPermissions.canEdit}
+        isAdmin={isAdmin}
       />
 
       <SupplierSynthesisModal

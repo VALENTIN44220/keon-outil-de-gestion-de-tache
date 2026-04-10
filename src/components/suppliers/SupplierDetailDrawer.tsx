@@ -1,7 +1,18 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useSupplierCategories, useSupplierFamillesByCategorie } from "@/hooks/useSupplierCategorisation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -44,6 +55,8 @@ interface SupplierDetailDrawerProps {
   open: boolean;
   onClose: () => void;
   canEdit?: boolean;
+  /** Rôle app `admin` uniquement — sert à afficher la suppression (jamais à partir de can_delete_suppliers). */
+  isAdmin?: boolean;
 }
 
 type SupplierRow = {
@@ -97,10 +110,13 @@ const TYPES_CONTRAT = ["Contrat cadre", "Commande ponctuelle", "Appel d'offres",
 const DELAIS_PAIEMENT = ["30 jours date de facture", "30 jours fdm", "45 jours fdm", "60 jours", "variable"];
 const INCOTERMS = ["EXW", "FCA", "CPT", "CIP", "DAP", "DPU", "DDP", "FAS", "FOB", "CFR", "CIF"];
 
-export function SupplierDetailDrawer({ supplierId, open, onClose, canEdit = true }: SupplierDetailDrawerProps) {
+export function SupplierDetailDrawer({ supplierId, open, onClose, canEdit = true, isAdmin = false }: SupplierDetailDrawerProps) {
+  const queryClient = useQueryClient();
   const [supplier, setSupplier] = useState<SupplierRow | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<Partial<SupplierRow>>({});
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const { data: categories = [], isLoading: catLoading } = useSupplierCategories();
   const { data: familles = [], isLoading: famLoading } = useSupplierFamillesByCategorie(formData.categorie as string | null);
@@ -154,6 +170,13 @@ export function SupplierDetailDrawer({ supplierId, open, onClose, canEdit = true
       fetchAttachments();
     }
   }, [open, fetchCompanies, fetchAttachments]);
+
+  useEffect(() => {
+    if (!open) {
+      setDeleteConfirmOpen(false);
+      setIsDeleting(false);
+    }
+  }, [open]);
 
   const handleAddCompany = async () => {
     const trimmed = newCompanyName.trim();
@@ -331,6 +354,31 @@ export function SupplierDetailDrawer({ supplierId, open, onClose, canEdit = true
     }
   };
 
+  const handleConfirmDeleteSupplier = async () => {
+    if (!supplierId || !isAdmin) return;
+    setIsDeleting(true);
+    setPendingSave(null);
+    try {
+      const paths = attachments.map((a) => a.storage_path).filter(Boolean);
+      if (paths.length > 0) {
+        const { error: storageErr } = await supabase.storage.from("supplier-attachments").remove(paths);
+        if (storageErr) console.error("Storage remove:", storageErr);
+      }
+      const { error } = await supabase.from("supplier_purchase_enrichment").delete().eq("id", supplierId);
+      if (error) throw error;
+      await queryClient.invalidateQueries({ queryKey: ["supplier-enrichment"] });
+      toast({ title: "Fournisseur supprimé", description: "La fiche a été retirée du référentiel." });
+      setDeleteConfirmOpen(false);
+      setAttachments([]);
+      onClose();
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Suppression impossible";
+      toast({ title: "Erreur", description: message, variant: "destructive" });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const handleViewAttachment = async (att: SupplierAttachment) => {
     try {
       const { data } = await supabase.storage
@@ -394,9 +442,23 @@ export function SupplierDetailDrawer({ supplierId, open, onClose, canEdit = true
                         </span>
                       )}
                     </div>
-                    <Button onClick={handleMarkComplete} disabled={!canEdit || formData.status === "complet"}>
-                      <Check className="h-4 w-4 mr-2" /> Marquer complet
-                    </Button>
+                    <div className="flex flex-col items-end gap-2">
+                      <Button onClick={handleMarkComplete} disabled={!canEdit || formData.status === "complet"}>
+                        <Check className="h-4 w-4 mr-2" /> Marquer complet
+                      </Button>
+                      {isAdmin ? (
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          className="border-destructive/60"
+                          onClick={() => setDeleteConfirmOpen(true)}
+                          disabled={isDeleting}
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Supprimer le fournisseur
+                        </Button>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               </DialogHeader>
@@ -759,6 +821,49 @@ export function SupplierDetailDrawer({ supplierId, open, onClose, canEdit = true
           )}
         </DialogContent>
       </Dialog>
+
+      {isAdmin ? (
+        <AlertDialog
+          open={deleteConfirmOpen}
+          onOpenChange={(next) => {
+            if (!isDeleting) setDeleteConfirmOpen(next);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Supprimer ce fournisseur&nbsp;?</AlertDialogTitle>
+              <AlertDialogDescription className="text-left space-y-3">
+                <span className="block">
+                  Cette action est définitive. La fiche sera retirée du référentiel et les pièces jointes
+                  associées seront supprimées du stockage.
+                </span>
+                {supplier ? (
+                  <span className="block font-medium text-foreground">
+                    {supplier.tiers}
+                    <span className="text-muted-foreground font-normal"> — </span>
+                    {supplier.nomfournisseur || "Sans nom"}
+                  </span>
+                ) : null}
+                <span className="block text-sm">Ne continuez que si vous êtes certain.</span>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Annuler</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90 focus:ring-destructive"
+                disabled={isDeleting}
+                onClick={(e) => {
+                  e.preventDefault();
+                  void handleConfirmDeleteSupplier();
+                }}
+              >
+                {isDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2 inline" /> : null}
+                Supprimer définitivement
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      ) : null}
 
       {/* Add Company Dialog */}
       <Dialog open={showAddCompany} onOpenChange={setShowAddCompany}>

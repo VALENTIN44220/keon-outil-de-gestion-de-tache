@@ -132,7 +132,7 @@ export function SectionedCustomFieldsRenderer({
   }, [sectionIdsKey]);
 
   const handleTabChange = useCallback((next: string) => {
-    setActiveTab((prev) => (prev === next ? prev : next));
+    setActiveTab(next);
     if (DEBUG_REACT_185) {
       console.log('[react185] SectionedCustomFieldsRenderer onValueChange', { next });
     }
@@ -162,8 +162,19 @@ export function SectionedCustomFieldsRenderer({
     );
   }
 
+  // Valeur contrôlée toujours alignée sur une section existante (évite value="" → état Radix cassé).
+  const resolvedTab =
+    activeTab && fieldSections.some((s) => s.id === activeTab)
+      ? activeTab
+      : fieldSections[0]!.id;
+
   return (
-    <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+    <Tabs
+      key={sectionIdsKey}
+      value={resolvedTab}
+      onValueChange={handleTabChange}
+      className="w-full"
+    >
       <TabsList className="w-full flex flex-wrap h-auto gap-1 p-1">
         {fieldSections.map((section) => (
           <TabsTrigger

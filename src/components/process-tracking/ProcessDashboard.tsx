@@ -9,6 +9,7 @@ import { MaterialRequestsPanel } from './MaterialRequestsPanel';
 import { SupplierListView } from '@/components/suppliers/SupplierListView';
 import { SupplierDetailDrawer } from '@/components/suppliers/SupplierDetailDrawer';
 import { useSupplierAccess } from '@/hooks/useSupplierAccess';
+import { useUserRole } from '@/hooks/useUserRole';
 import { Loader2 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
@@ -35,6 +36,7 @@ export function ProcessDashboard({ processId, departmentId, departmentIds, proce
   const [supplierDrawerOpen, setSupplierDrawerOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const { role: supplierRole } = useSupplierAccess();
+  const { isAdmin } = useUserRole();
 
   const hasMaterialSection = processName?.toUpperCase().includes('MAINTENANCE') ?? false;
   const hasSupplierSection = processName?.toUpperCase().includes('ACHAT') ?? false;
@@ -229,6 +231,7 @@ export function ProcessDashboard({ processId, departmentId, departmentIds, proce
             open={supplierDrawerOpen}
             onClose={() => { setSupplierDrawerOpen(false); setSelectedSupplierId(null); }}
             canEdit={supplierRole === 'achat'}
+            isAdmin={isAdmin}
           />
         </TabsContent>
       )}

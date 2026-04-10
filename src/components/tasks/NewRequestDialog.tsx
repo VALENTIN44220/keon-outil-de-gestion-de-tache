@@ -24,7 +24,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { validateCustomFields } from './CustomFieldsRenderer';
 import { SectionedCustomFieldsRenderer } from './SectionedCustomFieldsRenderer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Badge } from '@/components/ui/badge';
@@ -660,6 +659,22 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
     return allFields;
   }, [visibleCustomFields]);
 
+  const showSubProcessTab = useMemo(
+    () => hasMultipleSubProcesses && availableSubProcesses.length > 0,
+    [hasMultipleSubProcesses, availableSubProcesses],
+  );
+
+  const showCustomFieldsTab = useMemo(() => customFieldsCount > 0, [customFieldsCount]);
+
+  const showMaterialTab = useMemo(() => {
+    const allSelectedIds = linkedSubProcessId ? [linkedSubProcessId] : selectedSubProcessIds;
+    return availableSubProcesses.some(
+      (sp) =>
+        allSelectedIds.includes(sp.id) &&
+        Boolean((sp as { form_schema?: { has_material_lines?: boolean } }).form_schema?.has_material_lines),
+    );
+  }, [linkedSubProcessId, selectedSubProcessIds, availableSubProcesses]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -928,7 +943,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
       }
 
       // Persist material request lines
-      if (hasMaterialSubProcess && materialLines.length > 0) {
+      if (showMaterialTab && materialLines.length > 0) {
         const materialRows = materialLines
           .filter(l => l.article !== null)
           .map(l => ({
@@ -1011,17 +1026,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
     return departments.find(d => d.id === depId)?.name || null;
   };
 
-  const showSubProcessTab = hasMultipleSubProcesses && availableSubProcesses.length > 0;
-  const showCustomFieldsTab = customFieldsCount > 0;
-  const hasMaterialSubProcess = (() => {
-    const allSelectedIds = linkedSubProcessId ? [linkedSubProcessId] : selectedSubProcessIds;
-    return availableSubProcesses.some(sp => 
-      allSelectedIds.includes(sp.id) && (sp as any).form_schema?.has_material_lines
-    );
-  })();
-  const showMaterialTab = hasMaterialSubProcess;
-
-  const materialValid = !hasMaterialSubProcess || (
+  const materialValid = !showMaterialTab || (
     materialLines.length > 0 && materialLines.every(l => l.article !== null && l.quantite > 0)
   );
 
@@ -1062,30 +1067,31 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
           onClose={onClose} 
         />
         
-        <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          {/* Tabs */}
+        {/* Hors <form> : évite que boutons / Radix Select (type implicite submit) déclenchent la soumission.
+            La validation reste entièrement dans handleSubmit. */}
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           <Tabs defaultValue="general" className="flex-1 flex flex-col min-h-0 overflow-hidden">
             <div className="px-6 pt-5 pb-2 flex-shrink-0 bg-gradient-to-b from-white to-transparent">
               <TabsList className="w-full bg-muted/40 p-1.5 rounded-2xl h-auto flex-wrap gap-1 border border-border/50">
-                <TabsTrigger 
-                  value="general" 
+                <TabsTrigger
+                  value="general"
                   className="flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl font-semibold transition-all duration-200 data-[state=active]:shadow-lg data-[state=active]:bg-white data-[state=active]:text-primary data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-white/50"
                 >
                   <FileText className="h-4 w-4" />
                   <span>Général</span>
                 </TabsTrigger>
                 {showSubProcessTab && (
-                  <TabsTrigger 
-                    value="subprocesses" 
+                  <TabsTrigger
+                    value="subprocesses"
                     className="flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl font-semibold transition-all duration-200 data-[state=active]:shadow-lg data-[state=active]:bg-white data-[state=active]:text-primary data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-white/50"
                   >
                     <CheckSquare className="h-4 w-4" />
                     <span>Tâches</span>
-                    <Badge 
-                      variant={selectedSubProcessIds.length > 0 ? "default" : "secondary"} 
+                    <Badge
+                      variant={selectedSubProcessIds.length > 0 ? 'default' : 'secondary'}
                       className={cn(
-                        "ml-1.5 text-[10px] px-2 py-0.5 rounded-full font-bold",
-                        selectedSubProcessIds.length > 0 && "bg-primary shadow-sm"
+                        'ml-1.5 text-[10px] px-2 py-0.5 rounded-full font-bold',
+                        selectedSubProcessIds.length > 0 && 'bg-primary shadow-sm',
                       )}
                     >
                       {selectedSubProcessIds.length}
@@ -1093,8 +1099,8 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                   </TabsTrigger>
                 )}
                 {showCustomFieldsTab && (
-                  <TabsTrigger 
-                    value="customfields" 
+                  <TabsTrigger
+                    value="customfields"
                     className="flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl font-semibold transition-all duration-200 data-[state=active]:shadow-lg data-[state=active]:bg-white data-[state=active]:text-primary data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-white/50"
                   >
                     <FormInput className="h-4 w-4" />
@@ -1105,17 +1111,17 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                   </TabsTrigger>
                 )}
                 {showMaterialTab && (
-                  <TabsTrigger 
-                    value="material" 
+                  <TabsTrigger
+                    value="material"
                     className="flex-1 flex items-center justify-center gap-2.5 py-3 px-4 rounded-xl font-semibold transition-all duration-200 data-[state=active]:shadow-lg data-[state=active]:bg-white data-[state=active]:text-primary data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground data-[state=inactive]:hover:bg-white/50"
                   >
                     <Package className="h-4 w-4" />
                     <span>Articles</span>
-                    <Badge 
-                      variant={materialLines.length > 0 ? "default" : "secondary"} 
+                    <Badge
+                      variant={materialLines.length > 0 ? 'default' : 'secondary'}
                       className={cn(
-                        "ml-1.5 text-[10px] px-2 py-0.5 rounded-full font-bold",
-                        materialLines.length > 0 && "bg-primary shadow-sm"
+                        'ml-1.5 text-[10px] px-2 py-0.5 rounded-full font-bold',
+                        materialLines.length > 0 && 'bg-primary shadow-sm',
                       )}
                     >
                       {materialLines.length}
@@ -1125,10 +1131,8 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
               </TabsList>
             </div>
 
-            {/* Scrollable Content (native scroll for reliability + visible OS scrollbar) */}
             <div className="flex-1 min-h-0 overflow-y-auto pr-3">
               <div className="px-6 py-5">
-                {/* General Tab */}
                 <TabsContent value="general" className="mt-0 space-y-6">
                   {/* System Fields Card */}
                   <SystemFieldsCard
@@ -1448,7 +1452,6 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                         type="date"
                         value={dueDate}
                         onChange={(e) => setDueDate(e.target.value)}
-                        required
                         disabled={commonFieldsConfig?.due_date?.editable === false}
                         className={cn(
                           "h-12 rounded-xl border-2 transition-all",
@@ -1598,8 +1601,9 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
               </div>
             </div>
           </Tabs>
+        </div>
 
-          {/* Fixed Footer */}
+        <form onSubmit={handleSubmit} className="flex-shrink-0">
           <RequestDialogFooter
             onClose={onClose}
             isSubmitting={isSubmitting}

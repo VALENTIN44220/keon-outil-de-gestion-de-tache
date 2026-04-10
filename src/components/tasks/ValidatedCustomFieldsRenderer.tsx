@@ -94,6 +94,42 @@ const FIELD_ICONS: Record<CustomFieldType, React.ElementType> = {
   repeatable_table: Database,
 };
 
+/** Radix Select : interdit `value=""` sur SelectItem (réservé au placeholder). */
+function normalizeSelectOptionsFromField(field: TemplateCustomField): { value: string; label: string }[] {
+  const raw = field.options || [];
+  const out: { value: string; label: string }[] = [];
+  for (const opt of raw as unknown[]) {
+    if (typeof opt === 'string') {
+      const v = opt.trim();
+      if (v === '') continue;
+      out.push({ value: v, label: opt });
+      continue;
+    }
+    if (opt == null || typeof opt !== 'object') continue;
+    const o = opt as { value?: unknown; label?: unknown };
+    const rawVal = o.value;
+    const lbl = o.label;
+    let valueStr: string | null = null;
+    if (rawVal !== undefined && rawVal !== null && String(rawVal).trim() !== '') {
+      valueStr = String(rawVal);
+    } else if (lbl !== undefined && lbl !== null && String(lbl).trim() !== '') {
+      valueStr = String(lbl);
+    }
+    if (!valueStr) continue;
+    const labelStr =
+      lbl !== undefined && lbl !== null && String(lbl).trim() !== '' ? String(lbl) : valueStr;
+    out.push({ value: valueStr, label: labelStr });
+  }
+  return out;
+}
+
+/** Valeur contrôlée uniquement si elle existe dans les items (évite erreurs Radix). */
+function selectControlledValue(raw: unknown, allowedValues: Set<string>): string | undefined {
+  if (raw === '' || raw === null || raw === undefined) return undefined;
+  const s = String(raw);
+  return allowedValues.has(s) ? s : undefined;
+}
+
 export const ValidatedCustomFieldsRenderer = memo(function ValidatedCustomFieldsRenderer({
   fields,
   values,
@@ -323,6 +359,11 @@ export const ValidatedCustomFieldsRenderer = memo(function ValidatedCustomFields
       handleValidation(field.id, values[field.id] ?? field.default_value ?? '');
     };
 
+    /** Radix Select + onValueChange : ne pas appeler handleBlur() ici — `values` du render est encore stale juste après onChange parent. */
+    const markTouchedAfterSelect = () => {
+      setTouchedFields((prev) => new Set(prev).add(field.id));
+    };
+
     return (
       <div
         key={field.id}
@@ -354,7 +395,15 @@ export const ValidatedCustomFieldsRenderer = memo(function ValidatedCustomFields
         )}
 
         <div className="relative">
-          {renderFieldInput(field, value, handleChange, handleBlur, showError, hint)}
+          {renderFieldInput(
+            field,
+            value,
+            handleChange,
+            handleBlur,
+            showError,
+            hint,
+            markTouchedAfterSelect,
+          )}
           
           {showError && validationResult?.message && (
             <div className="absolute right-0 top-1/2 -translate-y-1/2 pr-8">
@@ -397,7 +446,8 @@ export const ValidatedCustomFieldsRenderer = memo(function ValidatedCustomFields
     handleChange: (v: any) => void,
     handleBlur: () => void,
     hasError: boolean,
-    hint: string
+    hint: string,
+    markTouchedAfterSelect: () => void,
   ) => {
     const inputClass = cn(
       'transition-all',
@@ -548,17 +598,15 @@ export const ValidatedCustomFieldsRenderer = memo(function ValidatedCustomFields
         );
 
       case 'select': {
-        // Normalize options: handle both {value,label} objects and plain strings
-        const selectOptions = (field.options || []).map((opt: any) => {
-          if (typeof opt === 'string') return { value: opt, label: opt };
-          return { value: opt.value || opt, label: opt.label || opt.value || opt };
-        });
+        const selectOptions = normalizeSelectOptionsFromField(field);
+        const allowed = new Set(selectOptions.map((o) => o.value));
+        const selectValue = selectControlledValue(value, allowed);
         return (
           <Select
-            value={value}
+            value={selectValue}
             onValueChange={(v) => {
               handleChange(v);
-              handleBlur();
+              markTouchedAfterSelect();
             }}
             disabled={disabled}
           >
@@ -645,13 +693,15 @@ export const ValidatedCustomFieldsRenderer = memo(function ValidatedCustomFields
         );
       }
 
-      case 'user_search':
+      case 'user_search': {
+        const allowed = new Set(users.map((u) => u.id));
+        const selectValue = selectControlledValue(value, allowed);
         return (
           <Select
-            value={value}
+            value={selectValue}
             onValueChange={(v) => {
               handleChange(v);
-              handleBlur();
+              markTouchedAfterSelect();
             }}
             disabled={disabled || loadingUsers}
           >
@@ -673,14 +723,17 @@ export const ValidatedCustomFieldsRenderer = memo(function ValidatedCustomFields
             </SelectContent>
           </Select>
         );
+      }
 
-      case 'department_search':
+      case 'department_search': {
+        const allowed = new Set(departments.map((d) => d.id));
+        const selectValue = selectControlledValue(value, allowed);
         return (
           <Select
-            value={value}
+            value={selectValue}
             onValueChange={(v) => {
               handleChange(v);
-              handleBlur();
+              markTouchedAfterSelect();
             }}
             disabled={disabled || loadingDepartments}
           >
@@ -702,6 +755,7 @@ export const ValidatedCustomFieldsRenderer = memo(function ValidatedCustomFields
             </SelectContent>
           </Select>
         );
+      }
 
       case 'file':
         return (
@@ -731,19 +785,21 @@ export const ValidatedCustomFieldsRenderer = memo(function ValidatedCustomFields
           </div>
         );
 
-      case 'table_lookup':
+      case 'table_lookup': {
         const lookupOptions = tableLookupData[field.id] || [];
         const isLoadingLookup = loadingTableLookup[field.id];
         const tableInfo = LOOKUP_TABLES.find(
           (t) => t.value === field.lookup_table
         );
+        const allowed = new Set(lookupOptions.map((o) => o.id));
+        const selectValue = selectControlledValue(value, allowed);
 
         return (
           <Select
-            value={value}
+            value={selectValue}
             onValueChange={(v) => {
               handleChange(v);
-              handleBlur();
+              markTouchedAfterSelect();
             }}
             disabled={disabled || isLoadingLookup}
           >
@@ -766,6 +822,7 @@ export const ValidatedCustomFieldsRenderer = memo(function ValidatedCustomFields
             </SelectContent>
           </Select>
         );
+      }
 
       case 'repeatable_table':
         return (
