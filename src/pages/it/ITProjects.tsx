@@ -116,7 +116,7 @@ type SortKey = 'code_projet_digital' | 'nom_projet' | 'type_projet' | 'statut' |
 
 export default function ITProjects() {
   const navigate = useNavigate();
-  const { projects, isLoading, deleteProject } = useITProjects();
+  const { projects, isLoading, deleteProject, fetchProjects } = useITProjects();
   const { isAdmin } = useUserRole();
   const [showCreate, setShowCreate] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ITProject | null>(null);
@@ -711,7 +711,7 @@ export default function ITProjects() {
         </div>
       </div>
 
-      <ITProjectFormDialog open={showCreate} onClose={() => setShowCreate(false)} />
+      <ITProjectFormDialog open={showCreate} onClose={() => setShowCreate(false)} onSaved={fetchProjects} />
 
       <AlertDialog open={!!deleteTarget} onOpenChange={open => { if (!open) setDeleteTarget(null); }}>
         <AlertDialogContent>
