@@ -11,17 +11,22 @@ import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import {
   Plus, Monitor, Search, Download, Save, RotateCcw, Filter,
   FolderKanban, AlertTriangle, TrendingUp, ArrowUpDown, ChevronRight, Target,
-  FolderOpen, Bookmark
+  FolderOpen, Bookmark, Trash2
 } from 'lucide-react';
 import { format, subMonths, startOfMonth, startOfYear, isAfter } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { ITProjectFormDialog } from '@/components/it/ITProjectFormDialog';
+import { useUserRole } from '@/hooks/useUserRole';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
@@ -111,8 +116,10 @@ type SortKey = 'code_projet_digital' | 'nom_projet' | 'type_projet' | 'statut' |
 
 export default function ITProjects() {
   const navigate = useNavigate();
-  const { projects, isLoading } = useITProjects();
+  const { projects, isLoading, deleteProject } = useITProjects();
+  const { isAdmin } = useUserRole();
   const [showCreate, setShowCreate] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<ITProject | null>(null);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [contextName, setContextName] = useState('');
 
@@ -671,7 +678,18 @@ export default function ITProjects() {
                                 {p.chef_projet_it?.display_name || '—'}
                               </td>
                               <td className="px-3 py-2.5">
-                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                <div className="flex items-center gap-1 justify-end">
+                                  {isAdmin && (
+                                    <button
+                                      onClick={e => { e.stopPropagation(); setDeleteTarget(p); }}
+                                      className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                                      title="Supprimer le projet"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  )}
+                                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                </div>
                               </td>
                             </tr>
                           );
@@ -694,6 +712,40 @@ export default function ITProjects() {
       </div>
 
       <ITProjectFormDialog open={showCreate} onClose={() => setShowCreate(false)} />
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={open => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" /> Supprimer le projet IT
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-1">
+              <span className="block">
+                Êtes-vous sûr de vouloir supprimer définitivement le projet{' '}
+                <span className="font-mono font-semibold text-foreground">{deleteTarget?.code_projet_digital}</span>
+                {' '}— <span className="font-medium text-foreground">{deleteTarget?.nom_projet}</span> ?
+              </span>
+              <span className="block text-xs text-destructive/80 font-medium">
+                Cette action est irréversible. Toutes les données associées (jalons, tâches liées) seront également supprimées.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                if (deleteTarget) {
+                  await deleteProject(deleteTarget.id);
+                  setDeleteTarget(null);
+                }
+              }}
+            >
+              Supprimer définitivement
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Save context dialog */}
       <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>

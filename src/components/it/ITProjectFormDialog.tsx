@@ -27,6 +27,7 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
   const [isSaving, setIsSaving] = useState(false);
 
   // Form state
+  const [codeProjetDigital, setCodeProjetDigital] = useState('');
   const [nomProjet, setNomProjet] = useState('');
   const [description, setDescription] = useState('');
   const [typeProjet, setTypeProjet] = useState<ITProjectType>('applicatif');
@@ -95,6 +96,7 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
 
   useEffect(() => {
     if (project) {
+      setCodeProjetDigital(project.code_projet_digital || '');
       setNomProjet(project.nom_projet || '');
       setDescription(project.description || '');
       setTypeProjet((project.type_projet as ITProjectType) || 'applicatif');
@@ -121,6 +123,7 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
   }, [project, open]);
 
   const resetForm = () => {
+    setCodeProjetDigital('');
     setNomProjet('');
     setDescription('');
     setTypeProjet('applicatif');
@@ -148,6 +151,7 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
     setIsSaving(true);
 
     const payload: any = {
+      ...(codeProjetDigital.trim() && { code_projet_digital: codeProjetDigital.trim().toUpperCase() }),
       nom_projet: nomProjet,
       description: description || null,
       type_projet: typeProjet,
@@ -212,6 +216,21 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
 
           {/* General tab */}
           <TabsContent value="general" className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label htmlFor="code">Code projet digital</Label>
+              <Input
+                id="code"
+                placeholder="Auto-généré si vide (ex: NSK_IT-00001)"
+                value={codeProjetDigital}
+                onChange={e => setCodeProjetDigital(e.target.value)}
+                className="font-mono uppercase"
+                disabled={isEdit}
+              />
+              {isEdit
+                ? <p className="text-xs text-muted-foreground">Le code projet ne peut pas être modifié après création.</p>
+                : <p className="text-xs text-muted-foreground">Laissez vide pour générer automatiquement un code NSK_IT-XXXXX.</p>
+              }
+            </div>
             <div className="space-y-2">
               <Label htmlFor="nom">Nom du projet *</Label>
               <Input id="nom" placeholder="Ex: Refonte portail client, Migration ERP..." value={nomProjet} onChange={e => setNomProjet(e.target.value)} />
