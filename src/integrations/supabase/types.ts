@@ -4361,6 +4361,10 @@ export type Database = {
           updated_by: string | null
           validite_du_contrat: string | null
           validite_prix: string | null
+          validated_by_achats_at: string | null
+          validated_by_achats_user_id: string | null
+          validated_by_compta_at: string | null
+          validated_by_compta_user_id: string | null
         }
         Insert: {
           adresse_mail?: string | null
@@ -4407,6 +4411,10 @@ export type Database = {
           updated_by?: string | null
           validite_du_contrat?: string | null
           validite_prix?: string | null
+          validated_by_achats_at?: string | null
+          validated_by_achats_user_id?: string | null
+          validated_by_compta_at?: string | null
+          validated_by_compta_user_id?: string | null
         }
         Update: {
           adresse_mail?: string | null
@@ -4453,6 +4461,10 @@ export type Database = {
           updated_by?: string | null
           validite_du_contrat?: string | null
           validite_prix?: string | null
+          validated_by_achats_at?: string | null
+          validated_by_achats_user_id?: string | null
+          validated_by_compta_at?: string | null
+          validated_by_compta_user_id?: string | null
         }
         Relationships: []
       }
@@ -7991,6 +8003,10 @@ export type Database = {
       }
     }
     Functions: {
+      apply_supplier_waiting_validation: {
+        Args: { p_waiting_ids: string[] }
+        Returns: undefined
+      }
       calculate_supplier_completeness: {
         Args: {
           p_adresse_mail: string

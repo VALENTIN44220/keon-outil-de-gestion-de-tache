@@ -10,6 +10,8 @@ export type SupplierWaitingApprovalRow = {
   famille: string | null;
   siret: string | null;
   created_at: string | null;
+  validated_by_compta_at: string | null;
+  validated_by_achats_at: string | null;
 };
 
 export function useSupplierWaitingApprovalList(options?: { enabled?: boolean }) {
@@ -19,7 +21,9 @@ export function useSupplierWaitingApprovalList(options?: { enabled?: boolean }) 
     queryFn: async () => {
       const { data, error } = await supabase
         .from('supplier_waiting_approval')
-        .select('id,line_index,tiers,nomfournisseur,entite,famille,siret,created_at')
+        .select(
+          'id,line_index,tiers,nomfournisseur,entite,famille,siret,created_at,validated_by_compta_at,validated_by_achats_at',
+        )
         .order('created_at', { ascending: false });
 
       if (error) throw error;
