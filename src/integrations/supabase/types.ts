@@ -8007,6 +8007,14 @@ export type Database = {
         Args: { p_waiting_ids: string[] }
         Returns: undefined
       }
+      promote_supplier_waiting_to_enrichment: {
+        Args: { p_waiting_ids: string[] }
+        Returns: {
+          attachments: Json
+          enrichment_id: string
+          former_waiting_id: string
+        }[]
+      }
       calculate_supplier_completeness: {
         Args: {
           p_adresse_mail: string
