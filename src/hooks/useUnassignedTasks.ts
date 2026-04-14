@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSimulation } from '@/contexts/SimulationContext';
+import { reassignmentStakeholderPatchForActingProfile } from '@/lib/reassignmentStakeholderUpdate';
 import { Task } from '@/types/task';
 import { useToast } from '@/hooks/use-toast';
 
@@ -13,7 +15,9 @@ interface UseUnassignedTasksResult {
 }
 
 export function useUnassignedTasks(): UseUnassignedTasksResult {
-  const { user, profile } = useAuth();
+  const { user, profile: authProfile } = useAuth();
+  const { getActiveProfile } = useSimulation();
+  const profile = getActiveProfile() || authProfile;
   const { toast } = useToast();
   const [unassignedTasks, setUnassignedTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -59,10 +63,25 @@ export function useUnassignedTasks(): UseUnassignedTasksResult {
 
   const assignTask = async (taskId: string, assigneeId: string) => {
     try {
-      const { error } = await supabase
+      const { data: row, error: fetchErr } = await supabase
         .from('tasks')
-        .update({ assignee_id: assigneeId })
-        .eq('id', taskId);
+        .select('assignee_id, reassignment_stakeholder_id')
+        .eq('id', taskId)
+        .maybeSingle();
+      if (fetchErr) throw fetchErr;
+
+      const updates: Record<string, string> = { assignee_id: assigneeId };
+      Object.assign(
+        updates,
+        reassignmentStakeholderPatchForActingProfile(
+          profile?.id,
+          row?.assignee_id ?? null,
+          assigneeId,
+          row?.reassignment_stakeholder_id ?? null
+        )
+      );
+
+      const { error } = await supabase.from('tasks').update(updates).eq('id', taskId);
 
       if (error) throw error;
 

@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSimulation } from '@/contexts/SimulationContext';
 import { Holiday, UserLeave, WorkloadSlot, WorkloadDay, TeamMemberWorkload } from '@/types/workload';
+import { reassignmentStakeholderPatchForActingProfile } from '@/lib/reassignmentStakeholderUpdate';
 import { format, addDays, isWeekend, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, parseISO, differenceInDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -42,7 +43,7 @@ export function useWorkloadPlanning({
             .maybeSingle(),
           supabase
             .from('tasks')
-            .select('id, status, target_department_id')
+            .select('id, status, target_department_id, assignee_id, reassignment_stakeholder_id')
             .eq('id', taskId)
             .maybeSingle(),
         ]);
@@ -65,6 +66,16 @@ export function useWorkloadPlanning({
         update.status = 'todo';
       }
 
+      Object.assign(
+        update,
+        reassignmentStakeholderPatchForActingProfile(
+          profile?.id,
+          taskRow.assignee_id ?? null,
+          assigneeProfileId,
+          taskRow.reassignment_stakeholder_id ?? null
+        )
+      );
+
       const { error: updateError } = await supabase
         .from('tasks')
         .update(update)
@@ -72,7 +83,7 @@ export function useWorkloadPlanning({
 
       if (updateError) throw updateError;
     },
-    []
+    [profile?.id]
   );
 
   const fetchData = useCallback(async () => {

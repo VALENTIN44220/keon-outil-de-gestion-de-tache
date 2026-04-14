@@ -13,6 +13,8 @@ import { Loader2, UserRoundPlus, Search, CheckCircle2, Filter, Users, ChevronDow
 import { Task } from '@/types/task';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
+import { useSimulation } from '@/contexts/SimulationContext';
 
 interface BulkReassignDialogProps {
   open: boolean;
@@ -61,6 +63,9 @@ const statusColors: Record<string, string> = {
 };
 
 export function BulkReassignDialog({ open, onOpenChange, tasks, onComplete }: BulkReassignDialogProps) {
+  const { profile: authProfile } = useAuth();
+  const { getActiveProfile } = useSimulation();
+  const profile = getActiveProfile() || authProfile;
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [targetUserId, setTargetUserId] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -215,21 +220,49 @@ export function BulkReassignDialog({ open, onOpenChange, tasks, onComplete }: Bu
     setIsProcessing(true);
     try {
       const ids = Array.from(selectedTaskIds);
+      const tasksById = new Map(tasks.map((t) => [t.id, t]));
 
       for (let i = 0; i < ids.length; i += 50) {
         const batch = ids.slice(i, i + 50);
-        const { error } = await supabase
-          .from('tasks')
-          .update({ assignee_id: targetUserId })
-          .in('id', batch);
+        const withStakeholder = batch.filter((id) => {
+          const t = tasksById.get(id);
+          return (
+            !!profile?.id &&
+            !!t &&
+            !t.reassignment_stakeholder_id &&
+            t.assignee_id &&
+            t.assignee_id !== targetUserId
+          );
+        });
+        const withoutStakeholder = batch.filter((id) => !withStakeholder.includes(id));
 
-        if (error) throw error;
+        if (withStakeholder.length > 0) {
+          const { error } = await supabase
+            .from('tasks')
+            .update({ assignee_id: targetUserId, reassignment_stakeholder_id: profile!.id })
+            .in('id', withStakeholder);
+          if (error) throw error;
 
-        await supabase
-          .from('tasks')
-          .update({ assignee_id: targetUserId, status: 'todo' })
-          .in('id', batch)
-          .eq('status', 'to_assign');
+          await supabase
+            .from('tasks')
+            .update({ assignee_id: targetUserId, status: 'todo', reassignment_stakeholder_id: profile!.id })
+            .in('id', withStakeholder)
+            .eq('status', 'to_assign');
+        }
+
+        if (withoutStakeholder.length > 0) {
+          const { error } = await supabase
+            .from('tasks')
+            .update({ assignee_id: targetUserId })
+            .in('id', withoutStakeholder);
+          if (error) throw error;
+
+          await supabase
+            .from('tasks')
+            .update({ assignee_id: targetUserId, status: 'todo' })
+            .in('id', withoutStakeholder)
+            .eq('status', 'to_assign');
+        }
       }
 
       toast.success(`${ids.length} tâche(s) réaffectée(s) à ${selectedMember?.display_name}`);

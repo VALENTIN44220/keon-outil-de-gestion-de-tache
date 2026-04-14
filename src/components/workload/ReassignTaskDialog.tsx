@@ -32,6 +32,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSimulation } from '@/contexts/SimulationContext';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { reassignmentStakeholderPatchForActingProfile } from '@/lib/reassignmentStakeholderUpdate';
 
 interface TeamMember {
   id: string;
@@ -186,36 +187,57 @@ export function ReassignTaskDialog({
     try {
       if (reassignMode === 'duplicate') {
         // Mode DUPLICATION : Créer une nouvelle tâche indépendante
-        const { data: newTask, error: createError } = await supabase
+        const dupBase = {
+          user_id: task.user_id,
+          title: task.title,
+          description: task.description,
+          status: 'todo' as const,
+          priority: task.priority,
+          type: task.type,
+          category: task.category,
+          category_id: task.category_id,
+          subcategory_id: task.subcategory_id,
+          due_date: task.due_date,
+          assignee_id: selectedUserId,
+          requester_id: task.requester_id,
+          reporter_id: task.reporter_id,
+          target_department_id: task.target_department_id,
+          source_process_template_id: task.source_process_template_id,
+          source_sub_process_template_id: task.source_sub_process_template_id,
+          parent_request_id: task.parent_request_id,
+          be_project_id: task.be_project_id,
+          be_label_id: task.be_label_id,
+          validation_level_1: task.validation_level_1,
+          validation_level_2: task.validation_level_2,
+          validator_level_1_id: task.validator_level_1_id,
+          validator_level_2_id: task.validator_level_2_id,
+        };
+        const dupPayload =
+          task.allows_reassignment ? { ...dupBase, allows_reassignment: true as const } : dupBase;
+
+        let { data: newTask, error: createError } = await supabase
           .from('tasks')
-          .insert({
-            user_id: task.user_id,
-            title: task.title,
-            description: task.description,
-            status: 'todo' as const, // New task starts as todo
-            priority: task.priority,
-            type: task.type,
-            category: task.category,
-            category_id: task.category_id,
-            subcategory_id: task.subcategory_id,
-            due_date: task.due_date,
-            assignee_id: selectedUserId,
-            requester_id: task.requester_id,
-            reporter_id: task.reporter_id,
-            target_department_id: task.target_department_id,
-            source_process_template_id: task.source_process_template_id,
-            source_sub_process_template_id: task.source_sub_process_template_id,
-            parent_request_id: task.parent_request_id,
-            be_project_id: task.be_project_id,
-            be_label_id: task.be_label_id,
-            // Validation settings from original (but reset status)
-            validation_level_1: task.validation_level_1,
-            validation_level_2: task.validation_level_2,
-            validator_level_1_id: task.validator_level_1_id,
-            validator_level_2_id: task.validator_level_2_id,
-          })
+          .insert(dupPayload)
           .select('id, task_number')
           .single();
+
+        const allowsColErr = (err: typeof createError) => {
+          const m = err?.message?.toLowerCase() ?? '';
+          return (
+            !!err &&
+            (m.includes('allows_reassignment') ||
+              (m.includes('column') && m.includes('tasks')) ||
+              m.includes('schema cache') ||
+              err.code === '42703' ||
+              err.code === 'PGRST204')
+          );
+        };
+
+        if (createError && task.allows_reassignment && allowsColErr(createError)) {
+          const retry = await supabase.from('tasks').insert(dupBase).select('id, task_number').single();
+          newTask = retry.data;
+          createError = retry.error;
+        }
 
         if (createError) throw createError;
 
@@ -261,14 +283,46 @@ export function ReassignTaskDialog({
         );
       } else {
         // Mode TRANSFERT : Déplacer la tâche existante
-        const { error: taskError } = await supabase
+        const prevAssigneeId = task.assignee_id;
+        const transferPatch: Record<string, unknown> = {
+          assignee_id: selectedUserId,
+          // If task was "À affecter", move to "À faire"
+          ...(task.status === 'to_assign' ? { status: 'todo' } : {}),
+        };
+        Object.assign(
+          transferPatch,
+          reassignmentStakeholderPatchForActingProfile(
+            profile?.id,
+            prevAssigneeId ?? null,
+            selectedUserId,
+            task.reassignment_stakeholder_id
+          )
+        );
+
+        let { error: taskError } = await supabase
           .from('tasks')
-          .update({
-            assignee_id: selectedUserId,
-            // If task was "À affecter", move to "À faire"
-            ...(task.status === 'to_assign' ? { status: 'todo' } : {}),
-          })
+          .update(transferPatch)
           .eq('id', task.id);
+
+        const stakeholderColErr = (err: typeof taskError) => {
+          const m = err?.message?.toLowerCase() ?? '';
+          return (
+            !!err &&
+            (m.includes('reassignment_stakeholder_id') ||
+              (m.includes('column') && m.includes('tasks')) ||
+              m.includes('schema cache') ||
+              err.code === '42703' ||
+              err.code === 'PGRST204')
+          );
+        };
+
+        if (taskError && transferPatch.reassignment_stakeholder_id && stakeholderColErr(taskError)) {
+          const { assignee_id, status: st } = transferPatch;
+          const fallback: Record<string, unknown> = { assignee_id };
+          if (st) fallback.status = st;
+          const retry = await supabase.from('tasks').update(fallback).eq('id', task.id);
+          taskError = retry.error;
+        }
 
         if (taskError) throw taskError;
 

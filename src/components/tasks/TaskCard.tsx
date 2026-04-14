@@ -4,6 +4,7 @@ import { Clock, User, MoreVertical, Trash2, ChevronDown, ChevronRight, ListCheck
 import { Task, TaskStatus } from '@/types/task';
 import { useParentRequestNumber } from '@/hooks/useParentRequestNumber';
 import { cn } from '@/lib/utils';
+import { parseTaskCalendarDate } from '@/lib/formatTaskDate';
 import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
@@ -62,8 +63,11 @@ export function TaskCard({ task, onStatusChange, onDelete, compact = false, task
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
-  const dueDate = task.due_date ? new Date(task.due_date) : null;
-  const isOverdue = dueDate && dueDate < new Date() && task.status !== 'done';
+  const dueDate = parseTaskCalendarDate(task.due_date);
+  const isOverdue =
+    dueDate &&
+    dueDate < new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()) &&
+    task.status !== 'done';
   const isRequest = task.type === 'request';
   const isAssignmentTask = task.is_assignment_task;
   const parentRequestNumber = useParentRequestNumber(task.parent_request_id);
@@ -108,7 +112,7 @@ export function TaskCard({ task, onStatusChange, onDelete, compact = false, task
                 {parentRequestNumber}
               </Badge>
             )}
-            {isAssignmentTask && (
+            {(isAssignmentTask || task.status === 'to_assign') && (
               <Badge className="text-xs flex items-center gap-1 bg-amber-500 hover:bg-amber-600 text-white">
                 <UserPlus className="h-3 w-3" />
                 À affecter
@@ -269,6 +273,7 @@ export function TaskCard({ task, onStatusChange, onDelete, compact = false, task
         open={isDetailOpen}
         onClose={() => setIsDetailOpen(false)}
         onStatusChange={onStatusChange}
+        onTaskMutated={onTaskUpdated}
       />
 
       {/* Task edit dialog */}

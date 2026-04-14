@@ -167,9 +167,14 @@ export function PendingAssignmentsView() {
                     <CardHeader className="py-3 px-4">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <CardTitle className="text-sm font-medium">
-                            {task.title}
-                          </CardTitle>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <CardTitle className="text-sm font-medium">
+                              {task.title}
+                            </CardTitle>
+                            <Badge className="text-[10px] h-5 bg-amber-500 hover:bg-amber-600 text-white border-0">
+                              À affecter
+                            </Badge>
+                          </div>
                           {task.description && (
                             <CardDescription className="text-xs mt-1 line-clamp-2">
                               {task.description}

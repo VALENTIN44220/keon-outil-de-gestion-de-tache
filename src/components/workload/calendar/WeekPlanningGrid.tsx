@@ -71,15 +71,16 @@
    isCompact?: boolean;
  }
  
- interface TaskPill {
-   task: Task;
-   slots: WorkloadSlot[];
-   startDate: string;
-   endDate: string;
-   startCol: number;
-   spanCols: number;
-   row: number; // For stacking multiple tasks
- }
+interface TaskPill {
+  task: Task;
+  slots: WorkloadSlot[];
+  startDate: string;
+  endDate: string;
+  startCol: number;
+  spanCols: number;
+  row: number; // For stacking multiple tasks
+  isDateBased?: boolean; // positioned via start_date/due_date, no workload_slots
+}
  
  export function WeekPlanningGrid({
    workloadData = [],
@@ -148,90 +149,136 @@
      return map;
    }, [workloadData]);
  
-   // Compute task pills with positions for each user
-   const taskPillsByUser = useMemo(() => {
-     const result = new Map<string, TaskPill[]>();
-     
-     workloadData.forEach(member => {
-       const userSlots = slotsByUser.get(member.memberId) || [];
-       const taskMap = new Map<string, { task: Task; slots: WorkloadSlot[] }>();
-       
-       userSlots.forEach(slot => {
-         if (slot.task) {
-           if (!taskMap.has(slot.task_id)) {
-             const fullTask = tasks.find(t => t.id === slot.task_id);
-             if (fullTask) {
-               taskMap.set(slot.task_id, { task: fullTask, slots: [] });
-             }
-           }
-           const entry = taskMap.get(slot.task_id);
-           if (entry) {
-             entry.slots.push(slot);
-           }
-         }
-       });
-       
-       // Convert to positioned pills
-       const pills: TaskPill[] = [];
-       Array.from(taskMap.values()).forEach(({ task, slots }) => {
-         const sortedSlots = [...slots].sort((a, b) => a.date.localeCompare(b.date));
-         if (sortedSlots.length === 0) return;
-         
-         const startDateStr = sortedSlots[0].date;
-         const endDateStr = sortedSlots[sortedSlots.length - 1].date;
-         
-         // Find column indices
-         let startCol = periodUnits.findIndex(u => u.key === startDateStr);
-         let endCol = periodUnits.findIndex(u => u.key === endDateStr);
-         
-         // Clamp to visible range
-         if (startCol === -1) {
-           try {
-             const taskStart = parseISO(startDateStr);
-             if (taskStart < periodUnits[0]?.date) startCol = 0;
-           } catch { /* skip */ }
-         }
-         if (endCol === -1) {
-           try {
-             const taskEnd = parseISO(endDateStr);
-             if (taskEnd > periodUnits[periodUnits.length - 1]?.date) endCol = periodUnits.length - 1;
-           } catch { /* skip */ }
-         }
-         
-         if (startCol !== -1 && endCol !== -1 && startCol <= endCol) {
-           pills.push({
-             task,
-             slots,
-             startDate: startDateStr,
-             endDate: endDateStr,
-             startCol,
-             spanCols: endCol - startCol + 1,
-             row: 0, // Will be computed for stacking
-           });
-         }
-       });
-       
-       // Sort by start column, then by span (longer first)
-       pills.sort((a, b) => a.startCol - b.startCol || b.spanCols - a.spanCols);
-       
-       // Assign rows for overlapping pills (simple greedy algorithm)
-       const colEndRow: number[] = new Array(periodUnits.length).fill(0);
-       pills.forEach(pill => {
-         let maxRow = 0;
-         for (let c = pill.startCol; c < pill.startCol + pill.spanCols; c++) {
-           maxRow = Math.max(maxRow, colEndRow[c]);
-         }
-         pill.row = maxRow;
-         for (let c = pill.startCol; c < pill.startCol + pill.spanCols; c++) {
-           colEndRow[c] = maxRow + 1;
-         }
-       });
-       
-       result.set(member.memberId, pills);
-     });
-     
-     return result;
-   }, [workloadData, slotsByUser, tasks, periodUnits]);
+  // Compute task pills with positions for each user
+  const taskPillsByUser = useMemo(() => {
+    const result = new Map<string, TaskPill[]>();
+
+    workloadData.forEach(member => {
+      const userSlots = slotsByUser.get(member.memberId) || [];
+      const taskMap = new Map<string, { task: Task; slots: WorkloadSlot[] }>();
+
+      userSlots.forEach(slot => {
+        if (slot.task) {
+          if (!taskMap.has(slot.task_id)) {
+            const fullTask = tasks.find(t => t.id === slot.task_id);
+            if (fullTask) {
+              taskMap.set(slot.task_id, { task: fullTask, slots: [] });
+            }
+          }
+          const entry = taskMap.get(slot.task_id);
+          if (entry) {
+            entry.slots.push(slot);
+          }
+        }
+      });
+
+      // Convert slot-based tasks to positioned pills
+      const pills: TaskPill[] = [];
+      Array.from(taskMap.values()).forEach(({ task, slots }) => {
+        const sortedSlots = [...slots].sort((a, b) => a.date.localeCompare(b.date));
+        if (sortedSlots.length === 0) return;
+
+        const startDateStr = sortedSlots[0].date;
+        const endDateStr = sortedSlots[sortedSlots.length - 1].date;
+
+        let startCol = periodUnits.findIndex(u => u.key === startDateStr);
+        let endCol = periodUnits.findIndex(u => u.key === endDateStr);
+
+        if (startCol === -1) {
+          try {
+            const taskStart = parseISO(startDateStr);
+            if (taskStart < periodUnits[0]?.date) startCol = 0;
+          } catch { /* skip */ }
+        }
+        if (endCol === -1) {
+          try {
+            const taskEnd = parseISO(endDateStr);
+            if (taskEnd > periodUnits[periodUnits.length - 1]?.date) endCol = periodUnits.length - 1;
+          } catch { /* skip */ }
+        }
+
+        if (startCol !== -1 && endCol !== -1 && startCol <= endCol) {
+          pills.push({
+            task,
+            slots,
+            startDate: startDateStr,
+            endDate: endDateStr,
+            startCol,
+            spanCols: endCol - startCol + 1,
+            row: 0,
+          });
+        }
+      });
+
+      // Second pass: date-based tasks (have start_date/due_date but no workload_slots)
+      const slotTaskIds = new Set(taskMap.keys());
+      tasks.forEach(task => {
+        if (!task.due_date && !task.start_date) return;
+        if (task.assignee_id !== member.memberId) return;
+        if (slotTaskIds.has(task.id)) return;
+
+        const taskStartStr = task.start_date || task.due_date!;
+        const taskEndStr = task.due_date || task.start_date!;
+
+        let startCol = -1;
+        let endCol = -1;
+
+        periodUnits.forEach((u, i) => {
+          if (u.key >= taskStartStr && u.key <= taskEndStr) {
+            if (startCol === -1) startCol = i;
+            endCol = i;
+          }
+        });
+
+        // Clamp: task may start before or end after the visible week
+        if (startCol === -1 && endCol === -1) {
+          try {
+            const ts = parseISO(taskStartStr);
+            const te = parseISO(taskEndStr);
+            const firstDate = periodUnits[0]?.date;
+            const lastDate = periodUnits[periodUnits.length - 1]?.date;
+            if (firstDate && lastDate && ts <= lastDate && te >= firstDate) {
+              startCol = 0;
+              endCol = periodUnits.length - 1;
+            }
+          } catch { /* skip */ }
+        }
+
+        if (startCol !== -1 && endCol !== -1 && startCol <= endCol) {
+          pills.push({
+            task,
+            slots: [],
+            startDate: taskStartStr,
+            endDate: taskEndStr,
+            startCol,
+            spanCols: endCol - startCol + 1,
+            row: 0,
+            isDateBased: true,
+          });
+        }
+      });
+
+      // Sort by start column, then by span (longer first)
+      pills.sort((a, b) => a.startCol - b.startCol || b.spanCols - a.spanCols);
+
+      // Assign rows for overlapping pills (simple greedy algorithm)
+      const colEndRow: number[] = new Array(periodUnits.length).fill(0);
+      pills.forEach(pill => {
+        let maxRow = 0;
+        for (let c = pill.startCol; c < pill.startCol + pill.spanCols; c++) {
+          maxRow = Math.max(maxRow, colEndRow[c]);
+        }
+        pill.row = maxRow;
+        for (let c = pill.startCol; c < pill.startCol + pill.spanCols; c++) {
+          colEndRow[c] = maxRow + 1;
+        }
+      });
+
+      result.set(member.memberId, pills);
+    });
+
+    return result;
+  }, [workloadData, slotsByUser, tasks, periodUnits]);
  
    // Leaves lookup
    const leavesByUserDate = useMemo(() => {
@@ -553,29 +600,30 @@
                      {/* Task pills overlay */}
                      <div className="absolute inset-0 pointer-events-none" style={{ top: 8 }}>
                        {userPills.map((pill) => {
-                         const { task, slots, startCol, spanCols, row } = pill;
+                         const { task, slots, startCol, spanCols, row, isDateBased } = pill;
                          const statusStyle = STATUS_COLORS[task.status] || STATUS_COLORS['todo'];
                          const priority = PRIORITY_INDICATORS[task.priority] || PRIORITY_INDICATORS['medium'];
                          const isHovered = hoveredTask === task.id;
                          const isDragging = draggingTask === task.id;
-                         
-                         // Check for conflicts
+
                          const hasConflict = slots.some(s => {
                            if (!checkSlotLeaveConflict) return false;
                            const result = checkSlotLeaveConflict(member.memberId, s.date, s.half_day as 'morning' | 'afternoon');
                            return result.hasConflict;
                          });
-                         
-                         // Calculate position
+
                          const left = startCol * columnWidth + 4;
                          const width = spanCols * columnWidth - 8;
                          const top = row * (pillHeight + pillGap);
-                         
-                         // Duration in days
-                         const durationDays = Math.ceil(slots.length / 2);
-                         
+
+                         const durationDays = isDateBased
+                           ? (task.start_date && task.due_date
+                               ? Math.max(1, Math.round((parseISO(task.due_date).getTime() - parseISO(task.start_date).getTime()) / 86400000) + 1)
+                               : 1)
+                           : Math.ceil(slots.length / 2);
+
                          return (
-                           <Tooltip key={task.id}>
+                           <Tooltip key={`${task.id}-${isDateBased ? 'date' : 'slot'}`}>
                              <TooltipTrigger asChild>
                                <div
                                  draggable
@@ -595,33 +643,25 @@
                                    statusStyle.border,
                                    isHovered && "ring-2 ring-primary/30 z-20 scale-[1.02]",
                                    isDragging && "opacity-50 rotate-1 scale-105",
-                                   hasConflict && "ring-2 ring-orange-400"
+                                   hasConflict && "ring-2 ring-orange-400",
+                                   isDateBased && "border-dashed opacity-80"
                                  )}
-                                 style={{ 
-                                   left, 
+                                 style={{
+                                   left,
                                    width: Math.max(width, 80),
                                    top,
                                    height: pillHeight,
                                  }}
                                >
-                                 {/* Priority dot */}
                                  <div className={cn("w-2 h-2 rounded-full shrink-0", priority.dot)} />
-                                 
-                                 {/* Conflict icon */}
                                  {hasConflict && <AlertTriangle className="h-3.5 w-3.5 text-orange-500 shrink-0" />}
-                                 
-                                 {/* Title */}
                                  <span className="truncate flex-1 font-semibold">{task.title}</span>
-                                 
-                                 {/* Duration badge */}
                                  {durationDays >= 1 && (
                                    <Badge variant="outline" className="shrink-0 text-[10px] px-1.5 py-0 h-5 bg-background/50">
                                      <Clock className="h-3 w-3 mr-0.5" />
                                      {durationDays}j
                                    </Badge>
                                  )}
-                                 
-                                 {/* Drag handle (visible on hover) */}
                                  <GripVertical className={cn(
                                    "h-4 w-4 shrink-0 text-muted-foreground/50 transition-opacity",
                                    isHovered ? "opacity-100" : "opacity-0"
@@ -643,10 +683,21 @@
                                      {priority.label}
                                    </Badge>
                                  </div>
-                                 <div className="text-[11px] text-muted-foreground flex items-center gap-1 pt-1 border-t">
-                                   <Clock className="h-3 w-3" />
-                                   {slots.length} créneaux • {durationDays} jour{durationDays > 1 ? 's' : ''}
-                                 </div>
+                                 {isDateBased ? (
+                                   <div className="text-[11px] text-muted-foreground flex items-center gap-1 pt-1 border-t">
+                                     <Clock className="h-3 w-3" />
+                                     {task.start_date && task.due_date
+                                       ? `${format(parseISO(task.start_date), 'd MMM', { locale: fr })} → ${format(parseISO(task.due_date), 'd MMM', { locale: fr })}`
+                                       : task.due_date
+                                         ? `Échéance : ${format(parseISO(task.due_date), 'd MMM', { locale: fr })}`
+                                         : `Début : ${format(parseISO(task.start_date!), 'd MMM', { locale: fr })}`}
+                                   </div>
+                                 ) : (
+                                   <div className="text-[11px] text-muted-foreground flex items-center gap-1 pt-1 border-t">
+                                     <Clock className="h-3 w-3" />
+                                     {slots.length} créneaux • {durationDays} jour{durationDays > 1 ? 's' : ''}
+                                   </div>
+                                 )}
                                  {hasConflict && (
                                    <div className="text-orange-600 text-xs flex items-center gap-1 pt-1 border-t border-orange-200">
                                      <AlertTriangle className="h-3 w-3" />

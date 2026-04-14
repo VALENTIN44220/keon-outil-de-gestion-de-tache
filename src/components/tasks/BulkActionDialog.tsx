@@ -14,6 +14,8 @@ import { Task } from '@/types/task';
 import { useCategories } from '@/hooks/useCategories';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
+import { useSimulation } from '@/contexts/SimulationContext';
 
 interface BulkActionDialogProps {
   open: boolean;
@@ -132,6 +134,9 @@ function MultiSelectFilter({
 
 export function BulkActionDialog({ open, onOpenChange, tasks, onComplete, canReassign = false }: BulkActionDialogProps) {
   const { categories } = useCategories();
+  const { profile: authProfile } = useAuth();
+  const { getActiveProfile } = useSimulation();
+  const profile = getActiveProfile() || authProfile;
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [isProcessing, setIsProcessing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -352,17 +357,50 @@ export function BulkActionDialog({ open, onOpenChange, tasks, onComplete, canRea
         updates.it_project_id = targetItProjectId === '__remove__' ? null : targetItProjectId;
       }
 
+      const tasksById = new Map(tasks.map((t) => [t.id, t]));
+
       for (let i = 0; i < ids.length; i += 50) {
         const batch = ids.slice(i, i + 50);
-        const { error } = await supabase.from('tasks').update(updates).in('id', batch);
-        if (error) throw error;
 
-        if (targetUserId) {
-          await supabase
-            .from('tasks')
-            .update({ ...updates, status: 'todo' })
-            .in('id', batch)
-            .eq('status', 'to_assign');
+        if (targetUserId && profile?.id && updates.assignee_id) {
+          const withStakeholder = batch.filter((id) => {
+            const t = tasksById.get(id);
+            return !!t && !t.reassignment_stakeholder_id && t.assignee_id && t.assignee_id !== targetUserId;
+          });
+          const withoutStakeholder = batch.filter((id) => !withStakeholder.includes(id));
+
+          const updatesWithStakeholder = { ...updates, reassignment_stakeholder_id: profile.id };
+
+          if (withStakeholder.length > 0) {
+            const { error } = await supabase.from('tasks').update(updatesWithStakeholder).in('id', withStakeholder);
+            if (error) throw error;
+            await supabase
+              .from('tasks')
+              .update({ ...updatesWithStakeholder, status: 'todo' })
+              .in('id', withStakeholder)
+              .eq('status', 'to_assign');
+          }
+
+          if (withoutStakeholder.length > 0) {
+            const { error } = await supabase.from('tasks').update(updates).in('id', withoutStakeholder);
+            if (error) throw error;
+            await supabase
+              .from('tasks')
+              .update({ ...updates, status: 'todo' })
+              .in('id', withoutStakeholder)
+              .eq('status', 'to_assign');
+          }
+        } else {
+          const { error } = await supabase.from('tasks').update(updates).in('id', batch);
+          if (error) throw error;
+
+          if (targetUserId) {
+            await supabase
+              .from('tasks')
+              .update({ ...updates, status: 'todo' })
+              .in('id', batch)
+              .eq('status', 'to_assign');
+          }
         }
       }
 

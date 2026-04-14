@@ -8,6 +8,59 @@ import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
 import { useTeamHierarchy } from '@/hooks/useTeamHierarchy';
 import { TaskScope } from '@/hooks/useTaskScope';
 
+function sortTasksNewestFirst(tasks: Task[]): Task[] {
+  return [...tasks].sort(
+    (a, b) =>
+      new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+  );
+}
+
+function mergeTasksDedupeById(primary: Task[], extra: Task[]): Task[] {
+  // Même id dans les deux listes : fusionner (ex. ligne « équipe » chargée sans reassignment_stakeholder_id
+  // puis ligne stakeholder plus à jour, ou l’inverse).
+  const byId = new Map<string, Task>();
+  for (const t of primary) {
+    byId.set(t.id, t);
+  }
+  for (const t of extra) {
+    const existing = byId.get(t.id);
+    if (!existing) {
+      byId.set(t.id, t);
+    } else {
+      byId.set(t.id, { ...existing, ...t });
+    }
+  }
+  return sortTasksNewestFirst(Array.from(byId.values()));
+}
+
+/**
+ * Tâches où l'utilisateur suit après une réaffectation.
+ * Si la colonne n'existe pas encore (migration non appliquée), retourne [] sans casser le chargement principal.
+ */
+async function fetchTasksAsStakeholder(profileId: string): Promise<Task[]> {
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('*')
+    .eq('type', 'task')
+    .eq('reassignment_stakeholder_id', profileId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    const m = error.message?.toLowerCase() ?? '';
+    if (
+      m.includes('column') ||
+      m.includes('does not exist') ||
+      m.includes('schema cache') ||
+      error.code === '42703'
+    ) {
+      return [];
+    }
+    console.warn('fetchTasksAsStakeholder:', error);
+    return [];
+  }
+  return (data || []) as Task[];
+}
+
 export function useTasks(externalScope?: TaskScope) {
   const { user, profile: authProfile } = useAuth();
   const { isSimulating, simulatedProfile } = useSimulation();
@@ -44,6 +97,8 @@ export function useTasks(externalScope?: TaskScope) {
     if (!user || !profile || permissionsLoading) {
       if (!user) {
         setTasks([]);
+      }
+      if (!user || !profile) {
         setIsLoading(false);
       }
       return;
@@ -51,52 +106,46 @@ export function useTasks(externalScope?: TaskScope) {
 
     setIsLoading(true);
 
-    // Fetch only tasks (not requests)
+    const withStakeholder = async (primary: Task[]): Promise<Task[]> => {
+      const extra = await fetchTasksAsStakeholder(profile.id);
+      return extra.length ? mergeTasksDedupeById(primary, extra) : primary;
+    };
+
     let query = supabase
       .from('tasks')
       .select('*')
       .eq('type', 'task')
       .order('created_at', { ascending: false });
 
-    // Apply scope-based filtering
     switch (scope) {
       case 'my_tasks':
-        // Only tasks assigned to me
         query = query.eq('assignee_id', profile.id);
         break;
-        
+
       case 'department_tasks':
-        // Tasks assigned to me or my team members, OR tasks targeted to my department
+        // Uniquement les tâches dont l'exécutant est dans l'équipe (soi + hiérarchie).
+        // Les files « par service » (target_department_id) restent dans les vues « À affecter » / affectation.
         if (effectivePermissions.can_view_subordinates_tasks || effectivePermissions.can_view_all_tasks) {
           if (myTeamIds.length > 0) {
-            // Tasks assigned to team members OR targeted to my department
-            const assigneeFilter = myTeamIds.map(id => `assignee_id.eq.${id}`).join(',');
-            if (profile.department_id) {
-              query = query.or(`${assigneeFilter},target_department_id.eq.${profile.department_id}`);
-            } else {
-              query = query.or(assigneeFilter);
-            }
+            query = query.in('assignee_id', myTeamIds);
+          } else {
+            query = query.eq('assignee_id', profile.id);
           }
         } else {
-          // Fallback to just my tasks if no permission
           query = query.eq('assignee_id', profile.id);
         }
         break;
-        
+
       case 'all_tasks':
-        // All tasks - only allowed if user has can_view_all_tasks permission
         if (!effectivePermissions.can_view_all_tasks) {
-          // Fallback to department scope
           if (effectivePermissions.can_view_subordinates_tasks && myTeamIds.length > 0) {
-            const assigneeFilter = myTeamIds.map(id => `assignee_id.eq.${id}`).join(',');
-            query = query.or(assigneeFilter);
+            query = query.in('assignee_id', myTeamIds);
           } else {
             query = query.eq('assignee_id', profile.id);
           }
         }
-        // No additional filter for admins - they see everything
         break;
-        
+
       default:
         query = query.eq('assignee_id', profile.id);
     }
@@ -104,8 +153,8 @@ export function useTasks(externalScope?: TaskScope) {
     const { data, error } = await query;
 
     if (error) {
-      // Ignore abort errors (React StrictMode / fast navigation)
       if (error.message?.includes('AbortError') || error.code === '20') {
+        setIsLoading(false);
         return;
       }
       console.error('Error fetching tasks:', error);
@@ -114,9 +163,28 @@ export function useTasks(externalScope?: TaskScope) {
         description: 'Impossible de charger les tâches useTasks.ts',
         variant: 'destructive',
       });
-    } else {
-      setTasks((data || []) as Task[]);
+      setIsLoading(false);
+      return;
     }
+
+    let rows = (data || []) as Task[];
+
+    // Suivi post-réaffectation : tâches où l’utilisateur est stakeholder (ex-manager) même si l’assigné n’est plus dans son équipe.
+    if (scope === 'my_tasks') {
+      rows = await withStakeholder(rows);
+    } else if (
+      scope === 'department_tasks' &&
+      (effectivePermissions.can_view_subordinates_tasks || effectivePermissions.can_view_all_tasks)
+    ) {
+      rows = await withStakeholder(rows);
+    } else if (
+      scope === 'all_tasks' &&
+      (effectivePermissions.can_view_all_tasks || effectivePermissions.can_view_subordinates_tasks)
+    ) {
+      rows = await withStakeholder(rows);
+    }
+
+    setTasks(sortTasksNewestFirst(rows));
     setIsLoading(false);
   }, [user, profile, toast, effectivePermissions, permissionsLoading, isSimulating, scope, myTeamIds]);
 

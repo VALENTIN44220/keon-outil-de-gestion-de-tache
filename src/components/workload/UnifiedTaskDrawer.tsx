@@ -27,7 +27,11 @@ import {
    AlertDialogTitle,
    AlertDialogTrigger,
  } from '@/components/ui/alert-dialog';
- import { ReassignTaskDialog } from './ReassignTaskDialog';
+import { ReassignTaskDialog } from './ReassignTaskDialog';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { useUserRole } from '@/hooks/useUserRole';
+import { canInitiateTaskReassignment } from '@/lib/taskReassignmentPermissions';
 import {
   Calendar,
   Clock,
@@ -110,14 +114,39 @@ export function UnifiedTaskDrawer({
 }: UnifiedTaskDrawerProps) {
   const [comment, setComment] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
- const [isReassignOpen, setIsReassignOpen] = useState(false);
+  const [isReassignOpen, setIsReassignOpen] = useState(false);
+  const [assigneeManagerId, setAssigneeManagerId] = useState<string | null>(null);
+  const { profile } = useAuth();
+  const { isAdmin } = useUserRole();
+
+  const assigneeIdForManager =
+    item?.type === 'task' && item.task ? item.task.assignee_id : null;
+
+  useEffect(() => {
+    if (!assigneeIdForManager) {
+      setAssigneeManagerId(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('manager_id')
+        .eq('id', assigneeIdForManager)
+        .maybeSingle();
+      if (!cancelled) setAssigneeManagerId(data?.manager_id ?? null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [assigneeIdForManager]);
 
   // Reset comment when drawer closes
   useEffect(() => {
-   if (!isOpen) {
-     setComment('');
-     setIsReassignOpen(false);
-   }
+    if (!isOpen) {
+      setComment('');
+      setIsReassignOpen(false);
+    }
   }, [isOpen]);
 
   if (!item) return null;
@@ -216,6 +245,12 @@ export function UnifiedTaskDrawer({
     if (!item.task) return null;
     
     const task = item.task;
+    const canReassign = canInitiateTaskReassignment({
+      task,
+      profileId: profile?.id,
+      assigneeManagerId,
+      isAdmin,
+    });
     const priorityConfig = getTaskPriorityConfig();
     const statusConfig = getTaskStatusConfig();
     const dueInfo = getDueDateInfo();
@@ -295,8 +330,12 @@ export function UnifiedTaskDrawer({
               )}
             </div>
  
-         {/* Reassign button - always available for assigned tasks */}
-         {task.assignee_id && task.status !== 'validated' && task.status !== 'done' && (
+         {canReassign &&
+           task.assignee_id &&
+           task.status !== 'validated' &&
+           task.status !== 'done' &&
+           task.status !== 'cancelled' &&
+           task.status !== 'refused' && (
            <Button 
              variant="outline" 
              size="sm" 

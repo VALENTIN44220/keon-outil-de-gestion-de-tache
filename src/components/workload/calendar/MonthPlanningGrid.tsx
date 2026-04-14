@@ -77,13 +77,14 @@
    isCompact?: boolean;
  }
  
- interface DayTask {
-   task: Task;
-   slots: WorkloadSlot[];
-   userId: string;
-   userName: string;
-   userAvatar?: string;
- }
+interface DayTask {
+  task: Task;
+  slots: WorkloadSlot[];
+  userId: string;
+  userName: string;
+  userAvatar?: string;
+  isDateBased?: boolean; // task positioned via start_date/due_date, no workload_slots
+}
  
  export function MonthPlanningGrid({
    workloadData = [],
@@ -145,56 +146,86 @@
      return map;
    }, [workloadData]);
    
-   // Tasks by date (for all or selected members)
-   const tasksByDate = useMemo(() => {
-     const map = new Map<string, DayTask[]>();
-     const filterMembers = selectedMembers.size > 0 ? selectedMembers : null;
-     
-     workloadData.forEach(member => {
-       if (filterMembers && !filterMembers.has(member.memberId)) return;
-       
-       const userSlots = slotsByUser.get(member.memberId) || [];
-       const taskMap = new Map<string, { task: Task; slots: WorkloadSlot[] }>();
-       
-       userSlots.forEach(slot => {
-         if (slot.task) {
-           if (!taskMap.has(slot.task_id)) {
-             const fullTask = tasks.find(t => t.id === slot.task_id);
-             if (fullTask) {
-               taskMap.set(slot.task_id, { task: fullTask, slots: [] });
-             }
-           }
-           const entry = taskMap.get(slot.task_id);
-           if (entry) {
-             entry.slots.push(slot);
-           }
-         }
-       });
-       
-       // Add to date map
-       taskMap.forEach(({ task, slots }) => {
-         slots.forEach(slot => {
-           const dateKey = slot.date;
-           if (!map.has(dateKey)) {
-             map.set(dateKey, []);
-           }
-           // Check if this task is already added for this date
-           const existing = map.get(dateKey)!.find(dt => dt.task.id === task.id && dt.userId === member.memberId);
-           if (!existing) {
-             map.get(dateKey)!.push({
-               task,
-               slots,
-               userId: member.memberId,
-               userName: member.memberName,
-               userAvatar: member.avatarUrl,
-             });
-           }
-         });
-       });
-     });
-     
-     return map;
-   }, [workloadData, slotsByUser, tasks, selectedMembers]);
+  // Tasks by date (for all or selected members)
+  const tasksByDate = useMemo(() => {
+    const map = new Map<string, DayTask[]>();
+    const filterMembers = selectedMembers.size > 0 ? selectedMembers : null;
+    // Track (taskId_userId) pairs that already have workload slots
+    const processedSlotPairs = new Set<string>();
+
+    // First pass: slot-based tasks
+    workloadData.forEach(member => {
+      if (filterMembers && !filterMembers.has(member.memberId)) return;
+
+      const userSlots = slotsByUser.get(member.memberId) || [];
+      const taskMap = new Map<string, { task: Task; slots: WorkloadSlot[] }>();
+
+      userSlots.forEach(slot => {
+        if (slot.task) {
+          if (!taskMap.has(slot.task_id)) {
+            const fullTask = tasks.find(t => t.id === slot.task_id);
+            if (fullTask) {
+              taskMap.set(slot.task_id, { task: fullTask, slots: [] });
+            }
+          }
+          const entry = taskMap.get(slot.task_id);
+          if (entry) {
+            entry.slots.push(slot);
+          }
+        }
+      });
+
+      taskMap.forEach(({ task, slots }) => {
+        processedSlotPairs.add(`${task.id}_${member.memberId}`);
+        slots.forEach(slot => {
+          const dateKey = slot.date;
+          if (!map.has(dateKey)) map.set(dateKey, []);
+          const existing = map.get(dateKey)!.find(dt => dt.task.id === task.id && dt.userId === member.memberId);
+          if (!existing) {
+            map.get(dateKey)!.push({
+              task,
+              slots,
+              userId: member.memberId,
+              userName: member.memberName,
+              userAvatar: member.avatarUrl,
+            });
+          }
+        });
+      });
+    });
+
+    // Second pass: date-based tasks — tasks with start_date / due_date but no workload_slots
+    tasks.forEach(task => {
+      if (!task.due_date && !task.start_date) return;
+
+      const member = workloadData.find(m => m.memberId === task.assignee_id);
+      if (!member) return;
+      if (filterMembers && !filterMembers.has(member.memberId)) return;
+      if (processedSlotPairs.has(`${task.id}_${member.memberId}`)) return;
+
+      const taskStartStr = task.start_date || task.due_date!;
+      const taskEndStr = task.due_date || task.start_date!;
+
+      calendarDays.forEach(day => {
+        const dateStr = format(day, 'yyyy-MM-dd');
+        if (dateStr < taskStartStr || dateStr > taskEndStr) return;
+        if (!map.has(dateStr)) map.set(dateStr, []);
+        const existing = map.get(dateStr)!.find(dt => dt.task.id === task.id && dt.userId === member.memberId);
+        if (!existing) {
+          map.get(dateStr)!.push({
+            task,
+            slots: [],
+            userId: member.memberId,
+            userName: member.memberName,
+            userAvatar: member.avatarUrl,
+            isDateBased: true,
+          });
+        }
+      });
+    });
+
+    return map;
+  }, [workloadData, slotsByUser, tasks, selectedMembers, calendarDays]);
    
    // Leaves by user and date
    const leavesByUserDate = useMemo(() => {
@@ -469,66 +500,83 @@
                        </div>
                      </div>
                      
-                     {/* Task pills */}
-                     <div className="flex-1 px-1 pb-1 space-y-0.5 overflow-hidden">
-                       {visibleTasks.map((dayTask) => {
-                         const { task, slots, userId, userName, userAvatar } = dayTask;
-                         const statusStyle = STATUS_COLORS[task.status] || STATUS_COLORS['todo'];
-                         const priorityDot = PRIORITY_DOTS[task.priority] || PRIORITY_DOTS['medium'];
-                         const userColor = userColorMap.get(userId) || USER_COLORS[0];
-                         
-                         return (
-                           <Tooltip key={`${task.id}-${userId}`}>
-                             <TooltipTrigger asChild>
-                               <div
-                                 draggable
-                                 onDragStart={(e) => {
-                                   e.dataTransfer.setData('taskId', task.id);
-                                   e.dataTransfer.setData('duration', String(slots.length));
-                                 }}
-                                 onClick={() => onTaskClick(task, slots)}
-                                 className={cn(
-                                   "flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] cursor-pointer",
-                                   "border-l-2 transition-all hover:shadow-md hover:scale-[1.02]",
-                                   statusStyle.bg,
-                                   statusStyle.text,
-                                   statusStyle.border
-                                 )}
-                               >
-                                 {/* Priority dot */}
-                                 <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", priorityDot)} />
-                                 
-                                 {/* Title */}
-                                 <span className="truncate flex-1 font-medium">{task.title}</span>
-                                 
-                                 {/* User avatar (team view) */}
-                                 {selectedMembers.size !== 1 && (
-                                   <Avatar className={cn("h-4 w-4 shrink-0 ring-1", userColor.ring)}>
-                                     <AvatarImage src={userAvatar} />
-                                     <AvatarFallback className={cn("text-[6px] text-white", userColor.bg)}>
-                                       {getInitials(userName)}
-                                     </AvatarFallback>
-                                   </Avatar>
-                                 )}
-                               </div>
-                             </TooltipTrigger>
+                    {/* Task pills */}
+                    <div className="flex-1 px-1 pb-1 space-y-0.5 overflow-hidden">
+                      {visibleTasks.map((dayTask) => {
+                        const { task, slots, userId, userName, userAvatar, isDateBased } = dayTask;
+                        const statusStyle = STATUS_COLORS[task.status] || STATUS_COLORS['todo'];
+                        const priorityDot = PRIORITY_DOTS[task.priority] || PRIORITY_DOTS['medium'];
+                        const userColor = userColorMap.get(userId) || USER_COLORS[0];
+                        const isDeadlineDay = isDateBased && task.due_date === format(day, 'yyyy-MM-dd');
+
+                        return (
+                          <Tooltip key={`${task.id}-${userId}`}>
+                            <TooltipTrigger asChild>
+                              <div
+                                draggable
+                                onDragStart={(e) => {
+                                  e.dataTransfer.setData('taskId', task.id);
+                                  e.dataTransfer.setData('duration', String(slots.length || 2));
+                                }}
+                                onClick={() => onTaskClick(task, slots)}
+                                className={cn(
+                                  "flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] cursor-pointer",
+                                  "border-l-2 transition-all hover:shadow-md hover:scale-[1.02]",
+                                  statusStyle.bg,
+                                  statusStyle.text,
+                                  statusStyle.border,
+                                  isDateBased && "opacity-80 border-dashed"
+                                )}
+                              >
+                                {/* Priority dot */}
+                                <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", priorityDot)} />
+
+                                {/* Deadline flag on the due_date day */}
+                                {isDeadlineDay && (
+                                  <Flag className="h-2.5 w-2.5 shrink-0 text-current opacity-70" />
+                                )}
+
+                                {/* Title */}
+                                <span className="truncate flex-1 font-medium">{task.title}</span>
+
+                                {/* User avatar (team view) */}
+                                {selectedMembers.size !== 1 && (
+                                  <Avatar className={cn("h-4 w-4 shrink-0 ring-1", userColor.ring)}>
+                                    <AvatarImage src={userAvatar} />
+                                    <AvatarFallback className={cn("text-[6px] text-white", userColor.bg)}>
+                                      {getInitials(userName)}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                )}
+                              </div>
+                            </TooltipTrigger>
                              <TooltipContent side="right" className="max-w-xs p-3">
                                <div className="space-y-2">
-                                 <div className="font-bold text-sm">{task.title}</div>
-                                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                   <User className="h-3 w-3" />
-                                   {userName}
-                                 </div>
-                                 <div className="flex items-center gap-2 flex-wrap">
-                                   <Badge variant="outline" className="text-[10px]">
-                                     {getStatusLabel(task.status)}
-                                   </Badge>
-                                   <Badge className={cn("text-[10px] text-white", priorityDot)}>
-                                     <Flag className="h-3 w-3 mr-1" />
-                                     {task.priority}
-                                   </Badge>
-                                 </div>
-                               </div>
+                                <div className="font-bold text-sm">{task.title}</div>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  <User className="h-3 w-3" />
+                                  {userName}
+                                </div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <Badge variant="outline" className="text-[10px]">
+                                    {getStatusLabel(task.status)}
+                                  </Badge>
+                                  <Badge className={cn("text-[10px] text-white", priorityDot)}>
+                                    <Flag className="h-3 w-3 mr-1" />
+                                    {task.priority}
+                                  </Badge>
+                                </div>
+                                {isDateBased && (
+                                  <div className="text-[10px] text-muted-foreground pt-1 border-t flex items-center gap-1">
+                                    <Clock className="h-3 w-3" />
+                                    {task.start_date && task.due_date
+                                      ? `${format(parseISO(task.start_date), 'dd/MM', { locale: fr })} → ${format(parseISO(task.due_date), 'dd/MM', { locale: fr })}`
+                                      : task.due_date
+                                        ? `Échéance : ${format(parseISO(task.due_date), 'dd/MM', { locale: fr })}`
+                                        : `Début : ${format(parseISO(task.start_date!), 'dd/MM', { locale: fr })}`}
+                                  </div>
+                                )}
+                              </div>
                              </TooltipContent>
                            </Tooltip>
                          );
@@ -555,25 +603,26 @@
                              </div>
                              <ScrollArea className="max-h-64">
                                <div className="p-2 space-y-1">
-                                 {dayTasks.map((dayTask) => {
-                                   const { task, slots, userId, userName, userAvatar } = dayTask;
-                                   const statusStyle = STATUS_COLORS[task.status] || STATUS_COLORS['todo'];
-                                   const priorityDot = PRIORITY_DOTS[task.priority] || PRIORITY_DOTS['medium'];
-                                   const userColor = userColorMap.get(userId) || USER_COLORS[0];
-                                   
-                                   return (
-                                     <div
-                                       key={`${task.id}-${userId}`}
-                                       onClick={() => onTaskClick(task, slots)}
-                                       className={cn(
-                                         "flex items-center gap-2 p-2 rounded-lg cursor-pointer",
-                                         "border-l-2 transition-all hover:shadow-md",
-                                         statusStyle.bg,
-                                         statusStyle.text,
-                                         statusStyle.border
-                                       )}
-                                     >
-                                       <div className={cn("w-2 h-2 rounded-full shrink-0", priorityDot)} />
+                                {dayTasks.map((dayTask) => {
+                                  const { task, slots, userId, userName, userAvatar, isDateBased: isDB } = dayTask;
+                                  const statusStyle = STATUS_COLORS[task.status] || STATUS_COLORS['todo'];
+                                  const priorityDot = PRIORITY_DOTS[task.priority] || PRIORITY_DOTS['medium'];
+                                  const userColor = userColorMap.get(userId) || USER_COLORS[0];
+
+                                  return (
+                                    <div
+                                      key={`${task.id}-${userId}`}
+                                      onClick={() => onTaskClick(task, slots)}
+                                      className={cn(
+                                        "flex items-center gap-2 p-2 rounded-lg cursor-pointer",
+                                        "border-l-2 transition-all hover:shadow-md",
+                                        statusStyle.bg,
+                                        statusStyle.text,
+                                        statusStyle.border,
+                                        isDB && "border-dashed opacity-80"
+                                      )}
+                                    >
+                                      <div className={cn("w-2 h-2 rounded-full shrink-0", priorityDot)} />
                                        <div className="flex-1 min-w-0">
                                          <div className="text-xs font-medium truncate">{task.title}</div>
                                          <div className="text-[10px] text-muted-foreground flex items-center gap-1">

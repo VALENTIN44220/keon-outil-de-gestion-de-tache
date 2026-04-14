@@ -388,6 +388,7 @@ export function PlanningCalendarView({
             onTaskUpdated?.();
           }}
           onStatusChange={handleStatusChange}
+          onTaskMutated={onTaskUpdated}
         />
        </div>
      </TooltipProvider>

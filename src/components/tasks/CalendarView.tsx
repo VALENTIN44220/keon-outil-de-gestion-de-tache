@@ -227,6 +227,7 @@ export function CalendarView({ tasks, onStatusChange, onDelete, progressMap, onT
           open={!!selectedTask}
           onClose={() => setSelectedTask(null)}
           onStatusChange={onStatusChange}
+          onTaskMutated={onTaskUpdated}
         />
 
       )}

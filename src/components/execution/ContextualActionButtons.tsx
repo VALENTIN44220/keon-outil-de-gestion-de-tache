@@ -35,6 +35,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Task, TaskStatus } from '@/types/task';
+import { useSubProcessFinalRejectionPolicy } from '@/hooks/useSubProcessFinalRejectionPolicy';
+import { rejectValidationWithExecutorPolicy } from '@/services/taskStatusService';
 
 interface ContextualActionButtonsProps {
   task: Task;
@@ -58,6 +60,7 @@ export function ContextualActionButtons({
   className,
 }: ContextualActionButtonsProps) {
   const { profile: currentUser } = useAuth();
+  const returnsToExecutorOnReject = useSubProcessFinalRejectionPolicy(task.source_sub_process_template_id ?? undefined);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<{ action: string; status?: TaskStatus } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -113,31 +116,46 @@ export function ContextualActionButtons({
   const handleValidation = async (approved: boolean) => {
     if (!currentUser) return;
 
-    // Update task status based on decision
-    const newStatus: TaskStatus = approved ? 
-      (validationLevel === 1 && hasValidation ? 'pending_validation_2' : 'validated') :
-      'refused';
+    if (!approved) {
+      const level: 1 | 2 = task.status === 'pending_validation_2' ? 2 : 1;
+      const result = await rejectValidationWithExecutorPolicy(
+        task.id,
+        level,
+        currentUser.id,
+        '',
+        returnsToExecutorOnReject,
+      );
+      if (!result.success) {
+        toast.error(result.error || 'Impossible d’enregistrer le refus');
+        return;
+      }
+      if (result.newStatus) onStatusChange(task.id, result.newStatus);
+      toast.success(returnsToExecutorOnReject ? 'Tâche renvoyée pour correction' : 'Tâche non validée (refus enregistré)');
+      return;
+    }
+
+    const newStatus: TaskStatus =
+      validationLevel === 1 && hasValidation ? 'pending_validation_2' : 'validated';
 
     await supabase
       .from('tasks')
       .update({ status: newStatus, updated_at: new Date().toISOString() })
       .eq('id', task.id);
 
-    // Emit validation event
     await supabase.from('workflow_events').insert({
       event_type: 'validation_decided',
       entity_type: 'validation',
       entity_id: task.id,
       triggered_by: currentUser.id,
       payload: {
-        decision: approved ? 'approved' : 'rejected',
+        decision: 'approved',
         level: validationLevel,
         task_title: task.title,
       },
     });
 
     onStatusChange(task.id, newStatus);
-    toast.success(approved ? 'Validation approuvée' : 'Validation refusée');
+    toast.success('Validation approuvée');
   };
 
   const confirmAction = (action: string, status?: TaskStatus) => {
@@ -161,8 +179,10 @@ export function ContextualActionButtons({
         };
       case 'reject':
         return {
-          title: 'Refuser la validation ?',
-          description: 'La tâche sera renvoyée pour correction. Un commentaire explicatif est recommandé.',
+          title: task.source_sub_process_template_id ? 'Tâche non validée ?' : 'Refuser la validation ?',
+          description: returnsToExecutorOnReject
+            ? 'L’assigné pourra corriger et soumettre à nouveau pour validation.'
+            : 'Le refus sera enregistré sans retour automatique vers l’exécution (selon la config du sous-processus).',
         };
       case 'start':
         return {
@@ -199,7 +219,7 @@ export function ContextualActionButtons({
             onClick={() => confirmAction('reject')}
           >
             <ThumbsDown className="h-4 w-4 mr-2" />
-            Refuser
+            {task.source_sub_process_template_id ? 'Tâche non validée' : 'Refuser'}
           </Button>
         </div>
       );

@@ -63,13 +63,14 @@
    isCompact?: boolean;
  }
  
- interface MemberTaskBar {
-   task: Task;
-   slots: WorkloadSlot[];
-   startWeekIdx: number;
-   endWeekIdx: number;
-   spanWeeks: number;
- }
+interface MemberTaskBar {
+  task: Task;
+  slots: WorkloadSlot[];
+  startWeekIdx: number;
+  endWeekIdx: number;
+  spanWeeks: number;
+  isDateBased?: boolean;
+}
  
  const WEEK_WIDTH = 90;
  const MEMBER_COL_WIDTH = 220;
@@ -218,13 +219,64 @@
          });
        });
        
-       // Sort by start week
-       bars.sort((a, b) => a.startWeekIdx - b.startWeekIdx);
-       map.set(member.memberId, bars);
-     });
-     
-     return map;
-   }, [workloadData, slotsByUser, tasks, weeks]);
+      // Second pass: date-based tasks (have start_date/due_date but no workload_slots)
+      const slotTaskIds = new Set(taskMap.keys());
+      tasks.forEach(task => {
+        if (!task.due_date && !task.start_date) return;
+        if (task.assignee_id !== member.memberId) return;
+        if (slotTaskIds.has(task.id)) return;
+
+        const taskStartStr = task.start_date || task.due_date!;
+        const taskEndStr = task.due_date || task.start_date!;
+
+        let startWeekIdx = -1;
+        let endWeekIdx = -1;
+
+        try {
+          const minDate = parseISO(taskStartStr);
+          const maxDate = parseISO(taskEndStr);
+
+          weeks.forEach((week, idx) => {
+            const weekInterval = { start: week.start, end: week.end };
+            if (isWithinInterval(minDate, weekInterval) && startWeekIdx === -1) {
+              startWeekIdx = idx;
+            }
+            if (isWithinInterval(maxDate, weekInterval)) {
+              endWeekIdx = idx;
+            }
+          });
+
+          // Clamp: task may span outside visible quarter
+          if (startWeekIdx === -1 && endWeekIdx === -1) {
+            if (minDate <= weeks[weeks.length - 1]?.end && maxDate >= weeks[0]?.start) {
+              startWeekIdx = 0;
+              endWeekIdx = weeks.length - 1;
+            }
+          }
+          if (startWeekIdx === -1 && endWeekIdx !== -1) startWeekIdx = 0;
+          if (endWeekIdx === -1 && startWeekIdx !== -1) endWeekIdx = weeks.length - 1;
+          if (endWeekIdx < startWeekIdx) endWeekIdx = startWeekIdx;
+        } catch { return; }
+
+        if (startWeekIdx === -1) return;
+
+        bars.push({
+          task,
+          slots: [],
+          startWeekIdx,
+          endWeekIdx,
+          spanWeeks: endWeekIdx - startWeekIdx + 1,
+          isDateBased: true,
+        });
+      });
+
+      // Sort by start week
+      bars.sort((a, b) => a.startWeekIdx - b.startWeekIdx);
+      map.set(member.memberId, bars);
+    });
+
+    return map;
+  }, [workloadData, slotsByUser, tasks, weeks]);
    
    // Leaves by user and week
    const leavesByUserWeek = useMemo(() => {
@@ -473,68 +525,79 @@
                      );
                    })}
                    
-                   {/* Task bars overlay */}
-                   {memberBars.map((bar) => {
-                     const statusStyle = STATUS_COLORS[bar.task.status] || STATUS_COLORS['todo'];
-                     const priorityColor = PRIORITY_COLORS[bar.task.priority] || PRIORITY_COLORS['medium'];
-                     const left = bar.startWeekIdx * WEEK_WIDTH + 4;
-                     const width = bar.spanWeeks * WEEK_WIDTH - 8;
-                     
-                     return (
-                       <Tooltip key={bar.task.id}>
-                         <TooltipTrigger asChild>
-                           <div
-                             draggable
-                             onDragStart={(e) => {
-                               e.dataTransfer.setData('taskId', bar.task.id);
-                               e.dataTransfer.setData('duration', String(bar.slots.length));
-                             }}
-                             onClick={() => onTaskClick(bar.task, bar.slots)}
-                             className={cn(
-                               "absolute top-2 flex items-center gap-1.5 px-2 rounded-md cursor-pointer",
-                               "border shadow-sm transition-all hover:shadow-md hover:scale-[1.02]",
-                               statusStyle.bg,
-                               statusStyle.text,
-                               statusStyle.border
-                             )}
-                             style={{
-                               left,
-                               width: Math.max(width, 60),
-                               height: isCompact ? 28 : 32,
-                             }}
-                           >
-                             <GripVertical className="h-3 w-3 shrink-0 opacity-40 cursor-grab" />
-                             <div className={cn("w-2 h-2 rounded-full shrink-0", priorityColor)} />
-                             <span className="text-[11px] font-medium truncate flex-1">
-                               {bar.task.title}
-                             </span>
-                             {bar.spanWeeks > 1 && (
-                               <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 shrink-0">
-                                 {bar.spanWeeks}s
-                               </Badge>
-                             )}
-                           </div>
-                         </TooltipTrigger>
-                         <TooltipContent side="top" className="max-w-xs p-3">
-                           <div className="space-y-2">
-                             <div className="font-bold">{bar.task.title}</div>
-                             <div className="flex items-center gap-2 flex-wrap">
-                               <Badge variant="outline" className="text-[10px]">
-                                 {getStatusLabel(bar.task.status)}
-                               </Badge>
-                               <Badge className={cn("text-[10px] text-white", priorityColor)}>
-                                 <Flag className="h-3 w-3 mr-1" />
-                                 {bar.task.priority}
-                               </Badge>
-                             </div>
-                             <div className="text-xs text-muted-foreground">
-                               {bar.slots.length} créneau{bar.slots.length > 1 ? 'x' : ''} sur {bar.spanWeeks} semaine{bar.spanWeeks > 1 ? 's' : ''}
-                             </div>
-                           </div>
-                         </TooltipContent>
-                       </Tooltip>
-                     );
-                   })}
+                  {/* Task bars overlay */}
+                  {memberBars.map((bar) => {
+                    const statusStyle = STATUS_COLORS[bar.task.status] || STATUS_COLORS['todo'];
+                    const priorityColor = PRIORITY_COLORS[bar.task.priority] || PRIORITY_COLORS['medium'];
+                    const left = bar.startWeekIdx * WEEK_WIDTH + 4;
+                    const width = bar.spanWeeks * WEEK_WIDTH - 8;
+
+                    return (
+                      <Tooltip key={`${bar.task.id}-${bar.isDateBased ? 'date' : 'slot'}`}>
+                        <TooltipTrigger asChild>
+                          <div
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData('taskId', bar.task.id);
+                              e.dataTransfer.setData('duration', String(bar.slots.length || 2));
+                            }}
+                            onClick={() => onTaskClick(bar.task, bar.slots)}
+                            className={cn(
+                              "absolute top-2 flex items-center gap-1.5 px-2 rounded-md cursor-pointer",
+                              "border shadow-sm transition-all hover:shadow-md hover:scale-[1.02]",
+                              statusStyle.bg,
+                              statusStyle.text,
+                              statusStyle.border,
+                              bar.isDateBased && "border-dashed opacity-80"
+                            )}
+                            style={{
+                              left,
+                              width: Math.max(width, 60),
+                              height: isCompact ? 28 : 32,
+                            }}
+                          >
+                            <GripVertical className="h-3 w-3 shrink-0 opacity-40 cursor-grab" />
+                            <div className={cn("w-2 h-2 rounded-full shrink-0", priorityColor)} />
+                            <span className="text-[11px] font-medium truncate flex-1">
+                              {bar.task.title}
+                            </span>
+                            {bar.spanWeeks > 1 && (
+                              <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 shrink-0">
+                                {bar.spanWeeks}s
+                              </Badge>
+                            )}
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs p-3">
+                          <div className="space-y-2">
+                            <div className="font-bold">{bar.task.title}</div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Badge variant="outline" className="text-[10px]">
+                                {getStatusLabel(bar.task.status)}
+                              </Badge>
+                              <Badge className={cn("text-[10px] text-white", priorityColor)}>
+                                <Flag className="h-3 w-3 mr-1" />
+                                {bar.task.priority}
+                              </Badge>
+                            </div>
+                            {bar.isDateBased ? (
+                              <div className="text-xs text-muted-foreground">
+                                {bar.task.start_date && bar.task.due_date
+                                  ? `${format(parseISO(bar.task.start_date), 'd MMM', { locale: fr })} → ${format(parseISO(bar.task.due_date), 'd MMM', { locale: fr })}`
+                                  : bar.task.due_date
+                                    ? `Échéance : ${format(parseISO(bar.task.due_date), 'd MMM', { locale: fr })}`
+                                    : `Début : ${format(parseISO(bar.task.start_date!), 'd MMM', { locale: fr })}`}
+                              </div>
+                            ) : (
+                              <div className="text-xs text-muted-foreground">
+                                {bar.slots.length} créneau{bar.slots.length > 1 ? 'x' : ''} sur {bar.spanWeeks} semaine{bar.spanWeeks > 1 ? 's' : ''}
+                              </div>
+                            )}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  })}
                  </div>
                </div>
              );

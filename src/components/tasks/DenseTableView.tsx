@@ -13,6 +13,7 @@ import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { useTableSort, SortDirection } from '@/hooks/useTableSort';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { formatTaskCalendarDate } from '@/lib/formatTaskDate';
 import { supabase } from '@/integrations/supabase/client';
 import { TaskDetailDialog } from './TaskDetailDialog';
 import { cn } from '@/lib/utils';
@@ -255,7 +256,11 @@ export function DenseTableView({ tasks, onStatusChange, onDelete, progressMap, o
         );
       }
       case 'due_date':
-        return task.due_date ? <span className="text-xs">{format(new Date(task.due_date), 'dd/MM/yyyy', { locale: fr })}</span> : <span className="text-xs text-muted-foreground">—</span>;
+        return task.due_date ? (
+          <span className="text-xs">{formatTaskCalendarDate(task.due_date, 'dd/MM/yyyy')}</span>
+        ) : (
+          <span className="text-xs text-muted-foreground">—</span>
+        );
       case 'progress': {
         const p = progressMap?.[task.id];
         if (!p) return <span className="text-xs text-muted-foreground">—</span>;
@@ -372,6 +377,7 @@ export function DenseTableView({ tasks, onStatusChange, onDelete, progressMap, o
           open={!!selectedTask}
           onClose={() => setSelectedTask(null)}
           onStatusChange={onStatusChange}
+          onTaskMutated={onTaskUpdated}
         />
       )}
     </>

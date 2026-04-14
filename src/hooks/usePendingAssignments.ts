@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSimulation } from '@/contexts/SimulationContext';
+import { reassignmentStakeholderPatchForActingProfile } from '@/lib/reassignmentStakeholderUpdate';
 import { useToast } from '@/hooks/use-toast';
 import { Task } from '@/types/task';
 
@@ -42,7 +44,9 @@ interface UsePendingAssignmentsResult {
 }
 
 export function usePendingAssignments(): UsePendingAssignmentsResult {
-  const { user, profile } = useAuth();
+  const { user, profile: authProfile } = useAuth();
+  const { getActiveProfile } = useSimulation();
+  const profile = getActiveProfile() || authProfile;
   const { toast } = useToast();
   const [tasksToAssign, setTasksToAssign] = useState<TaskToAssign[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -140,14 +144,39 @@ export function usePendingAssignments(): UsePendingAssignmentsResult {
 
   const assignTask = async (taskId: string, assigneeId: string) => {
     try {
-      // Update the task: change assignee and status to 'todo'
-      const { error } = await supabase
+      const { data: row, error: fetchErr } = await supabase
         .from('tasks')
-        .update({
-          assignee_id: assigneeId,
-          status: 'todo',
-        })
-        .eq('id', taskId);
+        .select('assignee_id, reassignment_stakeholder_id, requester_id, parent_request_id')
+        .eq('id', taskId)
+        .maybeSingle();
+      if (fetchErr) throw fetchErr;
+
+      const updates: Record<string, string | null> = {
+        assignee_id: assigneeId,
+        status: 'todo',
+      };
+
+      if (!row?.requester_id && row?.parent_request_id) {
+        const { data: parentReq } = await supabase
+          .from('tasks')
+          .select('requester_id')
+          .eq('id', row.parent_request_id)
+          .maybeSingle();
+        if (parentReq?.requester_id) {
+          updates.requester_id = parentReq.requester_id;
+        }
+      }
+      Object.assign(
+        updates,
+        reassignmentStakeholderPatchForActingProfile(
+          profile?.id,
+          row?.assignee_id ?? null,
+          assigneeId,
+          row?.reassignment_stakeholder_id ?? null
+        )
+      );
+
+      const { error } = await supabase.from('tasks').update(updates).eq('id', taskId);
 
       if (error) throw error;
 
