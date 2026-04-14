@@ -1,4 +1,5 @@
 -- Demande de nouveau fournisseur : lignes en attente d'approbation (miroir supplier_purchase_enrichment + line_index + pays).
+-- Version 20260417120001 : séparée de 20260417120000 car schema_migrations.version = timestamp seul (unicité).
 -- line_index: UUID unique par soumission (généré côté client), stable pour filtrer / supprimer des lots.
 
 CREATE TABLE IF NOT EXISTS public.supplier_waiting_approval (
@@ -72,7 +73,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
-CREATE TRIGGER trg_supplier_waiting_tiers_unique
+-- OR REPLACE : idempotent si la migration est rejouée (PG 14+).
+CREATE OR REPLACE TRIGGER trg_supplier_waiting_tiers_unique
   BEFORE INSERT OR UPDATE OF tiers ON public.supplier_waiting_approval
   FOR EACH ROW
   EXECUTE FUNCTION public.enforce_waiting_tiers_vs_enrichment();
@@ -92,33 +94,37 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
-CREATE TRIGGER trg_enrichment_tiers_vs_waiting
+CREATE OR REPLACE TRIGGER trg_enrichment_tiers_vs_waiting
   BEFORE INSERT OR UPDATE OF tiers ON public.supplier_purchase_enrichment
   FOR EACH ROW
   EXECUTE FUNCTION public.enforce_enrichment_tiers_vs_waiting();
 
-CREATE TRIGGER trg_supplier_waiting_approval_updated_at
+CREATE OR REPLACE TRIGGER trg_supplier_waiting_approval_updated_at
   BEFORE UPDATE ON public.supplier_waiting_approval
   FOR EACH ROW
   EXECUTE FUNCTION public.update_supplier_enrichment_updated_at();
 
 ALTER TABLE public.supplier_waiting_approval ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Achat and Compta can read supplier waiting approval" ON public.supplier_waiting_approval;
 CREATE POLICY "Achat and Compta can read supplier waiting approval"
   ON public.supplier_waiting_approval
   FOR SELECT
   USING (public.has_supplier_access());
 
+DROP POLICY IF EXISTS "Achat and Compta can insert supplier waiting approval" ON public.supplier_waiting_approval;
 CREATE POLICY "Achat and Compta can insert supplier waiting approval"
   ON public.supplier_waiting_approval
   FOR INSERT
   WITH CHECK (public.has_supplier_access());
 
+DROP POLICY IF EXISTS "Achat and Compta can update supplier waiting approval" ON public.supplier_waiting_approval;
 CREATE POLICY "Achat and Compta can update supplier waiting approval"
   ON public.supplier_waiting_approval
   FOR UPDATE
   USING (public.has_supplier_access());
 
+DROP POLICY IF EXISTS "Achat and Compta can delete supplier waiting approval" ON public.supplier_waiting_approval;
 CREATE POLICY "Achat and Compta can delete supplier waiting approval"
   ON public.supplier_waiting_approval
   FOR DELETE
@@ -141,16 +147,19 @@ CREATE INDEX IF NOT EXISTS idx_supplier_waiting_att_waiting ON public.supplier_w
 
 ALTER TABLE public.supplier_waiting_approval_attachments ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "supplier waiting attachments select" ON public.supplier_waiting_approval_attachments;
 CREATE POLICY "supplier waiting attachments select"
   ON public.supplier_waiting_approval_attachments
   FOR SELECT
   USING (public.has_supplier_access());
 
+DROP POLICY IF EXISTS "supplier waiting attachments insert" ON public.supplier_waiting_approval_attachments;
 CREATE POLICY "supplier waiting attachments insert"
   ON public.supplier_waiting_approval_attachments
   FOR INSERT
   WITH CHECK (public.has_supplier_access());
 
+DROP POLICY IF EXISTS "supplier waiting attachments delete" ON public.supplier_waiting_approval_attachments;
 CREATE POLICY "supplier waiting attachments delete"
   ON public.supplier_waiting_approval_attachments
   FOR DELETE
@@ -160,14 +169,17 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('supplier-waiting-attachments', 'supplier-waiting-attachments', false)
 ON CONFLICT (id) DO NOTHING;
 
+DROP POLICY IF EXISTS "Authenticated can upload supplier waiting attachments" ON storage.objects;
 CREATE POLICY "Authenticated can upload supplier waiting attachments"
   ON storage.objects FOR INSERT TO authenticated
   WITH CHECK (bucket_id = 'supplier-waiting-attachments');
 
+DROP POLICY IF EXISTS "Authenticated can read supplier waiting attachments" ON storage.objects;
 CREATE POLICY "Authenticated can read supplier waiting attachments"
   ON storage.objects FOR SELECT TO authenticated
   USING (bucket_id = 'supplier-waiting-attachments');
 
+DROP POLICY IF EXISTS "Authenticated can delete supplier waiting attachments" ON storage.objects;
 CREATE POLICY "Authenticated can delete supplier waiting attachments"
   ON storage.objects FOR DELETE TO authenticated
   USING (bucket_id = 'supplier-waiting-attachments');
