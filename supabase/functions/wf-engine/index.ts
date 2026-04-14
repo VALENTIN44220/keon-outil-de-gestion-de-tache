@@ -205,6 +205,10 @@ async function fireEvent(supabase: any, body: any, actorId: string | null) {
 
   await logEvent(supabase, instance_id, workflowId, nextStep.step_key, "step_entered", actorId, {});
 
+  if (event === "rejected" && currentStep.step_type === "validation" && nextStep.step_type === "execution") {
+    await reopenSubProcessTasksAfterFinalRejection(supabase, instance, workflowId);
+  }
+
   // If next step is validation, notify
   if (nextStep.step_type === "validation") {
     await logEvent(supabase, instance_id, workflowId, nextStep.step_key, "validation_pending", actorId, {
@@ -516,6 +520,54 @@ async function resolveAssignmentRule(supabase: any, rule: any, instance: any): P
 }
 
 // ===================== HELPERS =====================
+/** Remet les tâches liées au sous-processus en « in-progress » après refus de validation finale (retour exécuteur). */
+async function reopenSubProcessTasksAfterFinalRejection(supabase: any, instance: any, workflowId: string) {
+  try {
+    const { data: wf } = await supabase
+      .from("wf_workflows")
+      .select("sub_process_template_id, standard_options")
+      .eq("id", workflowId)
+      .maybeSingle();
+
+    const opts = (wf?.standard_options || {}) as Record<string, unknown>;
+    if (opts.final_rejection_returns_to_executor === false) return;
+
+    const spId = wf?.sub_process_template_id as string | undefined;
+    if (!spId || !instance.demand_id) return;
+
+    const statuses = ["done", "validated", "pending_validation_1", "pending_validation_2"];
+    const { data: byParent } = await supabase
+      .from("tasks")
+      .select("id")
+      .eq("parent_request_id", instance.demand_id)
+      .eq("source_sub_process_template_id", spId)
+      .eq("type", "task")
+      .in("status", statuses);
+
+    let ids = (byParent || []).map((r: { id: string }) => r.id);
+    if (ids.length === 0) {
+      const { data: self } = await supabase
+        .from("tasks")
+        .select("id")
+        .eq("id", instance.demand_id)
+        .eq("source_sub_process_template_id", spId)
+        .in("status", statuses)
+        .maybeSingle();
+      if (self?.id) ids = [self.id];
+    }
+
+    if (ids.length === 0) return;
+
+    const now = new Date().toISOString();
+    await supabase
+      .from("tasks")
+      .update({ status: "in-progress", is_locked_for_validation: false, updated_at: now })
+      .in("id", ids);
+  } catch (e) {
+    console.warn("reopenSubProcessTasksAfterFinalRejection:", e);
+  }
+}
+
 async function getNextStep(supabase: any, workflowId: string, fromStepKey: string, event: string, steps: any[]) {
   const { data: transitions } = await supabase
     .from("wf_transitions")
