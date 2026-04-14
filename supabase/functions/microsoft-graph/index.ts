@@ -357,7 +357,21 @@ async function getPlannerTasks(accessToken: string, planId: string): Promise<any
     const resp: Response = await fetch(url, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
-    if (!resp.ok) throw new Error(`Failed to fetch planner tasks: ${resp.status}`);
+
+    if (!resp.ok) {
+      if (resp.status === 429) {
+        const retryAfter = resp.headers.get('Retry-After');
+        const waitSec = retryAfter ? parseInt(retryAfter, 10) : 60;
+        throw new Error(
+          `L'API Microsoft Planner est temporairement surchargée (429). Veuillez réessayer dans ${waitSec} secondes.`
+        );
+      }
+      if (resp.status === 401) throw new Error('Token Microsoft expiré ou invalide (401). Reconnectez votre compte Microsoft.');
+      if (resp.status === 403) throw new Error("Accès refusé au plan Planner (403). Vérifiez vos permissions.");
+      if (resp.status === 404) throw new Error("Plan Planner introuvable (404). Le plan a peut-être été supprimé.");
+      throw new Error(`Erreur API Planner: ${resp.status}`);
+    }
+
     const data: any = await resp.json();
     allTasks.push(...(data.value || []));
     url = data['@odata.nextLink'] || null;
@@ -370,24 +384,30 @@ async function getPlannerTasks(accessToken: string, planId: string): Promise<any
 async function resolveGraphUsers(accessToken: string, userIds: string[]): Promise<Map<string, { displayName: string; email: string }>> {
   const results = new Map<string, { displayName: string; email: string }>();
   const uniqueIds = [...new Set(userIds)];
-  
-  for (const uid of uniqueIds) {
-    try {
-      const resp = await fetch(`${MICROSOFT_GRAPH_URL}/users/${uid}?$select=displayName,mail,userPrincipalName`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      if (resp.ok) {
-        const user = await resp.json();
-        results.set(uid, {
-          displayName: user.displayName || '',
-          email: (user.mail || user.userPrincipalName || '').toLowerCase(),
+
+  // Resolve users in parallel batches of 5 to avoid serial API calls while
+  // staying well within Graph's per-user throttle limits.
+  const BATCH = 5;
+  for (let i = 0; i < uniqueIds.length; i += BATCH) {
+    const chunk = uniqueIds.slice(i, i + BATCH);
+    await Promise.all(chunk.map(async (uid) => {
+      try {
+        const resp = await fetch(`${MICROSOFT_GRAPH_URL}/users/${uid}?$select=displayName,mail,userPrincipalName`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
         });
+        if (resp.ok) {
+          const user = await resp.json();
+          results.set(uid, {
+            displayName: user.displayName || '',
+            email: (user.mail || user.userPrincipalName || '').toLowerCase(),
+          });
+        }
+      } catch (e) {
+        console.error(`Failed to resolve user ${uid}:`, e);
       }
-    } catch (e) {
-      console.error(`Failed to resolve user ${uid}:`, e);
-    }
+    }));
   }
-  
+
   return results;
 }
 
@@ -440,6 +460,45 @@ async function matchEmailToProfile(supabase: any, email: string): Promise<string
   }
 
   return null;
+}
+
+/** Normalized email aliases for a profile (Microsoft connection, profile fields, auth email). */
+async function collectProfileEmailAliases(supabase: any, profileId: string): Promise<Set<string>> {
+  const out = new Set<string>();
+  const push = (e: string | null | undefined) => {
+    const v = (e || '').trim().toLowerCase();
+    if (v) out.add(v);
+  };
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('lovable_email, secondary_email, user_id')
+    .eq('id', profileId)
+    .maybeSingle();
+
+  if (!profile) return out;
+
+  push(profile.lovable_email);
+  push(profile.secondary_email);
+
+  const { data: msRows } = await supabase
+    .from('user_microsoft_connections')
+    .select('email')
+    .eq('profile_id', profileId);
+  for (const row of msRows || []) {
+    push(row?.email);
+  }
+
+  if (profile.user_id) {
+    try {
+      const { data: userData, error: authErr } = await supabase.auth.admin.getUserById(profile.user_id);
+      if (!authErr) push(userData?.user?.email);
+    } catch {
+      // ignore
+    }
+  }
+
+  return out;
 }
 
 // Get task details (description, checklist)
@@ -648,19 +707,27 @@ Deno.serve(async (req) => {
         .eq('user_id', userId)
         .single();
 
+      // Only include refresh_token in the payload when a non-null value is available.
+      // Omitting it from the upsert preserves any previously stored refresh_token so
+      // that a subsequent page-load (where provider_refresh_token is absent) does not
+      // silently wipe the only token we have for background renewal.
+      const connectionPayload: Record<string, unknown> = {
+        user_id: userId,
+        profile_id: userProfile?.id,
+        access_token,
+        token_expires_at: expiresAt,
+        email: profile.mail || profile.userPrincipalName,
+        display_name: profile.displayName,
+        is_calendar_sync_enabled: true,
+        is_email_sync_enabled: true,
+      };
+      if (refresh_token) {
+        connectionPayload.refresh_token = refresh_token;
+      }
+
       const { error } = await supabase
         .from('user_microsoft_connections')
-        .upsert({
-          user_id: userId,
-          profile_id: userProfile?.id,
-          access_token,
-          refresh_token: refresh_token ?? null,
-          token_expires_at: expiresAt,
-          email: profile.mail || profile.userPrincipalName,
-          display_name: profile.displayName,
-          is_calendar_sync_enabled: true,
-          is_email_sync_enabled: true,
-        }, { onConflict: 'user_id' });
+        .upsert(connectionPayload, { onConflict: 'user_id' });
 
       if (error) throw error;
 
@@ -875,6 +942,7 @@ Deno.serve(async (req) => {
       }
 
       const plannerTasks: any[] = await getPlannerTasks(accessToken, mapping.planner_plan_id);
+      console.log(`planner-sync: fetched ${plannerTasks.length} tasks from plan ${mapping.planner_plan_id}`);
 
       // Get bucket mappings for subcategory resolution
       const { data: bucketMappings } = await supabase
@@ -883,8 +951,10 @@ Deno.serve(async (req) => {
         .eq('plan_mapping_id', planMappingId);
       const bucketToSubcategory = new Map((bucketMappings || []).map(bm => [bm.planner_bucket_id, bm.mapped_subcategory_id]));
 
-      // Import state filter
-      const importStates: string[] = mapping.import_states || ['notStarted', 'inProgress', 'completed'];
+      // Import state filter (DB default includes completed; JS must not treat [] as "use default")
+      const importStates: string[] = Array.isArray(mapping.import_states) && mapping.import_states.length > 0
+        ? mapping.import_states
+        : ['notStarted', 'inProgress', 'completed'];
 
       // Map Planner percentComplete to state string for filtering
       function getPlannerState(percent: number): string {
@@ -893,14 +963,30 @@ Deno.serve(async (req) => {
         return 'notStarted';
       }
 
-      // Get existing links
+      // Get existing links for THIS mapping (used for UPDATE loop + local task prefetch)
       const { data: existingLinks } = await supabase
         .from('planner_task_links')
         .select('*')
         .eq('plan_mapping_id', planMappingId);
 
-      const linkedPlannerIds = new Set((existingLinks || []).map(l => l.planner_task_id));
+      // Dedup: planner_task_ids already linked under THIS user's mappings.
+      // Scoped to the current user so that different users can each import tasks
+      // from the same shared Planner plan into their own local task set.
+      const { data: allUserMappings } = await supabase
+        .from('planner_plan_mappings')
+        .select('id')
+        .eq('user_id', userId);
+      const allUserMappingIds = (allUserMappings || []).map((m: any) => m.id);
+
+      const { data: allPlannerLinks } = await supabase
+        .from('planner_task_links')
+        .select('planner_task_id')
+        .in('plan_mapping_id', allUserMappingIds.length > 0 ? allUserMappingIds : ['__none__']);
+
+      const linkedPlannerIds = new Set((allPlannerLinks || []).map(l => l.planner_task_id));
       const linkedLocalIds = new Set((existingLinks || []).map(l => l.local_task_id));
+
+      console.log(`planner-sync: ${linkedPlannerIds.size} tasks already linked (user scope), ${existingLinks?.length || 0} links for this mapping`);
 
       // Prefetch all linked local tasks once to avoid N+1 queries
       const localTaskIds = [...new Set((existingLinks || []).map(l => l.local_task_id).filter(Boolean))];
@@ -932,12 +1018,27 @@ Deno.serve(async (req) => {
         .eq('user_id', userId)
         .single();
 
-      // Resolve Planner assignees if enabled
+      // When default requester is set, optionally restrict NEW imports to Planner tasks where at least
+      // one Graph assignee email matches that profile's known emails (avoids bulk-importing legacy plans).
+      let defaultRequesterEmails: Set<string> | null = null;
+      if (mapping.default_requester_id) {
+        const aliases = await collectProfileEmailAliases(supabase, mapping.default_requester_id);
+        if (aliases.size > 0) {
+          defaultRequesterEmails = aliases;
+        } else {
+          console.warn(
+            'planner-sync: default_requester_id is set but no email aliases resolved; import assignee filter disabled',
+          );
+        }
+      }
+
+      // Resolve Planner assignees if enabled, or when we need Graph emails for default-requester import filter
       const resolveAssignees = mapping.resolve_assignees !== false;
       const graphUserCache = new Map<string, { displayName: string; email: string }>();
       const profileCache = new Map<string, string | null>(); // email -> profile_id
 
-      if (resolveAssignees) {
+      const needGraphAssigneeEmails = !!(defaultRequesterEmails && defaultRequesterEmails.size > 0);
+      if (resolveAssignees || needGraphAssigneeEmails) {
         // Collect all unique assignee IDs from planner tasks
         const allAssigneeIds: string[] = [];
         for (const pt of plannerTasks) {
@@ -945,14 +1046,17 @@ Deno.serve(async (req) => {
             allAssigneeIds.push(...Object.keys(pt.assignments));
           }
         }
-        
+
         if (allAssigneeIds.length > 0) {
           const resolved = await resolveGraphUsers(accessToken, allAssigneeIds);
           resolved.forEach((v, k) => graphUserCache.set(k, v));
         }
       }
 
-      // Helper to get local profile_id from a Planner assignee
+      // Helper to get local profile_id from Planner assignees.
+      // Iterates ALL assignees (not just the first) and returns the first one
+      // that resolves to a local profile. If none resolve, returns null profileId
+      // with the first assignee's info for traceability.
       async function resolveAssigneeToProfile(plannerTask: any): Promise<{ profileId: string | null; email: string; displayName: string }> {
         if (!resolveAssignees || !plannerTask.assignments) {
           return { profileId: null, email: '', displayName: '' };
@@ -961,32 +1065,72 @@ Deno.serve(async (req) => {
         const assigneeIds = Object.keys(plannerTask.assignments);
         if (assigneeIds.length === 0) return { profileId: null, email: '', displayName: '' };
         
-        // Take the first assignee
-        const graphUserId = assigneeIds[0];
-        const graphUser = graphUserCache.get(graphUserId);
-        if (!graphUser) return { profileId: null, email: '', displayName: '' };
-        
-        // Check cache
-        if (!profileCache.has(graphUser.email)) {
-          const pid = await matchEmailToProfile(supabase, graphUser.email);
-          profileCache.set(graphUser.email, pid);
+        let firstEmail = '';
+        let firstDisplayName = '';
+
+        for (const graphUserId of assigneeIds) {
+          const graphUser = graphUserCache.get(graphUserId);
+          if (!graphUser) continue;
+
+          if (!firstEmail) {
+            firstEmail = graphUser.email;
+            firstDisplayName = graphUser.displayName;
+          }
+
+          if (!profileCache.has(graphUser.email)) {
+            const pid = await matchEmailToProfile(supabase, graphUser.email);
+            profileCache.set(graphUser.email, pid);
+          }
+
+          const resolvedId = profileCache.get(graphUser.email);
+          if (resolvedId) {
+            return {
+              profileId: resolvedId,
+              email: graphUser.email,
+              displayName: graphUser.displayName,
+            };
+          }
         }
-        
+
         return {
-          profileId: profileCache.get(graphUser.email) || null,
-          email: graphUser.email,
-          displayName: graphUser.displayName,
+          profileId: null,
+          email: firstEmail,
+          displayName: firstDisplayName,
         };
       }
 
       // PULL: Import new planner tasks
       if (mapping.sync_direction === 'from_planner' || mapping.sync_direction === 'both') {
+        let skippedAlreadyLinked = 0;
+        let skippedByState = 0;
+        let skippedByDefaultRequesterAssignee = 0;
+
         for (const pt of plannerTasks) {
-          if (linkedPlannerIds.has(pt.id)) continue;
+          if (linkedPlannerIds.has(pt.id)) { skippedAlreadyLinked++; continue; }
 
           // Filter by state
           const taskState = getPlannerState(pt.percentComplete || 0);
-          if (!importStates.includes(taskState)) continue;
+          if (!importStates.includes(taskState)) { skippedByState++; continue; }
+
+          // Optional: only import tasks assigned in Planner to someone whose email matches
+          // the configured default requester (demandeur). Unassigned Planner tasks are still imported.
+          if (defaultRequesterEmails && defaultRequesterEmails.size > 0) {
+            const assigneeIds = pt.assignments ? Object.keys(pt.assignments) : [];
+            if (assigneeIds.length > 0) {
+              let assigneeMatchesRequester = false;
+              for (const aid of assigneeIds) {
+                const em = (graphUserCache.get(aid)?.email || '').trim().toLowerCase();
+                if (em && defaultRequesterEmails.has(em)) {
+                  assigneeMatchesRequester = true;
+                  break;
+                }
+              }
+              if (!assigneeMatchesRequester) {
+                skippedByDefaultRequesterAssignee++;
+                continue;
+              }
+            }
+          }
 
           try {
             const status = mapping.default_status || plannerPercentToStatus(pt.percentComplete || 0);
@@ -998,9 +1142,14 @@ Deno.serve(async (req) => {
             // Resolve Planner labels
             const plannerLabels = resolveLabels(pt.appliedCategories || null, categoryDescriptions);
 
-            // Resolve assignee from Planner
+            // Resolve assignee from Planner.
+            // Only fall back to syncing user when the task has NO Planner assignees
+            // (truly unassigned). When assignees exist but none can be resolved to
+            // a local profile, leave assignee_id null to avoid incorrectly claiming
+            // ownership of tasks assigned to people outside the app.
             const assigneeInfo = await resolveAssigneeToProfile(pt);
-            const assigneeId = assigneeInfo.profileId || userProfile?.id;
+            const hasPlannerAssignees = pt.assignments && Object.keys(pt.assignments).length > 0;
+            const assigneeId = assigneeInfo.profileId || (hasPlannerAssignees ? null : userProfile?.id);
 
             // Fetch Planner note details only for tasks that will be imported
             let plannerDescription: string | null = null;
@@ -1073,7 +1222,7 @@ Deno.serve(async (req) => {
               }
             }
 
-            await supabase.from('planner_task_links').insert({
+            const { error: linkErr } = await supabase.from('planner_task_links').insert({
               plan_mapping_id: planMappingId,
               planner_task_id: pt.id,
               local_task_id: newTask.id,
@@ -1083,6 +1232,12 @@ Deno.serve(async (req) => {
               planner_assignee_name: assigneeInfo.displayName || null,
             });
 
+            if (linkErr) {
+              // Roll back the task row to avoid leaving an unlinked orphan.
+              await supabase.from('tasks').delete().eq('id', newTask.id);
+              throw linkErr;
+            }
+
             linkedPlannerIds.add(pt.id);
             linkedLocalIds.add(newTask.id);
 
@@ -1091,6 +1246,10 @@ Deno.serve(async (req) => {
             errors.push({ plannerTaskId: pt.id, error: err.message });
           }
         }
+
+        console.log(
+          `planner-sync PULL: ${tasksPulled} imported, ${skippedAlreadyLinked} already linked, ${skippedByState} filtered by state (importStates=${importStates.join(',')}), ${skippedByDefaultRequesterAssignee} skipped (Planner assignee does not match default requester emails)`,
+        );
       }
 
       // UPDATE: Sync existing linked tasks (only rows that were linked at sync start; PULL additions are handled next run).
@@ -1105,69 +1264,90 @@ Deno.serve(async (req) => {
 
           let etagForLink = plannerTask['@odata.etag'] as string;
 
+          // If both sides are already finished, nothing to sync — just refresh the stored etag and move on.
+          const localIsDone = ['done', 'validated'].includes(localTask.status);
+          const plannerIsDone = (plannerTask.percentComplete || 0) === 100;
+          if (localIsDone && plannerIsDone) {
+            await supabase.from('planner_task_links').update({
+              planner_etag: etagForLink,
+              last_synced_at: new Date().toISOString(),
+              sync_status: 'synced',
+            }).eq('id', link.id);
+            continue;
+          }
+
+          // Etag short-circuit: if Planner task is unchanged since last sync, skip the
+          // details fetch and all pull-direction field diffs (saves one Graph API call per task).
+          const plannerTaskUnchanged = !!link.planner_etag && plannerTask['@odata.etag'] === link.planner_etag;
+
           // Pull updates from Planner
           if (mapping.sync_direction === 'from_planner' || mapping.sync_direction === 'both') {
             let plannerNotesDescription: string | null = null;
-            try {
-              const details = await getPlannerTaskDetails(accessToken, plannerTask.id);
-              plannerNotesDescription = details.description ?? null;
-            } catch {
-              plannerNotesDescription = null;
-            }
-
-            const plannerStatus = plannerPercentToStatus(plannerTask.percentComplete || 0);
-            const plannerPriority = plannerPriorityToApp(plannerTask.priority || 5);
-
-            const updates: any = {};
-            if (plannerStatus !== localTask.status) updates.status = plannerStatus;
-            if (plannerPriority !== localTask.priority) updates.priority = plannerPriority;
-            if (plannerTask.dueDateTime) {
-              const dueDate = plannerTask.dueDateTime.substring(0, 10);
-              if (dueDate !== localTask.due_date) updates.due_date = dueDate;
-            }
-
-            // Sync date_demande from Planner createdDateTime (overwrite if incorrect)
-            if (plannerTask.createdDateTime && plannerTask.createdDateTime !== localTask.date_demande) {
-              updates.date_demande = plannerTask.createdDateTime;
-            }
-
-            // Sync date_lancement from Planner startDateTime (overwrite if incorrect)
-            if (plannerTask.startDateTime && plannerTask.startDateTime !== localTask.date_lancement) {
-              updates.date_lancement = plannerTask.startDateTime;
-            }
-
-            // Sync date_fermeture from Planner completedDateTime
-            if (plannerTask.completedDateTime) {
-              if (plannerTask.completedDateTime !== localTask.date_fermeture) {
-                updates.date_fermeture = plannerTask.completedDateTime;
+            if (!plannerTaskUnchanged) {
+              try {
+                const details = await getPlannerTaskDetails(accessToken, plannerTask.id);
+                plannerNotesDescription = details.description ?? null;
+              } catch {
+                plannerNotesDescription = null;
               }
-            } else if (!localTask.date_fermeture && plannerStatus === 'done' && plannerTask.createdDateTime) {
-              // Fallback when Planner task is completed but completion timestamp is unavailable
-              updates.date_fermeture = plannerTask.createdDateTime;
-            } else if (plannerStatus !== 'done' && plannerStatus !== 'validated' && localTask.date_fermeture) {
-              // Re-opened in Planner: clear local closure date
-              updates.date_fermeture = null;
             }
 
-            // Update planner labels
+            // Compute label names once — used for both field diff and junction table sync.
             const newLabels = resolveLabels(plannerTask.appliedCategories || null, categoryDescriptions);
-            const currentLabels = localTask.planner_labels || [];
-            if (JSON.stringify(newLabels.sort()) !== JSON.stringify([...currentLabels].sort())) {
-              updates.planner_labels = newLabels.length > 0 ? newLabels : null;
-            }
 
-            if (plannerNotesDescription !== null && plannerNotesDescription !== (localTask.description || '')) {
-              updates.description = plannerNotesDescription;
-            }
+            if (!plannerTaskUnchanged) {
+              const plannerStatus = plannerPercentToStatus(plannerTask.percentComplete || 0);
+              const plannerPriority = plannerPriorityToApp(plannerTask.priority || 5);
 
-            if (Object.keys(updates).length > 0) {
-              await supabase.from('tasks').update(updates).eq('id', link.local_task_id);
-              localTasksById.set(link.local_task_id, { ...localTask, ...updates });
-              tasksUpdated++;
-            }
+              const updates: any = {};
+              if (plannerStatus !== localTask.status) updates.status = plannerStatus;
+              if (plannerPriority !== localTask.priority) updates.priority = plannerPriority;
+              if (plannerTask.dueDateTime) {
+                const dueDate = plannerTask.dueDateTime.substring(0, 10);
+                if (dueDate !== localTask.due_date) updates.due_date = dueDate;
+              }
+
+              // Sync date_demande from Planner createdDateTime (overwrite if incorrect)
+              if (plannerTask.createdDateTime && plannerTask.createdDateTime !== localTask.date_demande) {
+                updates.date_demande = plannerTask.createdDateTime;
+              }
+
+              // Sync date_lancement from Planner startDateTime (overwrite if incorrect)
+              if (plannerTask.startDateTime && plannerTask.startDateTime !== localTask.date_lancement) {
+                updates.date_lancement = plannerTask.startDateTime;
+              }
+
+              // Sync date_fermeture from Planner completedDateTime
+              if (plannerTask.completedDateTime) {
+                if (plannerTask.completedDateTime !== localTask.date_fermeture) {
+                  updates.date_fermeture = plannerTask.completedDateTime;
+                }
+              } else if (!localTask.date_fermeture && plannerStatus === 'done' && plannerTask.createdDateTime) {
+                // Fallback when Planner task is completed but completion timestamp is unavailable
+                updates.date_fermeture = plannerTask.createdDateTime;
+              } else if (plannerStatus !== 'done' && plannerStatus !== 'validated' && localTask.date_fermeture) {
+                // Re-opened in Planner: clear local closure date
+                updates.date_fermeture = null;
+              }
+
+              const currentLabels = localTask.planner_labels || [];
+              if (JSON.stringify(newLabels.sort()) !== JSON.stringify([...currentLabels].sort())) {
+                updates.planner_labels = newLabels.length > 0 ? newLabels : null;
+              }
+
+              if (plannerNotesDescription !== null && plannerNotesDescription !== (localTask.description || '')) {
+                updates.description = plannerNotesDescription;
+              }
+
+              if (Object.keys(updates).length > 0) {
+                await supabase.from('tasks').update(updates).eq('id', link.local_task_id);
+                localTasksById.set(link.local_task_id, { ...localTask, ...updates });
+                tasksUpdated++;
+              }
+            } // end !plannerTaskUnchanged
 
             // Sync planner labels to task_labels junction table
-            if (newLabels.length > 0 && mapping.mapped_process_template_id) {
+            if (!plannerTaskUnchanged && newLabels.length > 0 && mapping.mapped_process_template_id) {
               try {
                 const { data: ptData } = await supabase
                   .from('process_templates')
@@ -1245,8 +1425,11 @@ Deno.serve(async (req) => {
 
       // PUSH: Push local unlinked tasks to Planner
       if (mapping.sync_direction === 'to_planner' || mapping.sync_direction === 'both') {
-        // Get local tasks for this category that are not yet linked
-        let localQuery = supabase.from('tasks').select('*').eq('user_id', userId).eq('type', 'task');
+        // Only push active tasks — finished tasks have no value in Planner and would flood the plan.
+        let localQuery = supabase.from('tasks').select('*')
+          .eq('user_id', userId)
+          .eq('type', 'task')
+          .not('status', 'in', '("done","validated","refused","cloture")');
         if (mapping.mapped_category_id) localQuery = localQuery.eq('category_id', mapping.mapped_category_id);
 
         const { data: localTasks } = await localQuery;
