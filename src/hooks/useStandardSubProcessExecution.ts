@@ -8,6 +8,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { emitWorkflowEvent } from '@/services/workflowEventService';
+import { rejectValidationWithExecutorPolicy } from '@/services/taskStatusService';
+import { getFinalRejectionReturnsToExecutor } from '@/lib/standardWorkflowTemplate';
+import { normalizeValidationLevel } from '@/lib/taskValidationUi';
+// TODO (désactivé) — team_lead_reassignment : décommentez quand la feature est réactivée
+// import { fetchProcessAssignmentHandling } from '@/lib/processAssignmentConfig';
 import type { StandardSubProcessNodeConfig } from '@/types/workflow';
 import type { TaskStatus } from '@/types/task';
 
@@ -32,7 +37,7 @@ export function useStandardSubProcessExecution() {
 
   /**
    * S1 - Création des tâches du sous-processus
-   * Statut initial: 'todo' (direct) ou 'to_assign' (manager)
+   * Statut initial: 'todo' (direct) ou 'to_assign' (manager).
    */
   const createSubProcessTasks = useCallback(async (
     config: StandardSubProcessNodeConfig,
@@ -50,6 +55,9 @@ export function useStandardSubProcessExecution() {
     }
 
     try {
+      // TODO (désactivé) — team_lead_reassignment
+      // const processHandling = await fetchProcessAssignmentHandling(context.processTemplateId);
+
       // Récupérer les templates de tâches du sous-processus
       const { data: taskTemplates, error: templatesError } = await supabase
         .from('task_templates')
@@ -63,9 +71,9 @@ export function useStandardSubProcessExecution() {
         return [];
       }
 
-      // Déterminer le mode d'affectation
+      // Déterminer le mode d'affectation (nœud workflow)
       const isDirect = config.assignment_mode === 'direct';
-      const initialStatus: TaskStatus = isDirect ? 'todo' : 'to_assign';
+      let initialStatus: TaskStatus = isDirect ? 'todo' : 'to_assign';
 
       // Déterminer l'assignee selon le mode
       let assigneeId: string | undefined;
@@ -86,6 +94,10 @@ export function useStandardSubProcessExecution() {
         assigneeId = await resolveManagerId(config, context.requesterId);
       }
 
+      // TODO (désactivé) — team_lead_reassignment : lorsque la feature sera réactivée, positionner
+      // allows_reassignment=true et garder status='todo' quand processHandling==='team_lead_reassignment' && isDirect.
+      const allowsReassignment = false;
+
       // Créer l'entrée dans request_sub_processes
       const { data: subProcessRun, error: spRunError } = await supabase
         .from('request_sub_processes')
@@ -101,46 +113,97 @@ export function useStandardSubProcessExecution() {
 
       if (spRunError) throw spRunError;
 
+      const { data: parentRow } = await supabase
+        .from('tasks')
+        .select('due_date, requester_id, reporter_id')
+        .eq('id', context.requestId)
+        .maybeSingle();
+      const parentDue: string | null = parentRow?.due_date
+        ? String(parentRow.due_date).split('T')[0]
+        : null;
+
       const createdTasks: TaskCreationResult[] = [];
       const today = new Date();
       const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
+      const isAllowsReassignmentColumnError = (err: { message?: string; code?: string } | null) => {
+        if (!err?.message) return false;
+        const m = err.message.toLowerCase();
+        return (
+          m.includes('allows_reassignment') ||
+          (m.includes('column') && m.includes('tasks')) ||
+          m.includes('schema cache') ||
+          err.code === '42703' ||
+          err.code === 'PGRST204'
+        );
+      };
+
       // Créer les tâches
       for (const template of taskTemplates) {
-        const dueDate = template.default_duration_days
+        const dueFromTemplate = template.default_duration_days
           ? (() => {
-              const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + template.default_duration_days);
+              const d = new Date(
+                today.getFullYear(),
+                today.getMonth(),
+                today.getDate() + Number(template.default_duration_days)
+              );
               return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
             })()
           : null;
+        const dueDate = parentDue ?? dueFromTemplate;
 
-        const { data: newTask, error: taskError } = await supabase
+        const baseRow = {
+          title: template.title,
+          description: template.description,
+          priority: template.priority || 'medium',
+          status: initialStatus,
+          type: 'task' as const,
+          start_date: todayStr,
+          due_date: dueDate,
+          user_id: user.id,
+          assignee_id: assigneeId,
+          parent_request_id: context.requestId,
+          requester_id: parentRow?.requester_id ?? null,
+          reporter_id: parentRow?.reporter_id ?? null,
+          source_process_template_id: context.processTemplateId,
+          source_sub_process_template_id: sub_process_template_id,
+          parent_sub_process_run_id: subProcessRun.id,
+          workflow_run_id: context.workflowRunId,
+          validation_level_1: normalizeValidationLevel(template.validation_level_1),
+          validation_level_2: normalizeValidationLevel(template.validation_level_2),
+          validator_level_1_id: template.validator_level_1_id ?? null,
+          validator_level_2_id: template.validator_level_2_id ?? null,
+          category_id: template.category_id,
+          subcategory_id: template.subcategory_id,
+        };
+
+        let insertPayload: typeof baseRow & { allows_reassignment?: boolean } = allowsReassignment
+          ? { ...baseRow, allows_reassignment: true }
+          : baseRow;
+
+        let { data: newTask, error: taskError } = await supabase
           .from('tasks')
-          .insert({
-            title: template.title,
-            description: template.description,
-            priority: template.priority || 'medium',
-            status: initialStatus,
-            type: 'task',
-            start_date: todayStr,
-            due_date: dueDate,
-            user_id: user.id,
-            assignee_id: assigneeId,
-            parent_request_id: context.requestId,
-            source_process_template_id: context.processTemplateId,
-            source_sub_process_template_id: sub_process_template_id,
-            parent_sub_process_run_id: subProcessRun.id,
-            workflow_run_id: context.workflowRunId,
-            validation_level_1: template.validation_level_1 || 'none',
-            validation_level_2: template.validation_level_2 || 'none',
-            category_id: template.category_id,
-            subcategory_id: template.subcategory_id,
-          })
+          .insert(insertPayload)
           .select()
           .single();
 
+        if (taskError && allowsReassignment && isAllowsReassignmentColumnError(taskError)) {
+          const retry = await supabase.from('tasks').insert(baseRow).select().single();
+          newTask = retry.data;
+          taskError = retry.error;
+          if (!taskError) {
+            console.warn(
+              '[tasks] Colonne allows_reassignment absente — tâche créée sans option réaffectation. Appliquez la migration 20260418120000_task_reassignment_stakeholder.sql'
+            );
+          }
+        }
+
         if (taskError) {
           console.error('Error creating task:', taskError);
+          toast.error(
+            `Création de tâche impossible : ${template.title}`,
+            { description: taskError.message }
+          );
           continue;
         }
 
@@ -218,7 +281,7 @@ export function useStandardSubProcessExecution() {
       // Notification à l'affecté ou au manager
       const assigneeId = createdTasks[0]?.assigneeId;
       if (assigneeId) {
-        const eventType = config.assignment_mode === 'direct' ? 'task_assigned' : 'task_to_assign';
+        const eventType = createdTasks[0]?.status === 'to_assign' ? 'task_to_assign' : 'task_assigned';
         
         await emitWorkflowEvent(
           eventType,
@@ -388,20 +451,31 @@ export function useStandardSubProcessExecution() {
           })
           .eq('id', taskId);
       } else {
-        // Rejet → statut "review"
-        await supabase
-          .from('tasks')
-          .update({
-            status: 'review',
-            [`validation_${validationLevel}_status`]: 'refused',
-            [`validation_${validationLevel}_at`]: new Date().toISOString(),
-            [`validation_${validationLevel}_by`]: profile?.id,
-            [`validation_${validationLevel}_comment`]: comment,
-          })
-          .eq('id', taskId);
+        let returnsToExecutor = true;
+        if (task.source_sub_process_template_id) {
+          const { data: wfRow } = await supabase
+            .from('wf_workflows')
+            .select('standard_options')
+            .eq('sub_process_template_id', task.source_sub_process_template_id)
+            .eq('is_active', true)
+            .order('version', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          returnsToExecutor = getFinalRejectionReturnsToExecutor(wfRow?.standard_options);
+        }
+
+        const rej = await rejectValidationWithExecutorPolicy(
+          taskId,
+          validationLevel,
+          profile!.id,
+          comment ?? '',
+          returnsToExecutor,
+        );
+        if (!rej.success) return false;
+        // Le refus passe par transitionTaskStatus → task_status_changed (notifications CAS 4 / 4b)
+        return true;
       }
 
-      // Émettre événement
       await emitWorkflowEvent(
         'validation_decided',
         'task',

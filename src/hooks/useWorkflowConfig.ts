@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { fetchEnrichedWorkflowAssignmentRules } from '@/lib/workflowAssignmentRules';
@@ -11,6 +11,43 @@ import type {
   WfStepPoolValidator, WfStepSequenceValidator,
 } from '@/types/workflow';
 
+/**
+ * Plusieurs lignes `wf_workflows` peuvent être `is_active` pour un même sous-processus (doublons,
+ * versions). Prendre uniquement `order('version').limit(1)` renvoie souvent une version vide
+ * récente alors qu’un autre workflow contient encore les étapes — d’où « 0 étape » à l’écran.
+ */
+function pickPrimaryWorkflowForSubProcess(
+  workflows: WfWorkflow[],
+  stepRefRows: { workflow_id: string }[],
+): WfWorkflow {
+  if (workflows.length === 1) return workflows[0];
+
+  const stepCountByWf = new Map<string, number>();
+  for (const w of workflows) stepCountByWf.set(w.id, 0);
+  for (const row of stepRefRows) {
+    const id = row.workflow_id;
+    if (stepCountByWf.has(id)) stepCountByWf.set(id, (stepCountByWf.get(id) || 0) + 1);
+  }
+
+  const maxSteps = Math.max(0, ...workflows.map(w => stepCountByWf.get(w.id) || 0));
+
+  return workflows.reduce((best, w) => {
+    const cw = stepCountByWf.get(w.id) || 0;
+    const cb = stepCountByWf.get(best.id) || 0;
+    if (cw !== cb) return cw > cb ? w : best;
+    // Plusieurs workflows actifs vides : éviter de prendre la version toute neuve (souvent 0 étape)
+    // alors qu’une version plus ancienne porte encore le graphe — ou l’inverse si tout est à 0.
+    if (maxSteps === 0) {
+      if (w.version !== best.version) return w.version < best.version ? w : best;
+    } else {
+      if (w.version !== best.version) return w.version > best.version ? w : best;
+    }
+    const wt = w.updated_at ? new Date(w.updated_at).getTime() : 0;
+    const bt = best.updated_at ? new Date(best.updated_at).getTime() : 0;
+    return wt >= bt ? w : best;
+  });
+}
+
 export function useWorkflowConfig(subProcessTemplateId: string | undefined) {
   const [workflow, setWorkflow] = useState<WfWorkflow | null>(null);
   const [steps, setSteps] = useState<WfStep[]>([]);
@@ -21,30 +58,55 @@ export function useWorkflowConfig(subProcessTemplateId: string | undefined) {
   const [poolValidators, setPoolValidators] = useState<WfStepPoolValidator[]>([]);
   const [sequenceValidators, setSequenceValidators] = useState<WfStepSequenceValidator[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  /** Après le premier chargement OK pour ce sous-processus, les refetch ne doivent pas remettre isLoading (sinon tout l’onglet disparaît / se « reset »). */
+  const lastSubProcessIdRef = useRef<string | undefined>(undefined);
+  const hasCompletedInitialLoadRef = useRef(false);
 
   const fetchAll = useCallback(async () => {
-    if (!subProcessTemplateId) return;
-    setIsLoading(true);
+    if (!subProcessTemplateId) {
+      setIsLoading(false);
+      return;
+    }
+    if (lastSubProcessIdRef.current !== subProcessTemplateId) {
+      lastSubProcessIdRef.current = subProcessTemplateId;
+      hasCompletedInitialLoadRef.current = false;
+    }
+    if (!hasCompletedInitialLoadRef.current) {
+      setIsLoading(true);
+    }
     try {
-      // Fetch workflow for this sub-process
-      const { data: wfData } = await supabase
+      const { data: wfList, error: wfListErr } = await supabase
         .from('wf_workflows')
         .select('*')
         .eq('sub_process_template_id', subProcessTemplateId)
         .eq('is_active', true)
-        .order('version', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .order('version', { ascending: false });
 
-      if (!wfData) {
+      if (wfListErr) {
+        console.error('wf_workflows load error', wfListErr);
+        throw wfListErr;
+      }
+
+      if (!wfList?.length) {
         setWorkflow(null);
         setSteps([]);
         setTransitions([]);
         setNotifications([]);
         setActions([]);
+        hasCompletedInitialLoadRef.current = true;
         setIsLoading(false);
         return;
       }
+
+      const wfIds = wfList.map(w => w.id);
+      const { data: stepRefRows, error: stepRefErr } = await supabase
+        .from('wf_steps')
+        .select('workflow_id')
+        .in('workflow_id', wfIds);
+
+      if (stepRefErr) console.error('wf_steps index load error', stepRefErr);
+
+      const wfData = pickPrimaryWorkflowForSubProcess(wfList, stepRefErr ? [] : (stepRefRows ?? []));
 
       setWorkflow(wfData);
       const wfId = wfData.id;
@@ -60,6 +122,9 @@ export function useWorkflowConfig(subProcessTemplateId: string | undefined) {
         fetchEnrichedWorkflowAssignmentRules(),
       ]);
 
+      if (stepsRes.error) console.error('wf_steps load error', stepsRes.error);
+      if (transRes.error) console.error('wf_transitions load error', transRes.error);
+
       setSteps(stepsRes.data || []);
       setTransitions(transRes.data || []);
       setNotifications(notifsRes.data || []);
@@ -67,6 +132,7 @@ export function useWorkflowConfig(subProcessTemplateId: string | undefined) {
       setPoolValidators(poolRes.data || []);
       setSequenceValidators(seqRes.data || []);
       setAssignmentRules(enrichedRules);
+      hasCompletedInitialLoadRef.current = true;
     } catch (error) {
       console.error('Error fetching workflow config:', error);
       toast.error('Erreur lors du chargement du workflow');
@@ -91,6 +157,15 @@ export function useWorkflowConfig(subProcessTemplateId: string | undefined) {
     };
     const { data, error } = await supabase.from('wf_workflows').insert(insert).select().single();
     if (error) { toast.error('Erreur création workflow'); return null; }
+
+    const { error: deactErr } = await supabase
+      .from('wf_workflows')
+      .update({ is_active: false })
+      .eq('sub_process_template_id', subProcessTemplateId)
+      .eq('is_active', true)
+      .neq('id', data.id);
+    if (deactErr) console.error('wf_workflows deactivate siblings', deactErr);
+
     setWorkflow(data);
     toast.success('Workflow créé');
 

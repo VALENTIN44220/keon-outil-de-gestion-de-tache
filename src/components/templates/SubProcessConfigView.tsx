@@ -682,8 +682,11 @@ export function SubProcessConfigView({
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <div>
                       <CardTitle className="text-base">Tâches du sous-processus</CardTitle>
-                      <CardDescription>
-                        Liste des tâches avec leurs checklists
+                      <CardDescription className="space-y-1">
+                        <span>Liste des tâches avec leurs checklists.</span>
+                        <span className="block text-xs text-amber-900/90 dark:text-amber-200/90">
+                          Pour activer « Envoyer pour validation » côté exécutant, ouvrez une tâche avec « Modifier » et renseignez la section « Qui valide avant la clôture ? ».
+                        </span>
                       </CardDescription>
                     </div>
                     {canManage && (
@@ -723,6 +726,11 @@ export function SubProcessConfigView({
                                 {task.checklist_count > 0 && (
                                   <Badge variant="outline" className="text-xs">
                                     {task.checklist_count} sous-action(s)
+                                  </Badge>
+                                )}
+                                {(task.validation_level_1 !== 'none' || task.validation_level_2 !== 'none') && (
+                                  <Badge variant="outline" className="text-xs border-amber-300 text-amber-900 dark:text-amber-100">
+                                    Validation avant clôture
                                   </Badge>
                                 )}
                               </div>

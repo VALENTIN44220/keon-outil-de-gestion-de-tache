@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { TaskTemplate, TemplateVisibility, ValidationLevelType, VALIDATION_TYPE_LABELS } from '@/types/template';
+import { TaskTemplate, TemplateVisibility, ValidationLevelType } from '@/types/template';
+import { TaskTemplateValidationSection } from './TaskTemplateValidationSection';
 import { CategorySelect } from './CategorySelect';
 import { VisibilitySelect } from './VisibilitySelect';
 import { VariableInputField } from './VariableInputField';
@@ -232,12 +233,27 @@ export function AddTaskTemplateDialog({
             onChange={setVisibilityLevel}
           />
 
-          {/* Note: Les champs de validation N1/N2 sont maintenant gérés via le workflow graphique */}
-          <div className="p-3 bg-muted/50 rounded-lg border border-dashed">
-            <p className="text-sm text-muted-foreground">
-              💡 La validation est maintenant configurée via l'onglet <strong>Workflow</strong> du processus parent.
-            </p>
-          </div>
+          <TaskTemplateValidationSection
+            validationLevel1={validationLevel1}
+            validationLevel2={validationLevel2}
+            onValidationLevel1Change={(v) => {
+              setValidationLevel1(v);
+              if (v === 'none') {
+                setValidationLevel2('none');
+                setValidatorLevel2Id(null);
+              }
+              if (v !== 'free') setValidatorLevel1Id(null);
+            }}
+            onValidationLevel2Change={(v) => {
+              setValidationLevel2(v);
+              if (v !== 'free') setValidatorLevel2Id(null);
+            }}
+            validatorLevel1Id={validatorLevel1Id}
+            validatorLevel2Id={validatorLevel2Id}
+            onValidatorLevel1Change={setValidatorLevel1Id}
+            onValidatorLevel2Change={setValidatorLevel2Id}
+            profiles={profiles}
+          />
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>

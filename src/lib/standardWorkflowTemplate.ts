@@ -21,6 +21,8 @@ export interface StandardWorkflowOptions {
   executor_type: 'specific_user' | 'requester' | 'requester_manager' | 'role' | 'manual' | 'field_value';
   executor_value: string | null;
   completion_behavior: 'close_task' | 'send_to_validation';
+  /** Si true (défaut), un refus à la validation finale renvoie vers l’exécution pour correction puis nouvelle validation. Si false, transition vers clôture (refus sans boucle). */
+  final_rejection_returns_to_executor: boolean;
   enable_notifications: boolean;
   enable_auto_actions: boolean;
 }
@@ -38,9 +40,33 @@ export const DEFAULT_STANDARD_OPTIONS: StandardWorkflowOptions = {
   executor_type: 'manual',
   executor_value: null,
   completion_behavior: 'close_task',
+  final_rejection_returns_to_executor: true,
   enable_notifications: true,
   enable_auto_actions: false,
 };
+
+/** Fusionne les options stockées en base avec les défauts (rétrocompatibilité). */
+export function mergeStandardWorkflowOptions(raw: unknown): StandardWorkflowOptions {
+  if (!raw || typeof raw !== 'object') {
+    return { ...DEFAULT_STANDARD_OPTIONS };
+  }
+  const o = raw as Partial<StandardWorkflowOptions>;
+  return {
+    ...DEFAULT_STANDARD_OPTIONS,
+    ...o,
+    final_rejection_returns_to_executor:
+      typeof o.final_rejection_returns_to_executor === 'boolean'
+        ? o.final_rejection_returns_to_executor
+        : DEFAULT_STANDARD_OPTIONS.final_rejection_returns_to_executor,
+  };
+}
+
+/** Lit l’option depuis le JSON `wf_workflows.standard_options` (défaut true). */
+export function getFinalRejectionReturnsToExecutor(standardOptions: unknown): boolean {
+  if (!standardOptions || typeof standardOptions !== 'object') return true;
+  const v = (standardOptions as Record<string, unknown>).final_rejection_returns_to_executor;
+  return typeof v === 'boolean' ? v : true;
+}
 
 import type { Json } from '@/integrations/supabase/types';
 
@@ -143,11 +169,19 @@ export function generateStandardStructure(options: StandardWorkflowOptions): Gen
     steps.push({ step_key: finalValKey, name: "Validation de l'action", step_type: 'validation', order_index: orderIdx++, state_label: 'En attente de validation finale', is_required: true, validation_mode: 'simple' });
     transitions.push({ from_step_key: lastKey, to_step_key: finalValKey, event: 'done' });
 
+    const returnToExecutorOnFinalReject = options.final_rejection_returns_to_executor !== false;
     validationConfigs.push({
       name: 'Validation finale', validation_key: 'std_val_final', object_type: 'task',
       source_step_key: finalValKey, validator_type: options.final_validator_type,
       on_approved_effect: 'advance_step', on_rejected_effect: 'goto_step',
-      on_rejected_target_step_key: execKey, is_active: true, order_index: 1, validation_mode: 'simple',
+      on_rejected_target_step_key: returnToExecutorOnFinalReject ? execKey : 'std_closed',
+      is_active: true, order_index: 1, validation_mode: 'simple',
+    });
+
+    transitions.push({
+      from_step_key: finalValKey,
+      to_step_key: returnToExecutorOnFinalReject ? execKey : 'std_closed',
+      event: 'rejected',
     });
 
     lastKey = finalValKey;

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,7 @@ import {
   fetchEnrichedWorkflowAssignmentRules,
   EnrichedAssignmentRule,
 } from '@/lib/workflowAssignmentRules';
+import type { ProcessAssignmentHandling } from '@/lib/processAssignmentConfig';
 
 interface ProcessAssignmentTabProps {
   process: ProcessWithTasks;
@@ -30,12 +31,19 @@ type AssignmentScope = 'global' | 'per_subprocess';
 
 interface AssignmentConfig {
   scope: AssignmentScope;
+  /**
+   * Direct = tâches assignées aux cibles des règles.
+   * team_lead_reassignment = le collaborateur ciblé reçoit la tâche « À faire » avec réaffectation possible ;
+   * après transfert il garde la visibilité pour suivre l'avancement (voir exécution workflow S1).
+   */
+  assignment_handling: ProcessAssignmentHandling;
   /** ID from wf_assignment_rules — the default rule for the process */
   default_assignment_rule_id: string | null;
 }
 
 const DEFAULT_CONFIG: AssignmentConfig = {
   scope: 'per_subprocess',
+  assignment_handling: 'direct',
   default_assignment_rule_id: null,
 };
 
@@ -70,20 +78,36 @@ export function ProcessAssignmentTab({ process, onUpdate, canManage }: ProcessAs
 
       if (error) throw error;
 
-      const settings = (data?.settings as Record<string, any>) || {};
-      const saved = settings.assignment_config as AssignmentConfig | undefined;
+      const settings = (data?.settings as Record<string, unknown>) || {};
+      const saved = settings.assignment_config as Partial<AssignmentConfig> & { scope?: string } | undefined;
 
-      setConfig(saved ?? DEFAULT_CONFIG);
+      const handlingRaw = saved?.assignment_handling;
+      const assignment_handling: ProcessAssignmentHandling =
+        handlingRaw === 'team_lead_reassignment' ? 'team_lead_reassignment' : 'direct';
+
+      const scopeRaw = saved?.scope;
+      const scope: AssignmentScope = scopeRaw === 'global' ? 'global' : 'per_subprocess';
+
+      const merged: AssignmentConfig = {
+        ...DEFAULT_CONFIG,
+        scope,
+        assignment_handling,
+        default_assignment_rule_id:
+          typeof saved?.default_assignment_rule_id === 'string'
+            ? saved.default_assignment_rule_id
+            : null,
+      };
+      setConfig(merged);
       setIsDirty(false);
-    } catch (error) {
-      console.error('Error loading assignment config:', error);
+    } catch (err) {
+      console.error('Error loading assignment config:', err);
     } finally {
       setIsLoading(false);
     }
   };
 
   const updateConfig = (updates: Partial<AssignmentConfig>) => {
-    setConfig(prev => ({ ...prev, ...updates }));
+    setConfig((prev) => ({ ...prev, ...updates }));
     setIsDirty(true);
   };
 
@@ -101,9 +125,18 @@ export function ProcessAssignmentTab({ process, onUpdate, canManage }: ProcessAs
       if (fetchError) throw fetchError;
 
       const currentSettings = (currentData?.settings as Record<string, unknown>) || {};
+
+      const payload = {
+        scope: config.scope,
+        assignment_handling: config.assignment_handling,
+        default_assignment_rule_id: config.default_assignment_rule_id,
+        // Ancienne option retirée : on nettoie le JSON pour les sauvegardes futures.
+        conditional_sub_process_rules: [] as const,
+      };
+
       const updatedSettings = {
         ...currentSettings,
-        assignment_config: config as unknown,
+        assignment_config: payload as unknown,
       };
 
       const { error } = await supabase
@@ -113,6 +146,7 @@ export function ProcessAssignmentTab({ process, onUpdate, canManage }: ProcessAs
 
       if (error) throw error;
 
+      setConfig(config);
       toast.success("Configuration d'affectation enregistrée");
       setIsDirty(false);
       onUpdate();
@@ -124,8 +158,7 @@ export function ProcessAssignmentTab({ process, onUpdate, canManage }: ProcessAs
     }
   };
 
-  // Group rules by type for readability
-  const groupedRules = groupRulesByType(rules);
+  const groupedRules = useMemo(() => groupRulesByType(rules), [rules]);
 
   if (isLoading) {
     return (
@@ -151,7 +184,36 @@ export function ProcessAssignmentTab({ process, onUpdate, canManage }: ProcessAs
         )}
       </div>
 
-      {/* Scope */}
+      {/*
+       * TODO (désactivé) — Type d'affectation : « Affectation directe » vs « Réaffectation par les managers »
+       * La logique `assignment_handling: team_lead_reassignment` permet, lorsqu'une règle résout un collaborateur,
+       * de lui attribuer la tâche en « À faire » avec une option de réaffectation (allows_reassignment).
+       * L'approche actuelle privilégie la configuration par sous-processus (chaque SP définit ses propres règles
+       * dans son onglet Workflow) ; ce mode processus-global sera réactivé ultérieurement.
+       *
+       * <Card>
+       *   <CardHeader>
+       *     <CardTitle className="text-base">Type d'affectation</CardTitle>
+       *     <CardDescription>
+       *       Détermine comment les cibles des règles (poste, groupe, utilisateur…) sont matérialisées en tâches
+       *       lors de l'exécution des workflows de ce processus.
+       *     </CardDescription>
+       *   </CardHeader>
+       *   <CardContent>
+       *     <RadioGroup value={config.assignment_handling}
+       *       onValueChange={(v) => updateConfig({ assignment_handling: v as ProcessAssignmentHandling })}
+       *       disabled={!canManage} className="space-y-3">
+       *       <div …> direct — Affectation directe </div>
+       *       <div …> team_lead_reassignment — Réaffectation par les managers </div>
+       *     </RadioGroup>
+       *     <Info note>
+       *       Ce mode ne remplace pas une affectation « manager » d'une étape de workflow : il s'applique aux
+       *       branches où la cible serait déjà un collaborateur précis, en ajoutant la délégation et le suivi.
+       *     </Info note>
+       *   </CardContent>
+       * </Card>
+       */}
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Périmètre d'affectation</CardTitle>
@@ -192,7 +254,6 @@ export function ProcessAssignmentTab({ process, onUpdate, canManage }: ProcessAs
         </CardContent>
       </Card>
 
-      {/* Global rule selector */}
       {config.scope === 'global' && (
         <Card>
           <CardHeader>
@@ -214,18 +275,7 @@ export function ProcessAssignmentTab({ process, onUpdate, canManage }: ProcessAs
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">Aucune règle par défaut</SelectItem>
-                {groupedRules.map((group) => (
-                  <div key={group.label}>
-                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
-                      {group.label}
-                    </div>
-                    {group.items.map((rule) => (
-                      <SelectItem key={rule.id} value={rule.id}>
-                        {rule.display_name}
-                      </SelectItem>
-                    ))}
-                  </div>
-                ))}
+                <GroupedRuleSelectItems groupedRules={groupedRules} />
               </SelectContent>
             </Select>
 
@@ -275,6 +325,23 @@ export function ProcessAssignmentTab({ process, onUpdate, canManage }: ProcessAs
 interface RuleGroup {
   label: string;
   items: EnrichedAssignmentRule[];
+}
+
+function GroupedRuleSelectItems({ groupedRules }: { groupedRules: RuleGroup[] }) {
+  return (
+    <>
+      {groupedRules.map((group) => (
+        <div key={group.label}>
+          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">{group.label}</div>
+          {group.items.map((rule) => (
+            <SelectItem key={rule.id} value={rule.id}>
+              {rule.display_name}
+            </SelectItem>
+          ))}
+        </div>
+      ))}
+    </>
+  );
 }
 
 function groupRulesByType(rules: EnrichedAssignmentRule[]): RuleGroup[] {

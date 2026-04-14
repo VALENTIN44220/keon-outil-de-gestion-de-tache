@@ -24,8 +24,26 @@ import { WfSimulation } from './WfSimulation';
 import { WfModeSelector } from './WfModeSelector';
 import { WfStandardModePanel } from './WfStandardModePanel';
 import { runCoherenceChecks } from '@/lib/workflowCoherenceChecks';
-import { DEFAULT_STANDARD_OPTIONS, generateStandardStructure } from '@/lib/standardWorkflowTemplate';
+import { DEFAULT_STANDARD_OPTIONS, generateStandardStructure, mergeStandardWorkflowOptions } from '@/lib/standardWorkflowTemplate';
 import type { StandardWorkflowOptions } from '@/lib/standardWorkflowTemplate';
+
+function throwOnSupabaseError(res: { error: { message?: string } | null }, label: string) {
+  if (res.error) {
+    console.error(label, res.error);
+    throw new Error(res.error.message || label);
+  }
+}
+
+/** Un seul workflow actif par sous-processus : évite de lire / écrire sur deux lignes différentes. */
+async function deactivateOtherActiveWorkflows(subProcessTemplateId: string, keepWorkflowId: string) {
+  const { error } = await supabase
+    .from('wf_workflows')
+    .update({ is_active: false })
+    .eq('sub_process_template_id', subProcessTemplateId)
+    .eq('is_active', true)
+    .neq('id', keepWorkflowId);
+  if (error) console.error('deactivateOtherActiveWorkflows', error);
+}
 
 interface Props {
   subProcessId: string;
@@ -44,20 +62,21 @@ export function WorkflowConfigTab({ subProcessId, subProcessName, canManage }: P
   const standardOptionsRaw = (wf.workflow as any)?.standard_options;
   const customizedAt = (wf.workflow as any)?.customized_at;
 
-  const [standardOptions, setStandardOptions] = useState<StandardWorkflowOptions>(
-    () => {
-      if (standardOptionsRaw && typeof standardOptionsRaw === 'object' && 'request_validation' in standardOptionsRaw) {
-        return standardOptionsRaw as StandardWorkflowOptions;
-      }
-      return DEFAULT_STANDARD_OPTIONS;
-    }
+  const [standardOptions, setStandardOptions] = useState<StandardWorkflowOptions>(() =>
+    mergeStandardWorkflowOptions(
+      standardOptionsRaw && typeof standardOptionsRaw === 'object' && 'request_validation' in standardOptionsRaw
+        ? standardOptionsRaw
+        : null
+    )
   );
 
-  // Sync standard options when workflow data changes
+  // Sync standard options quand la BDD change — sans réécrire si le contenu est identique (refetch après passage en avancé, etc.)
   useEffect(() => {
-    if (standardOptionsRaw && typeof standardOptionsRaw === 'object' && 'request_validation' in standardOptionsRaw) {
-      setStandardOptions(standardOptionsRaw as StandardWorkflowOptions);
+    if (!standardOptionsRaw || typeof standardOptionsRaw !== 'object' || !('request_validation' in standardOptionsRaw)) {
+      return;
     }
+    const merged = mergeStandardWorkflowOptions(standardOptionsRaw);
+    setStandardOptions((prev) => (JSON.stringify(prev) === JSON.stringify(merged) ? prev : merged));
   }, [standardOptionsRaw]);
 
   useEffect(() => {
@@ -70,47 +89,71 @@ export function WorkflowConfigTab({ subProcessId, subProcessName, canManage }: P
     return checks.filter(c => c.severity === 'error').length;
   }, [wf.steps, wf.transitions, wf.actions, wf.notifications, tv.taskConfigs, tv.validationConfigs, wf.workflow]);
 
+  /** Replace steps / transitions / notifications / tasks / validations from generated standard structure (shared by apply + switch to advanced). */
+  const replaceWorkflowWithStandardStructure = useCallback(async (wfId: string, options: StandardWorkflowOptions) => {
+    const structure = generateStandardStructure(options);
+
+    const delResults = await Promise.all([
+      supabase.from('wf_steps').delete().eq('workflow_id', wfId),
+      supabase.from('wf_transitions').delete().eq('workflow_id', wfId),
+      supabase.from('wf_notifications').delete().eq('workflow_id', wfId),
+      supabase.from('wf_actions').delete().eq('workflow_id', wfId),
+      supabase.from('wf_task_configs').delete().eq('workflow_id', wfId),
+      supabase.from('wf_validation_configs').delete().eq('workflow_id', wfId),
+    ]);
+    delResults.forEach((r, i) => throwOnSupabaseError(r, `wf delete batch ${i}`));
+
+    if (structure.steps.length > 0) {
+      throwOnSupabaseError(
+        await supabase.from('wf_steps').insert(structure.steps.map(s => ({ ...s, workflow_id: wfId, step_type: s.step_type as any, validation_mode: (s.validation_mode || 'none') as any }))),
+        'wf_steps insert',
+      );
+    }
+    if (structure.transitions.length > 0) {
+      throwOnSupabaseError(
+        await supabase.from('wf_transitions').insert(structure.transitions.map(t => ({ ...t, workflow_id: wfId }))),
+        'wf_transitions insert',
+      );
+    }
+    if (structure.notifications.length > 0) {
+      throwOnSupabaseError(
+        await supabase.from('wf_notifications').insert(structure.notifications.map(n => ({ ...n, workflow_id: wfId }))),
+        'wf_notifications insert',
+      );
+    }
+    if (structure.taskConfigs.length > 0) {
+      throwOnSupabaseError(
+        await supabase.from('wf_task_configs').insert(structure.taskConfigs.map(tc => ({ ...tc, workflow_id: wfId }))),
+        'wf_task_configs insert',
+      );
+    }
+    if (structure.validationConfigs.length > 0) {
+      throwOnSupabaseError(
+        await supabase.from('wf_validation_configs').insert(structure.validationConfigs.map(vc => ({ ...vc, workflow_id: wfId }))),
+        'wf_validation_configs insert',
+      );
+    }
+  }, []);
+
   // Apply standard template: delete existing + create from template
   const applyStandardTemplate = useCallback(async (options: StandardWorkflowOptions) => {
     if (!wf.workflow) return;
     setIsApplyingStandard(true);
     try {
       const wfId = wf.workflow.id;
-      const structure = generateStandardStructure(options);
+      await replaceWorkflowWithStandardStructure(wfId, options);
 
-      // Delete existing config
-      await Promise.all([
-        supabase.from('wf_steps').delete().eq('workflow_id', wfId),
-        supabase.from('wf_transitions').delete().eq('workflow_id', wfId),
-        supabase.from('wf_notifications').delete().eq('workflow_id', wfId),
-        supabase.from('wf_actions').delete().eq('workflow_id', wfId),
-        supabase.from('wf_task_configs').delete().eq('workflow_id', wfId),
-        supabase.from('wf_validation_configs').delete().eq('workflow_id', wfId),
-      ]);
+      throwOnSupabaseError(
+        await supabase.from('wf_workflows').update({
+          config_mode: 'standard',
+          standard_options: options as any,
+          customized_at: null,
+        }).eq('id', wfId),
+        'wf_workflows update (standard)',
+      );
 
-      // Insert new structure
-      if (structure.steps.length > 0) {
-        await supabase.from('wf_steps').insert(structure.steps.map(s => ({ ...s, workflow_id: wfId, step_type: s.step_type as any, validation_mode: (s.validation_mode || 'none') as any })));
-      }
-      if (structure.transitions.length > 0) {
-        await supabase.from('wf_transitions').insert(structure.transitions.map(t => ({ ...t, workflow_id: wfId })));
-      }
-      if (structure.notifications.length > 0) {
-        await supabase.from('wf_notifications').insert(structure.notifications.map(n => ({ ...n, workflow_id: wfId })));
-      }
-      if (structure.taskConfigs.length > 0) {
-        await supabase.from('wf_task_configs').insert(structure.taskConfigs.map(tc => ({ ...tc, workflow_id: wfId })));
-      }
-      if (structure.validationConfigs.length > 0) {
-        await supabase.from('wf_validation_configs').insert(structure.validationConfigs.map(vc => ({ ...vc, workflow_id: wfId })));
-      }
-
-      // Save options + mode
-      await supabase.from('wf_workflows').update({
-        config_mode: 'standard',
-        standard_options: options as any,
-        customized_at: null,
-      }).eq('id', wfId);
+      const spid = wf.workflow.sub_process_template_id;
+      if (spid) await deactivateOtherActiveWorkflows(spid, wfId);
 
       toast.success('Configuration standard appliquée');
       await wf.refetch();
@@ -121,17 +164,39 @@ export function WorkflowConfigTab({ subProcessId, subProcessName, canManage }: P
     } finally {
       setIsApplyingStandard(false);
     }
-  }, [wf.workflow]);
+  }, [wf.workflow, replaceWorkflowWithStandardStructure, wf, tv]);
 
   const switchToAdvanced = useCallback(async () => {
     if (!wf.workflow) return;
-    await supabase.from('wf_workflows').update({
-      config_mode: 'advanced',
-      customized_at: new Date().toISOString(),
-    }).eq('id', wf.workflow.id);
-    toast.success('Mode avancé activé');
-    await wf.refetch();
-  }, [wf.workflow]);
+    setIsApplyingStandard(true);
+    try {
+      const wfId = wf.workflow.id;
+      // Matérialiser en base exactement l’aperçu du mode standard (generateStandardStructure),
+      // sinon l’onglet avancé ne liste que le squelette BDD alors que l’UI montrait 8 étapes.
+      await replaceWorkflowWithStandardStructure(wfId, standardOptions);
+
+      throwOnSupabaseError(
+        await supabase.from('wf_workflows').update({
+          config_mode: 'advanced',
+          standard_options: standardOptions as any,
+          customized_at: new Date().toISOString(),
+        }).eq('id', wfId),
+        'wf_workflows update (advanced)',
+      );
+
+      const spid = wf.workflow.sub_process_template_id;
+      if (spid) await deactivateOtherActiveWorkflows(spid, wfId);
+
+      toast.success('Mode avancé activé');
+      await wf.refetch();
+      tv.fetchTasksAndValidations();
+    } catch (err) {
+      console.error(err);
+      toast.error('Erreur lors du passage en mode avancé');
+    } finally {
+      setIsApplyingStandard(false);
+    }
+  }, [wf.workflow, standardOptions, replaceWorkflowWithStandardStructure, wf, tv]);
 
   const switchToStandard = useCallback(async () => {
     if (!wf.workflow) return;
@@ -194,6 +259,7 @@ export function WorkflowConfigTab({ subProcessId, subProcessName, canManage }: P
         mode={configMode}
         canManage={canManage}
         customizedAt={customizedAt}
+        isBusy={isApplyingStandard}
         onSwitchToAdvanced={switchToAdvanced}
         onSwitchToStandard={switchToStandard}
       />

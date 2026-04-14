@@ -142,6 +142,19 @@ export function WfStandardModePanel({ options, canManage, onOptionsChange, onApp
                     </Select>
                   </div>
                 )}
+                <div className="flex items-center justify-between gap-2 pl-4 border-l-2 border-amber-200 pt-1">
+                  <div className="space-y-0.5">
+                    <Label className="text-xs">Refus → retour exécuteur</Label>
+                    <p className="text-[10px] text-muted-foreground leading-snug">
+                      Si activé, « Tâche non validée » renvoie l’action à l’assigné pour correction puis nouvelle validation. Sinon, refus sans retour vers l’exécution (clôture côté workflow).
+                    </p>
+                  </div>
+                  <Switch
+                    checked={options.final_rejection_returns_to_executor !== false}
+                    onCheckedChange={v => update({ final_rejection_returns_to_executor: v })}
+                    disabled={!canManage}
+                  />
+                </div>
               </>
             )}
           </CardContent>

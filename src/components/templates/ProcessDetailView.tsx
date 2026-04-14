@@ -194,6 +194,9 @@ export function ProcessDetailView({
               </TabsContent>
 
               <TabsContent value="tasks" className="p-6 pt-4 space-y-2">
+                <p className="text-xs text-muted-foreground rounded-md border border-amber-200/80 bg-amber-50/50 dark:bg-amber-950/20 px-3 py-2 mb-2">
+                  Validation avant clôture : ouvrez une tâche (icône crayon dans la liste dépliable) et utilisez la section « Qui valide avant la clôture ? » pour afficher « Envoyer pour validation » aux exécutants.
+                </p>
                 {directTasks.length === 0 ? (
                   <div className="text-center py-8">
                     <ListTodo className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />

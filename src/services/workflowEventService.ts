@@ -381,6 +381,24 @@ async function handleTaskStatusChanged(taskId: string, payload: EventPayload): P
   }
 
   // =========================================
+  // CAS 4b: Refus définitif (pending_validation_* → refused, sans retour exécuteur)
+  // =========================================
+  if (toStatus === 'refused' && isPendingValidation(fromStatus || '')) {
+    const comment = payload.comment || task.validation_1_comment || task.validation_2_comment || '';
+    if (task.assignee_id) {
+      await createNotification({
+        recipient_id: task.assignee_id,
+        type: 'validation_decided',
+        title: 'Tâche non validée',
+        body: `La tâche "${title}" n'a pas été validée.${comment ? ` Motif : ${comment}` : ''}`,
+        entity_type: 'task',
+        entity_id: taskId,
+      });
+    }
+    return;
+  }
+
+  // =========================================
   // CAS 5: Tâche terminée (done) - sans validation
   // =========================================
   if (toStatus === 'done') {
