@@ -15,9 +15,17 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
-import { useSupplierEnrichment, SupplierFilters, SupplierSortConfig, SupplierEnrichment } from '@/hooks/useSupplierEnrichment';
+import {
+  useSupplierEnrichment,
+  useBulkSupplierValidation,
+  isSupplierValidatedByRole,
+  SupplierFilters,
+  SupplierSortConfig,
+  SupplierEnrichment,
+  type SupplierValidationRole,
+} from '@/hooks/useSupplierEnrichment';
 import { useSupplierFilterPresets, SupplierFilterPreset } from '@/hooks/useSupplierFilterPresets';
-import { Search, Filter, ExternalLink, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LayoutGrid, List, Save, Star, Trash2, FolderOpen, RotateCcw, Columns3, Pencil, Globe, GripVertical } from 'lucide-react';
+import { Search, Filter, ExternalLink, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, LayoutGrid, List, Save, Star, Trash2, FolderOpen, RotateCcw, Columns3, Pencil, Globe, GripVertical, Loader2 } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -36,6 +44,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -53,11 +62,18 @@ import {
 
 type SupplierViewMode = 'table' | 'grid';
 
+const VALIDATION_GROUP_LABEL: Record<SupplierValidationRole, string> = {
+  achat: 'Achats',
+  compta: 'Comptabilité',
+};
+
 interface SupplierListViewProps {
   onOpenSupplier: (id: string) => void;
   onViewSupplier: (id: string) => void;
   canEdit?: boolean;
   isAdmin?: boolean;
+  /** Rôle métier pour valider / annuler la validation (même groupe uniquement). */
+  supplierRole?: SupplierValidationRole | null;
   /** Si vrai (route /suppliers uniquement), ordre des colonnes persisté sur le profil et en-têtes réordonnables. */
   persistColumnOrderToProfile?: boolean;
 }
@@ -112,12 +128,12 @@ function colWidthPx(key: string, widths: Record<string, number>): number {
 /** Positions `left` des colonnes sticky (largeurs = état utilisateur). */
 function getSupplierStickyColumnLayout(
   activeColumns: SupplierColumnDef[],
-  canEdit: boolean,
+  leadingColumnWidthPx: number,
   widths: Record<string, number>,
 ): { leftByKey: Map<string, number>; order: string[] } {
   const leftByKey = new Map<string, number>();
   const order: string[] = [];
-  let left = canEdit ? 52 : 0;
+  let left = leadingColumnWidthPx;
   for (const key of HORIZONTAL_STICKY_SUPPLIER_KEYS) {
     if (!activeColumns.some((c) => c.key === key)) continue;
     leftByKey.set(key, left);
@@ -242,6 +258,30 @@ const ALL_COLUMNS: SupplierColumnDef[] = [
   { key: 'ca_estime', label: 'CA estimé', defaultVisible: false, render: (s) => s.ca_estime != null ? new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(s.ca_estime) : '—' },
   { key: 'description', label: 'Description', defaultVisible: false, render: (s) => <span title={s.description || ''} className="max-w-[300px] block whitespace-pre-wrap">{s.description || '—'}</span> },
   { key: 'status', label: 'Statut', defaultVisible: false, render: (s) => s.status || '—' },
+  {
+    key: 'validation_achats',
+    label: 'Validé achats',
+    defaultVisible: false,
+    className: 'w-[124px]',
+    render: (s) =>
+      s.validated_by_achats_at ? (
+        <span className="text-xs text-muted-foreground">{safeFormatDate(s.validated_by_achats_at)}</span>
+      ) : (
+        '—'
+      ),
+  },
+  {
+    key: 'validation_compta',
+    label: 'Validé compta',
+    defaultVisible: false,
+    className: 'w-[124px]',
+    render: (s) =>
+      s.validated_by_compta_at ? (
+        <span className="text-xs text-muted-foreground">{safeFormatDate(s.validated_by_compta_at)}</span>
+      ) : (
+        '—'
+      ),
+  },
   { key: 'created_at', label: 'Date création', defaultVisible: false, render: (s) => <span className="text-muted-foreground text-sm">{safeFormatDate(s.created_at)}</span> },
   { key: 'completeness_score', label: 'Complétude', defaultVisible: true, className: 'w-[150px]', render: () => null /* special */ },
   { key: 'updated_at', label: 'Mise à jour', defaultVisible: true, render: (s) => <span className="text-muted-foreground text-sm">{safeFormatDate(s.updated_at)}</span> },
@@ -382,6 +422,7 @@ export function SupplierListView({
   onViewSupplier,
   canEdit = false,
   isAdmin = false,
+  supplierRole = null,
   persistColumnOrderToProfile = false,
 }: SupplierListViewProps) {
   const pageSize = 200;
@@ -578,6 +619,93 @@ export function SupplierListView({
     if (page >= totalPages) setPage(Math.max(0, totalPages - 1));
   }, [page, totalPages]);
 
+  const showValidationControls = supplierRole === 'achat' || supplierRole === 'compta';
+  const leadingColumnWidthPx = useMemo(() => {
+    if (!showValidationControls && !canEdit) return 0;
+    if (showValidationControls && canEdit) return 88;
+    return 52;
+  }, [showValidationControls, canEdit]);
+  const showLeadingColumn = leadingColumnWidthPx > 0;
+
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const bulkValidation = useBulkSupplierValidation();
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [page, viewMode]);
+
+  const pageSupplierIds = useMemo(() => filteredSuppliers.map((s) => s.id), [filteredSuppliers]);
+  const allOnPageSelected =
+    pageSupplierIds.length > 0 && pageSupplierIds.every((id) => selectedIds.has(id));
+  const someOnPageSelected =
+    pageSupplierIds.some((id) => selectedIds.has(id)) && !allOnPageSelected;
+
+  const selectedRowsOnPage = useMemo(
+    () => filteredSuppliers.filter((s) => selectedIds.has(s.id)),
+    [filteredSuppliers, selectedIds],
+  );
+
+  const allSelectedValidatedByMyGroup =
+    !!supplierRole &&
+    selectedRowsOnPage.length > 0 &&
+    selectedRowsOnPage.length === selectedIds.size &&
+    selectedRowsOnPage.every((s) => isSupplierValidatedByRole(s, supplierRole));
+
+  const idsToValidate =
+    supplierRole && selectedRowsOnPage.length > 0
+      ? selectedRowsOnPage.filter((s) => !isSupplierValidatedByRole(s, supplierRole)).map((s) => s.id)
+      : [];
+
+  const handleValidationAction = async () => {
+    if (!supplierRole || selectedIds.size === 0) return;
+    if (selectedRowsOnPage.length !== selectedIds.size) {
+      toast({
+        title: 'Sélection invalide',
+        description: 'Les fournisseurs sélectionnés doivent être visibles sur la page courante (changement de page réinitialise la sélection).',
+        variant: 'destructive',
+      });
+      return;
+    }
+    try {
+      if (allSelectedValidatedByMyGroup) {
+        await bulkValidation.mutateAsync({
+          ids: selectedRowsOnPage.map((s) => s.id),
+          mode: 'cancel',
+          role: supplierRole,
+        });
+        toast({
+          title: 'Validation annulée',
+          description: `La validation ${VALIDATION_GROUP_LABEL[supplierRole]} a été retirée pour ${selectedRowsOnPage.length} fiche(s).`,
+        });
+      } else {
+        if (idsToValidate.length === 0) return;
+        await bulkValidation.mutateAsync({
+          ids: idsToValidate,
+          mode: 'validate',
+          role: supplierRole,
+        });
+        toast({
+          title: 'Fournisseurs validés',
+          description: `${idsToValidate.length} fiche(s) marquée(s) par ${VALIDATION_GROUP_LABEL[supplierRole]}.`,
+        });
+      }
+      setSelectedIds(new Set());
+    } catch (e: unknown) {
+      toast({
+        title: 'Erreur',
+        description: e instanceof Error ? e.message : 'Mise à jour impossible',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const validationPrimaryDisabled =
+    bulkValidation.isPending ||
+    !supplierRole ||
+    selectedIds.size === 0 ||
+    selectedRowsOnPage.length !== selectedIds.size ||
+    (!allSelectedValidatedByMyGroup && idsToValidate.length === 0);
+
   const statusConfig = {
     a_completer: { label: 'À compléter', color: 'bg-destructive/10 text-destructive' },
     en_cours: { label: 'En cours', color: 'bg-warning/10 text-warning' },
@@ -631,8 +759,8 @@ export function SupplierListView({
     [persistColumnOrderToProfile, activeColumns, visibleColumns],
   );
   const stickyLayout = useMemo(
-    () => getSupplierStickyColumnLayout(activeColumns, canEdit, columnWidths),
-    [activeColumns, canEdit, columnWidths],
+    () => getSupplierStickyColumnLayout(activeColumns, leadingColumnWidthPx, columnWidths),
+    [activeColumns, leadingColumnWidthPx, columnWidths],
   );
   /** Fond opaque (carte / muted au survol de ligne) — pas de transparence. */
   const stickyColClass =
@@ -641,8 +769,8 @@ export function SupplierListView({
     'sticky border-r border-border bg-card shadow-[4px_0_8px_-6px_rgba(0,0,0,0.14)] hover:!bg-muted';
   const tableWidthPx = useMemo(() => {
     const sum = activeColumns.reduce((acc, c) => acc + colWidthPx(c.key, columnWidths), 0);
-    return Math.max(sum + (canEdit ? 52 : 0), 800);
-  }, [activeColumns, columnWidths, canEdit]);
+    return Math.max(sum + leadingColumnWidthPx, 800);
+  }, [activeColumns, columnWidths, leadingColumnWidthPx]);
   const toggleColumn = (key: string) => {
     setVisibleColumns(prev =>
       prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
@@ -689,6 +817,40 @@ export function SupplierListView({
           <div className="text-2xl font-bold text-success">{stats.complet}</div>
         </Card>
       </div>
+
+      {showValidationControls && selectedIds.size > 0 && supplierRole && (
+        <Card className="p-4 border-primary/30 bg-primary/5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm">
+              <span className="font-medium">{selectedIds.size}</span> fournisseur(s) sélectionné(s)
+              {selectedRowsOnPage.length !== selectedIds.size && (
+                <span className="block text-destructive text-xs mt-1">
+                  Sélectionnez uniquement des lignes visibles sur cette page pour agir.
+                </span>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant={allSelectedValidatedByMyGroup ? 'outline' : 'default'}
+                className={cn(!allSelectedValidatedByMyGroup && 'bg-green-600 hover:bg-green-700')}
+                disabled={validationPrimaryDisabled}
+                onClick={() => void handleValidationAction()}
+              >
+                {bulkValidation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : null}
+                {allSelectedValidatedByMyGroup
+                  ? `Annuler la validation de ${VALIDATION_GROUP_LABEL[supplierRole]}`
+                  : 'Valider le(s) fournisseur(s)'}
+              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
+                Effacer la sélection
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Filters */}
       <Card className="p-4">
@@ -966,9 +1128,27 @@ export function SupplierListView({
               return (
                 <Card key={supplier.id} className="p-4 cursor-pointer hover:shadow-md transition-shadow border-l-4" style={{ borderLeftColor: score >= 80 ? 'hsl(var(--success))' : score >= 40 ? 'hsl(var(--warning))' : 'hsl(var(--destructive))' }} onClick={() => onViewSupplier(supplier.id)}>
                   <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-sm truncate">{supplier.nomfournisseur || '—'}</p>
-                      <p className="font-mono text-xs text-muted-foreground">{supplier.tiers}</p>
+                    <div className="flex items-start gap-2 min-w-0 flex-1">
+                      {showValidationControls && (
+                        <div className="pt-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedIds.has(supplier.id)}
+                            onCheckedChange={(v) => {
+                              setSelectedIds((prev) => {
+                                const next = new Set(prev);
+                                if (v === true) next.add(supplier.id);
+                                else next.delete(supplier.id);
+                                return next;
+                              });
+                            }}
+                            aria-label={`Sélectionner ${supplier.nomfournisseur || supplier.tiers}`}
+                          />
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-sm truncate">{supplier.nomfournisseur || '—'}</p>
+                        <p className="font-mono text-xs text-muted-foreground">{supplier.tiers}</p>
+                      </div>
                     </div>
                     {st && <Badge className={cn('text-[10px] px-1.5 py-0 shrink-0', st.color)}>{score}%</Badge>}
                   </div>
@@ -1010,7 +1190,40 @@ export function SupplierListView({
                 <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleColumnDragEnd}>
                 <TableHeader className="sticky top-0 z-[10] bg-card [&_tr]:border-b shadow-[0_1px_3px_-1px_rgba(0,0,0,0.1)]">
                   <TableRow>
-                    {canEdit && <TableHead className={cn("w-[50px] bg-card", stickyHeadColClass)} style={{ left: 0, zIndex: 12, width: 52, minWidth: 52, maxWidth: 52 }}></TableHead>}
+                    {showLeadingColumn && (
+                      <TableHead
+                        className={cn('bg-card', stickyHeadColClass)}
+                        style={{
+                          left: 0,
+                          zIndex: 12,
+                          width: leadingColumnWidthPx,
+                          minWidth: leadingColumnWidthPx,
+                          maxWidth: leadingColumnWidthPx,
+                        }}
+                      >
+                        {showValidationControls ? (
+                          <div className="flex items-center justify-center">
+                            <Checkbox
+                              checked={
+                                allOnPageSelected ? true : someOnPageSelected ? 'indeterminate' : false
+                              }
+                              onCheckedChange={() => {
+                                setSelectedIds((prev) => {
+                                  const next = new Set(prev);
+                                  if (allOnPageSelected) {
+                                    pageSupplierIds.forEach((id) => next.delete(id));
+                                  } else {
+                                    pageSupplierIds.forEach((id) => next.add(id));
+                                  }
+                                  return next;
+                                });
+                              }}
+                              aria-label="Sélectionner tous les fournisseurs de la page"
+                            />
+                          </div>
+                        ) : null}
+                      </TableHead>
+                    )}
                     <SortableContext items={activeColumns.map((c) => c.key)} strategy={horizontalListSortingStrategy}>
                     {activeColumns.map((col) => {
                       const w = colWidthPx(col.key, columnWidths);
@@ -1042,7 +1255,20 @@ export function SupplierListView({
                   {isLoading ? (
                      Array.from({ length: 8 }).map((_, i) => (
                       <TableRow key={i}>
-                        {canEdit && <TableCell className={stickyColClass} style={{ left: 0, zIndex: 3, width: 52, minWidth: 52, maxWidth: 52 }}><Skeleton className="h-4 w-8" /></TableCell>}
+                        {showLeadingColumn && (
+                          <TableCell
+                            className={stickyColClass}
+                            style={{
+                              left: 0,
+                              zIndex: 3,
+                              width: leadingColumnWidthPx,
+                              minWidth: leadingColumnWidthPx,
+                              maxWidth: leadingColumnWidthPx,
+                            }}
+                          >
+                            <Skeleton className="h-4 w-8 mx-auto" />
+                          </TableCell>
+                        )}
                         {activeColumns.map((col, j) => {
                           const w = colWidthPx(col.key, columnWidths);
                           const stickyPart = stickySupplierCellStyle(
@@ -1062,16 +1288,44 @@ export function SupplierListView({
                     ))
                   ) : filteredSuppliers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={activeColumns.length + (canEdit ? 1 : 0)} className="text-center py-8 text-muted-foreground">Aucun fournisseur trouvé</TableCell>
+                      <TableCell colSpan={activeColumns.length + (showLeadingColumn ? 1 : 0)} className="text-center py-8 text-muted-foreground">Aucun fournisseur trouvé</TableCell>
                     </TableRow>
                   ) : (
                     filteredSuppliers.map((supplier) => (
                       <TableRow key={supplier.id} className="group cursor-pointer hover:bg-muted/50" onClick={() => onViewSupplier(supplier.id)}>
-                        {canEdit && (
-                          <TableCell className={stickyColClass} style={{ left: 0, zIndex: 3, width: 52, minWidth: 52, maxWidth: 52 }}>
-                            <Button variant="ghost" size="icon" title="Modifier" onClick={(e) => { e.stopPropagation(); onOpenSupplier(supplier.id); }}>
-                              <Pencil className="h-4 w-4" />
-                            </Button>
+                        {showLeadingColumn && (
+                          <TableCell
+                            className={cn(stickyColClass, 'p-0')}
+                            style={{
+                              left: 0,
+                              zIndex: 3,
+                              width: leadingColumnWidthPx,
+                              minWidth: leadingColumnWidthPx,
+                              maxWidth: leadingColumnWidthPx,
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div className="flex items-center justify-center gap-0.5 py-1">
+                              {showValidationControls && (
+                                <Checkbox
+                                  checked={selectedIds.has(supplier.id)}
+                                  onCheckedChange={(v) => {
+                                    setSelectedIds((prev) => {
+                                      const next = new Set(prev);
+                                      if (v === true) next.add(supplier.id);
+                                      else next.delete(supplier.id);
+                                      return next;
+                                    });
+                                  }}
+                                  aria-label={`Sélectionner ${supplier.nomfournisseur || supplier.tiers}`}
+                                />
+                              )}
+                              {canEdit && (
+                                <Button variant="ghost" size="icon" title="Modifier" onClick={(e) => { e.stopPropagation(); onOpenSupplier(supplier.id); }}>
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
                           </TableCell>
                         )}
                         {activeColumns.map((col) => {

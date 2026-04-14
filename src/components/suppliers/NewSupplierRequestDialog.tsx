@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Dialog,
@@ -206,6 +206,31 @@ export function NewSupplierRequestDialog({ open, onClose }: NewSupplierRequestDi
 
   const familleOptions = familles.map((f) => ({ value: f, label: f }));
 
+  const handleFamilleChange = useCallback(
+    (next: string) => {
+      setFamille(next);
+      const trimmed = next.trim();
+      if (!trimmed) return;
+      if (familles.some((f) => f.toLowerCase() === trimmed.toLowerCase())) return;
+
+      void (async () => {
+        const { error } = await supabase.rpc('register_supplier_famille_from_demand', {
+          p_famille: trimmed,
+        });
+        if (error) {
+          toast({
+            title: 'Enregistrement de la famille',
+            description: error.message,
+            variant: 'destructive',
+          });
+          return;
+        }
+        await queryClient.invalidateQueries({ queryKey: ['categories_ref', 'familles_all'] });
+      })();
+    },
+    [familles, queryClient]
+  );
+
   return (
     <Dialog open={open} onOpenChange={(next) => !next && !submitting && onClose()}>
       <DialogContent className="sm:max-w-2xl max-h-[92vh] overflow-hidden flex flex-col gap-0 p-0">
@@ -255,7 +280,7 @@ export function NewSupplierRequestDialog({ open, onClose }: NewSupplierRequestDi
                   <Label>Famille de fournisseur *</Label>
                   <SearchableSelect
                     value={famille}
-                    onValueChange={setFamille}
+                    onValueChange={handleFamilleChange}
                     options={familleOptions}
                     placeholder={famillesLoading ? 'Chargement…' : 'Sélectionner une famille…'}
                     disabled={famillesLoading}

@@ -2,6 +2,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface SupplierEnrichment {
   id: string;
@@ -55,6 +56,11 @@ export interface SupplierEnrichment {
   created_at: string;
   updated_at: string;
   updated_by: string | null;
+
+  validated_by_achats_at?: string | null;
+  validated_by_achats_user_id?: string | null;
+  validated_by_compta_at?: string | null;
+  validated_by_compta_user_id?: string | null;
 }
 
 export interface SupplierFilters {
@@ -286,6 +292,51 @@ export function useSupplierEnrichment(filters: SupplierFilters, page = 0, pageSi
       } as FilterOptions),
     updateSupplier,
   };
+}
+
+export type SupplierValidationRole = 'achat' | 'compta';
+
+export function isSupplierValidatedByRole(s: SupplierEnrichment, role: SupplierValidationRole): boolean {
+  if (role === 'achat') return !!s.validated_by_achats_at;
+  return !!s.validated_by_compta_at;
+}
+
+export function useBulkSupplierValidation() {
+  const queryClient = useQueryClient();
+  const { profile } = useAuth();
+
+  return useMutation({
+    mutationFn: async (params: {
+      ids: string[];
+      mode: 'validate' | 'cancel';
+      role: SupplierValidationRole;
+    }) => {
+      const { ids, mode, role } = params;
+      if (!profile?.id) throw new Error('Profil utilisateur introuvable');
+      const patch =
+        role === 'achat'
+          ? mode === 'validate'
+            ? {
+                validated_by_achats_at: new Date().toISOString(),
+                validated_by_achats_user_id: profile.id,
+              }
+            : { validated_by_achats_at: null, validated_by_achats_user_id: null }
+          : mode === 'validate'
+            ? {
+                validated_by_compta_at: new Date().toISOString(),
+                validated_by_compta_user_id: profile.id,
+              }
+            : { validated_by_compta_at: null, validated_by_compta_user_id: null };
+
+      for (const id of ids) {
+        const { error } = await supabase.from('supplier_purchase_enrichment').update(patch).eq('id', id);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['supplier-enrichment'] });
+    },
+  });
 }
 
 export function useSupplierById(id: string | null) {

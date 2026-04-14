@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 export default function SupplierReference() {
   const { effectivePermissions, isLoading: permLoading } = useEffectivePermissions();
-  const { supplierPermissions, isLoading: accessLoading } = useSupplierAccess();
+  const { supplierPermissions, role: supplierRole, isLoading: accessLoading } = useSupplierAccess();
   const { isAdmin } = useUserRole();
   const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -95,6 +95,7 @@ export default function SupplierReference() {
             onViewSupplier={handleViewSupplier}
             canEdit={supplierPermissions.canEdit}
             isAdmin={isAdmin}
+            supplierRole={supplierRole}
             persistColumnOrderToProfile
           />
         </main>
