@@ -5227,7 +5227,9 @@ export type Database = {
           is_locked_for_validation: boolean | null
           it_project_id: string | null
           it_project_phase: string | null
+          allows_reassignment: boolean
           original_assignee_id: string | null
+          reassignment_stakeholder_id: string | null
           parent_request_id: string | null
           parent_sub_process_run_id: string | null
           planner_labels: string[] | null
@@ -5308,7 +5310,9 @@ export type Database = {
           is_locked_for_validation?: boolean | null
           it_project_id?: string | null
           it_project_phase?: string | null
+          allows_reassignment?: boolean
           original_assignee_id?: string | null
+          reassignment_stakeholder_id?: string | null
           parent_request_id?: string | null
           parent_sub_process_run_id?: string | null
           planner_labels?: string[] | null
@@ -5389,7 +5393,9 @@ export type Database = {
           is_locked_for_validation?: boolean | null
           it_project_id?: string | null
           it_project_phase?: string | null
+          allows_reassignment?: boolean
           original_assignee_id?: string | null
+          reassignment_stakeholder_id?: string | null
           parent_request_id?: string | null
           parent_sub_process_run_id?: string | null
           planner_labels?: string[] | null
@@ -5501,6 +5507,13 @@ export type Database = {
           {
             foreignKeyName: "tasks_original_assignee_id_fkey"
             columns: ["original_assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_reassignment_stakeholder_id_fkey"
+            columns: ["reassignment_stakeholder_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -8014,6 +8027,10 @@ export type Database = {
           enrichment_id: string
           former_waiting_id: string
         }[]
+      }
+      register_supplier_famille_from_demand: {
+        Args: { p_famille: string }
+        Returns: undefined
       }
       calculate_supplier_completeness: {
         Args: {
