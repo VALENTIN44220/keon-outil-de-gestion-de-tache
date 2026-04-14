@@ -87,9 +87,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        // Ignore technical token refreshes to avoid global rerender storms
-        // when users switch browser tabs and come back.
+        // Keep the session JWT current when Supabase silently refreshes it, but
+        // skip the heavier profile/connection side-effects to avoid rerender storms.
         if (event === 'TOKEN_REFRESHED') {
+          if (session) {
+            setSession(prev => (prev?.access_token === session.access_token ? prev : session));
+          }
           return;
         }
 
@@ -137,7 +140,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (session?.user) {
         lastProfileUserIdRef.current = session.user.id;
         fetchProfile(session.user.id).then(setProfile);
-        void connectMicrosoftOnFirstOAuthLogin(session);
+        // Only forward provider tokens when they are actually present (i.e. right after
+        // an OAuth sign-in). On ordinary page loads getSession() restores from storage
+        // without provider_token, so calling connect here would be a no-op at best and
+        // could overwrite a good refresh_token with null at worst.
+        const providerToken = (session as any).provider_token as string | undefined;
+        if (providerToken) {
+          void connectMicrosoftOnFirstOAuthLogin(session);
+        }
       } else {
         lastProfileUserIdRef.current = null;
       }
