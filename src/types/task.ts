@@ -45,6 +45,10 @@ export interface Task {
   validation_2_by: string | null;
   validation_2_comment: string | null;
   original_assignee_id: string | null;
+  /** Process option: assignee may transfer while keeping prior assignee in the loop */
+  allows_reassignment?: boolean;
+  /** Prior assignee (or similar) who keeps visibility after reassignment */
+  reassignment_stakeholder_id?: string | null;
   is_locked_for_validation: boolean;
   // Request workflow fields
   parent_request_id: string | null;
