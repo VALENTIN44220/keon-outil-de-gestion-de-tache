@@ -2,7 +2,10 @@ import { useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { Task } from '@/types/task';
+import { normalizeValidationLevel } from '@/lib/taskValidationUi';
+// TODO (désactivé) — team_lead_reassignment : décommentez quand la feature est réactivée
+// import { fetchProcessAssignmentSettings, pickAssignmentRuleIdForPendingTask } from '@/lib/processAssignmentConfig';
+// import { resolveWfAssignmentRuleToProfileId } from '@/lib/resolveWfAssignmentRuleToProfile';
 
 interface GeneratePendingAssignmentsOptions {
   parentRequestId: string;
@@ -13,7 +16,7 @@ interface GeneratePendingAssignmentsOptions {
 }
 
 export function useRequestWorkflow() {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
 
   /**
@@ -59,20 +62,48 @@ export function useRequestWorkflow() {
           return 0;
         }
 
-        // Get parent request title
-        const { data: parentRequest } = await supabase
+        const { data: parentRow } = await supabase
           .from('tasks')
-          .select('title')
+          .select('due_date, requester_id, reporter_id')
           .eq('id', parentRequestId)
-          .single();
+          .maybeSingle();
+        const parentDue: string | null = parentRow?.due_date
+          ? String(parentRow.due_date).split('T')[0]
+          : null;
+
+        // Résoudre le manager effectif (depuis l'option passée ou depuis le template de sous-processus)
+        let effectiveTargetManagerId = targetManagerId;
+        if (!effectiveTargetManagerId && subProcessTemplateId) {
+          const { data: spt } = await supabase
+            .from('sub_process_templates')
+            .select('target_manager_id')
+            .eq('id', subProcessTemplateId)
+            .maybeSingle();
+          effectiveTargetManagerId = spt?.target_manager_id ?? undefined;
+        }
+
+        /*
+         * TODO (désactivé) — team_lead_reassignment
+         * Lorsque la feature sera réactivée, récupérer ici `processAssignment` via
+         * `fetchProcessAssignmentSettings(processTemplateId)`, résoudre la règle WF via
+         * `pickAssignmentRuleIdForPendingTask` + `resolveWfAssignmentRuleToProfileId`, puis
+         * insérer avec `status: 'todo'`, `assignee_id` = profil résolu, `allows_reassignment: true`.
+         */
 
         const today = new Date();
+        const y0 = today.getFullYear();
+        const m0 = today.getMonth();
+        const d0 = today.getDate();
 
-        // Create tasks directly with status "to_assign" assigned to the target manager
         for (const template of taskTemplates) {
-          const dueDate = template.default_duration_days
-            ? new Date(today.getTime() + template.default_duration_days * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+          const dueFromTemplate = template.default_duration_days
+            ? (() => {
+                const d = new Date(y0, m0, d0 + Number(template.default_duration_days));
+                return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+              })()
             : null;
+          // Échéance de la demande parente (saisie à la création) : sinon délai par défaut du gabarit.
+          const dueDate = parentDue ?? dueFromTemplate;
 
           const { data: newTask, error: taskError } = await supabase
             .from('tasks')
@@ -80,16 +111,22 @@ export function useRequestWorkflow() {
               title: template.title,
               description: template.description,
               priority: template.priority,
-              status: 'to_assign', // New status: À affecter
-              type: 'task',
+              status: 'to_assign' as const,
+              type: 'task' as const,
               due_date: dueDate,
               user_id: user.id,
-              assignee_id: targetManagerId || null, // Assigned to the target manager
+              assignee_id: effectiveTargetManagerId || null,
               parent_request_id: parentRequestId,
+              requester_id: parentRow?.requester_id ?? null,
+              reporter_id: parentRow?.reporter_id ?? null,
               source_process_template_id: processTemplateId,
               source_sub_process_template_id: subProcessTemplateId || null,
               target_department_id: targetDepartmentId,
               requires_validation: template.requires_validation || false,
+              validation_level_1: normalizeValidationLevel(template.validation_level_1),
+              validation_level_2: normalizeValidationLevel(template.validation_level_2),
+              validator_level_1_id: template.validator_level_1_id ?? null,
+              validator_level_2_id: template.validator_level_2_id ?? null,
               is_assignment_task: false,
             })
             .select()

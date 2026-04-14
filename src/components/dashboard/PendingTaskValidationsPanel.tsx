@@ -17,6 +17,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { useSubProcessFinalRejectionPolicy } from '@/hooks/useSubProcessFinalRejectionPolicy';
+import { rejectValidationWithExecutorPolicy } from '@/services/taskStatusService';
 
 interface PendingTaskValidationsPanelProps {
   tasks: Task[];
@@ -39,6 +41,9 @@ export function PendingTaskValidationsPanel({
   } | null>(null);
   const [comment, setComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const returnsToExecutorOnReject = useSubProcessFinalRejectionPolicy(
+    actionDialog?.task?.source_sub_process_template_id ?? undefined,
+  );
 
   const getLevel = (task: Task): 1 | 2 => {
     return task.status === 'pending_validation_2' ? 2 : 1;
@@ -98,21 +103,21 @@ export function PendingTaskValidationsPanel({
     const level = getLevel(task);
 
     try {
-      const { error } = await (supabase as any)
-        .from('tasks')
-        .update({
-          status: 'in-progress',
-          [`validation_${level}_status`]: 'refused',
-          [`validation_${level}_at`]: new Date().toISOString(),
-          [`validation_${level}_by`]: profile.id,
-          [`validation_${level}_comment`]: comment,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', task.id);
+      const result = await rejectValidationWithExecutorPolicy(
+        task.id,
+        level,
+        profile.id,
+        comment,
+        returnsToExecutorOnReject,
+      );
+      if (!result.success) throw new Error(result.error);
 
-      if (error) throw error;
-
-      toast({ title: 'Tâche refusée', description: 'La tâche a été renvoyée en cours.' });
+      toast({
+        title: returnsToExecutorOnReject ? 'Tâche non validée' : 'Refus enregistré',
+        description: returnsToExecutorOnReject
+          ? 'La tâche a été renvoyée à l’assigné pour correction.'
+          : 'Le refus a été enregistré (sans retour automatique vers l’exécution).',
+      });
       setActionDialog(null);
       setComment('');
       onRefresh();
@@ -206,7 +211,7 @@ export function PendingTaskValidationsPanel({
                       }}
                     >
                       <XCircle className="h-3.5 w-3.5" />
-                      Refuser
+                      {task.source_sub_process_template_id ? 'Non validée' : 'Refuser'}
                     </Button>
                   </div>
                 </div>
@@ -260,7 +265,7 @@ export function PendingTaskValidationsPanel({
                 variant="destructive"
               >
                 {isSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                Refuser
+                {actionDialog.task.source_sub_process_template_id ? 'Tâche non validée' : 'Refuser'}
               </Button>
             )}
           </DialogFooter>

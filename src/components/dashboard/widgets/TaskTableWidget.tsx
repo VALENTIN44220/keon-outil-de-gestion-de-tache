@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Task } from '@/types/task';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
@@ -9,10 +9,12 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Checkbox } from '@/components/ui/checkbox';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { formatTaskCalendarDate } from '@/lib/formatTaskDate';
 import { cn } from '@/lib/utils';
 import { Columns3 } from 'lucide-react';
 import { TASK_STATUS_LABELS, TASK_STATUS_COLORS } from '@/services/taskStatusService';
 import { supabase } from '@/integrations/supabase/client';
+import { DASHBOARD_TABLE_INITIAL_ROWS, DASHBOARD_TABLE_SCROLL_CHUNK } from '@/lib/dashboardTaskLimits';
 
 interface TaskTableWidgetProps {
   tasks: Task[];
@@ -56,6 +58,12 @@ function renderDate(dateStr: string | null) {
   }
 }
 
+function renderDueDate(dateStr: string | null) {
+  if (!dateStr) return '-';
+  const s = formatTaskCalendarDate(dateStr, 'dd MMM yyyy');
+  return s || '-';
+}
+
 const ALL_COLUMNS: ColumnDef[] = [
   { key: 'task_number', label: 'N° Tâche', defaultVisible: true, render: (t) => t.task_number || '-' },
   { key: 'parent_request_number', label: 'Réf. Demande', defaultVisible: true, render: (t) => t._parentRequestNumber ? (
@@ -64,7 +72,7 @@ const ALL_COLUMNS: ColumnDef[] = [
   { key: 'title', label: 'Titre', defaultVisible: true, render: (t) => <span className="font-medium max-w-[250px] truncate block">{t.title}</span>, width: 'max-w-[250px]' },
   { key: 'status', label: 'Statut', defaultVisible: true, render: (t) => renderStatus(t.status) },
   { key: 'priority', label: 'Priorité', defaultVisible: true, render: (t) => renderPriority(t.priority) },
-  { key: 'due_date', label: 'Échéance', defaultVisible: true, render: (t) => renderDate(t.due_date) },
+  { key: 'due_date', label: 'Échéance', defaultVisible: true, render: (t) => renderDueDate(t.due_date) },
   { key: 'source', label: 'Source', defaultVisible: true, render: (t) => {
     if (t.planner_task_id) return <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">Planner</Badge>;
     if (t.parent_request_id) return <Badge variant="outline" className="text-xs bg-keon-orange/10 text-keon-orange border-keon-orange/30">Demande</Badge>;
@@ -115,7 +123,44 @@ export function TaskTableWidget({ tasks, onTaskClick, processId }: TaskTableWidg
   })), [taskItems, parentRequestNumbers]);
 
   const { sortedData, sortConfig, handleSort } = useTableSort(enrichedTasks, 'created_at', 'desc');
-  const displayTasks = sortedData.slice(0, 100);
+  const sortedLengthRef = useRef(0);
+  sortedLengthRef.current = sortedData.length;
+
+  const [visibleCount, setVisibleCount] = useState(DASHBOARD_TABLE_INITIAL_ROWS);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setVisibleCount(DASHBOARD_TABLE_INITIAL_ROWS);
+  }, [enrichedTasks.length, sortConfig.key, sortConfig.direction]);
+
+  useEffect(() => {
+    setVisibleCount((c) => Math.min(c, sortedData.length));
+  }, [sortedData.length]);
+
+  useEffect(() => {
+    const root = scrollRef.current;
+    const sentinel = sentinelRef.current;
+    if (!root || !sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return;
+        setVisibleCount((c) => {
+          const max = sortedLengthRef.current;
+          if (c >= max) return c;
+          return Math.min(c + DASHBOARD_TABLE_SCROLL_CHUNK, max);
+        });
+      },
+      { root, rootMargin: '100px', threshold: 0 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [sortedData]);
+
+  const effectiveVisible = Math.min(visibleCount, sortedData.length);
+  const displayTasks = sortedData.slice(0, effectiveVisible);
+  const hasMoreRows = effectiveVisible < sortedData.length;
 
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
     const saved = localStorage.getItem(storageKey);
@@ -172,7 +217,7 @@ export function TaskTableWidget({ tasks, onTaskClick, processId }: TaskTableWidg
       </div>
 
       {/* Table */}
-      <div className="flex-1 overflow-auto">
+      <div ref={scrollRef} className="flex-1 overflow-auto">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40">
@@ -207,6 +252,11 @@ export function TaskTableWidget({ tasks, onTaskClick, processId }: TaskTableWidg
                 ))}
               </TableRow>
             ))}
+            {hasMoreRows && (
+              <TableRow ref={sentinelRef} className="border-0 hover:bg-transparent">
+                <TableCell colSpan={activeColumns.length} className="h-8 p-0 border-0" aria-hidden />
+              </TableRow>
+            )}
             {displayTasks.length === 0 && (
               <TableRow>
                 <TableCell colSpan={activeColumns.length} className="text-center text-muted-foreground py-8">
@@ -218,9 +268,9 @@ export function TaskTableWidget({ tasks, onTaskClick, processId }: TaskTableWidg
         </Table>
       </div>
 
-      {taskItems.length > 100 && (
+      {hasMoreRows && (
         <p className="text-xs text-muted-foreground text-center py-2 shrink-0">
-          Affichage des 100 premières tâches sur {taskItems.length}
+          {effectiveVisible} sur {sortedData.length} tâche{sortedData.length > 1 ? 's' : ''} affichée{sortedData.length > 1 ? 's' : ''} — faites défiler pour charger plus
         </p>
       )}
     </div>

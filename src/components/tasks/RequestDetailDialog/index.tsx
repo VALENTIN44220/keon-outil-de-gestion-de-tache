@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Task, TaskStatus, TaskPriority } from '@/types/task';
 import { useMaterialValidation } from '@/hooks/useMaterialValidation';
 import {
@@ -55,6 +55,8 @@ import {
   LayoutDashboard,
   GitBranch,
    Ban,
+  UserRoundPlus,
+  Send,
 } from 'lucide-react';
 import { ThumbsUp, ThumbsDown } from 'lucide-react';
 import { format } from 'date-fns';
@@ -69,8 +71,18 @@ import { SynthesisTab } from './SynthesisTab';
 import { SubProcessTab } from './SubProcessTab';
 import { WorkflowProgressTab } from './WorkflowProgressTab';
 import { RequestCustomFieldsDisplay } from './RequestCustomFieldsDisplay';
+import { ReassignTaskDialog } from '@/components/workload/ReassignTaskDialog';
+import { useAuth } from '@/contexts/AuthContext';
+import { useUserRole } from '@/hooks/useUserRole';
+import { canInitiateTaskReassignment } from '@/lib/taskReassignmentPermissions';
+import { canOfferSendForValidationInsteadOfMarkDone } from '@/lib/taskValidationUi';
+import { sendTaskForValidationFromExecutorState } from '@/services/taskStatusService';
 
-export function RequestDetailDialog({ task, open, onClose, onStatusChange }: RequestDetailDialogProps) {
+export function RequestDetailDialog({ task, open, onClose, onStatusChange, onTaskMutated }: RequestDetailDialogProps) {
+  const { profile } = useAuth();
+  const { isAdmin } = useUserRole();
+  const [isReassignOpen, setIsReassignOpen] = useState(false);
+  const [taskForReassign, setTaskForReassign] = useState<Task | null>(null);
   const [childTasks, setChildTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [profiles, setProfiles] = useState<Map<string, string>>(new Map());
@@ -98,6 +110,7 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange }: Req
   const [selectedChildTask, setSelectedChildTask] = useState<Task | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSendingChildValidation, setIsSendingChildValidation] = useState(false);
   const [editForm, setEditForm] = useState({
     title: '',
     description: '',
@@ -171,14 +184,7 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange }: Req
     return Math.round((completedTasks / childTasks.length) * 100);
   }, [childTasks]);
 
-  useEffect(() => {
-    if (open && task) {
-      fetchRelatedData();
-      setActiveTab('synthesis');
-    }
-  }, [open, task?.id]);
-
-  const fetchRelatedData = async () => {
+  const fetchRelatedData = useCallback(async () => {
     if (!task) return;
 
     setIsLoading(true);
@@ -258,7 +264,31 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange }: Req
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [task]);
+
+  useEffect(() => {
+    if (open && task) {
+      fetchRelatedData();
+      setActiveTab('synthesis');
+    }
+  }, [open, task?.id, fetchRelatedData]);
+
+  const handleReassigned = useCallback(async () => {
+    const reassignId = taskForReassign?.id;
+    setIsReassignOpen(false);
+    setTaskForReassign(null);
+    if (open && task) {
+      await fetchRelatedData();
+    }
+    if (reassignId) {
+      const { data } = await supabase.from('tasks').select('*').eq('id', reassignId).maybeSingle();
+      if (data) {
+        const updated = data as Task;
+        setSelectedChildTask((prev) => (prev?.id === reassignId ? updated : prev));
+      }
+    }
+    onTaskMutated?.();
+  }, [open, task, taskForReassign?.id, onTaskMutated, fetchRelatedData]);
 
   const handleOpenChildTask = (childTask: Task) => {
     setSelectedChildTask(childTask);
@@ -314,6 +344,36 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange }: Req
       setIsSaving(false);
     }
   };
+
+  const handleChildSendForValidation = useCallback(async () => {
+    if (!selectedChildTask) return;
+    setIsSendingChildValidation(true);
+    try {
+      const res = await sendTaskForValidationFromExecutorState(
+        selectedChildTask.id,
+        selectedChildTask.status,
+        selectedChildTask.validator_level_1_id,
+      );
+      if (!res.success) {
+        toast.error(res.error || 'Envoi pour validation impossible');
+        return;
+      }
+      const ns = res.newStatus!;
+      onStatusChange(selectedChildTask.id, ns);
+      const { data: fresh } = await supabase.from('tasks').select('*').eq('id', selectedChildTask.id).maybeSingle();
+      if (fresh) {
+        const row = fresh as Task;
+        setSelectedChildTask(row);
+        setChildTasks((prev) => prev.map((t) => (t.id === row.id ? row : t)));
+      } else {
+        setSelectedChildTask((prev) => (prev ? { ...prev, status: ns } : null));
+        setChildTasks((prev) => prev.map((t) => (t.id === selectedChildTask.id ? { ...t, status: ns } : t)));
+      }
+      toast.success('Tâche envoyée pour validation');
+    } finally {
+      setIsSendingChildValidation(false);
+    }
+  }, [selectedChildTask, onStatusChange]);
 
   const handleSelectSubProcess = (subProcessId: string) => {
     setActiveTab(subProcessId);
@@ -492,8 +552,28 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange }: Req
       : selectedChildTask.status === 'in-progress' 
         ? Clock 
         : AlertCircle;
+
+    const canShowReassignChild =
+      canInitiateTaskReassignment({
+        task: selectedChildTask,
+        profileId: profile?.id,
+        assigneeManagerId: selectedChildAssigneeManagerId,
+        isAdmin,
+      }) &&
+      !!selectedChildTask.assignee_id &&
+      selectedChildTask.status !== 'validated' &&
+      selectedChildTask.status !== 'done' &&
+      selectedChildTask.status !== 'cancelled' &&
+      selectedChildTask.status !== 'refused';
+
+    const childOfferSend = canOfferSendForValidationInsteadOfMarkDone(selectedChildTask);
+    const childCanSubmitValidation =
+      !!profile?.id &&
+      !!selectedChildTask.assignee_id &&
+      (profile.id === selectedChildTask.assignee_id || isAdmin);
         
     return (
+      <>
       <Dialog open={open} onOpenChange={onClose}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -674,6 +754,24 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange }: Req
                   )}
                 </div>
 
+                {canShowReassignChild && (
+                  <>
+                    <Separator />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full gap-2 text-amber-600 border-amber-200 hover:bg-amber-50 hover:text-amber-700"
+                      onClick={() => {
+                        setTaskForReassign(selectedChildTask);
+                        setIsReassignOpen(true);
+                      }}
+                    >
+                      <UserRoundPlus className="h-4 w-4" />
+                      Réaffecter à quelqu'un d'autre
+                    </Button>
+                  </>
+                )}
+
                 <Separator />
                 <TaskCommentsSection taskId={selectedChildTask.id} className="min-h-[200px]" />
 
@@ -681,16 +779,41 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange }: Req
                   <Button variant="outline" onClick={handleCloseChildTask}>
                     Retour
                   </Button>
-                  <Button onClick={() => { onStatusChange(selectedChildTask.id, 'done'); handleCloseChildTask(); }}>
-                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                    Marquer terminé
-                  </Button>
+                  {childOfferSend && childCanSubmitValidation ? (
+                    <Button
+                      disabled={isSendingChildValidation}
+                      onClick={() => void handleChildSendForValidation()}
+                    >
+                      {isSendingChildValidation ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4 mr-2" />
+                      )}
+                      Envoyer pour validation
+                    </Button>
+                  ) : (
+                    <Button onClick={() => { onStatusChange(selectedChildTask.id, 'done'); handleCloseChildTask(); }}>
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      Marquer terminé
+                    </Button>
+                  )}
                 </div>
               </>
             )}
           </div>
         </DialogContent>
       </Dialog>
+      <ReassignTaskDialog
+        task={taskForReassign}
+        isOpen={isReassignOpen && !!taskForReassign}
+        onClose={() => {
+          setIsReassignOpen(false);
+          setTaskForReassign(null);
+        }}
+        onReassigned={handleReassigned}
+        includeWorkloadSlots={false}
+      />
+      </>
     );
   }
 

@@ -24,7 +24,7 @@ import {
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
-import { 
+import {
   Building2, 
   Calendar, 
   CalendarClock,
@@ -34,6 +34,7 @@ import {
   Workflow, 
   ChevronRight,
   CheckCircle2,
+  XCircle,
   Clock,
   AlertCircle,
   Loader2,
@@ -44,7 +45,10 @@ import {
   MessageSquare,
   ListTodo,
   Info,
-  FileText
+  FileText,
+  UserRoundPlus,
+  Send,
+  ShieldCheck,
 } from 'lucide-react';
 import { RequestValidationButton } from './RequestValidationButton';
 import { format } from 'date-fns';
@@ -58,6 +62,16 @@ import { useDueDatePermissionWithManager } from '@/hooks/useDueDatePermission';
 import { RequestInfoTab } from './RequestInfoTab';
 import { ITProjectPhaseSelect } from '@/components/it/ITProjectPhaseSelect';
 import { IT_PROJECT_PHASES } from '@/types/itProject';
+import { ReassignTaskDialog } from '@/components/workload/ReassignTaskDialog';
+import { useAuth } from '@/contexts/AuthContext';
+import { useUserRole } from '@/hooks/useUserRole';
+import { canInitiateTaskReassignment } from '@/lib/taskReassignmentPermissions';
+import { canOfferSendForValidationInsteadOfMarkDone, normalizeValidationLevel } from '@/lib/taskValidationUi';
+import {
+  sendTaskForValidationFromExecutorState,
+  rejectValidationWithExecutorPolicy,
+} from '@/services/taskStatusService';
+import { useSubProcessFinalRejectionPolicy } from '@/hooks/useSubProcessFinalRejectionPolicy';
 
 interface Profile {
   id: string;
@@ -74,6 +88,8 @@ interface TaskDetailDialogProps {
   open: boolean;
   onClose: () => void;
   onStatusChange: (taskId: string, status: TaskStatus) => void;
+  /** Rafraîchir la liste parente après réaffectation / mutation */
+  onTaskMutated?: () => void;
 }
 
 const priorityConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; color: string }> = {
@@ -93,18 +109,33 @@ const statusConfig: Record<string, { label: string; icon: typeof CheckCircle2; c
   refused: { label: 'Refusé', icon: AlertCircle, color: 'text-destructive' },
 };
 
-export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDetailDialogProps) {
+export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMutated }: TaskDetailDialogProps) {
+  const { profile } = useAuth();
+  const { isAdmin } = useUserRole();
+  const [isReassignOpen, setIsReassignOpen] = useState(false);
+  const [taskForReassign, setTaskForReassign] = useState<Task | null>(null);
   const [childTasks, setChildTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [profiles, setProfiles] = useState<Map<string, string>>(new Map());
   const [profilesList, setProfilesList] = useState<{ id: string; display_name: string; manager_id: string | null }[]>([]);
   const [departments, setDepartments] = useState<Map<string, string>>(new Map());
   const [processName, setProcessName] = useState<string | null>(null);
-  
+  /** Demandeur / rapporteur hérités de la demande parente quand la tâche ne les a pas en colonne. */
+  const [parentRequestPersonIds, setParentRequestPersonIds] = useState<{
+    requester_id: string | null;
+    reporter_id: string | null;
+  } | null>(null);
+
   // Child task editing state
   const [selectedChildTask, setSelectedChildTask] = useState<Task | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSendingValidation, setIsSendingValidation] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
+  const [validationActionDialog, setValidationActionDialog] = useState<{
+    type: 'approve' | 'refuse';
+  } | null>(null);
+  const [validationComment, setValidationComment] = useState('');
   const [activeTab, setActiveTab] = useState<'tasks' | 'chat' | 'request-info'>('tasks');
   const [editForm, setEditForm] = useState({
     title: '',
@@ -127,18 +158,48 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
     selectedChildTask,
     selectedChildAssigneeManagerId
   );
+
+  const rootTaskAssigneeManagerId = useMemo(() => {
+    if (!task?.assignee_id) return null;
+    return profilesList.find((p) => p.id === task.assignee_id)?.manager_id ?? null;
+  }, [task?.assignee_id, profilesList]);
+
+  const displayRequesterId = useMemo(
+    () => task?.requester_id ?? parentRequestPersonIds?.requester_id ?? null,
+    [task?.requester_id, parentRequestPersonIds?.requester_id],
+  );
+  const displayReporterId = useMemo(
+    () => task?.reporter_id ?? parentRequestPersonIds?.reporter_id ?? null,
+    [task?.reporter_id, parentRequestPersonIds?.reporter_id],
+  );
+
+  // Politique de rejet : retour exécuteur ou refus terminal ?
+  const returnsToExecutorOnReject = useSubProcessFinalRejectionPolicy(
+    task?.source_sub_process_template_id ?? undefined,
+  );
+
+  // L'utilisateur courant peut-il valider/rejeter la tâche ?
+  const validationLevel = task?.status === 'pending_validation_2' ? 2 : 1;
+  const canValidateTask = useMemo(() => {
+    if (!task || !profile?.id) return false;
+    if (task.status !== 'pending_validation_1' && task.status !== 'pending_validation_2') return false;
+    if (isAdmin) return true;
+    const level = task.status === 'pending_validation_2' ? 2 : 1;
+    const validationType = normalizeValidationLevel(
+      level === 1 ? task.validation_level_1 : task.validation_level_2,
+    );
+    const explicitValidatorId = level === 1 ? task.validator_level_1_id : task.validator_level_2_id;
+    if (explicitValidatorId) return explicitValidatorId === profile.id;
+    if (validationType === 'manager') return rootTaskAssigneeManagerId === profile.id;
+    if (validationType === 'requester') return displayRequesterId === profile.id;
+    return false;
+  }, [task, profile?.id, isAdmin, rootTaskAssigneeManagerId, displayRequesterId]);
   
   // Fetch checklist progress for child tasks
   const childTaskIds = childTasks.map(t => t.id);
   const { progressMap: checklistProgress } = useTasksProgress(childTaskIds);
 
-  useEffect(() => {
-    if (open && task) {
-      fetchRelatedData();
-    }
-  }, [open, task?.id]);
-
-  const fetchRelatedData = async () => {
+  const fetchRelatedData = useCallback(async () => {
     if (!task) return;
 
     setIsLoading(true);
@@ -152,6 +213,21 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
 
       if (children) {
         setChildTasks(children as Task[]);
+      }
+
+      if (task.parent_request_id) {
+        const { data: pr } = await supabase
+          .from('tasks')
+          .select('requester_id, reporter_id')
+          .eq('id', task.parent_request_id)
+          .maybeSingle();
+        setParentRequestPersonIds(
+          pr
+            ? { requester_id: pr.requester_id ?? null, reporter_id: pr.reporter_id ?? null }
+            : null,
+        );
+      } else {
+        setParentRequestPersonIds(null);
       }
 
       // Fetch profiles with manager_id for permission checking
@@ -198,7 +274,81 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [task]);
+
+  useEffect(() => {
+    if (open && task) {
+      fetchRelatedData();
+    }
+  }, [open, task?.id, fetchRelatedData]);
+
+  const handleRootSendForValidation = useCallback(async () => {
+    if (!task) return;
+    setIsSendingValidation(true);
+    try {
+      const res = await sendTaskForValidationFromExecutorState(
+        task.id,
+        task.status,
+        task.validator_level_1_id,
+      );
+      if (!res.success) {
+        toast.error(res.error || 'Envoi pour validation impossible');
+        return;
+      }
+      if (res.newStatus) onStatusChange(task.id, res.newStatus);
+      toast.success('Tâche envoyée pour validation');
+      onClose();
+    } finally {
+      setIsSendingValidation(false);
+    }
+  }, [task, onStatusChange, onClose]);
+
+  const handleChildSendForValidation = useCallback(async () => {
+    if (!selectedChildTask) return;
+    setIsSendingValidation(true);
+    try {
+      const res = await sendTaskForValidationFromExecutorState(
+        selectedChildTask.id,
+        selectedChildTask.status,
+        selectedChildTask.validator_level_1_id,
+      );
+      if (!res.success) {
+        toast.error(res.error || 'Envoi pour validation impossible');
+        return;
+      }
+      const ns = res.newStatus!;
+      onStatusChange(selectedChildTask.id, ns);
+      const { data: fresh } = await supabase.from('tasks').select('*').eq('id', selectedChildTask.id).maybeSingle();
+      if (fresh) {
+        const row = fresh as Task;
+        setSelectedChildTask(row);
+        setChildTasks((prev) => prev.map((t) => (t.id === row.id ? row : t)));
+      } else {
+        setSelectedChildTask((prev) => (prev ? { ...prev, status: ns } : null));
+        setChildTasks((prev) => prev.map((t) => (t.id === selectedChildTask.id ? { ...t, status: ns } : t)));
+      }
+      toast.success('Tâche envoyée pour validation');
+    } finally {
+      setIsSendingValidation(false);
+    }
+  }, [selectedChildTask, onStatusChange]);
+
+  const handleReassigned = useCallback(async () => {
+    const reassignId = taskForReassign?.id;
+    setIsReassignOpen(false);
+    setTaskForReassign(null);
+    if (open && task) {
+      await fetchRelatedData();
+    }
+    if (reassignId) {
+      const { data } = await supabase.from('tasks').select('*').eq('id', reassignId).maybeSingle();
+      if (data) {
+        const updated = data as Task;
+        setSelectedChildTask((prev) => (prev?.id === reassignId ? updated : prev));
+      }
+    }
+    onTaskMutated?.();
+  }, [open, task, taskForReassign?.id, onTaskMutated, fetchRelatedData]);
 
   const handleOpenChildTask = (childTask: Task) => {
     setSelectedChildTask(childTask);
@@ -265,7 +415,27 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
   // Child task detail/edit view
   if (selectedChildTask) {
     const ChildStatusIcon = statusConfig[selectedChildTask.status]?.icon || AlertCircle;
+    const canShowReassignChild =
+      canInitiateTaskReassignment({
+        task: selectedChildTask,
+        profileId: profile?.id,
+        assigneeManagerId: selectedChildAssigneeManagerId,
+        isAdmin,
+      }) &&
+      !!selectedChildTask.assignee_id &&
+      selectedChildTask.status !== 'validated' &&
+      selectedChildTask.status !== 'done' &&
+      selectedChildTask.status !== 'cancelled' &&
+      selectedChildTask.status !== 'refused';
+
+    const childOfferSend = canOfferSendForValidationInsteadOfMarkDone(selectedChildTask);
+    const childCanSubmitValidation =
+      !!profile?.id &&
+      !!selectedChildTask.assignee_id &&
+      (profile.id === selectedChildTask.assignee_id || isAdmin);
+
     return (
+      <>
       <Dialog open={open} onOpenChange={onClose}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col overflow-hidden rounded-2xl sm:rounded-2xl">
           <DialogHeader>
@@ -470,6 +640,24 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
                     )}
                   </div>
 
+                  {canShowReassignChild && (
+                    <>
+                      <Separator />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full gap-2 text-amber-600 border-amber-200 hover:bg-amber-50 hover:text-amber-700"
+                        onClick={() => {
+                          setTaskForReassign(selectedChildTask);
+                          setIsReassignOpen(true);
+                        }}
+                      >
+                        <UserRoundPlus className="h-4 w-4" />
+                        Réaffecter à quelqu'un d'autre
+                      </Button>
+                    </>
+                  )}
+
                   {/* Checklist / Sub-actions */}
                   <Separator />
                   <div>
@@ -507,30 +695,141 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
                   onValidationTriggered={() => {
                     setChildTasks(prev => prev.map(t => 
                       t.id === selectedChildTask.id 
-                        ? { ...t, status: 'pending-validation' as TaskStatus }
+                        ? { ...t, status: 'pending_validation_1' as TaskStatus }
                         : t
                     ));
-                    setSelectedChildTask(prev => prev ? { ...prev, status: 'pending-validation' as TaskStatus } : null);
+                    setSelectedChildTask(prev => prev ? { ...prev, status: 'pending_validation_1' as TaskStatus } : null);
                   }}
                 />
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={handleCloseChildTask}>
                     Retour à la demande
                   </Button>
-                  <Button onClick={() => { onStatusChange(selectedChildTask.id, 'done'); handleCloseChildTask(); }}>
-                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                    Marquer terminé
-                  </Button>
+                  {childOfferSend && childCanSubmitValidation ? (
+                    <Button
+                      disabled={isSendingValidation}
+                      onClick={() => void handleChildSendForValidation()}
+                    >
+                      {isSendingValidation ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4 mr-2" />
+                      )}
+                      Envoyer pour validation
+                    </Button>
+                  ) : (
+                    <Button onClick={() => { onStatusChange(selectedChildTask.id, 'done'); handleCloseChildTask(); }}>
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      Marquer terminé
+                    </Button>
+                  )}
                 </div>
               </div>
             )}
           </div>
         </DialogContent>
       </Dialog>
+      <ReassignTaskDialog
+        task={taskForReassign}
+        isOpen={isReassignOpen && !!taskForReassign}
+        onClose={() => {
+          setIsReassignOpen(false);
+          setTaskForReassign(null);
+        }}
+        onReassigned={handleReassigned}
+        includeWorkloadSlots={false}
+      />
+      </>
     );
   }
 
+  const canShowReassignRoot =
+    task.type !== 'request' &&
+    canInitiateTaskReassignment({
+      task,
+      profileId: profile?.id,
+      assigneeManagerId: rootTaskAssigneeManagerId,
+      isAdmin,
+    }) &&
+    !!task.assignee_id &&
+    task.status !== 'validated' &&
+    task.status !== 'done' &&
+    task.status !== 'cancelled' &&
+    task.status !== 'refused';
+
+  const handleValidationApprove = async () => {
+    if (!task || !profile?.id) return;
+    setIsValidating(true);
+    try {
+      const level = validationLevel as 1 | 2;
+      const needsLevel2 = level === 1 && normalizeValidationLevel(task.validation_level_2) !== 'none';
+      const newStatus = needsLevel2 ? 'pending_validation_2' : 'validated';
+      const updates: Record<string, unknown> = {
+        status: newStatus,
+        [`validation_${level}_status`]: 'validated',
+        [`validation_${level}_at`]: new Date().toISOString(),
+        [`validation_${level}_by`]: profile.id,
+        [`validation_${level}_comment`]: validationComment || null,
+        updated_at: new Date().toISOString(),
+      };
+      if (newStatus === 'validated') updates.validated_at = new Date().toISOString();
+      const { error } = await (supabase as any).from('tasks').update(updates).eq('id', task.id);
+      if (error) throw error;
+      toast.success(newStatus === 'validated' ? 'Tâche validée' : 'Passage à la validation niveau 2');
+      onStatusChange(task.id, newStatus as TaskStatus);
+      setValidationActionDialog(null);
+      setValidationComment('');
+      onClose();
+    } catch (err) {
+      console.error(err);
+      toast.error('Impossible de valider la tâche');
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  const handleValidationRefuse = async () => {
+    if (!task || !profile?.id) return;
+    if (!validationComment.trim()) {
+      toast.error('Un commentaire est obligatoire pour justifier le refus.');
+      return;
+    }
+    setIsValidating(true);
+    try {
+      const level = validationLevel as 1 | 2;
+      const result = await rejectValidationWithExecutorPolicy(
+        task.id,
+        level,
+        profile.id,
+        validationComment,
+        returnsToExecutorOnReject,
+      );
+      if (!result.success) throw new Error(result.error);
+      toast.success(
+        returnsToExecutorOnReject
+          ? 'Tâche renvoyée à l\'assigné pour correction'
+          : 'Refus enregistré',
+      );
+      onStatusChange(task.id, result.newStatus ?? (returnsToExecutorOnReject ? 'in-progress' : 'refused'));
+      setValidationActionDialog(null);
+      setValidationComment('');
+      onClose();
+    } catch (err) {
+      console.error(err);
+      toast.error('Impossible de refuser la tâche');
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  const rootOfferSend = task.type === 'task' && canOfferSendForValidationInsteadOfMarkDone(task);
+  const rootCanSubmitValidation =
+    !!profile?.id &&
+    !!task.assignee_id &&
+    (profile.id === task.assignee_id || isAdmin);
+
   return (
+    <>
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[95%] max-h-[90vh] flex flex-col overflow-hidden rounded-2xl sm:rounded-2xl">
         <DialogHeader>
@@ -550,14 +849,51 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
           </div>
           <DialogTitle className="text-xl pr-8">{task.title}</DialogTitle>
           {task.status !== 'done' && task.status !== 'validated' && (
-            <div className="mt-3 flex justify-end">
-              <Button
-                onClick={() => { onStatusChange(task.id, 'done'); onClose(); }}
-                className="gap-2"
-              >
-                <CheckCircle2 className="h-4 w-4" />
-                Marquer terminé
-              </Button>
+            <div className="mt-3 flex justify-end gap-2 flex-wrap">
+              {/* Boutons manager : valider / rejeter */}
+              {canValidateTask && (
+                <>
+                  <Button
+                    variant="outline"
+                    className="gap-2 text-destructive border-destructive/30 hover:bg-destructive/10"
+                    onClick={() => { setValidationComment(''); setValidationActionDialog({ type: 'refuse' }); }}
+                  >
+                    <XCircle className="h-4 w-4" />
+                    {task.source_sub_process_template_id ? 'Tâche non validée' : 'Rejeter'}
+                  </Button>
+                  <Button
+                    className="gap-2 bg-success hover:bg-success/90 text-success-foreground"
+                    onClick={() => { setValidationComment(''); setValidationActionDialog({ type: 'approve' }); }}
+                  >
+                    <ShieldCheck className="h-4 w-4" />
+                    Valider la tâche
+                  </Button>
+                </>
+              )}
+              {/* Bouton exécutant */}
+              {!canValidateTask && rootOfferSend && rootCanSubmitValidation && (
+                <Button
+                  onClick={() => void handleRootSendForValidation()}
+                  disabled={isSendingValidation}
+                  className="gap-2"
+                >
+                  {isSendingValidation ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                  Envoyer pour validation
+                </Button>
+              )}
+              {!canValidateTask && !rootOfferSend && task.status !== 'pending_validation_1' && task.status !== 'pending_validation_2' && (
+                <Button
+                  onClick={() => { onStatusChange(task.id, 'done'); onClose(); }}
+                  className="gap-2"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  Marquer terminé
+                </Button>
+              )}
             </div>
           )}
         </DialogHeader>
@@ -590,13 +926,34 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
             <div className="flex items-center gap-2">
               <User className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground">Demandeur:</span>
-              <span>{task.requester_id ? profiles.get(task.requester_id) || 'N/A' : <span className="italic text-muted-foreground">—</span>}</span>
+              <span>
+                {displayRequesterId ? (
+                  profiles.get(displayRequesterId) || 'N/A'
+                ) : (
+                  <span className="italic text-muted-foreground">—</span>
+                )}
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <User className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground">Rapporteur:</span>
-              <span>{task.reporter_id ? profiles.get(task.reporter_id) || 'N/A' : <span className="italic text-muted-foreground">—</span>}</span>
+              <span>
+                {displayReporterId ? (
+                  profiles.get(displayReporterId) || 'N/A'
+                ) : (
+                  <span className="italic text-muted-foreground">—</span>
+                )}
+              </span>
             </div>
+            {task.reassignment_stakeholder_id && (
+              <div className="flex items-center gap-2">
+                <UserRoundPlus className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Suivi réaffectation :</span>
+                <span>
+                  {profiles.get(task.reassignment_stakeholder_id) || 'N/A'}
+                </span>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <Building2 className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground">Service:</span>
@@ -657,6 +1014,24 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
               <span>{task.date_lancement ? format(new Date(task.date_lancement), 'dd MMMM yyyy', { locale: fr }) : <span className="italic text-muted-foreground">—</span>}</span>
             </div>
           </div>
+
+          {canShowReassignRoot && (
+            <>
+              <Separator />
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full gap-2 text-amber-600 border-amber-200 hover:bg-amber-50 hover:text-amber-700"
+                onClick={() => {
+                  setTaskForReassign(task);
+                  setIsReassignOpen(true);
+                }}
+              >
+                <UserRoundPlus className="h-4 w-4" />
+                Réaffecter à quelqu'un d'autre
+              </Button>
+            </>
+          )}
 
           {/* Checklist / Sub-actions for main task */}
           <Separator />
@@ -868,15 +1243,71 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange }: TaskDe
             <Button variant="outline" onClick={onClose}>
               Fermer
             </Button>
-            {task.status !== 'done' && task.status !== 'validated' && (
-              <Button onClick={() => { onStatusChange(task.id, 'done'); onClose(); }}>
-                <CheckCircle2 className="h-4 w-4 mr-2" />
-                Marquer terminé
-              </Button>
-            )}
           </div>
         </div>
       </DialogContent>
     </Dialog>
+    <ReassignTaskDialog
+      task={taskForReassign}
+      isOpen={isReassignOpen && !!taskForReassign}
+      onClose={() => {
+        setIsReassignOpen(false);
+        setTaskForReassign(null);
+      }}
+      onReassigned={handleReassigned}
+      includeWorkloadSlots={false}
+    />
+
+    {/* Dialogue confirmation validation / refus */}
+    <Dialog open={!!validationActionDialog} onOpenChange={() => setValidationActionDialog(null)}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>
+            {validationActionDialog?.type === 'approve' ? 'Valider la tâche' : 'Rejeter la tâche'}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">{task.title}</p>
+          <Textarea
+            placeholder={
+              validationActionDialog?.type === 'approve'
+                ? 'Commentaire (optionnel)…'
+                : 'Justification du refus (obligatoire)…'
+            }
+            value={validationComment}
+            onChange={(e) => setValidationComment(e.target.value)}
+            rows={3}
+          />
+        </div>
+        <div className="flex justify-end gap-2 mt-4">
+          <Button variant="outline" onClick={() => setValidationActionDialog(null)}>
+            Annuler
+          </Button>
+          {validationActionDialog?.type === 'approve' && (
+            <Button
+              onClick={() => void handleValidationApprove()}
+              disabled={isValidating}
+              className="bg-success hover:bg-success/90 text-success-foreground"
+            >
+              {isValidating && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              <ShieldCheck className="h-4 w-4 mr-2" />
+              Valider
+            </Button>
+          )}
+          {validationActionDialog?.type === 'refuse' && (
+            <Button
+              onClick={() => void handleValidationRefuse()}
+              disabled={isValidating}
+              variant="destructive"
+            >
+              {isValidating && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+              <XCircle className="h-4 w-4 mr-2" />
+              {task.source_sub_process_template_id ? 'Tâche non validée' : 'Rejeter'}
+            </Button>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

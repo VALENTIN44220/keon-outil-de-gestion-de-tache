@@ -15,6 +15,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ProcessWithTasks, TaskTemplate } from '@/types/template';
 import { Task } from '@/types/task';
 import { toast } from 'sonner';
+import { normalizeValidationLevel } from '@/lib/taskValidationUi';
 
 interface CreateFromTemplateDialogProps {
   open: boolean;
@@ -146,6 +147,10 @@ export function CreateFromTemplateDialog({ open, onClose, onTasksCreated }: Crea
           target_department_id: null,
           requires_validation: (template as any).requires_validation || false,
           current_validation_level: 0,
+          validation_level_1: normalizeValidationLevel(template.validation_level_1),
+          validation_level_2: normalizeValidationLevel(template.validation_level_2),
+          validator_level_1_id: template.validator_level_1_id ?? null,
+          validator_level_2_id: template.validator_level_2_id ?? null,
         };
       });
 

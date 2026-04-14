@@ -347,6 +347,7 @@ export default function ITProjectHubTasks() {
           open={!!selectedTask}
           onClose={() => setSelectedTask(null)}
           onStatusChange={handleStatusChange}
+          onTaskMutated={loadTasks}
         />
       </div>
     </Layout>

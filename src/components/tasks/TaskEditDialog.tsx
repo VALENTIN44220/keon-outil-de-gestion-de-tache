@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Task, TaskStatus, TaskPriority } from '@/types/task';
 import { useParentRequestNumber } from '@/hooks/useParentRequestNumber';
 import {
@@ -27,14 +27,18 @@ import { TaskLinksEditor } from './TaskLinksEditor';
 import { TaskCommentsSection } from './TaskCommentsSection';
 import { RequestValidationButton } from './RequestValidationButton';
 import { Badge } from '@/components/ui/badge';
-import { Ticket, CheckSquare, Save, Loader2, Info, MessageSquare, Lock } from 'lucide-react';
+import { Ticket, CheckSquare, Save, Loader2, Info, MessageSquare, Lock, UserRoundPlus, Send } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useTaskAttachments } from '@/hooks/useTaskAttachments';
 import { useDueDatePermissionWithManager } from '@/hooks/useDueDatePermission';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { getStatusSelectOptions } from '@/services/taskStatusService';
+import { getStatusSelectOptions, sendTaskForValidationFromExecutorState } from '@/services/taskStatusService';
+import { canOfferSendForValidationInsteadOfMarkDone, taskRequiresValidationBeforeDone } from '@/lib/taskValidationUi';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserRole } from '@/hooks/useUserRole';
+import { ReassignTaskDialog } from '@/components/workload/ReassignTaskDialog';
+import { canInitiateTaskReassignment } from '@/lib/taskReassignmentPermissions';
 
 interface Department {
   id: string;
@@ -67,7 +71,10 @@ const priorityOptions: { value: TaskPriority; label: string }[] = [
 export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditDialogProps) {
   const { toast } = useToast();
   const { profile } = useAuth();
+  const { isAdmin } = useUserRole();
   const [isLoading, setIsLoading] = useState(false);
+  const [isSendingValidation, setIsSendingValidation] = useState(false);
+  const [isReassignOpen, setIsReassignOpen] = useState(false);
   const parentRequestNumber = useParentRequestNumber(task?.parent_request_id || null);
   
   // Form state
@@ -96,17 +103,70 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
   // Due date permission check
   const { canEditDueDate, reason: dueDateReason } = useDueDatePermissionWithManager(task, assigneeManagerId);
 
-  // Check if current user is assignee on a subprocess task with validation → read-only mode
+  // Assignee + validation modèle (N1/N2 ou flag) → lecture seule sur la fiche (liens / commentaires restent possibles)
   const isAssigneeReadOnly = useMemo(() => {
     if (!task || !profile) return false;
-    // Must be a task from a subprocess (has parent_request_id)
-    if (!task.parent_request_id) return false;
-    // Current user must be the assignee
     if (task.assignee_id !== profile.id) return false;
-    // Task must require validation (has validation levels configured or requires_validation flag)
-    if (task.requires_validation || task.validation_level_1 !== 'none' || task.validation_level_2 !== 'none') return true;
-    return false;
+    return Boolean(task.requires_validation || taskRequiresValidationBeforeDone(task));
   }, [task, profile]);
+
+  const canSubmitTemplateValidation = Boolean(
+    task &&
+      profile &&
+      task.type === 'task' &&
+      task.assignee_id &&
+      (profile.id === task.assignee_id || isAdmin),
+  );
+  const showSendForValidation =
+    Boolean(task) && canSubmitTemplateValidation && canOfferSendForValidationInsteadOfMarkDone(task!);
+
+  const handleSendForValidation = useCallback(async () => {
+    if (!task || task.type !== 'task') return;
+    setIsSendingValidation(true);
+    try {
+      const res = await sendTaskForValidationFromExecutorState(
+        task.id,
+        task.status,
+        task.validator_level_1_id,
+      );
+      if (!res.success) {
+        toast({
+          title: 'Erreur',
+          description: res.error || 'Envoi pour validation impossible',
+          variant: 'destructive',
+        });
+        return;
+      }
+      toast({
+        title: 'Envoyé',
+        description: 'La tâche a été envoyée pour validation.',
+      });
+      onTaskUpdated();
+      onClose();
+    } finally {
+      setIsSendingValidation(false);
+    }
+  }, [task, toast, onTaskUpdated, onClose]);
+
+  const isStakeholderOnly = useMemo(() => {
+    if (!task || !profile) return false;
+    return (
+      task.reassignment_stakeholder_id === profile.id &&
+      task.assignee_id !== profile.id
+    );
+  }, [task, profile]);
+
+  const isFormLocked = isAssigneeReadOnly || isStakeholderOnly;
+
+  const canReassign = useMemo(() => {
+    if (!task) return false;
+    return canInitiateTaskReassignment({
+      task,
+      profileId: profile?.id,
+      assigneeManagerId,
+      isAdmin,
+    });
+  }, [task, profile?.id, assigneeManagerId, isAdmin]);
 
   // Initialize form when task changes
   useEffect(() => {
@@ -229,6 +289,7 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
   if (!task) return null;
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -265,6 +326,15 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
               <span>Cette tâche fait partie d'un processus avec validation. Les champs sont verrouillés. Vous pouvez ajouter des liens/PJ, échanger des messages et demander la validation.</span>
             </div>
           )}
+          {isStakeholderOnly && !isAssigneeReadOnly && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-muted border border-border text-sm text-muted-foreground">
+              <Info className="h-4 w-4 shrink-0" />
+              <span>
+                Vous suivez cette tâche après une réaffectation. Les champs de la fiche sont en lecture seule ;
+                l'exécution est du ressort du nouveau responsable.
+              </span>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="title">Titre *</Label>
@@ -274,8 +344,8 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Titre de la tâche"
               required
-              disabled={isAssigneeReadOnly}
-              className={isAssigneeReadOnly ? 'opacity-60 cursor-not-allowed' : ''}
+              disabled={isFormLocked}
+              className={isFormLocked ? 'opacity-60 cursor-not-allowed' : ''}
             />
           </div>
 
@@ -287,16 +357,16 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Description détaillée..."
               rows={3}
-              disabled={isAssigneeReadOnly}
-              className={isAssigneeReadOnly ? 'opacity-60 cursor-not-allowed' : ''}
+              disabled={isFormLocked}
+              className={isFormLocked ? 'opacity-60 cursor-not-allowed' : ''}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Statut</Label>
-              <Select value={status} onValueChange={(v) => setStatus(v as TaskStatus)} disabled={isAssigneeReadOnly}>
-                <SelectTrigger className={isAssigneeReadOnly ? 'opacity-60 cursor-not-allowed' : ''}>
+              <Select value={status} onValueChange={(v) => setStatus(v as TaskStatus)} disabled={isFormLocked}>
+                <SelectTrigger className={isFormLocked ? 'opacity-60 cursor-not-allowed' : ''}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -311,8 +381,8 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
 
             <div className="space-y-2">
               <Label>Priorité</Label>
-              <Select value={priority} onValueChange={(v) => setPriority(v as TaskPriority)} disabled={isAssigneeReadOnly}>
-                <SelectTrigger className={isAssigneeReadOnly ? 'opacity-60 cursor-not-allowed' : ''}>
+              <Select value={priority} onValueChange={(v) => setPriority(v as TaskPriority)} disabled={isFormLocked}>
+                <SelectTrigger className={isFormLocked ? 'opacity-60 cursor-not-allowed' : ''}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -329,14 +399,20 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <Label htmlFor="dueDate">Date d'échéance</Label>
-              {(!canEditDueDate || isAssigneeReadOnly) && (
+              {(!canEditDueDate || isFormLocked) && (
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Info className="h-4 w-4 text-muted-foreground cursor-help" />
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p className="max-w-xs">{isAssigneeReadOnly ? 'Champ verrouillé pour les tâches avec validation' : dueDateReason}</p>
+                      <p className="max-w-xs">
+                        {isStakeholderOnly
+                          ? 'Lecture seule : vous suivez cette tâche après une réaffectation.'
+                          : isAssigneeReadOnly
+                            ? 'Champ verrouillé pour les tâches avec validation'
+                            : dueDateReason}
+                      </p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -347,12 +423,12 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
-              disabled={!canEditDueDate || isAssigneeReadOnly}
-              className={(!canEditDueDate || isAssigneeReadOnly) ? 'opacity-60 cursor-not-allowed' : ''}
+              disabled={!canEditDueDate || isFormLocked}
+              className={(!canEditDueDate || isFormLocked) ? 'opacity-60 cursor-not-allowed' : ''}
             />
           </div>
 
-          <div className={isAssigneeReadOnly ? 'pointer-events-none opacity-60' : ''}>
+          <div className={isFormLocked ? 'pointer-events-none opacity-60' : ''}>
             <CategorySelect
               categories={categories}
               selectedCategoryId={categoryId}
@@ -374,7 +450,7 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
                 <SearchableSelect
                   value={targetDepartmentId || 'none'}
                   onValueChange={(v) => setTargetDepartmentId(v === 'none' ? null : v)}
-                  disabled={isAssigneeReadOnly}
+                  disabled={isFormLocked}
                   placeholder="Sélectionner un service"
                   searchPlaceholder="Rechercher un service..."
                   options={[
@@ -389,7 +465,7 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
                 <SearchableSelect
                   value={assigneeId || 'none'}
                   onValueChange={(v) => setAssigneeId(v === 'none' ? null : v)}
-                  disabled={isAssigneeReadOnly}
+                  disabled={isFormLocked}
                   placeholder="Sélectionner l'exécutant"
                   searchPlaceholder="Rechercher un collaborateur..."
                   options={[
@@ -402,8 +478,8 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
           </div>
 
           {/* Tabs for additional features */}
-          <Tabs defaultValue={isAssigneeReadOnly ? "links" : "checklist"} className="border-t pt-4 mt-4">
-            <TabsList className={`grid w-full ${isAssigneeReadOnly ? 'grid-cols-4' : 'grid-cols-4'}`}>
+          <Tabs defaultValue={isFormLocked ? "links" : "checklist"} className="border-t pt-4 mt-4">
+            <TabsList className={`grid w-full ${isFormLocked ? 'grid-cols-4' : 'grid-cols-4'}`}>
               <TabsTrigger value="checklist">Sous-actions</TabsTrigger>
               <TabsTrigger value="links">Liens & PJ</TabsTrigger>
               <TabsTrigger value="roles">Responsabilités</TabsTrigger>
@@ -469,14 +545,14 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
             </TabsContent>
 
             <TabsContent value="roles" className="mt-4 space-y-4">
-              <div className={isAssigneeReadOnly ? 'pointer-events-none opacity-60' : ''}>
+              <div className={isFormLocked ? 'pointer-events-none opacity-60' : ''}>
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <Label>Demandeur</Label>
                     <SearchableSelect
                       value={requesterId || 'none'}
                       onValueChange={(v) => setRequesterId(v === 'none' ? null : v)}
-                      disabled={isAssigneeReadOnly}
+                      disabled={isFormLocked}
                       placeholder="Sélectionner le demandeur"
                       searchPlaceholder="Rechercher un collaborateur..."
                       options={[
@@ -491,7 +567,7 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
                     <SearchableSelect
                       value={reporterId || 'none'}
                       onValueChange={(v) => setReporterId(v === 'none' ? null : v)}
-                      disabled={isAssigneeReadOnly}
+                      disabled={isFormLocked}
                       placeholder="Sélectionner le rapporteur"
                       searchPlaceholder="Rechercher un collaborateur..."
                       options={[
@@ -510,23 +586,48 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
           </Tabs>
 
           <div className="flex justify-between items-center gap-3 pt-4 border-t">
-            {isAssigneeReadOnly && task ? (
-              <RequestValidationButton 
-                taskId={task.id} 
-                taskStatus={task.status}
-                onValidationTriggered={() => {
-                  onTaskUpdated();
-                  onClose();
-                }}
-              />
-            ) : (
-              <div />
-            )}
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-2 items-center">
+              {showSendForValidation && (
+                <Button
+                  type="button"
+                  onClick={() => void handleSendForValidation()}
+                  disabled={isSendingValidation}
+                >
+                  {isSendingValidation ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4 mr-2" />
+                  )}
+                  Envoyer pour validation
+                </Button>
+              )}
+              {isAssigneeReadOnly && task ? (
+                <RequestValidationButton
+                  taskId={task.id}
+                  taskStatus={task.status}
+                  onValidationTriggered={() => {
+                    onTaskUpdated();
+                    onClose();
+                  }}
+                />
+              ) : null}
+            </div>
+            <div className="flex gap-3 flex-wrap justify-end">
+              {!isRequest && canReassign && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="text-amber-700 border-amber-200 hover:bg-amber-50"
+                  onClick={() => setIsReassignOpen(true)}
+                >
+                  <UserRoundPlus className="h-4 w-4 mr-2" />
+                  Réaffecter à quelqu'un d'autre
+                </Button>
+              )}
               <Button type="button" variant="outline" onClick={onClose}>
-                {isAssigneeReadOnly ? 'Fermer' : 'Annuler'}
+                {isFormLocked ? 'Fermer' : 'Annuler'}
               </Button>
-              {!isAssigneeReadOnly && (
+              {!isFormLocked && (
                 <Button type="submit" disabled={isLoading}>
                   {isLoading ? (
                     <>
@@ -546,5 +647,16 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
         </form>
       </DialogContent>
     </Dialog>
+    <ReassignTaskDialog
+      task={task}
+      isOpen={isReassignOpen}
+      onClose={() => setIsReassignOpen(false)}
+      onReassigned={() => {
+        onTaskUpdated();
+        onClose();
+      }}
+      includeWorkloadSlots
+    />
+    </>
   );
 }

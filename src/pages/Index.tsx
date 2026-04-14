@@ -26,9 +26,10 @@ import { useUnassignedTasks } from '@/hooks/useUnassignedTasks';
 import { usePendingAssignments } from '@/hooks/usePendingAssignments';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSimulation } from '@/contexts/SimulationContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Workflow, ChevronDown, ChevronUp, Zap, Settings2, ShieldCheck, LayoutGrid, Columns, Calendar, TableProperties, BarChart3 } from 'lucide-react';
+import { Loader2, Workflow, ChevronDown, ChevronUp, Zap, Settings2, ShieldCheck, LayoutGrid, Columns, Calendar, TableProperties, BarChart3, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Layers } from 'lucide-react';
@@ -44,7 +45,10 @@ import { usePendingTaskValidations } from '@/hooks/usePendingTaskValidations';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 const Index = () => {
-  const { profile } = useAuth();
+  const { profile: authProfile } = useAuth();
+  const { isSimulating, simulatedProfile } = useSimulation();
+  /** Même profil que `useTasks` (simulation incluse) pour périmètre et filtre stakeholder. */
+  const profile = isSimulating && simulatedProfile ? simulatedProfile : authProfile;
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeView, setActiveView] = useState('dashboard');
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
@@ -53,6 +57,8 @@ const Index = () => {
   const [showFullStats, setShowFullStats] = useState(false);
   const [dashboardMode, setDashboardMode] = useState<'tasks' | 'planner' | 'validations'>('tasks');
   const [taskSubMode, setTaskSubMode] = useState<'grid' | 'kanban' | 'calendar' | 'table' | 'analytics'>('table');
+  /** Sous-filtre liste tâches : tout le périmètre ou uniquement les tâches suivies après réaffectation (stakeholder). */
+  const [taskTeamSubView, setTaskTeamSubView] = useState<'all' | 'team_stakeholder'>('all');
   const [isBulkActionOpen, setIsBulkActionOpen] = useState(false);
   const [kanbanGroupMode, setKanbanGroupMode] = useState<KanbanGroupMode>('status');
   const [crossFilters, setCrossFilters] = useState<CrossFilters>(DEFAULT_CROSS_FILTERS);
@@ -195,11 +201,13 @@ const Index = () => {
       if (crossFilters.assigneeIds.length > 0 && !crossFilters.assigneeIds.includes(task.assignee_id || '')) return false;
       if (crossFilters.categoryIds.length > 0 && !crossFilters.categoryIds.includes(task.category_id || '')) return false;
       if (crossFilters.serviceGroupIds.length > 0) {
-        const sgId = 
+        const sgId =
           (task.source_process_template_id ? processServiceGroupMap.get(task.source_process_template_id) : null) ||
           ((task as any).process_template_id ? processServiceGroupMap.get((task as any).process_template_id) : null) ||
           (task.target_department_id ? deptServiceGroupMap.get(task.target_department_id) : null);
-        if (!sgId || !crossFilters.serviceGroupIds.includes(sgId)) return false;
+        // Sans correspondance dans les cartes (processus récent, etc.) : ne pas exclure la tâche du tableau
+        if (!sgId) return true;
+        if (!crossFilters.serviceGroupIds.includes(sgId)) return false;
       }
       if (crossFilters.dateRange.start && task.created_at) {
         const taskDate = new Date(task.created_at);
@@ -211,18 +219,34 @@ const Index = () => {
       }
       if (crossFilters.itProjectIds && crossFilters.itProjectIds.length > 0) {
         const hasNone = crossFilters.itProjectIds.includes('__none__');
-        const projectIds = crossFilters.itProjectIds.filter(id => id !== '__none__');
-        if (hasNone && !task.it_project_id) {
-          // matches "Sans projet IT"
-        } else if (projectIds.length > 0 && task.it_project_id && projectIds.includes(task.it_project_id)) {
-          // matches a specific project
-        } else {
-          return false;
+        const projectIds = crossFilters.itProjectIds.filter((id) => id !== '__none__');
+        const sansProjet = hasNone && !task.it_project_id;
+        const projetChoisi =
+          projectIds.length > 0 &&
+          !!task.it_project_id &&
+          projectIds.includes(task.it_project_id);
+
+        if (hasNone && projectIds.length === 0) {
+          if (!sansProjet) return false;
+        } else if (!hasNone && projectIds.length > 0) {
+          if (!projetChoisi) return false;
+        } else if (hasNone && projectIds.length > 0) {
+          if (!sansProjet && !projetChoisi) return false;
         }
       }
       return true;
     });
-  }, [tasks, advancedFilters, crossFilters]);
+  }, [tasks, advancedFilters, crossFilters, processServiceGroupMap, deptServiceGroupMap]);
+
+  const teamStakeholderCount = useMemo(
+    () => (profile?.id ? tasks.filter((t) => t.reassignment_stakeholder_id === profile.id).length : 0),
+    [tasks, profile?.id],
+  );
+
+  const tasksForDashboardList = useMemo(() => {
+    if (taskTeamSubView !== 'team_stakeholder' || !profile?.id) return filteredTasks;
+    return filteredTasks.filter((t) => t.reassignment_stakeholder_id === profile.id);
+  }, [filteredTasks, taskTeamSubView, profile?.id]);
 
   // Build group labels map
   const groupLabels = useMemo(() => {
@@ -340,7 +364,7 @@ const Index = () => {
       case 'kanban':
         return (
           <KanbanBoard
-            tasks={filteredTasks}
+            tasks={tasksForDashboardList}
             onStatusChange={updateTaskStatus}
             onDelete={deleteTask}
             groupBy={advancedFilters.groupBy}
@@ -355,7 +379,7 @@ const Index = () => {
       case 'calendar':
         return (
           <CalendarView
-            tasks={filteredTasks}
+            tasks={tasksForDashboardList}
             onStatusChange={updateTaskStatus}
             onDelete={deleteTask}
             groupBy={advancedFilters.groupBy}
@@ -367,7 +391,7 @@ const Index = () => {
       case 'table':
         return (
           <DenseTableView
-            tasks={filteredTasks}
+            tasks={tasksForDashboardList}
             onStatusChange={updateTaskStatus}
             onDelete={deleteTask}
             progressMap={progressMap}
@@ -377,7 +401,7 @@ const Index = () => {
       default:
         return (
           <TaskList 
-            tasks={filteredTasks} 
+            tasks={tasksForDashboardList} 
             onStatusChange={updateTaskStatus}
             onDelete={deleteTask}
             groupBy={advancedFilters.groupBy}
@@ -411,6 +435,11 @@ const Index = () => {
     // Task management views (grid/kanban/calendar/table)
     return (
       <>
+        {taskTeamSubView === 'team_stakeholder' && tasksForDashboardList.length === 0 && (
+          <p className="text-sm text-muted-foreground mb-3 px-1">
+            Aucune tâche ici pour l’instant : les tâches que vous avez réaffectées avec suivi apparaissent dans « Tâches de l’équipe » (même si le nouvel assigné n’est plus dans votre filtre équipe), pour suivre l’avancement et les échanges.
+          </p>
+        )}
         <CrossFiltersPanel
           filters={crossFilters}
           onFiltersChange={setCrossFilters}
@@ -518,8 +547,48 @@ const Index = () => {
 
           <div className="w-px bg-keon-300 mx-1 my-1.5 self-stretch" />
 
+          {taskSubMode !== 'analytics' && (
+            <>
+              <button
+                type="button"
+                onClick={() => setTaskTeamSubView('all')}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-2 text-xs border-b-2 transition-colors',
+                  taskTeamSubView === 'all'
+                    ? 'border-keon-blue text-keon-blue bg-white font-medium'
+                    : 'border-transparent text-keon-600 hover:text-keon-900 hover:bg-keon-100',
+                )}
+              >
+                Toutes
+              </button>
+              <button
+                type="button"
+                onClick={() => setTaskTeamSubView('team_stakeholder')}
+                className={cn(
+                  'flex items-center gap-1.5 px-3 py-2 text-xs border-b-2 transition-colors',
+                  taskTeamSubView === 'team_stakeholder'
+                    ? 'border-keon-blue text-keon-blue bg-white font-medium'
+                    : 'border-transparent text-keon-600 hover:text-keon-900 hover:bg-keon-100',
+                )}
+              >
+                <Users className="h-3.5 w-3.5" />
+                Tâches de l’équipe
+                {teamStakeholderCount > 0 && (
+                  <Badge variant="secondary" className="ml-0.5 text-[10px] px-1.5 py-0">
+                    {teamStakeholderCount}
+                  </Badge>
+                )}
+              </button>
+              <div className="w-px bg-keon-300 mx-1 my-1.5 self-stretch" />
+            </>
+          )}
+
           <button
-            onClick={() => { setTaskSubMode('analytics'); fetchAllRequests(); }}
+            onClick={() => {
+              setTaskTeamSubView('all');
+              setTaskSubMode('analytics');
+              fetchAllRequests();
+            }}
             className={cn(
               "flex items-center gap-1.5 px-4 py-2 text-xs border-b-2 transition-colors",
               taskSubMode === 'analytics'
@@ -650,6 +719,7 @@ const Index = () => {
             setSelectedTaskForComment(null);
           }}
           onStatusChange={updateTaskStatus}
+          onTaskMutated={refetch}
         />
       )}
 
@@ -662,6 +732,7 @@ const Index = () => {
             setSelectedRequest(null);
           }}
           onStatusChange={updateTaskStatus}
+          onTaskMutated={refetch}
         />
       )}
 

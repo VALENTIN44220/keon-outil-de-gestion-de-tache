@@ -187,8 +187,8 @@ const VALID_TRANSITIONS: Partial<Record<TaskStatus, TaskStatus[]>> = {
   'to_assign': ['todo', 'in-progress', 'cancelled'],
   'todo': ['in-progress', 'to_assign', 'cancelled'],
   'in-progress': ['done', 'todo', 'pending_validation_1', 'review', 'cancelled'],
-  'pending_validation_1': ['pending_validation_2', 'validated', 'in-progress', 'review', 'cancelled'],
-  'pending_validation_2': ['validated', 'in-progress', 'review', 'cancelled'],
+  'pending_validation_1': ['pending_validation_2', 'validated', 'in-progress', 'refused', 'review', 'cancelled'],
+  'pending_validation_2': ['validated', 'in-progress', 'refused', 'review', 'cancelled'],
   'validated': ['cancelled'], // Statut terminal - seul annulation possible
   'refused': ['todo', 'in-progress', 'review', 'cancelled'], // Statut transitoire
   'review': ['todo', 'in-progress', 'cancelled'],
@@ -315,6 +315,10 @@ export async function transitionTaskStatus(
       updateData.is_locked_for_validation = false;
     }
 
+    if (newStatus === 'refused') {
+      updateData.is_locked_for_validation = false;
+    }
+
     if (newStatus === 'in-progress' && isPendingValidation(currentStatus)) {
       // Retour en cours après refus - unlock
       updateData.is_locked_for_validation = false;
@@ -411,6 +415,35 @@ export async function requestValidation(
 }
 
 /**
+ * Depuis todo / in-progress / review : passe en in-progress si besoin puis pending_validation_1.
+ * Utilisé quand la tâche a des niveaux de validation (ex. après réaffectation avec boucle manager).
+ */
+export async function sendTaskForValidationFromExecutorState(
+  taskId: string,
+  currentStatus: TaskStatus,
+  validatorLevel1Id?: string | null,
+): Promise<TransitionResult> {
+  let status = currentStatus;
+  if (status === 'todo') {
+    const r = await startTask(taskId);
+    if (!r.success) return r;
+    status = 'in-progress';
+  }
+  if (status === 'review') {
+    const r = await transitionTaskStatus(taskId, 'in-progress');
+    if (!r.success) return r;
+    status = 'in-progress';
+  }
+  if (status !== 'in-progress') {
+    return {
+      success: false,
+      error: 'Passez la tâche en cours avant d’envoyer pour validation.',
+    };
+  }
+  return requestValidation(taskId, validatorLevel1Id || undefined);
+}
+
+/**
  * Valide une tâche au niveau 1
  * @param toLevel2 - Si true, passe au niveau 2 au lieu de valider directement
  */
@@ -502,6 +535,44 @@ export async function rejectValidationToInProgress(
     });
   } catch (error) {
     console.error('Error rejecting validation:', error);
+    return { success: false, error: 'Erreur lors du refus de validation' };
+  }
+}
+
+/**
+ * Refus de validation : retour exécuteur (reprise) ou refus défini (`refused`) selon la config standard du sous-processus.
+ */
+export async function rejectValidationWithExecutorPolicy(
+  taskId: string,
+  level: 1 | 2,
+  validatorId: string,
+  comment: string,
+  returnsToExecutor: boolean,
+): Promise<TransitionResult> {
+  if (returnsToExecutor) {
+    return rejectValidationToInProgress(taskId, level, validatorId, comment);
+  }
+  try {
+    const auditUpdates: Record<string, unknown> = {
+      [`validation_${level}_status`]: 'refused',
+      [`validation_${level}_at`]: new Date().toISOString(),
+      [`validation_${level}_by`]: validatorId,
+      [`validation_${level}_comment`]: comment || null,
+      is_locked_for_validation: false,
+    };
+
+    const { error: auditError } = await supabase
+      .from('tasks')
+      .update(auditUpdates)
+      .eq('id', taskId);
+
+    if (auditError) {
+      return { success: false, error: 'Erreur lors de la mise à jour de l\'audit' };
+    }
+
+    return transitionTaskStatus(taskId, 'refused', { comment });
+  } catch (error) {
+    console.error('Error rejecting validation (terminal):', error);
     return { success: false, error: 'Erreur lors du refus de validation' };
   }
 }

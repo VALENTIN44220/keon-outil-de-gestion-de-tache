@@ -366,12 +366,13 @@ export function ConfigurableDashboard({
 
     // Service Group filter
     if (activeFilters.serviceGroupIds.length > 0) {
-      result = result.filter(t => {
-        const sgId = 
+      result = result.filter((t) => {
+        const sgId =
           (t.source_process_template_id ? processServiceGroupMap.get(t.source_process_template_id) : null) ||
           ((t as any).process_template_id ? processServiceGroupMap.get((t as any).process_template_id) : null) ||
           (t.target_department_id ? deptServiceGroupMap.get(t.target_department_id) : null);
-        return sgId ? activeFilters.serviceGroupIds.includes(sgId) : false;
+        if (!sgId) return true;
+        return activeFilters.serviceGroupIds.includes(sgId);
       });
     }
 

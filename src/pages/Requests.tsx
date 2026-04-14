@@ -463,6 +463,7 @@ const Requests = () => {
             handleRefresh();
           }}
           onStatusChange={handleRequestStatusChange}
+          onTaskMutated={handleRefresh}
         />
       )}
     </div>

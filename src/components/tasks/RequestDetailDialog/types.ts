@@ -28,6 +28,7 @@ export interface RequestDetailDialogProps {
   open: boolean;
   onClose: () => void;
   onStatusChange: (taskId: string, status: TaskStatus) => void;
+  onTaskMutated?: () => void;
 }
 
 export const priorityConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; color: string }> = {
