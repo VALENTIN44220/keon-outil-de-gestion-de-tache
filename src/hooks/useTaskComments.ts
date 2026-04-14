@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSimulation } from '@/contexts/SimulationContext';
 import { useToast } from '@/hooks/use-toast';
 
 export interface TaskComment {
@@ -18,28 +19,15 @@ export interface TaskComment {
 }
 
 export function useTaskComments(taskId: string | null) {
-  const { user } = useAuth();
+  const { profile: authProfile } = useAuth();
+  const { isSimulating, simulatedProfile } = useSimulation();
+  /** Même profil que le reste de l’app en simulation (ex. useTasks). */
+  const profile = isSimulating && simulatedProfile ? simulatedProfile : authProfile;
+  const userProfileId = useMemo(() => profile?.id ?? null, [profile?.id]);
   const { toast } = useToast();
   const [comments, setComments] = useState<TaskComment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
-  const [userProfileId, setUserProfileId] = useState<string | null>(null);
-
-  // Fetch user profile id
-  useEffect(() => {
-    const fetchProfileId = async () => {
-      if (!user) return;
-      const { data } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-      if (data) {
-        setUserProfileId(data.id);
-      }
-    };
-    fetchProfileId();
-  }, [user]);
 
   const fetchComments = useCallback(async () => {
     if (!taskId) {
