@@ -562,6 +562,7 @@ export function UnifiedCalendarView() {
           updateTaskStatus(taskId, status);
           handleTaskUpdated();
         }}
+        onTaskMutated={handleTaskUpdated}
       />
     </>
   );

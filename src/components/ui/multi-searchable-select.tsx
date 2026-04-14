@@ -86,25 +86,29 @@ const MultiSearchableSelect = React.forwardRef<HTMLButtonElement, MultiSearchabl
               triggerClassName
             )}
           >
-            <div className="flex flex-wrap gap-1 flex-1">
+            <div className="flex flex-wrap gap-1 flex-1 text-left">
               {values.length === 0 ? (
                 <span>{placeholder}</span>
               ) : (
-                values.map((val) => (
-                  <Badge
-                    key={val}
-                    variant="secondary"
-                    className="text-xs px-1.5 py-0 h-5 gap-1"
-                  >
-                    {val}
-                    {!disabled && (
-                      <X
-                        className="h-3 w-3 cursor-pointer hover:text-destructive"
-                        onClick={(e) => handleRemove(e, val)}
-                      />
-                    )}
-                  </Badge>
-                ))
+                values.map((val) => {
+                  const label = options.find((o) => o.value === val)?.label ?? val;
+                  return (
+                    <Badge
+                      key={val}
+                      variant="secondary"
+                      className="text-xs px-1.5 py-0 h-5 gap-1 max-w-full"
+                      title={label}
+                    >
+                      <span className="truncate max-w-[200px]">{label}</span>
+                      {!disabled && (
+                        <X
+                          className="h-3 w-3 shrink-0 cursor-pointer hover:text-destructive"
+                          onClick={(e) => handleRemove(e, val)}
+                        />
+                      )}
+                    </Badge>
+                  );
+                })
               )}
             </div>
             <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />

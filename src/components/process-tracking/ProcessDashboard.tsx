@@ -12,6 +12,7 @@ import { useSupplierAccess } from '@/hooks/useSupplierAccess';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Loader2 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { DASHBOARD_TASKS_FETCH_LIMIT } from '@/lib/dashboardTaskLimits';
 
 const ProcessTaskManagement = lazy(() =>
   import('./ProcessTaskManagement').then(m => ({ default: m.ProcessTaskManagement }))
@@ -72,7 +73,9 @@ export function ProcessDashboard({ processId, departmentId, departmentIds, proce
       query = query.or(`process_template_id.eq.${processId},source_process_template_id.eq.${processId}`);
     }
 
-    const { data, error } = await query.order('created_at', { ascending: false });
+    const { data, error } = await query
+      .order('created_at', { ascending: false })
+      .limit(DASHBOARD_TASKS_FETCH_LIMIT);
 
     if (!error && data) {
       let allTasks = data as any[];
@@ -91,7 +94,8 @@ export function ProcessDashboard({ processId, departmentId, departmentIds, proce
             .from('tasks')
             .select('*')
             .in('assignee_id', Array.from(deptProfileIds))
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false })
+            .limit(DASHBOARD_TASKS_FETCH_LIMIT);
 
           if (assigneeTasks) {
             const extra = (assigneeTasks as any[]).filter(t => !existingIds.has(t.id));
@@ -225,7 +229,12 @@ export function ProcessDashboard({ processId, departmentId, departmentIds, proce
       )}
       {hasSupplierSection && (
         <TabsContent value="suppliers">
-          <SupplierListView onOpenSupplier={handleOpenSupplier} onViewSupplier={handleOpenSupplier} canEdit={supplierRole === 'achat'} />
+          <SupplierListView
+            onOpenSupplier={handleOpenSupplier}
+            onViewSupplier={handleOpenSupplier}
+            canEdit={supplierRole === 'achat'}
+            supplierRole={supplierRole}
+          />
           <SupplierDetailDrawer
             supplierId={selectedSupplierId}
             open={supplierDrawerOpen}
@@ -244,6 +253,7 @@ export function ProcessDashboard({ processId, departmentId, departmentIds, proce
         open={!!selectedTask}
         onClose={() => setSelectedTask(null)}
         onStatusChange={() => {}}
+        onTaskMutated={fetchTasks}
       />
     ) : (
       <TaskDetailDialog
@@ -251,6 +261,7 @@ export function ProcessDashboard({ processId, departmentId, departmentIds, proce
         open={!!selectedTask}
         onClose={() => setSelectedTask(null)}
         onStatusChange={() => {}}
+        onTaskMutated={fetchTasks}
       />
     )}
   </>

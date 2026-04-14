@@ -44,7 +44,7 @@ export function PlannerMappingDialog({ open, onOpenChange, mapping, onSave }: Pl
   const { categories, addSubcategory, refetch: refetchCategories } = useCategories();
   const [buckets, setBuckets] = useState<PlannerBucket[]>([]);
   const [bucketMappings, setBucketMappings] = useState<BucketMapping[]>([]);
-  const [importStates, setImportStates] = useState<string[]>(mapping.import_states || ['notStarted', 'inProgress', 'completed']);
+  const [importStates, setImportStates] = useState<string[]>(mapping.import_states || ['notStarted', 'inProgress']);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [newSubName, setNewSubName] = useState<Record<string, string>>({});
@@ -97,7 +97,7 @@ export function PlannerMappingDialog({ open, onOpenChange, mapping, onSave }: Pl
   useEffect(() => {
     if (open) {
       fetchBuckets();
-      setImportStates(mapping.import_states || ['notStarted', 'inProgress', 'completed']);
+      setImportStates(mapping.import_states || ['notStarted', 'inProgress']);
       setDefaultRequesterId(mapping.default_requester_id || 'none');
       setDefaultReporterId(mapping.default_reporter_id || 'none');
       setResolveAssignees(mapping.resolve_assignees !== false);
@@ -232,7 +232,7 @@ export function PlannerMappingDialog({ open, onOpenChange, mapping, onSave }: Pl
                       searchPlaceholder="Rechercher un collaborateur..."
                     />
                     <p className="text-xs text-muted-foreground">
-                      Profil affecté comme demandeur pour toutes les tâches importées
+                      Profil affecté comme demandeur pour toutes les tâches importées. Si un demandeur est défini et que ses emails sont connus (compte Microsoft, emails profil, etc.), seules les tâches Planner qui ont au moins un assigné Teams avec une de ces emails seront importées parmi les tâches non encore liées (les tâches sans assigné Planner restent importées).
                     </p>
                   </div>
 
@@ -299,6 +299,11 @@ export function PlannerMappingDialog({ open, onOpenChange, mapping, onSave }: Pl
               {/* State Filter */}
               <div className="space-y-3">
                 <Label className="font-medium">États des tâches à importer</Label>
+                <p className="text-xs text-muted-foreground">
+                  Seules les tâches Planner <span className="font-medium">non encore importées</span> dont l'état correspond seront créées.
+                  Les tâches déjà importées sont mises à jour indépendamment de ce filtre.
+                  Activer "Terminé" importera également les anciennes tâches closes présentes dans Planner.
+                </p>
                 <div className="flex flex-wrap gap-2">
                   {PLANNER_STATES.map(state => (
                     <label

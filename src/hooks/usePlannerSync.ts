@@ -189,7 +189,8 @@ export function usePlannerSync() {
 
       const total = result.tasksPulled + result.tasksPushed + result.tasksUpdated;
       if (result.errors > 0) {
-        toast.warning(`Sync partielle: ${total} tâches traitées, ${result.errors} erreurs`);
+        const detail = data.error ? ` — ${data.error}` : '';
+        toast.warning(`Sync partielle: ${total} tâches traitées, ${result.errors} erreurs${detail}`);
       } else {
         toast.success(`Sync terminée: ${result.tasksPulled} importées, ${result.tasksPushed} poussées, ${result.tasksUpdated} mises à jour`);
       }

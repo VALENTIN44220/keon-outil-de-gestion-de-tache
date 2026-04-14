@@ -15,6 +15,7 @@ import { useCategories } from '@/hooks/useCategories';
 import { useTasksProgress } from '@/hooks/useChecklists';
 import { Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
+import { DASHBOARD_TASKS_FETCH_LIMIT } from '@/lib/dashboardTaskLimits';
 
 interface ProcessTaskManagementProps {
   processId?: string;
@@ -57,7 +58,9 @@ export function ProcessTaskManagement({ processId, departmentId, processIds, can
       query = query.or(`process_template_id.eq.${processId},source_process_template_id.eq.${processId}`);
     }
 
-    const { data, error } = await query.order('created_at', { ascending: false });
+    const { data, error } = await query
+      .order('created_at', { ascending: false })
+      .limit(DASHBOARD_TASKS_FETCH_LIMIT);
 
     if (!error && data) {
       if (isDeptMode && departmentId) {
@@ -72,7 +75,8 @@ export function ProcessTaskManagement({ processId, departmentId, processIds, can
             .from('tasks')
             .select('*')
             .in('assignee_id', deptProfiles.map(p => p.id))
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false })
+            .limit(DASHBOARD_TASKS_FETCH_LIMIT);
 
           if (assigneeTasks) {
             const extra = (assigneeTasks as any[]).filter(t => !existingIds.has(t.id));

@@ -26,7 +26,7 @@ interface RequestWizardDialogProps {
 }
 
 export function RequestWizardDialog({ open, onClose, onSuccess, initialProcessId }: RequestWizardDialogProps) {
-  const { profile: currentUser } = useAuth();
+  const { profile: currentUser, user: authUser } = useAuth();
   const [data, setData] = useState<RequestWizardData>(defaultWizardData);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -252,14 +252,16 @@ export function RequestWizardDialog({ open, onClose, onSuccess, initialProcessId
   };
 
   const handleSubmit = async () => {
-    if (!currentUser) {
+    if (!currentUser || !authUser) {
       toast.error("Vous devez être connecté");
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const userId = currentUser.id;
+      // tasks.user_id is auth.users.id (RLS: auth.uid() = user_id); assignee/requester reference profiles.id
+      const profileId = currentUser.id;
+      const authUserId = authUser.id;
 
       // Determine task/request parameters
       let taskType: "task" | "request" = "task";
@@ -267,7 +269,7 @@ export function RequestWizardDialog({ open, onClose, onSuccess, initialProcessId
       let status = "todo";
 
       if (data.requestType === "personal") {
-        assigneeId = userId;
+        assigneeId = profileId;
       } else if (data.requestType === "person") {
         assigneeId = data.targetPersonId;
       } else if (data.requestType === "process") {
@@ -284,9 +286,9 @@ export function RequestWizardDialog({ open, onClose, onSuccess, initialProcessId
           priority: data.priority,
           status,
           type: taskType,
-          user_id: userId,
+          user_id: authUserId,
           assignee_id: assigneeId,
-          requester_id: userId,
+          requester_id: profileId,
           due_date: data.dueDate,
           be_project_id: data.beProjectId,
           it_project_id: data.itProjectId,
@@ -338,12 +340,12 @@ export function RequestWizardDialog({ open, onClose, onSuccess, initialProcessId
           event_type: "request_created",
           entity_type: "request",
           entity_id: taskData.id,
-          triggered_by: userId,
+          triggered_by: authUserId,
           payload: {
             request_type: "process",
             process_id: data.processId,
             sub_process_ids: data.selectedSubProcesses,
-            requester_id: userId,
+            requester_id: profileId,
           },
         });
         if (wfError) {
@@ -356,7 +358,7 @@ export function RequestWizardDialog({ open, onClose, onSuccess, initialProcessId
           const { data: profileData } = await supabase
             .from("profiles")
             .select("id, display_name")
-            .eq("user_id", userId)
+            .eq("user_id", authUserId)
             .single();
 
           const materialRows = data.materialLines
