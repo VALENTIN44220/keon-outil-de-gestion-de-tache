@@ -2384,6 +2384,7 @@ export type Database = {
       planner_sync_logs: {
         Row: {
           created_at: string
+          diagnostics: Json | null
           direction: string
           errors: Json | null
           id: string
@@ -2396,6 +2397,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          diagnostics?: Json | null
           direction: string
           errors?: Json | null
           id?: string
@@ -2408,6 +2410,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          diagnostics?: Json | null
           direction?: string
           errors?: Json | null
           id?: string

@@ -41,6 +41,7 @@ export interface SyncLog {
   tasks_pulled: number;
   tasks_updated: number;
   errors: any[];
+  diagnostics?: Record<string, unknown> | null;
   status: string;
   created_at: string;
 }
@@ -179,7 +180,14 @@ export function usePlannerSync() {
         body: { action: 'planner-sync', planMappingId: mappingId },
       });
       if (error) throw error;
-      
+      if (!data || typeof data !== 'object') {
+        throw new Error('Réponse vide du service de synchronisation Planner.');
+      }
+      // La Edge Function renvoie souvent { success: false, error } en HTTP 200 — invoke ne met pas `error`.
+      if (data.success === false) {
+        throw new Error((data as { error?: string }).error || 'Synchronisation Planner refusée par le serveur.');
+      }
+
       const result: SyncResult = {
         tasksPulled: data.tasksPulled || 0,
         tasksPushed: data.tasksPushed || 0,
@@ -188,9 +196,57 @@ export function usePlannerSync() {
       };
 
       const total = result.tasksPulled + result.tasksPushed + result.tasksUpdated;
+      const diag = data?.diagnostics as
+        | {
+            plannerTasksFetched?: number;
+            pullSkippedAlreadyLinked?: number;
+            pullSkippedByState?: number;
+            pullSkippedByDefaultRequesterAssignee?: number;
+            syncDirection?: string;
+            defaultRequesterFilterActive?: boolean;
+            graphUsersResolved?: number;
+            sampleErrors?: unknown[];
+            sampleFirstTask?: {
+              derivedState?: string;
+              stateFilterIncludes?: boolean;
+              alreadyLinkedForUser?: boolean;
+            };
+          }
+        | undefined;
+
       if (result.errors > 0) {
         const detail = data.error ? ` — ${data.error}` : '';
-        toast.warning(`Sync partielle: ${total} tâches traitées, ${result.errors} erreurs${detail}`);
+        const samples = diag?.sampleErrors;
+        const samplesStr =
+          Array.isArray(samples) && samples.length > 0
+            ? ` Ex.: ${samples
+                .slice(0, 2)
+                .map((x: any) => x?.error || x?.message || JSON.stringify(x))
+                .join(' | ')}`
+            : '';
+        toast.warning(`Sync partielle: ${total} tâches traitées, ${result.errors} erreur(s)${detail}${samplesStr}`, { duration: 14000 });
+      } else if (total === 0 && diag) {
+        if ((diag.plannerTasksFetched ?? 0) > 0) {
+          const sft = diag.sampleFirstTask;
+          const firstHint =
+            sft && typeof sft.derivedState === 'string'
+              ? ` Ex. 1re tâche Planner: état=${sft.derivedState}, passe le filtre d’état=${sft.stateFilterIncludes === true ? 'oui' : 'non'}, déjà liée pour vous=${sft.alreadyLinkedForUser === true ? 'oui' : 'non'}.`
+              : '';
+          toast.info('Sync Planner — aucun changement (diagnostic)', {
+            description:
+              `Microsoft a renvoyé ${diag.plannerTasksFetched} tâche(s). Exclues — déjà liées: ${diag.pullSkippedAlreadyLinked ?? 0}, ` +
+              `filtre d’état: ${diag.pullSkippedByState ?? 0}, filtre demandeur (assignés résolus mais ≠ demandeur): ${diag.pullSkippedByDefaultRequesterAssignee ?? 0}. ` +
+              `Direction: ${diag.syncDirection ?? '?'}. Filtre demandeur actif: ${diag.defaultRequesterFilterActive ? 'oui' : 'non'}. ` +
+              `Profils Graph résolus: ${diag.graphUsersResolved ?? 0}.${firstHint}`,
+            duration: 14000,
+          });
+        } else {
+          toast.info('Sync Planner — aucun changement (diagnostic)', {
+            description:
+              `Microsoft Graph n’a renvoyé aucune tâche pour ce plan. Vérifiez le plan, les droits Planner, ou reconnectez Microsoft 365.`,
+            duration: 12000,
+          });
+        }
       } else {
         toast.success(`Sync terminée: ${result.tasksPulled} importées, ${result.tasksPushed} poussées, ${result.tasksUpdated} mises à jour`);
       }

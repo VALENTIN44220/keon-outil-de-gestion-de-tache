@@ -33,6 +33,12 @@ const PLANNER_STATES = [
   { value: 'completed', label: 'Terminé', color: 'bg-success/10 text-success' },
 ];
 
+/** Aligné sur le DEFAULT SQL de planner_plan_mappings.import_states */
+function normalizePlannerImportStates(states: string[] | null | undefined): string[] {
+  if (Array.isArray(states) && states.length > 0) return states;
+  return ['notStarted', 'inProgress', 'completed'];
+}
+
 interface PlannerMappingDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -44,7 +50,7 @@ export function PlannerMappingDialog({ open, onOpenChange, mapping, onSave }: Pl
   const { categories, addSubcategory, refetch: refetchCategories } = useCategories();
   const [buckets, setBuckets] = useState<PlannerBucket[]>([]);
   const [bucketMappings, setBucketMappings] = useState<BucketMapping[]>([]);
-  const [importStates, setImportStates] = useState<string[]>(mapping.import_states || ['notStarted', 'inProgress']);
+  const [importStates, setImportStates] = useState<string[]>(() => normalizePlannerImportStates(mapping.import_states));
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [newSubName, setNewSubName] = useState<Record<string, string>>({});
@@ -97,7 +103,7 @@ export function PlannerMappingDialog({ open, onOpenChange, mapping, onSave }: Pl
   useEffect(() => {
     if (open) {
       fetchBuckets();
-      setImportStates(mapping.import_states || ['notStarted', 'inProgress']);
+      setImportStates(normalizePlannerImportStates(mapping.import_states));
       setDefaultRequesterId(mapping.default_requester_id || 'none');
       setDefaultReporterId(mapping.default_reporter_id || 'none');
       setResolveAssignees(mapping.resolve_assignees !== false);
@@ -232,7 +238,7 @@ export function PlannerMappingDialog({ open, onOpenChange, mapping, onSave }: Pl
                       searchPlaceholder="Rechercher un collaborateur..."
                     />
                     <p className="text-xs text-muted-foreground">
-                      Profil affecté comme demandeur pour toutes les tâches importées. Si un demandeur est défini et que ses emails sont connus (compte Microsoft, emails profil, etc.), seules les tâches Planner qui ont au moins un assigné Teams avec une de ces emails seront importées parmi les tâches non encore liées (les tâches sans assigné Planner restent importées).
+                      Profil enregistré comme demandeur sur les tâches importées. Si un demandeur est défini et que ses emails sont connus, les nouvelles tâches importées ne gardent que celles dont Microsoft Graph a résolu au moins un email d’assigné Teams correspondant à ce demandeur ; si Graph ne renvoie pas d’email pour les assignés, le filtre ne s’applique pas. Les tâches sans assigné dans Planner restent importées.
                     </p>
                   </div>
 
@@ -302,8 +308,13 @@ export function PlannerMappingDialog({ open, onOpenChange, mapping, onSave }: Pl
                 <p className="text-xs text-muted-foreground">
                   Seules les tâches Planner <span className="font-medium">non encore importées</span> dont l'état correspond seront créées.
                   Les tâches déjà importées sont mises à jour indépendamment de ce filtre.
-                  Activer "Terminé" importera également les anciennes tâches closes présentes dans Planner.
+                  Sans « Terminé », une tâche Planner à 100&nbsp;% est ignorée : sur un plan où tout est clos, la sync peut donc afficher 0 importée même s’il y a des tâches côté Teams.
                 </p>
+                {importStates.length > 0 && !importStates.includes('completed') && (
+                  <p className="text-xs text-amber-700 dark:text-amber-500">
+                    « Terminé » n’est pas coché : les tâches Planner déjà terminées ne seront pas créées dans l’app.
+                  </p>
+                )}
                 <div className="flex flex-wrap gap-2">
                   {PLANNER_STATES.map(state => (
                     <label

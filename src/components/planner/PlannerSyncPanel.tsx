@@ -16,6 +16,22 @@ import { useCategories } from '@/hooks/useCategories';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
+function formatPlannerSyncDiagnostics(d: Record<string, unknown>): string {
+  const parts = [
+    `Graph: ${d.plannerTasksFetched ?? 0} tâche(s)`,
+    `excl. déjà liées: ${d.pullSkippedAlreadyLinked ?? 0}`,
+    `excl. filtre état: ${d.pullSkippedByState ?? 0}`,
+    `excl. filtre demandeur: ${d.pullSkippedByDefaultRequesterAssignee ?? 0}`,
+  ];
+  const sft = d.sampleFirstTask as Record<string, unknown> | undefined;
+  if (sft && typeof sft.derivedState === 'string') {
+    parts.push(
+      `1re tâche: état=${sft.derivedState} autorisé=${sft.stateFilterIncludes === true ? 'oui' : 'non'} déjàLiée=${sft.alreadyLinkedForUser === true ? 'oui' : 'non'}`,
+    );
+  }
+  return parts.join(' · ');
+}
+
 export function PlannerSyncPanel() {
   const {
     plans,
@@ -372,34 +388,44 @@ export function PlannerSyncPanel() {
             <ScrollArea className="max-h-48">
               <div className="space-y-2">
                 {syncLogs.map(log => (
-                  <div key={log.id} className="flex items-center justify-between text-sm py-1.5 border-b last:border-0">
-                    <div className="flex items-center gap-2">
-                    {log.status === 'success' ? (
-                        <CheckCircle2 className="h-3.5 w-3.5 text-success" />
-                      ) : (
-                        <AlertCircle className="h-3.5 w-3.5 text-warning" />
-                      )}
-                      <span className="text-xs text-muted-foreground">
-                        {format(new Date(log.created_at), "d MMM HH:mm", { locale: fr })}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 text-xs">
-                      {log.tasks_pulled > 0 && <span className="text-primary">↓ {log.tasks_pulled} importées</span>}
-                      {log.tasks_pushed > 0 && <span className="text-success">↑ {log.tasks_pushed} poussées</span>}
-                      {log.tasks_updated > 0 && <span className="text-warning">↻ {log.tasks_updated} mises à jour</span>}
-                      {log.errors?.length > 0 && (
-                        <span
-                          className="text-destructive cursor-help"
-                          title={log.errors.map((e: any) => e.error || e.message || JSON.stringify(e)).join('\n')}
-                        >
-                          ⚠ {log.errors.length} erreur{log.errors.length > 1 ? 's' : ''}
+                  <div key={log.id} className="py-1.5 border-b last:border-0">
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        {log.status === 'success' ? (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-success" />
+                        ) : (
+                          <AlertCircle className="h-3.5 w-3.5 text-warning" />
+                        )}
+                        <span className="text-xs text-muted-foreground">
+                          {format(new Date(log.created_at), "d MMM HH:mm", { locale: fr })}
                         </span>
-                      )}
-                      {log.status === 'running' && <span className="text-muted-foreground italic">En cours…</span>}
-                      {log.status !== 'running' && log.tasks_pulled === 0 && log.tasks_pushed === 0 && log.tasks_updated === 0 && (!log.errors || log.errors.length === 0) && (
-                        <span className="text-muted-foreground">Aucune modification</span>
-                      )}
+                      </div>
+                      <div className="flex items-center gap-3 text-xs">
+                        {log.tasks_pulled > 0 && <span className="text-primary">↓ {log.tasks_pulled} importées</span>}
+                        {log.tasks_pushed > 0 && <span className="text-success">↑ {log.tasks_pushed} poussées</span>}
+                        {log.tasks_updated > 0 && <span className="text-warning">↻ {log.tasks_updated} mises à jour</span>}
+                        {log.errors?.length > 0 && (
+                          <span
+                            className="text-destructive cursor-help"
+                            title={log.errors.map((e: any) => e.error || e.message || JSON.stringify(e)).join('\n')}
+                          >
+                            ⚠ {log.errors.length} erreur{log.errors.length > 1 ? 's' : ''}
+                          </span>
+                        )}
+                        {log.status === 'running' && <span className="text-muted-foreground italic">En cours…</span>}
+                        {log.status !== 'running' && log.tasks_pulled === 0 && log.tasks_pushed === 0 && log.tasks_updated === 0 && (!log.errors || log.errors.length === 0) && (
+                          <span className="text-muted-foreground">Aucune modification</span>
+                        )}
+                      </div>
                     </div>
+                    {log.diagnostics && typeof log.diagnostics === 'object' && (
+                      <div
+                        className="text-[11px] text-muted-foreground leading-snug mt-1 pl-6 max-w-full break-words"
+                        title={JSON.stringify(log.diagnostics, null, 2)}
+                      >
+                        {formatPlannerSyncDiagnostics(log.diagnostics as Record<string, unknown>)}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

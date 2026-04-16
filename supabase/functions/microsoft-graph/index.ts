@@ -324,6 +324,23 @@ async function getPlannerPlanDetails(accessToken: string, planId: string): Promi
   return await resp.json();
 }
 
+/** Normalise import_states (TEXT[]) vers les libellés attendus par la sync Planner. */
+function normalizeImportStatesFromMapping(raw: unknown): string[] {
+  const fallback = ['notStarted', 'inProgress', 'completed'];
+  if (!Array.isArray(raw) || raw.length === 0) return [...fallback];
+  const mapped = raw
+    .map((s) => {
+      const t = String(s).trim();
+      const lower = t.toLowerCase();
+      if (lower === 'notstarted') return 'notStarted';
+      if (lower === 'inprogress') return 'inProgress';
+      if (lower === 'completed') return 'completed';
+      return t;
+    })
+    .filter((t) => t.length > 0);
+  return mapped.length > 0 ? mapped : [...fallback];
+}
+
 // Resolve applied categories to label names
 function resolveLabels(appliedCategories: Record<string, boolean> | null, categoryDescriptions: Record<string, string>): string[] {
   if (!appliedCategories) return [];
@@ -616,6 +633,47 @@ function appPriorityToPlanner(priority: string): number {
   }
 }
 
+/** Écrit le log de sync ; retire `diagnostics` si la colonne n’existe pas encore (migration non appliquée). */
+async function persistPlannerSyncLog(
+  supabase: any,
+  syncLogId: string | null,
+  row: Record<string, unknown>,
+): Promise<void> {
+  const stripDiag = (r: Record<string, unknown>) => {
+    const { diagnostics, ...rest } = r;
+    return rest;
+  };
+  const isDiagColumnMissing = (e: any) => {
+    const s = `${e?.message ?? ''}${e?.details ?? ''}${e?.hint ?? ''}`;
+    return /diagnostics/i.test(s) || /column .* does not exist/i.test(s);
+  };
+
+  try {
+    if (syncLogId) {
+      let { error } = await supabase.from('planner_sync_logs').update(row).eq('id', syncLogId);
+      if (error && row.diagnostics != null && isDiagColumnMissing(error)) {
+        ({ error } = await supabase.from('planner_sync_logs').update(stripDiag(row)).eq('id', syncLogId));
+      }
+      if (error) {
+        console.error('planner_sync_logs update failed:', error);
+        let { error: insErr } = await supabase.from('planner_sync_logs').insert(row);
+        if (insErr && row.diagnostics != null && isDiagColumnMissing(insErr)) {
+          ({ error: insErr } = await supabase.from('planner_sync_logs').insert(stripDiag(row)));
+        }
+        if (insErr) console.error('planner_sync_logs insert failed:', insErr);
+      }
+    } else {
+      let { error: insertErr } = await supabase.from('planner_sync_logs').insert(row);
+      if (insertErr && row.diagnostics != null && isDiagColumnMissing(insertErr)) {
+        ({ error: insertErr } = await supabase.from('planner_sync_logs').insert(stripDiag(row)));
+      }
+      if (insertErr) console.error('planner_sync_logs insert (no syncLogId) failed:', insertErr);
+    }
+  } catch (e) {
+    console.error('persistPlannerSyncLog:', e);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -894,11 +952,23 @@ Deno.serve(async (req) => {
       }
 
       const { planMappingId } = params;
+      if (!planMappingId || typeof planMappingId !== 'string') {
+        return new Response(JSON.stringify({ success: false, error: 'planMappingId requis' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       let tasksPulled = 0;
       let tasksPushed = 0;
       let tasksUpdated = 0;
       const errors: any[] = [];
       let syncLogId: string | null = null;
+      // PULL diagnostics (returned to client when sync ends) — helps debug "0 tasks" reports
+      let plannerTasksFetched = 0;
+      let pullSkippedAlreadyLinked = 0;
+      let pullSkippedByState = 0;
+      let pullSkippedByDefaultRequesterAssignee = 0;
 
       try {
 
@@ -942,6 +1012,7 @@ Deno.serve(async (req) => {
       }
 
       const plannerTasks: any[] = await getPlannerTasks(accessToken, mapping.planner_plan_id);
+      plannerTasksFetched = plannerTasks.length;
       console.log(`planner-sync: fetched ${plannerTasks.length} tasks from plan ${mapping.planner_plan_id}`);
 
       // Get bucket mappings for subcategory resolution
@@ -951,16 +1022,20 @@ Deno.serve(async (req) => {
         .eq('plan_mapping_id', planMappingId);
       const bucketToSubcategory = new Map((bucketMappings || []).map(bm => [bm.planner_bucket_id, bm.mapped_subcategory_id]));
 
-      // Import state filter (DB default includes completed; JS must not treat [] as "use default")
-      const importStates: string[] = Array.isArray(mapping.import_states) && mapping.import_states.length > 0
-        ? mapping.import_states
-        : ['notStarted', 'inProgress', 'completed'];
+      // Import state filter (tolère null, [], casse incorrecte)
+      const importStates: string[] = normalizeImportStatesFromMapping(mapping.import_states);
 
       // Map Planner percentComplete to state string for filtering
       function getPlannerState(percent: number): string {
         if (percent === 100) return 'completed';
         if (percent > 0) return 'inProgress';
         return 'notStarted';
+      }
+
+      function plannerPercentValue(raw: unknown): number {
+        if (typeof raw === 'number' && !Number.isNaN(raw)) return raw;
+        const n = parseInt(String(raw ?? ''), 10);
+        return Number.isFinite(n) ? n : 0;
       }
 
       // Get existing links for THIS mapping (used for UPDATE loop + local task prefetch)
@@ -978,12 +1053,17 @@ Deno.serve(async (req) => {
         .eq('user_id', userId);
       const allUserMappingIds = (allUserMappings || []).map((m: any) => m.id);
 
-      const { data: allPlannerLinks } = await supabase
-        .from('planner_task_links')
-        .select('planner_task_id')
-        .in('plan_mapping_id', allUserMappingIds.length > 0 ? allUserMappingIds : ['__none__']);
-
-      const linkedPlannerIds = new Set((allPlannerLinks || []).map(l => l.planner_task_id));
+      let linkedPlannerIds = new Set<string>();
+      if (allUserMappingIds.length > 0) {
+        const { data: allPlannerLinks, error: allLinksErr } = await supabase
+          .from('planner_task_links')
+          .select('planner_task_id')
+          .in('plan_mapping_id', allUserMappingIds);
+        if (allLinksErr) {
+          console.error('planner-sync: failed to load planner_task_links for user mappings', allLinksErr);
+        }
+        linkedPlannerIds = new Set((allPlannerLinks || []).map((l: { planner_task_id: string }) => l.planner_task_id));
+      }
       const linkedLocalIds = new Set((existingLinks || []).map(l => l.local_task_id));
 
       console.log(`planner-sync: ${linkedPlannerIds.size} tasks already linked (user scope), ${existingLinks?.length || 0} links for this mapping`);
@@ -1101,33 +1181,28 @@ Deno.serve(async (req) => {
 
       // PULL: Import new planner tasks
       if (mapping.sync_direction === 'from_planner' || mapping.sync_direction === 'both') {
-        let skippedAlreadyLinked = 0;
-        let skippedByState = 0;
-        let skippedByDefaultRequesterAssignee = 0;
-
         for (const pt of plannerTasks) {
-          if (linkedPlannerIds.has(pt.id)) { skippedAlreadyLinked++; continue; }
+          if (linkedPlannerIds.has(pt.id)) { pullSkippedAlreadyLinked++; continue; }
 
           // Filter by state
-          const taskState = getPlannerState(pt.percentComplete || 0);
-          if (!importStates.includes(taskState)) { skippedByState++; continue; }
+          const taskState = getPlannerState(plannerPercentValue(pt.percentComplete));
+          if (!importStates.includes(taskState)) { pullSkippedByState++; continue; }
 
-          // Optional: only import tasks assigned in Planner to someone whose email matches
-          // the configured default requester (demandeur). Unassigned Planner tasks are still imported.
+          // Optional: only import tasks whose Planner assignees include someone whose Graph email
+          // matches the default requester. If Graph did not return any email for those assignees,
+          // do NOT skip (otherwise every task is excluded and sync stays at 0).
           if (defaultRequesterEmails && defaultRequesterEmails.size > 0) {
             const assigneeIds = pt.assignments ? Object.keys(pt.assignments) : [];
             if (assigneeIds.length > 0) {
-              let assigneeMatchesRequester = false;
-              for (const aid of assigneeIds) {
-                const em = (graphUserCache.get(aid)?.email || '').trim().toLowerCase();
-                if (em && defaultRequesterEmails.has(em)) {
-                  assigneeMatchesRequester = true;
-                  break;
+              const resolvedEmails = assigneeIds
+                .map((aid) => (graphUserCache.get(aid)?.email || '').trim().toLowerCase())
+                .filter(Boolean);
+              if (resolvedEmails.length > 0) {
+                const anyMatch = resolvedEmails.some((em) => defaultRequesterEmails!.has(em));
+                if (!anyMatch) {
+                  pullSkippedByDefaultRequesterAssignee++;
+                  continue;
                 }
-              }
-              if (!assigneeMatchesRequester) {
-                skippedByDefaultRequesterAssignee++;
-                continue;
               }
             }
           }
@@ -1248,7 +1323,7 @@ Deno.serve(async (req) => {
         }
 
         console.log(
-          `planner-sync PULL: ${tasksPulled} imported, ${skippedAlreadyLinked} already linked, ${skippedByState} filtered by state (importStates=${importStates.join(',')}), ${skippedByDefaultRequesterAssignee} skipped (Planner assignee does not match default requester emails)`,
+          `planner-sync PULL: ${tasksPulled} imported, ${pullSkippedAlreadyLinked} already linked, ${pullSkippedByState} filtered by state (importStates=${importStates.join(',')}), ${pullSkippedByDefaultRequesterAssignee} skipped (assignee emails resolved but none match default requester)`,
         );
       }
 
@@ -1464,6 +1539,32 @@ Deno.serve(async (req) => {
       // Update mapping
       await supabase.from('planner_plan_mappings').update({ last_sync_at: new Date().toISOString() }).eq('id', planMappingId);
 
+      const firstPt = plannerTasks[0];
+      const firstDerivedState = firstPt
+        ? getPlannerState(plannerPercentValue(firstPt.percentComplete))
+        : null;
+      const syncDiagnosticsPayload = {
+        plannerTasksFetched,
+        pullSkippedAlreadyLinked,
+        pullSkippedByState,
+        pullSkippedByDefaultRequesterAssignee,
+        importStatesUsed: importStates,
+        importStatesRaw: mapping.import_states,
+        syncDirection: mapping.sync_direction,
+        defaultRequesterFilterActive: !!(defaultRequesterEmails && defaultRequesterEmails.size > 0),
+        graphUsersResolved: graphUserCache.size,
+        sampleFirstTask: firstPt
+          ? {
+            id: firstPt.id,
+            percentComplete: firstPt.percentComplete,
+            derivedState: firstDerivedState,
+            stateFilterIncludes: firstDerivedState ? importStates.includes(firstDerivedState) : false,
+            alreadyLinkedForUser: linkedPlannerIds.has(firstPt.id),
+          }
+          : null,
+        sampleErrors: errors.slice(0, 5),
+      };
+
       // Finalize sync log - ensure it's always written
       const finalLogData = {
         user_id: userId,
@@ -1474,26 +1575,10 @@ Deno.serve(async (req) => {
         tasks_updated: tasksUpdated,
         errors,
         status: errors.length > 0 ? 'partial' : 'success',
+        diagnostics: syncDiagnosticsPayload,
       };
 
-      try {
-        if (syncLogId) {
-          const { error: updateErr } = await supabase.from('planner_sync_logs').update(finalLogData).eq('id', syncLogId);
-          if (updateErr) {
-            console.error('Failed to update sync log, inserting new:', updateErr);
-            await supabase.from('planner_sync_logs').insert(finalLogData);
-          }
-        } else {
-          const { error: insertErr } = await supabase.from('planner_sync_logs').insert(finalLogData);
-          if (insertErr) console.error('Failed to insert final sync log:', insertErr);
-        }
-      } catch (logFinalErr) {
-        console.error('Sync log finalization error:', logFinalErr);
-        // Last resort: try one more time
-        try {
-          await supabase.from('planner_sync_logs').insert(finalLogData);
-        } catch (_) { /* give up */ }
-      }
+      await persistPlannerSyncLog(supabase, syncLogId, finalLogData);
 
       return new Response(JSON.stringify({
         success: true,
@@ -1501,6 +1586,7 @@ Deno.serve(async (req) => {
         tasksPushed,
         tasksUpdated,
         errors: errors.length,
+        diagnostics: syncDiagnosticsPayload,
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
       } catch (syncErr: any) {
