@@ -59,7 +59,8 @@ Deno.serve(async (req) => {
     // Parse request body
     const { 
       email, 
-      password, 
+      password,       // optional – kept for backward-compat with bulk-import flows
+      redirect_to,    // where the invite email should send the user
       display_name,
       company_id,
       department_id,
@@ -70,9 +71,9 @@ Deno.serve(async (req) => {
       upsert_mode,
     } = await req.json();
 
-    if (!email || (!password && !upsert_mode)) {
+    if (!email) {
       return new Response(
-        JSON.stringify({ error: 'Email and password are required' }),
+        JSON.stringify({ error: 'Email is required' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -197,33 +198,50 @@ Deno.serve(async (req) => {
       }
     }
 
-    // User does not exist - create new user
-    if (!password) {
-      return new Response(
-        JSON.stringify({ error: 'Password is required for new users' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // User does not exist — create via invitation (no password) or legacy password path
+    let userData: any;
+
+    if (password) {
+      // Legacy path kept for backward-compat (e.g. bulk-import flows that still send a password)
+      const { data, error: createError } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: {
+          display_name: display_name || email,
+        },
+      });
+      if (createError) {
+        console.error('User creation error (password path):', createError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to create user account' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      userData = data;
+    } else {
+      // Primary path: send an invitation email so the user connects via Microsoft Azure.
+      // The invite link lands on /auth/accept-invite where we prompt Microsoft sign-in.
+      const siteUrl = Deno.env.get('SITE_URL') || supabaseUrl.replace('.supabase.co', '.vercel.app');
+      const inviteRedirectTo = redirect_to || `${siteUrl}/auth/accept-invite`;
+
+      const { data, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+        data: {
+          display_name: display_name || email,
+        },
+        redirectTo: inviteRedirectTo,
+      });
+      if (inviteError) {
+        console.error('User invite error:', inviteError);
+        return new Response(
+          JSON.stringify({ error: 'Failed to send invitation' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      userData = data;
     }
 
-    // Create the user
-    const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: {
-        display_name: display_name || email,
-      },
-    });
-
-    if (createError) {
-      console.error('User creation error:', createError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to create user account' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Update the profile with additional info (including lovable_email)
+    // Update the profile created by the handle_new_user trigger with org fields
     const { data: profileData, error: profileError } = await supabaseAdmin
       .from('profiles')
       .update({
@@ -234,7 +252,6 @@ Deno.serve(async (req) => {
         hierarchy_level_id,
         permission_profile_id,
         manager_id,
-        must_change_password: true,
         lovable_email: email,
       })
       .eq('user_id', userData.user.id)

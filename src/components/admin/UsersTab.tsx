@@ -190,7 +190,6 @@ export function UsersTab({
   
   // New user form
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [companyId, setCompanyId] = useState<string>('');
   const [departmentId, setDepartmentId] = useState<string>('');
@@ -202,7 +201,6 @@ export function UsersTab({
 
   const resetForm = () => {
     setEmail('');
-    setPassword('');
     setDisplayName('');
     setCompanyId('');
     setDepartmentId('');
@@ -219,13 +217,8 @@ export function UsersTab({
   };
 
   const handleCreateUser = async () => {
-    if (!email.trim() || !password.trim()) {
-      toast.error('Email et mot de passe requis');
-      return;
-    }
-
-    if (password.length < 6) {
-      toast.error('Le mot de passe doit contenir au moins 6 caractères');
+    if (!email.trim()) {
+      toast.error('Email requis');
       return;
     }
 
@@ -243,7 +236,7 @@ export function UsersTab({
         },
         body: {
           email: email.trim(),
-          password,
+          redirect_to: `${window.location.origin}/auth/accept-invite`,
           display_name: displayName.trim() || undefined,
           company_id: companyId || undefined,
           department_id: departmentId || undefined,
@@ -274,7 +267,7 @@ export function UsersTab({
         }
       }
 
-      toast.success('Utilisateur créé avec succès');
+      toast.success('Invitation envoyée — l\'utilisateur recevra un email pour se connecter via Microsoft.');
       resetForm();
       setIsDialogOpen(false);
       onUserCreated();
@@ -651,40 +644,32 @@ export function UsersTab({
                   <DialogDescription>
                     {editingUser 
                       ? 'Modifiez les informations de l\'utilisateur'
-                      : 'Le mot de passe devra être changé à la première connexion'
+                      : 'Un email d\'invitation sera envoyé. L\'utilisateur devra se connecter via son compte Microsoft Azure.'
                     }
                   </DialogDescription>
                 </DialogHeader>
 
                 <div className="space-y-6 py-4">
-                  {/* Credentials - only for new users */}
+                  {/* Email - only for new users */}
                   {!editingUser && (
                     <div className="space-y-4 p-4 rounded-lg bg-muted/50 border">
                       <h4 className="font-medium flex items-center gap-2">
-                        <AlertCircle className="h-4 w-4 text-amber-500" />
-                        Identifiants de connexion
+                        <Mail className="h-4 w-4 text-primary" />
+                        Invitation par email
                       </h4>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="space-y-2">
-                          <Label htmlFor="email">Email *</Label>
-                          <Input
-                            id="email"
-                            type="email"
-                            placeholder="utilisateur@exemple.com"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="password">Mot de passe temporaire *</Label>
-                          <Input
-                            id="password"
-                            type="password"
-                            placeholder="Min. 6 caractères"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                          />
-                        </div>
+                      <p className="text-sm text-muted-foreground">
+                        L'utilisateur recevra un email d'invitation et devra se connecter avec son compte <strong>Microsoft Azure</strong>.
+                        Aucun mot de passe ne sera créé.
+                      </p>
+                      <div className="space-y-2">
+                        <Label htmlFor="email">Adresse email Microsoft *</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          placeholder="prenom.nom@entreprise.com"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                        />
                       </div>
                     </div>
                   )}
@@ -973,7 +958,7 @@ export function UsersTab({
                     onClick={() => editingUser ? handleUpdateUser(editingUser.id, editingUser.status) : handleCreateUser()}
                     disabled={isCreating}
                   >
-                    {isCreating ? 'Création...' : (editingUser ? 'Mettre à jour' : 'Créer l\'utilisateur')}
+                    {isCreating ? 'Envoi...' : (editingUser ? 'Mettre à jour' : 'Envoyer l\'invitation')}
                   </Button>
                 </div>
               </DialogContent>

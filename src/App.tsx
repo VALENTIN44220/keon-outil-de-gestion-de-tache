@@ -18,6 +18,7 @@ import { ITProjectsAccessGate } from "@/components/it/ITProjectsAccessGate";
 const Index = lazy(() => import("./pages/Index"));
 const Auth = lazy(() => import("./pages/Auth"));
 const AuthCallback = lazy(() => import("./pages/AuthCallback"));
+const AcceptInvite = lazy(() => import("./pages/AcceptInvite"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Profile = lazy(() => import("./pages/Profile"));
 const Templates = lazy(() => import("./pages/Templates"));
@@ -131,6 +132,7 @@ const App = () => (
             <Routes>
               <Route path="/auth" element={<Auth />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
+              <Route path="/auth/accept-invite" element={<AcceptInvite />} />
               <Route path="/reset-password" element={<ResetPassword />} />
             {/* Persistent route placeholders (real screens are mounted by <PersistentRoutes />) */}
             <Route path="/" element={<></>} />
