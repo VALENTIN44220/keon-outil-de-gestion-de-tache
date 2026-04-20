@@ -417,6 +417,12 @@ export function PlannerImportPreviewDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <PlannerTitleDuplicatesDialog
+        open={titleDupesOpen}
+        onOpenChange={setTitleDupesOpen}
+        planMappingId={planMappingId}
+      />
     </Dialog>
   );
 }
