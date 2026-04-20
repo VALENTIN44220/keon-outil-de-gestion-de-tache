@@ -144,3 +144,127 @@ export function useITProjectBudget(projectId: string | undefined) {
     kpis,
   };
 }
+
+export function useITBudgetGlobal(filters: { annee?: number; entite?: string; type_depense?: string; categorie?: string }) {
+  const qc = useQueryClient();
+
+  const linesQuery = useQuery({
+    queryKey: ['it-budget-global-lines', filters],
+    queryFn: async (): Promise<ITBudgetLine[]> => {
+      let q = supabase.from('it_budget_lines').select('*');
+      if (filters.annee)        q = q.eq('annee', filters.annee);
+      if (filters.entite)       q = q.eq('entite', filters.entite);
+      if (filters.type_depense) q = q.eq('type_depense', filters.type_depense);
+      if (filters.categorie)    q = q.eq('categorie', filters.categorie);
+      const { data, error } = await q.order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data as ITBudgetLine[]) ?? [];
+    },
+  });
+
+  const expensesQuery = useQuery({
+    queryKey: ['it-budget-global-expenses', filters],
+    queryFn: async (): Promise<ITManualExpense[]> => {
+      let q = supabase.from('it_manual_expenses').select('*');
+      if (filters.annee)  q = q.eq('annee', filters.annee);
+      if (filters.entite) q = q.eq('entite', filters.entite);
+      const { data, error } = await q.order('created_at', { ascending: false });
+      if (error) throw error;
+      return (data as ITManualExpense[]) ?? [];
+    },
+  });
+
+  const addLine = useMutation({
+    mutationFn: async (line: Omit<ITBudgetLine, 'id' | 'created_at' | 'updated_at'>) => {
+      const { data, error } = await supabase.from('it_budget_lines').insert(line).select().single();
+      if (error) throw error;
+      return data as ITBudgetLine;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['it-budget-global-lines'] }),
+  });
+
+  const updateLine = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<ITBudgetLine> }) => {
+      const { data, error } = await supabase.from('it_budget_lines').update(updates).eq('id', id).select().single();
+      if (error) throw error;
+      return data as ITBudgetLine;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['it-budget-global-lines'] }),
+  });
+
+  const deleteLine = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('it_budget_lines').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['it-budget-global-lines'] }),
+  });
+
+  const addExpense = useMutation({
+    mutationFn: async (exp: Omit<ITManualExpense, 'id' | 'created_at' | 'updated_at'>) => {
+      const { data, error } = await supabase.from('it_manual_expenses').insert(exp).select().single();
+      if (error) throw error;
+      return data as ITManualExpense;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['it-budget-global-expenses'] }),
+  });
+
+  const lines    = linesQuery.data    ?? [];
+  const expenses = expensesQuery.data ?? [];
+
+  // KPIs globaux
+  const budget_initial       = lines.reduce((s, l) => s + (l.montant_budget ?? 0), 0);
+  const budget_revise        = lines.reduce((s, l) => s + (l.montant_budget_revise ?? l.montant_budget ?? 0), 0);
+  const engage               = 0;
+  const constate             = 0;
+  const manuel_prevu         = expenses.filter(e => e.statut !== 'annule').reduce((s, e) => s + (e.montant_prevu ?? 0), 0);
+  const forecast_fin_annee   = constate + (engage - constate) + manuel_prevu;
+  const ecart_budget         = forecast_fin_annee - budget_revise;
+  const montant_reaffectable = Math.max(budget_revise - forecast_fin_annee, 0);
+  const depassement          = Math.max(forecast_fin_annee - budget_revise, 0);
+
+  const kpis: ITBudgetKPIs = {
+    budget_initial, budget_revise, engage, constate,
+    reste_a_engager:   budget_revise - engage,
+    reste_a_constater: engage - constate,
+    forecast_fin_annee, ecart_budget, montant_reaffectable, depassement,
+    taux_consommation: budget_revise > 0 ? Math.round((constate / budget_revise) * 100) : 0,
+  };
+
+  // Répartition par type_depense pour waterfall
+  const byType = ['Opex', 'Capex', 'RH', 'Amortissement'].map(type => ({
+    type,
+    budget_initial: lines.filter(l => l.type_depense === type).reduce((s, l) => s + (l.montant_budget ?? 0), 0),
+    budget_revise:  lines.filter(l => l.type_depense === type).reduce((s, l) => s + (l.montant_budget_revise ?? l.montant_budget ?? 0), 0),
+  }));
+
+  // Répartition par catégorie pour graphique
+  const byCategorie = Array.from(
+    lines.reduce((map, l) => {
+      const key = l.categorie?.trim() || 'Sans catégorie';
+      const cur = map.get(key) || { categorie: key, budget_initial: 0, budget_revise: 0 };
+      cur.budget_initial += l.montant_budget ?? 0;
+      cur.budget_revise  += l.montant_budget_revise ?? l.montant_budget ?? 0;
+      map.set(key, cur);
+      return map;
+    }, new Map<string, { categorie: string; budget_initial: number; budget_revise: number }>())
+  ).map(([, v]) => v).sort((a, b) => b.budget_revise - a.budget_revise);
+
+  // Répartition par entite
+  const byEntite = Array.from(
+    lines.reduce((map, l) => {
+      const key = l.entite?.trim() || 'Non affecté';
+      const cur = map.get(key) || { entite: key, budget: 0 };
+      cur.budget += l.montant_budget_revise ?? l.montant_budget ?? 0;
+      map.set(key, cur);
+      return map;
+    }, new Map<string, { entite: string; budget: number }>())
+  ).map(([, v]) => v).sort((a, b) => b.budget - a.budget);
+
+  return {
+    lines, linesLoading: linesQuery.isLoading,
+    expenses, expensesLoading: expensesQuery.isLoading,
+    addLine, updateLine, deleteLine, addExpense,
+    kpis, byType, byCategorie, byEntite,
+  };
+}

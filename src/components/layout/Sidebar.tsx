@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, BarChart3, ChevronLeft, ChevronRight, Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText, ArrowLeftRight, Calendar, MessageCircle, Building2, ClipboardList, Lightbulb, Monitor, Leaf } from 'lucide-react';
+import { LayoutDashboard, BarChart3, ChevronLeft, ChevronRight, Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText, ArrowLeftRight, Calendar, MessageCircle, Building2, ClipboardList, Lightbulb, Monitor, Leaf, Euro } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
 import { useAuth } from '@/contexts/AuthContext';
@@ -57,6 +57,13 @@ const menuGroups: MenuGroup[] = [
         label: 'Projets IT',
         icon: Monitor,
         path: '/it/projects',
+        permissionKey: 'can_access_it_projects',
+      },
+      {
+        id: 'it-budget',
+        label: 'Budget IT',
+        icon: Euro,
+        path: '/it/budget',
         permissionKey: 'can_access_it_projects',
       },
       { id: 'innovation', label: 'Projets INNO', icon: Lightbulb, path: '/innovation/requests', permissionKey: 'can_access_dashboard' },

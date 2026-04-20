@@ -56,6 +56,7 @@ const ITProjectHubSync = lazy(() => import("./pages/it/ITProjectHubSync"));
 const ITProjectHubDiscussions = lazy(() => import("./pages/it/ITProjectHubDiscussions"));
 const ITProjectHubFiles = lazy(() => import("./pages/it/ITProjectHubFiles"));
 const ITProjectHubBudget = lazy(() => import("./pages/it/ITProjectHubBudget"));
+const ITBudgetGlobal = lazy(() => import("./pages/it/ITBudgetGlobal"));
 
 const App = () => (
     <AuthProvider>
@@ -122,6 +123,7 @@ const App = () => (
                 // IT project hub (écran dédié + voir projet IT)
                 { path: "/it/projects", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjects /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/projects/import-fdr", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectImportFDR /></ITProjectsAccessGate></ProtectedRoute> },
+                { path: "/it/budget", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITBudgetGlobal /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/projects/:code/overview", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubOverview /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/projects/:code/tasks", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubTasks /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/projects/:code/timeline", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubTimeline /></ITProjectsAccessGate></ProtectedRoute> },
@@ -168,6 +170,7 @@ const App = () => (
             <Route path="/spv/projects/:code/files" element={<></>} />
             <Route path="/it/projects" element={<></>} />
             <Route path="/it/projects/import-fdr" element={<></>} />
+            <Route path="/it/budget" element={<></>} />
             <Route path="/it/projects/:code/overview" element={<></>} />
             <Route path="/it/projects/:code/tasks" element={<></>} />
             <Route path="/it/projects/:code/timeline" element={<></>} />

@@ -330,3 +330,20 @@ export interface ITBudgetKPIs {
   depassement: number;
   taux_consommation: number;
 }
+
+// ================================================
+// Budget Global IT — Types complémentaires
+// ================================================
+
+export const IT_ENTITES = ['KEON', 'Sycomore', 'Fluxo', 'TADD', 'Autre'] as const;
+export type ITEntite = typeof IT_ENTITES[number];
+
+export const IT_BUDGET_ANNEES = [2024, 2025, 2026, 2027] as const;
+export type ITBudgetAnnee = typeof IT_BUDGET_ANNEES[number];
+
+export interface ITBudgetGlobalFilters {
+  annee: number;
+  entite: string;
+  type_depense: string;
+  categorie: string;
+}
