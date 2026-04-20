@@ -7980,6 +7980,7 @@ export type Database = {
         Returns: boolean
       }
       cancel_request: { Args: { p_request_id: string }; Returns: undefined }
+      clean_planner_task_title: { Args: { p_title: string }; Returns: string }
       cleanup_planner_duplicates_for_mapping: {
         Args: { p_plan_mapping_id: string }
         Returns: Json
@@ -7995,6 +7996,17 @@ export type Database = {
       current_company_id: { Args: never; Returns: string }
       current_department_id: { Args: never; Returns: string }
       current_profile_id: { Args: never; Returns: string }
+      detect_planner_title_duplicates: {
+        Args: { p_plan_mapping_id: string }
+        Returns: {
+          clean_title: string
+          count: number
+          created_dates: string[]
+          task_ids: string[]
+          task_numbers: string[]
+          titles: string[]
+        }[]
+      }
       emit_workflow_event: {
         Args: {
           p_entity_id: string
@@ -8112,6 +8124,10 @@ export type Database = {
         Returns: boolean
       }
       is_inno_admin: { Args: never; Returns: boolean }
+      merge_planner_title_duplicates: {
+        Args: { p_task_ids_to_delete: string[] }
+        Returns: Json
+      }
       next_entity_number: {
         Args: { p_entity_type: string; p_project_code: string }
         Returns: string
