@@ -999,6 +999,36 @@ Deno.serve(async (req) => {
         linkedPlannerIds = new Set((links || []).map((l: any) => l.planner_task_id));
       }
 
+      // Fallback matching: a task without an active link may already exist in the
+      // user's tasks (e.g. link was deleted, or task was imported then renamed).
+      // We compare by normalized title to avoid recreating duplicates.
+      // Strip the optional internal numbering prefix "T-XXX-NNNN — " and trim/lower.
+      const normalizeTitle = (raw: string | null | undefined): string => {
+        if (!raw) return '';
+        let s = String(raw).trim();
+        // Remove "T-PERSO-1234 — <id>-/-<bucket>-/-" full legacy prefix
+        s = s.replace(/^T-[A-Z]+-\d+ — \d+-\/-[^/]*-\/-/, '');
+        // Remove plain "T-XXX-NNNN — " prefix
+        s = s.replace(/^T-[A-Z]+-\d+ — /, '');
+        return s.trim().toLowerCase();
+      };
+
+      const existingTitleSet = new Set<string>();
+      try {
+        const { data: existingTasks } = await supabase
+          .from('tasks')
+          .select('title')
+          .eq('user_id', userId)
+          .not('title', 'is', null)
+          .limit(10000);
+        for (const row of existingTasks || []) {
+          const norm = normalizeTitle((row as any).title);
+          if (norm) existingTitleSet.add(norm);
+        }
+      } catch (_e) {
+        // best-effort; if the lookup fails we just fall back to link-based matching
+      }
+
       // Resolve all assignee user IDs in one batch
       const allAssigneeIds: string[] = [];
       for (const pt of plannerTasks) {
