@@ -128,7 +128,7 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
     const result = { ...DEFAULT_PERMISSIONS };
 
     if (permissionProfile) {
-      const raw = permissionProfile as Record<string, unknown>;
+      const raw = permissionProfile as unknown as Record<string, unknown>;
       (SCREEN_PERMISSIONS as readonly ScreenPermissionKey[]).forEach(key => {
         const v = raw[key];
         if (v !== undefined && v !== null) result[key] = v as boolean;
