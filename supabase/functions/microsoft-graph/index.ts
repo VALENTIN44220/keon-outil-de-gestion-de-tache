@@ -1059,6 +1059,8 @@ Deno.serve(async (req) => {
           };
         });
         const percent = typeof pt.percentComplete === 'number' ? pt.percentComplete : 0;
+        const linkedById = linkedPlannerIds.has(pt.id);
+        const linkedByTitle = !linkedById && existingTitleSet.has(normalizeTitle(pt.title));
         return {
           id: pt.id,
           title: pt.title,
@@ -1069,7 +1071,7 @@ Deno.serve(async (req) => {
           dueDateTime: pt.dueDateTime || null,
           createdDateTime: pt.createdDateTime || null,
           assignees,
-          alreadyLinked: linkedPlannerIds.has(pt.id),
+          alreadyLinked: linkedById || linkedByTitle,
         };
       });
 
