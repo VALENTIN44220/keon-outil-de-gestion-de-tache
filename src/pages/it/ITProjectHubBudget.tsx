@@ -78,16 +78,20 @@ function formatMoisBudget(m: number | null | undefined): string {
   return MOIS_COURTS[m] ?? `M${m}`;
 }
 
-const PRESET_CATEGORIES = [
-  'Logiciels',
-  'Infrastructure',
-  'Prestations',
-  'Hébergement',
-  'Licences',
-  'Formation',
-  'Matériel',
-  'Autre',
-] as const;
+const PRESET_CATEGORIES_NIVEAU1 = ['IT', 'IT ERP'] as const;
+
+const PRESET_SOUS_CATEGORIES: Record<string, string[]> = {
+  IT: [
+    'Users', 'Réseau', 'Maintenance', 'Amazon', 'Téléphonie',
+    'Doubletrade', 'Adobe', 'Anydesk', 'Nanosystem', 'PROCONSULTEAM',
+    'Bright fastspring', 'Ceciaa', 'Aleas', 'EBP', 'Yousign',
+    'Pentest', 'ARCGIS', 'Copilot', 'Autre',
+  ],
+  'IT ERP': [
+    'Exalog Cegid', 'E-attestation', 'Veremes', 'Lucca', 'Divalto',
+    'Yooz', 'BLC Pipedrive', 'lucanet', 'CreditSafe', 'Autre',
+  ],
+};
 
 const BUDGET_LINE_STATUTS = Object.keys(BUDGET_LINE_STATUT_CONFIG) as BudgetLineStatut[];
 
@@ -183,8 +187,7 @@ export default function ITProjectHubBudget() {
   const [expenseSaving, setExpenseSaving] = useState(false);
   const [deleteExpenseId, setDeleteExpenseId] = useState<string | null>(null);
 
-  const [lineCategorieSelect, setLineCategorieSelect] = useState<string>(PRESET_CATEGORIES[0]);
-  const [lineCategorieAutre, setLineCategorieAutre] = useState('');
+  const [lineCategorieSelect, setLineCategorieSelect] = useState<string>(PRESET_CATEGORIES_NIVEAU1[0]);
   const [lineSousCategorie, setLineSousCategorie] = useState('');
   const [lineFournisseur, setLineFournisseur] = useState('');
   const [lineTypeDepense, setLineTypeDepense] = useState<TypeDepense>('Opex');
@@ -204,9 +207,16 @@ export default function ITProjectHubBudget() {
   const [expStatut, setExpStatut] = useState<ITManualExpense['statut']>('en_attente');
   const [expCommentaire, setExpCommentaire] = useState('');
 
+  const lineSousCategorieOptions = useMemo(() => {
+    const base = [...(PRESET_SOUS_CATEGORIES[lineCategorieSelect] ?? [])];
+    if (lineSousCategorie && !base.includes(lineSousCategorie)) {
+      base.push(lineSousCategorie);
+    }
+    return base;
+  }, [lineCategorieSelect, lineSousCategorie]);
+
   const resetLineForm = useCallback(() => {
-    setLineCategorieSelect(PRESET_CATEGORIES[0]);
-    setLineCategorieAutre('');
+    setLineCategorieSelect(PRESET_CATEGORIES_NIVEAU1[0]);
     setLineSousCategorie('');
     setLineFournisseur('');
     setLineTypeDepense('Opex');
@@ -228,17 +238,11 @@ export default function ITProjectHubBudget() {
   const openEditLine = (line: ITBudgetLine) => {
     setEditingLine(line);
     const cat = line.categorie?.trim() || '';
-    const presetList = PRESET_CATEGORIES as readonly string[];
-    const isPreset = presetList.includes(cat);
-    if (isPreset) {
+    const niveau1 = PRESET_CATEGORIES_NIVEAU1 as readonly string[];
+    if (niveau1.includes(cat)) {
       setLineCategorieSelect(cat);
-      setLineCategorieAutre('');
-    } else if (cat) {
-      setLineCategorieSelect('Autre');
-      setLineCategorieAutre(cat);
     } else {
-      setLineCategorieSelect(PRESET_CATEGORIES[0]);
-      setLineCategorieAutre('');
+      setLineCategorieSelect(PRESET_CATEGORIES_NIVEAU1[0]);
     }
     setLineSousCategorie(line.sous_categorie ?? '');
     setLineFournisseur(line.fournisseur_prevu ?? '');
@@ -314,11 +318,6 @@ export default function ITProjectHubBudget() {
 
   const progressValue = Math.min(100, Math.max(0, kpis.taux_consommation));
 
-  const buildCategorieValue = () => {
-    if (lineCategorieSelect === 'Autre') return lineCategorieAutre.trim() || 'Autre';
-    return lineCategorieSelect;
-  };
-
   const submitLine = async () => {
     if (!project?.id) return;
     const montant = Number(lineMontantBudget.replace(',', '.'));
@@ -340,7 +339,7 @@ export default function ITProjectHubBudget() {
         await updateLine.mutateAsync({
           id: editingLine.id,
           updates: {
-            categorie: buildCategorieValue() || null,
+            categorie: lineCategorieSelect || null,
             sous_categorie: lineSousCategorie || null,
             fournisseur_prevu: lineFournisseur || null,
             type_depense: lineTypeDepense,
@@ -359,7 +358,7 @@ export default function ITProjectHubBudget() {
           it_project_id: project.id,
           exercice: new Date().getFullYear(),
           version: '1',
-          categorie: buildCategorieValue() || null,
+          categorie: lineCategorieSelect || null,
           sous_categorie: lineSousCategorie || null,
           fournisseur_prevu: lineFournisseur || null,
           type_depense: lineTypeDepense,
@@ -925,29 +924,40 @@ export default function ITProjectHubBudget() {
           <div className="space-y-3 py-2">
             <div className="space-y-2">
               <Label>Catégorie</Label>
-              <Select value={lineCategorieSelect} onValueChange={setLineCategorieSelect}>
+              <Select
+                value={lineCategorieSelect}
+                onValueChange={(v) => {
+                  setLineCategorieSelect(v);
+                  setLineSousCategorie('');
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {PRESET_CATEGORIES.map((c) => (
+                  {PRESET_CATEGORIES_NIVEAU1.map((c) => (
                     <SelectItem key={c} value={c}>
                       {c}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {lineCategorieSelect === 'Autre' && (
-                <Input
-                  placeholder="Précisez la catégorie"
-                  value={lineCategorieAutre}
-                  onChange={(e) => setLineCategorieAutre(e.target.value)}
-                />
-              )}
             </div>
             <div className="space-y-2">
               <Label>Sous-catégorie</Label>
-              <Input value={lineSousCategorie} onChange={(e) => setLineSousCategorie(e.target.value)} />
+              <Select value={lineSousCategorie} onValueChange={setLineSousCategorie}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sous-catégorie" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">—</SelectItem>
+                  {lineSousCategorieOptions.map((opt) => (
+                    <SelectItem key={opt} value={opt}>
+                      {opt}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Fournisseur prévu</Label>

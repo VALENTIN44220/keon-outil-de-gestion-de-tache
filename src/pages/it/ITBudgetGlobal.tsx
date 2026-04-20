@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Layout } from '@/components/layout/Layout';
 import { useITBudgetGlobal } from '@/hooks/useITProjectBudget';
 import { supabase } from '@/integrations/supabase/client';
@@ -82,16 +82,20 @@ function formatMoisBudget(m: number | null | undefined): string {
 type LineExtra = ITBudgetLine & { entite?: string | null; annee?: number | null };
 type ExpenseExtra = ITManualExpense & { entite?: string | null; annee?: number | null };
 
-const PRESET_CATEGORIES = [
-  'Logiciels',
-  'Infrastructure',
-  'Prestations',
-  'Hébergement',
-  'Licences',
-  'Formation',
-  'Matériel',
-  'Autre',
-] as const;
+const PRESET_CATEGORIES_NIVEAU1 = ['IT', 'IT ERP'] as const;
+
+const PRESET_SOUS_CATEGORIES: Record<string, string[]> = {
+  IT: [
+    'Users', 'Réseau', 'Maintenance', 'Amazon', 'Téléphonie',
+    'Doubletrade', 'Adobe', 'Anydesk', 'Nanosystem', 'PROCONSULTEAM',
+    'Bright fastspring', 'Ceciaa', 'Aleas', 'EBP', 'Yousign',
+    'Pentest', 'ARCGIS', 'Copilot', 'Autre',
+  ],
+  'IT ERP': [
+    'Exalog Cegid', 'E-attestation', 'Veremes', 'Lucca', 'Divalto',
+    'Yooz', 'BLC Pipedrive', 'lucanet', 'CreditSafe', 'Autre',
+  ],
+};
 
 const BUDGET_LINE_STATUTS = Object.keys(BUDGET_LINE_STATUT_CONFIG) as BudgetLineStatut[];
 
@@ -141,6 +145,18 @@ export default function ITBudgetGlobal() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
+  const { data: suppliersList = [] } = useQuery({
+    queryKey: ['suppliers-for-budget'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('supplier_purchase_enrichment')
+        .select('tiers, nomfournisseur')
+        .order('nomfournisseur', { ascending: true });
+      if (error) throw error;
+      return (data || []) as { tiers: string; nomfournisseur: string | null }[];
+    },
+  });
+
   const [annee, setAnnee] = useState(2026);
   const [entite, setEntite] = useState('');
   const [type_depense, setTypeDepense] = useState('');
@@ -185,8 +201,7 @@ export default function ITBudgetGlobal() {
   const [expenseSaving, setExpenseSaving] = useState(false);
   const [deleteExpenseId, setDeleteExpenseId] = useState<string | null>(null);
 
-  const [lineCategorieSelect, setLineCategorieSelect] = useState<string>(PRESET_CATEGORIES[0]);
-  const [lineCategorieAutre, setLineCategorieAutre] = useState('');
+  const [lineCategorieSelect, setLineCategorieSelect] = useState<string>(PRESET_CATEGORIES_NIVEAU1[0]);
   const [lineSousCategorie, setLineSousCategorie] = useState('');
   const [lineFournisseur, setLineFournisseur] = useState('');
   const [lineTypeDepense, setLineTypeDepense] = useState<TypeDepense>('Opex');
@@ -212,9 +227,16 @@ export default function ITBudgetGlobal() {
   const [expAnnee, setExpAnnee] = useState<string>('2026');
   const [expItProjectId, setExpItProjectId] = useState('');
 
+  const lineSousCategorieOptions = useMemo(() => {
+    const base = [...(PRESET_SOUS_CATEGORIES[lineCategorieSelect] ?? [])];
+    if (lineSousCategorie && !base.includes(lineSousCategorie)) {
+      base.push(lineSousCategorie);
+    }
+    return base;
+  }, [lineCategorieSelect, lineSousCategorie]);
+
   const resetLineForm = useCallback(() => {
-    setLineCategorieSelect(PRESET_CATEGORIES[0]);
-    setLineCategorieAutre('');
+    setLineCategorieSelect(PRESET_CATEGORIES_NIVEAU1[0]);
     setLineSousCategorie('');
     setLineFournisseur('');
     setLineTypeDepense('Opex');
@@ -240,17 +262,11 @@ export default function ITBudgetGlobal() {
     const lx = line as LineExtra;
     setEditingLine(line);
     const cat = line.categorie?.trim() || '';
-    const presetList = PRESET_CATEGORIES as readonly string[];
-    const isPreset = presetList.includes(cat);
-    if (isPreset) {
+    const niveau1 = PRESET_CATEGORIES_NIVEAU1 as readonly string[];
+    if (niveau1.includes(cat)) {
       setLineCategorieSelect(cat);
-      setLineCategorieAutre('');
-    } else if (cat) {
-      setLineCategorieSelect('Autre');
-      setLineCategorieAutre(cat);
     } else {
-      setLineCategorieSelect(PRESET_CATEGORIES[0]);
-      setLineCategorieAutre('');
+      setLineCategorieSelect(PRESET_CATEGORIES_NIVEAU1[0]);
     }
     setLineSousCategorie(line.sous_categorie ?? '');
     setLineFournisseur(line.fournisseur_prevu ?? '');
@@ -331,11 +347,6 @@ export default function ITBudgetGlobal() {
 
   const progressValue = Math.min(100, Math.max(0, kpis.taux_consommation));
 
-  const buildCategorieValue = () => {
-    if (lineCategorieSelect === 'Autre') return lineCategorieAutre.trim() || 'Autre';
-    return lineCategorieSelect;
-  };
-
   const hasActiveFilters = !!(entite || type_depense || categorie.trim());
 
   const resetFilters = () => {
@@ -366,7 +377,7 @@ export default function ITBudgetGlobal() {
     setLineSaving(true);
     try {
       const baseUpdates = {
-        categorie: buildCategorieValue() || null,
+        categorie: lineCategorieSelect || null,
         sous_categorie: lineSousCategorie || null,
         fournisseur_prevu: lineFournisseur || null,
         type_depense: lineTypeDepense,
@@ -1067,29 +1078,59 @@ export default function ITBudgetGlobal() {
             </div>
             <div className="space-y-2">
               <Label>Catégorie</Label>
-              <Select value={lineCategorieSelect} onValueChange={setLineCategorieSelect}>
+              <Select
+                value={lineCategorieSelect}
+                onValueChange={(v) => {
+                  setLineCategorieSelect(v);
+                  setLineSousCategorie('');
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {PRESET_CATEGORIES.map((c) => (
+                  {PRESET_CATEGORIES_NIVEAU1.map((c) => (
                     <SelectItem key={c} value={c}>
                       {c}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {lineCategorieSelect === 'Autre' && (
-                <Input placeholder="Précisez la catégorie" value={lineCategorieAutre} onChange={(e) => setLineCategorieAutre(e.target.value)} />
-              )}
             </div>
             <div className="space-y-2">
               <Label>Sous-catégorie</Label>
-              <Input value={lineSousCategorie} onChange={(e) => setLineSousCategorie(e.target.value)} />
+              <Select value={lineSousCategorie} onValueChange={setLineSousCategorie}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sous-catégorie" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">—</SelectItem>
+                  {lineSousCategorieOptions.map((opt) => (
+                    <SelectItem key={opt} value={opt}>
+                      {opt}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Fournisseur prévu</Label>
-              <Input value={lineFournisseur} onChange={(e) => setLineFournisseur(e.target.value)} />
+              <Select
+                value={lineFournisseur || '__none__'}
+                onValueChange={(v) => setLineFournisseur(v === '__none__' ? '' : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner un fournisseur" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— Aucun —</SelectItem>
+                  {suppliersList.map((s) => (
+                    <SelectItem key={s.tiers} value={s.tiers}>
+                      {s.nomfournisseur ? `${s.nomfournisseur} (${s.tiers})` : s.tiers}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Type de dépense</Label>
