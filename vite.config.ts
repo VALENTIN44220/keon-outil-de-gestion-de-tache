@@ -7,14 +7,17 @@ import { componentTagger } from "lovable-tagger";
 export default defineConfig(({ mode }) => {
   // Vite charge implicitement les variables pour l'app (import.meta.env),
   // mais pour le fichier de config lui-même on sécurise avec loadEnv.
-  const env = loadEnv(mode, process.cwd(), "VITE_");
+  const env = loadEnv(mode, process.cwd(), "");
   const backendUrl = env.VITE_SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const backendPublishableKey =
     env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
+  // Note: do NOT throw here. The runtime client (client.safe.ts) validates env vars.
+  // Throwing in the Vite config breaks `vite build` in environments where env injection
+  // happens after config load (e.g. some sandbox setups).
   if (!backendUrl || !backendPublishableKey) {
-    throw new Error(
-      '[Supabase] VITE_SUPABASE_URL and/or VITE_SUPABASE_PUBLISHABLE_KEY are missing in environment.'
+    console.warn(
+      '[Supabase] VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY missing at config load — relying on runtime injection.'
     );
   }
 
