@@ -2090,7 +2090,6 @@ export type Database = {
           can_access_team: boolean
           can_access_templates: boolean
           can_access_workload: boolean
-          can_access_it_projects: boolean
           can_assign_to_all: boolean
           can_assign_to_subordinates: boolean
           can_create_be_projects: boolean | null
@@ -2144,7 +2143,6 @@ export type Database = {
           can_access_team?: boolean
           can_access_templates?: boolean
           can_access_workload?: boolean
-          can_access_it_projects?: boolean
           can_assign_to_all?: boolean
           can_assign_to_subordinates?: boolean
           can_create_be_projects?: boolean | null
@@ -2198,7 +2196,6 @@ export type Database = {
           can_access_team?: boolean
           can_access_templates?: boolean
           can_access_workload?: boolean
-          can_access_it_projects?: boolean
           can_assign_to_all?: boolean
           can_assign_to_subordinates?: boolean
           can_create_be_projects?: boolean | null
@@ -2384,7 +2381,6 @@ export type Database = {
       planner_sync_logs: {
         Row: {
           created_at: string
-          diagnostics: Json | null
           direction: string
           errors: Json | null
           id: string
@@ -2397,7 +2393,6 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          diagnostics?: Json | null
           direction: string
           errors?: Json | null
           id?: string
@@ -2410,7 +2405,6 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          diagnostics?: Json | null
           direction?: string
           errors?: Json | null
           id?: string
@@ -2937,7 +2931,6 @@ export type Database = {
           permission_profile_id: string | null
           secondary_email: string | null
           status: string
-          suppliers_list_column_order: Json | null
           updated_at: string
           user_id: string
         }
@@ -2962,7 +2955,6 @@ export type Database = {
           permission_profile_id?: string | null
           secondary_email?: string | null
           status?: string
-          suppliers_list_column_order?: Json | null
           updated_at?: string
           user_id: string
         }
@@ -2987,7 +2979,6 @@ export type Database = {
           permission_profile_id?: string | null
           secondary_email?: string | null
           status?: string
-          suppliers_list_column_order?: Json | null
           updated_at?: string
           user_id?: string
         }
@@ -3032,6 +3023,64 @@ export type Database = {
             columns: ["permission_profile_id"]
             isOneToOne: false
             referencedRelation: "permission_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_field_values: {
+        Row: {
+          created_at: string
+          field_def_id: string
+          id: string
+          project_id: string
+          updated_at: string
+          updated_by: string | null
+          valeur: string | null
+          valeur_evaluation: string | null
+          valeur_jsonb: Json | null
+        }
+        Insert: {
+          created_at?: string
+          field_def_id: string
+          id?: string
+          project_id: string
+          updated_at?: string
+          updated_by?: string | null
+          valeur?: string | null
+          valeur_evaluation?: string | null
+          valeur_jsonb?: Json | null
+        }
+        Update: {
+          created_at?: string
+          field_def_id?: string
+          id?: string
+          project_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          valeur?: string | null
+          valeur_evaluation?: string | null
+          valeur_jsonb?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_field_values_field_def_id_fkey"
+            columns: ["field_def_id"]
+            isOneToOne: false
+            referencedRelation: "questionnaire_field_definitions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_field_values_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "be_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_field_values_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -3146,6 +3195,77 @@ export type Database = {
           visible_columns?: string[]
         }
         Relationships: []
+      }
+      questionnaire_field_definitions: {
+        Row: {
+          champ_id: string
+          created_at: string
+          created_by: string | null
+          has_evaluation_risque: boolean
+          id: string
+          is_active: boolean
+          is_builtin: boolean
+          label: string
+          note: string | null
+          options: string[] | null
+          order_index: number
+          pilier_code: string
+          required: boolean
+          section: string
+          sous_section: string | null
+          spreadsheet_template: Json | null
+          type_champ: string
+          updated_at: string
+        }
+        Insert: {
+          champ_id: string
+          created_at?: string
+          created_by?: string | null
+          has_evaluation_risque?: boolean
+          id?: string
+          is_active?: boolean
+          is_builtin?: boolean
+          label: string
+          note?: string | null
+          options?: string[] | null
+          order_index?: number
+          pilier_code: string
+          required?: boolean
+          section: string
+          sous_section?: string | null
+          spreadsheet_template?: Json | null
+          type_champ?: string
+          updated_at?: string
+        }
+        Update: {
+          champ_id?: string
+          created_at?: string
+          created_by?: string | null
+          has_evaluation_risque?: boolean
+          id?: string
+          is_active?: boolean
+          is_builtin?: boolean
+          label?: string
+          note?: string | null
+          options?: string[] | null
+          order_index?: number
+          pilier_code?: string
+          required?: boolean
+          section?: string
+          sous_section?: string | null
+          spreadsheet_template?: Json | null
+          type_champ?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "questionnaire_field_definitions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       recurrence_runs: {
         Row: {
@@ -4171,6 +4291,7 @@ export type Database = {
           delai_de_paiement: string | null
           delais_de_paiement_commentaires: string | null
           description: string | null
+          detail_par_entite: string | null
           echeances_de_paiement: string | null
           entite: string | null
           evolution_tarif_2026: string | null
@@ -4215,6 +4336,7 @@ export type Database = {
           delai_de_paiement?: string | null
           delais_de_paiement_commentaires?: string | null
           description?: string | null
+          detail_par_entite?: string | null
           echeances_de_paiement?: string | null
           entite?: string | null
           evolution_tarif_2026?: string | null
@@ -4259,6 +4381,7 @@ export type Database = {
           delai_de_paiement?: string | null
           delais_de_paiement_commentaires?: string | null
           description?: string | null
+          detail_par_entite?: string | null
           echeances_de_paiement?: string | null
           entite?: string | null
           evolution_tarif_2026?: string | null
@@ -4317,200 +4440,6 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
-      }
-      supplier_waiting_approval: {
-        Row: {
-          adresse_mail: string | null
-          avenants: string | null
-          ca_estime: number | null
-          categorie: string | null
-          commentaires: string | null
-          commentaires_date_contrat: string | null
-          commentaires_type_de_contrat: string | null
-          completeness_score: number | null
-          created_at: string | null
-          date_premiere_signature: string | null
-          delai_de_paiement: string | null
-          delais_de_paiement_commentaires: string | null
-          description: string | null
-          echeances_de_paiement: string | null
-          entite: string | null
-          evolution_tarif_2026: string | null
-          exclusivite_non_sollicitation: string | null
-          famille: string | null
-          famille_source_initiale: string | null
-          garanties_bancaire_et_equipement: string | null
-          id: string
-          incoterm: string | null
-          line_index: string
-          nom_contact: string | null
-          nomfournisseur: string | null
-          pays: string | null
-          penalites: string | null
-          poste: string | null
-          remise: string | null
-          rfa: string | null
-          segment: string | null
-          siret: string | null
-          site_web: string | null
-          sous_segment: string | null
-          status: string | null
-          telephone: string | null
-          tiers: string | null
-          transport: string | null
-          tva: string | null
-          type_de_contrat: string | null
-          updated_at: string | null
-          updated_by: string | null
-          validite_du_contrat: string | null
-          validite_prix: string | null
-          validated_by_achats_at: string | null
-          validated_by_achats_user_id: string | null
-          validated_by_compta_at: string | null
-          validated_by_compta_user_id: string | null
-        }
-        Insert: {
-          adresse_mail?: string | null
-          avenants?: string | null
-          ca_estime?: number | null
-          categorie?: string | null
-          commentaires?: string | null
-          commentaires_date_contrat?: string | null
-          commentaires_type_de_contrat?: string | null
-          completeness_score?: number | null
-          created_at?: string | null
-          date_premiere_signature?: string | null
-          delai_de_paiement?: string | null
-          delais_de_paiement_commentaires?: string | null
-          description?: string | null
-          echeances_de_paiement?: string | null
-          entite?: string | null
-          evolution_tarif_2026?: string | null
-          exclusivite_non_sollicitation?: string | null
-          famille?: string | null
-          famille_source_initiale?: string | null
-          garanties_bancaire_et_equipement?: string | null
-          id?: string
-          incoterm?: string | null
-          line_index: string
-          nom_contact?: string | null
-          nomfournisseur?: string | null
-          pays?: string | null
-          penalites?: string | null
-          poste?: string | null
-          remise?: string | null
-          rfa?: string | null
-          segment?: string | null
-          siret?: string | null
-          site_web?: string | null
-          sous_segment?: string | null
-          status?: string | null
-          telephone?: string | null
-          tiers?: string | null
-          transport?: string | null
-          tva?: string | null
-          type_de_contrat?: string | null
-          updated_at?: string | null
-          updated_by?: string | null
-          validite_du_contrat?: string | null
-          validite_prix?: string | null
-          validated_by_achats_at?: string | null
-          validated_by_achats_user_id?: string | null
-          validated_by_compta_at?: string | null
-          validated_by_compta_user_id?: string | null
-        }
-        Update: {
-          adresse_mail?: string | null
-          avenants?: string | null
-          ca_estime?: number | null
-          categorie?: string | null
-          commentaires?: string | null
-          commentaires_date_contrat?: string | null
-          commentaires_type_de_contrat?: string | null
-          completeness_score?: number | null
-          created_at?: string | null
-          date_premiere_signature?: string | null
-          delai_de_paiement?: string | null
-          delais_de_paiement_commentaires?: string | null
-          description?: string | null
-          echeances_de_paiement?: string | null
-          entite?: string | null
-          evolution_tarif_2026?: string | null
-          exclusivite_non_sollicitation?: string | null
-          famille?: string | null
-          famille_source_initiale?: string | null
-          garanties_bancaire_et_equipement?: string | null
-          id?: string
-          incoterm?: string | null
-          line_index?: string
-          nom_contact?: string | null
-          nomfournisseur?: string | null
-          pays?: string | null
-          penalites?: string | null
-          poste?: string | null
-          remise?: string | null
-          rfa?: string | null
-          segment?: string | null
-          siret?: string | null
-          site_web?: string | null
-          sous_segment?: string | null
-          status?: string | null
-          telephone?: string | null
-          tiers?: string | null
-          transport?: string | null
-          tva?: string | null
-          type_de_contrat?: string | null
-          updated_at?: string | null
-          updated_by?: string | null
-          validite_du_contrat?: string | null
-          validite_prix?: string | null
-          validated_by_achats_at?: string | null
-          validated_by_achats_user_id?: string | null
-          validated_by_compta_at?: string | null
-          validated_by_compta_user_id?: string | null
-        }
-        Relationships: []
-      }
-      supplier_waiting_approval_attachments: {
-        Row: {
-          id: string
-          waiting_approval_id: string
-          attachment_kind: string
-          file_name: string
-          file_url: string
-          storage_path: string
-          uploaded_by: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          waiting_approval_id: string
-          attachment_kind: string
-          file_name: string
-          file_url: string
-          storage_path: string
-          uploaded_by?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          waiting_approval_id?: string
-          attachment_kind?: string
-          file_name?: string
-          file_url?: string
-          storage_path?: string
-          uploaded_by?: string | null
-          created_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "supplier_waiting_approval_attachments_waiting_approval_id_fkey"
-            columns: ["waiting_approval_id"]
-            isOneToOne: false
-            referencedRelation: "supplier_waiting_approval"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       supplier_taxonomy: {
         Row: {
@@ -5230,9 +5159,7 @@ export type Database = {
           is_locked_for_validation: boolean | null
           it_project_id: string | null
           it_project_phase: string | null
-          allows_reassignment: boolean
           original_assignee_id: string | null
-          reassignment_stakeholder_id: string | null
           parent_request_id: string | null
           parent_sub_process_run_id: string | null
           planner_labels: string[] | null
@@ -5313,9 +5240,7 @@ export type Database = {
           is_locked_for_validation?: boolean | null
           it_project_id?: string | null
           it_project_phase?: string | null
-          allows_reassignment?: boolean
           original_assignee_id?: string | null
-          reassignment_stakeholder_id?: string | null
           parent_request_id?: string | null
           parent_sub_process_run_id?: string | null
           planner_labels?: string[] | null
@@ -5396,9 +5321,7 @@ export type Database = {
           is_locked_for_validation?: boolean | null
           it_project_id?: string | null
           it_project_phase?: string | null
-          allows_reassignment?: boolean
           original_assignee_id?: string | null
-          reassignment_stakeholder_id?: string | null
           parent_request_id?: string | null
           parent_sub_process_run_id?: string | null
           planner_labels?: string[] | null
@@ -5510,13 +5433,6 @@ export type Database = {
           {
             foreignKeyName: "tasks_original_assignee_id_fkey"
             columns: ["original_assignee_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tasks_reassignment_stakeholder_id_fkey"
-            columns: ["reassignment_stakeholder_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -6054,7 +5970,6 @@ export type Database = {
           can_access_team: boolean | null
           can_access_templates: boolean | null
           can_access_workload: boolean | null
-          can_access_it_projects: boolean | null
           can_assign_to_all: boolean | null
           can_assign_to_subordinates: boolean | null
           can_create_be_projects: boolean | null
@@ -6091,7 +6006,6 @@ export type Database = {
           can_access_team?: boolean | null
           can_access_templates?: boolean | null
           can_access_workload?: boolean | null
-          can_access_it_projects?: boolean | null
           can_assign_to_all?: boolean | null
           can_assign_to_subordinates?: boolean | null
           can_create_be_projects?: boolean | null
@@ -6128,7 +6042,6 @@ export type Database = {
           can_access_team?: boolean | null
           can_access_templates?: boolean | null
           can_access_workload?: boolean | null
-          can_access_it_projects?: boolean | null
           can_assign_to_all?: boolean | null
           can_assign_to_subordinates?: boolean | null
           can_create_be_projects?: boolean | null
@@ -8019,22 +7932,6 @@ export type Database = {
       }
     }
     Functions: {
-      apply_supplier_waiting_validation: {
-        Args: { p_waiting_ids: string[] }
-        Returns: undefined
-      }
-      promote_supplier_waiting_to_enrichment: {
-        Args: { p_waiting_ids: string[] }
-        Returns: {
-          attachments: Json
-          enrichment_id: string
-          former_waiting_id: string
-        }[]
-      }
-      register_supplier_famille_from_demand: {
-        Args: { p_famille: string }
-        Returns: undefined
-      }
       calculate_supplier_completeness: {
         Args: {
           p_adresse_mail: string
