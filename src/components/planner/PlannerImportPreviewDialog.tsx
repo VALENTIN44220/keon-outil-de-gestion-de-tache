@@ -69,6 +69,7 @@ export function PlannerImportPreviewDialog({
   const [tasks, setTasks] = useState<PlannerPreviewTask[]>([]);
   const [buckets, setBuckets] = useState<Bucket[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [titleDupesOpen, setTitleDupesOpen] = useState(false);
 
   // Filters
   const [search, setSearch] = useState('');
