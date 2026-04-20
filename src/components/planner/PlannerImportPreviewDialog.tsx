@@ -5,9 +5,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Search, Trash2, AlertTriangle } from 'lucide-react';
+import { Loader2, Search, Trash2, AlertTriangle, Wrench } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { PlannerTitleDuplicatesDialog } from './PlannerTitleDuplicatesDialog';
 import {
   Select,
   SelectContent,
