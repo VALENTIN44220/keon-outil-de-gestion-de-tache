@@ -942,7 +942,13 @@ Deno.serve(async (req) => {
       });
     }
 
-    if (action === 'planner-sync') {
+    // ────────────────────────────────────────────────────────────────────────
+    // PLANNER PREVIEW: returns Planner tasks of a plan, enriched with bucket /
+    // assignee info and a flag indicating whether each task is already linked
+    // for the current user. Used by the import dialog to let the user pick
+    // which tasks to import.
+    // ────────────────────────────────────────────────────────────────────────
+    if (action === 'planner-preview-tasks') {
       if (!userId) throw new Error('User not authenticated');
       const accessToken = await getValidAccessToken(supabase, userId);
       if (!accessToken) {
@@ -958,6 +964,118 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
+
+      const { data: mapping, error: mappingError } = await supabase
+        .from('planner_plan_mappings')
+        .select('*')
+        .eq('id', planMappingId)
+        .eq('user_id', userId)
+        .single();
+      if (mappingError || !mapping) {
+        return new Response(JSON.stringify({ success: false, error: 'Plan mapping not found' }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const [plannerTasks, buckets] = await Promise.all([
+        getPlannerTasks(accessToken, mapping.planner_plan_id),
+        getPlannerBuckets(accessToken, mapping.planner_plan_id).catch(() => []),
+      ]);
+
+      // Existing linked planner_task_ids across all the user's mappings (avoids
+      // proposing tasks already imported in another mapping by the same user).
+      const { data: allUserMappings } = await supabase
+        .from('planner_plan_mappings')
+        .select('id')
+        .eq('user_id', userId);
+      const allUserMappingIds = (allUserMappings || []).map((m: any) => m.id);
+      let linkedPlannerIds = new Set<string>();
+      if (allUserMappingIds.length > 0) {
+        const { data: links } = await supabase
+          .from('planner_task_links')
+          .select('planner_task_id')
+          .in('plan_mapping_id', allUserMappingIds);
+        linkedPlannerIds = new Set((links || []).map((l: any) => l.planner_task_id));
+      }
+
+      // Resolve all assignee user IDs in one batch
+      const allAssigneeIds: string[] = [];
+      for (const pt of plannerTasks) {
+        if (pt.assignments) allAssigneeIds.push(...Object.keys(pt.assignments));
+      }
+      const graphUsers = allAssigneeIds.length > 0
+        ? await resolveGraphUsers(accessToken, allAssigneeIds).catch(() => new Map())
+        : new Map();
+
+      const bucketById = new Map<string, string>(
+        (buckets || []).map((b: any) => [b.id, b.name as string])
+      );
+
+      function getStateLabel(percent: number): string {
+        if (percent === 100) return 'completed';
+        if (percent > 0) return 'inProgress';
+        return 'notStarted';
+      }
+
+      const items = plannerTasks.map((pt: any) => {
+        const assigneeIds = pt.assignments ? Object.keys(pt.assignments) : [];
+        const assignees = assigneeIds.map((aid) => {
+          const u = graphUsers.get(aid);
+          return {
+            id: aid,
+            email: u?.email || '',
+            displayName: u?.displayName || '',
+          };
+        });
+        const percent = typeof pt.percentComplete === 'number' ? pt.percentComplete : 0;
+        return {
+          id: pt.id,
+          title: pt.title,
+          state: getStateLabel(percent),
+          percentComplete: percent,
+          bucketId: pt.bucketId || null,
+          bucketName: pt.bucketId ? (bucketById.get(pt.bucketId) || null) : null,
+          dueDateTime: pt.dueDateTime || null,
+          createdDateTime: pt.createdDateTime || null,
+          assignees,
+          alreadyLinked: linkedPlannerIds.has(pt.id),
+        };
+      });
+
+      return new Response(JSON.stringify({
+        success: true,
+        tasks: items,
+        buckets: (buckets || []).map((b: any) => ({ id: b.id, name: b.name })),
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    if (action === 'planner-sync') {
+      if (!userId) throw new Error('User not authenticated');
+      const accessToken = await getValidAccessToken(supabase, userId);
+      if (!accessToken) {
+        return new Response(JSON.stringify({ success: false, error: 'No valid Microsoft connection' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const { planMappingId, selectedPlannerTaskIds, skipPush } = params as {
+        planMappingId?: string;
+        selectedPlannerTaskIds?: string[] | null;
+        skipPush?: boolean;
+      };
+      if (!planMappingId || typeof planMappingId !== 'string') {
+        return new Response(JSON.stringify({ success: false, error: 'planMappingId requis' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      // Optional explicit selection: when provided (even empty), restrict the
+      // PULL pass to those Planner task ids. `null`/`undefined` keeps the legacy
+      // behaviour (import everything that passes filters).
+      const selectionSet: Set<string> | null = Array.isArray(selectedPlannerTaskIds)
+        ? new Set(selectedPlannerTaskIds)
+        : null;
 
       let tasksPulled = 0;
       let tasksPushed = 0;
