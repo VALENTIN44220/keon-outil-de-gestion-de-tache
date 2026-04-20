@@ -173,11 +173,21 @@ export function usePlannerSync() {
     }
   };
 
-  const syncPlan = async (mappingId: string): Promise<SyncResult | null> => {
+  const syncPlan = async (
+    mappingId: string,
+    options?: { selectedPlannerTaskIds?: string[]; skipPush?: boolean },
+  ): Promise<SyncResult | null> => {
     setIsSyncing(mappingId);
     try {
       const { data, error } = await supabase.functions.invoke('microsoft-graph', {
-        body: { action: 'planner-sync', planMappingId: mappingId },
+        body: {
+          action: 'planner-sync',
+          planMappingId: mappingId,
+          ...(options?.selectedPlannerTaskIds !== undefined && {
+            selectedPlannerTaskIds: options.selectedPlannerTaskIds,
+          }),
+          ...(options?.skipPush !== undefined && { skipPush: options.skipPush }),
+        },
       });
       if (error) throw error;
       if (!data || typeof data !== 'object') {

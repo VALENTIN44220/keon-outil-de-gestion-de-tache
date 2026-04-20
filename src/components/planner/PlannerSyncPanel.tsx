@@ -12,6 +12,7 @@ import { Loader2, RefreshCw, Plus, Trash2, ArrowLeftRight, ArrowRight, ArrowLeft
 import { usePlannerSync, PlannerPlan, PlanMapping } from '@/hooks/usePlannerSync';
 import { PlannerMappingDialog } from './PlannerMappingDialog';
 import { PlannerImportedTasksList } from './PlannerImportedTasksList';
+import { PlannerImportPreviewDialog } from './PlannerImportPreviewDialog';
 import { useCategories } from '@/hooks/useCategories';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -55,6 +56,7 @@ export function PlannerSyncPanel() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('none');
   const [selectedDirection, setSelectedDirection] = useState<'both' | 'from_planner' | 'to_planner'>('both');
   const [mappingDialogMapping, setMappingDialogMapping] = useState<PlanMapping | null>(null);
+  const [importPreviewMapping, setImportPreviewMapping] = useState<PlanMapping | null>(null);
 
   useEffect(() => {
     if (showAddPlan && plans.length === 0) {
@@ -314,12 +316,13 @@ export function PlannerSyncPanel() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => syncPlan(mapping.id)}
+                        onClick={() => setImportPreviewMapping(mapping)}
                         disabled={!!isSyncing || !mapping.sync_enabled}
                         className="gap-1"
+                        title="Choisir les tâches Planner à importer"
                       >
                         <RefreshCw className={isSyncing === mapping.id ? 'h-3.5 w-3.5 animate-spin' : 'h-3.5 w-3.5'} />
-                        Sync
+                        Importer…
                       </Button>
                       <Button
                         variant="ghost"
@@ -445,6 +448,21 @@ export function PlannerSyncPanel() {
           }}
         />
       )}
+
+      {/* Import preview dialog (select tasks to import + filters) */}
+      <PlannerImportPreviewDialog
+        open={!!importPreviewMapping}
+        onOpenChange={(open) => { if (!open) setImportPreviewMapping(null); }}
+        planMappingId={importPreviewMapping?.id ?? null}
+        planTitle={importPreviewMapping?.planner_plan_title ?? ''}
+        onConfirmImport={async (selectedIds) => {
+          if (!importPreviewMapping) return;
+          await syncPlan(importPreviewMapping.id, {
+            selectedPlannerTaskIds: selectedIds,
+            skipPush: true,
+          });
+        }}
+      />
     </div>
   );
 }

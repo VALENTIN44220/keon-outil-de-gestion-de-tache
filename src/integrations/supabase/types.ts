@@ -7980,6 +7980,10 @@ export type Database = {
         Returns: boolean
       }
       cancel_request: { Args: { p_request_id: string }; Returns: undefined }
+      cleanup_planner_duplicates_for_mapping: {
+        Args: { p_plan_mapping_id: string }
+        Returns: Json
+      }
       compute_next_recurrence: {
         Args: { p_current: string; p_interval: number; p_unit: string }
         Returns: string
