@@ -5,9 +5,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Search, Trash2, AlertTriangle } from 'lucide-react';
+import { Loader2, Search, Trash2, AlertTriangle, Wrench } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { PlannerTitleDuplicatesDialog } from './PlannerTitleDuplicatesDialog';
 import {
   Select,
   SelectContent,
@@ -68,6 +69,7 @@ export function PlannerImportPreviewDialog({
   const [tasks, setTasks] = useState<PlannerPreviewTask[]>([]);
   const [buckets, setBuckets] = useState<Bucket[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [titleDupesOpen, setTitleDupesOpen] = useState(false);
 
   // Filters
   const [search, setSearch] = useState('');
@@ -312,21 +314,33 @@ export function PlannerImportPreviewDialog({
               {linkedCount > 0 && ` • ${linkedCount} déjà liée(s)`}
             </span>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleCleanupDuplicates}
-            disabled={cleaningUp}
-            className="gap-1 text-muted-foreground hover:text-destructive"
-            title="Supprime les tâches importées plusieurs fois pour ce plan"
-          >
-            {cleaningUp ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Trash2 className="h-3.5 w-3.5" />
-            )}
-            Nettoyer doublons
-          </Button>
+          <div className="flex gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setTitleDupesOpen(true)}
+              className="gap-1 text-muted-foreground hover:text-foreground"
+              title="Détecte les tâches qui ont le même titre Planner réel (préfixes T-XXX-NNNN ignorés) et permet de choisir lesquelles supprimer"
+            >
+              <Wrench className="h-3.5 w-3.5" />
+              Doublons par titre
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleCleanupDuplicates}
+              disabled={cleaningUp}
+              className="gap-1 text-muted-foreground hover:text-destructive"
+              title="Supprime les tâches importées plusieurs fois pour ce plan (par identifiant Planner)"
+            >
+              {cleaningUp ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="h-3.5 w-3.5" />
+              )}
+              Nettoyer (par ID)
+            </Button>
+          </div>
         </div>
 
         {/* Task list */}
@@ -403,6 +417,12 @@ export function PlannerImportPreviewDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <PlannerTitleDuplicatesDialog
+        open={titleDupesOpen}
+        onOpenChange={setTitleDupesOpen}
+        planMappingId={planMappingId}
+      />
     </Dialog>
   );
 }
