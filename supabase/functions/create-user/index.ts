@@ -2,8 +2,29 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
+
+/** JWT from browser invoke: primary Authorization, fallback header for stale FunctionsClient auth. */
+function getJwtFromRequest(req: Request): string | null {
+  const stripBearer = (h: string) => {
+    const t = h.trim();
+    if (!t) return null;
+    return t.replace(/^Bearer\s+/i, '').trim() || null;
+  };
+  const primary = req.headers.get('Authorization');
+  if (primary) {
+    const jwt = stripBearer(primary);
+    if (jwt) return jwt;
+  }
+  const fallback = req.headers.get('x-client-authorization');
+  if (fallback) {
+    const jwt = stripBearer(fallback);
+    if (jwt) return jwt;
+  }
+  return null;
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -22,16 +43,15 @@ Deno.serve(async (req) => {
       },
     });
 
-    // Verify the requesting user is an admin
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
+    // Verify the requesting user is an admin (JWT from Authorization or x-client-authorization)
+    const token = getJwtFromRequest(req);
+    if (!token) {
       return new Response(
         JSON.stringify({ error: 'Authorization header required' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const token = authHeader.replace('Bearer ', '');
     const { data: { user: requestingUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
     
     if (authError || !requestingUser) {

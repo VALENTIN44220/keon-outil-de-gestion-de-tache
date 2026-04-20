@@ -224,15 +224,25 @@ export function UsersTab({
 
     setIsCreating(true);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData.session?.access_token;
-      if (!accessToken) {
+      const { error: userError } = await supabase.auth.getUser();
+      if (userError) {
         throw new Error('Session expirée. Merci de vous reconnecter puis réessayer.');
+      }
+
+      let { data: sessionData } = await supabase.auth.getSession();
+      let accessToken = sessionData.session?.access_token;
+      if (!accessToken) {
+        const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+        if (refreshError || !refreshed.session?.access_token) {
+          throw new Error('Session expirée. Merci de vous reconnecter puis réessayer.');
+        }
+        accessToken = refreshed.session.access_token;
       }
 
       const response = await supabase.functions.invoke('create-user', {
         headers: {
           Authorization: `Bearer ${accessToken}`,
+          'x-client-authorization': `Bearer ${accessToken}`,
         },
         body: {
           email: email.trim(),

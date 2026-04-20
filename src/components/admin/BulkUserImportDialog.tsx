@@ -151,12 +151,23 @@ paul.durand@exemple.fr;Paul DURAND;;;Technicien;jean.dupont@exemple.fr`;
     setStep('importing');
     const importResults: ImportResult[] = [];
 
-    const { data: sessionData } = await supabase.auth.getSession();
-    const accessToken = sessionData.session?.access_token;
-    if (!accessToken) {
+    const { error: userError } = await supabase.auth.getUser();
+    if (userError) {
       toast.error('Session expirée. Merci de vous reconnecter puis réessayer.');
       setStep('preview');
       return;
+    }
+
+    let { data: sessionData } = await supabase.auth.getSession();
+    let accessToken = sessionData.session?.access_token;
+    if (!accessToken) {
+      const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError || !refreshed.session?.access_token) {
+        toast.error('Session expirée. Merci de vous reconnecter puis réessayer.');
+        setStep('preview');
+        return;
+      }
+      accessToken = refreshed.session.access_token;
     }
     
     // Build a map of created users' emails to their profile IDs for manager resolution
@@ -228,6 +239,7 @@ paul.durand@exemple.fr;Paul DURAND;;;Technicien;jean.dupont@exemple.fr`;
         const response = await supabase.functions.invoke('create-user', {
           headers: {
             Authorization: `Bearer ${accessToken}`,
+            'x-client-authorization': `Bearer ${accessToken}`,
           },
           body: {
             email: user.email,

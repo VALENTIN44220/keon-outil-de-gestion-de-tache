@@ -1,4 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -8,12 +18,14 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Save, Info, Lock, Plus } from 'lucide-react';
+import { Save, Info, Lock, Plus, GripVertical } from 'lucide-react';
 import { OPTIONS_EVALUATION_RISQUE, type PilierCode } from '@/config/questionnaireConfig';
 import { useProjectQuestionnaire, type AnswersMap } from '@/hooks/useProjectQuestionnaire';
-import { useQuestionnaireFieldDefs, groupFieldsBySection, type FieldDefinition } from '@/hooks/useQuestionnaireFieldDefs';
+import { useQuestionnaireFieldDefs, type FieldDefinition } from '@/hooks/useQuestionnaireFieldDefs';
+import { getCanonicalSectionGroups, useQuestionnaireSectionOrder } from '@/hooks/useQuestionnaireSectionOrder';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { cn } from '@/lib/utils';
 import { AddCustomFieldDialog } from './AddCustomFieldDialog';
 import { TableInsertSpreadsheet } from './TableInsertSpreadsheet';
 
@@ -88,6 +100,59 @@ function buildValueJsonbFromRawAndDisplay(raw: Matrix, display: Matrix) {
   }
 
   return { cells };
+}
+
+function SortableQuestionnaireSection({
+  section,
+  draggable,
+  children,
+  triggerSummary,
+}: {
+  section: string;
+  draggable: boolean;
+  children: React.ReactNode;
+  triggerSummary: React.ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: section,
+    disabled: !draggable,
+  });
+  const style = { transform: CSS.Transform.toString(transform), transition };
+  const onPointerDown = listeners.onPointerDown;
+  const gripListeners =
+    draggable && onPointerDown
+      ? {
+          ...listeners,
+          onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {
+            onPointerDown(e);
+            e.stopPropagation();
+          },
+        }
+      : { ...listeners };
+
+  return (
+    <div ref={setNodeRef} style={style} className={cn(isDragging && 'relative z-10 opacity-95')}>
+      <AccordionItem value={section} className="border rounded-lg overflow-visible">
+        <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/30">
+          <div className="flex items-center gap-3 w-full min-w-0">
+            {draggable ? (
+              <button
+                type="button"
+                aria-label="Glisser-déposer pour réordonner les sections"
+                className="shrink-0 touch-none cursor-grab rounded-md p-1 text-muted-foreground hover:bg-muted/50 hover:text-foreground active:cursor-grabbing"
+                {...attributes}
+                {...gripListeners}
+              >
+                <GripVertical className="h-4 w-4" />
+              </button>
+            ) : null}
+            {triggerSummary}
+          </div>
+        </AccordionTrigger>
+        {children}
+      </AccordionItem>
+    </div>
+  );
 }
 
 function buildInitialRawFromTemplateAndValue(
@@ -239,6 +304,7 @@ export function PilierQuestionnaireTab({
   pilierCode,
   readonly = false,
 }: PilierQuestionnaireTabProps) {
+  const { profile } = useAuth();
   const { answers, isLoading: isLoadingAnswers, isSaving, fetchAnswers, saveSectionAnswers, canWritePilier } =
     useProjectQuestionnaire(projectId, codeDivalto);
   const { data: fieldDefs = [], isLoading: isLoadingDefs } = useQuestionnaireFieldDefs(pilierCode);
@@ -248,31 +314,14 @@ export function PilierQuestionnaireTab({
   const [addFieldCtx, setAddFieldCtx] = useState<AddFieldContext | null>(null);
 
   const canWrite = !readonly && canWritePilier(pilierCode);
-  const sections = useMemo(() => {
-    const base = groupFieldsBySection(fieldDefs);
-    if (pilierCode !== '02') return base;
+  const canonicalGroups = useMemo(() => getCanonicalSectionGroups(fieldDefs, pilierCode), [fieldDefs, pilierCode]);
+  const { orderedGroups, order, onDragEnd } = useQuestionnaireSectionOrder(profile?.id, projectId, pilierCode, canonicalGroups);
 
-    const desiredOrder = [
-      'GENERALITES',
-      'TABLE DE CAPI ET CCA',
-      'STRUCTURATION JURIDIQUE',
-      'GOUVERNANCE',
-      'GESTION ADMINISTRATIVE ET FINANCIERE',
-      'GESTION DES RESSOURCES HUMAINES',
-      "GESTION DE L'IT",
-    ];
-    const rank = (s: string) => {
-      const idx = desiredOrder.indexOf(s);
-      return idx === -1 ? Number.POSITIVE_INFINITY : idx;
-    };
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
-    return [...base].sort((a, b) => {
-      const ra = rank(a.section);
-      const rb = rank(b.section);
-      if (ra !== rb) return ra - rb;
-      return a.section.localeCompare(b.section, 'fr');
-    });
-  }, [fieldDefs, pilierCode]);
   const isLoading = isLoadingAnswers || isLoadingDefs;
 
   useEffect(() => {
@@ -443,7 +492,7 @@ export function PilierQuestionnaireTab({
     );
   }
 
-  if (sections.length === 0) {
+  if (canonicalGroups.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-2">
         <p className="text-sm">Aucun champ défini pour ce pilier.</p>
@@ -460,101 +509,102 @@ export function PilierQuestionnaireTab({
         </div>
       )}
 
-      <Accordion
-        type="multiple"
-        defaultValue={[]}
-        className="space-y-2"
-      >
-        {sections.map(({ section, fields: sectionFields }) => {
-          const isDirty = dirtySection.has(section);
-          const filledCount = sectionFields.filter(f => localAnswers[f.champ_id]?.valeur).length;
-          const sousSections = [...new Set(sectionFields.map(f => f.sous_section || ''))];
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+        <Accordion type="multiple" defaultValue={[]} className="space-y-2">
+          <SortableContext items={order} strategy={verticalListSortingStrategy}>
+            {orderedGroups.map(({ section, fields: sectionFields }) => {
+              const isDirty = dirtySection.has(section);
+              const filledCount = sectionFields.filter(f => localAnswers[f.champ_id]?.valeur).length;
+              const sousSections = [...new Set(sectionFields.map(f => f.sous_section || ''))];
 
-          return (
-            <AccordionItem
-              key={section}
-              value={section}
-              className="border rounded-lg overflow-visible"
-            >
-              <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/30">
-                <div className="flex items-center gap-3 w-full">
-                  <span className="font-semibold text-sm text-left">{section}</span>
-                  <Badge
-                    variant={filledCount === sectionFields.length ? 'default' : filledCount > 0 ? 'secondary' : 'outline'}
-                    className="text-xs ml-auto mr-2"
-                  >
-                    {filledCount} / {sectionFields.length}
-                  </Badge>
-                  {isDirty && (
-                    <Badge variant="destructive" className="text-xs">Non sauvegardé</Badge>
-                  )}
-                </div>
-              </AccordionTrigger>
-
-              <AccordionContent className="px-4 pb-4">
-                {sousSections.map(ss => {
-                  const ssFields = sectionFields.filter(f => (f.sous_section || '') === ss);
-                  return (
-                    <div key={ss || 'default'} className="mb-4">
-                      {ss && (
-                        <div className="flex items-center justify-between mb-3 border-b pb-1">
-                          <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                            {ss}
-                          </h4>
-                          {/* Bouton ajout dans une sous-section */}
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 text-xs gap-1 text-muted-foreground hover:text-foreground"
-                            onClick={() => setAddFieldCtx({ section, sousSection: ss })}
-                          >
-                            <Plus className="h-3 w-3" />
-                            Ajouter un champ
-                          </Button>
-                        </div>
+              return (
+                <SortableQuestionnaireSection
+                  key={section}
+                  section={section}
+                  draggable={canWrite}
+                  triggerSummary={
+                    <>
+                      <span className="font-semibold text-sm text-left flex-1 min-w-0">{section}</span>
+                      <Badge
+                        variant={
+                          filledCount === sectionFields.length ? 'default' : filledCount > 0 ? 'secondary' : 'outline'
+                        }
+                        className="text-xs shrink-0 ml-auto mr-2"
+                      >
+                        {filledCount} / {sectionFields.length}
+                      </Badge>
+                      {isDirty && (
+                        <Badge variant="destructive" className="text-xs shrink-0">
+                          Non sauvegardé
+                        </Badge>
                       )}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {ssFields.map(f => renderField(f))}
+                    </>
+                  }
+                >
+                  <AccordionContent className="px-4 pb-4">
+                    {sousSections.map(ss => {
+                      const ssFields = sectionFields.filter(f => (f.sous_section || '') === ss);
+                      return (
+                        <div key={ss || 'default'} className="mb-4">
+                          {ss && (
+                            <div className="flex items-center justify-between mb-3 border-b pb-1">
+                              <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                {ss}
+                              </h4>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 text-xs gap-1 text-muted-foreground hover:text-foreground"
+                                onClick={() => setAddFieldCtx({ section, sousSection: ss })}
+                              >
+                                <Plus className="h-3 w-3" />
+                                Ajouter un champ
+                              </Button>
+                            </div>
+                          )}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {ssFields.map(f => renderField(f))}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {sousSections.length === 1 && sousSections[0] === '' && (
+                      <div className="mt-2">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs gap-1 text-muted-foreground hover:text-foreground"
+                          onClick={() => setAddFieldCtx({ section })}
+                        >
+                          <Plus className="h-3 w-3" />
+                          Ajouter un champ à cette section
+                        </Button>
                       </div>
-                    </div>
-                  );
-                })}
+                    )}
 
-                {/* Bouton ajout si pas de sous-sections, ou ajout global à la section */}
-                {(sousSections.length === 1 && sousSections[0] === '') && (
-                  <div className="mt-2">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-xs gap-1 text-muted-foreground hover:text-foreground"
-                      onClick={() => setAddFieldCtx({ section })}
-                    >
-                      <Plus className="h-3 w-3" />
-                      Ajouter un champ à cette section
-                    </Button>
-                  </div>
-                )}
-
-                {canWrite && (
-                  <div className="flex justify-end mt-4 pt-3 border-t">
-                    <Button
-                      size="sm"
-                      onClick={() => handleSave(section, sectionFields)}
-                      disabled={isSaving || !isDirty}
-                      className="gap-2"
-                    >
-                      <Save className="h-3.5 w-3.5" />
-                      {isSaving ? 'Sauvegarde…' : 'Sauvegarder la section'}
-                    </Button>
-                  </div>
-                )}
-              </AccordionContent>
-            </AccordionItem>
-          );
-        })}
-      </Accordion>
+                    {canWrite && (
+                      <div className="flex justify-end mt-4 pt-3 border-t">
+                        <Button
+                          size="sm"
+                          onClick={() => handleSave(section, sectionFields)}
+                          disabled={isSaving || !isDirty}
+                          className="gap-2"
+                        >
+                          <Save className="h-3.5 w-3.5" />
+                          {isSaving ? 'Sauvegarde…' : 'Sauvegarder la section'}
+                        </Button>
+                      </div>
+                    )}
+                  </AccordionContent>
+                </SortableQuestionnaireSection>
+              );
+            })}
+          </SortableContext>
+        </Accordion>
+      </DndContext>
 
       {addFieldCtx && (
         <AddCustomFieldDialog
