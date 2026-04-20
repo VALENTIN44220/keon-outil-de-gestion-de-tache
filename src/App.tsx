@@ -55,6 +55,7 @@ const ITProjectHubTimeline = lazy(() => import("./pages/it/ITProjectHubTimeline"
 const ITProjectHubSync = lazy(() => import("./pages/it/ITProjectHubSync"));
 const ITProjectHubDiscussions = lazy(() => import("./pages/it/ITProjectHubDiscussions"));
 const ITProjectHubFiles = lazy(() => import("./pages/it/ITProjectHubFiles"));
+const ITProjectHubBudget = lazy(() => import("./pages/it/ITProjectHubBudget"));
 
 const App = () => (
     <AuthProvider>
@@ -127,6 +128,7 @@ const App = () => (
                 { path: "/it/projects/:code/sync", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubSync /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/projects/:code/discussions", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubDiscussions /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/projects/:code/files", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubFiles /></ITProjectsAccessGate></ProtectedRoute> },
+                { path: "/it/projects/:code/budget", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubBudget /></ITProjectsAccessGate></ProtectedRoute> },
               ]}
             />
             <Routes>
@@ -172,6 +174,7 @@ const App = () => (
             <Route path="/it/projects/:code/sync" element={<></>} />
             <Route path="/it/projects/:code/discussions" element={<></>} />
             <Route path="/it/projects/:code/files" element={<></>} />
+            <Route path="/it/projects/:code/budget" element={<></>} />
             <Route path="/design-system" element={<DesignSystem />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />

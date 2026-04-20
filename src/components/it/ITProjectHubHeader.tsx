@@ -3,7 +3,7 @@ import { ITProject, IT_PROJECT_STATUS_CONFIG, IT_PROJECT_PRIORITY_CONFIG, IT_PRO
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { ArrowLeft, LayoutDashboard, ListTodo, Calendar, MessageSquare, Paperclip, RefreshCw, Pencil, ChevronRight, Monitor, AlertTriangle, TrendingUp, CheckCircle2, Clock, MessageSquareText, Link2, ExternalLink } from 'lucide-react';
+import { ArrowLeft, LayoutDashboard, ListTodo, Calendar, MessageSquare, Paperclip, RefreshCw, Pencil, ChevronRight, Monitor, AlertTriangle, TrendingUp, CheckCircle2, Clock, MessageSquareText, Link2, ExternalLink, Euro } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useITProjectSync } from '@/hooks/useITProjectSync';
 
@@ -20,6 +20,7 @@ const navItems = [
   { value: 'sync',        label: 'Teams / Loop',       icon: RefreshCw },
   { value: 'discussions', label: 'Discussions',        icon: MessageSquare },
   { value: 'files',       label: 'Fichiers',           icon: Paperclip },
+  { value: 'budget',      label: 'Budget',             icon: Euro },
 ];
 
 export function ITProjectHubHeader({ project, stats, onEditProject }: ITProjectHubHeaderProps) {

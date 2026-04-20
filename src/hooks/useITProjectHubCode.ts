@@ -18,6 +18,7 @@ export function useITProjectHubCode(): string | undefined {
       /^\/it\/projects\/([^/]+)\/overview/,
       /^\/it\/projects\/([^/]+)\/tasks/,
       /^\/it\/projects\/([^/]+)\/timeline/,
+      /^\/it\/projects\/([^/]+)\/budget/,
       /^\/it\/projects\/([^/]+)\/sync/,
       /^\/it\/projects\/([^/]+)\/discussions/,
       /^\/it\/projects\/([^/]+)\/files/,

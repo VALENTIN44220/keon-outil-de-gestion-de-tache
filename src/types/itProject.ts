@@ -245,3 +245,88 @@ export const IT_PROJECT_PILIER_CONFIG: Record<
 };
 
 // Exemple de code généré automatiquement : NSK_IT-00001
+
+// ================================================
+// Budget IT — Types
+// ================================================
+
+export type BudgetLineStatut =
+  | 'brouillon' | 'valide' | 'engage_partiel' | 'engage_total'
+  | 'facture_partiel' | 'facture_total' | 'clos' | 'anomalie';
+
+export type TypeDepense = 'Opex' | 'Capex' | 'RH' | 'Amortissement';
+
+export const BUDGET_LINE_STATUT_CONFIG: Record<BudgetLineStatut, { label: string; className: string }> = {
+  brouillon:       { label: 'Brouillon',          className: 'bg-slate-100 text-slate-600 border-slate-300' },
+  valide:          { label: 'Validé',             className: 'bg-green-100 text-green-700 border-green-300' },
+  engage_partiel:  { label: 'Engagé partiel',     className: 'bg-blue-100 text-blue-700 border-blue-300' },
+  engage_total:    { label: 'Engagé total',       className: 'bg-blue-200 text-blue-800 border-blue-400' },
+  facture_partiel: { label: 'Facturé partiel',    className: 'bg-violet-100 text-violet-700 border-violet-300' },
+  facture_total:   { label: 'Facturé total',      className: 'bg-violet-200 text-violet-800 border-violet-400' },
+  clos:            { label: 'Clos',               className: 'bg-gray-100 text-gray-500 border-gray-300' },
+  anomalie:        { label: 'Anomalie',           className: 'bg-red-100 text-red-700 border-red-300' },
+};
+
+export interface ITBudgetLine {
+  id: string;
+  it_project_id: string;
+  exercice: number;
+  version: string;
+  categorie?: string | null;
+  sous_categorie?: string | null;
+  fournisseur_prevu?: string | null;
+  type_depense?: TypeDepense | null;
+  nature_depense?: string | null;
+  description?: string | null;
+  mois_budget?: number | null;
+  montant_budget: number;
+  montant_budget_revise?: number | null;
+  statut: BudgetLineStatut;
+  mode_saisie: 'import' | 'manuel';
+  commentaire?: string | null;
+  external_key?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ITManualExpense {
+  id: string;
+  it_budget_line_id?: string | null;
+  it_project_id: string;
+  type_prevision: 'depense_prevue' | 'provision' | 'refacturation' | 'correction' | 'exceptionnel';
+  date_prevue?: string | null;
+  fournisseur?: string | null;
+  description?: string | null;
+  montant_prevu: number;
+  statut: 'en_attente' | 'confirme' | 'annule';
+  commentaire?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ITBudgetReallocation {
+  id: string;
+  it_project_id: string;
+  from_budget_line_id?: string | null;
+  to_budget_line_id?: string | null;
+  montant: number;
+  motif?: string | null;
+  statut_validation: 'en_attente' | 'valide' | 'rejete';
+  decided_by?: string | null;
+  decided_at?: string | null;
+  created_at: string;
+}
+
+export interface ITBudgetKPIs {
+  budget_initial: number;
+  budget_revise: number;
+  engage: number;         // Phase 2 : CFK Divalto
+  constate: number;       // Phase 2 : FFK Divalto
+  reste_a_engager: number;
+  reste_a_constater: number;
+  forecast_fin_annee: number;
+  ecart_budget: number;
+  montant_reaffectable: number;
+  depassement: number;
+  taux_consommation: number;
+}
