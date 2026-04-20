@@ -1622,8 +1622,8 @@ Deno.serve(async (req) => {
         }
       }
 
-      // PUSH: Push local unlinked tasks to Planner
-      if (mapping.sync_direction === 'to_planner' || mapping.sync_direction === 'both') {
+      // PUSH: Push local unlinked tasks to Planner (skipped when caller asks for import-only)
+      if (!skipPush && (mapping.sync_direction === 'to_planner' || mapping.sync_direction === 'both')) {
         // Only push active tasks — finished tasks have no value in Planner and would flood the plan.
         let localQuery = supabase.from('tasks').select('*')
           .eq('user_id', userId)
