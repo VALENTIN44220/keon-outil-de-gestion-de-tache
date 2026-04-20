@@ -1332,6 +1332,61 @@ Deno.serve(async (req) => {
           }
 
           try {
+            // ─── DUPLICATE PREVENTION: fallback matching by exact title ──────
+            // Some legacy tasks were imported without a planner_task_link.
+            // Before creating a new task, check if a task with the exact Planner
+            // title (or a previously-renamed variant carrying that title in its
+            // suffix) already exists for this user. If so, just create the link
+            // and treat it as "already linked" — never create a duplicate row.
+            const titleVariants = [
+              pt.title,
+              // legacy renamed format: "T-XXX-NNNN — <ID>-/-<bucket>-/-<title>"
+              `%-/-${pt.title}`,
+              // legacy renamed format: "T-XXX-NNNN — <title>"
+              `T-%-_____ — ${pt.title}`,
+            ];
+
+            const { data: titleMatches } = await supabase
+              .from('tasks')
+              .select('id, title')
+              .eq('user_id', userId)
+              .or(
+                [
+                  `title.eq.${pt.title.replace(/,/g, '\\,')}`,
+                  `title.ilike.%-/-${pt.title.replace(/,/g, '\\,')}`,
+                  `title.ilike.T-%— ${pt.title.replace(/,/g, '\\,')}`,
+                ].join(','),
+              )
+              .limit(5);
+
+            const existingMatch =
+              Array.isArray(titleMatches) && titleMatches.length > 0
+                ? titleMatches.find((t) => !linkedLocalIds.has(t.id)) || titleMatches[0]
+                : null;
+
+            if (existingMatch && !linkedLocalIds.has(existingMatch.id)) {
+              // Link the existing task instead of creating a new one
+              const { error: backlinkErr } = await supabase.from('planner_task_links').insert({
+                plan_mapping_id: planMappingId,
+                planner_task_id: pt.id,
+                local_task_id: existingMatch.id,
+                planner_etag: pt['@odata.etag'],
+                sync_status: 'synced',
+              });
+              if (!backlinkErr) {
+                linkedPlannerIds.add(pt.id);
+                linkedLocalIds.add(existingMatch.id);
+                pullSkippedAlreadyLinked++;
+                console.log(
+                  `planner-sync PULL: linked existing task ${existingMatch.id} to planner task ${pt.id} via title match`,
+                );
+                continue;
+              }
+              // If link insert failed (e.g. unique violation), still skip creation
+              console.warn('planner-sync PULL: title fallback link insert failed', backlinkErr);
+            }
+            // ─────────────────────────────────────────────────────────────────
+
             const status = mapping.default_status || plannerPercentToStatus(pt.percentComplete || 0);
             const priority = mapping.default_priority || plannerPriorityToApp(pt.priority || 5);
 
