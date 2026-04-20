@@ -1302,6 +1302,12 @@ Deno.serve(async (req) => {
         for (const pt of plannerTasks) {
           if (linkedPlannerIds.has(pt.id)) { pullSkippedAlreadyLinked++; continue; }
 
+          // Explicit user selection (modal preview): only import these ids
+          if (selectionSet && !selectionSet.has(pt.id)) {
+            pullSkippedByState++; // reuse counter so the user sees "filtered out"
+            continue;
+          }
+
           // Filter by state
           const taskState = getPlannerState(plannerPercentValue(pt.percentComplete));
           if (!importStates.includes(taskState)) { pullSkippedByState++; continue; }
