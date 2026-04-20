@@ -448,6 +448,21 @@ export function PlannerSyncPanel() {
           }}
         />
       )}
+
+      {/* Import preview dialog (select tasks to import + filters) */}
+      <PlannerImportPreviewDialog
+        open={!!importPreviewMapping}
+        onOpenChange={(open) => { if (!open) setImportPreviewMapping(null); }}
+        planMappingId={importPreviewMapping?.id ?? null}
+        planTitle={importPreviewMapping?.planner_plan_title ?? ''}
+        onConfirmImport={async (selectedIds) => {
+          if (!importPreviewMapping) return;
+          await syncPlan(importPreviewMapping.id, {
+            selectedPlannerTaskIds: selectedIds,
+            skipPush: true,
+          });
+        }}
+      />
     </div>
   );
 }
