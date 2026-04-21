@@ -347,3 +347,32 @@ export interface ITBudgetGlobalFilters {
   type_depense: string;
   categorie: string;
 }
+
+// ================================================
+// IT Budget — Préférences utilisateur
+// ================================================
+
+export interface ITBudgetColumnsConfig {
+  /** Clés des colonnes visibles, dans l'ordre */
+  order: string[];
+  /** Clés des colonnes masquées */
+  hidden: string[];
+}
+
+export interface ITBudgetFiltersConfig {
+  annee?: number;
+  entite?: string;
+  type_depense?: string;
+  categorie?: string;
+  sous_categorie?: string;
+  fournisseur_prevu?: string;
+  statut?: string;
+  mois_budget?: string;
+  projet_it?: string;
+  search?: string;
+}
+
+export interface ITBudgetUserPreferences {
+  columns_config: ITBudgetColumnsConfig;
+  filters_config: ITBudgetFiltersConfig;
+}

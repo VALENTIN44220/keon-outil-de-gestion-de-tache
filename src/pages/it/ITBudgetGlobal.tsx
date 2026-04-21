@@ -39,6 +39,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { BudgetLinesBulkActionsBar } from '@/components/it/BudgetLinesBulkActionsBar';
+import { BudgetColumnsManager } from '@/components/it/BudgetColumnsManager';
+import { IT_BUDGET_COLUMNS, type ITBudgetLineRow } from '@/components/it/budgetColumns';
+import { useITBudgetPreferences } from '@/hooks/useITBudgetPreferences';
 import {
   LayoutDashboard,
   TrendingUp,
@@ -261,21 +264,26 @@ export default function ITBudgetGlobal() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const [annee, setAnnee] = useState(2026);
-  const [entite, setEntite] = useState('');
-  const [type_depense, setTypeDepense] = useState('');
-  const [categorie, setCategorie] = useState('');
-  const [activeTab, setActiveTab] = useState<'synthese' | 'lignes' | 'depenses'>('synthese');
+  const { prefs, isLoaded: prefsLoaded, updateColumns, updateFilters } = useITBudgetPreferences();
 
-  const apiFilters = useMemo(
+  const filters = useMemo(
     () => ({
-      annee,
-      entite: entite || undefined,
-      type_depense: type_depense || undefined,
-      categorie: categorie.trim() || undefined,
+      annee: prefs.filters_config.annee ?? new Date().getFullYear(),
+      entite: prefs.filters_config.entite ?? '',
+      type_depense: prefs.filters_config.type_depense ?? '',
+      categorie: prefs.filters_config.categorie ?? '',
     }),
-    [annee, entite, type_depense, categorie]
+    [prefs.filters_config]
   );
+
+  const setFilter = useCallback(
+    <K extends keyof typeof prefs.filters_config>(key: K, value: (typeof prefs.filters_config)[K]) => {
+      updateFilters({ ...prefs.filters_config, [key]: value });
+    },
+    [prefs.filters_config, updateFilters]
+  );
+
+  const [activeTab, setActiveTab] = useState<'synthese' | 'lignes' | 'depenses'>('synthese');
 
   const {
     lines,
@@ -293,7 +301,7 @@ export default function ITBudgetGlobal() {
     byType,
     byCategorie,
     byEntite,
-  } = useITBudgetGlobal(apiFilters);
+  } = useITBudgetGlobal(filters);
 
   const [filterTypeDepense, setFilterTypeDepense] = useState<string>('__all__');
   const [filterMois, setFilterMois] = useState<string>('__all__');
@@ -409,9 +417,9 @@ export default function ITBudgetGlobal() {
     setLineStatut('brouillon');
     setLineCommentaire('');
     setLineEntite(IT_ENTITES[0]);
-    setLineAnnee(String(annee));
+    setLineAnnee(String(filters.annee));
     setLineItProjectId('');
-  }, [annee]);
+  }, [filters.annee]);
 
   const openAddLine = () => {
     setEditingLine(null);
@@ -440,7 +448,7 @@ export default function ITBudgetGlobal() {
     setLineStatut(line.statut);
     setLineCommentaire(line.commentaire ?? '');
     setLineEntite((lx.entite as string) || IT_ENTITES[0]);
-    setLineAnnee(String(lx.annee ?? line.exercice ?? annee));
+    setLineAnnee(String(lx.annee ?? line.exercice ?? filters.annee));
     setLineItProjectId(line.it_project_id ?? '');
     setLineDialogOpen(true);
   };
@@ -454,9 +462,9 @@ export default function ITBudgetGlobal() {
     setExpStatut('en_attente');
     setExpCommentaire('');
     setExpEntite(IT_ENTITES[0]);
-    setExpAnnee(String(annee));
+    setExpAnnee(String(filters.annee));
     setExpItProjectId('');
-  }, [annee]);
+  }, [filters.annee]);
 
   const openAddExpense = () => {
     setEditingExpense(null);
@@ -475,7 +483,7 @@ export default function ITBudgetGlobal() {
     setExpStatut(exp.statut);
     setExpCommentaire(exp.commentaire ?? '');
     setExpEntite((ex.entite as string) || IT_ENTITES[0]);
-    setExpAnnee(String(ex.annee ?? annee));
+    setExpAnnee(String(ex.annee ?? filters.annee));
     setExpItProjectId(exp.it_project_id ?? '');
     setExpenseDialogOpen(true);
   };
@@ -508,12 +516,15 @@ export default function ITBudgetGlobal() {
 
   const progressValue = Math.min(100, Math.max(0, kpis.taux_consommation));
 
-  const hasActiveFilters = !!(entite || type_depense || categorie.trim());
+  const hasActiveFilters = !!(filters.entite || filters.type_depense || filters.categorie.trim());
 
   const resetFilters = () => {
-    setEntite('');
-    setTypeDepense('');
-    setCategorie('');
+    updateFilters({
+      ...prefs.filters_config,
+      entite: '',
+      type_depense: '',
+      categorie: '',
+    });
   };
 
   const submitLine = async () => {
@@ -719,13 +730,13 @@ export default function ITBudgetGlobal() {
               <LayoutDashboard className="h-7 w-7 text-violet-600" />
               Suivi budgétaire IT
             </h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              Vision consolidée tous projets — Exercice {annee}
+              <p className="text-sm text-muted-foreground mt-1">
+              Vision consolidée tous projets — Exercice {filters.annee}
             </p>
           </div>
           <div className="flex items-center gap-2">
             <Label className="text-xs text-muted-foreground whitespace-nowrap">Année</Label>
-            <Select value={String(annee)} onValueChange={(v) => setAnnee(Number(v))}>
+            <Select value={String(filters.annee)} onValueChange={(v) => setFilter('annee', Number(v))}>
               <SelectTrigger className="w-[120px]">
                 <SelectValue />
               </SelectTrigger>
@@ -741,7 +752,7 @@ export default function ITBudgetGlobal() {
         </header>
 
         <div className="px-6 py-3 border-b bg-muted/30 flex flex-wrap gap-3 items-center">
-          <Select value={entite || '__all__'} onValueChange={(v) => setEntite(v === '__all__' ? '' : v)}>
+          <Select value={filters.entite || '__all__'} onValueChange={(v) => setFilter('entite', v === '__all__' ? '' : v)}>
             <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="Entité" />
             </SelectTrigger>
@@ -754,7 +765,7 @@ export default function ITBudgetGlobal() {
               ))}
             </SelectContent>
           </Select>
-          <Select value={type_depense || '__all__'} onValueChange={(v) => setTypeDepense(v === '__all__' ? '' : v)}>
+          <Select value={filters.type_depense || '__all__'} onValueChange={(v) => setFilter('type_depense', v === '__all__' ? '' : v)}>
             <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="Type" />
             </SelectTrigger>
@@ -769,8 +780,8 @@ export default function ITBudgetGlobal() {
           <Input
             className="max-w-xs"
             placeholder="Filtrer par catégorie..."
-            value={categorie}
-            onChange={(e) => setCategorie(e.target.value)}
+            value={filters.categorie}
+            onChange={(e) => setFilter('categorie', e.target.value)}
           />
           {hasActiveFilters && (
             <Button type="button" variant="outline" size="sm" className="gap-1" onClick={resetFilters}>
@@ -784,7 +795,7 @@ export default function ITBudgetGlobal() {
           </Button>
         </div>
 
-        {linesLoading ? (
+        {linesLoading || !prefsLoaded ? (
           <BudgetPageSkeleton />
         ) : (
           <div className="flex-1 overflow-auto p-6 space-y-6">
@@ -1021,6 +1032,7 @@ export default function ITBudgetGlobal() {
                       ))}
                     </SelectContent>
                   </Select>
+                  <BudgetColumnsManager config={prefs.columns_config} onChange={updateColumns} />
                   <Button type="button" onClick={openAddLine} className="gap-2 ml-auto">
                     <Plus className="h-4 w-4" />
                     + Ajouter une ligne
@@ -1075,29 +1087,21 @@ export default function ITBudgetGlobal() {
                               );
                             })()}
                           </TableHead>
-                          <TableHead>Catégorie</TableHead>
-                          <TableHead>Entité</TableHead>
-                          <TableHead>Projet IT</TableHead>
-                          <TableHead>Année</TableHead>
-                          <TableHead>Sous-catégorie</TableHead>
-                          <TableHead>Fournisseur</TableHead>
-                          <TableHead>Type</TableHead>
-                          <TableHead>Mois</TableHead>
-                          <TableHead className="text-right">Budget initial</TableHead>
-                          <TableHead className="text-right">Budget révisé</TableHead>
-                          <TableHead className="text-right">Total annuel</TableHead>
-                          <TableHead>Statut</TableHead>
+                          {prefs.columns_config.order.map((key) => {
+                            const col = IT_BUDGET_COLUMNS.find((c) => c.key === key);
+                            if (!col) return null;
+                            return (
+                              <TableHead key={key} className={cn(col.align === 'right' && 'text-right', col.className)}>
+                                {col.label}
+                              </TableHead>
+                            );
+                          })}
                           <TableHead className="w-[100px]">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {filteredLines.map((l) => {
-                          const lx = l as LineExtra;
-                          const st = BUDGET_LINE_STATUT_CONFIG[l.statut];
-                          const pid = l.it_project_id?.trim();
-                          const montantAnnuel =
-                            (l as ITBudgetLine & { montant_annuel?: number | null }).montant_annuel ??
-                            (l.montant_budget ?? 0) * 12;
+                          const line = l as ITBudgetLineRow;
                           return (
                             <Fragment key={l.id}>
                               <TableRow
@@ -1111,29 +1115,28 @@ export default function ITBudgetGlobal() {
                                     aria-label={`Sélectionner ligne ${l.categorie ?? ''}`}
                                   />
                                 </TableCell>
-                                <TableCell className="font-medium">{l.categorie ?? '—'}</TableCell>
-                                <TableCell>{lx.entite ?? '—'}</TableCell>
-                                <TableCell className="font-mono text-xs">
-                                  {pid ? `${pid.slice(0, 8)}…` : '—'}
-                                </TableCell>
-                                <TableCell>{lx.annee ?? l.exercice ?? '—'}</TableCell>
-                                <TableCell>{l.sous_categorie ?? '—'}</TableCell>
-                                <TableCell>{l.fournisseur_prevu ?? '—'}</TableCell>
-                                <TableCell>{l.type_depense ?? '—'}</TableCell>
-                                <TableCell>{formatMoisBudget(l.mois_budget)}</TableCell>
-                                <TableCell className="text-right tabular-nums">{eur(l.montant_budget ?? 0)}</TableCell>
-                                <TableCell className="text-right tabular-nums">
-                                  {eur(l.montant_budget_revise ?? l.montant_budget ?? 0)}
-                                </TableCell>
-                                <TableCell className="text-right tabular-nums">{eur(montantAnnuel)}</TableCell>
-                                <TableCell>
-                                  <Badge variant="outline" className={cn('border', st.className)}>
-                                    {st.label}
-                                  </Badge>
-                                </TableCell>
+                                {prefs.columns_config.order.map((key) => {
+                                  const col = IT_BUDGET_COLUMNS.find((c) => c.key === key);
+                                  if (!col) return null;
+                                  return (
+                                    <TableCell
+                                      key={key}
+                                      className={cn(col.align === 'right' && 'text-right', col.className)}
+                                    >
+                                      {col.render(line, { eur, formatMoisBudget })}
+                                    </TableCell>
+                                  );
+                                })}
                                 <TableCell onClick={(e) => e.stopPropagation()}>
                                   <div className="flex gap-1">
-                                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditLine(l)} aria-label="Éditer">
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8"
+                                      onClick={() => openEditLine(l)}
+                                      aria-label="Éditer"
+                                    >
                                       <Pencil className="h-4 w-4" />
                                     </Button>
                                     <Button
@@ -1151,7 +1154,7 @@ export default function ITBudgetGlobal() {
                               </TableRow>
                               {expandedLineId === l.id && (
                                 <TableRow>
-                                  <TableCell colSpan={14} className="p-0">
+                                  <TableCell colSpan={prefs.columns_config.order.length + 2} className="p-0">
                                     <ExpandedMonths lineId={l.id} />
                                   </TableCell>
                                 </TableRow>
