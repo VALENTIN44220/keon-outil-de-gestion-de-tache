@@ -29,6 +29,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -37,6 +38,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
+import { BudgetLinesBulkActionsBar } from '@/components/it/BudgetLinesBulkActionsBar';
 import {
   LayoutDashboard,
   TrendingUp,
@@ -281,6 +283,9 @@ export default function ITBudgetGlobal() {
     addLine,
     updateLine,
     deleteLine,
+    bulkUpdateLines,
+    bulkDeleteLines,
+    bulkDuplicateLines,
     addExpense,
     expenses,
     expensesLoading,
@@ -298,11 +303,64 @@ export default function ITBudgetGlobal() {
   const [lineSaving, setLineSaving] = useState(false);
   const [deleteLineId, setDeleteLineId] = useState<string | null>(null);
   const [expandedLineId, setExpandedLineId] = useState<string | null>(null);
+  const [selectedLineIds, setSelectedLineIds] = useState<Set<string>>(new Set());
 
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<ITManualExpense | null>(null);
   const [expenseSaving, setExpenseSaving] = useState(false);
   const [deleteExpenseId, setDeleteExpenseId] = useState<string | null>(null);
+
+  const toggleLineSelection = useCallback((id: string) => {
+    setSelectedLineIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleAllVisible = useCallback((allSelected: boolean, visibleIds: string[]) => {
+    setSelectedLineIds((prev) => {
+      const next = new Set(prev);
+      if (allSelected) visibleIds.forEach((id) => next.delete(id));
+      else visibleIds.forEach((id) => next.add(id));
+      return next;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => setSelectedLineIds(new Set()), []);
+
+  useEffect(() => {
+    setSelectedLineIds((prev) => {
+      const existingIds = new Set(lines.map((l) => l.id));
+      const filtered = new Set<string>();
+      prev.forEach((id) => {
+        if (existingIds.has(id)) filtered.add(id);
+      });
+      return filtered.size === prev.size ? prev : filtered;
+    });
+  }, [lines]);
+
+  const anneeOptions = useMemo(() => {
+    const years = new Set<number>();
+    lines.forEach((l) => {
+      const y = (l as any).annee ?? l.exercice;
+      if (typeof y === 'number') years.add(y);
+    });
+    const current = new Date().getFullYear();
+    [current - 1, current, current + 1, current + 2].forEach((y) => years.add(y));
+    return Array.from(years).sort((a, b) => a - b);
+  }, [lines]);
+
+  const entiteOptions = useMemo(() => {
+    const s = new Set<string>();
+    lines.forEach((l) => {
+      const e = (l as any).entite;
+      if (e && typeof e === 'string' && e.trim()) s.add(e.trim());
+    });
+    ['KEON', 'NASKEO', 'SYCOMORE', 'TEIKEI', 'KEON.BIO', 'GECO2', 'CAPCOO'].forEach((e) => s.add(e));
+    return Array.from(s).sort();
+  }, [lines]);
 
   const [lineCategorieSelect, setLineCategorieSelect] = useState<string>(PRESET_CATEGORIES_NIVEAU1[0]);
   const [lineSousCategorie, setLineSousCategorie] = useState('');
@@ -978,9 +1036,45 @@ export default function ITBudgetGlobal() {
                   </div>
                 ) : (
                   <div className="rounded-md border overflow-x-auto">
+                    <BudgetLinesBulkActionsBar
+                      selectedIds={Array.from(selectedLineIds)}
+                      allLines={lines as any}
+                      onClearSelection={clearSelection}
+                      onBulkUpdate={async (updates) => {
+                        await bulkUpdateLines.mutateAsync({
+                          ids: Array.from(selectedLineIds),
+                          updates,
+                        });
+                      }}
+                      onBulkDelete={async () => {
+                        await bulkDeleteLines.mutateAsync(Array.from(selectedLineIds));
+                        clearSelection();
+                      }}
+                      onBulkDuplicate={async () => {
+                        await bulkDuplicateLines.mutateAsync(Array.from(selectedLineIds));
+                        clearSelection();
+                      }}
+                      entiteOptions={entiteOptions}
+                      anneeOptions={anneeOptions}
+                    />
                     <Table>
                       <TableHeader>
                         <TableRow>
+                          <TableHead className="w-[40px]">
+                            {(() => {
+                              const visibleIds = filteredLines.map((l) => l.id);
+                              const allSelected =
+                                visibleIds.length > 0 && visibleIds.every((id) => selectedLineIds.has(id));
+                              const someSelected = visibleIds.some((id) => selectedLineIds.has(id));
+                              return (
+                                <Checkbox
+                                  checked={allSelected ? true : someSelected ? 'indeterminate' : false}
+                                  onCheckedChange={() => toggleAllVisible(allSelected, visibleIds)}
+                                  aria-label="Tout sélectionner"
+                                />
+                              );
+                            })()}
+                          </TableHead>
                           <TableHead>Catégorie</TableHead>
                           <TableHead>Entité</TableHead>
                           <TableHead>Projet IT</TableHead>
@@ -1007,9 +1101,16 @@ export default function ITBudgetGlobal() {
                           return (
                             <Fragment key={l.id}>
                               <TableRow
-                                className="cursor-pointer"
+                                className={cn('cursor-pointer', selectedLineIds.has(l.id) && 'bg-primary/5')}
                                 onClick={() => setExpandedLineId(expandedLineId === l.id ? null : l.id)}
                               >
+                                <TableCell onClick={(e) => e.stopPropagation()} className="w-[40px]">
+                                  <Checkbox
+                                    checked={selectedLineIds.has(l.id)}
+                                    onCheckedChange={() => toggleLineSelection(l.id)}
+                                    aria-label={`Sélectionner ligne ${l.categorie ?? ''}`}
+                                  />
+                                </TableCell>
                                 <TableCell className="font-medium">{l.categorie ?? '—'}</TableCell>
                                 <TableCell>{lx.entite ?? '—'}</TableCell>
                                 <TableCell className="font-mono text-xs">
@@ -1050,7 +1151,7 @@ export default function ITBudgetGlobal() {
                               </TableRow>
                               {expandedLineId === l.id && (
                                 <TableRow>
-                                  <TableCell colSpan={13} className="p-0">
+                                  <TableCell colSpan={14} className="p-0">
                                     <ExpandedMonths lineId={l.id} />
                                   </TableCell>
                                 </TableRow>

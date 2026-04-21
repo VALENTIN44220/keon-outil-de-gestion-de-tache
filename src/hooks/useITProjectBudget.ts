@@ -200,6 +200,49 @@ export function useITBudgetGlobal(filters: { annee?: number; entite?: string; ty
     onSuccess: () => qc.invalidateQueries({ queryKey: ['it-budget-global-lines'] }),
   });
 
+  const bulkUpdateLines = useMutation({
+    mutationFn: async ({ ids, updates }: { ids: string[]; updates: Partial<ITBudgetLine> }) => {
+      if (ids.length === 0) return [];
+      const { data, error } = await supabase
+        .from('it_budget_lines')
+        .update(updates)
+        .in('id', ids)
+        .select();
+      if (error) throw error;
+      return (data ?? []) as ITBudgetLine[];
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['it-budget-global-lines'] }),
+  });
+
+  const bulkDeleteLines = useMutation({
+    mutationFn: async (ids: string[]) => {
+      if (ids.length === 0) return;
+      const { error } = await supabase.from('it_budget_lines').delete().in('id', ids);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['it-budget-global-lines'] }),
+  });
+
+  const bulkDuplicateLines = useMutation({
+    mutationFn: async (ids: string[]) => {
+      if (ids.length === 0) return [];
+      const { data: sources, error: e1 } = await supabase
+        .from('it_budget_lines')
+        .select('*')
+        .in('id', ids);
+      if (e1) throw e1;
+      if (!sources || sources.length === 0) return [];
+      const clones = sources.map(({ id, created_at, updated_at, ...rest }: any) => ({
+        ...rest,
+        statut: 'brouillon',
+      }));
+      const { data, error } = await supabase.from('it_budget_lines').insert(clones).select();
+      if (error) throw error;
+      return (data ?? []) as ITBudgetLine[];
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['it-budget-global-lines'] }),
+  });
+
   const addExpense = useMutation({
     mutationFn: async (exp: Omit<ITManualExpense, 'id' | 'created_at' | 'updated_at'>) => {
       const { data, error } = await supabase.from('it_manual_expenses').insert(exp).select().single();
@@ -264,7 +307,9 @@ export function useITBudgetGlobal(filters: { annee?: number; entite?: string; ty
   return {
     lines, linesLoading: linesQuery.isLoading,
     expenses, expensesLoading: expensesQuery.isLoading,
-    addLine, updateLine, deleteLine, addExpense,
+    addLine, updateLine, deleteLine,
+    bulkUpdateLines, bulkDeleteLines, bulkDuplicateLines,
+    addExpense,
     kpis, byType, byCategorie, byEntite,
   };
 }
