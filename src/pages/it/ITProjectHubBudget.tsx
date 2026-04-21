@@ -208,7 +208,7 @@ export default function ITProjectHubBudget() {
   const [expCommentaire, setExpCommentaire] = useState('');
 
   const lineSousCategorieOptions = useMemo(() => {
-    const base = [...(PRESET_SOUS_CATEGORIES[lineCategorieSelect] ?? [])];
+    const base = (PRESET_SOUS_CATEGORIES[lineCategorieSelect] ?? []).filter((s) => s && s.trim() !== '');
     if (lineSousCategorie && !base.includes(lineSousCategorie)) {
       base.push(lineSousCategorie);
     }
@@ -945,12 +945,15 @@ export default function ITProjectHubBudget() {
             </div>
             <div className="space-y-2">
               <Label>Sous-catégorie</Label>
-              <Select value={lineSousCategorie} onValueChange={setLineSousCategorie}>
+              <Select
+                value={lineSousCategorie || '__none__'}
+                onValueChange={(v) => setLineSousCategorie(v === '__none__' ? '' : v)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Sous-catégorie" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">—</SelectItem>
+                  <SelectItem value="__none__">—</SelectItem>
                   {lineSousCategorieOptions.map((opt) => (
                     <SelectItem key={opt} value={opt}>
                       {opt}
