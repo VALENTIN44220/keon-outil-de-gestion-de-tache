@@ -1,9 +1,10 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { Layout } from '@/components/layout/Layout';
 import { useITBudgetGlobal, useITBudgetLineMonths, type ITBudgetLineMonth } from '@/hooks/useITProjectBudget';
 import { supabase } from '@/integrations/supabase/client';
+import { SupplierCombobox } from '@/components/it/SupplierCombobox';
 import {
   BUDGET_LINE_STATUT_CONFIG,
   IT_ENTITES,
@@ -258,18 +259,6 @@ export default function ITBudgetGlobal() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const { data: suppliersList = [] } = useQuery({
-    queryKey: ['suppliers-for-budget'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('supplier_purchase_enrichment')
-        .select('tiers, nomfournisseur')
-        .order('nomfournisseur', { ascending: true });
-      if (error) throw error;
-      return (data || []) as { tiers: string; nomfournisseur: string | null }[];
-    },
-  });
-
   const [annee, setAnnee] = useState(2026);
   const [entite, setEntite] = useState('');
   const [type_depense, setTypeDepense] = useState('');
@@ -318,7 +307,6 @@ export default function ITBudgetGlobal() {
   const [lineCategorieSelect, setLineCategorieSelect] = useState<string>(PRESET_CATEGORIES_NIVEAU1[0]);
   const [lineSousCategorie, setLineSousCategorie] = useState('');
   const [lineFournisseur, setLineFournisseur] = useState('');
-  const [supplierSearch, setSupplierSearch] = useState('');
   const [lineTypeDepense, setLineTypeDepense] = useState<TypeDepense>('Opex');
   const [lineNatureDepense, setLineNatureDepense] = useState('');
   const [lineDescription, setLineDescription] = useState('');
@@ -1162,7 +1150,7 @@ export default function ITBudgetGlobal() {
         )}
       </div>
 
-      <Dialog open={lineDialogOpen} onOpenChange={(o) => { if (!o) { setLineDialogOpen(false); setEditingLine(null); setSupplierSearch(''); } }}>
+      <Dialog open={lineDialogOpen} onOpenChange={(o) => { if (!o) { setLineDialogOpen(false); setEditingLine(null); } }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingLine ? 'Modifier la ligne budgétaire' : 'Nouvelle ligne budgétaire'}</DialogTitle>
@@ -1250,39 +1238,11 @@ export default function ITBudgetGlobal() {
             </div>
             <div className="space-y-2">
               <Label>Fournisseur prévu</Label>
-              <Select
-                value={lineFournisseur || '__none__'}
-                onValueChange={(v) => setLineFournisseur(v === '__none__' ? '' : v)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner un fournisseur" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[300px]">
-                  <div className="px-2 pb-2 pt-1 sticky top-0 bg-background z-10">
-                    <Input
-                      placeholder="Rechercher un fournisseur..."
-                      value={supplierSearch}
-                      onChange={(e) => setSupplierSearch(e.target.value)}
-                      className="h-8 text-xs"
-                      onKeyDown={(e) => e.stopPropagation()}
-                    />
-                  </div>
-                  <SelectItem value="__none__">— Aucun —</SelectItem>
-                  {suppliersList
-                    .filter((s) => {
-                      const q = supplierSearch.toLowerCase();
-                      return !q
-                        || s.tiers.toLowerCase().includes(q)
-                        || (s.nomfournisseur ?? '').toLowerCase().includes(q);
-                    })
-                    .map((s) => (
-                      <SelectItem key={s.tiers} value={s.tiers}>
-                        {s.nomfournisseur ? `${s.nomfournisseur} (${s.tiers})` : s.tiers}
-                      </SelectItem>
-                    ))
-                  }
-                </SelectContent>
-              </Select>
+              <SupplierCombobox
+                value={lineFournisseur ?? ''}
+                onValueChange={(v) => setLineFournisseur(v)}
+                placeholder="— Aucun —"
+              />
             </div>
             <div className="space-y-2">
               <Label>Type de dépense</Label>
