@@ -7,7 +7,11 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 .env
-env.json 
+.env.local
+.VALENTIN_MSI.env
+env.txt
+*.env
+supabase/.temp/ 
 pipelines
 
 node_modules

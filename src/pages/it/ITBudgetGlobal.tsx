@@ -7,7 +7,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { SupplierCombobox } from '@/components/it/SupplierCombobox';
 import {
   BUDGET_LINE_STATUT_CONFIG,
-  IT_ENTITES,
   IT_BUDGET_ANNEES,
   type BudgetLineStatut,
   type ITBudgetLine,
@@ -42,6 +41,8 @@ import { BudgetLinesBulkActionsBar } from '@/components/it/BudgetLinesBulkAction
 import { BudgetColumnsManager } from '@/components/it/BudgetColumnsManager';
 import { IT_BUDGET_COLUMNS, type ITBudgetLineRow } from '@/components/it/budgetColumns';
 import { useITBudgetPreferences } from '@/hooks/useITBudgetPreferences';
+import { EntityCombobox } from '@/components/it/EntityCombobox';
+import { useCompanies } from '@/hooks/useCompanies';
 import {
   LayoutDashboard,
   TrendingUp,
@@ -265,6 +266,7 @@ export default function ITBudgetGlobal() {
   const queryClient = useQueryClient();
 
   const { prefs, isLoaded: prefsLoaded, updateColumns, updateFilters } = useITBudgetPreferences();
+  const { data: companiesList = [] } = useCompanies();
 
   const filters = useMemo(
     () => ({
@@ -360,15 +362,7 @@ export default function ITBudgetGlobal() {
     return Array.from(years).sort((a, b) => a - b);
   }, [lines]);
 
-  const entiteOptions = useMemo(() => {
-    const s = new Set<string>();
-    lines.forEach((l) => {
-      const e = (l as any).entite;
-      if (e && typeof e === 'string' && e.trim()) s.add(e.trim());
-    });
-    ['KEON', 'NASKEO', 'SYCOMORE', 'TEIKEI', 'KEON.BIO', 'GECO2', 'CAPCOO'].forEach((e) => s.add(e));
-    return Array.from(s).sort();
-  }, [lines]);
+  const entiteOptions = useMemo(() => companiesList.map((c) => c.name), [companiesList]);
 
   const [lineCategorieSelect, setLineCategorieSelect] = useState<string>(PRESET_CATEGORIES_NIVEAU1[0]);
   const [lineSousCategorie, setLineSousCategorie] = useState('');
@@ -381,7 +375,7 @@ export default function ITBudgetGlobal() {
   const [lineMontantRevise, setLineMontantRevise] = useState('');
   const [lineStatut, setLineStatut] = useState<BudgetLineStatut>('brouillon');
   const [lineCommentaire, setLineCommentaire] = useState('');
-  const [lineEntite, setLineEntite] = useState<string>(IT_ENTITES[0]);
+  const [lineEntite, setLineEntite] = useState<string>('');
   const [lineAnnee, setLineAnnee] = useState<string>('2026');
   const [lineItProjectId, setLineItProjectId] = useState('');
 
@@ -392,7 +386,7 @@ export default function ITBudgetGlobal() {
   const [expMontant, setExpMontant] = useState('');
   const [expStatut, setExpStatut] = useState<ITManualExpense['statut']>('en_attente');
   const [expCommentaire, setExpCommentaire] = useState('');
-  const [expEntite, setExpEntite] = useState<string>(IT_ENTITES[0]);
+  const [expEntite, setExpEntite] = useState<string>('');
   const [expAnnee, setExpAnnee] = useState<string>('2026');
   const [expItProjectId, setExpItProjectId] = useState('');
 
@@ -416,7 +410,7 @@ export default function ITBudgetGlobal() {
     setLineMontantRevise('');
     setLineStatut('brouillon');
     setLineCommentaire('');
-    setLineEntite(IT_ENTITES[0]);
+    setLineEntite('');
     setLineAnnee(String(filters.annee));
     setLineItProjectId('');
   }, [filters.annee]);
@@ -447,7 +441,7 @@ export default function ITBudgetGlobal() {
     setLineMontantRevise(line.montant_budget_revise != null ? String(line.montant_budget_revise) : '');
     setLineStatut(line.statut);
     setLineCommentaire(line.commentaire ?? '');
-    setLineEntite((lx.entite as string) || IT_ENTITES[0]);
+    setLineEntite((lx.entite as string) || '');
     setLineAnnee(String(lx.annee ?? line.exercice ?? filters.annee));
     setLineItProjectId(line.it_project_id ?? '');
     setLineDialogOpen(true);
@@ -461,7 +455,7 @@ export default function ITBudgetGlobal() {
     setExpMontant('');
     setExpStatut('en_attente');
     setExpCommentaire('');
-    setExpEntite(IT_ENTITES[0]);
+    setExpEntite('');
     setExpAnnee(String(filters.annee));
     setExpItProjectId('');
   }, [filters.annee]);
@@ -482,7 +476,7 @@ export default function ITBudgetGlobal() {
     setExpMontant(String(exp.montant_prevu ?? ''));
     setExpStatut(exp.statut);
     setExpCommentaire(exp.commentaire ?? '');
-    setExpEntite((ex.entite as string) || IT_ENTITES[0]);
+    setExpEntite((ex.entite as string) || '');
     setExpAnnee(String(ex.annee ?? filters.annee));
     setExpItProjectId(exp.it_project_id ?? '');
     setExpenseDialogOpen(true);
@@ -752,19 +746,17 @@ export default function ITBudgetGlobal() {
         </header>
 
         <div className="px-6 py-3 border-b bg-muted/30 flex flex-wrap gap-3 items-center">
-          <Select value={filters.entite || '__all__'} onValueChange={(v) => setFilter('entite', v === '__all__' ? '' : v)}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Entité" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__all__">Toutes les entités</SelectItem>
-              {IT_ENTITES.map((e) => (
-                <SelectItem key={e} value={e}>
-                  {e}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <EntityCombobox
+            value={prefs.filters_config.entite ?? 'all'}
+            onValueChange={(v) =>
+              updateFilters({
+                ...prefs.filters_config,
+                entite: v === 'all' ? undefined : v,
+              })
+            }
+            allowAll
+            triggerClassName="w-[200px]"
+          />
           <Select value={filters.type_depense || '__all__'} onValueChange={(v) => setFilter('type_depense', v === '__all__' ? '' : v)}>
             <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="Type" />
@@ -1262,19 +1254,13 @@ export default function ITBudgetGlobal() {
           <div className="space-y-3 py-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label>Entité</Label>
-                <Select value={lineEntite} onValueChange={setLineEntite}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {IT_ENTITES.map((e) => (
-                      <SelectItem key={e} value={e}>
-                        {e}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Entité *</Label>
+                <EntityCombobox
+                  value={lineEntite ?? ''}
+                  onValueChange={(v) => setLineEntite(v)}
+                  placeholder="Sélectionner une entité"
+                  allowEmpty
+                />
               </div>
               <div className="space-y-2">
                 <Label>Année</Label>
@@ -1447,18 +1433,7 @@ export default function ITBudgetGlobal() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Entité</Label>
-                <Select value={expEntite} onValueChange={setExpEntite}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {IT_ENTITES.map((e) => (
-                      <SelectItem key={e} value={e}>
-                        {e}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <EntityCombobox value={expEntite ?? ''} onValueChange={(v) => setExpEntite(v)} allowEmpty />
               </div>
               <div className="space-y-2">
                 <Label>Année</Label>

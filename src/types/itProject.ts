@@ -335,6 +335,7 @@ export interface ITBudgetKPIs {
 // Budget Global IT — Types complémentaires
 // ================================================
 
+// @deprecated — utiliser useCompanies() pour la liste des entités. Conservé pour compat types.
 export const IT_ENTITES = ['KEON', 'Sycomore', 'Fluxo', 'TADD', 'Autre'] as const;
 export type ITEntite = typeof IT_ENTITES[number];
 
