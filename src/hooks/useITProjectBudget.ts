@@ -268,3 +268,53 @@ export function useITBudgetGlobal(filters: { annee?: number; entite?: string; ty
     kpis, byType, byCategorie, byEntite,
   };
 }
+
+export interface ITBudgetLineMonth {
+  id: string;
+  budget_line_id: string;
+  mois: number;
+  montant_budget: number;
+  montant_budget_revise?: number | null;
+  ref_commande_divalto?: string | null;
+  ref_facture_divalto?: string | null;
+  statut_rapprochement: 'non_rapproche' | 'commande_liee' | 'facture_liee' | 'solde';
+  pdf_url?: string | null;
+  commentaire?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export function useITBudgetLineMonths(lineId: string | undefined) {
+  const qc = useQueryClient();
+
+  const query = useQuery({
+    queryKey: ['it-budget-line-months', lineId],
+    queryFn: async (): Promise<ITBudgetLineMonth[]> => {
+      if (!lineId) return [];
+      const { data, error } = await supabase
+        .from('it_budget_line_months')
+        .select('*')
+        .eq('budget_line_id', lineId)
+        .order('mois', { ascending: true });
+      if (error) throw error;
+      return (data as ITBudgetLineMonth[]) ?? [];
+    },
+    enabled: !!lineId,
+  });
+
+  const updateMonth = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<ITBudgetLineMonth> }) => {
+      const { data, error } = await supabase
+        .from('it_budget_line_months')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as ITBudgetLineMonth;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['it-budget-line-months', lineId] }),
+  });
+
+  return { ...query, updateMonth };
+}

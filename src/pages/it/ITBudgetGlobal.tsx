@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Layout } from '@/components/layout/Layout';
-import { useITBudgetGlobal } from '@/hooks/useITProjectBudget';
+import { useITBudgetGlobal, useITBudgetLineMonths, type ITBudgetLineMonth } from '@/hooks/useITProjectBudget';
 import { supabase } from '@/integrations/supabase/client';
 import {
   BUDGET_LINE_STATUT_CONFIG,
@@ -127,6 +127,119 @@ const EXPENSE_STATUT_LABEL: Record<ITManualExpense['statut'], string> = {
   annule: 'Annulé',
 };
 
+function ExpandedMonths({ lineId }: { lineId: string }) {
+  const { data: months = [], isLoading, updateMonth } = useITBudgetLineMonths(lineId);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [refCmd, setRefCmd] = useState('');
+  const [refFac, setRefFac] = useState('');
+  const [pdfUrl, setPdfUrl] = useState('');
+  const [statut, setStatut] = useState<ITBudgetLineMonth['statut_rapprochement']>('non_rapproche');
+
+  const MOIS_LABELS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+
+  const STATUT_RAPPR_CONFIG = {
+    non_rapproche: { label: 'Non rapproché', className: 'bg-slate-100 text-slate-600 border-slate-300' },
+    commande_liee: { label: 'Commande liée', className: 'bg-blue-100 text-blue-700 border-blue-300' },
+    facture_liee: { label: 'Facture liée', className: 'bg-violet-100 text-violet-700 border-violet-300' },
+    solde: { label: 'Soldé', className: 'bg-green-100 text-green-700 border-green-300' },
+  };
+
+  const openEdit = (m: ITBudgetLineMonth) => {
+    setEditingId(m.id);
+    setRefCmd(m.ref_commande_divalto ?? '');
+    setRefFac(m.ref_facture_divalto ?? '');
+    setPdfUrl(m.pdf_url ?? '');
+    setStatut(m.statut_rapprochement);
+  };
+
+  const saveEdit = async (id: string) => {
+    await updateMonth.mutateAsync({
+      id,
+      updates: {
+        ref_commande_divalto: refCmd || null,
+        ref_facture_divalto: refFac || null,
+        pdf_url: pdfUrl || null,
+        statut_rapprochement: statut,
+      },
+    });
+    setEditingId(null);
+  };
+
+  if (isLoading) return <div className="p-4 text-sm text-muted-foreground">Chargement...</div>;
+
+  return (
+    <div className="px-4 pb-4 bg-muted/30">
+      <table className="w-full text-xs border-collapse">
+        <thead>
+          <tr className="border-b">
+            <th className="text-left py-2 px-2 font-medium text-muted-foreground">Mois</th>
+            <th className="text-right py-2 px-2 font-medium text-muted-foreground">Montant</th>
+            <th className="py-2 px-2 font-medium text-muted-foreground">Réf. Commande</th>
+            <th className="py-2 px-2 font-medium text-muted-foreground">Réf. Facture</th>
+            <th className="py-2 px-2 font-medium text-muted-foreground">PJ Facture</th>
+            <th className="py-2 px-2 font-medium text-muted-foreground">Statut</th>
+            <th className="py-2 px-2"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {months.map((m) => (
+            <tr key={m.id} className="border-b last:border-0 hover:bg-muted/50">
+              <td className="py-1.5 px-2 font-medium">{MOIS_LABELS[m.mois - 1]}</td>
+              <td className="py-1.5 px-2 text-right tabular-nums">
+                {(m.montant_budget ?? 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+              </td>
+              {editingId === m.id ? (
+                <>
+                  <td className="py-1 px-2"><Input className="h-7 text-xs" value={refCmd} onChange={(e) => setRefCmd(e.target.value)} placeholder="CFK-..." /></td>
+                  <td className="py-1 px-2"><Input className="h-7 text-xs" value={refFac} onChange={(e) => setRefFac(e.target.value)} placeholder="FFK-..." /></td>
+                  <td className="py-1 px-2"><Input className="h-7 text-xs" value={pdfUrl} onChange={(e) => setPdfUrl(e.target.value)} placeholder="https://..." /></td>
+                  <td className="py-1 px-2">
+                    <Select value={statut} onValueChange={(v) => setStatut(v as ITBudgetLineMonth['statut_rapprochement'])}>
+                      <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(STATUT_RAPPR_CONFIG).map(([k, v]) => (
+                          <SelectItem key={k} value={k}>{v.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </td>
+                  <td className="py-1 px-2">
+                    <div className="flex gap-1">
+                      <Button size="sm" className="h-7 text-xs px-2" onClick={() => saveEdit(m.id)}>OK</Button>
+                      <Button size="sm" variant="ghost" className="h-7 text-xs px-2" onClick={() => setEditingId(null)}>✕</Button>
+                    </div>
+                  </td>
+                </>
+              ) : (
+                <>
+                  <td className="py-1.5 px-2 text-muted-foreground">{m.ref_commande_divalto ?? '—'}</td>
+                  <td className="py-1.5 px-2 text-muted-foreground">{m.ref_facture_divalto ?? '—'}</td>
+                  <td className="py-1.5 px-2">
+                    {m.pdf_url
+                      ? <a href={m.pdf_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline truncate max-w-[120px] block">Voir PJ</a>
+                      : <span className="text-muted-foreground">—</span>
+                    }
+                  </td>
+                  <td className="py-1.5 px-2">
+                    <Badge variant="outline" className={cn('border text-[10px]', STATUT_RAPPR_CONFIG[m.statut_rapprochement].className)}>
+                      {STATUT_RAPPR_CONFIG[m.statut_rapprochement].label}
+                    </Badge>
+                  </td>
+                  <td className="py-1.5 px-2">
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEdit(m)}>
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                  </td>
+                </>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function BudgetPageSkeleton() {
   return (
     <div className="flex-1 overflow-auto p-6 space-y-6 animate-pulse">
@@ -195,6 +308,7 @@ export default function ITBudgetGlobal() {
   const [editingLine, setEditingLine] = useState<ITBudgetLine | null>(null);
   const [lineSaving, setLineSaving] = useState(false);
   const [deleteLineId, setDeleteLineId] = useState<string | null>(null);
+  const [expandedLineId, setExpandedLineId] = useState<string | null>(null);
 
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<ITManualExpense | null>(null);
@@ -888,6 +1002,7 @@ export default function ITBudgetGlobal() {
                           <TableHead>Mois</TableHead>
                           <TableHead className="text-right">Budget initial</TableHead>
                           <TableHead className="text-right">Budget révisé</TableHead>
+                          <TableHead className="text-right">Total annuel</TableHead>
                           <TableHead>Statut</TableHead>
                           <TableHead className="w-[100px]">Actions</TableHead>
                         </TableRow>
@@ -897,45 +1012,61 @@ export default function ITBudgetGlobal() {
                           const lx = l as LineExtra;
                           const st = BUDGET_LINE_STATUT_CONFIG[l.statut];
                           const pid = l.it_project_id?.trim();
+                          const montantAnnuel =
+                            (l as ITBudgetLine & { montant_annuel?: number | null }).montant_annuel ??
+                            (l.montant_budget ?? 0) * 12;
                           return (
-                            <TableRow key={l.id}>
-                              <TableCell className="font-medium">{l.categorie ?? '—'}</TableCell>
-                              <TableCell>{lx.entite ?? '—'}</TableCell>
-                              <TableCell className="font-mono text-xs">
-                                {pid ? `${pid.slice(0, 8)}…` : '—'}
-                              </TableCell>
-                              <TableCell>{lx.annee ?? l.exercice ?? '—'}</TableCell>
-                              <TableCell>{l.sous_categorie ?? '—'}</TableCell>
-                              <TableCell>{l.fournisseur_prevu ?? '—'}</TableCell>
-                              <TableCell>{l.type_depense ?? '—'}</TableCell>
-                              <TableCell>{formatMoisBudget(l.mois_budget)}</TableCell>
-                              <TableCell className="text-right tabular-nums">{eur(l.montant_budget ?? 0)}</TableCell>
-                              <TableCell className="text-right tabular-nums">
-                                {eur(l.montant_budget_revise ?? l.montant_budget ?? 0)}
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="outline" className={cn('border', st.className)}>
-                                  {st.label}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex gap-1">
-                                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditLine(l)} aria-label="Éditer">
-                                    <Pencil className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-destructive"
-                                    onClick={() => setDeleteLineId(l.id)}
-                                    aria-label="Supprimer"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
+                            <Fragment key={l.id}>
+                              <TableRow
+                                className="cursor-pointer"
+                                onClick={() => setExpandedLineId(expandedLineId === l.id ? null : l.id)}
+                              >
+                                <TableCell className="font-medium">{l.categorie ?? '—'}</TableCell>
+                                <TableCell>{lx.entite ?? '—'}</TableCell>
+                                <TableCell className="font-mono text-xs">
+                                  {pid ? `${pid.slice(0, 8)}…` : '—'}
+                                </TableCell>
+                                <TableCell>{lx.annee ?? l.exercice ?? '—'}</TableCell>
+                                <TableCell>{l.sous_categorie ?? '—'}</TableCell>
+                                <TableCell>{l.fournisseur_prevu ?? '—'}</TableCell>
+                                <TableCell>{l.type_depense ?? '—'}</TableCell>
+                                <TableCell>{formatMoisBudget(l.mois_budget)}</TableCell>
+                                <TableCell className="text-right tabular-nums">{eur(l.montant_budget ?? 0)}</TableCell>
+                                <TableCell className="text-right tabular-nums">
+                                  {eur(l.montant_budget_revise ?? l.montant_budget ?? 0)}
+                                </TableCell>
+                                <TableCell className="text-right tabular-nums">{eur(montantAnnuel)}</TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className={cn('border', st.className)}>
+                                    {st.label}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell onClick={(e) => e.stopPropagation()}>
+                                  <div className="flex gap-1">
+                                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditLine(l)} aria-label="Éditer">
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-destructive"
+                                      onClick={() => setDeleteLineId(l.id)}
+                                      aria-label="Supprimer"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                              {expandedLineId === l.id && (
+                                <TableRow>
+                                  <TableCell colSpan={13} className="p-0">
+                                    <ExpandedMonths lineId={l.id} />
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </Fragment>
                           );
                         })}
                       </TableBody>
