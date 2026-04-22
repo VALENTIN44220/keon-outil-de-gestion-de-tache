@@ -43,6 +43,7 @@ import { IT_BUDGET_COLUMNS, type ITBudgetLineRow } from '@/components/it/budgetC
 import { useITBudgetPreferences } from '@/hooks/useITBudgetPreferences';
 import { EntityCombobox } from '@/components/it/EntityCombobox';
 import { useCompanies } from '@/hooks/useCompanies';
+import { useITProjects } from '@/hooks/useITProjects';
 import {
   LayoutDashboard,
   TrendingUp,
@@ -54,7 +55,7 @@ import {
   AlertTriangle,
   List,
   PenLine,
-  PieChart,
+  PieChart as PieChartIcon,
   Pencil,
   Trash2,
   Plus,
@@ -72,6 +73,9 @@ import {
   Tooltip as RechartsTooltip,
   Legend,
   ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
 } from 'recharts';
 
 const EUR_OPTS = { style: 'currency' as const, currency: 'EUR' as const };
@@ -303,7 +307,32 @@ export default function ITBudgetGlobal() {
     byType,
     byCategorie,
     byEntite,
+    byFournisseur,
+    bySousCategorie,
   } = useITBudgetGlobal(filters);
+
+  // Résolution des noms de projets IT pour la synthèse
+  const { projects: allProjects = [] } = useITProjects();
+
+  const projectNameMap = useMemo(
+    () => new Map(allProjects.map((p) => [p.id, p.nom_projet])),
+    [allProjects]
+  );
+
+  const byProjet = useMemo(() => {
+    return Array.from(
+      lines.reduce((map, l) => {
+        if (!l.it_project_id) return map;
+        const key = l.it_project_id;
+        const label = projectNameMap.get(key) ?? `Projet ${key.slice(0, 8)}…`;
+        const cur = map.get(key) || { projet_id: key, projet: label, budget: 0 };
+        cur.budget += (l as any).montant_budget_revise ?? l.montant_budget ?? 0;
+        map.set(key, cur);
+        return map;
+      }, new Map<string, { projet_id: string; projet: string; budget: number }>())
+    ).map(([, v]) => v)
+      .sort((a, b) => b.budget - a.budget);
+  }, [lines, projectNameMap]);
 
   const [filterTypeDepense, setFilterTypeDepense] = useState<string>('__all__');
   const [filterMois, setFilterMois] = useState<string>('__all__');
@@ -858,7 +887,7 @@ export default function ITBudgetGlobal() {
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)} className="space-y-4">
               <TabsList className="flex flex-wrap h-auto gap-1 p-1">
                 <TabsTrigger value="synthese" className="gap-2">
-                  <PieChart className="h-4 w-4" />
+                  <PieChartIcon className="h-4 w-4" />
                   Synthèse
                 </TabsTrigger>
                 <TabsTrigger value="lignes" className="gap-2">
@@ -872,73 +901,175 @@ export default function ITBudgetGlobal() {
               </TabsList>
 
               <TabsContent value="synthese" className="space-y-6 mt-4">
-                <div>
-                  <h3 className="text-sm font-semibold mb-3">Répartition par type</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    {byType.map((row) => {
-                      const st = typeCardStyle[row.type] ?? typeCardStyle.Opex;
-                      const pct =
-                        budgetReviseGlobal > 0 ? Math.min(100, Math.round((row.budget_revise / budgetReviseGlobal) * 100)) : 0;
-                      return (
-                        <div key={row.type} className={cn('rounded-xl border p-4 shadow-sm', st.border, st.bg)}>
-                          <p className="text-xs font-medium text-muted-foreground">{row.type}</p>
-                          <p className="mt-1 text-lg font-bold tabular-nums">{eur(row.budget_revise)}</p>
-                          <Progress value={pct} className="h-2 mt-2" />
-                          <p className="text-[10px] text-muted-foreground mt-1">{pct}% du budget révisé global</p>
+
+                {/* KPI Cards + Taux — inchangé, déjà au-dessus des tabs */}
+
+                {/* --- Ligne 1 : Type + Sous-catégorie --- */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                  {/* Répartition par type */}
+                  <Card>
+                    <CardContent className="pt-6">
+                      <h3 className="text-sm font-semibold mb-3">Répartition par type de dépense</h3>
+                      <div className="grid grid-cols-2 gap-2">
+                        {byType.map((row) => {
+                          const st = typeCardStyle[row.type] ?? typeCardStyle.Opex;
+                          const pct = budgetReviseGlobal > 0
+                            ? Math.min(100, Math.round((row.budget_revise / budgetReviseGlobal) * 100))
+                            : 0;
+                          return (
+                            <div key={row.type} className={cn('rounded-xl border p-3 shadow-sm', st.border, st.bg)}>
+                              <p className="text-xs font-medium text-muted-foreground">{row.type}</p>
+                              <p className="mt-1 text-base font-bold tabular-nums">{eur(row.budget_revise)}</p>
+                              <Progress value={pct} className="h-1.5 mt-2" />
+                              <p className="text-[10px] text-muted-foreground mt-1">{pct}% du total</p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Budget par sous-catégorie */}
+                  <Card>
+                    <CardContent className="pt-6">
+                      <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
+                        <BarChart2 className="h-4 w-4" />
+                        Budget par sous-catégorie
+                      </h3>
+                      {bySousCategorie.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-8 text-muted-foreground border border-dashed rounded-lg">
+                          <p className="text-sm">Aucune donnée</p>
                         </div>
-                      );
-                    })}
-                  </div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height={220}>
+                          <BarChart
+                            layout="vertical"
+                            data={bySousCategorie}
+                            margin={{ top: 4, right: 16, left: 8, bottom: 4 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                            <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={(v) => eur(Number(v))} />
+                            <YAxis type="category" dataKey="sous_categorie" width={120} tick={{ fontSize: 10 }} />
+                            <RechartsTooltip formatter={(value: number) => eur(value)} />
+                            <Bar dataKey="budget_revise" name="Budget révisé" fill="#6366f1" radius={[0, 4, 4, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      )}
+                    </CardContent>
+                  </Card>
                 </div>
 
-                <Card>
-                  <CardContent className="pt-6">
-                    <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
-                      <BarChart2 className="h-4 w-4" />
-                      Budget par catégorie
-                    </h3>
-                    {byCategorie.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-12 text-muted-foreground border border-dashed rounded-lg">
-                        <BarChart2 className="h-10 w-10 opacity-40 mb-2" />
-                        <p className="text-sm">Aucune donnée</p>
-                      </div>
-                    ) : (
-                      <ResponsiveContainer width="100%" height={280}>
-                        <BarChart data={byCategorie} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                          <XAxis dataKey="categorie" tick={{ fontSize: 11 }} interval={0} angle={-20} textAnchor="end" height={64} />
-                          <YAxis tick={{ fontSize: 11 }} />
-                          <RechartsTooltip formatter={(value: number) => eur(value)} />
-                          <Legend />
-                          <Bar dataKey="budget_initial" name="Budget initial" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                          <Bar dataKey="budget_revise" name="Budget révisé" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    )}
-                  </CardContent>
-                </Card>
+                {/* --- Ligne 2 : Catégorie + Entité --- */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-                <Card>
-                  <CardContent className="pt-6">
-                    <h3 className="text-sm font-semibold mb-4">Budget par entité</h3>
-                    {byEntite.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-12 text-muted-foreground border border-dashed rounded-lg">
-                        <p className="text-sm">Aucune donnée</p>
-                      </div>
-                    ) : (
-                      <ResponsiveContainer width="100%" height={200}>
-                        <BarChart layout="vertical" data={byEntite} margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
-                          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                          <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => eur(Number(v))} />
-                          <YAxis type="category" dataKey="entite" width={100} tick={{ fontSize: 11 }} />
-                          <RechartsTooltip formatter={(value: number) => eur(value)} />
-                          <Bar dataKey="budget" name="Budget" fill="#3b82f6" radius={[0, 4, 4, 0]} />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    )}
-                  </CardContent>
-                </Card>
+                  {/* Budget par catégorie */}
+                  <Card>
+                    <CardContent className="pt-6">
+                      <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
+                        <BarChart2 className="h-4 w-4" />
+                        Budget par catégorie
+                      </h3>
+                      {byCategorie.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-8 text-muted-foreground border border-dashed rounded-lg">
+                          <p className="text-sm">Aucune donnée</p>
+                        </div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height={220}>
+                          <BarChart data={byCategorie} margin={{ top: 4, right: 8, left: 0, bottom: 32 }}>
+                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                            <XAxis dataKey="categorie" tick={{ fontSize: 10 }} interval={0} angle={-25} textAnchor="end" height={60} />
+                            <YAxis tick={{ fontSize: 10 }} />
+                            <RechartsTooltip formatter={(value: number) => eur(value)} />
+                            <Legend />
+                            <Bar dataKey="budget_initial" name="Initial" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="budget_revise" name="Révisé" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      )}
+                    </CardContent>
+                  </Card>
 
+                  {/* Budget par entité */}
+                  <Card>
+                    <CardContent className="pt-6">
+                      <h3 className="text-sm font-semibold mb-4">Budget par entité</h3>
+                      {byEntite.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-8 text-muted-foreground border border-dashed rounded-lg">
+                          <p className="text-sm">Aucune donnée</p>
+                        </div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height={220}>
+                          <BarChart layout="vertical" data={byEntite} margin={{ top: 4, right: 16, left: 8, bottom: 4 }}>
+                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                            <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={(v) => eur(Number(v))} />
+                            <YAxis type="category" dataKey="entite" width={100} tick={{ fontSize: 10 }} />
+                            <RechartsTooltip formatter={(value: number) => eur(value)} />
+                            <Bar dataKey="budget" name="Budget" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* --- Ligne 3 : Fournisseur + Projet IT --- */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                  {/* Top 10 fournisseurs */}
+                  <Card>
+                    <CardContent className="pt-6">
+                      <h3 className="text-sm font-semibold mb-4">Top 10 fournisseurs</h3>
+                      {byFournisseur.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-8 text-muted-foreground border border-dashed rounded-lg">
+                          <p className="text-sm">Aucune donnée</p>
+                        </div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height={260}>
+                          <BarChart
+                            layout="vertical"
+                            data={byFournisseur}
+                            margin={{ top: 4, right: 16, left: 8, bottom: 4 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                            <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={(v) => eur(Number(v))} />
+                            <YAxis type="category" dataKey="fournisseur" width={130} tick={{ fontSize: 10 }} />
+                            <RechartsTooltip formatter={(value: number) => eur(value)} />
+                            <Bar dataKey="budget" name="Budget révisé" fill="#f59e0b" radius={[0, 4, 4, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Budget par projet IT */}
+                  <Card>
+                    <CardContent className="pt-6">
+                      <h3 className="text-sm font-semibold mb-4">Budget par projet IT</h3>
+                      {byProjet.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-8 text-muted-foreground border border-dashed rounded-lg">
+                          <p className="text-sm">Aucune ligne rattachée à un projet IT</p>
+                        </div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height={260}>
+                          <BarChart
+                            layout="vertical"
+                            data={byProjet}
+                            margin={{ top: 4, right: 16, left: 8, bottom: 4 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                            <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={(v) => eur(Number(v))} />
+                            <YAxis type="category" dataKey="projet" width={140} tick={{ fontSize: 10 }} />
+                            <RechartsTooltip formatter={(value: number) => eur(value)} />
+                            <Bar dataKey="budget" name="Budget révisé" fill="#10b981" radius={[0, 4, 4, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* --- Waterfall récapitulatif (pleine largeur) --- */}
                 <Card>
                   <CardContent className="pt-6">
                     <h3 className="text-sm font-semibold mb-4">Waterfall (récapitulatif)</h3>
@@ -951,8 +1082,7 @@ export default function ITBudgetGlobal() {
                         <TableRow>
                           <TableCell className="font-medium">Révisions</TableCell>
                           <TableCell className="text-right tabular-nums">
-                            {revisionsDelta >= 0 ? '+' : ''}
-                            {eur(revisionsDelta)}
+                            {revisionsDelta >= 0 ? '+' : ''}{eur(revisionsDelta)}
                           </TableCell>
                         </TableRow>
                         <TableRow>
@@ -969,12 +1099,10 @@ export default function ITBudgetGlobal() {
                         </TableRow>
                         <TableRow>
                           <TableCell className="font-medium">Écart au budget</TableCell>
-                          <TableCell
-                            className={cn(
-                              'text-right tabular-nums font-semibold',
-                              kpis.ecart_budget > 0 ? 'text-red-600' : 'text-emerald-600'
-                            )}
-                          >
+                          <TableCell className={cn(
+                            'text-right tabular-nums font-semibold',
+                            kpis.ecart_budget > 0 ? 'text-red-600' : 'text-emerald-600'
+                          )}>
                             {eur(kpis.ecart_budget)}
                           </TableCell>
                         </TableRow>
@@ -982,6 +1110,7 @@ export default function ITBudgetGlobal() {
                     </Table>
                   </CardContent>
                 </Card>
+
               </TabsContent>
 
               <TabsContent value="lignes" className="space-y-4 mt-4">

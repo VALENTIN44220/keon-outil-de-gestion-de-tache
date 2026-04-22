@@ -304,13 +304,36 @@ export function useITBudgetGlobal(filters: { annee?: number; entite?: string; ty
     }, new Map<string, { entite: string; budget: number }>())
   ).map(([, v]) => v).sort((a, b) => b.budget - a.budget);
 
+  const byFournisseur = Array.from(
+    lines.reduce((map, l) => {
+      const key = l.fournisseur_prevu?.trim() || 'Sans fournisseur';
+      const cur = map.get(key) || { fournisseur: key, budget: 0 };
+      cur.budget += l.montant_budget_revise ?? l.montant_budget ?? 0;
+      map.set(key, cur);
+      return map;
+    }, new Map<string, { fournisseur: string; budget: number }>())
+  ).map(([, v]) => v)
+    .sort((a, b) => b.budget - a.budget)
+    .slice(0, 10); // top 10
+
+  const bySousCategorie = Array.from(
+    lines.reduce((map, l) => {
+      const key = l.sous_categorie?.trim() || 'Sans sous-catégorie';
+      const cur = map.get(key) || { sous_categorie: key, budget_initial: 0, budget_revise: 0 };
+      cur.budget_initial += l.montant_budget ?? 0;
+      cur.budget_revise  += l.montant_budget_revise ?? l.montant_budget ?? 0;
+      map.set(key, cur);
+      return map;
+    }, new Map<string, { sous_categorie: string; budget_initial: number; budget_revise: number }>())
+  ).map(([, v]) => v)
+    .sort((a, b) => b.budget_revise - a.budget_revise);
+
   return {
     lines, linesLoading: linesQuery.isLoading,
     expenses, expensesLoading: expensesQuery.isLoading,
-    addLine, updateLine, deleteLine,
+    addLine, updateLine, deleteLine, addExpense,
     bulkUpdateLines, bulkDeleteLines, bulkDuplicateLines,
-    addExpense,
-    kpis, byType, byCategorie, byEntite,
+    kpis, byType, byCategorie, byEntite, byFournisseur, bySousCategorie,
   };
 }
 
