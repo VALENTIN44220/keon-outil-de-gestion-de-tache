@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Layout } from '@/components/layout/Layout';
 import { useITBudgetGlobal, useITBudgetLineMonths, type ITBudgetLineMonth } from '@/hooks/useITProjectBudget';
+import { useITBudgetEngageConstate } from '@/hooks/useITBudgetEngageConstate';
+import { BudgetLineRapprochementPanel } from '@/components/it/BudgetLineRapprochementPanel';
 import { supabase } from '@/integrations/supabase/client';
 import { SupplierCombobox } from '@/components/it/SupplierCombobox';
 import {
@@ -310,6 +312,12 @@ export default function ITBudgetGlobal() {
     byFournisseur,
     bySousCategorie,
   } = useITBudgetGlobal(filters);
+  const { data: engageConstateData } = useITBudgetEngageConstate({
+    annee: filters.annee,
+    entite: filters.entite,
+  });
+  const engageGlobal   = engageConstateData?.totalEngage   ?? 0;
+  const constateGlobal = engageConstateData?.totalConstate ?? 0;
 
   // Résolution des noms de projets IT pour la synthèse
   const { projects: allProjects = [] } = useITProjects();
@@ -845,7 +853,7 @@ export default function ITBudgetGlobal() {
                     <ShoppingCart className="h-4 w-4 text-indigo-600 shrink-0" />
                   </div>
                 </div>
-                <p className="mt-2 text-xl font-bold tabular-nums text-indigo-800 dark:text-indigo-200">{eur(kpis.engage)}</p>
+                <p className="mt-2 text-xl font-bold tabular-nums text-indigo-800 dark:text-indigo-200">{eur(engageGlobal)}</p>
               </div>
               <div className="flex flex-1 min-w-[160px] max-w-[220px] flex-col rounded-xl border border-violet-200 bg-violet-50/50 p-4 shadow-sm dark:bg-violet-950/20">
                 <div className="flex items-center justify-between gap-2">
@@ -857,7 +865,7 @@ export default function ITBudgetGlobal() {
                     <CheckCircle2 className="h-4 w-4 text-violet-600 shrink-0" />
                   </div>
                 </div>
-                <p className="mt-2 text-xl font-bold tabular-nums text-violet-800 dark:text-violet-200">{eur(kpis.constate)}</p>
+                <p className="mt-2 text-xl font-bold tabular-nums text-violet-800 dark:text-violet-200">{eur(constateGlobal)}</p>
               </div>
               <div className="flex flex-1 min-w-[160px] max-w-[220px] flex-col rounded-xl border border-amber-200 bg-amber-50/50 p-4 shadow-sm dark:bg-amber-950/20">
                 <div className="flex items-center justify-between gap-2">
@@ -874,7 +882,7 @@ export default function ITBudgetGlobal() {
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <span className="text-sm font-medium">Taux de consommation budgétaire</span>
                   <span className="text-xs text-muted-foreground sm:text-right">
-                    {kpis.taux_consommation}% — Constaté {eur(kpis.constate)} / Budget révisé {eur(kpis.budget_revise)}
+                    {kpis.taux_consommation}% — Constaté {eur(constateGlobal)} / Budget révisé {eur(kpis.budget_revise)}
                   </span>
                 </div>
                 <Progress value={progressValue} className="h-3" />
@@ -1250,6 +1258,15 @@ export default function ITBudgetGlobal() {
                                 })}
                                 <TableCell onClick={(e) => e.stopPropagation()}>
                                   <div className="flex gap-1">
+                                    {(() => {
+                                      const ec = engageConstateData?.rows.find(r => r.budget_line_id === l.id);
+                                      const hasLinks = (ec?.nb_commandes ?? 0) + (ec?.nb_factures ?? 0) > 0;
+                                      return hasLinks ? (
+                                        <Badge variant="outline" className="text-[10px] border-emerald-300 text-emerald-600 mr-1">
+                                          Lié
+                                        </Badge>
+                                      ) : null;
+                                    })()}
                                     <Button
                                       type="button"
                                       variant="ghost"
@@ -1380,7 +1397,12 @@ export default function ITBudgetGlobal() {
           <DialogHeader>
             <DialogTitle>{editingLine ? 'Modifier la ligne budgétaire' : 'Nouvelle ligne budgétaire'}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3 py-2">
+          <Tabs defaultValue="general">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="general">Général</TabsTrigger>
+              <TabsTrigger value="rapprochement">Rapprochement Divalto</TabsTrigger>
+            </TabsList>
+            <TabsContent value="general" className="space-y-3 py-2 mt-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label>Entité *</Label>
@@ -1541,7 +1563,14 @@ export default function ITBudgetGlobal() {
               <Label>Commentaire</Label>
               <Textarea rows={3} value={lineCommentaire} onChange={(e) => setLineCommentaire(e.target.value)} />
             </div>
-          </div>
+            </TabsContent>
+            <TabsContent value="rapprochement" className="py-2 mt-2">
+              <BudgetLineRapprochementPanel
+                budgetLineId={editingLine?.id ?? null}
+                fournisseurPrevu={lineFournisseur || null}
+              />
+            </TabsContent>
+          </Tabs>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => { setLineDialogOpen(false); setEditingLine(null); }}>
               Annuler
