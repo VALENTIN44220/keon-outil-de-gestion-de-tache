@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { ITBudgetLine } from '@/types/itProject';
+import { lineAnnualBudgetRevise } from '@/lib/itBudgetTotals';
 
 /**
  * Agrégation mensuelle globale et par fournisseur, pour l'écran Suivi
@@ -218,7 +219,7 @@ export function useITBudgetGlobalBreakdown(lines: ITBudgetLine[]) {
       const tiers = l.fournisseur_prevu ?? null;
       if (!tiers) continue;
       const s = getOrInit(tiers, null);
-      s.budget += l.montant_budget_revise ?? l.montant_budget ?? 0;
+      s.budget += lineAnnualBudgetRevise(l);
     }
 
     // Commandes : prend le tiers de la commande (fallback ligne si vide)

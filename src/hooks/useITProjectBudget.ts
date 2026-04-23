@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   ITBudgetLine, ITManualExpense, ITBudgetReallocation, ITBudgetKPIs
 } from '@/types/itProject';
+import { lineAnnualBudget, lineAnnualBudgetRevise } from '@/lib/itBudgetTotals';
 
 export function useITProjectBudget(projectId: string | undefined) {
   const qc = useQueryClient();
@@ -111,8 +112,8 @@ export function useITProjectBudget(projectId: string | undefined) {
   const lines    = linesQuery.data    ?? [];
   const expenses = expensesQuery.data ?? [];
 
-  const budget_initial  = lines.reduce((s, l) => s + (l.montant_budget ?? 0), 0);
-  const budget_revise   = lines.reduce((s, l) => s + (l.montant_budget_revise ?? l.montant_budget ?? 0), 0);
+  const budget_initial  = lines.reduce((s, l) => s + lineAnnualBudget(l), 0);
+  const budget_revise   = lines.reduce((s, l) => s + lineAnnualBudgetRevise(l), 0);
   const engage          = 0; // TODO Phase 2 : CFK Divalto
   const constate        = 0; // TODO Phase 2 : FFK Divalto
   const manuel_prevu    = expenses.filter(e => e.statut !== 'annule').reduce((s, e) => s + (e.montant_prevu ?? 0), 0);
@@ -256,8 +257,8 @@ export function useITBudgetGlobal(filters: { annee?: number; entite?: string; ty
   const expenses = expensesQuery.data ?? [];
 
   // KPIs globaux
-  const budget_initial       = lines.reduce((s, l) => s + (l.montant_budget ?? 0), 0);
-  const budget_revise        = lines.reduce((s, l) => s + (l.montant_budget_revise ?? l.montant_budget ?? 0), 0);
+  const budget_initial       = lines.reduce((s, l) => s + lineAnnualBudget(l), 0);
+  const budget_revise        = lines.reduce((s, l) => s + lineAnnualBudgetRevise(l), 0);
   const engage               = 0;
   const constate             = 0;
   const manuel_prevu         = expenses.filter(e => e.statut !== 'annule').reduce((s, e) => s + (e.montant_prevu ?? 0), 0);
@@ -277,8 +278,8 @@ export function useITBudgetGlobal(filters: { annee?: number; entite?: string; ty
   // Répartition par type_depense pour waterfall
   const byType = ['Opex', 'Capex', 'RH', 'Amortissement'].map(type => ({
     type,
-    budget_initial: lines.filter(l => l.type_depense === type).reduce((s, l) => s + (l.montant_budget ?? 0), 0),
-    budget_revise:  lines.filter(l => l.type_depense === type).reduce((s, l) => s + (l.montant_budget_revise ?? l.montant_budget ?? 0), 0),
+    budget_initial: lines.filter(l => l.type_depense === type).reduce((s, l) => s + lineAnnualBudget(l), 0),
+    budget_revise:  lines.filter(l => l.type_depense === type).reduce((s, l) => s + lineAnnualBudgetRevise(l), 0),
   }));
 
   // Répartition par catégorie pour graphique
@@ -286,8 +287,8 @@ export function useITBudgetGlobal(filters: { annee?: number; entite?: string; ty
     lines.reduce((map, l) => {
       const key = l.categorie?.trim() || 'Sans catégorie';
       const cur = map.get(key) || { categorie: key, budget_initial: 0, budget_revise: 0 };
-      cur.budget_initial += l.montant_budget ?? 0;
-      cur.budget_revise  += l.montant_budget_revise ?? l.montant_budget ?? 0;
+      cur.budget_initial += lineAnnualBudget(l);
+      cur.budget_revise  += lineAnnualBudgetRevise(l);
       map.set(key, cur);
       return map;
     }, new Map<string, { categorie: string; budget_initial: number; budget_revise: number }>())
@@ -298,7 +299,7 @@ export function useITBudgetGlobal(filters: { annee?: number; entite?: string; ty
     lines.reduce((map, l) => {
       const key = l.entite?.trim() || 'Non affecté';
       const cur = map.get(key) || { entite: key, budget: 0 };
-      cur.budget += l.montant_budget_revise ?? l.montant_budget ?? 0;
+      cur.budget += lineAnnualBudgetRevise(l);
       map.set(key, cur);
       return map;
     }, new Map<string, { entite: string; budget: number }>())
@@ -308,7 +309,7 @@ export function useITBudgetGlobal(filters: { annee?: number; entite?: string; ty
     lines.reduce((map, l) => {
       const key = l.fournisseur_prevu?.trim() || 'Sans fournisseur';
       const cur = map.get(key) || { fournisseur: key, budget: 0 };
-      cur.budget += l.montant_budget_revise ?? l.montant_budget ?? 0;
+      cur.budget += lineAnnualBudgetRevise(l);
       map.set(key, cur);
       return map;
     }, new Map<string, { fournisseur: string; budget: number }>())
@@ -320,8 +321,8 @@ export function useITBudgetGlobal(filters: { annee?: number; entite?: string; ty
     lines.reduce((map, l) => {
       const key = l.sous_categorie?.trim() || 'Sans sous-catégorie';
       const cur = map.get(key) || { sous_categorie: key, budget_initial: 0, budget_revise: 0 };
-      cur.budget_initial += l.montant_budget ?? 0;
-      cur.budget_revise  += l.montant_budget_revise ?? l.montant_budget ?? 0;
+      cur.budget_initial += lineAnnualBudget(l);
+      cur.budget_revise  += lineAnnualBudgetRevise(l);
       map.set(key, cur);
       return map;
     }, new Map<string, { sous_categorie: string; budget_initial: number; budget_revise: number }>())

@@ -6,6 +6,7 @@ import { useITBudgetGlobal } from '@/hooks/useITProjectBudget';
 import { useITBudgetEngageConstate } from '@/hooks/useITBudgetEngageConstate';
 import { useITBudgetGlobalBreakdown } from '@/hooks/useITBudgetGlobalBreakdown';
 import { useITBudgetRapprochement } from '@/hooks/useITBudgetRapprochement';
+import { lineAnnualBudgetRevise } from '@/lib/itBudgetTotals';
 import { BudgetLineRapprochementPanel } from '@/components/it/BudgetLineRapprochementPanel';
 import { BulkRapprochementDialog } from '@/components/it/BulkRapprochementDialog';
 import { supabase } from '@/integrations/supabase/client';
@@ -351,7 +352,7 @@ export default function ITBudgetGlobal() {
         const key = l.it_project_id;
         const label = projectNameMap.get(key) ?? `Projet ${key.slice(0, 8)}…`;
         const cur = map.get(key) || { projet_id: key, projet: label, budget: 0 };
-        cur.budget += (l as any).montant_budget_revise ?? l.montant_budget ?? 0;
+        cur.budget += lineAnnualBudgetRevise(l);
         map.set(key, cur);
         return map;
       }, new Map<string, { projet_id: string; projet: string; budget: number }>())

@@ -9,6 +9,7 @@ import { useITProjectBudget } from '@/hooks/useITProjectBudget';
 import { useITBudgetOptions, PRESET_CATEGORIES } from '@/hooks/useITBudgetOptions';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { extractErrorMessage } from '@/lib/extractErrorMessage';
+import { lineAnnualBudget, lineAnnualBudgetRevise } from '@/lib/itBudgetTotals';
 import {
   BUDGET_LINE_STATUT_CONFIG,
   type BudgetLineStatut,
@@ -311,8 +312,8 @@ export default function ITProjectHubBudget() {
     for (const l of lines) {
       const key = (l.categorie?.trim() || 'Sans catégorie');
       const cur = map.get(key) || { categorie: key, budget_initial: 0, budget_revise: 0 };
-      cur.budget_initial += l.montant_budget ?? 0;
-      cur.budget_revise += l.montant_budget_revise ?? l.montant_budget ?? 0;
+      cur.budget_initial += lineAnnualBudget(l);
+      cur.budget_revise += lineAnnualBudgetRevise(l);
       map.set(key, cur);
     }
     return Array.from(map.values()).sort((a, b) => a.categorie.localeCompare(b.categorie, 'fr'));
@@ -729,9 +730,9 @@ export default function ITProjectHubBudget() {
                               <TableCell>{l.fournisseur_prevu ?? '—'}</TableCell>
                               <TableCell>{l.type_depense ?? '—'}</TableCell>
                               <TableCell>{formatBudgetPeriode(l)}</TableCell>
-                              <TableCell className="text-right tabular-nums">{eur(l.montant_budget ?? 0)}</TableCell>
+                              <TableCell className="text-right tabular-nums">{eur(lineAnnualBudget(l))}</TableCell>
                               <TableCell className="text-right tabular-nums">
-                                {eur(l.montant_budget_revise ?? l.montant_budget ?? 0)}
+                                {eur(lineAnnualBudgetRevise(l))}
                               </TableCell>
                               <TableCell>
                                 <Badge variant="outline" className={cn('border', st.className)}>

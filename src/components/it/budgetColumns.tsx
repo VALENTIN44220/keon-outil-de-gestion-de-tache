@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import type { ITBudgetLine } from '@/types/itProject';
 import { BUDGET_LINE_STATUT_CONFIG } from '@/types/itProject';
+import { lineAnnualBudgetRevise } from '@/lib/itBudgetTotals';
 
 interface LineExtra {
   entite?: string | null;
@@ -123,7 +124,7 @@ export const IT_BUDGET_COLUMNS: ITBudgetColumnDef[] = [
     defaultVisible: true,
     align: 'right',
     render: (l, h) => {
-      const montant = l.montant_annuel ?? (l.montant_budget ?? 0) * 12;
+      const montant = l.montant_annuel ?? lineAnnualBudgetRevise(l);
       return <span className="tabular-nums">{h.eur(montant)}</span>;
     },
   },
