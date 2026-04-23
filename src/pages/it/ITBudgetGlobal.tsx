@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Layout } from '@/components/layout/Layout';
 import { useITBudgetGlobal } from '@/hooks/useITProjectBudget';
 import { useITBudgetEngageConstate } from '@/hooks/useITBudgetEngageConstate';
+import { useITBudgetGlobalBreakdown } from '@/hooks/useITBudgetGlobalBreakdown';
 import { useITBudgetRapprochement } from '@/hooks/useITBudgetRapprochement';
 import { BudgetLineRapprochementPanel } from '@/components/it/BudgetLineRapprochementPanel';
 import { BulkRapprochementDialog } from '@/components/it/BulkRapprochementDialog';
@@ -332,6 +333,9 @@ export default function ITBudgetGlobal() {
   const engageGlobal   = engageConstateData?.totalEngage   ?? 0;
   const constateGlobal = engageConstateData?.totalConstate ?? 0;
 
+  // Ventilation mensuelle + par fournisseur pour les cards de la synthèse
+  const { monthlyRows, supplierRows } = useITBudgetGlobalBreakdown(lines);
+
   // Résolution des noms de projets IT pour la synthèse
   const { projects: allProjects = [] } = useITProjects();
 
@@ -580,6 +584,22 @@ export default function ITBudgetGlobal() {
   const revisionsDelta = kpis.budget_revise - kpis.budget_initial;
   const budgetReviseGlobal = kpis.budget_revise;
 
+  /**
+   * Forecast corrigé : `useITBudgetGlobal` renvoie engage/constate = 0 (TODO
+   * Phase 2). Ici on recalcule avec les données réelles de Divalto via
+   * `useITBudgetEngageConstate`, ce qui évite l'incohérence "Forecast = 0 et
+   * Écart = -Budget révisé".
+   *
+   * Règle : le forecast représente le décaissement anticipé à fin d'année =
+   * le plus grand entre engagé (commandes) et constaté (factures), + les
+   * dépenses manuelles prévues. On ne gonfle pas le forecast avec le budget
+   * restant non-engagé, pour rester réaliste sur la trajectoire réelle.
+   */
+  const forecastCorrige = Math.max(engageGlobal, constateGlobal) + manuel_prevu;
+  const ecartCorrige = forecastCorrige - kpis.budget_revise;
+  const depassementCorrige = Math.max(ecartCorrige, 0);
+  const economieCorrigee = Math.max(-ecartCorrige, 0);
+
   const tauxConsommationBudgetPct = useMemo(() => {
     const br = Number(kpis.budget_revise);
     const constate = Number(constateGlobal) || 0;
@@ -797,7 +817,7 @@ export default function ITBudgetGlobal() {
   }, [lineDialogOpen, editingLine, resetLineForm]);
 
   const depassementCard =
-    kpis.depassement > 0 ? (
+    depassementCorrige > 0 ? (
       <div
         className={cn(
           'flex flex-1 min-w-[160px] max-w-[220px] flex-col rounded-xl border p-4 shadow-sm',
@@ -808,7 +828,7 @@ export default function ITBudgetGlobal() {
           <span className="text-xs font-medium text-muted-foreground">Dépassement</span>
           <AlertTriangle className="h-4 w-4 text-red-600 shrink-0" />
         </div>
-        <p className="mt-2 text-xl font-bold tabular-nums text-red-600">{eur(kpis.depassement)}</p>
+        <p className="mt-2 text-xl font-bold tabular-nums text-red-600">{eur(depassementCorrige)}</p>
       </div>
     ) : (
       <div
@@ -821,7 +841,7 @@ export default function ITBudgetGlobal() {
           <span className="text-xs font-medium text-muted-foreground">Économie potentielle</span>
           <TrendingDown className="h-4 w-4 text-emerald-600 shrink-0" />
         </div>
-        <p className="mt-2 text-xl font-bold tabular-nums text-emerald-600">{eur(kpis.montant_reaffectable)}</p>
+        <p className="mt-2 text-xl font-bold tabular-nums text-emerald-600">{eur(economieCorrigee)}</p>
       </div>
     );
 
@@ -945,7 +965,10 @@ export default function ITBudgetGlobal() {
                   <span className="text-xs font-medium text-muted-foreground">Forecast fin d&apos;année</span>
                   <Target className="h-4 w-4 text-amber-600 shrink-0" />
                 </div>
-                <p className="mt-2 text-xl font-bold tabular-nums text-amber-900 dark:text-amber-100">{eur(kpis.forecast_fin_annee)}</p>
+                <p className="mt-2 text-xl font-bold tabular-nums text-amber-900 dark:text-amber-100">{eur(forecastCorrige)}</p>
+                <p className="mt-1 text-[10px] text-muted-foreground leading-tight">
+                  max(engagé, constaté) + dépenses manuelles
+                </p>
               </div>
               {depassementCard}
             </div>
@@ -1148,6 +1171,144 @@ export default function ITBudgetGlobal() {
                   </Card>
                 </div>
 
+                {/* --- Ventilation mensuelle globale --- */}
+                <Card>
+                  <CardContent className="pt-6">
+                    <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
+                      <BarChart2 className="h-4 w-4" />
+                      Décaissement mensuel — Budget vs Commandé vs Facturé
+                    </h3>
+                    {monthlyRows.every((r) => r.budget === 0 && r.commande === 0 && r.facture === 0) ? (
+                      <div className="flex flex-col items-center justify-center py-8 text-muted-foreground border border-dashed rounded-lg">
+                        <p className="text-sm">Aucune donnée mensuelle</p>
+                      </div>
+                    ) : (
+                      <>
+                        <ResponsiveContainer width="100%" height={260}>
+                          <BarChart
+                            data={monthlyRows.map((r) => ({
+                              mois: ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'][r.mois - 1],
+                              Budget: Math.round(r.budget),
+                              Commandé: Math.round(r.commande),
+                              Facturé: Math.round(r.facture),
+                            }))}
+                            margin={{ top: 4, right: 8, left: 0, bottom: 4 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                            <XAxis dataKey="mois" tick={{ fontSize: 10 }} />
+                            <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => eur(Number(v))} />
+                            <RechartsTooltip formatter={(value: number) => eur(value)} />
+                            <Legend />
+                            <Bar dataKey="Budget" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="Commandé" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="Facturé" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                        <div className="mt-4 overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Mois</TableHead>
+                                <TableHead className="text-right">Budget</TableHead>
+                                <TableHead className="text-right">Commandé</TableHead>
+                                <TableHead className="text-right">Facturé</TableHead>
+                                <TableHead className="text-right">Écart (budget - facturé)</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {monthlyRows.map((r) => {
+                                const ecart = r.budget - r.facture;
+                                const label = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'][r.mois - 1];
+                                return (
+                                  <TableRow key={r.mois}>
+                                    <TableCell className="font-medium">{label}</TableCell>
+                                    <TableCell className="text-right tabular-nums">{eur(r.budget)}</TableCell>
+                                    <TableCell className="text-right tabular-nums text-indigo-700 dark:text-indigo-400">{eur(r.commande)}</TableCell>
+                                    <TableCell className="text-right tabular-nums text-violet-700 dark:text-violet-400">{eur(r.facture)}</TableCell>
+                                    <TableCell className={cn('text-right tabular-nums font-semibold', ecart < 0 ? 'text-red-600' : 'text-emerald-600')}>
+                                      {eur(ecart)}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                              <TableRow className="border-t-2 bg-muted/40 font-semibold">
+                                <TableCell>Total</TableCell>
+                                <TableCell className="text-right tabular-nums">
+                                  {eur(monthlyRows.reduce((s, r) => s + r.budget, 0))}
+                                </TableCell>
+                                <TableCell className="text-right tabular-nums text-indigo-700 dark:text-indigo-400">
+                                  {eur(monthlyRows.reduce((s, r) => s + r.commande, 0))}
+                                </TableCell>
+                                <TableCell className="text-right tabular-nums text-violet-700 dark:text-violet-400">
+                                  {eur(monthlyRows.reduce((s, r) => s + r.facture, 0))}
+                                </TableCell>
+                                <TableCell />
+                              </TableRow>
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* --- Vue détaillée par fournisseur --- */}
+                <Card>
+                  <CardContent className="pt-6">
+                    <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
+                      <BarChart2 className="h-4 w-4" />
+                      Vue par fournisseur — Budget / Commandé / Facturé / Écart
+                    </h3>
+                    {supplierRows.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-8 text-muted-foreground border border-dashed rounded-lg">
+                        <p className="text-sm">Aucun fournisseur affecté</p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Fournisseur</TableHead>
+                              <TableHead>Code tiers</TableHead>
+                              <TableHead className="text-right">Budget</TableHead>
+                              <TableHead className="text-right">Commandé</TableHead>
+                              <TableHead className="text-right">Facturé</TableHead>
+                              <TableHead className="text-right">Écart</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {supplierRows.map((s) => (
+                              <TableRow key={`${s.tiers}-${s.nomfournisseur ?? ''}`}>
+                                <TableCell className="font-medium">{s.nomfournisseur ?? '—'}</TableCell>
+                                <TableCell className="font-mono text-xs text-muted-foreground">{s.tiers}</TableCell>
+                                <TableCell className="text-right tabular-nums">{eur(s.budget)}</TableCell>
+                                <TableCell className="text-right tabular-nums text-indigo-700 dark:text-indigo-400">{eur(s.commande)}</TableCell>
+                                <TableCell className="text-right tabular-nums text-violet-700 dark:text-violet-400">{eur(s.facture)}</TableCell>
+                                <TableCell className={cn('text-right tabular-nums font-semibold', s.ecart < 0 ? 'text-red-600' : 'text-emerald-600')}>
+                                  {eur(s.ecart)}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                            <TableRow className="border-t-2 bg-muted/40 font-semibold">
+                              <TableCell colSpan={2}>Total</TableCell>
+                              <TableCell className="text-right tabular-nums">
+                                {eur(supplierRows.reduce((s, r) => s + r.budget, 0))}
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums text-indigo-700 dark:text-indigo-400">
+                                {eur(supplierRows.reduce((s, r) => s + r.commande, 0))}
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums text-violet-700 dark:text-violet-400">
+                                {eur(supplierRows.reduce((s, r) => s + r.facture, 0))}
+                              </TableCell>
+                              <TableCell />
+                            </TableRow>
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
                 {/* --- Waterfall récapitulatif (pleine largeur) --- */}
                 <Card>
                   <CardContent className="pt-6">
@@ -1173,16 +1334,24 @@ export default function ITBudgetGlobal() {
                           <TableCell className="text-right tabular-nums">{eur(manuel_prevu)}</TableCell>
                         </TableRow>
                         <TableRow>
+                          <TableCell className="font-medium">Engagé (commandes Divalto)</TableCell>
+                          <TableCell className="text-right tabular-nums">{eur(engageGlobal)}</TableCell>
+                        </TableRow>
+                        <TableRow>
+                          <TableCell className="font-medium">Constaté (factures Divalto)</TableCell>
+                          <TableCell className="text-right tabular-nums">{eur(constateGlobal)}</TableCell>
+                        </TableRow>
+                        <TableRow>
                           <TableCell className="font-medium">Forecast fin d&apos;année</TableCell>
-                          <TableCell className="text-right tabular-nums">{eur(kpis.forecast_fin_annee)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{eur(forecastCorrige)}</TableCell>
                         </TableRow>
                         <TableRow>
                           <TableCell className="font-medium">Écart au budget</TableCell>
                           <TableCell className={cn(
                             'text-right tabular-nums font-semibold',
-                            kpis.ecart_budget > 0 ? 'text-red-600' : 'text-emerald-600'
+                            ecartCorrige > 0 ? 'text-red-600' : 'text-emerald-600'
                           )}>
-                            {eur(kpis.ecart_budget)}
+                            {eur(ecartCorrige)}
                           </TableCell>
                         </TableRow>
                       </TableBody>
