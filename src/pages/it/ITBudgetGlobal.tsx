@@ -191,7 +191,7 @@ function ExpandedMonths({ line }: { line: ITBudgetLine }) {
     }
 
     // Factures par mois (date_facture → mois, HT consolidé gescom ou estimé)
-    for (const g of facturesLiees) {
+    for (const g of facturesLieesGrouped) {
       if (!g.date_facture) continue;
       const m = new Date(g.date_facture).getMonth();
       if (m >= 0 && m < 12) {
@@ -201,11 +201,7 @@ function ExpandedMonths({ line }: { line: ITBudgetLine }) {
     }
 
     return init;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [commandesLiees, facturesLieesGrouped, line.budget_type, line.mois_budget, line.montant_budget, line.montant_budget_revise]);
-
-  // facturesLieesGrouped est stable dans la dépendance, on utilise l'alias pour la lisibilité
-  const facturesLiees = facturesLieesGrouped;
 
   const totals = rows.reduce(
     (acc, r) => ({
@@ -259,9 +255,9 @@ function ExpandedMonths({ line }: { line: ITBudgetLine }) {
             <td className="py-2 px-2 text-right tabular-nums text-indigo-700 dark:text-indigo-400">{eur(totals.commande)}</td>
             <td className="py-2 px-2 text-right tabular-nums text-violet-700 dark:text-violet-400">{eur(totals.facture)}</td>
             <td colSpan={2} className="py-2 px-2 text-[11px] text-muted-foreground font-normal">
-              {commandesLiees.length === 0 && facturesLiees.length === 0
+              {commandesLiees.length === 0 && facturesLieesGrouped.length === 0
                 ? 'Aucune commande ou facture liée — utilisez l’onglet Rapprochement Divalto lors de l’édition de la ligne.'
-                : `${commandesLiees.length} commande(s), ${facturesLiees.length} facture(s) liée(s).`}
+                : `${commandesLiees.length} commande(s), ${facturesLieesGrouped.length} facture(s) liée(s).`}
             </td>
           </tr>
         </tbody>
