@@ -2,8 +2,9 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Layout } from '@/components/layout/Layout';
-import { useITBudgetGlobal, useITBudgetLineMonths, type ITBudgetLineMonth } from '@/hooks/useITProjectBudget';
+import { useITBudgetGlobal } from '@/hooks/useITProjectBudget';
 import { useITBudgetEngageConstate } from '@/hooks/useITBudgetEngageConstate';
+import { useITBudgetRapprochement } from '@/hooks/useITBudgetRapprochement';
 import { BudgetLineRapprochementPanel } from '@/components/it/BudgetLineRapprochementPanel';
 import { BulkRapprochementDialog } from '@/components/it/BulkRapprochementDialog';
 import { supabase } from '@/integrations/supabase/client';
@@ -136,45 +137,86 @@ const EXPENSE_STATUT_LABEL: Record<ITManualExpense['statut'], string> = {
   annule: 'Annulé',
 };
 
-function ExpandedMonths({ lineId }: { lineId: string }) {
-  const { data: months = [], isLoading, updateMonth } = useITBudgetLineMonths(lineId);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [refCmd, setRefCmd] = useState('');
-  const [refFac, setRefFac] = useState('');
-  const [pdfUrl, setPdfUrl] = useState('');
-  const [statut, setStatut] = useState<ITBudgetLineMonth['statut_rapprochement']>('non_rapproche');
+/**
+ * Déroulé mensuel d'une ligne budgétaire.
+ *
+ * Historiquement cette vue lisait `it_budget_line_months` (souvent vide) ce
+ * qui donnait un expand vide pour toute ligne annuelle. Ici on calcule tout
+ * côté client depuis :
+ *   - `ligne.budget_type` + `montant_budget` (+ `mois_budget` pour annuel)
+ *   - les commandes / factures Divalto liées (via useITBudgetRapprochement,
+ *     qui dédoublonne déjà gescom/compta et calcule un HT réel ou estimé)
+ */
+function ExpandedMonths({ line }: { line: ITBudgetLine }) {
+  const {
+    commandesLiees,
+    facturesLieesGrouped,
+    isLoading,
+  } = useITBudgetRapprochement(line.id, line.fournisseur_prevu ?? null);
 
   const MOIS_LABELS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
 
-  const STATUT_RAPPR_CONFIG = {
-    non_rapproche: { label: 'Non rapproché', className: 'bg-slate-100 text-slate-600 border-slate-300' },
-    commande_liee: { label: 'Commande liée', className: 'bg-blue-100 text-blue-700 border-blue-300' },
-    facture_liee: { label: 'Facture liée', className: 'bg-violet-100 text-violet-700 border-violet-300' },
-    solde: { label: 'Soldé', className: 'bg-green-100 text-green-700 border-green-300' },
+  type MonthRow = {
+    mois: number;
+    budget: number;
+    commande: number;
+    facture: number;
+    refsCmd: string[];
+    refsFac: string[];
   };
 
-  const openEdit = (m: ITBudgetLineMonth) => {
-    setEditingId(m.id);
-    setRefCmd(m.ref_commande_divalto ?? '');
-    setRefFac(m.ref_facture_divalto ?? '');
-    setPdfUrl(m.pdf_url ?? '');
-    setStatut(m.statut_rapprochement);
-  };
+  const rows: MonthRow[] = useMemo(() => {
+    const init: MonthRow[] = Array.from({ length: 12 }, (_, i) => ({
+      mois: i + 1, budget: 0, commande: 0, facture: 0, refsCmd: [], refsFac: [],
+    }));
 
-  const saveEdit = async (id: string) => {
-    await updateMonth.mutateAsync({
-      id,
-      updates: {
-        ref_commande_divalto: refCmd || null,
-        ref_facture_divalto: refFac || null,
-        pdf_url: pdfUrl || null,
-        statut_rapprochement: statut,
-      },
-    });
-    setEditingId(null);
-  };
+    // Budget par mois selon le type
+    const montant = line.montant_budget_revise ?? line.montant_budget ?? 0;
+    if (line.budget_type === 'mensuel') {
+      for (let i = 0; i < 12; i++) init[i].budget = montant;
+    } else if (line.budget_type === 'annuel' && line.mois_budget) {
+      const idx = line.mois_budget - 1;
+      if (idx >= 0 && idx < 12) init[idx].budget = montant;
+    }
 
-  if (isLoading) return <div className="p-4 text-sm text-muted-foreground">Chargement...</div>;
+    // Commandes par mois (date_commande → mois)
+    for (const link of commandesLiees as Array<{ fullcdno: string; it_divalto_commandes?: { date_commande?: string | null; montant_ht?: number | null } }>) {
+      const c = link.it_divalto_commandes;
+      if (!c?.date_commande) continue;
+      const m = new Date(c.date_commande).getMonth();
+      if (m >= 0 && m < 12) {
+        init[m].commande += c.montant_ht ?? 0;
+        init[m].refsCmd.push(link.fullcdno);
+      }
+    }
+
+    // Factures par mois (date_facture → mois, HT consolidé gescom ou estimé)
+    for (const g of facturesLiees) {
+      if (!g.date_facture) continue;
+      const m = new Date(g.date_facture).getMonth();
+      if (m >= 0 && m < 12) {
+        init[m].facture += g.montant_ht ?? 0;
+        init[m].refsFac.push(g.reference);
+      }
+    }
+
+    return init;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [commandesLiees, facturesLieesGrouped, line.budget_type, line.mois_budget, line.montant_budget, line.montant_budget_revise]);
+
+  // facturesLieesGrouped est stable dans la dépendance, on utilise l'alias pour la lisibilité
+  const facturesLiees = facturesLieesGrouped;
+
+  const totals = rows.reduce(
+    (acc, r) => ({
+      budget: acc.budget + r.budget,
+      commande: acc.commande + r.commande,
+      facture: acc.facture + r.facture,
+    }),
+    { budget: 0, commande: 0, facture: 0 }
+  );
+
+  if (isLoading) return <div className="p-4 text-sm text-muted-foreground">Chargement…</div>;
 
   return (
     <div className="px-4 pb-4 bg-muted/30">
@@ -182,67 +224,46 @@ function ExpandedMonths({ lineId }: { lineId: string }) {
         <thead>
           <tr className="border-b">
             <th className="text-left py-2 px-2 font-medium text-muted-foreground">Mois</th>
-            <th className="text-right py-2 px-2 font-medium text-muted-foreground">Montant</th>
-            <th className="py-2 px-2 font-medium text-muted-foreground">Réf. Commande</th>
-            <th className="py-2 px-2 font-medium text-muted-foreground">Réf. Facture</th>
-            <th className="py-2 px-2 font-medium text-muted-foreground">PJ Facture</th>
-            <th className="py-2 px-2 font-medium text-muted-foreground">Statut</th>
-            <th className="py-2 px-2"></th>
+            <th className="text-right py-2 px-2 font-medium text-muted-foreground">Budget</th>
+            <th className="text-right py-2 px-2 font-medium text-muted-foreground">Commandé</th>
+            <th className="text-right py-2 px-2 font-medium text-muted-foreground">Facturé</th>
+            <th className="text-left py-2 px-2 font-medium text-muted-foreground">Réf. Commande(s)</th>
+            <th className="text-left py-2 px-2 font-medium text-muted-foreground">Réf. Facture(s)</th>
           </tr>
         </thead>
         <tbody>
-          {months.map((m) => (
-            <tr key={m.id} className="border-b last:border-0 hover:bg-muted/50">
-              <td className="py-1.5 px-2 font-medium">{MOIS_LABELS[m.mois - 1]}</td>
-              <td className="py-1.5 px-2 text-right tabular-nums">
-                {(m.montant_budget ?? 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
-              </td>
-              {editingId === m.id ? (
-                <>
-                  <td className="py-1 px-2"><Input className="h-7 text-xs" value={refCmd} onChange={(e) => setRefCmd(e.target.value)} placeholder="CFK-..." /></td>
-                  <td className="py-1 px-2"><Input className="h-7 text-xs" value={refFac} onChange={(e) => setRefFac(e.target.value)} placeholder="FFK-..." /></td>
-                  <td className="py-1 px-2"><Input className="h-7 text-xs" value={pdfUrl} onChange={(e) => setPdfUrl(e.target.value)} placeholder="https://..." /></td>
-                  <td className="py-1 px-2">
-                    <Select value={statut} onValueChange={(v) => setStatut(v as ITBudgetLineMonth['statut_rapprochement'])}>
-                      <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(STATUT_RAPPR_CONFIG).map(([k, v]) => (
-                          <SelectItem key={k} value={k}>{v.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </td>
-                  <td className="py-1 px-2">
-                    <div className="flex gap-1">
-                      <Button size="sm" className="h-7 text-xs px-2" onClick={() => saveEdit(m.id)}>OK</Button>
-                      <Button size="sm" variant="ghost" className="h-7 text-xs px-2" onClick={() => setEditingId(null)}>✕</Button>
-                    </div>
-                  </td>
-                </>
-              ) : (
-                <>
-                  <td className="py-1.5 px-2 text-muted-foreground">{m.ref_commande_divalto ?? '—'}</td>
-                  <td className="py-1.5 px-2 text-muted-foreground">{m.ref_facture_divalto ?? '—'}</td>
-                  <td className="py-1.5 px-2">
-                    {m.pdf_url
-                      ? <a href={m.pdf_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline truncate max-w-[120px] block">Voir PJ</a>
-                      : <span className="text-muted-foreground">—</span>
-                    }
-                  </td>
-                  <td className="py-1.5 px-2">
-                    <Badge variant="outline" className={cn('border text-[10px]', STATUT_RAPPR_CONFIG[m.statut_rapprochement].className)}>
-                      {STATUT_RAPPR_CONFIG[m.statut_rapprochement].label}
-                    </Badge>
-                  </td>
-                  <td className="py-1.5 px-2">
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEdit(m)}>
-                      <Pencil className="h-3 w-3" />
-                    </Button>
-                  </td>
-                </>
-              )}
-            </tr>
-          ))}
+          {rows.map((r) => {
+            const isEmpty = r.budget === 0 && r.commande === 0 && r.facture === 0;
+            return (
+              <tr key={r.mois} className={cn('border-b last:border-0', isEmpty ? 'text-muted-foreground/60' : 'hover:bg-muted/50')}>
+                <td className="py-1.5 px-2 font-medium">{MOIS_LABELS[r.mois - 1]}</td>
+                <td className="py-1.5 px-2 text-right tabular-nums">{r.budget ? eur(r.budget) : '—'}</td>
+                <td className="py-1.5 px-2 text-right tabular-nums text-indigo-700 dark:text-indigo-400">
+                  {r.commande ? eur(r.commande) : '—'}
+                </td>
+                <td className="py-1.5 px-2 text-right tabular-nums text-violet-700 dark:text-violet-400">
+                  {r.facture ? eur(r.facture) : '—'}
+                </td>
+                <td className="py-1.5 px-2 font-mono text-[11px] text-muted-foreground">
+                  {r.refsCmd.length ? r.refsCmd.join(', ') : '—'}
+                </td>
+                <td className="py-1.5 px-2 font-mono text-[11px] text-muted-foreground">
+                  {r.refsFac.length ? r.refsFac.join(', ') : '—'}
+                </td>
+              </tr>
+            );
+          })}
+          <tr className="border-t-2 font-semibold bg-muted/40">
+            <td className="py-2 px-2">Total</td>
+            <td className="py-2 px-2 text-right tabular-nums">{eur(totals.budget)}</td>
+            <td className="py-2 px-2 text-right tabular-nums text-indigo-700 dark:text-indigo-400">{eur(totals.commande)}</td>
+            <td className="py-2 px-2 text-right tabular-nums text-violet-700 dark:text-violet-400">{eur(totals.facture)}</td>
+            <td colSpan={2} className="py-2 px-2 text-[11px] text-muted-foreground font-normal">
+              {commandesLiees.length === 0 && facturesLiees.length === 0
+                ? 'Aucune commande ou facture liée — utilisez l’onglet Rapprochement Divalto lors de l’édition de la ligne.'
+                : `${commandesLiees.length} commande(s), ${facturesLiees.length} facture(s) liée(s).`}
+            </td>
+          </tr>
         </tbody>
       </table>
     </div>
@@ -1371,7 +1392,7 @@ export default function ITBudgetGlobal() {
                               {expandedLineId === l.id && (
                                 <TableRow>
                                   <TableCell colSpan={prefs.columns_config.order.length + 2} className="p-0">
-                                    <ExpandedMonths lineId={l.id} />
+                                    <ExpandedMonths line={l} />
                                   </TableCell>
                                 </TableRow>
                               )}
