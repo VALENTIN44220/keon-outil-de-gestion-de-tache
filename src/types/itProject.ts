@@ -312,7 +312,17 @@ export interface ITBudgetOption {
 export interface ITManualExpense {
   id: string;
   it_budget_line_id?: string | null;
-  it_project_id: string;
+  it_project_id?: string | null;
+  entite?: string | null;
+  annee?: number | null;
+  categorie?: string | null;
+  sous_categorie?: string | null;
+  fournisseur_prevu?: string | null;
+  type_depense?: TypeDepense | null;
+  nature_depense?: string | null;
+  source_depense?: 'divalto' | 'note_de_frais' | 'autre' | string | null;
+  mode_decaissement?: 'annuel' | 'mensuel' | string | null;
+  mois_applicables?: number[] | null;
   type_prevision: 'depense_prevue' | 'provision' | 'refacturation' | 'correction' | 'exceptionnel';
   date_prevue?: string | null;
   fournisseur?: string | null;
@@ -323,6 +333,29 @@ export interface ITManualExpense {
   created_at: string;
   updated_at: string;
 }
+
+/** Montant budgété annuel équivalent (mensuel × nb mois applicables, ou 12 si mois non renseignés). */
+export function itManualExpenseAnnualEquivalent(
+  e: Pick<ITManualExpense, 'montant_prevu' | 'mode_decaissement' | 'mois_applicables'>,
+): number {
+  const m = e.montant_prevu ?? 0;
+  if (e.mode_decaissement === 'mensuel') {
+    const n = e.mois_applicables?.length ? e.mois_applicables.length : 12;
+    return m * n;
+  }
+  return m;
+}
+
+export const MANUAL_EXPENSE_SOURCE_LABEL: Record<string, string> = {
+  divalto: 'Divalto',
+  note_de_frais: 'Note de frais',
+  autre: 'Autre',
+};
+
+export const MANUAL_EXPENSE_MODE_LABEL: Record<string, string> = {
+  annuel: 'Annuel',
+  mensuel: 'Mensuel',
+};
 
 export interface ITBudgetReallocation {
   id: string;

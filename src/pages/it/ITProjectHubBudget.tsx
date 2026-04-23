@@ -10,8 +10,12 @@ import { useITBudgetOptions, PRESET_CATEGORIES } from '@/hooks/useITBudgetOption
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { extractErrorMessage } from '@/lib/extractErrorMessage';
 import { lineAnnualBudget, lineAnnualBudgetRevise } from '@/lib/itBudgetTotals';
+import { useITProjects } from '@/hooks/useITProjects';
 import {
   BUDGET_LINE_STATUT_CONFIG,
+  itManualExpenseAnnualEquivalent,
+  MANUAL_EXPENSE_MODE_LABEL,
+  MANUAL_EXPENSE_SOURCE_LABEL,
   type BudgetLineStatut,
   type BudgetType,
   type ITBudgetLine,
@@ -33,6 +37,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -82,6 +87,7 @@ const MOIS_LONGS = [
   'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
   'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
 ];
+const MOIS_LABELS = MOIS_LONGS;
 
 function formatBudgetPeriode(l: Pick<ITBudgetLine, 'budget_type' | 'mois_budget'>): string {
   if (l.budget_type === 'mensuel') return 'Mensuel';
@@ -168,6 +174,26 @@ export default function ITProjectHubBudget() {
     reallocations,
     kpis,
   } = useITProjectBudget(project?.id);
+  const { projects: allProjects = [] } = useITProjects();
+
+  const projectLabelById = useMemo(
+    () =>
+      new Map(
+        allProjects.map((p) => [
+          p.id,
+          p.code_projet_digital ? `${p.code_projet_digital} — ${p.nom_projet}` : p.nom_projet,
+        ]),
+      ),
+    [allProjects],
+  );
+
+  const expenseAnneeDefault = useMemo(() => {
+    for (const l of lines) {
+      const y = (l as { annee?: number }).annee ?? l.exercice;
+      if (typeof y === 'number' && y > 0) return y;
+    }
+    return new Date().getFullYear();
+  }, [lines]);
 
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [filterTypeDepense, setFilterTypeDepense] = useState<string>('__all__');
@@ -210,6 +236,21 @@ export default function ITProjectHubBudget() {
   const [expMontant, setExpMontant] = useState('');
   const [expStatut, setExpStatut] = useState<ITManualExpense['statut']>('en_attente');
   const [expCommentaire, setExpCommentaire] = useState('');
+  const [expItProjectId, setExpItProjectId] = useState<string>('');
+  const [expSourceDepense, setExpSourceDepense] = useState<'divalto' | 'note_de_frais' | 'autre'>('divalto');
+  const [expModeDecaissement, setExpModeDecaissement] = useState<'annuel' | 'mensuel'>('annuel');
+  const [expMoisApplicables, setExpMoisApplicables] = useState<number[]>([]);
+  const [expCategorieSelect, setExpCategorieSelect] = useState<string>(PRESET_CATEGORIES[0]);
+  const [expSousCategorie, setExpSousCategorie] = useState('');
+  const [expTypeDepense, setExpTypeDepense] = useState<TypeDepense>('Opex');
+  const [expNatureDepense, setExpNatureDepense] = useState('');
+  const [expFournisseurPrevu, setExpFournisseurPrevu] = useState('');
+
+  const expSousCategorieOptions = useMemo(() => {
+    const base = getSousCategorieOptions(expCategorieSelect);
+    if (expSousCategorie && !base.includes(expSousCategorie)) base.push(expSousCategorie);
+    return base;
+  }, [expCategorieSelect, expSousCategorie, getSousCategorieOptions]);
 
   const lineSousCategorieOptions = useMemo(() => {
     const base = getSousCategorieOptions(lineCategorieSelect);
@@ -228,6 +269,12 @@ export default function ITProjectHubBudget() {
     if (lineCategorieSelect && !base.includes(lineCategorieSelect)) base.push(lineCategorieSelect);
     return base;
   }, [categorieOptions, lineCategorieSelect]);
+
+  const expCategorieOptions = useMemo(() => {
+    const base = [...categorieOptions];
+    if (expCategorieSelect && !base.includes(expCategorieSelect)) base.push(expCategorieSelect);
+    return base;
+  }, [categorieOptions, expCategorieSelect]);
 
   const resetLineForm = useCallback(() => {
     setLineCategorieSelect(PRESET_CATEGORIES[0]);
@@ -276,7 +323,16 @@ export default function ITProjectHubBudget() {
     setExpMontant('');
     setExpStatut('en_attente');
     setExpCommentaire('');
-  }, []);
+    setExpItProjectId(project?.id ?? '');
+    setExpSourceDepense('divalto');
+    setExpModeDecaissement('annuel');
+    setExpMoisApplicables([]);
+    setExpCategorieSelect(PRESET_CATEGORIES[0]);
+    setExpSousCategorie('');
+    setExpTypeDepense('Opex');
+    setExpNatureDepense('');
+    setExpFournisseurPrevu('');
+  }, [project?.id]);
 
   const openAddExpense = () => {
     setEditingExpense(null);
@@ -288,11 +344,22 @@ export default function ITProjectHubBudget() {
     setEditingExpense(exp);
     setExpTypePrevision(exp.type_prevision);
     setExpFournisseur(exp.fournisseur ?? '');
+    setExpFournisseurPrevu(exp.fournisseur_prevu ?? exp.fournisseur ?? '');
     setExpDescription(exp.description ?? '');
     setExpDatePrevue(exp.date_prevue ? exp.date_prevue.slice(0, 10) : '');
     setExpMontant(String(exp.montant_prevu ?? ''));
     setExpStatut(exp.statut);
     setExpCommentaire(exp.commentaire ?? '');
+    setExpItProjectId(exp.it_project_id ?? project?.id ?? '');
+    const src = exp.source_depense;
+    setExpSourceDepense(src === 'note_de_frais' || src === 'autre' ? src : 'divalto');
+    const mode = exp.mode_decaissement;
+    setExpModeDecaissement(mode === 'mensuel' ? 'mensuel' : 'annuel');
+    setExpMoisApplicables(exp.mois_applicables ?? []);
+    setExpCategorieSelect(exp.categorie?.trim() || PRESET_CATEGORIES[0]);
+    setExpSousCategorie(exp.sous_categorie ?? '');
+    setExpTypeDepense((exp.type_depense as TypeDepense) || 'Opex');
+    setExpNatureDepense(exp.nature_depense ?? '');
     setExpenseDialogOpen(true);
   };
 
@@ -439,14 +506,28 @@ export default function ITProjectHubBudget() {
       toast({ title: 'Montant invalide', variant: 'destructive' });
       return;
     }
+    if (expModeDecaissement === 'mensuel' && expMoisApplicables.length === 0) {
+      toast({ title: 'Mois requis', description: 'Sélectionnez au moins un mois applicable.', variant: 'destructive' });
+      return;
+    }
     setExpenseSaving(true);
     try {
+      const itPid = expItProjectId.trim() || null;
       if (editingExpense) {
         await updateExpense.mutateAsync({
           id: editingExpense.id,
           updates: {
+            it_project_id: itPid,
+            source_depense: expSourceDepense,
+            mode_decaissement: expModeDecaissement,
+            mois_applicables: expMoisApplicables.length ? expMoisApplicables : null,
+            categorie: expCategorieSelect || null,
+            sous_categorie: expSousCategorie || null,
+            type_depense: expTypeDepense || null,
+            nature_depense: expNatureDepense || null,
+            fournisseur_prevu: expFournisseurPrevu || null,
             type_prevision: expTypePrevision,
-            fournisseur: expFournisseur || null,
+            fournisseur: expFournisseur || expFournisseurPrevu || null,
             description: expDescription || null,
             date_prevue: expDatePrevue || null,
             montant_prevu: montant,
@@ -457,18 +538,33 @@ export default function ITProjectHubBudget() {
         toast({ title: 'Dépense mise à jour' });
       } else {
         const payload: Omit<ITManualExpense, 'id' | 'created_at' | 'updated_at'> = {
-          it_project_id: project.id,
+          it_project_id: itPid,
           it_budget_line_id: null,
+          source_depense: expSourceDepense,
+          mode_decaissement: expModeDecaissement,
+          mois_applicables: expMoisApplicables.length ? expMoisApplicables : null,
+          categorie: expCategorieSelect || null,
+          sous_categorie: expSousCategorie || null,
+          type_depense: expTypeDepense || null,
+          nature_depense: expNatureDepense || null,
+          fournisseur_prevu: expFournisseurPrevu || null,
           type_prevision: expTypePrevision,
-          fournisseur: expFournisseur || null,
+          fournisseur: expFournisseur || expFournisseurPrevu || null,
           description: expDescription || null,
           date_prevue: expDatePrevue || null,
           montant_prevu: montant,
           statut: expStatut,
           commentaire: expCommentaire || null,
+          annee: expenseAnneeDefault,
+          entite: null,
         };
         await addExpense.mutateAsync(payload);
-        toast({ title: 'Dépense créée' });
+        toast({
+          title: 'Dépense créée',
+          description: !itPid
+            ? 'Sans projet lié : retrouvez-la dans le Budget IT global.'
+            : undefined,
+        });
       }
       setExpenseDialogOpen(false);
       setEditingExpense(null);
@@ -790,18 +886,33 @@ export default function ITProjectHubBudget() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Description</TableHead>
+                          <TableHead>Projet IT</TableHead>
+                          <TableHead>Source</TableHead>
+                          <TableHead>Décaissement</TableHead>
                           <TableHead>Type</TableHead>
                           <TableHead>Fournisseur</TableHead>
                           <TableHead>Date prévue</TableHead>
-                          <TableHead className="text-right">Montant</TableHead>
+                          <TableHead className="text-right">Montant saisi</TableHead>
+                          <TableHead className="text-right">Total année</TableHead>
                           <TableHead>Statut</TableHead>
                           <TableHead className="w-[100px]">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {expenses.map((e) => (
+                        {expenses.map((e) => {
+                          const projetLabel = e.it_project_id
+                            ? (projectLabelById.get(e.it_project_id) ?? `${e.it_project_id.slice(0, 8)}…`)
+                            : '—';
+                          const srcKey = e.source_depense ?? 'divalto';
+                          const modeKey = e.mode_decaissement ?? 'annuel';
+                          return (
                           <TableRow key={e.id}>
                             <TableCell>{e.description ?? '—'}</TableCell>
+                            <TableCell className="max-w-[10rem] truncate" title={projetLabel}>
+                              {projetLabel}
+                            </TableCell>
+                            <TableCell>{MANUAL_EXPENSE_SOURCE_LABEL[srcKey] ?? srcKey}</TableCell>
+                            <TableCell>{MANUAL_EXPENSE_MODE_LABEL[modeKey] ?? modeKey}</TableCell>
                             <TableCell>
                               <Badge
                                 variant="outline"
@@ -810,13 +921,16 @@ export default function ITProjectHubBudget() {
                                 {TYPE_PREVISION_LABEL[e.type_prevision]}
                               </Badge>
                             </TableCell>
-                            <TableCell>{e.fournisseur ?? '—'}</TableCell>
+                            <TableCell>{e.fournisseur ?? e.fournisseur_prevu ?? '—'}</TableCell>
                             <TableCell>
                               {e.date_prevue
                                 ? format(new Date(e.date_prevue), 'dd/MM/yyyy', { locale: fr })
                                 : '—'}
                             </TableCell>
                             <TableCell className="text-right tabular-nums">{eur(e.montant_prevu ?? 0)}</TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {eur(itManualExpenseAnnualEquivalent(e))}
+                            </TableCell>
                             <TableCell>
                               <Badge variant="outline" className={cn('border', EXPENSE_STATUT_CLASS[e.statut])}>
                                 {EXPENSE_STATUT_LABEL[e.statut]}
@@ -847,7 +961,8 @@ export default function ITProjectHubBudget() {
                               </div>
                             </TableCell>
                           </TableRow>
-                        ))}
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </div>
@@ -1117,6 +1232,117 @@ export default function ITProjectHubBudget() {
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="space-y-2">
+              <Label>Projet IT (optionnel)</Label>
+              <Select value={expItProjectId || '__none__'} onValueChange={(v) => setExpItProjectId(v === '__none__' ? '' : v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="— Aucun —" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— Aucun —</SelectItem>
+                  {allProjects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.code_projet_digital ? `${p.code_projet_digital} — ${p.nom_projet}` : p.nom_projet}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Source</Label>
+                <Select value={expSourceDepense} onValueChange={(v) => setExpSourceDepense(v as any)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="divalto">Divalto</SelectItem>
+                    <SelectItem value="note_de_frais">Note de frais</SelectItem>
+                    <SelectItem value="autre">Autre</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Décaissement</Label>
+                <Select value={expModeDecaissement} onValueChange={(v) => setExpModeDecaissement(v as any)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="annuel">Annuel</SelectItem>
+                    <SelectItem value="mensuel">Mensuel (montant / mois)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Mois applicables</Label>
+              <div className="flex flex-wrap gap-2">
+                {MOIS_LABELS.map((label, i) => {
+                  const month = i + 1;
+                  const checked = expMoisApplicables.includes(month);
+                  return (
+                    <label key={label} className="flex items-center gap-2 text-xs rounded-md border px-2 py-1 cursor-pointer select-none">
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={() => {
+                          setExpMoisApplicables((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(month)) next.delete(month);
+                            else next.add(month);
+                            return Array.from(next).sort((a, b) => a - b);
+                          });
+                        }}
+                        aria-label={label}
+                      />
+                      <span>{label.slice(0, 3)}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              {expModeDecaissement === 'mensuel' && (
+                <p className="text-[11px] text-muted-foreground">
+                  Total annuel estimé : {eur((Number(expMontant.replace(',', '.')) || 0) * (expMoisApplicables.length || 0))}
+                </p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label>Catégorie</Label>
+              <Select
+                value={expCategorieSelect}
+                onValueChange={(v) => {
+                  setExpCategorieSelect(v);
+                  setExpSousCategorie('');
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {expCategorieOptions.map((c) => (
+                    <SelectItem key={c} value={c}>
+                      {c}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Sous-catégorie</Label>
+              <Select value={expSousCategorie || '__none__'} onValueChange={(v) => setExpSousCategorie(v === '__none__' ? '' : v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sous-catégorie" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">—</SelectItem>
+                  {expSousCategorieOptions.map((opt) => (
+                    <SelectItem key={opt} value={opt}>
+                      {opt}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label>Type de prévision</Label>
               <Select
                 value={expTypePrevision}
@@ -1135,8 +1361,30 @@ export default function ITProjectHubBudget() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Fournisseur</Label>
-              <Input value={expFournisseur} onChange={(e) => setExpFournisseur(e.target.value)} />
+              <Label>Type de dépense</Label>
+              <Select value={expTypeDepense} onValueChange={(v) => setExpTypeDepense(v as TypeDepense)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Opex">Opex</SelectItem>
+                  <SelectItem value="Capex">Capex</SelectItem>
+                  <SelectItem value="RH">RH</SelectItem>
+                  <SelectItem value="Amortissement">Amortissement</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Nature de dépense</Label>
+              <Input value={expNatureDepense} onChange={(e) => setExpNatureDepense(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Fournisseur prévu</Label>
+              <SupplierCombobox
+                value={expFournisseurPrevu ?? ''}
+                onValueChange={(v) => setExpFournisseurPrevu(v)}
+                placeholder="— Aucun —"
+              />
             </div>
             <div className="space-y-2">
               <Label>Description</Label>

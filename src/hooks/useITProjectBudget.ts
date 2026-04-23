@@ -1,7 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import {
-  ITBudgetLine, ITManualExpense, ITBudgetReallocation, ITBudgetKPIs
+  ITBudgetLine,
+  ITManualExpense,
+  ITBudgetReallocation,
+  ITBudgetKPIs,
+  itManualExpenseAnnualEquivalent,
 } from '@/types/itProject';
 import { lineAnnualBudget, lineAnnualBudgetRevise } from '@/lib/itBudgetTotals';
 
@@ -116,7 +120,9 @@ export function useITProjectBudget(projectId: string | undefined) {
   const budget_revise   = lines.reduce((s, l) => s + lineAnnualBudgetRevise(l), 0);
   const engage          = 0; // TODO Phase 2 : CFK Divalto
   const constate        = 0; // TODO Phase 2 : FFK Divalto
-  const manuel_prevu    = expenses.filter(e => e.statut !== 'annule').reduce((s, e) => s + (e.montant_prevu ?? 0), 0);
+  const manuel_prevu = expenses
+    .filter((e) => e.statut !== 'annule')
+    .reduce((s, e) => s + itManualExpenseAnnualEquivalent(e), 0);
   const forecast_fin_annee   = constate + (engage - constate) + manuel_prevu;
   const ecart_budget         = forecast_fin_annee - budget_revise;
   const montant_reaffectable = Math.max(budget_revise - forecast_fin_annee, 0);
@@ -261,7 +267,9 @@ export function useITBudgetGlobal(filters: { annee?: number; entite?: string; ty
   const budget_revise        = lines.reduce((s, l) => s + lineAnnualBudgetRevise(l), 0);
   const engage               = 0;
   const constate             = 0;
-  const manuel_prevu         = expenses.filter(e => e.statut !== 'annule').reduce((s, e) => s + (e.montant_prevu ?? 0), 0);
+  const manuel_prevu = expenses
+    .filter((e) => e.statut !== 'annule')
+    .reduce((s, e) => s + itManualExpenseAnnualEquivalent(e), 0);
   const forecast_fin_annee   = constate + (engage - constate) + manuel_prevu;
   const ecart_budget         = forecast_fin_annee - budget_revise;
   const montant_reaffectable = Math.max(budget_revise - forecast_fin_annee, 0);
