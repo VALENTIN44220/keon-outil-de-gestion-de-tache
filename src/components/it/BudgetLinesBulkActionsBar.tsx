@@ -11,6 +11,7 @@ import {
   Trash2,
   X,
   Loader2,
+  Link2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -52,6 +53,8 @@ interface BudgetLinesBulkActionsBarProps {
   onBulkUpdate: (updates: Partial<LineWithExtra>) => Promise<void>;
   onBulkDelete: () => Promise<void>;
   onBulkDuplicate: () => Promise<void>;
+  /** Ouvre la boîte d'affectation à une commande/facture pour les lignes sélectionnées. */
+  onBulkRapprocher?: () => void;
   entiteOptions: string[];
   anneeOptions: number[];
 }
@@ -66,6 +69,7 @@ export function BudgetLinesBulkActionsBar({
   onBulkUpdate,
   onBulkDelete,
   onBulkDuplicate,
+  onBulkRapprocher,
   entiteOptions,
   anneeOptions,
 }: BudgetLinesBulkActionsBarProps) {
@@ -223,6 +227,20 @@ export function BudgetLinesBulkActionsBar({
       />
 
       <div className="mx-2 h-5 w-px bg-border" />
+
+      {onBulkRapprocher && (
+        <Button
+          type="button"
+          size="sm"
+          variant="default"
+          className="h-8 gap-1.5"
+          onClick={onBulkRapprocher}
+          disabled={pending !== null}
+        >
+          <Link2 className="h-3.5 w-3.5" />
+          Affecter à une commande/facture
+        </Button>
+      )}
 
       <Button
         type="button"

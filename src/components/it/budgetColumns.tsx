@@ -8,6 +8,7 @@ interface LineExtra {
   entite?: string | null;
   annee?: number | null;
   montant_annuel?: number | null;
+  projet_it_label?: string | null;
 }
 
 export type ITBudgetLineRow = ITBudgetLine & LineExtra;
@@ -23,7 +24,9 @@ export interface ITBudgetColumnDef {
 
 export interface ColumnHelpers {
   eur: (n: number) => string;
-  formatMoisBudget: (m: number | null | undefined) => string;
+  formatBudgetPeriode: (
+    l: Pick<ITBudgetLineRow, 'budget_type' | 'mois_budget'>
+  ) => string;
 }
 
 export const IT_BUDGET_COLUMNS: ITBudgetColumnDef[] = [
@@ -43,10 +46,11 @@ export const IT_BUDGET_COLUMNS: ITBudgetColumnDef[] = [
     key: 'projet_it_id',
     label: 'Projet IT',
     defaultVisible: true,
-    className: 'font-mono text-xs',
     render: (l) => {
+      if (l.projet_it_label) return l.projet_it_label;
       const pid = l.it_project_id?.trim();
-      return pid ? `${pid.slice(0, 8)}…` : '—';
+      if (!pid) return '—';
+      return <span className="font-mono text-xs">{pid.slice(0, 8)}…</span>;
     },
   },
   {
@@ -75,9 +79,9 @@ export const IT_BUDGET_COLUMNS: ITBudgetColumnDef[] = [
   },
   {
     key: 'mois_budget',
-    label: 'Mois',
+    label: 'Périodicité',
     defaultVisible: true,
-    render: (l, h) => h.formatMoisBudget(l.mois_budget),
+    render: (l, h) => h.formatBudgetPeriode(l),
   },
   {
     key: 'nature_depense',
