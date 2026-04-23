@@ -5,12 +5,17 @@ import { Layout } from '@/components/layout/Layout';
 import { useITBudgetGlobal, useITBudgetLineMonths, type ITBudgetLineMonth } from '@/hooks/useITProjectBudget';
 import { useITBudgetEngageConstate } from '@/hooks/useITBudgetEngageConstate';
 import { BudgetLineRapprochementPanel } from '@/components/it/BudgetLineRapprochementPanel';
+import { BulkRapprochementDialog } from '@/components/it/BulkRapprochementDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { SupplierCombobox } from '@/components/it/SupplierCombobox';
+import { ITProjectCombobox } from '@/components/it/ITProjectCombobox';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import { useITBudgetOptions, PRESET_CATEGORIES } from '@/hooks/useITBudgetOptions';
 import {
   BUDGET_LINE_STATUT_CONFIG,
   IT_BUDGET_ANNEES,
   type BudgetLineStatut,
+  type BudgetType,
   type ITBudgetLine,
   type ITManualExpense,
   type TypeDepense,
@@ -86,29 +91,19 @@ function eur(n: number) {
 }
 
 const MOIS_COURTS = ['', 'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+const MOIS_LONGS = [
+  'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
+];
 
-function formatMoisBudget(m: number | null | undefined): string {
-  if (m == null || m === undefined) return 'Annuel';
-  return MOIS_COURTS[m] ?? `M${m}`;
+function formatBudgetPeriode(l: Pick<ITBudgetLine, 'budget_type' | 'mois_budget'>): string {
+  if (l.budget_type === 'mensuel') return 'Mensuel';
+  if (l.mois_budget == null) return 'Annuel';
+  return `Annuel — ${MOIS_COURTS[l.mois_budget] ?? `M${l.mois_budget}`}`;
 }
 
 type LineExtra = ITBudgetLine & { entite?: string | null; annee?: number | null };
 type ExpenseExtra = ITManualExpense & { entite?: string | null; annee?: number | null };
-
-const PRESET_CATEGORIES_NIVEAU1 = ['IT', 'IT ERP'] as const;
-
-const PRESET_SOUS_CATEGORIES: Record<string, string[]> = {
-  IT: [
-    'Users', 'Réseau', 'Maintenance', 'Amazon', 'Téléphonie',
-    'Doubletrade', 'Adobe', 'Anydesk', 'Nanosystem', 'PROCONSULTEAM',
-    'Bright fastspring', 'Ceciaa', 'Aleas', 'EBP', 'Yousign',
-    'Pentest', 'ARCGIS', 'Copilot', 'Autre',
-  ],
-  'IT ERP': [
-    'Exalog Cegid', 'E-attestation', 'Veremes', 'Lucca', 'Divalto',
-    'Yooz', 'BLC Pipedrive', 'lucanet', 'CreditSafe', 'Autre',
-  ],
-};
 
 const BUDGET_LINE_STATUTS = Object.keys(BUDGET_LINE_STATUT_CONFIG) as BudgetLineStatut[];
 
@@ -401,13 +396,21 @@ export default function ITBudgetGlobal() {
 
   const entiteOptions = useMemo(() => companiesList.map((c) => c.name), [companiesList]);
 
-  const [lineCategorieSelect, setLineCategorieSelect] = useState<string>(PRESET_CATEGORIES_NIVEAU1[0]);
+  const {
+    categorieOptions,
+    getSousCategorieOptions,
+    natureDepenseOptions,
+    addOption,
+  } = useITBudgetOptions();
+
+  const [lineCategorieSelect, setLineCategorieSelect] = useState<string>(PRESET_CATEGORIES[0]);
   const [lineSousCategorie, setLineSousCategorie] = useState('');
   const [lineFournisseur, setLineFournisseur] = useState('');
   const [lineTypeDepense, setLineTypeDepense] = useState<TypeDepense>('Opex');
   const [lineNatureDepense, setLineNatureDepense] = useState('');
   const [lineDescription, setLineDescription] = useState('');
-  const [lineMoisBudget, setLineMoisBudget] = useState<string>('__annual__');
+  const [lineBudgetType, setLineBudgetType] = useState<BudgetType>('mensuel');
+  const [lineMoisDecaissement, setLineMoisDecaissement] = useState<string>('1');
   const [lineMontantBudget, setLineMontantBudget] = useState('');
   const [lineMontantRevise, setLineMontantRevise] = useState('');
   const [lineStatut, setLineStatut] = useState<BudgetLineStatut>('brouillon');
@@ -415,6 +418,7 @@ export default function ITBudgetGlobal() {
   const [lineEntite, setLineEntite] = useState<string>('');
   const [lineAnnee, setLineAnnee] = useState<string>('2026');
   const [lineItProjectId, setLineItProjectId] = useState('');
+  const [bulkRapprochementOpen, setBulkRapprochementOpen] = useState(false);
 
   const [expTypePrevision, setExpTypePrevision] = useState<ITManualExpense['type_prevision']>('depense_prevue');
   const [expFournisseur, setExpFournisseur] = useState('');
@@ -428,21 +432,32 @@ export default function ITBudgetGlobal() {
   const [expItProjectId, setExpItProjectId] = useState('');
 
   const lineSousCategorieOptions = useMemo(() => {
-    const base = (PRESET_SOUS_CATEGORIES[lineCategorieSelect] ?? []).filter((s) => s && s.trim() !== '');
-    if (lineSousCategorie && !base.includes(lineSousCategorie)) {
-      base.push(lineSousCategorie);
-    }
+    const base = getSousCategorieOptions(lineCategorieSelect);
+    if (lineSousCategorie && !base.includes(lineSousCategorie)) base.push(lineSousCategorie);
     return base;
-  }, [lineCategorieSelect, lineSousCategorie]);
+  }, [lineCategorieSelect, lineSousCategorie, getSousCategorieOptions]);
+
+  const lineNatureDepenseOptions = useMemo(() => {
+    const base = [...natureDepenseOptions];
+    if (lineNatureDepense && !base.includes(lineNatureDepense)) base.push(lineNatureDepense);
+    return base;
+  }, [natureDepenseOptions, lineNatureDepense]);
+
+  const lineCategorieOptions = useMemo(() => {
+    const base = [...categorieOptions];
+    if (lineCategorieSelect && !base.includes(lineCategorieSelect)) base.push(lineCategorieSelect);
+    return base;
+  }, [categorieOptions, lineCategorieSelect]);
 
   const resetLineForm = useCallback(() => {
-    setLineCategorieSelect(PRESET_CATEGORIES_NIVEAU1[0]);
+    setLineCategorieSelect(PRESET_CATEGORIES[0]);
     setLineSousCategorie('');
     setLineFournisseur('');
     setLineTypeDepense('Opex');
     setLineNatureDepense('');
     setLineDescription('');
-    setLineMoisBudget('__annual__');
+    setLineBudgetType('mensuel');
+    setLineMoisDecaissement('1');
     setLineMontantBudget('');
     setLineMontantRevise('');
     setLineStatut('brouillon');
@@ -462,18 +477,14 @@ export default function ITBudgetGlobal() {
     const lx = line as LineExtra;
     setEditingLine(line);
     const cat = line.categorie?.trim() || '';
-    const niveau1 = PRESET_CATEGORIES_NIVEAU1 as readonly string[];
-    if (niveau1.includes(cat)) {
-      setLineCategorieSelect(cat);
-    } else {
-      setLineCategorieSelect(PRESET_CATEGORIES_NIVEAU1[0]);
-    }
+    setLineCategorieSelect(cat || PRESET_CATEGORIES[0]);
     setLineSousCategorie(line.sous_categorie ?? '');
     setLineFournisseur(line.fournisseur_prevu ?? '');
     setLineTypeDepense((line.type_depense as TypeDepense) || 'Opex');
     setLineNatureDepense(line.nature_depense ?? '');
     setLineDescription(line.description ?? '');
-    setLineMoisBudget(line.mois_budget == null ? '__annual__' : String(line.mois_budget));
+    setLineBudgetType((line.budget_type as BudgetType) ?? 'mensuel');
+    setLineMoisDecaissement(line.mois_budget != null ? String(line.mois_budget) : '1');
     setLineMontantBudget(String(line.montant_budget ?? ''));
     setLineMontantRevise(line.montant_budget_revise != null ? String(line.montant_budget_revise) : '');
     setLineStatut(line.statut);
@@ -524,11 +535,24 @@ export default function ITBudgetGlobal() {
       if (filterTypeDepense !== '__all__' && (l.type_depense || '') !== filterTypeDepense) return false;
       if (filterMois !== '__all__') {
         const m = Number(filterMois);
-        if (l.mois_budget !== m) return false;
+        // Un budget mensuel couvre tous les mois ; un budget annuel n'apparaît
+        // que pour son mois de décaissement.
+        if (l.budget_type === 'annuel' && l.mois_budget !== m) return false;
       }
       return true;
     });
   }, [lines, filterTypeDepense, filterMois]);
+
+  const filteredLineRows = useMemo(
+    () =>
+      filteredLines.map((l) => ({
+        ...(l as ITBudgetLineRow),
+        projet_it_label: l.it_project_id
+          ? projectNameMap.get(l.it_project_id) ?? null
+          : null,
+      })) as ITBudgetLineRow[],
+    [filteredLines, projectNameMap]
+  );
 
   const manuel_prevu = useMemo(
     () => expenses.filter((e) => e.statut !== 'annule').reduce((s, e) => s + (e.montant_prevu ?? 0), 0),
@@ -570,7 +594,12 @@ export default function ITBudgetGlobal() {
       toast({ title: 'Budget révisé invalide', variant: 'destructive' });
       return;
     }
-    const mois = lineMoisBudget === '__annual__' ? null : Number(lineMoisBudget);
+    const mois =
+      lineBudgetType === 'annuel' ? Number(lineMoisDecaissement) : null;
+    if (lineBudgetType === 'annuel' && (!Number.isFinite(mois) || (mois as number) < 1 || (mois as number) > 12)) {
+      toast({ title: 'Mois de décaissement invalide', variant: 'destructive' });
+      return;
+    }
     const lineAnneeNum = Number(lineAnnee);
     if (!Number.isFinite(lineAnneeNum)) {
       toast({ title: 'Année invalide', variant: 'destructive' });
@@ -579,6 +608,25 @@ export default function ITBudgetGlobal() {
 
     setLineSaving(true);
     try {
+      // Persister les valeurs personnalisées (fire-and-forget) pour qu'elles
+      // apparaissent dans les dropdowns des autres utilisateurs.
+      if (lineCategorieSelect && !categorieOptions.includes(lineCategorieSelect)) {
+        addOption.mutate({ option_type: 'categorie', value: lineCategorieSelect });
+      }
+      if (
+        lineSousCategorie &&
+        !getSousCategorieOptions(lineCategorieSelect).includes(lineSousCategorie)
+      ) {
+        addOption.mutate({
+          option_type: 'sous_categorie',
+          value: lineSousCategorie,
+          parent_value: lineCategorieSelect,
+        });
+      }
+      if (lineNatureDepense && !natureDepenseOptions.includes(lineNatureDepense)) {
+        addOption.mutate({ option_type: 'nature_depense', value: lineNatureDepense });
+      }
+
       const baseUpdates = {
         categorie: lineCategorieSelect || null,
         sous_categorie: lineSousCategorie || null,
@@ -586,6 +634,7 @@ export default function ITBudgetGlobal() {
         type_depense: lineTypeDepense,
         nature_depense: lineNatureDepense || null,
         description: lineDescription || null,
+        budget_type: lineBudgetType,
         mois_budget: mois,
         montant_budget: montant,
         montant_budget_revise: montantRevise,
@@ -1195,6 +1244,7 @@ export default function ITBudgetGlobal() {
                         await bulkDuplicateLines.mutateAsync(Array.from(selectedLineIds));
                         clearSelection();
                       }}
+                      onBulkRapprocher={() => setBulkRapprochementOpen(true)}
                       entiteOptions={entiteOptions}
                       anneeOptions={anneeOptions}
                     />
@@ -1229,8 +1279,8 @@ export default function ITBudgetGlobal() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredLines.map((l) => {
-                          const line = l as ITBudgetLineRow;
+                        {filteredLineRows.map((l) => {
+                          const line = l;
                           return (
                             <Fragment key={l.id}>
                               <TableRow
@@ -1252,7 +1302,7 @@ export default function ITBudgetGlobal() {
                                       key={key}
                                       className={cn(col.align === 'right' && 'text-right', col.className)}
                                     >
-                                      {col.render(line, { eur, formatMoisBudget })}
+                                      {col.render(line, { eur, formatBudgetPeriode })}
                                     </TableCell>
                                   );
                                 })}
@@ -1431,51 +1481,38 @@ export default function ITBudgetGlobal() {
             </div>
             <div className="space-y-2">
               <Label>Projet IT (optionnel)</Label>
-              <Input
-                placeholder="Code projet IT ex: NSK_IT-00001"
+              <ITProjectCombobox
                 value={lineItProjectId}
-                onChange={(e) => setLineItProjectId(e.target.value)}
+                onValueChange={setLineItProjectId}
+                allowEmpty
+                placeholder="— Aucun projet —"
               />
             </div>
             <div className="space-y-2">
               <Label>Catégorie</Label>
-              <Select
+              <SearchableSelect
                 value={lineCategorieSelect}
                 onValueChange={(v) => {
                   setLineCategorieSelect(v);
                   setLineSousCategorie('');
                 }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PRESET_CATEGORIES_NIVEAU1.map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {c}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                options={lineCategorieOptions.map((c) => ({ value: c, label: c }))}
+                allowCustom
+                customPlaceholder="Ajouter une nouvelle catégorie"
+                searchPlaceholder="Rechercher ou saisir une catégorie..."
+              />
             </div>
             <div className="space-y-2">
               <Label>Sous-catégorie</Label>
-              <Select
-                value={lineSousCategorie || '__none__'}
-                onValueChange={(v) => setLineSousCategorie(v === '__none__' ? '' : v)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Sous-catégorie" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">—</SelectItem>
-                  {lineSousCategorieOptions.map((opt) => (
-                    <SelectItem key={opt} value={opt}>
-                      {opt}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={lineSousCategorie}
+                onValueChange={setLineSousCategorie}
+                options={lineSousCategorieOptions.map((o) => ({ value: o, label: o }))}
+                allowCustom
+                customPlaceholder="Ajouter une nouvelle sous-catégorie"
+                searchPlaceholder="Rechercher ou saisir une sous-catégorie..."
+                placeholder="— Sous-catégorie —"
+              />
             </div>
             <div className="space-y-2">
               <Label>Fournisseur prévu</Label>
@@ -1501,44 +1538,72 @@ export default function ITBudgetGlobal() {
             </div>
             <div className="space-y-2">
               <Label>Nature de dépense</Label>
-              <Input value={lineNatureDepense} onChange={(e) => setLineNatureDepense(e.target.value)} />
+              <SearchableSelect
+                value={lineNatureDepense}
+                onValueChange={setLineNatureDepense}
+                options={lineNatureDepenseOptions.map((o) => ({ value: o, label: o }))}
+                allowCustom
+                customPlaceholder="Ajouter une nouvelle nature de dépense"
+                searchPlaceholder="Rechercher ou saisir une nature..."
+                placeholder="— Nature de dépense —"
+              />
             </div>
             <div className="space-y-2">
               <Label>Description</Label>
               <Input value={lineDescription} onChange={(e) => setLineDescription(e.target.value)} />
             </div>
-            <div className="space-y-2">
-              <Label>Mois budget</Label>
-              <Select value={lineMoisBudget} onValueChange={setLineMoisBudget}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__annual__">Annuel</SelectItem>
-                  {[
-                    'Janvier',
-                    'Février',
-                    'Mars',
-                    'Avril',
-                    'Mai',
-                    'Juin',
-                    'Juillet',
-                    'Août',
-                    'Septembre',
-                    'Octobre',
-                    'Novembre',
-                    'Décembre',
-                  ].map((label, i) => (
-                    <SelectItem key={label} value={String(i + 1)}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Type de budget</Label>
+                <Select
+                  value={lineBudgetType}
+                  onValueChange={(v) => setLineBudgetType(v as BudgetType)}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="mensuel">Mensuel (même montant/mois)</SelectItem>
+                    <SelectItem value="annuel">Annuel (décaissement unique)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {lineBudgetType === 'annuel' && (
+                <div className="space-y-2">
+                  <Label>Mois de décaissement prévu</Label>
+                  <Select value={lineMoisDecaissement} onValueChange={setLineMoisDecaissement}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MOIS_LONGS.map((label, i) => (
+                        <SelectItem key={label} value={String(i + 1)}>
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
             <div className="space-y-2">
-              <Label>Montant budget (requis)</Label>
-              <Input type="number" step="0.01" required value={lineMontantBudget} onChange={(e) => setLineMontantBudget(e.target.value)} />
+              <Label>
+                {lineBudgetType === 'mensuel'
+                  ? 'Montant mensuel (requis)'
+                  : 'Montant annuel (requis)'}
+              </Label>
+              <Input
+                type="number"
+                step="0.01"
+                required
+                value={lineMontantBudget}
+                onChange={(e) => setLineMontantBudget(e.target.value)}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                {lineBudgetType === 'mensuel'
+                  ? 'Ce montant sera appliqué à chaque mois de l’année.'
+                  : 'Montant total décaissé sur le mois sélectionné.'}
+              </p>
             </div>
             <div className="space-y-2">
               <Label>Budget révisé (optionnel)</Label>
@@ -1706,6 +1771,18 @@ export default function ITBudgetGlobal() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <BulkRapprochementDialog
+        open={bulkRapprochementOpen}
+        onOpenChange={setBulkRapprochementOpen}
+        selectedIds={Array.from(selectedLineIds)}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['it-budget-commandes-liees'] });
+          queryClient.invalidateQueries({ queryKey: ['it-budget-factures-liees'] });
+          queryClient.invalidateQueries({ queryKey: ['it-budget-engage-constate'] });
+          clearSelection();
+        }}
+      />
     </Layout>
   );
 }

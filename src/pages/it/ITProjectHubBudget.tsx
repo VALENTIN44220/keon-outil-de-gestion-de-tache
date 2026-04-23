@@ -6,9 +6,12 @@ import { Layout } from '@/components/layout/Layout';
 import { ITProjectHubHeader } from '@/components/it/ITProjectHubHeader';
 import { useITProject, useITProjectTasks, useITProjectStats } from '@/hooks/useITProjectHub';
 import { useITProjectBudget } from '@/hooks/useITProjectBudget';
+import { useITBudgetOptions, PRESET_CATEGORIES } from '@/hooks/useITBudgetOptions';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import {
   BUDGET_LINE_STATUT_CONFIG,
   type BudgetLineStatut,
+  type BudgetType,
   type ITBudgetLine,
   type ITManualExpense,
   type TypeDepense,
@@ -73,26 +76,16 @@ function eur(n: number) {
 }
 
 const MOIS_COURTS = ['', 'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+const MOIS_LONGS = [
+  'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+  'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
+];
 
-function formatMoisBudget(m: number | null | undefined): string {
-  if (m == null || m === undefined) return 'Annuel';
-  return MOIS_COURTS[m] ?? `M${m}`;
+function formatBudgetPeriode(l: Pick<ITBudgetLine, 'budget_type' | 'mois_budget'>): string {
+  if (l.budget_type === 'mensuel') return 'Mensuel';
+  if (l.mois_budget == null) return 'Annuel';
+  return `Annuel — ${MOIS_COURTS[l.mois_budget] ?? `M${l.mois_budget}`}`;
 }
-
-const PRESET_CATEGORIES_NIVEAU1 = ['IT', 'IT ERP'] as const;
-
-const PRESET_SOUS_CATEGORIES: Record<string, string[]> = {
-  IT: [
-    'Users', 'Réseau', 'Maintenance', 'Amazon', 'Téléphonie',
-    'Doubletrade', 'Adobe', 'Anydesk', 'Nanosystem', 'PROCONSULTEAM',
-    'Bright fastspring', 'Ceciaa', 'Aleas', 'EBP', 'Yousign',
-    'Pentest', 'ARCGIS', 'Copilot', 'Autre',
-  ],
-  'IT ERP': [
-    'Exalog Cegid', 'E-attestation', 'Veremes', 'Lucca', 'Divalto',
-    'Yooz', 'BLC Pipedrive', 'lucanet', 'CreditSafe', 'Autre',
-  ],
-};
 
 const BUDGET_LINE_STATUTS = Object.keys(BUDGET_LINE_STATUT_CONFIG) as BudgetLineStatut[];
 
@@ -188,13 +181,21 @@ export default function ITProjectHubBudget() {
   const [expenseSaving, setExpenseSaving] = useState(false);
   const [deleteExpenseId, setDeleteExpenseId] = useState<string | null>(null);
 
-  const [lineCategorieSelect, setLineCategorieSelect] = useState<string>(PRESET_CATEGORIES_NIVEAU1[0]);
+  const {
+    categorieOptions,
+    getSousCategorieOptions,
+    natureDepenseOptions,
+    addOption,
+  } = useITBudgetOptions();
+
+  const [lineCategorieSelect, setLineCategorieSelect] = useState<string>(PRESET_CATEGORIES[0]);
   const [lineSousCategorie, setLineSousCategorie] = useState('');
   const [lineFournisseur, setLineFournisseur] = useState('');
   const [lineTypeDepense, setLineTypeDepense] = useState<TypeDepense>('Opex');
   const [lineNatureDepense, setLineNatureDepense] = useState('');
   const [lineDescription, setLineDescription] = useState('');
-  const [lineMoisBudget, setLineMoisBudget] = useState<string>('__annual__');
+  const [lineBudgetType, setLineBudgetType] = useState<BudgetType>('mensuel');
+  const [lineMoisDecaissement, setLineMoisDecaissement] = useState<string>('1');
   const [lineMontantBudget, setLineMontantBudget] = useState('');
   const [lineMontantRevise, setLineMontantRevise] = useState('');
   const [lineStatut, setLineStatut] = useState<BudgetLineStatut>('brouillon');
@@ -209,21 +210,32 @@ export default function ITProjectHubBudget() {
   const [expCommentaire, setExpCommentaire] = useState('');
 
   const lineSousCategorieOptions = useMemo(() => {
-    const base = (PRESET_SOUS_CATEGORIES[lineCategorieSelect] ?? []).filter((s) => s && s.trim() !== '');
-    if (lineSousCategorie && !base.includes(lineSousCategorie)) {
-      base.push(lineSousCategorie);
-    }
+    const base = getSousCategorieOptions(lineCategorieSelect);
+    if (lineSousCategorie && !base.includes(lineSousCategorie)) base.push(lineSousCategorie);
     return base;
-  }, [lineCategorieSelect, lineSousCategorie]);
+  }, [lineCategorieSelect, lineSousCategorie, getSousCategorieOptions]);
+
+  const lineNatureDepenseOptions = useMemo(() => {
+    const base = [...natureDepenseOptions];
+    if (lineNatureDepense && !base.includes(lineNatureDepense)) base.push(lineNatureDepense);
+    return base;
+  }, [natureDepenseOptions, lineNatureDepense]);
+
+  const lineCategorieOptions = useMemo(() => {
+    const base = [...categorieOptions];
+    if (lineCategorieSelect && !base.includes(lineCategorieSelect)) base.push(lineCategorieSelect);
+    return base;
+  }, [categorieOptions, lineCategorieSelect]);
 
   const resetLineForm = useCallback(() => {
-    setLineCategorieSelect(PRESET_CATEGORIES_NIVEAU1[0]);
+    setLineCategorieSelect(PRESET_CATEGORIES[0]);
     setLineSousCategorie('');
     setLineFournisseur('');
     setLineTypeDepense('Opex');
     setLineNatureDepense('');
     setLineDescription('');
-    setLineMoisBudget('__annual__');
+    setLineBudgetType('mensuel');
+    setLineMoisDecaissement('1');
     setLineMontantBudget('');
     setLineMontantRevise('');
     setLineStatut('brouillon');
@@ -239,18 +251,14 @@ export default function ITProjectHubBudget() {
   const openEditLine = (line: ITBudgetLine) => {
     setEditingLine(line);
     const cat = line.categorie?.trim() || '';
-    const niveau1 = PRESET_CATEGORIES_NIVEAU1 as readonly string[];
-    if (niveau1.includes(cat)) {
-      setLineCategorieSelect(cat);
-    } else {
-      setLineCategorieSelect(PRESET_CATEGORIES_NIVEAU1[0]);
-    }
+    setLineCategorieSelect(cat || PRESET_CATEGORIES[0]);
     setLineSousCategorie(line.sous_categorie ?? '');
     setLineFournisseur(line.fournisseur_prevu ?? '');
     setLineTypeDepense((line.type_depense as TypeDepense) || 'Opex');
     setLineNatureDepense(line.nature_depense ?? '');
     setLineDescription(line.description ?? '');
-    setLineMoisBudget(line.mois_budget == null ? '__annual__' : String(line.mois_budget));
+    setLineBudgetType((line.budget_type as BudgetType) ?? 'mensuel');
+    setLineMoisDecaissement(line.mois_budget != null ? String(line.mois_budget) : '1');
     setLineMontantBudget(String(line.montant_budget ?? ''));
     setLineMontantRevise(line.montant_budget_revise != null ? String(line.montant_budget_revise) : '');
     setLineStatut(line.statut);
@@ -291,7 +299,7 @@ export default function ITProjectHubBudget() {
       if (filterTypeDepense !== '__all__' && (l.type_depense || '') !== filterTypeDepense) return false;
       if (filterMois !== '__all__') {
         const m = Number(filterMois);
-        if (l.mois_budget !== m) return false;
+        if (l.budget_type === 'annuel' && l.mois_budget !== m) return false;
       }
       return true;
     });
@@ -333,9 +341,30 @@ export default function ITProjectHubBudget() {
       return;
     }
     const mois =
-      lineMoisBudget === '__annual__' ? null : Number(lineMoisBudget);
+      lineBudgetType === 'annuel' ? Number(lineMoisDecaissement) : null;
+    if (lineBudgetType === 'annuel' && (!Number.isFinite(mois) || (mois as number) < 1 || (mois as number) > 12)) {
+      toast({ title: 'Mois de décaissement invalide', variant: 'destructive' });
+      return;
+    }
     setLineSaving(true);
     try {
+      if (lineCategorieSelect && !categorieOptions.includes(lineCategorieSelect)) {
+        addOption.mutate({ option_type: 'categorie', value: lineCategorieSelect });
+      }
+      if (
+        lineSousCategorie &&
+        !getSousCategorieOptions(lineCategorieSelect).includes(lineSousCategorie)
+      ) {
+        addOption.mutate({
+          option_type: 'sous_categorie',
+          value: lineSousCategorie,
+          parent_value: lineCategorieSelect,
+        });
+      }
+      if (lineNatureDepense && !natureDepenseOptions.includes(lineNatureDepense)) {
+        addOption.mutate({ option_type: 'nature_depense', value: lineNatureDepense });
+      }
+
       if (editingLine) {
         await updateLine.mutateAsync({
           id: editingLine.id,
@@ -346,6 +375,7 @@ export default function ITProjectHubBudget() {
             type_depense: lineTypeDepense,
             nature_depense: lineNatureDepense || null,
             description: lineDescription || null,
+            budget_type: lineBudgetType,
             mois_budget: mois,
             montant_budget: montant,
             montant_budget_revise: montantRevise,
@@ -365,6 +395,7 @@ export default function ITProjectHubBudget() {
           type_depense: lineTypeDepense,
           nature_depense: lineNatureDepense || null,
           description: lineDescription || null,
+          budget_type: lineBudgetType,
           mois_budget: mois,
           montant_budget: montant,
           montant_budget_revise: montantRevise,
@@ -680,7 +711,7 @@ export default function ITProjectHubBudget() {
                           <TableHead>Sous-catégorie</TableHead>
                           <TableHead>Fournisseur</TableHead>
                           <TableHead>Type</TableHead>
-                          <TableHead>Mois</TableHead>
+                          <TableHead>Périodicité</TableHead>
                           <TableHead className="text-right">Budget initial</TableHead>
                           <TableHead className="text-right">Budget révisé</TableHead>
                           <TableHead>Statut</TableHead>
@@ -696,7 +727,7 @@ export default function ITProjectHubBudget() {
                               <TableCell>{l.sous_categorie ?? '—'}</TableCell>
                               <TableCell>{l.fournisseur_prevu ?? '—'}</TableCell>
                               <TableCell>{l.type_depense ?? '—'}</TableCell>
-                              <TableCell>{formatMoisBudget(l.mois_budget)}</TableCell>
+                              <TableCell>{formatBudgetPeriode(l)}</TableCell>
                               <TableCell className="text-right tabular-nums">{eur(l.montant_budget ?? 0)}</TableCell>
                               <TableCell className="text-right tabular-nums">
                                 {eur(l.montant_budget_revise ?? l.montant_budget ?? 0)}
@@ -925,43 +956,29 @@ export default function ITProjectHubBudget() {
           <div className="space-y-3 py-2">
             <div className="space-y-2">
               <Label>Catégorie</Label>
-              <Select
+              <SearchableSelect
                 value={lineCategorieSelect}
                 onValueChange={(v) => {
                   setLineCategorieSelect(v);
                   setLineSousCategorie('');
                 }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PRESET_CATEGORIES_NIVEAU1.map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {c}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                options={lineCategorieOptions.map((c) => ({ value: c, label: c }))}
+                allowCustom
+                customPlaceholder="Ajouter une nouvelle catégorie"
+                searchPlaceholder="Rechercher ou saisir une catégorie..."
+              />
             </div>
             <div className="space-y-2">
               <Label>Sous-catégorie</Label>
-              <Select
-                value={lineSousCategorie || '__none__'}
-                onValueChange={(v) => setLineSousCategorie(v === '__none__' ? '' : v)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Sous-catégorie" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">—</SelectItem>
-                  {lineSousCategorieOptions.map((opt) => (
-                    <SelectItem key={opt} value={opt}>
-                      {opt}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={lineSousCategorie}
+                onValueChange={setLineSousCategorie}
+                options={lineSousCategorieOptions.map((o) => ({ value: o, label: o }))}
+                allowCustom
+                customPlaceholder="Ajouter une nouvelle sous-catégorie"
+                searchPlaceholder="Rechercher ou saisir une sous-catégorie..."
+                placeholder="— Sous-catégorie —"
+              />
             </div>
             <div className="space-y-2">
               <Label>Fournisseur prévu</Label>
@@ -987,43 +1004,57 @@ export default function ITProjectHubBudget() {
             </div>
             <div className="space-y-2">
               <Label>Nature de dépense</Label>
-              <Input value={lineNatureDepense} onChange={(e) => setLineNatureDepense(e.target.value)} />
+              <SearchableSelect
+                value={lineNatureDepense}
+                onValueChange={setLineNatureDepense}
+                options={lineNatureDepenseOptions.map((o) => ({ value: o, label: o }))}
+                allowCustom
+                customPlaceholder="Ajouter une nouvelle nature de dépense"
+                searchPlaceholder="Rechercher ou saisir une nature..."
+                placeholder="— Nature de dépense —"
+              />
             </div>
             <div className="space-y-2">
               <Label>Description</Label>
               <Input value={lineDescription} onChange={(e) => setLineDescription(e.target.value)} />
             </div>
-            <div className="space-y-2">
-              <Label>Mois budget</Label>
-              <Select value={lineMoisBudget} onValueChange={setLineMoisBudget}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__annual__">Annuel</SelectItem>
-                  {[
-                    'Janvier',
-                    'Février',
-                    'Mars',
-                    'Avril',
-                    'Mai',
-                    'Juin',
-                    'Juillet',
-                    'Août',
-                    'Septembre',
-                    'Octobre',
-                    'Novembre',
-                    'Décembre',
-                  ].map((label, i) => (
-                    <SelectItem key={label} value={String(i + 1)}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Type de budget</Label>
+                <Select value={lineBudgetType} onValueChange={(v) => setLineBudgetType(v as BudgetType)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="mensuel">Mensuel (même montant/mois)</SelectItem>
+                    <SelectItem value="annuel">Annuel (décaissement unique)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {lineBudgetType === 'annuel' && (
+                <div className="space-y-2">
+                  <Label>Mois de décaissement prévu</Label>
+                  <Select value={lineMoisDecaissement} onValueChange={setLineMoisDecaissement}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MOIS_LONGS.map((label, i) => (
+                        <SelectItem key={label} value={String(i + 1)}>
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
             <div className="space-y-2">
-              <Label>Montant budget (requis)</Label>
+              <Label>
+                {lineBudgetType === 'mensuel'
+                  ? 'Montant mensuel (requis)'
+                  : 'Montant annuel (requis)'}
+              </Label>
               <Input
                 type="number"
                 step="0.01"
@@ -1031,6 +1062,11 @@ export default function ITProjectHubBudget() {
                 value={lineMontantBudget}
                 onChange={(e) => setLineMontantBudget(e.target.value)}
               />
+              <p className="text-[11px] text-muted-foreground">
+                {lineBudgetType === 'mensuel'
+                  ? 'Ce montant sera appliqué à chaque mois de l’année.'
+                  : 'Montant total décaissé sur le mois sélectionné.'}
+              </p>
             </div>
             <div className="space-y-2">
               <Label>Budget révisé (optionnel)</Label>
