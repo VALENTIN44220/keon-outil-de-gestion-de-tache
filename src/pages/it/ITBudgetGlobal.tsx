@@ -538,14 +538,20 @@ export default function ITBudgetGlobal() {
   const revisionsDelta = kpis.budget_revise - kpis.budget_initial;
   const budgetReviseGlobal = kpis.budget_revise;
 
+  const tauxConsommationBudgetPct = useMemo(() => {
+    const br = Number(kpis.budget_revise);
+    const constate = Number(constateGlobal) || 0;
+    if (!Number.isFinite(br) || br <= 0) return 0;
+    const pct = (constate / br) * 100;
+    return Math.min(100, Math.max(0, Math.round(pct * 10) / 10));
+  }, [kpis.budget_revise, constateGlobal]);
+
   const typeCardStyle: Record<string, { border: string; bg: string }> = {
     Opex: { border: 'border-blue-200', bg: 'bg-blue-50/50 dark:bg-blue-950/20' },
     Capex: { border: 'border-amber-200', bg: 'bg-amber-50/50 dark:bg-amber-950/20' },
     RH: { border: 'border-green-200', bg: 'bg-green-50/50 dark:bg-green-950/20' },
     Amortissement: { border: 'border-slate-200', bg: 'bg-slate-50/60 dark:bg-slate-950/30' },
   };
-
-  const progressValue = Math.min(100, Math.max(0, kpis.taux_consommation));
 
   const hasActiveFilters = !!(filters.entite || filters.type_depense || filters.categorie.trim());
 
@@ -882,13 +888,11 @@ export default function ITBudgetGlobal() {
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <span className="text-sm font-medium">Taux de consommation budgétaire</span>
                   <span className="text-xs text-muted-foreground sm:text-right">
-                    {kpis.taux_consommation}% — Constaté {eur(constateGlobal)} / Budget révisé {eur(kpis.budget_revise)}
+                    {tauxConsommationBudgetPct.toLocaleString('fr-FR', { maximumFractionDigits: 1 })}% — Constaté{' '}
+                    {eur(constateGlobal)} / Budget révisé {eur(kpis.budget_revise)}
                   </span>
                 </div>
-                <Progress value={progressValue} className="h-3" />
-                <p className="text-[11px] text-muted-foreground">
-                  ℹ Engagé et Constaté seront alimentés depuis Divalto (Phase 2)
-                </p>
+                <Progress value={tauxConsommationBudgetPct} className="h-3" />
               </CardContent>
             </Card>
 
@@ -1176,7 +1180,7 @@ export default function ITBudgetGlobal() {
                     </p>
                   </div>
                 ) : (
-                  <div className="rounded-md border overflow-x-auto">
+                  <div className="rounded-md border overflow-hidden min-w-0">
                     <BudgetLinesBulkActionsBar
                       selectedIds={Array.from(selectedLineIds)}
                       allLines={lines as any}
@@ -1198,10 +1202,12 @@ export default function ITBudgetGlobal() {
                       entiteOptions={entiteOptions}
                       anneeOptions={anneeOptions}
                     />
-                    <Table>
+                    <Table className="w-max min-w-full">
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-[40px]">
+                          <TableHead
+                            className="w-[40px] sticky left-0 z-20 border-r border-border/70 bg-background shadow-[4px_0_8px_-4px_rgba(0,0,0,0.12)]"
+                          >
                             {(() => {
                               const visibleIds = filteredLines.map((l) => l.id);
                               const allSelected =
@@ -1225,19 +1231,32 @@ export default function ITBudgetGlobal() {
                               </TableHead>
                             );
                           })}
-                          <TableHead className="w-[100px]">Actions</TableHead>
+                          <TableHead
+                            className="w-[100px] min-w-[6.5rem] sticky right-0 z-30 text-right border-l border-border/70 bg-background shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.12)]"
+                          >
+                            Actions
+                          </TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {filteredLines.map((l) => {
                           const line = l as ITBudgetLineRow;
+                          const isRowSelected = selectedLineIds.has(l.id);
                           return (
                             <Fragment key={l.id}>
                               <TableRow
-                                className={cn('cursor-pointer', selectedLineIds.has(l.id) && 'bg-primary/5')}
+                                className={cn('cursor-pointer group/line', isRowSelected && 'bg-primary/5')}
                                 onClick={() => setExpandedLineId(expandedLineId === l.id ? null : l.id)}
                               >
-                                <TableCell onClick={(e) => e.stopPropagation()} className="w-[40px]">
+                                <TableCell
+                                  onClick={(e) => e.stopPropagation()}
+                                  className={cn(
+                                    'w-[40px] sticky left-0 z-20 border-r border-border/70 py-2 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)]',
+                                    isRowSelected
+                                      ? 'bg-primary/5 group-hover/line:bg-primary/10'
+                                      : 'bg-background group-hover/line:bg-muted/50',
+                                  )}
+                                >
                                   <Checkbox
                                     checked={selectedLineIds.has(l.id)}
                                     onCheckedChange={() => toggleLineSelection(l.id)}
@@ -1256,13 +1275,21 @@ export default function ITBudgetGlobal() {
                                     </TableCell>
                                   );
                                 })}
-                                <TableCell onClick={(e) => e.stopPropagation()}>
-                                  <div className="flex gap-1">
+                                <TableCell
+                                  onClick={(e) => e.stopPropagation()}
+                                  className={cn(
+                                    'w-[100px] min-w-[6.5rem] sticky right-0 z-30 text-right border-l border-border/70 py-2 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.08)]',
+                                    isRowSelected
+                                      ? 'bg-primary/5 group-hover/line:bg-primary/10'
+                                      : 'bg-background group-hover/line:bg-muted/50',
+                                  )}
+                                >
+                                  <div className="flex items-center justify-end gap-0.5 flex-nowrap">
                                     {(() => {
                                       const ec = engageConstateData?.rows.find(r => r.budget_line_id === l.id);
                                       const hasLinks = (ec?.nb_commandes ?? 0) + (ec?.nb_factures ?? 0) > 0;
                                       return hasLinks ? (
-                                        <Badge variant="outline" className="text-[10px] border-emerald-300 text-emerald-600 mr-1">
+                                        <Badge variant="outline" className="text-[10px] border-emerald-300 text-emerald-600 mr-0 shrink-0">
                                           Lié
                                         </Badge>
                                       ) : null;
@@ -1271,7 +1298,7 @@ export default function ITBudgetGlobal() {
                                       type="button"
                                       variant="ghost"
                                       size="icon"
-                                      className="h-8 w-8"
+                                      className="h-8 w-8 shrink-0"
                                       onClick={() => openEditLine(l)}
                                       aria-label="Éditer"
                                     >
@@ -1281,7 +1308,7 @@ export default function ITBudgetGlobal() {
                                       type="button"
                                       variant="ghost"
                                       size="icon"
-                                      className="h-8 w-8 text-destructive"
+                                      className="h-8 w-8 shrink-0 text-destructive"
                                       onClick={() => setDeleteLineId(l.id)}
                                       aria-label="Supprimer"
                                     >
@@ -1319,26 +1346,37 @@ export default function ITBudgetGlobal() {
                     Aucune dépense manuelle
                   </div>
                 ) : (
-                  <div className="rounded-md border overflow-x-auto">
-                    <Table>
+                  <div className="rounded-md border overflow-hidden min-w-0">
+                    <Table className="w-max min-w-full">
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Description</TableHead>
+                          <TableHead className="min-w-[8rem] sticky left-0 z-20 border-r border-border/70 bg-background shadow-[4px_0_8px_-4px_rgba(0,0,0,0.12)]">
+                            Description
+                          </TableHead>
                           <TableHead>Entité</TableHead>
                           <TableHead>Type</TableHead>
                           <TableHead>Fournisseur</TableHead>
                           <TableHead>Date prévue</TableHead>
                           <TableHead className="text-right">Montant</TableHead>
                           <TableHead>Statut</TableHead>
-                          <TableHead className="w-[100px]">Actions</TableHead>
+                          <TableHead className="w-[100px] min-w-[5rem] sticky right-0 z-30 text-right border-l border-border/70 bg-background shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.12)]">
+                            Actions
+                          </TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {expenses.map((e) => {
                           const ex = e as ExpenseExtra;
                           return (
-                            <TableRow key={e.id}>
-                              <TableCell>{e.description ?? '—'}</TableCell>
+                            <TableRow key={e.id} className="group/line">
+                              <TableCell
+                                className={cn(
+                                  'min-w-[8rem] max-w-xs sticky left-0 z-20 border-r border-border/70 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)]',
+                                  'bg-background group-hover/line:bg-muted/50',
+                                )}
+                              >
+                                {e.description ?? '—'}
+                              </TableCell>
                               <TableCell>{ex.entite ?? '—'}</TableCell>
                               <TableCell>
                                 <Badge variant="outline" className={cn('border', TYPE_PREVISION_CLASS[e.type_prevision])}>
@@ -1355,16 +1393,28 @@ export default function ITBudgetGlobal() {
                                   {EXPENSE_STATUT_LABEL[e.statut]}
                                 </Badge>
                               </TableCell>
-                              <TableCell>
-                                <div className="flex gap-1">
-                                  <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditExpense(e)} aria-label="Éditer">
+                              <TableCell
+                                className={cn(
+                                  'w-[100px] min-w-[5rem] sticky right-0 z-30 text-right border-l border-border/70 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.08)]',
+                                  'bg-background group-hover/line:bg-muted/50',
+                                )}
+                              >
+                                <div className="flex items-center justify-end gap-0.5 flex-nowrap">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 shrink-0"
+                                    onClick={() => openEditExpense(e)}
+                                    aria-label="Éditer"
+                                  >
                                     <Pencil className="h-4 w-4" />
                                   </Button>
                                   <Button
                                     type="button"
                                     variant="ghost"
                                     size="icon"
-                                    className="h-8 w-8 text-destructive"
+                                    className="h-8 w-8 shrink-0 text-destructive"
                                     onClick={() => setDeleteExpenseId(e.id)}
                                     aria-label="Supprimer"
                                   >

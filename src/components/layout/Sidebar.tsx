@@ -1,10 +1,9 @@
-import React from 'react';
+import React, { Fragment, useState, useEffect, useMemo } from 'react';
 import { LayoutDashboard, BarChart3, ChevronLeft, ChevronRight, Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText, ArrowLeftRight, Calendar, MessageCircle, Building2, ClipboardList, Lightbulb, Monitor, Leaf, Euro } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSimulation } from '@/contexts/SimulationContext';
-import { useState, useEffect, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,15 +21,18 @@ interface SidebarProps {
   onViewChange: (view: string) => void;
 }
 
+interface SidebarMenuItem {
+  id: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  path: string;
+  permissionKey?: ScreenPermissionKey;
+  children?: SidebarMenuItem[];
+}
+
 interface MenuGroup {
   label?: string;
-  items: {
-    id: string;
-    label: string;
-    icon: any;
-    path: string;
-    permissionKey?: ScreenPermissionKey;
-  }[];
+  items: SidebarMenuItem[];
 }
 
 const menuGroups: MenuGroup[] = [
@@ -58,13 +60,15 @@ const menuGroups: MenuGroup[] = [
         icon: Monitor,
         path: '/it/projects',
         permissionKey: 'can_access_it_projects',
-      },
-      {
-        id: 'it-budget',
-        label: 'Budget IT',
-        icon: Euro,
-        path: '/it/budget',
-        permissionKey: 'can_access_it_projects',
+        children: [
+          {
+            id: 'it-budget',
+            label: 'Budget IT',
+            icon: Euro,
+            path: '/it/budget',
+            permissionKey: 'can_access_it_projects',
+          },
+        ],
       },
       { id: 'innovation', label: 'Projets INNO', icon: Lightbulb, path: '/innovation/requests', permissionKey: 'can_access_dashboard' },
     ],
@@ -121,6 +125,138 @@ const getGroupColorIndex = (groupLabel?: string): number => {
   return groupLabelToIndex[groupLabel || ''] ?? 0;
 };
 
+type SidebarNavRowProps = {
+  item: SidebarMenuItem;
+  groupLabel: string | undefined;
+  isSubItem: boolean;
+  derivedActiveView: string;
+  /** Desktop/tablet: sidebar replié (icônes seules) */
+  collapsed: boolean;
+  isMobile: boolean;
+  onMenuClick: (itemId: string, path: string) => void;
+  pendingValidationCount: number;
+};
+
+function SidebarNavRow({
+  item,
+  groupLabel,
+  isSubItem,
+  derivedActiveView,
+  collapsed,
+  isMobile,
+  onMenuClick,
+  pendingValidationCount,
+}: SidebarNavRowProps) {
+  const Icon = item.icon;
+  const isActive = derivedActiveView === item.id;
+  const gc = groupColors[getGroupColorIndex(groupLabel)];
+
+  if (isMobile) {
+    return (
+      <button
+        type="button"
+        onClick={() => onMenuClick(item.id, item.path)}
+        className={cn(
+          'w-full flex items-center gap-3 transition-all duration-200 font-body group relative',
+          isSubItem ? 'pl-1 ml-1.5 border-l-2 border-muted-foreground/40 py-2 rounded-r-xl' : 'px-3 py-2.5 rounded-xl',
+          isActive && [gc.bg, 'border-l-4', gc.border],
+          !isActive && 'hover:bg-muted/60 border-l-4 border-transparent',
+        )}
+      >
+        <div
+          className={cn(
+            'flex items-center justify-center rounded-xl transition-all duration-200 relative',
+            isSubItem ? 'p-1.5' : 'p-2',
+            isActive
+              ? [gc.iconBg, 'text-white shadow-md']
+              : [gc.iconInactive, 'bg-muted/50 group-hover:bg-muted'],
+          )}
+        >
+          <Icon className={cn('relative z-10', isSubItem ? 'w-3.5 h-3.5' : 'w-4 h-4')} />
+          {isActive && <div className={cn('absolute inset-0 rounded-xl blur-sm opacity-50', gc.iconBg)} />}
+        </div>
+        <span
+          className={cn(
+            'font-medium transition-colors flex-1 text-left',
+            isSubItem ? 'text-[13px]' : 'text-sm',
+            isActive ? [gc.text, 'font-semibold'] : [gc.textMuted, 'group-hover:opacity-80'],
+          )}
+        >
+          {item.label}
+        </span>
+        {item.id === 'dashboard' && pendingValidationCount > 0 && (
+          <Badge variant="destructive" className="text-[10px] px-1.5 py-0 min-w-[20px] justify-center">
+            {pendingValidationCount}
+          </Badge>
+        )}
+        {isActive && <div className={cn('w-2 h-2 rounded-full', gc.iconBg)} />}
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => onMenuClick(item.id, item.path)}
+      className={cn(
+        'w-full flex items-center gap-3 transition-all duration-200 font-body group relative',
+        collapsed
+          ? isSubItem
+            ? 'justify-center p-1.5'
+            : 'justify-center p-2'
+          : isSubItem
+            ? 'px-2 py-2 pl-1 ml-1.5 border-l-2 border-muted-foreground/40 rounded-r-xl'
+            : 'px-3 py-2.5 rounded-xl',
+        isActive && !collapsed && [gc.bg, 'border-l-4', gc.border],
+        !isActive && !collapsed && 'hover:bg-muted/60 border-l-4 border-transparent',
+      )}
+      title={collapsed ? item.label : undefined}
+    >
+      <div
+        className={cn(
+          'flex items-center justify-center rounded-xl transition-all duration-200 relative',
+          collapsed ? (isSubItem ? 'p-2' : 'p-3') : isSubItem ? 'p-1.5' : 'p-2',
+          isActive
+            ? [gc.iconBg, 'text-white shadow-md']
+            : [gc.iconInactive, 'bg-transparent'],
+        )}
+      >
+        <Icon className={cn('relative z-10', collapsed ? 'w-5 h-5' : isSubItem ? 'w-3.5 h-3.5' : 'w-4 h-4')} />
+        {isActive && <div className={cn('absolute inset-0 rounded-xl blur-sm opacity-50', gc.iconBg)} />}
+        {collapsed && item.id === 'dashboard' && pendingValidationCount > 0 && (
+          <div className="absolute -top-1 -right-1 w-4 h-4 bg-destructive text-destructive-foreground rounded-full text-[9px] flex items-center justify-center font-bold z-20">
+            {pendingValidationCount}
+          </div>
+        )}
+      </div>
+
+      {!collapsed && (
+        <>
+          <span
+            className={cn(
+              'font-medium transition-colors flex-1 text-left',
+              isSubItem ? 'text-[13px]' : 'text-sm',
+              isActive ? [gc.text, 'font-semibold'] : [gc.textMuted, 'group-hover:opacity-80'],
+            )}
+          >
+            {item.label}
+          </span>
+          {item.id === 'dashboard' && pendingValidationCount > 0 && (
+            <Badge variant="destructive" className="text-[10px] px-1.5 py-0 min-w-[20px] justify-center">
+              {pendingValidationCount}
+            </Badge>
+          )}
+          {isActive && <div className={cn('w-2 h-2 rounded-full', gc.iconBg)} />}
+        </>
+      )}
+    </button>
+  );
+}
+
+function flattenMenuItemsForMatch(groups: MenuGroup[]): SidebarMenuItem[] {
+  return groups.flatMap((g) => g.items.flatMap((i) => (i.children?.length ? [i, ...i.children] : [i])));
+}
+
 export function Sidebar({
   activeView,
   onViewChange
@@ -163,15 +299,27 @@ export function Sidebar({
   const profile = isSimulating && simulatedProfile ? simulatedProfile : authProfile;
 
   const filteredGroups = useMemo(() => {
+    const filterItem = (item: SidebarMenuItem): SidebarMenuItem | null => {
+      const screenOk = !item.permissionKey || canAccessScreen(item.permissionKey);
+      if (!screenOk) return null;
+      if (item.children?.length) {
+        if (!isPageVisibleOnDevice(item.id, currentDevice)) return null;
+        const children = item.children
+          .map((c) => filterItem(c))
+          .filter((c): c is SidebarMenuItem => c != null);
+        return { ...item, children };
+      }
+      return isPageVisibleOnDevice(item.id, currentDevice) ? item : null;
+    };
+
     const groups: MenuGroup[] = menuGroups
-      .map(group => ({
+      .map((group) => ({
         label: group.label,
-        items: group.items.filter((item) => {
-          const screenOk = !item.permissionKey || canAccessScreen(item.permissionKey);
-          return screenOk && isPageVisibleOnDevice(item.id, currentDevice);
-        }),
+        items: group.items
+          .map((item) => filterItem(item))
+          .filter((item): item is SidebarMenuItem => item != null),
       }))
-      .filter(group => group.items.length > 0);
+      .filter((group) => group.items.length > 0);
     
     // Add admin into CONFIGURATION group or as its own group
     if (isAdmin && isPageVisibleOnDevice('admin', currentDevice)) {
@@ -189,7 +337,7 @@ export function Sidebar({
   // Derive active menu item from URL to avoid desync when navigation happens outside the sidebar.
   const derivedActiveView = useMemo(() => {
     const pathname = location.pathname || '/';
-    const allItems = filteredGroups.flatMap(g => g.items);
+    const allItems = flattenMenuItemsForMatch(filteredGroups);
 
     let best: { id: string; path: string } | null = null;
     for (const item of allItems) {
@@ -336,44 +484,33 @@ export function Sidebar({
                   </div>
                 )}
                 <div className="space-y-0.5">
-                  {group.items.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = derivedActiveView === item.id;
-                    const gc = groupColors[getGroupColorIndex(group.label)];
-                    return (
-                      <button
-                        key={item.id}
-                        onClick={() => handleMenuClick(item.id, item.path)}
-                        className={cn(
-                          "w-full flex items-center gap-3 transition-all duration-200 font-body group relative px-3 py-2.5 rounded-xl",
-                          isActive && [gc.bg, "border-l-4", gc.border],
-                          !isActive && "hover:bg-muted/60 border-l-4 border-transparent",
-                        )}
-                      >
-                        <div className={cn(
-                          "flex items-center justify-center rounded-xl transition-all duration-200 relative p-2",
-                          isActive
-                            ? [gc.iconBg, "text-white shadow-md"]
-                            : [gc.iconInactive, "bg-muted/50 group-hover:bg-muted"],
-                        )}>
-                          <Icon className="w-4 h-4 relative z-10" />
-                          {isActive && <div className={cn("absolute inset-0 rounded-xl blur-sm opacity-50", gc.iconBg)} />}
-                        </div>
-                        <span className={cn(
-                          "font-medium text-sm transition-colors flex-1 text-left",
-                          isActive ? [gc.text, "font-semibold"] : [gc.textMuted, "group-hover:opacity-80"]
-                        )}>
-                          {item.label}
-                        </span>
-                        {item.id === 'dashboard' && pendingValidationCount > 0 && (
-                          <Badge variant="destructive" className="text-[10px] px-1.5 py-0 min-w-[20px] justify-center">
-                            {pendingValidationCount}
-                          </Badge>
-                        )}
-                        {isActive && <div className={cn("w-2 h-2 rounded-full", gc.iconBg)} />}
-                      </button>
-                    );
-                  })}
+                  {group.items.map((item) => (
+                    <Fragment key={item.id}>
+                      <SidebarNavRow
+                        item={item}
+                        groupLabel={group.label}
+                        isSubItem={false}
+                        derivedActiveView={derivedActiveView}
+                        collapsed={false}
+                        isMobile
+                        onMenuClick={handleMenuClick}
+                        pendingValidationCount={pendingValidationCount}
+                      />
+                      {item.children?.map((child) => (
+                        <SidebarNavRow
+                          key={child.id}
+                          item={child}
+                          groupLabel={group.label}
+                          isSubItem
+                          derivedActiveView={derivedActiveView}
+                          collapsed={false}
+                          isMobile
+                          onMenuClick={handleMenuClick}
+                          pendingValidationCount={pendingValidationCount}
+                        />
+                      ))}
+                    </Fragment>
+                  ))}
                 </div>
               </div>
             ))}
@@ -482,62 +619,33 @@ export function Sidebar({
               </div>
             )}
             <div className="space-y-0.5">
-              {group.items.map((item) => {
-                const Icon = item.icon;
-                const isActive = derivedActiveView === item.id;
-                const gc = groupColors[getGroupColorIndex(group.label)];
-                
-                return (
-                  <button 
-                    key={item.id}
-                    onClick={() => handleMenuClick(item.id, item.path)} 
-                    className={cn(
-                      "w-full flex items-center gap-3 transition-all duration-200 font-body group relative",
-                      collapsed ? "justify-center p-2" : "px-3 py-2.5 rounded-xl",
-                      isActive && !collapsed && [gc.bg, "border-l-4", gc.border],
-                      !isActive && !collapsed && "hover:bg-muted/60 border-l-4 border-transparent"
-                    )}
-                    title={collapsed ? item.label : undefined}
-                  >
-                    <div className={cn(
-                      "flex items-center justify-center rounded-xl transition-all duration-200 relative",
-                      collapsed ? "p-3" : "p-2",
-                      isActive 
-                        ? [gc.iconBg, "text-white shadow-md"]
-                        : [gc.iconInactive, "bg-transparent"],
-                    )}>
-                      <Icon className={cn("relative z-10", collapsed ? "w-5 h-5" : "w-4 h-4")} />
-                      {isActive && (
-                        <div className={cn("absolute inset-0 rounded-xl blur-sm opacity-50", gc.iconBg)} />
-                      )}
-                      {collapsed && item.id === 'dashboard' && pendingValidationCount > 0 && (
-                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-destructive text-destructive-foreground rounded-full text-[9px] flex items-center justify-center font-bold z-20">
-                          {pendingValidationCount}
-                        </div>
-                      )}
-                    </div>
-                    
-                    {!collapsed && (
-                      <>
-                        <span className={cn(
-                          "font-medium text-sm transition-colors flex-1 text-left",
-                          isActive ? [gc.text, "font-semibold"] : [gc.textMuted, "group-hover:opacity-80"]
-                        )}>
-                          {item.label}
-                        </span>
-                        {item.id === 'dashboard' && pendingValidationCount > 0 && (
-                          <Badge variant="destructive" className="text-[10px] px-1.5 py-0 min-w-[20px] justify-center">
-                            {pendingValidationCount}
-                          </Badge>
-                        )}
-                        {isActive && (
-                          <div className={cn("w-2 h-2 rounded-full", gc.iconBg)} />
-                        )}
-                      </>
-                    )}
-                  </button>
-                );
-              })}
+              {group.items.map((item) => (
+                <Fragment key={item.id}>
+                  <SidebarNavRow
+                    item={item}
+                    groupLabel={group.label}
+                    isSubItem={false}
+                    derivedActiveView={derivedActiveView}
+                    collapsed={collapsed}
+                    isMobile={false}
+                    onMenuClick={handleMenuClick}
+                    pendingValidationCount={pendingValidationCount}
+                  />
+                  {item.children?.map((child) => (
+                    <SidebarNavRow
+                      key={child.id}
+                      item={child}
+                      groupLabel={group.label}
+                      isSubItem
+                      derivedActiveView={derivedActiveView}
+                      collapsed={collapsed}
+                      isMobile={false}
+                      onMenuClick={handleMenuClick}
+                      pendingValidationCount={pendingValidationCount}
+                    />
+                  ))}
+                </Fragment>
+              ))}
             </div>
           </div>
         ))}
