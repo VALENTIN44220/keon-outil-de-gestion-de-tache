@@ -35,6 +35,12 @@ export interface SupplierRow {
   ecart: number;   // budget - facture (positif = économie, négatif = dépassement)
 }
 
+/** Références Divalto rattachées à une ligne budgétaire. */
+export interface LineLinkedRefs {
+  commandes: string[];
+  factures: string[];
+}
+
 interface LineMin {
   id: string;
   fournisseur_prevu: string | null;
@@ -46,6 +52,7 @@ interface LineMin {
 
 interface CommandeRaw {
   budget_line_id: string;
+  fullcdno: string;
   it_divalto_commandes: {
     tiers: string | null;
     nomfournisseur: string | null;
@@ -112,7 +119,7 @@ export function useITBudgetGlobalBreakdown(lines: ITBudgetLine[]) {
       if (lineIds.length === 0) return [] as CommandeRaw[];
       const { data, error } = await supabase
         .from('it_budget_line_commandes')
-        .select('budget_line_id, it_divalto_commandes(tiers, nomfournisseur, montant_ht, date_commande)')
+        .select('budget_line_id, fullcdno, it_divalto_commandes(tiers, nomfournisseur, montant_ht, date_commande)')
         .in('budget_line_id', lineIds);
       if (error) throw error;
       return (data ?? []) as unknown as CommandeRaw[];
@@ -257,9 +264,33 @@ export function useITBudgetGlobalBreakdown(lines: ITBudgetLine[]) {
     return Array.from(map.values()).sort((a, b) => b.budget - a.budget);
   }, [lines, commandesQuery.data, facturesQuery.data, lineById]);
 
+  // ── Mapping ligne → références Divalto liées (pour le regroupement UI) ─
+  const linkedRefs: Map<string, LineLinkedRefs> = useMemo(() => {
+    const map = new Map<string, LineLinkedRefs>();
+    const getOrInit = (id: string): LineLinkedRefs => {
+      let v = map.get(id);
+      if (!v) { v = { commandes: [], factures: [] }; map.set(id, v); }
+      return v;
+    };
+    for (const c of commandesQuery.data ?? []) {
+      if (!c.fullcdno) continue;
+      const v = getOrInit(c.budget_line_id);
+      if (!v.commandes.includes(c.fullcdno)) v.commandes.push(c.fullcdno);
+    }
+    if (facturesQuery.data) {
+      for (const link of facturesQuery.data.links) {
+        if (!link.fullcdno_fac) continue;
+        const v = getOrInit(link.budget_line_id);
+        if (!v.factures.includes(link.fullcdno_fac)) v.factures.push(link.fullcdno_fac);
+      }
+    }
+    return map;
+  }, [commandesQuery.data, facturesQuery.data]);
+
   return {
     monthlyRows,
     supplierRows,
+    linkedRefs,
     isLoading: commandesQuery.isLoading || facturesQuery.isLoading,
   };
 }

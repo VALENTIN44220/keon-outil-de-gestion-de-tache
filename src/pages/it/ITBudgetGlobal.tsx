@@ -71,6 +71,11 @@ import {
   Trash2,
   Plus,
   BarChart2,
+  Layers,
+  ChevronDown,
+  ChevronRight,
+  Receipt,
+  FileText,
   X,
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -335,7 +340,7 @@ export default function ITBudgetGlobal() {
   const constateGlobal = engageConstateData?.totalConstate ?? 0;
 
   // Ventilation mensuelle + par fournisseur pour les cards de la synthèse
-  const { monthlyRows, supplierRows } = useITBudgetGlobalBreakdown(lines);
+  const { monthlyRows, supplierRows, linkedRefs } = useITBudgetGlobalBreakdown(lines);
 
   // Résolution des noms de projets IT pour la synthèse
   const { projects: allProjects = [] } = useITProjects();
@@ -362,6 +367,8 @@ export default function ITBudgetGlobal() {
 
   const [filterTypeDepense, setFilterTypeDepense] = useState<string>('__all__');
   const [filterMois, setFilterMois] = useState<string>('__all__');
+  const [groupByRapprochement, setGroupByRapprochement] = useState(false);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   const [lineDialogOpen, setLineDialogOpen] = useState(false);
   const [editingLine, setEditingLine] = useState<ITBudgetLine | null>(null);
@@ -576,6 +583,70 @@ export default function ITBudgetGlobal() {
       })) as ITBudgetLineRow[],
     [filteredLines, projectNameMap]
   );
+
+  /**
+   * Regroupement par rapprochement : une "clé" est attribuée à chaque ligne
+   * — la première commande Divalto liée, sinon la première facture, sinon
+   * `_none_` (ligne non rattachée). Les lignes partageant la même clé sont
+   * affichées collées, sous un header pliable.
+   */
+  type LineGroup = {
+    key: string;
+    label: string;
+    kind: 'commande' | 'facture' | 'none';
+    rows: ITBudgetLineRow[];
+    totalBudget: number;
+    totalCommande: number;
+    totalFacture: number;
+  };
+  const lineGroups: LineGroup[] = useMemo(() => {
+    if (!groupByRapprochement) return [];
+    const map = new Map<string, LineGroup>();
+    const getOrInit = (key: string, label: string, kind: LineGroup['kind']): LineGroup => {
+      let g = map.get(key);
+      if (!g) {
+        g = { key, label, kind, rows: [], totalBudget: 0, totalCommande: 0, totalFacture: 0 };
+        map.set(key, g);
+      }
+      return g;
+    };
+    for (const row of filteredLineRows) {
+      const refs = linkedRefs.get(row.id);
+      let key = '_none_';
+      let label = 'Lignes non rattachées';
+      let kind: LineGroup['kind'] = 'none';
+      if (refs && refs.commandes.length > 0) {
+        key = 'cmd:' + refs.commandes[0];
+        label = refs.commandes[0];
+        kind = 'commande';
+      } else if (refs && refs.factures.length > 0) {
+        key = 'fac:' + refs.factures[0];
+        label = refs.factures[0];
+        kind = 'facture';
+      }
+      const g = getOrInit(key, label, kind);
+      g.rows.push(row);
+      g.totalBudget += lineAnnualBudgetRevise(row);
+      const ec = engageConstateData?.rows.find((r) => r.budget_line_id === row.id);
+      g.totalCommande += Number(ec?.engage ?? 0);
+      g.totalFacture += Number(ec?.constate ?? 0);
+    }
+    // Tri : groupes rattachés d'abord (par label), lignes non rattachées à la fin
+    return Array.from(map.values()).sort((a, b) => {
+      if (a.kind === 'none' && b.kind !== 'none') return 1;
+      if (a.kind !== 'none' && b.kind === 'none') return -1;
+      return a.label.localeCompare(b.label);
+    });
+  }, [groupByRapprochement, filteredLineRows, linkedRefs, engageConstateData]);
+
+  const toggleGroup = useCallback((key: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
 
   const manuel_prevu = useMemo(
     () => expenses.filter((e) => e.statut !== 'annule').reduce((s, e) => s + (e.montant_prevu ?? 0), 0),
@@ -1403,6 +1474,16 @@ export default function ITBudgetGlobal() {
                     </SelectContent>
                   </Select>
                   <BudgetColumnsManager config={prefs.columns_config} onChange={updateColumns} />
+                  <Button
+                    type="button"
+                    variant={groupByRapprochement ? 'default' : 'outline'}
+                    onClick={() => setGroupByRapprochement((v) => !v)}
+                    className="gap-2"
+                    title="Regrouper les lignes rattachées à la même commande/facture Divalto"
+                  >
+                    <Layers className="h-4 w-4" />
+                    {groupByRapprochement ? 'Groupé par rapprochement' : 'Grouper par rapprochement'}
+                  </Button>
                   <Button type="button" onClick={openAddLine} className="gap-2 ml-auto">
                     <Plus className="h-4 w-4" />
                     + Ajouter une ligne
@@ -1477,94 +1558,139 @@ export default function ITBudgetGlobal() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredLineRows.map((l) => {
-                          const line = l;
-                          const isRowSelected = selectedLineIds.has(l.id);
-                          return (
-                            <Fragment key={l.id}>
-                              <TableRow
-                                className={cn('cursor-pointer group/line', isRowSelected && 'bg-primary/5')}
-                                onClick={() => setExpandedLineId(expandedLineId === l.id ? null : l.id)}
-                              >
-                                <TableCell
-                                  onClick={(e) => e.stopPropagation()}
-                                  className={cn(
-                                    'w-[40px] sticky left-0 z-20 border-r border-border/70 py-2 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)]',
-                                    isRowSelected
-                                      ? 'bg-primary/5 group-hover/line:bg-primary/10'
-                                      : 'bg-background group-hover/line:bg-muted/50',
-                                  )}
+                        {(() => {
+                          const renderRow = (l: ITBudgetLineRow) => {
+                            const line = l;
+                            const isRowSelected = selectedLineIds.has(l.id);
+                            return (
+                              <Fragment key={l.id}>
+                                <TableRow
+                                  className={cn('cursor-pointer group/line', isRowSelected && 'bg-primary/5')}
+                                  onClick={() => setExpandedLineId(expandedLineId === l.id ? null : l.id)}
                                 >
-                                  <Checkbox
-                                    checked={selectedLineIds.has(l.id)}
-                                    onCheckedChange={() => toggleLineSelection(l.id)}
-                                    aria-label={`Sélectionner ligne ${l.categorie ?? ''}`}
-                                  />
-                                </TableCell>
-                                {prefs.columns_config.order.map((key) => {
-                                  const col = IT_BUDGET_COLUMNS.find((c) => c.key === key);
-                                  if (!col) return null;
-                                  return (
-                                    <TableCell
-                                      key={key}
-                                      className={cn(col.align === 'right' && 'text-right', col.className)}
-                                    >
-                                      {col.render(line, { eur, formatBudgetPeriode })}
-                                    </TableCell>
-                                  );
-                                })}
-                                <TableCell
-                                  onClick={(e) => e.stopPropagation()}
-                                  className={cn(
-                                    'w-[100px] min-w-[6.5rem] sticky right-0 z-30 text-right border-l border-border/70 py-2 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.08)]',
-                                    isRowSelected
-                                      ? 'bg-primary/5 group-hover/line:bg-primary/10'
-                                      : 'bg-background group-hover/line:bg-muted/50',
-                                  )}
-                                >
-                                  <div className="flex items-center justify-end gap-0.5 flex-nowrap">
-                                    {(() => {
-                                      const ec = engageConstateData?.rows.find(r => r.budget_line_id === l.id);
-                                      const hasLinks = (ec?.nb_commandes ?? 0) + (ec?.nb_factures ?? 0) > 0;
-                                      return hasLinks ? (
-                                        <Badge variant="outline" className="text-[10px] border-emerald-300 text-emerald-600 mr-0 shrink-0">
-                                          Lié
-                                        </Badge>
-                                      ) : null;
-                                    })()}
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 shrink-0"
-                                      onClick={() => openEditLine(l)}
-                                      aria-label="Éditer"
-                                    >
-                                      <Pencil className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8 shrink-0 text-destructive"
-                                      onClick={() => setDeleteLineId(l.id)}
-                                      aria-label="Supprimer"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                              {expandedLineId === l.id && (
-                                <TableRow>
-                                  <TableCell colSpan={prefs.columns_config.order.length + 2} className="p-0">
-                                    <ExpandedMonths line={l} />
+                                  <TableCell
+                                    onClick={(e) => e.stopPropagation()}
+                                    className={cn(
+                                      'w-[40px] sticky left-0 z-20 border-r border-border/70 py-2 shadow-[4px_0_8px_-4px_rgba(0,0,0,0.08)]',
+                                      isRowSelected
+                                        ? 'bg-primary/5 group-hover/line:bg-primary/10'
+                                        : 'bg-background group-hover/line:bg-muted/50',
+                                    )}
+                                  >
+                                    <Checkbox
+                                      checked={selectedLineIds.has(l.id)}
+                                      onCheckedChange={() => toggleLineSelection(l.id)}
+                                      aria-label={`Sélectionner ligne ${l.categorie ?? ''}`}
+                                    />
+                                  </TableCell>
+                                  {prefs.columns_config.order.map((key) => {
+                                    const col = IT_BUDGET_COLUMNS.find((c) => c.key === key);
+                                    if (!col) return null;
+                                    return (
+                                      <TableCell
+                                        key={key}
+                                        className={cn(col.align === 'right' && 'text-right', col.className)}
+                                      >
+                                        {col.render(line, { eur, formatBudgetPeriode })}
+                                      </TableCell>
+                                    );
+                                  })}
+                                  <TableCell
+                                    onClick={(e) => e.stopPropagation()}
+                                    className={cn(
+                                      'w-[100px] min-w-[6.5rem] sticky right-0 z-30 text-right border-l border-border/70 py-2 shadow-[-4px_0_8px_-4px_rgba(0,0,0,0.08)]',
+                                      isRowSelected
+                                        ? 'bg-primary/5 group-hover/line:bg-primary/10'
+                                        : 'bg-background group-hover/line:bg-muted/50',
+                                    )}
+                                  >
+                                    <div className="flex items-center justify-end gap-0.5 flex-nowrap">
+                                      {(() => {
+                                        const ec = engageConstateData?.rows.find(r => r.budget_line_id === l.id);
+                                        const hasLinks = (ec?.nb_commandes ?? 0) + (ec?.nb_factures ?? 0) > 0;
+                                        return hasLinks ? (
+                                          <Badge variant="outline" className="text-[10px] border-emerald-300 text-emerald-600 mr-0 shrink-0">
+                                            Lié
+                                          </Badge>
+                                        ) : null;
+                                      })()}
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 shrink-0"
+                                        onClick={() => openEditLine(l)}
+                                        aria-label="Éditer"
+                                      >
+                                        <Pencil className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 shrink-0 text-destructive"
+                                        onClick={() => setDeleteLineId(l.id)}
+                                        aria-label="Supprimer"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
                                   </TableCell>
                                 </TableRow>
-                              )}
-                            </Fragment>
-                          );
-                        })}
+                                {expandedLineId === l.id && (
+                                  <TableRow>
+                                    <TableCell colSpan={prefs.columns_config.order.length + 2} className="p-0">
+                                      <ExpandedMonths line={l} />
+                                    </TableCell>
+                                  </TableRow>
+                                )}
+                              </Fragment>
+                            );
+                          };
+
+                          if (!groupByRapprochement) {
+                            return filteredLineRows.map(renderRow);
+                          }
+
+                          return lineGroups.map((g) => {
+                            const isCollapsed = collapsedGroups.has(g.key);
+                            const Icon = g.kind === 'commande' ? Receipt : g.kind === 'facture' ? FileText : Layers;
+                            const colorClass =
+                              g.kind === 'commande'
+                                ? 'bg-indigo-50/60 dark:bg-indigo-950/30 border-l-4 border-l-indigo-400'
+                                : g.kind === 'facture'
+                                ? 'bg-violet-50/60 dark:bg-violet-950/30 border-l-4 border-l-violet-400'
+                                : 'bg-muted/40 border-l-4 border-l-muted-foreground/20';
+                            return (
+                              <Fragment key={g.key}>
+                                <TableRow
+                                  className={cn('cursor-pointer hover:opacity-90', colorClass)}
+                                  onClick={() => toggleGroup(g.key)}
+                                >
+                                  <TableCell colSpan={prefs.columns_config.order.length + 2} className="py-2">
+                                    <div className="flex items-center gap-2 text-sm">
+                                      {isCollapsed
+                                        ? <ChevronRight className="h-4 w-4 shrink-0" />
+                                        : <ChevronDown className="h-4 w-4 shrink-0" />
+                                      }
+                                      <Icon className="h-4 w-4 shrink-0" />
+                                      <span className="font-mono font-semibold">{g.label}</span>
+                                      <Badge variant="outline" className="text-[10px]">
+                                        {g.rows.length} ligne{g.rows.length > 1 ? 's' : ''}
+                                      </Badge>
+                                      <span className="ml-auto flex items-center gap-4 text-xs text-muted-foreground">
+                                        <span>Budget <span className="tabular-nums text-foreground font-medium">{eur(g.totalBudget)}</span></span>
+                                        <span>Engagé <span className="tabular-nums text-indigo-700 dark:text-indigo-400 font-medium">{eur(g.totalCommande)}</span></span>
+                                        <span>Constaté <span className="tabular-nums text-violet-700 dark:text-violet-400 font-medium">{eur(g.totalFacture)}</span></span>
+                                      </span>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                                {!isCollapsed && g.rows.map(renderRow)}
+                              </Fragment>
+                            );
+                          });
+                        })()}
                       </TableBody>
                     </Table>
                   </div>
