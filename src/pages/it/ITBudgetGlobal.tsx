@@ -51,6 +51,7 @@ import { useITBudgetPreferences } from '@/hooks/useITBudgetPreferences';
 import { EntityCombobox } from '@/components/it/EntityCombobox';
 import { useCompanies } from '@/hooks/useCompanies';
 import { useITProjects } from '@/hooks/useITProjects';
+import { extractErrorMessage } from '@/lib/extractErrorMessage';
 import {
   LayoutDashboard,
   TrendingUp,
@@ -673,7 +674,7 @@ export default function ITBudgetGlobal() {
       setLineDialogOpen(false);
       setEditingLine(null);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Erreur';
+      const msg = extractErrorMessage(e);
       toast({ title: 'Erreur', description: msg, variant: 'destructive' });
     } finally {
       setLineSaving(false);
@@ -686,7 +687,7 @@ export default function ITBudgetGlobal() {
       await deleteLine.mutateAsync(deleteLineId);
       toast({ title: 'Ligne supprimée' });
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Erreur';
+      const msg = extractErrorMessage(e);
       toast({ title: 'Suppression impossible', description: msg, variant: 'destructive' });
     } finally {
       setDeleteLineId(null);
@@ -750,7 +751,7 @@ export default function ITBudgetGlobal() {
       setExpenseDialogOpen(false);
       setEditingExpense(null);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Erreur';
+      const msg = extractErrorMessage(e);
       toast({ title: 'Erreur', description: msg, variant: 'destructive' });
     } finally {
       setExpenseSaving(false);
@@ -765,7 +766,7 @@ export default function ITBudgetGlobal() {
       await queryClient.invalidateQueries({ queryKey: ['it-budget-global-expenses'] });
       toast({ title: 'Dépense supprimée' });
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Erreur';
+      const msg = extractErrorMessage(e);
       toast({ title: 'Suppression impossible', description: msg, variant: 'destructive' });
     } finally {
       setDeleteExpenseId(null);

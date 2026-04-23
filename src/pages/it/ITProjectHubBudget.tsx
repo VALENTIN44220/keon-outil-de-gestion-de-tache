@@ -8,6 +8,7 @@ import { useITProject, useITProjectTasks, useITProjectStats } from '@/hooks/useI
 import { useITProjectBudget } from '@/hooks/useITProjectBudget';
 import { useITBudgetOptions, PRESET_CATEGORIES } from '@/hooks/useITBudgetOptions';
 import { SearchableSelect } from '@/components/ui/searchable-select';
+import { extractErrorMessage } from '@/lib/extractErrorMessage';
 import {
   BUDGET_LINE_STATUT_CONFIG,
   type BudgetLineStatut,
@@ -410,7 +411,7 @@ export default function ITProjectHubBudget() {
       setLineDialogOpen(false);
       setEditingLine(null);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Erreur';
+      const msg = extractErrorMessage(e);
       toast({ title: 'Erreur', description: msg, variant: 'destructive' });
     } finally {
       setLineSaving(false);
@@ -423,7 +424,7 @@ export default function ITProjectHubBudget() {
       await deleteLine.mutateAsync(deleteLineId);
       toast({ title: 'Ligne supprimée' });
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Erreur';
+      const msg = extractErrorMessage(e);
       toast({ title: 'Suppression impossible', description: msg, variant: 'destructive' });
     } finally {
       setDeleteLineId(null);
@@ -471,7 +472,7 @@ export default function ITProjectHubBudget() {
       setExpenseDialogOpen(false);
       setEditingExpense(null);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Erreur';
+      const msg = extractErrorMessage(e);
       toast({ title: 'Erreur', description: msg, variant: 'destructive' });
     } finally {
       setExpenseSaving(false);
@@ -484,7 +485,7 @@ export default function ITProjectHubBudget() {
       await deleteExpense.mutateAsync(deleteExpenseId);
       toast({ title: 'Dépense supprimée' });
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Erreur';
+      const msg = extractErrorMessage(e);
       toast({ title: 'Suppression impossible', description: msg, variant: 'destructive' });
     } finally {
       setDeleteExpenseId(null);
