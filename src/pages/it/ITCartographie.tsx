@@ -1,15 +1,17 @@
 import { useMemo, useState } from 'react';
-import { Map as MapIcon, Plus, Search } from 'lucide-react';
+import { LayoutGrid, Map as MapIcon, Network, Plus, Search } from 'lucide-react';
 import { Layout } from '@/components/layout/Layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { useITSolutions } from '@/hooks/useITSolutions';
 import { ITSolutionFormDialog } from '@/components/it/ITSolutionFormDialog';
 import { ITSolutionDetailDialog } from '@/components/it/ITSolutionDetailDialog';
+import { ITCartographieGraph } from '@/components/it/ITCartographieGraph';
 import {
   CRITICITE_CONFIG,
   DATALAKE_CONFIG,
@@ -17,7 +19,8 @@ import {
 } from '@/types/itSolution';
 
 export default function ITCartographie() {
-  const { solutions, links, isLoading } = useITSolutions();
+  const { solutions, links, solutionLinks, isLoading } = useITSolutions();
+  const [view, setView] = useState<'cards' | 'graph'>('cards');
   const [search, setSearch] = useState('');
   const [filterCriticite, setFilterCriticite] = useState<string>('__all__');
   const [filterDatalake, setFilterDatalake] = useState<string>('__all__');
@@ -71,13 +74,30 @@ export default function ITCartographie() {
               Catalogue des solutions IT en place chez KEON et leurs projets associés.
             </p>
           </div>
-          <Button type="button" onClick={openCreate} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Nouvelle solution
-          </Button>
+          <div className="flex items-center gap-2">
+            <Tabs value={view} onValueChange={(v) => setView(v as 'cards' | 'graph')}>
+              <TabsList>
+                <TabsTrigger value="cards" className="gap-1.5">
+                  <LayoutGrid className="h-3.5 w-3.5" />
+                  Cards
+                </TabsTrigger>
+                <TabsTrigger value="graph" className="gap-1.5">
+                  <Network className="h-3.5 w-3.5" />
+                  Graphe
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <Button type="button" onClick={openCreate} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Nouvelle solution
+            </Button>
+          </div>
         </header>
 
-        <div className="px-6 py-3 border-b bg-muted/30 flex flex-wrap gap-3 items-center">
+        <div className={cn(
+          'px-6 py-3 border-b bg-muted/30 flex flex-wrap gap-3 items-center',
+          view === 'graph' && 'hidden'
+        )}>
           <div className="relative flex-1 min-w-[240px] max-w-[420px]">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -114,6 +134,15 @@ export default function ITCartographie() {
           </span>
         </div>
 
+        {view === 'graph' ? (
+          <div className="flex-1 min-h-[480px]">
+            <ITCartographieGraph
+              solutions={solutions}
+              links={solutionLinks}
+              onSelectSolution={(s) => setSelected(s)}
+            />
+          </div>
+        ) : (
         <div className="flex-1 overflow-auto p-6 space-y-6">
           {isLoading ? (
             <p className="text-sm text-muted-foreground">Chargement…</p>
@@ -190,6 +219,7 @@ export default function ITCartographie() {
             ))
           )}
         </div>
+        )}
       </div>
 
       <ITSolutionDetailDialog

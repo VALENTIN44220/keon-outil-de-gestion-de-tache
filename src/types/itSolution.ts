@@ -99,3 +99,67 @@ export const LIEN_TYPE_LABEL: Record<ITSolutionLienType, string> = {
   decommissionnement:   'Décommissionnement',
   autre:                'Autre',
 };
+
+// ─── Liens entre solutions (cartographie graphe) ────────────────────────
+
+export type ITSolutionLinkFluxType =
+  | 'data'
+  | 'integration'
+  | 'fonctionnel'
+  | 'technique'
+  | 'fichier'
+  | 'autre';
+
+export type ITSolutionLinkDirection = 'source_to_target' | 'target_to_source' | 'bidirectionnel';
+
+export interface ITSolutionLink {
+  id: string;
+  source_solution_id: string;
+  target_solution_id: string;
+  type_flux?: ITSolutionLinkFluxType | null;
+  direction: ITSolutionLinkDirection;
+  protocole?: string | null;
+  frequence?: string | null;
+  criticite?: ITSolutionCriticite | null;
+  description?: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by?: string | null;
+}
+
+export const FLUX_TYPE_CONFIG: Record<ITSolutionLinkFluxType, { label: string; color: string; description: string }> = {
+  data:        { label: 'Données',          color: '#3b82f6', description: 'Échange de données (ETL, synchronisation)' },
+  integration: { label: 'Intégration',      color: '#6366f1', description: 'Intégration applicative (API, webhook)' },
+  fonctionnel: { label: 'Fonctionnel',      color: '#8b5cf6', description: 'Dépendance fonctionnelle / métier' },
+  technique:   { label: 'Technique',        color: '#0ea5e9', description: 'Dépendance technique (auth, infra)' },
+  fichier:     { label: 'Fichier',          color: '#f59e0b', description: 'Échange par fichier (CSV, SFTP)' },
+  autre:       { label: 'Autre',            color: '#6b7280', description: 'Autre type de lien' },
+};
+
+export const DIRECTION_LABEL: Record<ITSolutionLinkDirection, { label: string; symbol: string }> = {
+  source_to_target:   { label: 'Source → Cible',     symbol: '→' },
+  target_to_source:   { label: 'Cible → Source',     symbol: '←' },
+  bidirectionnel:     { label: 'Bidirectionnel',     symbol: '↔' },
+};
+
+/** Préset de fréquences usuelles (champ texte libre néanmoins). */
+export const PRESET_FREQUENCES = [
+  'Temps réel',
+  'Toutes les heures',
+  'Quotidien',
+  'Hebdomadaire',
+  'Mensuel',
+  'À la demande',
+] as const;
+
+/** Préset de protocoles usuels (champ texte libre néanmoins). */
+export const PRESET_PROTOCOLES = [
+  'REST API',
+  'GraphQL',
+  'Webhook',
+  'SFTP / fichier',
+  'JDBC / direct DB',
+  'CSV / Excel',
+  'Bus de messages',
+  'Autre',
+] as const;

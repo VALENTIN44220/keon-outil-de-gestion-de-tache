@@ -3,11 +3,13 @@ import { supabase } from '@/integrations/supabase/client';
 import type {
   ITSolution,
   ITSolutionLienType,
+  ITSolutionLink,
   ITSolutionProjectLink,
 } from '@/types/itSolution';
 
 const SOLUTIONS_KEY = ['it-solutions'];
 const LINKS_KEY = ['it-solution-projects'];
+const SOLUTION_LINKS_KEY = ['it-solution-links'];
 
 /**
  * Catalogue des solutions IT (cartographie) + jonction avec les projets IT.
@@ -107,14 +109,65 @@ export function useITSolutions() {
     onSuccess: invalidate,
   });
 
+  // ── Liens entre solutions (cartographie graphe) ───────────────────────
+  const solutionLinksQuery = useQuery({
+    queryKey: SOLUTION_LINKS_KEY,
+    queryFn: async (): Promise<ITSolutionLink[]> => {
+      const { data, error } = await supabase
+        .from('it_solution_links')
+        .select('*');
+      if (error) throw error;
+      return (data as ITSolutionLink[]) ?? [];
+    },
+  });
+
+  const invalidateLinks = () => qc.invalidateQueries({ queryKey: SOLUTION_LINKS_KEY });
+
+  type SolutionLinkPayload = Omit<ITSolutionLink, 'id' | 'created_at' | 'updated_at' | 'created_by'>;
+
+  const createSolutionLink = useMutation({
+    mutationFn: async (payload: SolutionLinkPayload) => {
+      const { data: auth } = await supabase.auth.getUser();
+      const { data, error } = await supabase
+        .from('it_solution_links')
+        .insert({ ...payload, created_by: auth.user?.id ?? null })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as ITSolutionLink;
+    },
+    onSuccess: invalidateLinks,
+  });
+
+  const updateSolutionLink = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<SolutionLinkPayload> }) => {
+      const { error } = await supabase.from('it_solution_links').update(updates).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: invalidateLinks,
+  });
+
+  const deleteSolutionLink = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('it_solution_links').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: invalidateLinks,
+  });
+
   return {
     solutions: solutionsQuery.data ?? [],
     links: linksQuery.data ?? [],
+    solutionLinks: solutionLinksQuery.data ?? [],
     isLoading: solutionsQuery.isLoading || linksQuery.isLoading,
+    isLoadingSolutionLinks: solutionLinksQuery.isLoading,
     createSolution,
     updateSolution,
     deleteSolution,
     linkProject,
     unlinkProject,
+    createSolutionLink,
+    updateSolutionLink,
+    deleteSolutionLink,
   };
 }
