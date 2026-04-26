@@ -57,6 +57,7 @@ const ITProjectHubDiscussions = lazy(() => import("./pages/it/ITProjectHubDiscus
 const ITProjectHubFiles = lazy(() => import("./pages/it/ITProjectHubFiles"));
 const ITProjectHubBudget = lazy(() => import("./pages/it/ITProjectHubBudget"));
 const ITBudgetGlobal = lazy(() => import("./pages/it/ITBudgetGlobal"));
+const ITCartographie = lazy(() => import("./pages/it/ITCartographie"));
 
 const App = () => (
     <AuthProvider>
@@ -124,6 +125,7 @@ const App = () => (
                 { path: "/it/projects", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjects /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/projects/import-fdr", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectImportFDR /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/budget", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITBudgetGlobal /></ITProjectsAccessGate></ProtectedRoute> },
+                { path: "/it/cartographie", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITCartographie /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/projects/:code/overview", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubOverview /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/projects/:code/tasks", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubTasks /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/projects/:code/timeline", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubTimeline /></ITProjectsAccessGate></ProtectedRoute> },

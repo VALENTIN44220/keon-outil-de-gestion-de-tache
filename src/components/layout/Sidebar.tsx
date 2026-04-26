@@ -1,5 +1,5 @@
 import React, { Fragment, useState, useEffect, useMemo } from 'react';
-import { LayoutDashboard, BarChart3, ChevronLeft, ChevronRight, Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText, ArrowLeftRight, Calendar, MessageCircle, Building2, ClipboardList, Lightbulb, Monitor, Leaf, Euro } from 'lucide-react';
+import { LayoutDashboard, BarChart3, ChevronLeft, ChevronRight, Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText, ArrowLeftRight, Calendar, MessageCircle, Building2, ClipboardList, Lightbulb, Monitor, Leaf, Euro, Map as MapIcon } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
 import { useAuth } from '@/contexts/AuthContext';
@@ -66,6 +66,13 @@ const menuGroups: MenuGroup[] = [
             label: 'Budget IT',
             icon: Euro,
             path: '/it/budget',
+            permissionKey: 'can_access_it_projects',
+          },
+          {
+            id: 'it-cartographie',
+            label: 'Cartographie IT',
+            icon: MapIcon,
+            path: '/it/cartographie',
             permissionKey: 'can_access_it_projects',
           },
         ],
