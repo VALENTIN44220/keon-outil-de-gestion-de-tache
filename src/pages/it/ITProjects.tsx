@@ -19,8 +19,9 @@ import { Label } from '@/components/ui/label';
 import {
   Plus, Monitor, Search, Download, Save, RotateCcw, Filter,
   FolderKanban, AlertTriangle, TrendingUp, ArrowUpDown, ChevronRight, Target,
-  FolderOpen, Bookmark, Trash2
+  FolderOpen, Bookmark, Trash2, GitMerge
 } from 'lucide-react';
+import { ITProjectMergeDialog } from '@/components/it/ITProjectMergeDialog';
 import { format, subMonths, startOfMonth, startOfYear, isAfter } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -119,6 +120,7 @@ export default function ITProjects() {
   const { projects, isLoading, deleteProject, fetchProjects } = useITProjects();
   const { isAdmin } = useUserRole();
   const [showCreate, setShowCreate] = useState(false);
+  const [showMerge, setShowMerge] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ITProject | null>(null);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [contextName, setContextName] = useState('');
@@ -326,6 +328,9 @@ export default function ITProjects() {
               </div>
             </div>
             <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setShowMerge(true)} className="gap-2">
+                <GitMerge className="h-4 w-4" /> Fusionner
+              </Button>
               <Button variant="outline" onClick={() => navigate('/it/projects/import-fdr')} className="gap-2">
                 <Download className="h-4 w-4" /> Importer FDR
               </Button>
@@ -712,6 +717,11 @@ export default function ITProjects() {
       </div>
 
       <ITProjectFormDialog open={showCreate} onClose={() => setShowCreate(false)} onSaved={fetchProjects} />
+      <ITProjectMergeDialog
+        open={showMerge}
+        onOpenChange={setShowMerge}
+        onMerged={() => fetchProjects()}
+      />
 
       <AlertDialog open={!!deleteTarget} onOpenChange={open => { if (!open) setDeleteTarget(null); }}>
         <AlertDialogContent>
