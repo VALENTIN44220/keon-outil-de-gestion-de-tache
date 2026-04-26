@@ -9,6 +9,8 @@ import { useITBudgetRapprochement } from '@/hooks/useITBudgetRapprochement';
 import { lineAnnualBudgetRevise } from '@/lib/itBudgetTotals';
 import { BudgetLineRapprochementPanel } from '@/components/it/BudgetLineRapprochementPanel';
 import { BulkRapprochementDialog } from '@/components/it/BulkRapprochementDialog';
+import { AssignGroupDialog } from '@/components/it/AssignGroupDialog';
+import { useITBudgetGroups } from '@/hooks/useITBudgetGroups';
 import { supabase } from '@/integrations/supabase/client';
 import { SupplierCombobox } from '@/components/it/SupplierCombobox';
 import { ITProjectCombobox } from '@/components/it/ITProjectCombobox';
@@ -79,6 +81,8 @@ import {
   ChevronRight,
   Receipt,
   FileText,
+  Boxes,
+  Link2,
   X,
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -346,6 +350,11 @@ export default function ITBudgetGlobal() {
 
   // Ventilation mensuelle + par fournisseur pour les cards de la synthèse
   const { monthlyRows, supplierRows, linkedRefs } = useITBudgetGlobalBreakdown(lines);
+  const { groups: rapprochementGroups } = useITBudgetGroups();
+  const groupById = useMemo(
+    () => new Map(rapprochementGroups.map((g) => [g.id, g])),
+    [rapprochementGroups]
+  );
 
   // Résolution des noms de projets IT pour la synthèse
   const { projects: allProjects = [] } = useITProjects();
@@ -454,6 +463,7 @@ export default function ITBudgetGlobal() {
   const [lineAnnee, setLineAnnee] = useState<string>('2026');
   const [lineItProjectId, setLineItProjectId] = useState('');
   const [bulkRapprochementOpen, setBulkRapprochementOpen] = useState(false);
+  const [assignGroupOpen, setAssignGroupOpen] = useState(false);
 
   const [expTypePrevision, setExpTypePrevision] = useState<ITManualExpense['type_prevision']>('depense_prevue');
   const [expFournisseur, setExpFournisseur] = useState('');
@@ -628,15 +638,19 @@ export default function ITBudgetGlobal() {
   );
 
   /**
-   * Regroupement par rapprochement : une "clé" est attribuée à chaque ligne
-   * — la première commande Divalto liée, sinon la première facture, sinon
-   * `_none_` (ligne non rattachée). Les lignes partageant la même clé sont
-   * affichées collées, sous un header pliable.
+   * Regroupement par rapprochement. Priorité de la clé :
+   *  1. `rapprochement_group_id` (groupe métier nommé)
+   *  2. première commande Divalto liée
+   *  3. première facture Divalto liée
+   *  4. `_none_` (ligne non rattachée)
+   * Les lignes partageant la même clé sont collées sous un header pliable.
    */
   type LineGroup = {
     key: string;
     label: string;
-    kind: 'commande' | 'facture' | 'none';
+    description?: string | null;
+    kind: 'manuel' | 'commande' | 'facture' | 'none';
+    groupId?: string | null;
     rows: ITBudgetLineRow[];
     totalBudget: number;
     totalCommande: number;
@@ -645,42 +659,51 @@ export default function ITBudgetGlobal() {
   const lineGroups: LineGroup[] = useMemo(() => {
     if (!groupByRapprochement) return [];
     const map = new Map<string, LineGroup>();
-    const getOrInit = (key: string, label: string, kind: LineGroup['kind']): LineGroup => {
+    const getOrInit = (key: string, label: string, kind: LineGroup['kind'], extras?: Partial<LineGroup>): LineGroup => {
       let g = map.get(key);
       if (!g) {
-        g = { key, label, kind, rows: [], totalBudget: 0, totalCommande: 0, totalFacture: 0 };
+        g = { key, label, kind, rows: [], totalBudget: 0, totalCommande: 0, totalFacture: 0, ...extras };
         map.set(key, g);
       }
       return g;
     };
     for (const row of filteredLineRows) {
-      const refs = linkedRefs.get(row.id);
       let key = '_none_';
       let label = 'Lignes non rattachées';
       let kind: LineGroup['kind'] = 'none';
-      if (refs && refs.commandes.length > 0) {
-        key = 'cmd:' + refs.commandes[0];
-        label = refs.commandes[0];
-        kind = 'commande';
-      } else if (refs && refs.factures.length > 0) {
-        key = 'fac:' + refs.factures[0];
-        label = refs.factures[0];
-        kind = 'facture';
+      let extras: Partial<LineGroup> | undefined;
+      if (row.rapprochement_group_id) {
+        const grp = groupById.get(row.rapprochement_group_id);
+        key = 'grp:' + row.rapprochement_group_id;
+        label = grp?.nom ?? `Groupe ${row.rapprochement_group_id.slice(0, 8)}…`;
+        kind = 'manuel';
+        extras = { groupId: row.rapprochement_group_id, description: grp?.description ?? null };
+      } else {
+        const refs = linkedRefs.get(row.id);
+        if (refs && refs.commandes.length > 0) {
+          key = 'cmd:' + refs.commandes[0];
+          label = refs.commandes[0];
+          kind = 'commande';
+        } else if (refs && refs.factures.length > 0) {
+          key = 'fac:' + refs.factures[0];
+          label = refs.factures[0];
+          kind = 'facture';
+        }
       }
-      const g = getOrInit(key, label, kind);
+      const g = getOrInit(key, label, kind, extras);
       g.rows.push(row);
       g.totalBudget += lineAnnualBudgetRevise(row);
       const ec = engageConstateData?.rows.find((r) => r.budget_line_id === row.id);
       g.totalCommande += Number(ec?.engage ?? 0);
       g.totalFacture += Number(ec?.constate ?? 0);
     }
-    // Tri : groupes rattachés d'abord (par label), lignes non rattachées à la fin
+    // Tri : groupes manuels d'abord, puis CFK/FFK, puis lignes non rattachées
+    const order: Record<LineGroup['kind'], number> = { manuel: 0, commande: 1, facture: 2, none: 3 };
     return Array.from(map.values()).sort((a, b) => {
-      if (a.kind === 'none' && b.kind !== 'none') return 1;
-      if (a.kind !== 'none' && b.kind === 'none') return -1;
+      if (order[a.kind] !== order[b.kind]) return order[a.kind] - order[b.kind];
       return a.label.localeCompare(b.label);
     });
-  }, [groupByRapprochement, filteredLineRows, linkedRefs, engageConstateData]);
+  }, [groupByRapprochement, filteredLineRows, linkedRefs, engageConstateData, groupById]);
 
   const toggleGroup = useCallback((key: string) => {
     setCollapsedGroups((prev) => {
@@ -1580,6 +1603,7 @@ export default function ITBudgetGlobal() {
                         clearSelection();
                       }}
                       onBulkRapprocher={() => setBulkRapprochementOpen(true)}
+                      onBulkGrouper={() => setAssignGroupOpen(true)}
                       entiteOptions={entiteOptions}
                       anneeOptions={anneeOptions}
                     />
@@ -1716,9 +1740,17 @@ export default function ITBudgetGlobal() {
 
                           return lineGroups.map((g) => {
                             const isCollapsed = collapsedGroups.has(g.key);
-                            const Icon = g.kind === 'commande' ? Receipt : g.kind === 'facture' ? FileText : Layers;
+                            const Icon = g.kind === 'manuel'
+                              ? Boxes
+                              : g.kind === 'commande'
+                              ? Receipt
+                              : g.kind === 'facture'
+                              ? FileText
+                              : Layers;
                             const colorClass =
-                              g.kind === 'commande'
+                              g.kind === 'manuel'
+                                ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-l-4 border-l-emerald-400'
+                                : g.kind === 'commande'
                                 ? 'bg-indigo-50/60 dark:bg-indigo-950/30 border-l-4 border-l-indigo-400'
                                 : g.kind === 'facture'
                                 ? 'bg-violet-50/60 dark:bg-violet-950/30 border-l-4 border-l-violet-400'
@@ -1736,10 +1768,28 @@ export default function ITBudgetGlobal() {
                                         : <ChevronDown className="h-4 w-4 shrink-0" />
                                       }
                                       <Icon className="h-4 w-4 shrink-0" />
-                                      <span className="font-mono font-semibold">{g.label}</span>
+                                      <span className={cn(g.kind === 'manuel' ? 'font-semibold' : 'font-mono font-semibold')}>{g.label}</span>
                                       <Badge variant="outline" className="text-[10px]">
                                         {g.rows.length} ligne{g.rows.length > 1 ? 's' : ''}
                                       </Badge>
+                                      {g.kind === 'manuel' && g.groupId && (
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="outline"
+                                          className="h-6 text-[10px] px-2 gap-1"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            // Sélectionne toutes les lignes du groupe et ouvre le rapprochement
+                                            setSelectedLineIds(new Set(g.rows.map((r) => r.id)));
+                                            setBulkRapprochementOpen(true);
+                                          }}
+                                          title="Affecter une commande / facture à toutes les lignes du groupe"
+                                        >
+                                          <Link2 className="h-3 w-3" />
+                                          Rapprocher
+                                        </Button>
+                                      )}
                                       <span className="ml-auto flex items-center gap-4 text-xs text-muted-foreground">
                                         <span>Budget <span className="tabular-nums text-foreground font-medium">{eur(g.totalBudget)}</span></span>
                                         <span>Engagé <span className="tabular-nums text-indigo-700 dark:text-indigo-400 font-medium">{eur(g.totalCommande)}</span></span>
@@ -2351,6 +2401,19 @@ export default function ITBudgetGlobal() {
           queryClient.invalidateQueries({ queryKey: ['it-budget-commandes-liees'] });
           queryClient.invalidateQueries({ queryKey: ['it-budget-factures-liees'] });
           queryClient.invalidateQueries({ queryKey: ['it-budget-engage-constate'] });
+          queryClient.invalidateQueries({ queryKey: ['it-budget-global-commandes'] });
+          queryClient.invalidateQueries({ queryKey: ['it-budget-global-factures'] });
+          clearSelection();
+        }}
+      />
+
+      <AssignGroupDialog
+        open={assignGroupOpen}
+        onOpenChange={setAssignGroupOpen}
+        selectedIds={Array.from(selectedLineIds)}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['it-budget-global-lines'] });
+          queryClient.invalidateQueries({ queryKey: ['it-budget-groups'] });
           clearSelection();
         }}
       />

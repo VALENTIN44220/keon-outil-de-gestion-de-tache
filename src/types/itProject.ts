@@ -294,6 +294,8 @@ export interface ITBudgetLine {
   mode_saisie: 'import' | 'manuel';
   commentaire?: string | null;
   external_key?: string | null;
+  /** Groupe de rapprochement auquel cette ligne appartient (FK optionnelle). */
+  rapprochement_group_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -307,6 +309,21 @@ export interface ITBudgetOption {
   parent_value?: string | null;
   created_by?: string | null;
   created_at: string;
+}
+
+/**
+ * Groupe de rapprochement : ensemble nommé de lignes budgétaires destinées
+ * à être affectées ensemble à une même commande / facture Divalto.
+ */
+export interface ITBudgetRapprochementGroup {
+  id: string;
+  nom: string;
+  description?: string | null;
+  exercice?: number | null;
+  entite?: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by?: string | null;
 }
 
 export interface ITManualExpense {

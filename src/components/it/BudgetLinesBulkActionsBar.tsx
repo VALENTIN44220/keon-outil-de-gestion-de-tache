@@ -12,6 +12,7 @@ import {
   X,
   Loader2,
   Link2,
+  Boxes,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -55,6 +56,8 @@ interface BudgetLinesBulkActionsBarProps {
   onBulkDuplicate: () => Promise<void>;
   /** Ouvre la boîte d'affectation à une commande/facture pour les lignes sélectionnées. */
   onBulkRapprocher?: () => void;
+  /** Ouvre la boîte d'affectation à un groupe de rapprochement. */
+  onBulkGrouper?: () => void;
   entiteOptions: string[];
   anneeOptions: number[];
 }
@@ -70,6 +73,7 @@ export function BudgetLinesBulkActionsBar({
   onBulkDelete,
   onBulkDuplicate,
   onBulkRapprocher,
+  onBulkGrouper,
   entiteOptions,
   anneeOptions,
 }: BudgetLinesBulkActionsBarProps) {
@@ -228,11 +232,25 @@ export function BudgetLinesBulkActionsBar({
 
       <div className="mx-2 h-5 w-px bg-border" />
 
-      {onBulkRapprocher && (
+      {onBulkGrouper && (
         <Button
           type="button"
           size="sm"
           variant="default"
+          className="h-8 gap-1.5"
+          onClick={onBulkGrouper}
+          disabled={pending !== null}
+        >
+          <Boxes className="h-3.5 w-3.5" />
+          Grouper / ajouter à un groupe
+        </Button>
+      )}
+
+      {onBulkRapprocher && (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
           className="h-8 gap-1.5"
           onClick={onBulkRapprocher}
           disabled={pending !== null}
