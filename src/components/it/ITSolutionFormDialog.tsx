@@ -48,6 +48,7 @@ const empty = (): Partial<ITSolution> => ({
   perimetre: '',
   criticite: null,
   commentaires: '',
+  logo_url: '',
 });
 
 export function ITSolutionFormDialog({ open, onOpenChange, solution, onSaved }: Props) {
@@ -86,6 +87,7 @@ export function ITSolutionFormDialog({ open, onOpenChange, solution, onSaved }: 
         perimetre: form.perimetre || null,
         criticite: (form.criticite as ITSolutionCriticite | null) ?? null,
         commentaires: form.commentaires || null,
+        logo_url: form.logo_url?.trim() || null,
       };
       if (solution) {
         await updateSolution.mutateAsync({ id: solution.id, updates: payload });
@@ -218,6 +220,29 @@ export function ITSolutionFormDialog({ open, onOpenChange, solution, onSaved }: 
                 onChange={(e) => setField('perimetre', e.target.value)}
                 placeholder="Ex: Groupe, SPV majo, Sites Naskeo..."
               />
+            </div>
+
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Logo (URL)</Label>
+              <div className="flex gap-2 items-start">
+                <Input
+                  value={form.logo_url ?? ''}
+                  onChange={(e) => setField('logo_url', e.target.value)}
+                  placeholder="https://...png ou .svg"
+                  className="flex-1"
+                />
+                {form.logo_url ? (
+                  <img
+                    src={form.logo_url}
+                    alt=""
+                    className="h-10 w-10 rounded border object-contain bg-white p-1"
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                  />
+                ) : null}
+              </div>
+              <p className="text-[10px] text-muted-foreground">
+                Lien vers une image publique (logo de l'éditeur, icône métier...). Affichée dans la card et le nœud du graphe.
+              </p>
             </div>
           </div>
 

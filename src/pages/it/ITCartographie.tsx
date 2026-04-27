@@ -175,6 +175,14 @@ export default function ITCartographie() {
                       >
                         <CardContent className="p-4 space-y-2">
                           <div className="flex items-start justify-between gap-2">
+                            {s.logo_url && (
+                              <img
+                                src={s.logo_url}
+                                alt=""
+                                className="h-10 w-10 shrink-0 rounded border bg-white object-contain p-1"
+                                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                              />
+                            )}
                             <div className="min-w-0 flex-1">
                               <p className="font-semibold truncate">{s.nom}</p>
                               {s.type && (

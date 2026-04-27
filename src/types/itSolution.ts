@@ -31,6 +31,14 @@ export interface ITSolution {
   perimetre?: string | null;
   criticite?: ITSolutionCriticite | null;
   commentaires?: string | null;
+  /** URL d'un logo / icône représentant la solution. */
+  logo_url?: string | null;
+  /** Position du nœud dans la vue graphe (persistée au drag). */
+  position_x?: number | null;
+  position_y?: number | null;
+  /** Taille du nœud dans la vue graphe (persistée au resize). */
+  width?: number | null;
+  height?: number | null;
   created_at: string;
   updated_at: string;
   created_by?: string | null;

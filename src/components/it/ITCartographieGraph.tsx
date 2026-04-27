@@ -1,25 +1,31 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ReactFlow,
   Background,
   Controls,
   MiniMap,
   MarkerType,
+  NodeResizer,
+  Position,
+  Handle,
+  EdgeLabelRenderer,
+  getSmoothStepPath,
+  useNodesState,
+  useEdgesState,
   type Node,
+  type NodeProps,
   type Edge,
   type EdgeProps,
-  type NodeProps,
-  Handle,
-  Position,
-  EdgeLabelRenderer,
-  getBezierPath,
+  type NodeChange,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import dagre from '@dagrejs/dagre';
 import { Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { ITSolutionLinkFormDialog } from '@/components/it/ITSolutionLinkFormDialog';
+import { useITSolutions } from '@/hooks/useITSolutions';
 import {
   CRITICITE_CONFIG,
   DIRECTION_LABEL,
@@ -34,65 +40,56 @@ interface Props {
   onSelectSolution?: (s: ITSolution) => void;
 }
 
-type SolutionNodeData = {
+type SolutionNodeData = Record<string, unknown> & {
   solution: ITSolution;
   onSelect?: (s: ITSolution) => void;
 };
 
-type SolutionLinkData = {
+type SolutionLinkData = Record<string, unknown> & {
   link: ITSolutionLink;
   onEdit: (link: ITSolutionLink) => void;
 };
 
+const DEFAULT_NODE_W = 220;
+const DEFAULT_NODE_H = 90;
+
 /**
- * Pose les nœuds en couches concentriques par catégorie. Le « hub » data
- * (Datalake / catégorie Plateforme data) est placé au centre, les autres
- * solutions distribuées en cercles autour selon leur catégorie.
+ * Layout dagre — DAG layered, minimise les croisements d'arêtes. Utilisé
+ * uniquement pour les nœuds dont la position n'est PAS encore enregistrée
+ * en base (les nœuds avec position_x/y sont laissés à leur place).
  */
-function computeLayout(solutions: ITSolution[]): Record<string, { x: number; y: number }> {
-  if (solutions.length === 0) return {};
-  const positions: Record<string, { x: number; y: number }> = {};
+function dagreLayout(
+  solutions: ITSolution[],
+  links: ITSolutionLink[]
+): Record<string, { x: number; y: number }> {
+  const g = new dagre.graphlib.Graph();
+  g.setGraph({ rankdir: 'LR', nodesep: 60, ranksep: 120, marginx: 20, marginy: 20 });
+  g.setDefaultEdgeLabel(() => ({}));
 
-  // Hub : la première solution dont la catégorie est "Plateforme data" sinon
-  // la solution avec le plus de liens entrants (déterminé en amont si on
-  // l'avait — ici on prend simplement la 1ère "Plateforme data").
-  const hub = solutions.find((s) => (s.categorie ?? '').toLowerCase().includes('plateforme'))
-    ?? solutions[0];
-  positions[hub.id] = { x: 0, y: 0 };
-
-  // Regroupe par catégorie hors hub
-  const buckets = new Map<string, ITSolution[]>();
   for (const s of solutions) {
-    if (s.id === hub.id) continue;
-    const k = s.categorie?.trim() || 'Sans catégorie';
-    if (!buckets.has(k)) buckets.set(k, []);
-    buckets.get(k)!.push(s);
+    g.setNode(s.id, { width: s.width ?? DEFAULT_NODE_W, height: s.height ?? DEFAULT_NODE_H });
+  }
+  for (const l of links) {
+    if (g.hasNode(l.source_solution_id) && g.hasNode(l.target_solution_id)) {
+      g.setEdge(l.source_solution_id, l.target_solution_id);
+    }
   }
 
-  const categories = Array.from(buckets.keys());
-  const totalCats = categories.length || 1;
-  const baseRadius = 360;
-  const angleStep = (2 * Math.PI) / totalCats;
+  dagre.layout(g);
 
-  categories.forEach((cat, ci) => {
-    const items = buckets.get(cat)!;
-    const baseAngle = ci * angleStep;
-    const radius = baseRadius + (items.length > 3 ? 80 : 0);
-    items.forEach((s, i) => {
-      // Spread items in a small arc around the category direction
-      const arc = items.length > 1 ? (i / (items.length - 1) - 0.5) * 0.45 : 0;
-      const a = baseAngle + arc;
-      positions[s.id] = {
-        x: Math.cos(a) * radius,
-        y: Math.sin(a) * radius,
-      };
-    });
-  });
-
-  return positions;
+  const out: Record<string, { x: number; y: number }> = {};
+  for (const s of solutions) {
+    const n = g.node(s.id);
+    if (n) {
+      // dagre renvoie le centre du nœud, ReactFlow attend le coin haut-gauche
+      const w = s.width ?? DEFAULT_NODE_W;
+      const h = s.height ?? DEFAULT_NODE_H;
+      out[s.id] = { x: n.x - w / 2, y: n.y - h / 2 };
+    }
+  }
+  return out;
 }
 
-/** Couleur de bordure du nœud selon la criticité de la solution. */
 function nodeBorder(crit: ITSolution['criticite']): string {
   switch (crit) {
     case 'tres_forte': return 'border-red-500';
@@ -103,26 +100,45 @@ function nodeBorder(crit: ITSolution['criticite']): string {
   }
 }
 
-function SolutionNode({ data }: NodeProps<Node<SolutionNodeData>>) {
+function SolutionNode({ data, selected }: NodeProps<Node<SolutionNodeData>>) {
   const { solution: s, onSelect } = data;
   return (
     <div
       onClick={() => onSelect?.(s)}
       className={cn(
-        'group rounded-lg border-2 bg-background shadow-sm hover:shadow-md transition-shadow px-3 py-2 cursor-pointer min-w-[180px] max-w-[220px]',
-        nodeBorder(s.criticite ?? null)
+        'group relative h-full w-full rounded-lg border-2 bg-background shadow-sm hover:shadow-md transition-shadow px-3 py-2 cursor-pointer overflow-hidden',
+        nodeBorder(s.criticite ?? null),
+        selected && 'ring-2 ring-primary'
       )}
     >
-      <Handle type="target" position={Position.Top} className="!bg-primary !w-2 !h-2" />
-      <Handle type="source" position={Position.Bottom} className="!bg-primary !w-2 !h-2" />
-      <Handle type="target" position={Position.Left} className="!bg-primary !w-2 !h-2" id="left" />
-      <Handle type="source" position={Position.Right} className="!bg-primary !w-2 !h-2" id="right" />
+      <NodeResizer
+        color="#6366f1"
+        isVisible={selected}
+        minWidth={140}
+        minHeight={64}
+        handleClassName="!w-2 !h-2 !rounded-sm"
+        lineClassName="!border-primary"
+      />
 
-      <div className="flex items-start gap-2">
+      <Handle type="target" position={Position.Top} className="!bg-primary !w-2 !h-2" id="t" />
+      <Handle type="source" position={Position.Bottom} className="!bg-primary !w-2 !h-2" id="b" />
+      <Handle type="target" position={Position.Left} className="!bg-primary !w-2 !h-2" id="l" />
+      <Handle type="source" position={Position.Right} className="!bg-primary !w-2 !h-2" id="r" />
+
+      <div className="flex items-start gap-2 h-full">
+        {s.logo_url && (
+          <img
+            src={s.logo_url}
+            alt=""
+            className="h-8 w-8 shrink-0 rounded border bg-white object-contain p-0.5"
+            draggable={false}
+            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+          />
+        )}
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold truncate">{s.nom}</p>
+          <p className="text-xs font-semibold leading-tight break-words">{s.nom}</p>
           {s.categorie && (
-            <p className="text-[10px] text-muted-foreground truncate">{s.categorie}</p>
+            <p className="text-[10px] text-muted-foreground leading-tight break-words mt-0.5">{s.categorie}</p>
           )}
         </div>
         {s.criticite && (
@@ -139,9 +155,10 @@ function SolutionNode({ data }: NodeProps<Node<SolutionNodeData>>) {
 }
 
 function CharacterizedEdge(props: EdgeProps<Edge<SolutionLinkData>>) {
-  const { sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, markerEnd, data, id, style } = props;
-  const [edgePath, labelX, labelY] = getBezierPath({
-    sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition,
+  const { sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, markerEnd, data, id, style, markerStart } = props;
+  // smoothstep : routage orthogonal qui réduit fortement les croisements
+  const [edgePath, labelX, labelY] = getSmoothStepPath({
+    sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, borderRadius: 12,
   });
 
   const link = data?.link;
@@ -157,6 +174,7 @@ function CharacterizedEdge(props: EdgeProps<Edge<SolutionLinkData>>) {
         stroke={flux?.color ?? '#6b7280'}
         strokeWidth={2}
         markerEnd={markerEnd}
+        markerStart={markerStart}
         style={style}
       />
       {link && (
@@ -184,33 +202,54 @@ const nodeTypes = { solution: SolutionNode };
 const edgeTypes = { characterized: CharacterizedEdge };
 
 export function ITCartographieGraph({ solutions, links, onSelectSolution }: Props) {
+  const { updateSolutionLayout } = useITSolutions();
   const [editingLink, setEditingLink] = useState<ITSolutionLink | null>(null);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
 
-  const layout = useMemo(() => computeLayout(solutions), [solutions]);
+  /**
+   * Position de chaque nœud :
+   *  - Si position_x/y présents en DB → on les utilise
+   *  - Sinon on utilise dagre pour calculer un layout sans croisements
+   */
+  const initialPositions = useMemo(() => {
+    const fallback = dagreLayout(solutions, links);
+    const positions: Record<string, { x: number; y: number }> = {};
+    for (const s of solutions) {
+      if (typeof s.position_x === 'number' && typeof s.position_y === 'number') {
+        positions[s.id] = { x: Number(s.position_x), y: Number(s.position_y) };
+      } else {
+        positions[s.id] = fallback[s.id] ?? { x: 0, y: 0 };
+      }
+    }
+    return positions;
+  }, [solutions, links]);
 
-  const nodes: Node<SolutionNodeData>[] = useMemo(
-    () => solutions.map((s) => ({
+  const buildNodes = useCallback((): Node<SolutionNodeData>[] =>
+    solutions.map((s) => ({
       id: s.id,
       type: 'solution',
-      position: layout[s.id] ?? { x: 0, y: 0 },
+      position: initialPositions[s.id] ?? { x: 0, y: 0 },
+      width: s.width ?? DEFAULT_NODE_W,
+      height: s.height ?? DEFAULT_NODE_H,
+      style: { width: s.width ?? DEFAULT_NODE_W, height: s.height ?? DEFAULT_NODE_H },
       data: { solution: s, onSelect: onSelectSolution },
     })),
-    [solutions, layout, onSelectSolution]
+    [solutions, initialPositions, onSelectSolution]
   );
 
-  const edges: Edge<SolutionLinkData>[] = useMemo(
-    () => links.map((l) => {
+  const buildEdges = useCallback((): Edge<SolutionLinkData>[] =>
+    links.map((l) => {
       const flux = l.type_flux ? FLUX_TYPE_CONFIG[l.type_flux] : null;
-      const arrow = l.direction === 'bidirectionnel' ? MarkerType.ArrowClosed : MarkerType.ArrowClosed;
       return {
         id: l.id,
         source: l.source_solution_id,
         target: l.target_solution_id,
         type: 'characterized',
         animated: l.criticite === 'tres_forte' || l.criticite === 'forte',
-        markerEnd: { type: arrow, color: flux?.color ?? '#6b7280' },
-        markerStart: l.direction === 'bidirectionnel' ? { type: arrow, color: flux?.color ?? '#6b7280' } : undefined,
+        markerEnd: { type: MarkerType.ArrowClosed, color: flux?.color ?? '#6b7280' },
+        markerStart: l.direction === 'bidirectionnel'
+          ? { type: MarkerType.ArrowClosed, color: flux?.color ?? '#6b7280' }
+          : undefined,
         style: { stroke: flux?.color ?? '#6b7280', strokeWidth: 2 },
         data: {
           link: l,
@@ -220,6 +259,45 @@ export function ITCartographieGraph({ solutions, links, onSelectSolution }: Prop
     }),
     [links]
   );
+
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node<SolutionNodeData>>(buildNodes());
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge<SolutionLinkData>>(buildEdges());
+
+  // Resync when source data change (DB invalidation)
+  useEffect(() => { setNodes(buildNodes()); }, [buildNodes, setNodes]);
+  useEffect(() => { setEdges(buildEdges()); }, [buildEdges, setEdges]);
+
+  // Debounce de persistance pour drag/resize (évite de spammer la DB)
+  const pendingTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const schedulePersist = useCallback((id: string, payload: { x?: number; y?: number; w?: number; h?: number }) => {
+    const existing = pendingTimers.current.get(id);
+    if (existing) clearTimeout(existing);
+    const t = setTimeout(() => {
+      pendingTimers.current.delete(id);
+      updateSolutionLayout.mutate({
+        id,
+        position_x: payload.x,
+        position_y: payload.y,
+        width: payload.w,
+        height: payload.h,
+      });
+    }, 600);
+    pendingTimers.current.set(id, t);
+  }, [updateSolutionLayout]);
+
+  // Hook ReactFlow : intercepte les changements de position et de dimension
+  const handleNodesChange = useCallback((changes: NodeChange[]) => {
+    onNodesChange(changes);
+    for (const c of changes) {
+      if (c.type === 'position' && c.position && !c.dragging) {
+        // Drag terminé
+        schedulePersist(c.id, { x: c.position.x, y: c.position.y });
+      } else if (c.type === 'dimensions' && c.dimensions && c.resizing === false) {
+        // Resize terminé
+        schedulePersist(c.id, { w: c.dimensions.width, h: c.dimensions.height });
+      }
+    }
+  }, [onNodesChange, schedulePersist]);
 
   const openCreateLink = useCallback(() => {
     setEditingLink(null);
@@ -238,11 +316,13 @@ export function ITCartographieGraph({ solutions, links, onSelectSolution }: Prop
       <ReactFlow
         nodes={nodes}
         edges={edges}
+        onNodesChange={handleNodesChange}
+        onEdgesChange={onEdgesChange}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView
-        fitViewOptions={{ padding: 0.2 }}
-        minZoom={0.2}
+        fitViewOptions={{ padding: 0.15 }}
+        minZoom={0.15}
         maxZoom={2}
         proOptions={{ hideAttribution: true }}
       >
@@ -262,6 +342,8 @@ export function ITCartographieGraph({ solutions, links, onSelectSolution }: Prop
             </div>
           ))}
         </div>
+        <p className="font-semibold mt-2 mb-1">Astuce</p>
+        <p className="text-muted-foreground">Glissez pour déplacer, sélectionnez puis tirez les coins pour redimensionner.</p>
       </div>
 
       <ITSolutionLinkFormDialog

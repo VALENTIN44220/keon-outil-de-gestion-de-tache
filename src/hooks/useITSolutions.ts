@@ -23,7 +23,7 @@ export function useITSolutions() {
       const { data, error } = await supabase
         .from('it_solutions')
         .select(
-          'id, nom, categorie, type, usage_principal, domaine_metier, visible_dans_schema, connecte_datalake, flux_principaux, statut_temporalite, owner_metier_id, owner_it_id, perimetre, criticite, commentaires, created_at, updated_at, created_by, owner_metier:profiles!it_solutions_owner_metier_id_fkey(id,display_name,avatar_url), owner_it:profiles!it_solutions_owner_it_id_fkey(id,display_name,avatar_url)'
+          'id, nom, categorie, type, usage_principal, domaine_metier, visible_dans_schema, connecte_datalake, flux_principaux, statut_temporalite, owner_metier_id, owner_it_id, perimetre, criticite, commentaires, logo_url, position_x, position_y, width, height, created_at, updated_at, created_by, owner_metier:profiles!it_solutions_owner_metier_id_fkey(id,display_name,avatar_url), owner_it:profiles!it_solutions_owner_it_id_fkey(id,display_name,avatar_url)'
         )
         .order('nom', { ascending: true });
       if (error) throw error;
@@ -77,6 +77,26 @@ export function useITSolutions() {
       if (error) throw error;
     },
     onSuccess: invalidate,
+  });
+
+  /**
+   * Met à jour position et taille d'un nœud dans le graphe (drag / resize).
+   * Persistance silencieuse — pas de toast, on n'invalide que la query
+   * solutions pour rafraîchir le cache.
+   */
+  const updateSolutionLayout = useMutation({
+    mutationFn: async (payload: {
+      id: string;
+      position_x?: number | null;
+      position_y?: number | null;
+      width?: number | null;
+      height?: number | null;
+    }) => {
+      const { id, ...patch } = payload;
+      const { error } = await supabase.from('it_solutions').update(patch).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: SOLUTIONS_KEY }),
   });
 
   const linkProject = useMutation({
@@ -164,6 +184,7 @@ export function useITSolutions() {
     createSolution,
     updateSolution,
     deleteSolution,
+    updateSolutionLayout,
     linkProject,
     unlinkProject,
     createSolutionLink,
