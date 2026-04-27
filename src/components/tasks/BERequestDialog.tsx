@@ -390,6 +390,7 @@ export function BERequestDialog({
               processTemplateId: beProcessId,
               targetDepartmentId,
               subProcessTemplateId: matchingSubProcess.id,
+              customFieldValues,
             });
             totalAssignments += count;
           }
@@ -403,6 +404,7 @@ export function BERequestDialog({
           parentRequestId: requestData.id,
           processTemplateId: beProcessId,
           targetDepartmentId,
+          customFieldValues,
         });
       }
 

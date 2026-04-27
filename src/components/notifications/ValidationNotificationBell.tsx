@@ -52,7 +52,14 @@ export function ValidationNotificationBell({
           <ScrollArea className="max-h-80">
             <div className="divide-y divide-border">
               {pendingValidations.map((task) => {
-                const level = task.request_validation_status === 'pending_level_1' ? 1 : 2;
+                const level =
+                  task.type === 'request'
+                    ? task.request_validation_status === 'pending_level_1'
+                      ? 1
+                      : 2
+                    : task.status === 'pending_validation_1'
+                      ? 1
+                      : 2;
                 return (
                   <button
                     key={task.id}

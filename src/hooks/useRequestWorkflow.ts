@@ -2,7 +2,8 @@ import { useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { normalizeValidationLevel } from '@/lib/taskValidationUi';
+import { insertPendingAssignmentTasksForLane } from '@/lib/insertPendingAssignmentTasksForLane';
+import { resolveSecondaryEcheanceLaneFromForm } from '@/lib/resolveSecondaryEcheanceLaneFromForm';
 // TODO (désactivé) — team_lead_reassignment : décommentez quand la feature est réactivée
 // import { fetchProcessAssignmentSettings, pickAssignmentRuleIdForPendingTask } from '@/lib/processAssignmentConfig';
 // import { resolveWfAssignmentRuleToProfileId } from '@/lib/resolveWfAssignmentRuleToProfile';
@@ -13,6 +14,8 @@ interface GeneratePendingAssignmentsOptions {
   targetDepartmentId: string;
   subProcessTemplateId?: string;
   targetManagerId?: string;
+  /** Valeurs du formulaire de demande (pour câbler échéance / service secondaires). */
+  customFieldValues?: Record<string, unknown> | null;
 }
 
 export function useRequestWorkflow() {
@@ -23,17 +26,26 @@ export function useRequestWorkflow() {
    * Generate pending task assignments from a process template when a request is created.
    * Tasks are NOT created immediately - they are stored as pending assignments
    * that the manager will assign to team members.
+   *
+   * Si le formulaire contient un couple « Service secondaire + Échéance secondaire », une deuxième
+   * série de tâches est créée avec `target_department_id` et `due_date` issus de ce couple.
    */
   const generatePendingAssignments = useCallback(
     async (options: GeneratePendingAssignmentsOptions): Promise<number> => {
-      const { parentRequestId, processTemplateId, targetDepartmentId, subProcessTemplateId, targetManagerId } = options;
+      const {
+        parentRequestId,
+        processTemplateId,
+        targetDepartmentId,
+        subProcessTemplateId,
+        targetManagerId,
+        customFieldValues,
+      } = options;
 
       if (!user) return 0;
 
       try {
         let taskTemplates: any[] = [];
 
-        // If sub-process is specified, fetch tasks from sub-process
         if (subProcessTemplateId) {
           const { data, error } = await supabase
             .from('task_templates')
@@ -45,7 +57,6 @@ export function useRequestWorkflow() {
           taskTemplates = data || [];
         }
 
-        // If no tasks from sub-process or no sub-process, try process level
         if (taskTemplates.length === 0) {
           const { data, error } = await supabase
             .from('task_templates')
@@ -67,19 +78,38 @@ export function useRequestWorkflow() {
           .select('due_date, requester_id, reporter_id')
           .eq('id', parentRequestId)
           .maybeSingle();
+
         const parentDue: string | null = parentRow?.due_date
           ? String(parentRow.due_date).split('T')[0]
           : null;
 
-        // Résoudre le manager effectif (depuis l'option passée ou depuis le template de sous-processus)
         let effectiveTargetManagerId = targetManagerId;
-        if (!effectiveTargetManagerId && subProcessTemplateId) {
+        let subProcessTargetDept: string | null = null;
+        if (subProcessTemplateId) {
           const { data: spt } = await supabase
             .from('sub_process_templates')
-            .select('target_manager_id')
+            .select('target_manager_id, target_department_id')
             .eq('id', subProcessTemplateId)
             .maybeSingle();
-          effectiveTargetManagerId = spt?.target_manager_id ?? undefined;
+          if (!effectiveTargetManagerId) {
+            effectiveTargetManagerId = spt?.target_manager_id ?? undefined;
+          }
+          subProcessTargetDept = spt?.target_department_id ?? null;
+        }
+
+        const secondaryLane = await resolveSecondaryEcheanceLaneFromForm(supabase, {
+          processTemplateId,
+          subProcessTemplateId: subProcessTemplateId ?? null,
+          customFieldValues: customFieldValues ?? null,
+        });
+
+        let secondaryAssigneeId: string | null = null;
+        if (
+          secondaryLane &&
+          subProcessTargetDept &&
+          secondaryLane.departmentId === subProcessTargetDept
+        ) {
+          secondaryAssigneeId = effectiveTargetManagerId ?? null;
         }
 
         /*
@@ -90,96 +120,51 @@ export function useRequestWorkflow() {
          * insérer avec `status: 'todo'`, `assignee_id` = profil résolu, `allows_reassignment: true`.
          */
 
-        const today = new Date();
-        const y0 = today.getFullYear();
-        const m0 = today.getMonth();
-        const d0 = today.getDate();
+        const primaryCreated = await insertPendingAssignmentTasksForLane({
+          userId: user.id,
+          parentRequestId,
+          processTemplateId,
+          subProcessTemplateId: subProcessTemplateId || null,
+          targetDepartmentId,
+          assigneeId: effectiveTargetManagerId ?? null,
+          parentRow,
+          taskTemplates,
+          lane: 'primary',
+        });
 
-        for (const template of taskTemplates) {
-          const dueFromTemplate = template.default_duration_days
-            ? (() => {
-                const d = new Date(y0, m0, d0 + Number(template.default_duration_days));
-                return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-              })()
-            : null;
-          // Échéance de la demande parente (saisie à la création) : sinon délai par défaut du gabarit.
-          const dueDate = parentDue ?? dueFromTemplate;
-
-          const { data: newTask, error: taskError } = await supabase
-            .from('tasks')
-            .insert({
-              title: template.title,
-              description: template.description,
-              priority: template.priority,
-              status: 'to_assign' as const,
-              type: 'task' as const,
-              due_date: dueDate,
-              user_id: user.id,
-              assignee_id: effectiveTargetManagerId || null,
-              parent_request_id: parentRequestId,
-              requester_id: parentRow?.requester_id ?? null,
-              reporter_id: parentRow?.reporter_id ?? null,
-              source_process_template_id: processTemplateId,
-              source_sub_process_template_id: subProcessTemplateId || null,
-              target_department_id: targetDepartmentId,
-              requires_validation: template.requires_validation || false,
-              validation_level_1: normalizeValidationLevel(template.validation_level_1),
-              validation_level_2: normalizeValidationLevel(template.validation_level_2),
-              validator_level_1_id: template.validator_level_1_id ?? null,
-              validator_level_2_id: template.validator_level_2_id ?? null,
-              is_assignment_task: false,
-            })
-            .select()
-            .single();
-
-          if (taskError) {
-            console.error('Error creating task:', taskError);
-            continue;
-          }
-
-          // Copy checklist items from template
-          const { data: templateChecklists } = await supabase
-            .from('task_template_checklists')
-            .select('*')
-            .eq('task_template_id', template.id);
-
-          if (templateChecklists && templateChecklists.length > 0) {
-            await supabase.from('task_checklists').insert(
-              templateChecklists.map((item) => ({
-                task_id: newTask.id,
-                title: item.title,
-                order_index: item.order_index,
-              }))
-            );
-          }
-
-          // Copy validation levels if required
-          if (template.requires_validation) {
-            const { data: templateValidationLevels } = await supabase
-              .from('template_validation_levels')
-              .select('*')
-              .eq('task_template_id', template.id);
-
-            if (templateValidationLevels && templateValidationLevels.length > 0) {
-              await supabase.from('task_validation_levels').insert(
-                templateValidationLevels.map((level) => ({
-                  task_id: newTask.id,
-                  level: level.level,
-                  validator_id: level.validator_profile_id,
-                  validator_department_id: level.validator_department_id,
-                  status: 'pending',
-                }))
-              );
-            }
+        let secondaryCreated = 0;
+        if (secondaryLane) {
+          const redundant =
+            secondaryLane.departmentId === targetDepartmentId &&
+            secondaryLane.dueDateYmd === parentDue;
+          if (!redundant) {
+            secondaryCreated = await insertPendingAssignmentTasksForLane({
+              userId: user.id,
+              parentRequestId,
+              processTemplateId,
+              subProcessTemplateId: subProcessTemplateId || null,
+              targetDepartmentId: secondaryLane.departmentId,
+              assigneeId: secondaryAssigneeId,
+              parentRow,
+              taskTemplates,
+              lane: 'secondary',
+              secondaryDueYmd: secondaryLane.dueDateYmd,
+              titleSuffix: ' — (service secondaire)',
+            });
           }
         }
 
+        const total = primaryCreated + secondaryCreated;
+
         toast({
           title: 'Demande créée',
-          description: `${taskTemplates.length} tâche(s) créées et assignées au manager pour affectation`,
+          description:
+            secondaryCreated > 0
+              ? `${total} tâche(s) créées (${primaryCreated} voie principale, ${secondaryCreated} échéance secondaire), en attente d'affectation`
+              : `${primaryCreated} tâche(s) créées et assignées au manager pour affectation`,
         });
 
-        return taskTemplates.length;
+        return total;
       } catch (error) {
         console.error('Error generating pending assignments:', error);
         toast({

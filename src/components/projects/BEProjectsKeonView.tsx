@@ -16,15 +16,15 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
 } from 'recharts';
-import { Leaf, Building2, Flame, BarChart2, MapPin, CheckCircle2, Settings2, RotateCcw } from 'lucide-react';
+import { Leaf, Building2, Flame, BarChart2, MapPin, CheckCircle2, Settings2, RotateCcw, FolderOpen, Activity } from 'lucide-react';
 import { WidgetWrapper, WidgetSizePreset, HeightPreset } from '@/components/dashboard/widgets/WidgetWrapper';
 import { WidgetConfig } from '@/components/dashboard/types';
 
+const SPV_QUESTIONNAIRE_FIELD = '02_GEN_spv_cree';
+
 const CHART_COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#6b7280'];
 const PILIER_CODES: PilierCode[] = ['00', '02', '04', '05', '06', '07'];
-const STORAGE_KEY = 'spv_widget_layout';
-
-// Default SPV widget configs using the same WidgetConfig shape as main dashboard
+// Default widget configs using the same WidgetConfig shape as main dashboard
 const DEFAULT_SPV_WIDGETS: WidgetConfig[] = [
   { id: 'kpis', type: 'stats-summary', title: 'KPI Band', size: { w: 4, h: 2 }, position: { x: 0, y: 0 } },
   { id: 'map', type: 'bar-chart', title: 'Carte des projets SPV', size: { w: 2, h: 4 }, position: { x: 0, y: 1 } },
@@ -33,10 +33,22 @@ const DEFAULT_SPV_WIDGETS: WidgetConfig[] = [
   { id: 'tableau', type: 'data-table', title: 'Tableau récap', size: { w: 4, h: 5 }, position: { x: 0, y: 9 } },
 ];
 
+export type BEProjectsKeonViewVariant = 'spv' | 'be';
+
+function storageKeyForKeonVariant(variant: BEProjectsKeonViewVariant): string {
+  return variant === 'be' ? 'be_widget_layout' : 'spv_widget_layout';
+}
+
+function defaultKeonWidgets(variant: BEProjectsKeonViewVariant): WidgetConfig[] {
+  const mapTitle = variant === 'be' ? 'Carte des projets BE' : 'Carte des projets SPV';
+  return DEFAULT_SPV_WIDGETS.map((w) => (w.id === 'map' ? { ...w, title: mapTitle } : w));
+}
+
 interface Props {
   projects: BEProject[];
   qstData: Record<string, Record<string, any>>;
   keonProjectIds: Set<string>;
+  variant?: BEProjectsKeonViewVariant;
 }
 
 // --- Height/Size helpers (same as ConfigurableDashboard) ---
@@ -85,8 +97,10 @@ function completionColor(pct: number) {
   return 'text-emerald-500';
 }
 
-export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props) {
+export function BEProjectsKeonView({ projects, qstData, keonProjectIds, variant = 'spv' }: Props) {
   const navigate = useNavigate();
+  const storageKey = storageKeyForKeonVariant(variant);
+  const hubBasePath = variant === 'spv' ? '/spv/projects' : '/be/projects';
   const [isMobileViewport, setIsMobileViewport] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     return window.matchMedia('(max-width: 767px)').matches;
@@ -94,14 +108,15 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
 
   // --- Widget config state (same pattern as ConfigurableDashboard) ---
   const [widgets, setWidgets] = useState<WidgetConfig[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const saved = localStorage.getItem(storageKeyForKeonVariant(variant));
+    const defaults = defaultKeonWidgets(variant);
     try {
-      const list = saved ? JSON.parse(saved) : DEFAULT_SPV_WIDGETS;
+      const list = saved ? JSON.parse(saved) : defaults;
       // Migration : KPI Band doit avoir au moins h:2 (250px) pour afficher les valeurs
       return list.map((w: WidgetConfig) =>
         w.id === 'kpis' && w.size.h < 2 ? { ...w, size: { ...w.size, h: 2 } } : w
       );
-    } catch { return DEFAULT_SPV_WIDGETS; }
+    } catch { return defaults; }
   });
   const [isEditing, setIsEditing] = useState(false);
   const [draggedWidget, setDraggedWidget] = useState<string | null>(null);
@@ -145,7 +160,7 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
   }, [kpiBandMeasuredPx]);
 
   // Persist to localStorage
-  useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(widgets)); }, [widgets]);
+  useEffect(() => { localStorage.setItem(storageKey, JSON.stringify(widgets)); }, [widgets, storageKey]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -157,17 +172,20 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
   }, []);
 
   // --- Data computations ---
-  // If questionnaire linkage is not readable for the current user, don't hide all projects.
+  // Vue BE : afficher tous les projets passés (table be_projects). Vue SPV : restreindre aux projets
+  // avec au moins une valeur questionnaire si le jeu d'IDs est disponible.
   const keonProjects = useMemo(() => {
+    if (variant === 'be') return projects;
     if (keonProjectIds.size === 0) return projects;
     return projects.filter((p) => keonProjectIds.has(p.id));
-  }, [projects, keonProjectIds]);
+  }, [projects, keonProjectIds, variant]);
 
   const kpis = useMemo(() => {
-    let spvCount = 0, gisementSum = 0, cmasValues: number[] = [], ksSum = 0, ksCount = 0, completeCount = 0;
+    let spvCount = 0, activeCount = 0, gisementSum = 0, cmasValues: number[] = [], ksSum = 0, ksCount = 0, completeCount = 0;
     keonProjects.forEach(p => {
+      if (p.status === 'active') activeCount++;
       const d = qstData[p.id] || {};
-      if ((getQstValue(d, 'spv') || '').toUpperCase() === 'OUI') spvCount++;
+      if (String(d[SPV_QUESTIONNAIRE_FIELD] ?? getQstValue(d, 'spv') ?? '').toUpperCase() === 'OUI') spvCount++;
       gisementSum += safeFloat(getQstValue(d, 'quantite', 'totale') || getQstValue(d, 'gisement', 'total') || '0');
       const cmas = safeFloat(getQstValue(d, 'cmax1') || '0');
       if (cmas > 0) cmasValues.push(cmas);
@@ -176,7 +194,7 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
       if (avgCompletion(d) > 50) completeCount++;
     });
     const cmasMoyen = cmasValues.length > 0 ? (cmasValues.reduce((a, b) => a + b, 0) / cmasValues.length).toFixed(1) : null;
-    return { total: keonProjects.length, spv: spvCount, gisement: Math.round(gisementSum), cmas: cmasMoyen ?? 'N/A', ks: ksCount > 0 ? (ksSum / ksCount).toFixed(1) : '—', complete: completeCount };
+    return { total: keonProjects.length, spv: spvCount, active: activeCount, gisement: Math.round(gisementSum), cmas: cmasMoyen ?? 'N/A', ks: ksCount > 0 ? (ksSum / ksCount).toFixed(1) : '—', complete: completeCount };
   }, [keonProjects, qstData]);
 
   const typoPieData = useMemo(() => {
@@ -199,7 +217,7 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
         id: p.id, code_projet: p.code_projet, nom_projet: p.nom_projet,
         region: getQstValue(d, 'region') || p.region || '—',
         typologie: getQstValue(d, 'typologie') || '—',
-        spv: (getQstValue(d, 'spv') || '').toUpperCase(),
+        spv: String(d[SPV_QUESTIONNAIRE_FIELD] ?? getQstValue(d, 'spv') ?? '').toUpperCase(),
         ks: safeFloat(getQstValue(d, 'keon', 'pct') || getQstValue(d, 'ks', 'keon') || '0'),
         gisement: safeFloat(getQstValue(d, 'quantite', 'totale') || getQstValue(d, 'gisement', 'total') || '0'),
         cmas: safeFloat(getQstValue(d, 'cmax1') || '0'),
@@ -224,7 +242,7 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
   useEffect(() => {
     // Expose navigate for popup buttons
     (window as any).__navigateToProject = (code: string) => {
-      navigate(`/spv/projects/${code}/overview`);
+      navigate(`${hubBasePath}/${code}/overview`);
     };
 
     let resizeObserver: ResizeObserver | null = null;
@@ -352,7 +370,7 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
           resizeObserver.observe(container);
         }
       } catch (error) {
-        console.error('[SPV Map] Leaflet init error:', error);
+        console.error('[Projects map] Leaflet init error:', error);
       }
     };
 
@@ -368,7 +386,7 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
       }
       delete (window as any).__navigateToProject;
     };
-  }, [keonWithCoords, navigate]);
+  }, [keonWithCoords, navigate, hubBasePath]);
 
   // --- Widget manipulation handlers (same as ConfigurableDashboard) ---
   const handleRemoveWidget = useCallback((id: string) => {
@@ -383,9 +401,9 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
     setWidgets(prev => prev.map(w => w.id === id ? { ...w, size: { ...w.size, h: HEIGHT_PRESET_TO_H[preset] } } : w));
   }, []);
 
-  const handleReset = useCallback(() => { setWidgets(DEFAULT_SPV_WIDGETS); }, []);
+  const handleReset = useCallback(() => { setWidgets(defaultKeonWidgets(variant)); }, [variant]);
 
-  const handleRestoreAll = useCallback(() => { setWidgets(DEFAULT_SPV_WIDGETS); }, []);
+  const handleRestoreAll = useCallback(() => { setWidgets(defaultKeonWidgets(variant)); }, [variant]);
 
   const handleDragStart = (widgetId: string) => { if (isEditing) setDraggedWidget(widgetId); };
   const handleDragOver = (e: React.DragEvent, targetId: string) => {
@@ -436,10 +454,19 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
     const activeMapRef = layout === 'desktop' ? desktopMapRef : mobileMapRef;
     switch (widget.id) {
       case 'kpis':
-        return (
+        return variant === 'spv' ? (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <KpiCard icon={<Leaf className="h-5 w-5 text-emerald-500" />} label="Projets SPV" value={String(kpis.total)} />
             <KpiCard icon={<Building2 className="h-5 w-5 text-blue-500" />} label="SPV créées" value={String(kpis.spv)} badge badgeClass="bg-emerald-500/10 text-emerald-600 border-emerald-500/20" />
+            <KpiCard icon={<BarChart2 className="h-5 w-5 text-amber-500" />} label="Gisement cumulé" value={`${kpis.gisement.toLocaleString('fr-FR')} tMB/an`} />
+            <KpiCard icon={<Flame className="h-5 w-5 text-orange-500" />} label="Cmax moyen" value={kpis.cmas === 'N/A' ? 'N/A' : `${kpis.cmas} Nm³/h`} />
+            <KpiCard icon={<BarChart2 className="h-5 w-5 text-violet-500" />} label="KS Keon moyen" value={`${kpis.ks} %`} />
+            <KpiCard icon={<CheckCircle2 className="h-5 w-5 text-emerald-500" />} label="Questionnaire >50%" value={String(kpis.complete)} />
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <KpiCard icon={<FolderOpen className="h-5 w-5 text-primary" />} label="Projets BE" value={String(kpis.total)} />
+            <KpiCard icon={<Activity className="h-5 w-5 text-emerald-500" />} label="Actifs" value={String(kpis.active)} badge badgeClass="bg-emerald-500/10 text-emerald-600 border-emerald-500/20" />
             <KpiCard icon={<BarChart2 className="h-5 w-5 text-amber-500" />} label="Gisement cumulé" value={`${kpis.gisement.toLocaleString('fr-FR')} tMB/an`} />
             <KpiCard icon={<Flame className="h-5 w-5 text-orange-500" />} label="Cmax moyen" value={kpis.cmas === 'N/A' ? 'N/A' : `${kpis.cmas} Nm³/h`} />
             <KpiCard icon={<BarChart2 className="h-5 w-5 text-violet-500" />} label="KS Keon moyen" value={`${kpis.ks} %`} />
@@ -451,7 +478,7 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
           <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
             <div className="flex items-center gap-2 mb-2 flex-shrink-0">
               <MapPin className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Carte des projets SPV</span>
+              <span className="text-sm font-medium">{variant === 'be' ? 'Carte des projets BE' : 'Carte des projets SPV'}</span>
               <Badge variant="secondary" className="ml-auto text-xs">{keonWithCoords.length} localisés</Badge>
             </div>
             {keonWithCoords.length === 0 ? (
@@ -509,7 +536,7 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
               </TableHeader>
               <TableBody>
                 {sortedData.map(row => (
-                  <TableRow key={row.id} className="cursor-pointer hover:bg-muted/30" onClick={() => navigate(`/spv/projects/${row.code_projet}/overview`)}>
+                  <TableRow key={row.id} className="cursor-pointer hover:bg-muted/30" onClick={() => navigate(`${hubBasePath}/${row.code_projet}/overview`)}>
                     <TableCell className="font-mono font-medium text-primary">{row.code_projet}</TableCell>
                     <TableCell className="font-medium">{row.nom_projet}</TableCell>
                     <TableCell className="text-muted-foreground">{row.region}</TableCell>
@@ -528,14 +555,18 @@ export function BEProjectsKeonView({ projects, qstData, keonProjectIds }: Props)
       default:
         return <div className="text-muted-foreground">Widget non reconnu</div>;
     }
-  }, [kpis, keonWithCoords, typoPieData, gisementBarData, sortedData, sortConfig, handleSort, navigate]);
+  }, [kpis, keonWithCoords, typoPieData, gisementBarData, sortedData, sortConfig, handleSort, navigate, variant, hubBasePath]);
 
   if (keonProjects.length === 0) {
     return (
       <Card className="border-border/50">
         <CardContent className="py-12 text-center text-muted-foreground">
-          <Leaf className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
-          <p>Aucun projet SPV trouvé dans les filtres actuels.</p>
+          {variant === 'spv' ? (
+            <Leaf className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
+          ) : (
+            <FolderOpen className="h-10 w-10 mx-auto mb-3 text-muted-foreground/50" />
+          )}
+          <p>{variant === 'spv' ? 'Aucun projet SPV trouvé dans les filtres actuels.' : 'Aucun projet BE trouvé dans les filtres actuels.'}</p>
         </CardContent>
       </Card>
     );

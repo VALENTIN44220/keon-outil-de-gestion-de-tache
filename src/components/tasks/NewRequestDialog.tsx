@@ -895,6 +895,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
               targetDepartmentId: subProcessDeptId,
               subProcessTemplateId: subProcessId,
               targetManagerId,
+              customFieldValues,
             });
             totalAssignments += count;
           }
@@ -926,6 +927,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
             targetDepartmentId: subProcessDeptId,
             subProcessTemplateId: linkedSubProcessId,
             targetManagerId,
+            customFieldValues,
           });
         }
         toast.success(hasRequestValidation ? 'Demande créée — en attente de validation' : 'Demande créée avec succès');
@@ -935,6 +937,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
             parentRequestId: requestData.id,
             processTemplateId: linkedProcessId,
             targetDepartmentId,
+            customFieldValues,
           });
         }
         toast.success(hasRequestValidation ? 'Demande créée — en attente de validation' : 'Demande créée avec succès');

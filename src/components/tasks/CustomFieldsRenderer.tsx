@@ -28,6 +28,7 @@ import {
   getEffectiveCustomFieldValue,
   isCustomFieldVisible,
 } from '@/lib/customFieldVisibility';
+import { parseSecondaryEcheancePair } from '@/lib/secondaryEcheancePair';
 import {
   Type,
   AlignLeft,
@@ -200,6 +201,17 @@ export function CustomFieldsRenderer({
     const value = values[field.id] ?? field.default_value ?? '';
     const error = errors[field.id];
     const isRequired = field.is_required;
+    const pairMeta = parseSecondaryEcheancePair(field);
+    const pairPartner =
+      pairMeta?.partner_field_id != null
+        ? fields.find((f) => f.id === pairMeta.partner_field_id)
+        : undefined;
+    const pairHint =
+      pairMeta?.role === 'due_date' && pairPartner
+        ? `Date limite pour le service choisi dans « ${pairPartner.label} ».`
+        : pairMeta?.role === 'service' && pairPartner
+          ? `À renseigner avec « ${pairPartner.label} » pour cadrer l'engagement sur ce service.`
+          : null;
 
     const handleChange = (newValue: any) => {
       onChange(field.id, newValue);
@@ -220,6 +232,10 @@ export function CustomFieldsRenderer({
 
         {field.description && (
           <p className="text-xs text-muted-foreground">{field.description}</p>
+        )}
+
+        {pairHint && (
+          <p className="text-xs text-muted-foreground border-l-2 border-primary/30 pl-2">{pairHint}</p>
         )}
 
         {renderFieldInput(field, value, handleChange, baseInputClass)}

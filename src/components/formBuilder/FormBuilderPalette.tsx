@@ -9,6 +9,7 @@ import {
   AlignLeft,
   Hash,
   Calendar,
+  CalendarClock,
   Clock,
   Mail,
   Phone,
@@ -30,6 +31,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   AlignLeft,
   Hash,
   Calendar,
+  CalendarClock,
   Clock,
   Mail,
   Phone,
@@ -104,7 +106,7 @@ export const FormBuilderPalette = memo(function FormBuilderPalette({
                   const Icon = ICON_MAP[config.icon] || Type;
                   return (
                     <button
-                      key={config.type}
+                      key={config.paletteKey ?? config.type}
                       onClick={() => onAddField(config)}
                       className={cn(
                         'w-full flex items-center gap-2 p-2 rounded-md text-left text-sm',

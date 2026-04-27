@@ -14,6 +14,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { MicrosoftSyncSettings } from '@/components/profile/MicrosoftSyncSettings';
 import { ChangePasswordDialog } from '@/components/auth/ChangePasswordDialog';
+import { AppNotificationCluster } from '@/components/notifications/AppNotificationCluster';
 
 interface ProfileData {
   display_name: string;
@@ -193,14 +194,13 @@ export default function Profile() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-2xl mx-auto px-4 py-8">
-        <Button
-          variant="ghost"
-          onClick={() => navigate('/')}
-          className="mb-6 gap-2"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Retour
-        </Button>
+        <div className="flex items-center justify-between gap-3 mb-6">
+          <Button variant="ghost" onClick={() => navigate('/')} className="gap-2 shrink-0">
+            <ArrowLeft className="h-4 w-4" />
+            Retour
+          </Button>
+          <AppNotificationCluster className="shrink-0" />
+        </div>
 
         <Tabs defaultValue={activeTab} className="animate-fade-in">
           <TabsList className="grid w-full grid-cols-2 mb-6">

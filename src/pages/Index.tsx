@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
+import { DeadlineTasksOverrideProvider } from '@/contexts/DeadlineTasksOverrideContext';
 import { DashboardToolbar, KanbanGroupMode } from '@/components/dashboard/DashboardToolbar';
 import { DashboardStats } from '@/components/dashboard/DashboardStats';
 import { ConfigurableDashboard } from '@/components/dashboard/ConfigurableDashboard';
@@ -305,17 +306,6 @@ const Index = () => {
       return true;
     },
     [allTasks]
-  );
-
-  const handleNotificationClick = (taskId: string) => {
-    void openTaskOrRequestFromId(taskId);
-  };
-
-  const handleCommentNotificationClick = useCallback(
-    (taskId: string, _notificationId: string) => {
-      void openTaskOrRequestFromId(taskId);
-    },
-    [openTaskOrRequestFromId]
   );
 
   // Deep link: /?openTask=<uuid> (used when notification is clicked from pages without local handlers)
@@ -678,6 +668,7 @@ const Index = () => {
   };
 
   return (
+    <DeadlineTasksOverrideProvider value={allTasks}>
     <div className="flex h-screen bg-background">
       <Sidebar 
         activeView={activeView} 
@@ -689,14 +680,6 @@ const Index = () => {
           title={getTitle()}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
-          notificationTasks={allTasks}
-          onNotificationClick={handleNotificationClick}
-          onCommentNotificationClick={handleCommentNotificationClick}
-          pendingValidations={pendingValidations}
-          pendingValidationCount={totalValidationCount}
-          onValidationClick={(taskId) => {
-            setDashboardMode('validations');
-          }}
         />
         
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-6">
@@ -744,6 +727,7 @@ const Index = () => {
         canReassign={canAssignToTeam}
       />
     </div>
+    </DeadlineTasksOverrideProvider>
   );
 };
 

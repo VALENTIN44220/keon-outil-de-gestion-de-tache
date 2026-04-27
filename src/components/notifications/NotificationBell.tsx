@@ -1,4 +1,4 @@
-import { Bell, AlertTriangle, Clock, Calendar, MessageSquare } from 'lucide-react';
+import { Bell, AlertTriangle, Clock, Calendar, MessageSquare, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Popover,
@@ -9,6 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TaskNotification } from '@/hooks/useNotifications';
 import { CommentNotification } from '@/hooks/useCommentNotifications';
+import type { InAppNotificationRow } from '@/hooks/useInAppNotifications';
 import { format, parseISO, formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -16,22 +17,30 @@ import { cn } from '@/lib/utils';
 interface NotificationBellProps {
   notifications: TaskNotification[];
   commentNotifications?: CommentNotification[];
+  /** In-app workflow / engine notifications (table public.notifications). */
+  workflowInAppNotifications?: InAppNotificationRow[];
+  workflowInAppUnreadCount?: number;
   unreadCount: number;
   hasUrgent: boolean;
   onNotificationClick?: (taskId: string) => void;
   onCommentNotificationClick?: (taskId: string, notificationId: string) => void;
+  onWorkflowInAppClick?: (row: InAppNotificationRow) => void;
 }
 
 export function NotificationBell({
   notifications,
   commentNotifications = [],
+  workflowInAppNotifications = [],
+  workflowInAppUnreadCount = 0,
   unreadCount,
   hasUrgent,
   onNotificationClick,
   onCommentNotificationClick,
+  onWorkflowInAppClick,
 }: NotificationBellProps) {
-  const totalUnread = unreadCount + commentNotifications.filter(n => !n.isRead).length;
-  const hasUnreadComments = commentNotifications.some(n => !n.isRead);
+  const commentUnread = commentNotifications.filter((n) => !n.isRead).length;
+  const totalUnread = unreadCount + commentUnread + workflowInAppUnreadCount;
+  const hasUnreadComments = commentNotifications.some((n) => !n.isRead);
 
   const getIcon = (type: TaskNotification['type']) => {
     switch (type) {
@@ -68,7 +77,9 @@ export function NotificationBell({
             <span
               className={cn(
                 'absolute -top-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full text-xs font-medium text-primary-foreground',
-                hasUrgent || hasUnreadComments ? 'bg-destructive animate-pulse' : 'bg-primary'
+                hasUrgent || hasUnreadComments || workflowInAppUnreadCount > 0
+                  ? 'bg-destructive animate-pulse'
+                  : 'bg-primary'
               )}
             >
               {totalUnread > 9 ? '9+' : totalUnread}
@@ -80,20 +91,28 @@ export function NotificationBell({
         <Tabs defaultValue="deadlines" className="w-full">
           <div className="border-b border-border px-4 py-3">
             <h3 className="font-semibold text-foreground mb-2">Notifications</h3>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="deadlines" className="text-xs">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="deadlines" className="text-xs px-1">
                 Échéances
                 {unreadCount > 0 && (
-                  <span className="ml-1.5 bg-destructive text-destructive-foreground text-xs px-1.5 py-0.5 rounded-full">
+                  <span className="ml-1 bg-destructive text-destructive-foreground text-xs px-1 py-0.5 rounded-full">
                     {unreadCount}
                   </span>
                 )}
               </TabsTrigger>
-              <TabsTrigger value="messages" className="text-xs">
-                Messages
-                {commentNotifications.filter(n => !n.isRead).length > 0 && (
-                  <span className="ml-1.5 bg-primary text-primary-foreground text-xs px-1.5 py-0.5 rounded-full">
-                    {commentNotifications.filter(n => !n.isRead).length}
+              <TabsTrigger value="messages" className="text-xs px-1">
+                Commentaires
+                {commentUnread > 0 && (
+                  <span className="ml-1 bg-primary text-primary-foreground text-xs px-1 py-0.5 rounded-full">
+                    {commentUnread}
+                  </span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="workflow" className="text-xs px-1">
+                Workflow
+                {workflowInAppUnreadCount > 0 && (
+                  <span className="ml-1 bg-violet-600 text-white text-xs px-1 py-0.5 rounded-full">
+                    {workflowInAppUnreadCount}
                   </span>
                 )}
               </TabsTrigger>
@@ -194,6 +213,46 @@ export function NotificationBell({
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
                             {formatDistanceToNow(parseISO(notification.createdAt), {
+                              addSuffix: true,
+                              locale: fr,
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+          </TabsContent>
+
+          <TabsContent value="workflow" className="m-0">
+            {workflowInAppNotifications.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <Zap className="h-10 w-10 text-muted-foreground/50 mb-2" />
+                <p className="text-sm text-muted-foreground">Aucune notification workflow</p>
+              </div>
+            ) : (
+              <ScrollArea className="max-h-80">
+                <div className="divide-y divide-border">
+                  {workflowInAppNotifications.map((row) => (
+                    <button
+                      key={row.id}
+                      type="button"
+                      onClick={() => onWorkflowInAppClick?.(row)}
+                      className="w-full text-left px-4 py-3 hover:bg-accent/50 transition-colors focus:outline-none focus:bg-accent/50"
+                    >
+                      <div className="flex gap-3">
+                        <div className="flex-shrink-0 mt-0.5 p-1.5 rounded-full border bg-violet-500/10 border-violet-500/25">
+                          <Zap className="h-4 w-4 text-violet-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">{row.title}</p>
+                          {row.message ? (
+                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-3">{row.message}</p>
+                          ) : null}
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {formatDistanceToNow(parseISO(row.created_at), {
                               addSuffix: true,
                               locale: fr,
                             })}

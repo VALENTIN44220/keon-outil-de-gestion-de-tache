@@ -2,6 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { WorkflowBuilder } from '@/components/workflow/WorkflowBuilder';
+import { AppNotificationCluster } from '@/components/notifications/AppNotificationCluster';
 import { useProcessTemplates } from '@/hooks/useProcessTemplates';
 import { useAllSubProcessTemplates } from '@/hooks/useAllSubProcessTemplates';
 import { useTemplatePermissions } from '@/hooks/useTemplatePermissions';
@@ -54,8 +55,8 @@ export default function WorkflowEditor() {
   return (
     <div className="h-screen flex flex-col bg-background">
       {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 border-b bg-card">
-        <div className="flex items-center gap-4">
+      <header className="flex items-center justify-between px-6 py-4 border-b bg-card gap-4">
+        <div className="flex items-center gap-4 min-w-0">
           <Button variant="ghost" size="icon" onClick={() => navigate('/templates')}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
@@ -64,6 +65,7 @@ export default function WorkflowEditor() {
             <p className="text-sm text-muted-foreground">{subtitle}</p>
           </div>
         </div>
+        <AppNotificationCluster className="shrink-0" />
       </header>
 
       {/* Workflow Canvas - Full height */}

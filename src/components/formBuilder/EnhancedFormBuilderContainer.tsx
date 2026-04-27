@@ -28,6 +28,11 @@ import { FormPreviewDrawer } from './FormPreviewDrawer';
 import type { FieldTypeConfig, FormField } from '@/types/formBuilder';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import {
+  getSecondaryEcheancePartnerFieldId,
+  idsToDeleteIncludingSecondaryEcheancePartner,
+  insertSecondaryEcheancePair,
+} from '@/lib/secondaryEcheancePair';
 
 interface EnhancedFormBuilderContainerProps {
   processTemplateId?: string | null;
@@ -119,6 +124,21 @@ export function EnhancedFormBuilderContainer({
 
         const sectionId = targetSectionId !== undefined ? targetSectionId : (selectedSectionId || null);
 
+        if (config.insertsSecondaryEcheancePair) {
+          const { dueDateFieldId } = await insertSecondaryEcheancePair(supabase, {
+            created_by: profile?.id || null,
+            process_template_id: processTemplateId || null,
+            sub_process_template_id: subProcessTemplateId || null,
+            section_id: sectionId,
+            row_index: fields.length,
+            order_index_base: fields.length,
+          });
+          toast.success('Couple Service secondaire + Échéance secondaire créé');
+          await loadData();
+          selectField(dueDateFieldId);
+          return;
+        }
+
         const fieldData: any = {
           name: `${config.type}_${Date.now()}`,
           label: config.label,
@@ -179,21 +199,21 @@ export function EnhancedFormBuilderContainer({
   const handleDeleteField = useCallback(
     async (fieldId: string) => {
       try {
-        const { error } = await supabase
-          .from('template_custom_fields')
-          .delete()
-          .eq('id', fieldId);
+        const field = fields.find((f) => f.id === fieldId);
+        const ids = field ? idsToDeleteIncludingSecondaryEcheancePartner(field) : [fieldId];
+
+        const { error } = await supabase.from('template_custom_fields').delete().in('id', ids);
 
         if (error) throw error;
 
-        toast.success('Champ supprimé');
+        toast.success(ids.length > 1 ? 'Champs liés supprimés' : 'Champ supprimé');
         await loadData();
       } catch (error: any) {
         console.error('Error deleting field:', error);
         toast.error(error.message || 'Erreur lors de la suppression');
       }
     },
-    [loadData]
+    [fields, loadData]
   );
 
   // Handle duplicating a field
@@ -201,6 +221,13 @@ export function EnhancedFormBuilderContainer({
     async (fieldId: string) => {
       const fieldToDuplicate = fields.find((f) => f.id === fieldId);
       if (!fieldToDuplicate) return;
+
+      if (getSecondaryEcheancePartnerFieldId(fieldToDuplicate)) {
+        toast.info(
+          'Ce champ fait partie du couple Service / Échéance secondaire. Ajoutez un nouveau couple depuis la bibliothèque.'
+        );
+        return;
+      }
 
       try {
         const { data: { user } } = await supabase.auth.getUser();

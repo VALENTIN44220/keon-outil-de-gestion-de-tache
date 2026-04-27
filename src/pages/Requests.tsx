@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useSearchParams, useNavigate, useLocation, matchPath } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
+import { DeadlineTasksOverrideProvider } from '@/contexts/DeadlineTasksOverrideContext';
 import { NewRequestDialog } from '@/components/tasks/NewRequestDialog';
 import { AddTaskDialog } from '@/components/tasks/AddTaskDialog';
 import { NewTaskDialog } from '@/components/tasks/NewTaskDialog';
@@ -263,16 +264,15 @@ const Requests = () => {
     [requests, allTasks]
   );
 
-  const handleNotificationClick = (taskId: string) => {
+  // Deep link depuis la cloche (sidebar) : /requests?openTask=…
+  useEffect(() => {
+    const taskId = searchParams.get('openTask');
+    if (!taskId) return;
     void openNotificationTarget(taskId);
-  };
-
-  const handleCommentNotificationClick = useCallback(
-    (taskId: string, _notificationId: string) => {
-      void openNotificationTarget(taskId);
-    },
-    [openNotificationTarget]
-  );
+    const next = new URLSearchParams(searchParams);
+    next.delete('openTask');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams, openNotificationTarget]);
 
   const handleRefresh = () => {
     fetchRequests();
@@ -409,6 +409,7 @@ const Requests = () => {
   };
 
   return (
+    <DeadlineTasksOverrideProvider value={allTasks}>
     <div className="flex h-screen bg-background">
       <Sidebar 
         activeView={activeView} 
@@ -420,9 +421,6 @@ const Requests = () => {
           title="Demandes"
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
-          notificationTasks={allTasks}
-          onNotificationClick={handleNotificationClick}
-          onCommentNotificationClick={handleCommentNotificationClick}
         />
         
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-6">
@@ -467,6 +465,7 @@ const Requests = () => {
         />
       )}
     </div>
+    </DeadlineTasksOverrideProvider>
   );
 };
 

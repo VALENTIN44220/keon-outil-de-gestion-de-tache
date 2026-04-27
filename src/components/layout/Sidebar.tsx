@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import keonLogo from '@/assets/keon-logo.jpg';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { UserProfilePopover } from './UserProfilePopover';
+import { AppNotificationCluster } from '@/components/notifications/AppNotificationCluster';
 import type { ScreenPermissionKey } from '@/types/permissions';
 import { usePendingValidationRequests } from '@/hooks/usePendingValidationRequests';
 
@@ -527,6 +528,10 @@ export function Sidebar({
             <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
           </div>
 
+          <div className="px-2 pb-2">
+            <AppNotificationCluster collapsed={false} />
+          </div>
+
           {/* User section */}
           <div className="p-3">
             <UserProfilePopover>
@@ -660,6 +665,10 @@ export function Sidebar({
 
       <div className="px-3 my-2">
         <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+      </div>
+
+      <div className={cn('px-2 pb-2', collapsed && 'px-1')}>
+        <AppNotificationCluster collapsed={collapsed} />
       </div>
 
       {/* User section */}

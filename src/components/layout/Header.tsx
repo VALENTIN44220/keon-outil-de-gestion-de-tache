@@ -3,7 +3,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,12 +11,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { NotificationBell } from '@/components/notifications/NotificationBell';
-import { ValidationNotificationBell } from '@/components/notifications/ValidationNotificationBell';
-import { useNotifications } from '@/hooks/useNotifications';
-import { useCommentNotifications } from '@/hooks/useCommentNotifications';
-import { supabase } from '@/integrations/supabase/client';
-import { Task } from '@/types/task';
 import keonTaskLogo from '@/assets/keon-task-logo.png';
 
 interface HeaderProps {
@@ -26,16 +19,6 @@ interface HeaderProps {
   onSearchChange: (query: string) => void;
   onAddTask?: () => void;
   addButtonLabel?: string;
-  /**
-   * When provided, deadline notifications are computed from these tasks (e.g. dashboard scope).
-   * Otherwise the header loads the current user's assigned tasks with a due date.
-   */
-  notificationTasks?: Task[];
-  onNotificationClick?: (taskId: string) => void;
-  onCommentNotificationClick?: (taskId: string, notificationId: string) => void;
-  pendingValidations?: Task[];
-  pendingValidationCount?: number;
-  onValidationClick?: (taskId: string) => void;
 }
 
 export function Header({
@@ -44,62 +27,9 @@ export function Header({
   onSearchChange,
   onAddTask,
   addButtonLabel = 'Nouvelle tâche',
-  notificationTasks: notificationTasksOverride,
-  onNotificationClick,
-  onCommentNotificationClick,
-  pendingValidations = [],
-  pendingValidationCount = 0,
-  onValidationClick,
 }: HeaderProps) {
   const { user, profile, signOut } = useAuth();
   const navigate = useNavigate();
-  const { commentNotifications, markAsRead: markCommentNotificationRead } = useCommentNotifications();
-
-  /** When pages do not pass handlers, open the item from the dashboard (deep link). */
-  const defaultOpenTask = (taskId: string) => {
-    navigate(`/?openTask=${encodeURIComponent(taskId)}`);
-  };
-
-  const { data: defaultDeadlineTasks = [] } = useQuery({
-    queryKey: ['header-deadline-tasks', profile?.id],
-    queryFn: async () => {
-      if (!profile?.id) return [];
-      // Align with comment notifications: any row the user is involved in (not only assignee + type=task).
-      const { data, error } = await supabase
-        .from('tasks')
-        .select('id, title, status, due_date, priority, type')
-        .not('due_date', 'is', null)
-        .or(
-          `assignee_id.eq.${profile.id},requester_id.eq.${profile.id},user_id.eq.${profile.id}`
-        );
-      if (error) throw error;
-      return (data || []) as Task[];
-    },
-    enabled: !!profile?.id,
-    staleTime: 60 * 1000,
-  });
-
-  const tasksForDeadlineNotifs =
-    notificationTasksOverride !== undefined ? notificationTasksOverride : defaultDeadlineTasks;
-
-  const { notifications, unreadCount, hasUrgent } = useNotifications(tasksForDeadlineNotifs);
-
-  const handleCommentNotificationClick = (taskId: string, notificationId: string) => {
-    markCommentNotificationRead(notificationId);
-    if (onCommentNotificationClick) {
-      onCommentNotificationClick(taskId, notificationId);
-    } else {
-      defaultOpenTask(taskId);
-    }
-  };
-
-  const handleDeadlineNotificationClick = (taskId: string) => {
-    if (onNotificationClick) {
-      onNotificationClick(taskId);
-    } else {
-      defaultOpenTask(taskId);
-    }
-  };
 
   const displayName = profile?.display_name || user?.email || 'Utilisateur';
   const initials = displayName
@@ -137,21 +67,6 @@ export function Header({
               className="pl-9 w-full bg-white text-sm h-8 sm:h-9"
             />
           </div>
-
-          <ValidationNotificationBell
-            pendingValidations={pendingValidations}
-            count={pendingValidationCount}
-            onValidationClick={onValidationClick}
-          />
-
-          <NotificationBell
-            notifications={notifications}
-            commentNotifications={commentNotifications}
-            unreadCount={unreadCount}
-            hasUrgent={hasUrgent}
-            onNotificationClick={handleDeadlineNotificationClick}
-            onCommentNotificationClick={handleCommentNotificationClick}
-          />
 
           {onAddTask && (
             <Button onClick={onAddTask} size="sm" className="gap-1.5 hidden sm:flex">

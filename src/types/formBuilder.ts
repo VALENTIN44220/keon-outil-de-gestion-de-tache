@@ -204,6 +204,13 @@ export interface FieldTypeConfig {
   description: string;
   defaultProps?: Partial<FormField>;
   allowedValidations?: ValidationType[];
+  /** Distinct React / DnD key when `type` duplicates another palette entry (e.g. two `date` rows). */
+  paletteKey?: string;
+  /**
+   * When true, adding from the palette inserts two linked fields:
+   * « Service secondaire » (department_search) + « Échéance secondaire » (date), both required.
+   */
+  insertsSecondaryEcheancePair?: boolean;
 }
 
 export const FIELD_TYPE_CONFIGS: FieldTypeConfig[] = [
@@ -302,7 +309,17 @@ export const FIELD_TYPE_CONFIGS: FieldTypeConfig[] = [
     description: 'Adresse web',
     defaultProps: { validation_type: 'url' },
   },
-  
+  {
+    type: 'date',
+    paletteKey: 'secondary_echeance_pair',
+    label: 'Échéance secondaire',
+    icon: 'CalendarClock',
+    category: 'advanced',
+    description:
+      'Ajoute le couple Service secondaire + date limite liée (obligatoires, comme l\'échéance principale).',
+    insertsSecondaryEcheancePair: true,
+  },
+
   // Lookup fields
   {
     type: 'user_search',

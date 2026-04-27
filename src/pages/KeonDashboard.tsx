@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Loader2, Search, BarChart2, LayoutGrid, List, Kanban, Leaf, Pencil, Trash2, Building2, LayoutDashboard } from 'lucide-react';
+import { Loader2, Search, BarChart2, LayoutGrid, List, Kanban, Leaf, Pencil, Trash2, Building2, LayoutDashboard, FolderOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
@@ -28,6 +28,13 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
 type SpvViewType = 'synthese' | 'cards' | 'table' | 'kanban';
+
+const SPV_QUESTIONNAIRE_FIELD = '02_GEN_spv_cree';
+
+function isSpvProjectFromQuestionnaire(projectId: string, qstData: Record<string, Record<string, any>>): boolean {
+  const raw = qstData[projectId]?.[SPV_QUESTIONNAIRE_FIELD];
+  return String(raw ?? '').toUpperCase().trim() === 'OUI';
+}
 
 const PILIER_CODES: PilierCode[] = ['00', '02', '04', '05', '06', '07'];
 
@@ -46,7 +53,13 @@ function completionColor(pct: number) {
   return 'text-emerald-500';
 }
 
-export default function KeonDashboard() {
+export type KeonDashboardVariant = 'spv' | 'be';
+
+interface KeonDashboardProps {
+  variant?: KeonDashboardVariant;
+}
+
+export default function KeonDashboard({ variant = 'spv' }: KeonDashboardProps) {
   const navigate = useNavigate();
   const { projects, isLoading, updateProject, deleteProject } = useBEProjects();
   const { qstData, keonProjectIds, getDistinctValues: getQstDistinctValues } = useQuestionnaireProjectData(projects);
@@ -81,16 +94,17 @@ export default function KeonDashboard() {
   const canEdit = permissionProfile?.can_edit_be_projects ?? false;
   const canDelete = permissionProfile?.can_delete_be_projects ?? false;
 
-  // Filter to KEON projects only (based on questionnaire linkage).
-  // If questionnaire data is not readable for the current user (RLS/permissions),
-  // `keonProjectIds` can be empty; in that case, keep projects visible rather than hiding everything.
-  const keonProjects = useMemo(() => {
-    if (keonProjectIds.size === 0) return projects;
-    return projects.filter((p) => keonProjectIds.has(p.id));
-  }, [projects, keonProjectIds]);
+  const scopedProjects = useMemo(() => {
+    if (variant === 'be') {
+      return projects;
+    }
+    return projects.filter((p) => isSpvProjectFromQuestionnaire(p.id, qstData));
+  }, [projects, qstData, variant]);
+
+  const hubBasePath = variant === 'spv' ? '/spv/projects' : '/be/projects';
 
   const filteredProjects = useMemo(() => {
-    let result = applyMultiFilters(keonProjects);
+    let result = applyMultiFilters(scopedProjects);
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(p =>
@@ -98,7 +112,7 @@ export default function KeonDashboard() {
       );
     }
     return result;
-  }, [keonProjects, applyMultiFilters, searchQuery]);
+  }, [scopedProjects, applyMultiFilters, searchQuery]);
 
   // Table data for table view
   const tableData = useMemo(() => {
@@ -110,7 +124,7 @@ export default function KeonDashboard() {
         nom_projet: p.nom_projet,
         region: getQstValue(d, 'region') || p.region || '—',
         typologie: getQstValue(d, 'typologie') || '—',
-        spv: (getQstValue(d, 'spv') || '').toUpperCase(),
+        spv: String(d[SPV_QUESTIONNAIRE_FIELD] ?? getQstValue(d, 'spv') ?? '').toUpperCase(),
         ks: safeFloat(getQstValue(d, 'keon', 'pct') || getQstValue(d, 'ks', 'keon') || '0'),
         gisement: safeFloat(getQstValue(d, 'quantite', 'totale') || getQstValue(d, 'gisement', 'total') || '0'),
         cmas: safeFloat(getQstValue(d, 'cmax1') || '0'),
@@ -148,13 +162,26 @@ export default function KeonDashboard() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-3xl font-display font-bold text-foreground flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-emerald-500/10">
-                <Leaf className="h-7 w-7 text-emerald-500" />
-              </div>
-              Dashboard SPV
+              {variant === 'spv' ? (
+                <>
+                  <div className="p-2 rounded-xl bg-emerald-500/10">
+                    <Leaf className="h-7 w-7 text-emerald-500" />
+                  </div>
+                  Dashboard SPV
+                </>
+              ) : (
+                <>
+                  <div className="p-2 rounded-xl bg-primary/10">
+                    <FolderOpen className="h-7 w-7 text-primary" />
+                  </div>
+                  PROJETS
+                </>
+              )}
             </h1>
             <p className="text-muted-foreground mt-2">
-              Vue consolidée des projets SPV et de leurs indicateurs questionnaire.
+              {variant === 'spv'
+                ? 'Vue consolidée des projets SPV et de leurs indicateurs questionnaire.'
+                : 'Gérez vos projets BE, suivez leur avancement et accédez au hub détaillé de chaque projet.'}
             </p>
           </div>
         </div>
@@ -225,7 +252,7 @@ export default function KeonDashboard() {
               <ProjectMultiFiltersPanel
                 filters={multiFilters}
                 onFiltersChange={setMultiFilters}
-                projects={keonProjects}
+                projects={scopedProjects}
                 activeFiltersCount={multiFiltersCount}
                 presets={presets}
                 onSavePreset={savePreset}
@@ -251,6 +278,7 @@ export default function KeonDashboard() {
                 projects={filteredProjects}
                 qstData={qstData}
                 keonProjectIds={keonProjectIds}
+                variant={variant}
               />
             )}
 
@@ -283,14 +311,14 @@ export default function KeonDashboard() {
                 <CardHeader className="pb-2">
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <Building2 className="h-5 w-5 text-muted-foreground" />
-                    Projets SPV
+                    {variant === 'spv' ? 'Projets SPV' : 'Projets BE'}
                     <Badge variant="secondary" className="ml-2">{filteredProjects.length}</Badge>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0">
                   {filteredProjects.length === 0 ? (
                     <div className="text-center py-12 text-muted-foreground">
-                      Aucun projet SPV trouvé pour ces critères
+                      {variant === 'spv' ? 'Aucun projet SPV trouvé pour ces critères' : 'Aucun projet BE trouvé pour ces critères'}
                     </div>
                   ) : (
                     <div className="overflow-x-auto rounded-lg border">
@@ -314,7 +342,7 @@ export default function KeonDashboard() {
                             <TableRow
                               key={row.id}
                               className="cursor-pointer hover:bg-muted/30"
-                              onClick={() => navigate(`/spv/projects/${row.code_projet}/overview`)}
+                              onClick={() => navigate(`${hubBasePath}/${row.code_projet}/overview`)}
                             >
                               <TableCell className="font-mono font-medium text-primary">{row.code_projet}</TableCell>
                               <TableCell className="font-medium">{row.nom_projet}</TableCell>
@@ -334,7 +362,7 @@ export default function KeonDashboard() {
                               {(canEdit || canDelete) && (
                                 <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                                   <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/spv/projects/${row.code_projet}/overview`)}>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`${hubBasePath}/${row.code_projet}/overview`)}>
                                       <LayoutDashboard className="h-4 w-4" />
                                     </Button>
                                     {canEdit && (

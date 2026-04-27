@@ -121,6 +121,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
   Paperclip: () => <span className="text-base">📎</span>,
   Database: () => <span className="text-base">🗃️</span>,
   Table2: () => <span className="text-base">📊</span>,
+  CalendarClock: () => <span className="text-base">🗓️</span>,
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -178,7 +179,7 @@ export const CommonFieldsLibrary = memo(function CommonFieldsLibrary({
     const IconComponent = ICON_MAP[config.icon];
     return (
       <button
-        key={config.type}
+        key={config.paletteKey ?? config.type}
         onClick={() => canManage && onAddField(config)}
         disabled={!canManage}
         className={cn(
