@@ -10,6 +10,7 @@ import {
   Handle,
   EdgeLabelRenderer,
   getSmoothStepPath,
+  getBezierPath,
   useNodesState,
   useEdgesState,
   type Node,
@@ -188,6 +189,10 @@ type SolutionLinkData = Record<string, unknown> & {
   link: ITSolutionLink;
   onEdit: (link: ITSolutionLink) => void;
   edgeColor: string;
+  /** Index de cette arete dans le groupe d'aretes parallèles entre les memes deux noeuds (0 = premiere). */
+  parallelIndex: number;
+  /** Nombre total d'aretes parallèles dans ce groupe. */
+  parallelCount: number;
 };
 
 // ─── Layout dagre (sans croisement) ───────────────────────────────────────
@@ -247,8 +252,8 @@ function SolutionNode({ data, selected }: NodeProps<Node<SolutionNodeData>>) {
 
       {/*
         Chaque cote a une paire source/target — l'utilisateur peut tirer un
-        lien dans les deux sens sans avoir a viser le bon point. Visibles au
-        hover grace au styling group/node.
+        lien dans les deux sens sans avoir a viser le bon point. Toujours
+        visibles, plus marques au survol pour la decouverte.
       */}
       {(['top', 'right', 'bottom', 'left'] as const).map((side) => {
         const positionMap: Record<typeof side, Position> = {
@@ -261,14 +266,14 @@ function SolutionNode({ data, selected }: NodeProps<Node<SolutionNodeData>>) {
               type="source"
               position={pos}
               id={`s-${side}`}
-              className="!w-3 !h-3 !rounded-full !bg-primary !border-2 !border-background opacity-0 group-hover:opacity-100 transition-opacity"
+              className="!w-3 !h-3 !rounded-full !bg-primary !border-2 !border-background opacity-60 group-hover:opacity-100 hover:!w-4 hover:!h-4 transition-all"
               style={{ zIndex: 2 }}
             />
             <Handle
               type="target"
               position={pos}
               id={`t-${side}`}
-              className="!w-3 !h-3 !rounded-full !bg-emerald-500 !border-2 !border-background opacity-0 group-hover:opacity-100 transition-opacity"
+              className="!w-3 !h-3 !rounded-full !bg-emerald-500 !border-2 !border-background opacity-50 group-hover:opacity-100 hover:!w-4 hover:!h-4 transition-all"
               style={{ zIndex: 1 }}
             />
           </span>
@@ -308,9 +313,27 @@ function SolutionNode({ data, selected }: NodeProps<Node<SolutionNodeData>>) {
 
 function CharacterizedEdge(props: EdgeProps<Edge<SolutionLinkData>>) {
   const { sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, markerEnd, data, id, style, markerStart } = props;
-  const [edgePath, labelX, labelY] = getSmoothStepPath({
-    sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, borderRadius: 12,
-  });
+  const parallelIndex = data?.parallelIndex ?? 0;
+  const parallelCount = data?.parallelCount ?? 1;
+
+  // S'il y a plusieurs aretes entre les memes noeuds, on les separe en
+  // les courbant differemment (bezier avec curvature variable). Sinon on
+  // garde le routage orthogonal smoothstep, plus lisible.
+  let edgePath: string;
+  let labelX: number;
+  let labelY: number;
+  if (parallelCount > 1) {
+    // Repartit la curvature autour de 0.25 selon l'index : -0.4, 0, +0.4...
+    const offset = ((parallelIndex - (parallelCount - 1) / 2) * 0.35);
+    [edgePath, labelX, labelY] = getBezierPath({
+      sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition,
+      curvature: 0.25 + offset,
+    });
+  } else {
+    [edgePath, labelX, labelY] = getSmoothStepPath({
+      sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, borderRadius: 12,
+    });
+  }
 
   const link = data?.link;
   const flux = link?.type_flux ? resolveFluxType(link.type_flux) : null;
@@ -392,9 +415,27 @@ export function ITCartographieGraph({ solutions, links, onSelectSolution }: Prop
     [solutions, initialPositions, onSelectSolution, colorBy]
   );
 
-  const buildEdges = useCallback((): Edge<SolutionLinkData>[] =>
-    links.map((l) => {
+  const buildEdges = useCallback((): Edge<SolutionLinkData>[] => {
+    // Indexe les aretes par paire {source, target} non orientee pour reperer
+    // les liens parallèles (et A->B / B->A regroupes ensemble).
+    const groupKeyOf = (l: ITSolutionLink) => {
+      const a = l.source_solution_id;
+      const b = l.target_solution_id;
+      return a < b ? `${a}|${b}` : `${b}|${a}`;
+    };
+    const groupCounts = new Map<string, number>();
+    const groupIndex = new Map<string, number>();
+    for (const l of links) {
+      const k = groupKeyOf(l);
+      groupCounts.set(k, (groupCounts.get(k) ?? 0) + 1);
+    }
+
+    return links.map((l) => {
       const { color } = colorForLink(l, edgeColorBy);
+      const k = groupKeyOf(l);
+      const idx = groupIndex.get(k) ?? 0;
+      groupIndex.set(k, idx + 1);
+      const count = groupCounts.get(k) ?? 1;
       return {
         id: l.id,
         source: l.source_solution_id,
@@ -410,11 +451,12 @@ export function ITCartographieGraph({ solutions, links, onSelectSolution }: Prop
           link: l,
           onEdit: (link) => { setEditingLink(link); setLinkDialogOpen(true); },
           edgeColor: color,
+          parallelIndex: idx,
+          parallelCount: count,
         },
       };
-    }),
-    [links, edgeColorBy]
-  );
+    });
+  }, [links, edgeColorBy]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<SolutionNodeData>>(buildNodes());
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge<SolutionLinkData>>(buildEdges());
