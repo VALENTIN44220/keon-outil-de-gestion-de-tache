@@ -20,11 +20,12 @@ export function useITSolutions() {
   const solutionsQuery = useQuery({
     queryKey: SOLUTIONS_KEY,
     queryFn: async (): Promise<ITSolution[]> => {
+      // SELECT * pour rester resilient si une migration de colonnes n'a pas
+      // encore ete appliquee (logo_url / position_x / etc.). Les jointures
+      // owner_metier / owner_it sont conservees explicitement.
       const { data, error } = await supabase
         .from('it_solutions')
-        .select(
-          'id, nom, categorie, type, usage_principal, domaine_metier, visible_dans_schema, connecte_datalake, flux_principaux, statut_temporalite, owner_metier_id, owner_it_id, perimetre, criticite, commentaires, logo_url, position_x, position_y, width, height, created_at, updated_at, created_by, owner_metier:profiles!it_solutions_owner_metier_id_fkey(id,display_name,avatar_url), owner_it:profiles!it_solutions_owner_it_id_fkey(id,display_name,avatar_url)'
-        )
+        .select('*, owner_metier:profiles!it_solutions_owner_metier_id_fkey(id,display_name,avatar_url), owner_it:profiles!it_solutions_owner_it_id_fkey(id,display_name,avatar_url)')
         .order('nom', { ascending: true });
       if (error) throw error;
       return (data as ITSolution[]) ?? [];
