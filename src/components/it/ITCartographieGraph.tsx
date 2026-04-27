@@ -30,6 +30,7 @@ import {
   CRITICITE_CONFIG,
   DIRECTION_LABEL,
   FLUX_TYPE_CONFIG,
+  resolveFluxType,
   type ITSolution,
   type ITSolutionLink,
 } from '@/types/itSolution';
@@ -162,7 +163,7 @@ function CharacterizedEdge(props: EdgeProps<Edge<SolutionLinkData>>) {
   });
 
   const link = data?.link;
-  const flux = link?.type_flux ? FLUX_TYPE_CONFIG[link.type_flux] : null;
+  const flux = link?.type_flux ? resolveFluxType(link.type_flux) : null;
   const direction = link?.direction ? DIRECTION_LABEL[link.direction] : null;
 
   return (
@@ -239,7 +240,7 @@ export function ITCartographieGraph({ solutions, links, onSelectSolution }: Prop
 
   const buildEdges = useCallback((): Edge<SolutionLinkData>[] =>
     links.map((l) => {
-      const flux = l.type_flux ? FLUX_TYPE_CONFIG[l.type_flux] : null;
+      const flux = l.type_flux ? resolveFluxType(l.type_flux) : null;
       return {
         id: l.id,
         source: l.source_solution_id,

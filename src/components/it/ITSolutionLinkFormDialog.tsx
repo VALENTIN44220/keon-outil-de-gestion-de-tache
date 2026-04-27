@@ -15,18 +15,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { toast } from '@/hooks/use-toast';
 import { useITSolutions } from '@/hooks/useITSolutions';
+import { useITSolutionLinkOptions } from '@/hooks/useITSolutionLinkOptions';
 import { extractErrorMessage } from '@/lib/extractErrorMessage';
 import {
   CRITICITE_CONFIG,
   DIRECTION_LABEL,
-  FLUX_TYPE_CONFIG,
-  PRESET_FREQUENCES,
-  PRESET_PROTOCOLES,
   type ITSolution,
   type ITSolutionCriticite,
   type ITSolutionLink,
   type ITSolutionLinkDirection,
-  type ITSolutionLinkFluxType,
 } from '@/types/itSolution';
 
 interface Props {
@@ -41,10 +38,16 @@ interface Props {
 
 export function ITSolutionLinkFormDialog({ open, onOpenChange, link, defaultSourceId, defaultTargetId }: Props) {
   const { solutions, createSolutionLink, updateSolutionLink, deleteSolutionLink } = useITSolutions();
+  const {
+    typeFluxOptions,
+    protocoleOptions,
+    frequenceOptions,
+    addOption,
+  } = useITSolutionLinkOptions();
 
   const [sourceId, setSourceId] = useState('');
   const [targetId, setTargetId] = useState('');
-  const [typeFlux, setTypeFlux] = useState<ITSolutionLinkFluxType | ''>('');
+  const [typeFlux, setTypeFlux] = useState<string>('');
   const [direction, setDirection] = useState<ITSolutionLinkDirection>('source_to_target');
   const [protocole, setProtocole] = useState('');
   const [frequence, setFrequence] = useState('');
@@ -57,7 +60,7 @@ export function ITSolutionLinkFormDialog({ open, onOpenChange, link, defaultSour
     if (link) {
       setSourceId(link.source_solution_id);
       setTargetId(link.target_solution_id);
-      setTypeFlux((link.type_flux ?? '') as ITSolutionLinkFluxType | '');
+      setTypeFlux(link.type_flux ?? '');
       setDirection(link.direction);
       setProtocole(link.protocole ?? '');
       setFrequence(link.frequence ?? '');
@@ -91,13 +94,31 @@ export function ITSolutionLinkFormDialog({ open, onOpenChange, link, defaultSour
     }
     setPending(true);
     try {
+      // Persiste les nouvelles valeurs custom dans le catalogue partage
+      // (fire-and-forget, ignore les doublons)
+      const knownFlux = new Set(typeFluxOptions.map((o) => o.value));
+      const knownProto = new Set(protocoleOptions.map((o) => o.value));
+      const knownFreq = new Set(frequenceOptions.map((o) => o.value));
+      const trimmedFlux = typeFlux.trim();
+      const trimmedProto = protocole.trim();
+      const trimmedFreq = frequence.trim();
+      if (trimmedFlux && !knownFlux.has(trimmedFlux)) {
+        addOption.mutate({ option_type: 'type_flux', value: trimmedFlux });
+      }
+      if (trimmedProto && !knownProto.has(trimmedProto)) {
+        addOption.mutate({ option_type: 'protocole', value: trimmedProto });
+      }
+      if (trimmedFreq && !knownFreq.has(trimmedFreq)) {
+        addOption.mutate({ option_type: 'frequence', value: trimmedFreq });
+      }
+
       const payload = {
         source_solution_id: sourceId,
         target_solution_id: targetId,
-        type_flux: (typeFlux || null) as ITSolutionLinkFluxType | null,
+        type_flux: trimmedFlux || null,
         direction,
-        protocole: protocole.trim() || null,
-        frequence: frequence.trim() || null,
+        protocole: trimmedProto || null,
+        frequence: trimmedFreq || null,
         criticite: (criticite || null) as ITSolutionCriticite | null,
         description: description.trim() || null,
       };
@@ -135,15 +156,17 @@ export function ITSolutionLinkFormDialog({ open, onOpenChange, link, defaultSour
     label: `${s.nom}${s.categorie ? ` — ${s.categorie}` : ''}`,
   }));
 
-  const protocoleOptions = PRESET_PROTOCOLES.map((p) => ({ value: p, label: p }));
-  if (protocole && !PRESET_PROTOCOLES.includes(protocole as never)) {
-    protocoleOptions.push({ value: protocole, label: protocole });
-  }
-
-  const frequenceOptions = PRESET_FREQUENCES.map((f) => ({ value: f, label: f }));
-  if (frequence && !PRESET_FREQUENCES.includes(frequence as never)) {
-    frequenceOptions.push({ value: frequence, label: frequence });
-  }
+  // Affiche egalement la valeur courante si elle a ete saisie a la volee et
+  // n'est pas encore en base (le SearchableSelect masquerait sinon le choix)
+  const ensureValue = (
+    base: { value: string; label: string }[],
+    current: string,
+  ) => (current && !base.some((o) => o.value === current)
+    ? [...base, { value: current, label: current }]
+    : base);
+  const fluxOpts = ensureValue(typeFluxOptions, typeFlux);
+  const protoOpts = ensureValue(protocoleOptions, protocole);
+  const freqOpts = ensureValue(frequenceOptions, frequence);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -190,15 +213,15 @@ export function ITSolutionLinkFormDialog({ open, onOpenChange, link, defaultSour
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>Type de flux</Label>
-              <Select value={typeFlux || '__none__'} onValueChange={(v) => setTypeFlux(v === '__none__' ? '' : (v as ITSolutionLinkFluxType))}>
-                <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">— Non défini —</SelectItem>
-                  {(Object.entries(FLUX_TYPE_CONFIG) as [ITSolutionLinkFluxType, typeof FLUX_TYPE_CONFIG.data][]).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>{v.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={typeFlux}
+                onValueChange={setTypeFlux}
+                options={fluxOpts}
+                allowCustom
+                customPlaceholder="Ajouter un type de flux"
+                placeholder="Choisir ou saisir..."
+                searchPlaceholder="Rechercher un type..."
+              />
             </div>
 
             <div className="space-y-2">
@@ -218,10 +241,11 @@ export function ITSolutionLinkFormDialog({ open, onOpenChange, link, defaultSour
               <SearchableSelect
                 value={protocole}
                 onValueChange={setProtocole}
-                options={protocoleOptions}
+                options={protoOpts}
                 allowCustom
                 customPlaceholder="Ajouter un protocole"
                 placeholder="Choisir ou saisir..."
+                searchPlaceholder="Rechercher un protocole..."
               />
             </div>
 
@@ -230,10 +254,11 @@ export function ITSolutionLinkFormDialog({ open, onOpenChange, link, defaultSour
               <SearchableSelect
                 value={frequence}
                 onValueChange={setFrequence}
-                options={frequenceOptions}
+                options={freqOpts}
                 allowCustom
                 customPlaceholder="Ajouter une fréquence"
                 placeholder="Choisir ou saisir..."
+                searchPlaceholder="Rechercher une fréquence..."
               />
             </div>
 

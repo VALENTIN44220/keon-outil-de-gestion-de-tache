@@ -110,13 +110,21 @@ export const LIEN_TYPE_LABEL: Record<ITSolutionLienType, string> = {
 
 // ─── Liens entre solutions (cartographie graphe) ────────────────────────
 
-export type ITSolutionLinkFluxType =
+/**
+ * Valeurs predefinies pour le type de flux. Le champ accepte aussi des
+ * valeurs personnalisees ajoutees via la table it_solution_link_options
+ * (le CHECK en DB a ete leve dans la migration 20260503160000).
+ */
+export type ITSolutionLinkFluxTypePreset =
   | 'data'
   | 'integration'
   | 'fonctionnel'
   | 'technique'
   | 'fichier'
   | 'autre';
+
+/** Texte libre accepte pour autoriser des types personnalises. */
+export type ITSolutionLinkFluxType = ITSolutionLinkFluxTypePreset | string;
 
 export type ITSolutionLinkDirection = 'source_to_target' | 'target_to_source' | 'bidirectionnel';
 
@@ -135,7 +143,7 @@ export interface ITSolutionLink {
   created_by?: string | null;
 }
 
-export const FLUX_TYPE_CONFIG: Record<ITSolutionLinkFluxType, { label: string; color: string; description: string }> = {
+export const FLUX_TYPE_CONFIG: Record<ITSolutionLinkFluxTypePreset, { label: string; color: string; description: string }> = {
   data:        { label: 'Données',          color: '#3b82f6', description: 'Échange de données (ETL, synchronisation)' },
   integration: { label: 'Intégration',      color: '#6366f1', description: 'Intégration applicative (API, webhook)' },
   fonctionnel: { label: 'Fonctionnel',      color: '#8b5cf6', description: 'Dépendance fonctionnelle / métier' },
@@ -143,6 +151,18 @@ export const FLUX_TYPE_CONFIG: Record<ITSolutionLinkFluxType, { label: string; c
   fichier:     { label: 'Fichier',          color: '#f59e0b', description: 'Échange par fichier (CSV, SFTP)' },
   autre:       { label: 'Autre',            color: '#6b7280', description: 'Autre type de lien' },
 };
+
+/**
+ * Resout la couleur et le label d'un type de flux : utilise FLUX_TYPE_CONFIG
+ * pour les valeurs presetees, fallback sur la valeur brute (et une couleur
+ * grise) pour les valeurs personnalisees ajoutees a la volee.
+ */
+export function resolveFluxType(value: string | null | undefined): { label: string; color: string } {
+  if (!value) return { label: '·', color: '#6b7280' };
+  const preset = (FLUX_TYPE_CONFIG as Record<string, { label: string; color: string }>)[value];
+  if (preset) return { label: preset.label, color: preset.color };
+  return { label: value, color: '#6b7280' };
+}
 
 export const DIRECTION_LABEL: Record<ITSolutionLinkDirection, { label: string; symbol: string }> = {
   source_to_target:   { label: 'Source → Cible',     symbol: '→' },
