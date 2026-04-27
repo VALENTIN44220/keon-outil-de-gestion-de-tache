@@ -35,12 +35,14 @@ import {
   CRITICITE_CONFIG,
   DATALAKE_CONFIG,
   DIRECTION_LABEL,
+  ETAT_FLUX_CONFIG,
   FLUX_TYPE_CONFIG,
   resolveFluxType,
   type ITSolution,
   type ITSolutionCriticite,
   type ITSolutionDatalakeStatus,
   type ITSolutionLink,
+  type ITSolutionLinkEtat,
 } from '@/types/itSolution';
 
 interface Props {
@@ -119,6 +121,60 @@ function buildLegend(solutions: ITSolution[], by: ColorBy): { color: string; lab
   return Array.from(map.values()).sort((a, b) => b.count - a.count);
 }
 
+// ─── Edge color-by mechanism ──────────────────────────────────────────────
+
+type EdgeColorBy = 'type_flux' | 'etat_flux' | 'criticite' | 'direction' | 'frequence' | 'protocole';
+
+const EDGE_COLOR_BY_LABEL: Record<EdgeColorBy, string> = {
+  type_flux:   'Type de flux',
+  etat_flux:   'État du flux',
+  criticite:   'Criticité',
+  direction:   'Direction',
+  frequence:   'Fréquence',
+  protocole:   'Protocole',
+};
+
+const DIRECTION_COLOR: Record<string, string> = {
+  source_to_target:  '#3b82f6',
+  target_to_source:  '#8b5cf6',
+  bidirectionnel:    '#10b981',
+};
+
+/** Couleur d'une arête selon le critère choisi. */
+function colorForLink(l: ITSolutionLink, by: EdgeColorBy): { color: string; label: string } {
+  if (by === 'type_flux') {
+    if (!l.type_flux) return { color: '#6b7280', label: 'Non défini' };
+    return resolveFluxType(l.type_flux);
+  }
+  if (by === 'etat_flux') {
+    if (!l.etat_flux) return { color: '#cbd5e1', label: 'Non défini' };
+    const cfg = ETAT_FLUX_CONFIG[l.etat_flux as ITSolutionLinkEtat];
+    return { color: cfg.color, label: cfg.label };
+  }
+  if (by === 'criticite') {
+    if (!l.criticite) return { color: '#cbd5e1', label: 'Non définie' };
+    return { color: CRITICITE_COLOR[l.criticite], label: CRITICITE_CONFIG[l.criticite].label };
+  }
+  if (by === 'direction') {
+    return { color: DIRECTION_COLOR[l.direction] ?? '#6b7280', label: DIRECTION_LABEL[l.direction]?.label ?? l.direction };
+  }
+  // Texte libre : hash → couleur stable
+  const v = (l[by] as string | null | undefined)?.trim() ?? '';
+  if (!v) return { color: '#cbd5e1', label: 'Non défini' };
+  return { color: colorFromString(v), label: v };
+}
+
+function buildEdgeLegend(links: ITSolutionLink[], by: EdgeColorBy): { color: string; label: string; count: number }[] {
+  const map = new Map<string, { color: string; label: string; count: number }>();
+  for (const l of links) {
+    const { color, label } = colorForLink(l, by);
+    const cur = map.get(label);
+    if (cur) cur.count += 1;
+    else map.set(label, { color, label, count: 1 });
+  }
+  return Array.from(map.values()).sort((a, b) => b.count - a.count);
+}
+
 const DEFAULT_NODE_W = 220;
 const DEFAULT_NODE_H = 90;
 
@@ -131,6 +187,7 @@ type SolutionNodeData = Record<string, unknown> & {
 type SolutionLinkData = Record<string, unknown> & {
   link: ITSolutionLink;
   onEdit: (link: ITSolutionLink) => void;
+  edgeColor: string;
 };
 
 // ─── Layout dagre (sans croisement) ───────────────────────────────────────
@@ -258,6 +315,7 @@ function CharacterizedEdge(props: EdgeProps<Edge<SolutionLinkData>>) {
   const link = data?.link;
   const flux = link?.type_flux ? resolveFluxType(link.type_flux) : null;
   const direction = link?.direction ? DIRECTION_LABEL[link.direction] : null;
+  const edgeColor = data?.edgeColor ?? flux?.color ?? '#6b7280';
 
   return (
     <>
@@ -265,7 +323,7 @@ function CharacterizedEdge(props: EdgeProps<Edge<SolutionLinkData>>) {
         id={id}
         d={edgePath}
         fill="none"
-        stroke={flux?.color ?? '#6b7280'}
+        stroke={edgeColor}
         strokeWidth={2}
         markerEnd={markerEnd}
         markerStart={markerStart}
@@ -281,7 +339,7 @@ function CharacterizedEdge(props: EdgeProps<Edge<SolutionLinkData>>) {
             }}
             className="absolute pointer-events-auto rounded-full border bg-background px-2 py-0.5 text-[10px] shadow-sm hover:bg-accent transition-colors"
           >
-            <span className="font-medium" style={{ color: flux?.color }}>
+            <span className="font-medium" style={{ color: edgeColor }}>
               {flux?.label ?? '·'}
             </span>
             {direction && <span className="ml-1 text-muted-foreground">{direction.symbol}</span>}
@@ -302,6 +360,7 @@ export function ITCartographieGraph({ solutions, links, onSelectSolution }: Prop
   const [editingLink, setEditingLink] = useState<ITSolutionLink | null>(null);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [colorBy, setColorBy] = useState<ColorBy>('criticite');
+  const [edgeColorBy, setEdgeColorBy] = useState<EdgeColorBy>('type_flux');
   const [defaultLink, setDefaultLink] = useState<{ source: string; target: string } | null>(null);
 
   const initialPositions = useMemo(() => {
@@ -335,25 +394,26 @@ export function ITCartographieGraph({ solutions, links, onSelectSolution }: Prop
 
   const buildEdges = useCallback((): Edge<SolutionLinkData>[] =>
     links.map((l) => {
-      const flux = l.type_flux ? resolveFluxType(l.type_flux) : null;
+      const { color } = colorForLink(l, edgeColorBy);
       return {
         id: l.id,
         source: l.source_solution_id,
         target: l.target_solution_id,
         type: 'characterized',
         animated: l.criticite === 'tres_forte' || l.criticite === 'forte',
-        markerEnd: { type: MarkerType.ArrowClosed, color: flux?.color ?? '#6b7280' },
+        markerEnd: { type: MarkerType.ArrowClosed, color },
         markerStart: l.direction === 'bidirectionnel'
-          ? { type: MarkerType.ArrowClosed, color: flux?.color ?? '#6b7280' }
+          ? { type: MarkerType.ArrowClosed, color }
           : undefined,
-        style: { stroke: flux?.color ?? '#6b7280', strokeWidth: 2 },
+        style: { stroke: color, strokeWidth: 2 },
         data: {
           link: l,
           onEdit: (link) => { setEditingLink(link); setLinkDialogOpen(true); },
+          edgeColor: color,
         },
       };
     }),
-    [links]
+    [links, edgeColorBy]
   );
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<SolutionNodeData>>(buildNodes());
@@ -423,18 +483,30 @@ export function ITCartographieGraph({ solutions, links, onSelectSolution }: Prop
     setLinkDialogOpen(true);
   }, []);
 
-  const legend = useMemo(() => buildLegend(solutions, colorBy), [solutions, colorBy]);
+  const nodeLegend = useMemo(() => buildLegend(solutions, colorBy), [solutions, colorBy]);
+  const edgeLegend = useMemo(() => buildEdgeLegend(links, edgeColorBy), [links, edgeColorBy]);
 
   return (
     <div className="relative h-full w-full">
-      {/* Toolbar : color-by + nouveau lien */}
-      <div className="absolute top-2 right-2 z-10 flex items-center gap-2">
+      {/* Toolbar : color-by cards + color-by aretes + nouveau lien */}
+      <div className="absolute top-2 right-2 z-10 flex flex-wrap items-center gap-2 justify-end">
         <div className="flex items-center gap-2 rounded-md border bg-background/90 backdrop-blur px-2 py-1 shadow-sm">
-          <Label className="text-xs text-muted-foreground whitespace-nowrap">Couleur par</Label>
+          <Label className="text-xs text-muted-foreground whitespace-nowrap">Cartes par</Label>
           <Select value={colorBy} onValueChange={(v) => setColorBy(v as ColorBy)}>
-            <SelectTrigger className="h-7 text-xs min-w-[160px]"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-7 text-xs min-w-[150px]"><SelectValue /></SelectTrigger>
             <SelectContent>
               {(Object.entries(COLOR_BY_LABEL) as [ColorBy, string][]).map(([k, label]) => (
+                <SelectItem key={k} value={k}>{label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-center gap-2 rounded-md border bg-background/90 backdrop-blur px-2 py-1 shadow-sm">
+          <Label className="text-xs text-muted-foreground whitespace-nowrap">Liens par</Label>
+          <Select value={edgeColorBy} onValueChange={(v) => setEdgeColorBy(v as EdgeColorBy)}>
+            <SelectTrigger className="h-7 text-xs min-w-[150px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {(Object.entries(EDGE_COLOR_BY_LABEL) as [EdgeColorBy, string][]).map(([k, label]) => (
                 <SelectItem key={k} value={k}>{label}</SelectItem>
               ))}
             </SelectContent>
@@ -466,11 +538,11 @@ export function ITCartographieGraph({ solutions, links, onSelectSolution }: Prop
         <MiniMap nodeStrokeWidth={3} pannable zoomable />
       </ReactFlow>
 
-      {/* Légende dynamique : couleurs des cards selon le critère choisi */}
-      <div className="absolute bottom-2 left-2 z-10 rounded-md border bg-background/90 backdrop-blur p-2 text-[11px] shadow-sm max-w-[260px]">
-        <p className="font-semibold mb-1">Couleurs des cartes — {COLOR_BY_LABEL[colorBy]}</p>
-        <div className="flex flex-col gap-0.5 max-h-[160px] overflow-y-auto pr-1">
-          {legend.map((entry) => (
+      {/* Légende dynamique : cartes + arêtes selon les critères choisis */}
+      <div className="absolute bottom-2 left-2 z-10 rounded-md border bg-background/90 backdrop-blur p-2 text-[11px] shadow-sm max-w-[280px]">
+        <p className="font-semibold mb-1">Cartes — {COLOR_BY_LABEL[colorBy]}</p>
+        <div className="flex flex-col gap-0.5 max-h-[140px] overflow-y-auto pr-1">
+          {nodeLegend.map((entry) => (
             <div key={entry.label} className="flex items-center gap-1.5">
               <span className="inline-block w-3 h-3 rounded shrink-0 border border-border/50" style={{ backgroundColor: entry.color }} />
               <span className="truncate">{entry.label}</span>
@@ -479,14 +551,19 @@ export function ITCartographieGraph({ solutions, links, onSelectSolution }: Prop
           ))}
         </div>
 
-        <div className="border-t mt-2 pt-2 space-y-1">
-          <p className="font-semibold">Types de flux (arêtes)</p>
-          {(Object.entries(FLUX_TYPE_CONFIG) as [keyof typeof FLUX_TYPE_CONFIG, typeof FLUX_TYPE_CONFIG.data][]).map(([k, v]) => (
-            <div key={k} className="flex items-center gap-1.5">
-              <span className="inline-block w-3 h-0.5 rounded shrink-0" style={{ backgroundColor: v.color }} />
-              <span>{v.label}</span>
-            </div>
-          ))}
+        <div className="border-t mt-2 pt-2">
+          <p className="font-semibold mb-1">Liens — {EDGE_COLOR_BY_LABEL[edgeColorBy]}</p>
+          <div className="flex flex-col gap-0.5 max-h-[140px] overflow-y-auto pr-1">
+            {edgeLegend.length === 0 ? (
+              <span className="text-muted-foreground italic">Aucun lien</span>
+            ) : edgeLegend.map((entry) => (
+              <div key={entry.label} className="flex items-center gap-1.5">
+                <span className="inline-block w-3 h-0.5 rounded shrink-0" style={{ backgroundColor: entry.color }} />
+                <span className="truncate">{entry.label}</span>
+                <span className="ml-auto text-muted-foreground">{entry.count}</span>
+              </div>
+            ))}
+          </div>
         </div>
 
         <p className="text-[10px] text-muted-foreground italic mt-2">

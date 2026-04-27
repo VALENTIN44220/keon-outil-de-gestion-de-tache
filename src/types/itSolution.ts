@@ -128,6 +128,13 @@ export type ITSolutionLinkFluxType = ITSolutionLinkFluxTypePreset | string;
 
 export type ITSolutionLinkDirection = 'source_to_target' | 'target_to_source' | 'bidirectionnel';
 
+export type ITSolutionLinkEtat =
+  | 'a_creer'
+  | 'planifie'
+  | 'en_developpement'
+  | 'en_fonctionnement'
+  | 'en_evolution';
+
 export interface ITSolutionLink {
   id: string;
   source_solution_id: string;
@@ -137,11 +144,23 @@ export interface ITSolutionLink {
   protocole?: string | null;
   frequence?: string | null;
   criticite?: ITSolutionCriticite | null;
+  /** Cycle de vie du flux. */
+  etat_flux?: ITSolutionLinkEtat | null;
+  /** Date de mise en service / production effective (format ISO YYYY-MM-DD). */
+  date_mise_en_service?: string | null;
   description?: string | null;
   created_at: string;
   updated_at: string;
   created_by?: string | null;
 }
+
+export const ETAT_FLUX_CONFIG: Record<ITSolutionLinkEtat, { label: string; color: string; className: string }> = {
+  a_creer:           { label: 'À créer',           color: '#94a3b8', className: 'bg-slate-100 text-slate-700 border-slate-300' },
+  planifie:          { label: 'Planifié',          color: '#0ea5e9', className: 'bg-sky-100 text-sky-700 border-sky-300' },
+  en_developpement:  { label: 'En développement',  color: '#f59e0b', className: 'bg-amber-100 text-amber-700 border-amber-300' },
+  en_fonctionnement: { label: 'En fonctionnement', color: '#10b981', className: 'bg-emerald-100 text-emerald-700 border-emerald-300' },
+  en_evolution:      { label: 'En évolution',      color: '#8b5cf6', className: 'bg-violet-100 text-violet-700 border-violet-300' },
+};
 
 export const FLUX_TYPE_CONFIG: Record<ITSolutionLinkFluxTypePreset, { label: string; color: string; description: string }> = {
   data:        { label: 'Données',          color: '#3b82f6', description: 'Échange de données (ETL, synchronisation)' },

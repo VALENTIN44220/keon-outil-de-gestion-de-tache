@@ -20,10 +20,12 @@ import { extractErrorMessage } from '@/lib/extractErrorMessage';
 import {
   CRITICITE_CONFIG,
   DIRECTION_LABEL,
+  ETAT_FLUX_CONFIG,
   type ITSolution,
   type ITSolutionCriticite,
   type ITSolutionLink,
   type ITSolutionLinkDirection,
+  type ITSolutionLinkEtat,
 } from '@/types/itSolution';
 
 interface Props {
@@ -52,6 +54,8 @@ export function ITSolutionLinkFormDialog({ open, onOpenChange, link, defaultSour
   const [protocole, setProtocole] = useState('');
   const [frequence, setFrequence] = useState('');
   const [criticite, setCriticite] = useState<ITSolutionCriticite | ''>('');
+  const [etat, setEtat] = useState<ITSolutionLinkEtat | ''>('');
+  const [dateMiseEnService, setDateMiseEnService] = useState('');
   const [description, setDescription] = useState('');
   const [pending, setPending] = useState(false);
 
@@ -65,6 +69,8 @@ export function ITSolutionLinkFormDialog({ open, onOpenChange, link, defaultSour
       setProtocole(link.protocole ?? '');
       setFrequence(link.frequence ?? '');
       setCriticite((link.criticite ?? '') as ITSolutionCriticite | '');
+      setEtat((link.etat_flux ?? '') as ITSolutionLinkEtat | '');
+      setDateMiseEnService(link.date_mise_en_service ?? '');
       setDescription(link.description ?? '');
     } else {
       setSourceId(defaultSourceId ?? '');
@@ -74,6 +80,8 @@ export function ITSolutionLinkFormDialog({ open, onOpenChange, link, defaultSour
       setProtocole('');
       setFrequence('');
       setCriticite('');
+      setEtat('');
+      setDateMiseEnService('');
       setDescription('');
     }
   }, [open, link, defaultSourceId, defaultTargetId]);
@@ -120,6 +128,8 @@ export function ITSolutionLinkFormDialog({ open, onOpenChange, link, defaultSour
         protocole: trimmedProto || null,
         frequence: trimmedFreq || null,
         criticite: (criticite || null) as ITSolutionCriticite | null,
+        etat_flux: (etat || null) as ITSolutionLinkEtat | null,
+        date_mise_en_service: dateMiseEnService.trim() || null,
         description: description.trim() || null,
       };
       if (link) {
@@ -262,7 +272,7 @@ export function ITSolutionLinkFormDialog({ open, onOpenChange, link, defaultSour
               />
             </div>
 
-            <div className="space-y-2 sm:col-span-2">
+            <div className="space-y-2">
               <Label>Criticité du lien</Label>
               <Select value={criticite || '__none__'} onValueChange={(v) => setCriticite(v === '__none__' ? '' : (v as ITSolutionCriticite))}>
                 <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
@@ -273,6 +283,28 @@ export function ITSolutionLinkFormDialog({ open, onOpenChange, link, defaultSour
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>État du flux</Label>
+              <Select value={etat || '__none__'} onValueChange={(v) => setEtat(v === '__none__' ? '' : (v as ITSolutionLinkEtat))}>
+                <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— Non défini —</SelectItem>
+                  {(Object.entries(ETAT_FLUX_CONFIG) as [ITSolutionLinkEtat, typeof ETAT_FLUX_CONFIG.a_creer][]).map(([k, v]) => (
+                    <SelectItem key={k} value={k}>{v.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Date de mise en service</Label>
+              <Input
+                type="date"
+                value={dateMiseEnService}
+                onChange={(e) => setDateMiseEnService(e.target.value)}
+              />
             </div>
           </div>
 
