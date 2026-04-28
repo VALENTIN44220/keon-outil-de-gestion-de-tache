@@ -1397,14 +1397,22 @@ Deno.serve(async (req) => {
                 : null;
 
             if (existingMatch && !linkedLocalIds.has(existingMatch.id)) {
-              // Link the existing task instead of creating a new one
-              const { error: backlinkErr } = await supabase.from('planner_task_links').insert({
-                plan_mapping_id: planMappingId,
-                planner_task_id: pt.id,
-                local_task_id: existingMatch.id,
-                planner_etag: pt['@odata.etag'],
-                sync_status: 'synced',
-              });
+              // Link the existing task instead of creating a new one.
+              // Upsert sur la cle composite (plan_mapping_id, planner_task_id) pour
+              // rester idempotent en cas de re-synchronisation.
+              const { error: backlinkErr } = await supabase
+                .from('planner_task_links')
+                .upsert(
+                  {
+                    plan_mapping_id: planMappingId,
+                    planner_task_id: pt.id,
+                    local_task_id: existingMatch.id,
+                    planner_etag: pt['@odata.etag'],
+                    sync_status: 'synced',
+                    last_synced_at: new Date().toISOString(),
+                  },
+                  { onConflict: 'plan_mapping_id,planner_task_id' },
+                );
               if (!backlinkErr) {
                 linkedPlannerIds.add(pt.id);
                 linkedLocalIds.add(existingMatch.id);
@@ -1508,20 +1516,38 @@ Deno.serve(async (req) => {
               }
             }
 
-            const { error: linkErr } = await supabase.from('planner_task_links').insert({
-              plan_mapping_id: planMappingId,
-              planner_task_id: pt.id,
-              local_task_id: newTask.id,
-              planner_etag: pt['@odata.etag'],
-              sync_status: 'synced',
-              planner_assignee_email: assigneeInfo.email || null,
-              planner_assignee_name: assigneeInfo.displayName || null,
-            });
+            // Idempotent upsert sur (plan_mapping_id, planner_task_id) : si un
+            // lien existait deja pour ce planner_task_id dans ce mapping (race ou
+            // re-sync), on met a jour le lien existant et on supprime la nouvelle
+            // tache locale qui vient d'etre creee pour eviter un orphelin.
+            const { data: linkRows, error: linkErr } = await supabase
+              .from('planner_task_links')
+              .upsert(
+                {
+                  plan_mapping_id: planMappingId,
+                  planner_task_id: pt.id,
+                  local_task_id: newTask.id,
+                  planner_etag: pt['@odata.etag'],
+                  sync_status: 'synced',
+                  planner_assignee_email: assigneeInfo.email || null,
+                  planner_assignee_name: assigneeInfo.displayName || null,
+                  last_synced_at: new Date().toISOString(),
+                },
+                { onConflict: 'plan_mapping_id,planner_task_id' },
+              )
+              .select('local_task_id');
 
             if (linkErr) {
               // Roll back the task row to avoid leaving an unlinked orphan.
               await supabase.from('tasks').delete().eq('id', newTask.id);
               throw linkErr;
+            }
+
+            const finalLocalId = linkRows?.[0]?.local_task_id ?? newTask.id;
+            if (finalLocalId !== newTask.id) {
+              // Le lien pointait deja vers une autre tache locale : on supprime
+              // la tache fraichement creee pour ne pas laisser d'orphelin.
+              await supabase.from('tasks').delete().eq('id', newTask.id);
             }
 
             linkedPlannerIds.add(pt.id);
@@ -1730,13 +1756,19 @@ Deno.serve(async (req) => {
               percentComplete: statusToPlannerPercent(lt.status),
             });
 
-            await supabase.from('planner_task_links').insert({
-              plan_mapping_id: planMappingId,
-              planner_task_id: created.id,
-              local_task_id: lt.id,
-              planner_etag: created['@odata.etag'],
-              sync_status: 'synced',
-            });
+            await supabase
+              .from('planner_task_links')
+              .upsert(
+                {
+                  plan_mapping_id: planMappingId,
+                  planner_task_id: created.id,
+                  local_task_id: lt.id,
+                  planner_etag: created['@odata.etag'],
+                  sync_status: 'synced',
+                  last_synced_at: new Date().toISOString(),
+                },
+                { onConflict: 'plan_mapping_id,planner_task_id' },
+              );
 
             linkedLocalIds.add(lt.id);
 
