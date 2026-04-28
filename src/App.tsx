@@ -45,6 +45,7 @@ const BEProjectHubDiscussions = lazy(() => import("./pages/be/BEProjectHubDiscus
 const BEProjectHubFiles = lazy(() => import("./pages/be/BEProjectHubFiles"));
 const BEProjectHubQuestionnaire = lazy(() => import("./pages/be/BEProjectHubQuestionnaire"));
 const BEProjectHubKeonSynthese = lazy(() => import("./pages/be/BEProjectHubKeonSynthese"));
+const BEProjectHubBudget = lazy(() => import("./pages/be/BEProjectHubBudget"));
 
 // IT Project Hub pages
 const ITProjects = lazy(() => import("./pages/it/ITProjects"));
@@ -111,6 +112,7 @@ const App = () => (
                 { path: "/be/projects/:code/questionnaire", end: true, element: <ProtectedRoute><BEProjectHubQuestionnaire /></ProtectedRoute> },
                 { path: "/be/projects/:code/keon-synthese", end: true, element: <ProtectedRoute><BEProjectHubKeonSynthese /></ProtectedRoute> },
                 { path: "/be/projects/:code/timeline", end: true, element: <ProtectedRoute><BEProjectHubTimeline /></ProtectedRoute> },
+                { path: "/be/projects/:code/budget", end: true, element: <ProtectedRoute><BEProjectHubBudget /></ProtectedRoute> },
                 { path: "/be/projects/:code/discussions", end: true, element: <ProtectedRoute><BEProjectHubDiscussions /></ProtectedRoute> },
                 { path: "/be/projects/:code/files", end: true, element: <ProtectedRoute><BEProjectHubFiles /></ProtectedRoute> },
 
@@ -118,6 +120,7 @@ const App = () => (
                 { path: "/spv/projects/:code/questionnaire", end: true, element: <ProtectedRoute><BEProjectHubQuestionnaire /></ProtectedRoute> },
                 { path: "/spv/projects/:code/keon-synthese", end: true, element: <ProtectedRoute><BEProjectHubKeonSynthese /></ProtectedRoute> },
                 { path: "/spv/projects/:code/timeline", end: true, element: <ProtectedRoute><BEProjectHubTimeline /></ProtectedRoute> },
+                { path: "/spv/projects/:code/budget", end: true, element: <ProtectedRoute><BEProjectHubBudget /></ProtectedRoute> },
                 { path: "/spv/projects/:code/discussions", end: true, element: <ProtectedRoute><BEProjectHubDiscussions /></ProtectedRoute> },
                 { path: "/spv/projects/:code/files", end: true, element: <ProtectedRoute><BEProjectHubFiles /></ProtectedRoute> },
 
@@ -162,8 +165,10 @@ const App = () => (
             <Route path="/be/projects/:code/questionnaire" element={<></>} />
             <Route path="/be/projects/:code/keon-synthese" element={<></>} />
             <Route path="/be/projects/:code/timeline" element={<></>} />
+            <Route path="/be/projects/:code/budget" element={<></>} />
             <Route path="/be/projects/:code/discussions" element={<></>} />
             <Route path="/be/projects/:code/files" element={<></>} />
+            <Route path="/spv/projects/:code/budget" element={<></>} />
             <Route path="/spv/projects/:code/overview" element={<></>} />
             <Route path="/spv/projects/:code/questionnaire" element={<></>} />
             <Route path="/spv/projects/:code/keon-synthese" element={<></>} />
