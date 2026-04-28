@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { ITProject, ITProjectMilestone, ITProjectPhase } from '@/types/itProject';
+import { ITProject, ITProjectMilestone, ITProjectPhase, ITMilestoneCalendarLink } from '@/types/itProject';
 import { Task } from '@/types/task';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRef, useCallback } from 'react';
@@ -69,6 +69,76 @@ export function useITProjectMilestones(projectId: string | undefined) {
     queryClient.invalidateQueries({ queryKey: ['it-project-milestones', projectId] });
   };
   return { ...query, addMilestone, updateMilestone, deleteMilestone };
+}
+
+/**
+ * Hook qui retourne les liens evenement-jalon pour TOUS les jalons d'un projet.
+ * Renvoie une Map<milestone_id, ITMilestoneCalendarLink[]> + add/remove.
+ */
+export function useITMilestoneCalendarLinks(milestoneIds: string[]) {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const sortedKey = [...milestoneIds].sort().join(',');
+
+  const query = useQuery({
+    queryKey: ['it-milestone-calendar-links', sortedKey],
+    queryFn: async (): Promise<Map<string, ITMilestoneCalendarLink[]>> => {
+      const map = new Map<string, ITMilestoneCalendarLink[]>();
+      if (milestoneIds.length === 0) return map;
+      const { data, error } = await supabase
+        .from('it_milestone_calendar_links')
+        .select('*')
+        .in('it_project_milestone_id', milestoneIds)
+        .order('start_time', { ascending: true });
+      if (error) throw error;
+      for (const row of (data || []) as ITMilestoneCalendarLink[]) {
+        const list = map.get(row.it_project_milestone_id) || [];
+        list.push(row);
+        map.set(row.it_project_milestone_id, list);
+      }
+      return map;
+    },
+    enabled: milestoneIds.length > 0,
+  });
+
+  const addLink = async (
+    milestoneId: string,
+    snapshot: {
+      outlook_event_id: string;
+      subject: string;
+      start_time: string;
+      end_time: string;
+      location?: string | null;
+      organizer_email?: string | null;
+    },
+  ) => {
+    const { data, error } = await supabase
+      .from('it_milestone_calendar_links')
+      .upsert(
+        {
+          it_project_milestone_id: milestoneId,
+          ...snapshot,
+          created_by: user?.id ?? null,
+        },
+        { onConflict: 'it_project_milestone_id,outlook_event_id' },
+      )
+      .select()
+      .single();
+    if (error) throw error;
+    queryClient.invalidateQueries({ queryKey: ['it-milestone-calendar-links', sortedKey] });
+    return data as ITMilestoneCalendarLink;
+  };
+
+  const removeLink = async (linkId: string) => {
+    const { error } = await supabase
+      .from('it_milestone_calendar_links')
+      .delete()
+      .eq('id', linkId);
+    if (error) throw error;
+    queryClient.invalidateQueries({ queryKey: ['it-milestone-calendar-links', sortedKey] });
+  };
+
+  return { ...query, addLink, removeLink };
 }
 
 export function useITProjectStats(tasks: Task[], project: ITProject | null | undefined) {

@@ -7,9 +7,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { ITProject, ITProjectStatus, ITProjectType, ITProjectPriority, ITProjectPhase, ITProjectPilier, IT_PROJECT_PHASES, IT_PROJECT_PILIER_CONFIG, STATUT_FDR_CONFIG, StatutFDR } from '@/types/itProject';
+import { ITProject, ITProjectStatus, ITProjectType, ITProjectPriority, ITProjectPhase, ITProjectPilier, IT_PROJECT_PHASES, ALL_IT_PROJECT_PHASES, IT_PROJECT_PILIER_CONFIG, STATUT_FDR_CONFIG, StatutFDR } from '@/types/itProject';
 import { useITProjects } from '@/hooks/useITProjects';
 import { supabase } from '@/integrations/supabase/client';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Monitor, Users, Calendar, Euro, Link2, MessageSquareText, Loader2, Target } from 'lucide-react';
 
 const NONE = '__none__';
@@ -34,7 +35,8 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
   const [priorite, setPriorite] = useState<ITProjectPriority>('normale');
   const [statut, setStatut] = useState<ITProjectStatus>('backlog');
   const [phaseCourante, setPhaseCourante] = useState<ITProjectPhase>('cadrage');
-  
+  const [phasesActives, setPhasesActives] = useState<ITProjectPhase[]>([...ALL_IT_PROJECT_PHASES]);
+
   const [dateFinPrevue, setDateFinPrevue] = useState('');
   const [budgetPrevisionnel, setBudgetPrevisionnel] = useState('');
   const [teamsChannelUrl, setTeamsChannelUrl] = useState('');
@@ -103,6 +105,9 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
       setPriorite((project.priorite as ITProjectPriority) || 'normale');
       setStatut(project.statut || 'backlog');
       setPhaseCourante((project.phase_courante as ITProjectPhase) || 'cadrage');
+      const rawPhases = project.phases_actives as unknown;
+      const arr = Array.isArray(rawPhases) ? (rawPhases as ITProjectPhase[]) : null;
+      setPhasesActives(arr && arr.length > 0 ? arr : [...ALL_IT_PROJECT_PHASES]);
       setDateFinPrevue(project.date_fin_prevue || '');
       setBudgetPrevisionnel(project.budget_previsionnel?.toString() || '');
       setTeamsChannelUrl(project.teams_channel_url || '');
@@ -130,6 +135,7 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
     setPriorite('normale');
     setStatut('backlog');
     setPhaseCourante('cadrage');
+    setPhasesActives([...ALL_IT_PROJECT_PHASES]);
     setDateFinPrevue('');
     setBudgetPrevisionnel('');
     setTeamsChannelUrl('');
@@ -146,9 +152,30 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
     setFdrCommentaires('');
   };
 
+  const orderedActivePhases = IT_PROJECT_PHASES
+    .map(p => p.value)
+    .filter(v => phasesActives.includes(v));
+
+  const togglePhaseActive = (phase: ITProjectPhase, checked: boolean) => {
+    setPhasesActives(prev => {
+      const next = checked
+        ? Array.from(new Set([...prev, phase]))
+        : prev.filter(p => p !== phase);
+      // Garder au moins une phase activée
+      return next.length > 0 ? next : prev;
+    });
+  };
+
   const handleSubmit = async () => {
     if (!nomProjet.trim()) return;
     setIsSaving(true);
+
+    const finalPhasesActives = orderedActivePhases.length > 0
+      ? orderedActivePhases
+      : [...ALL_IT_PROJECT_PHASES];
+    const finalPhaseCourante = finalPhasesActives.includes(phaseCourante)
+      ? phaseCourante
+      : finalPhasesActives[0];
 
     const payload: any = {
       ...(codeProjetDigital.trim() && { code_projet_digital: codeProjetDigital.trim().toUpperCase() }),
@@ -157,7 +184,8 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
       type_projet: typeProjet,
       priorite,
       statut,
-      phase_courante: phaseCourante,
+      phase_courante: finalPhaseCourante,
+      phases_actives: finalPhasesActives,
       date_fin_prevue: dateFinPrevue || null,
       budget_previsionnel: budgetPrevisionnel ? parseFloat(budgetPrevisionnel) : null,
       teams_channel_url: teamsChannelUrl || null,
@@ -287,12 +315,48 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
                 <Select value={phaseCourante} onValueChange={v => setPhaseCourante(v as ITProjectPhase)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {IT_PROJECT_PHASES.map(p => (
+                    {IT_PROJECT_PHASES.filter(p => phasesActives.includes(p.value)).map(p => (
                       <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            {/* Phases activées du projet */}
+            <div className="space-y-2 rounded-lg border bg-muted/20 p-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Phases activées</Label>
+                <span className="text-[10px] text-muted-foreground">
+                  {phasesActives.length}/{IT_PROJECT_PHASES.length} sélectionnée{phasesActives.length > 1 ? 's' : ''}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Décochez les phases qui ne s'appliquent pas à ce projet (ex. projet opérationnel sans phase de recette).
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                {IT_PROJECT_PHASES.map(p => {
+                  const checked = phasesActives.includes(p.value);
+                  const isOnlyOne = checked && phasesActives.length === 1;
+                  return (
+                    <label
+                      key={p.value}
+                      className="flex items-center gap-2 text-xs cursor-pointer rounded-md border bg-background px-2 py-1.5 hover:bg-muted/40"
+                    >
+                      <Checkbox
+                        checked={checked}
+                        disabled={isOnlyOne}
+                        onCheckedChange={(v) => togglePhaseActive(p.value, v === true)}
+                      />
+                      <span className="font-medium">{p.order}.</span>
+                      <span className="truncate">{p.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              {phasesActives.length === 1 && (
+                <p className="text-[10px] text-muted-foreground">Au moins une phase doit rester activée.</p>
+              )}
             </div>
           </TabsContent>
 

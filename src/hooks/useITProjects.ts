@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { ITProject } from '@/types/itProject';
+import { ITProject, ITProjectPhase, ALL_IT_PROJECT_PHASES } from '@/types/itProject';
 import { toast } from '@/hooks/use-toast';
 
 export function useITProjects() {
@@ -37,16 +37,25 @@ export function useITProjects() {
       const { data, error } = await supabase.from('it_projects').insert(payload).select().single();
       if (error) throw error;
 
-      // Auto-create standard milestones
-      const milestones = [
+      // Auto-create standard milestones — uniquement pour les phases activées
+      const STANDARD_MILESTONES: { titre: string; phase: ITProjectPhase; ordre: number }[] = [
         { titre: 'Cadrage validé',        phase: 'cadrage',       ordre: 1 },
         { titre: 'Conception approuvée',  phase: 'analyse',       ordre: 2 },
         { titre: 'Développement terminé', phase: 'developpement', ordre: 3 },
         { titre: 'Recette validée',       phase: 'recette',       ordre: 4 },
         { titre: 'Mise en production',    phase: 'deploiement',   ordre: 5 },
-      ].map(m => ({ ...m, it_project_id: data.id, statut: 'a_venir', date_prevue: null }));
+      ];
+      const activePhases: ITProjectPhase[] =
+        Array.isArray(data.phases_actives) && data.phases_actives.length > 0
+          ? (data.phases_actives as ITProjectPhase[])
+          : ALL_IT_PROJECT_PHASES;
+      const milestones = STANDARD_MILESTONES
+        .filter(m => activePhases.includes(m.phase))
+        .map(m => ({ ...m, it_project_id: data.id, statut: 'a_venir', date_prevue: null }));
 
-      await supabase.from('it_project_milestones').insert(milestones);
+      if (milestones.length > 0) {
+        await supabase.from('it_project_milestones').insert(milestones);
+      }
 
       setProjects(prev => [...prev, data as ITProject]);
       toast({ title: 'Projet créé', description: `${data.nom_projet} — ${data.code_projet_digital}` });

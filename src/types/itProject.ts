@@ -126,6 +126,11 @@ export interface ITProject {
   statut_fdr?: StatutFDR | null;
   etape_validation_fdr?: number | null;
 
+  // Sous-ensemble des phases standard activées pour ce projet.
+  // Permet de simplifier le cycle de vie (ex. projet opérationnel à 1-2 phases).
+  // Par défaut : les 5 phases sont actives.
+  phases_actives?: ITProjectPhase[] | null;
+
   // Joined data (optional, for display)
   responsable_it?: { id: string; display_name: string; avatar_url?: string | null } | null;
   chef_projet?: { id: string; display_name: string; avatar_url?: string | null } | null;
@@ -147,6 +152,26 @@ export interface ITProjectMilestone {
   date_reelle?: string | null;
   statut: MilestoneStatus;
   ordre: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Lien N<->N entre un jalon de projet IT et un evenement Outlook.
+ * On stocke un snapshot (subject / start_time / ...) au moment du lien
+ * pour pouvoir afficher l'info sur le jalon meme si l'utilisateur courant
+ * n'a pas l'evenement dans son cache personnel outlook_calendar_events.
+ */
+export interface ITMilestoneCalendarLink {
+  id: string;
+  it_project_milestone_id: string;
+  outlook_event_id: string;
+  subject: string;
+  start_time: string;
+  end_time: string;
+  location?: string | null;
+  organizer_email?: string | null;
+  created_by?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -225,6 +250,20 @@ export const IT_PROJECT_PHASES: { value: ITProjectPhase; label: string; order: n
   { value: 'deploiement', label: 'Déploiement / MEP', order: 5 },
 ];
 
+export const ALL_IT_PROJECT_PHASES: ITProjectPhase[] = IT_PROJECT_PHASES.map(p => p.value);
+
+/**
+ * Retourne les phases activées pour un projet, en conservant l'ordre canonique.
+ * Si la liste est absente / vide, on retombe sur les 5 phases standard.
+ */
+export function getActivePhases(
+  phasesActives?: ITProjectPhase[] | string[] | null,
+): typeof IT_PROJECT_PHASES {
+  if (!phasesActives || phasesActives.length === 0) return IT_PROJECT_PHASES;
+  const set = new Set(phasesActives as string[]);
+  return IT_PROJECT_PHASES.filter(p => set.has(p.value));
+}
+
 export const IT_PHASE_BADGE_CONFIG: Record<ITProjectPhase, { label: string; className: string }> = {
   cadrage: { label: 'Cadrage', className: 'bg-slate-500/10 text-slate-600 border-slate-500/20' },
   analyse: { label: 'Analyse', className: 'bg-blue-500/10 text-blue-600 border-blue-500/20' },
@@ -273,6 +312,10 @@ export interface ITBudgetLine {
   id: string;
   it_project_id: string;
   exercice: number;
+  /** Année budgétaire (alignée sur exercice). Utilisée pour le filtre du Budget IT global. */
+  annee?: number | null;
+  /** Entité / société (alignée sur la company du projet). Utilisée pour le filtre du Budget IT global. */
+  entite?: string | null;
   version: string;
   categorie?: string | null;
   sous_categorie?: string | null;

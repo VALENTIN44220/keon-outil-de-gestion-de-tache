@@ -1,5 +1,5 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { IT_PROJECT_PHASES } from '@/types/itProject';
+import { IT_PROJECT_PHASES, ITProjectPhase, getActivePhases } from '@/types/itProject';
 
 const NONE_SENTINEL = '__none__';
 
@@ -7,9 +7,14 @@ interface ITProjectPhaseSelectProps {
   value: string | null;
   onChange: (phase: string | null) => void;
   disabled?: boolean;
+  /**
+   * Sous-ensemble des phases du projet à afficher. Si non fourni, les 5 phases standard sont listées.
+   */
+  activePhases?: ITProjectPhase[] | null;
 }
 
-export function ITProjectPhaseSelect({ value, onChange, disabled }: ITProjectPhaseSelectProps) {
+export function ITProjectPhaseSelect({ value, onChange, disabled, activePhases }: ITProjectPhaseSelectProps) {
+  const phases = activePhases ? getActivePhases(activePhases) : IT_PROJECT_PHASES;
   return (
     <Select
       value={value || NONE_SENTINEL}
@@ -21,7 +26,7 @@ export function ITProjectPhaseSelect({ value, onChange, disabled }: ITProjectPha
       </SelectTrigger>
       <SelectContent>
         <SelectItem value={NONE_SENTINEL}>— Aucune phase —</SelectItem>
-        {IT_PROJECT_PHASES.map((p) => (
+        {phases.map((p) => (
           <SelectItem key={p.value} value={p.value}>
             {p.label}
           </SelectItem>
