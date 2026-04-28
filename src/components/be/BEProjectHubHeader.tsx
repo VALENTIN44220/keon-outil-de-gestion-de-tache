@@ -5,10 +5,10 @@ import { Task } from '@/types/task';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { 
-  ArrowLeft, 
-  LayoutDashboard, 
-  Calendar, 
-  MessageSquare, 
+  ArrowLeft,
+  LayoutDashboard,
+  Calendar,
+  MessageSquare,
   Paperclip,
   ChevronRight,
   FileText,
@@ -18,7 +18,8 @@ import {
   TrendingUp,
   Pencil,
   ClipboardList,
-  BarChart3
+  BarChart3,
+  Wallet
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useQuestionnaireProjectData } from '@/hooks/useQuestionnaireProjectData';
@@ -46,6 +47,7 @@ const baseNavItems = [
   { value: 'questionnaire', label: 'Questionnaire', icon: ClipboardList },
   { value: 'keon-synthese', label: '📊 Synthèse KEON', icon: BarChart3, keonOnly: true },
   { value: 'timeline', label: 'Timeline', icon: Calendar },
+  { value: 'budget', label: 'Budget', icon: Wallet },
   { value: 'discussions', label: 'Discussions', icon: MessageSquare },
   { value: 'files', label: 'Fichiers', icon: Paperclip },
 ];
