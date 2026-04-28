@@ -292,6 +292,10 @@ export interface ITBudgetLine {
   id: string;
   it_project_id: string;
   exercice: number;
+  /** Année budgétaire (alignée sur exercice). Utilisée pour le filtre du Budget IT global. */
+  annee?: number | null;
+  /** Entité / société (alignée sur la company du projet). Utilisée pour le filtre du Budget IT global. */
+  entite?: string | null;
   version: string;
   categorie?: string | null;
   sous_categorie?: string | null;

@@ -454,9 +454,14 @@ export default function ITProjectHubBudget() {
         });
         toast({ title: 'Ligne budgétaire mise à jour' });
       } else {
+        const currentYear = new Date().getFullYear();
         const payload: Omit<ITBudgetLine, 'id' | 'created_at' | 'updated_at'> = {
           it_project_id: project.id,
-          exercice: new Date().getFullYear(),
+          exercice: currentYear,
+          // Aligne annee + entite avec ce qu'attend la page Budget IT globale
+          // (sinon les lignes créées depuis l'onglet projet n'apparaissent pas).
+          annee: currentYear,
+          entite: project.company?.name || null,
           version: '1',
           categorie: lineCategorieSelect || null,
           sous_categorie: lineSousCategorie || null,
