@@ -126,6 +126,11 @@ export interface ITProject {
   statut_fdr?: StatutFDR | null;
   etape_validation_fdr?: number | null;
 
+  // Sous-ensemble des phases standard activées pour ce projet.
+  // Permet de simplifier le cycle de vie (ex. projet opérationnel à 1-2 phases).
+  // Par défaut : les 5 phases sont actives.
+  phases_actives?: ITProjectPhase[] | null;
+
   // Joined data (optional, for display)
   responsable_it?: { id: string; display_name: string; avatar_url?: string | null } | null;
   chef_projet?: { id: string; display_name: string; avatar_url?: string | null } | null;
@@ -224,6 +229,20 @@ export const IT_PROJECT_PHASES: { value: ITProjectPhase; label: string; order: n
   { value: 'recette', label: 'Recette / Tests', order: 4 },
   { value: 'deploiement', label: 'Déploiement / MEP', order: 5 },
 ];
+
+export const ALL_IT_PROJECT_PHASES: ITProjectPhase[] = IT_PROJECT_PHASES.map(p => p.value);
+
+/**
+ * Retourne les phases activées pour un projet, en conservant l'ordre canonique.
+ * Si la liste est absente / vide, on retombe sur les 5 phases standard.
+ */
+export function getActivePhases(
+  phasesActives?: ITProjectPhase[] | string[] | null,
+): typeof IT_PROJECT_PHASES {
+  if (!phasesActives || phasesActives.length === 0) return IT_PROJECT_PHASES;
+  const set = new Set(phasesActives as string[]);
+  return IT_PROJECT_PHASES.filter(p => set.has(p.value));
+}
 
 export const IT_PHASE_BADGE_CONFIG: Record<ITProjectPhase, { label: string; className: string }> = {
   cadrage: { label: 'Cadrage', className: 'bg-slate-500/10 text-slate-600 border-slate-500/20' },

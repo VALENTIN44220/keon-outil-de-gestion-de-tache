@@ -1598,6 +1598,7 @@ export type Database = {
           membres_ids: string[] | null
           nom_projet: string
           phase_courante: string | null
+          phases_actives: Json | null
           pilier: string | null
           priorite: string | null
           progress: number | null
@@ -1637,6 +1638,7 @@ export type Database = {
           membres_ids?: string[] | null
           nom_projet: string
           phase_courante?: string | null
+          phases_actives?: Json | null
           pilier?: string | null
           priorite?: string | null
           progress?: number | null
@@ -1676,6 +1678,7 @@ export type Database = {
           membres_ids?: string[] | null
           nom_projet?: string
           phase_courante?: string | null
+          phases_actives?: Json | null
           pilier?: string | null
           priorite?: string | null
           progress?: number | null

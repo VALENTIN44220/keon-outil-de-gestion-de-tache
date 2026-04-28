@@ -30,7 +30,7 @@ import { cn } from '@/lib/utils';
 import {
   IT_PROJECT_TYPE_CONFIG, IT_PROJECT_PHASES, IT_PROJECT_STATUS_CONFIG,
   STATUT_FDR_CONFIG, FDR_ETAPES, StatutFDR, ITProjectFDRValidation,
-  IT_PHASE_BADGE_CONFIG, ITProjectPhase
+  IT_PHASE_BADGE_CONFIG, ITProjectPhase, getActivePhases
 } from '@/types/itProject';
 import { ITProjectFormDialog } from '@/components/it/ITProjectFormDialog';
 import { ITPhaseAssignDialog } from '@/components/it/ITPhaseAssignDialog';
@@ -60,10 +60,16 @@ export default function ITProjectHubOverview() {
     supabase.from('profiles').select('id, display_name').eq('status', 'active').order('display_name').then(({ data }) => setAllProfiles(data || []));
   }, []);
 
+  // Phases activées pour ce projet (sous-ensemble des 5 phases standard)
+  const activePhases = useMemo(
+    () => getActivePhases(project?.phases_actives as ITProjectPhase[] | null | undefined),
+    [project?.phases_actives],
+  );
+
   // Compute effective progress per phase (auto or manual)
   const phaseProgressValues = useMemo(() => {
     const values: Record<string, number> = {};
-    for (const phase of IT_PROJECT_PHASES) {
+    for (const phase of activePhases) {
       const record = phaseProgressMap.get(phase.value);
       if (record && record.advancement_mode === 'manual' && record.manual_progress != null) {
         values[phase.value] = record.manual_progress;
@@ -75,13 +81,14 @@ export default function ITProjectHubOverview() {
       }
     }
     return values;
-  }, [tasks, phaseProgressMap]);
+  }, [tasks, phaseProgressMap, activePhases]);
 
   // Weighted global progress (equal weight per phase)
   const globalProgress = useMemo(() => {
-    const sum = IT_PROJECT_PHASES.reduce((acc, p) => acc + (phaseProgressValues[p.value] || 0), 0);
-    return Math.round(sum / IT_PROJECT_PHASES.length);
-  }, [phaseProgressValues]);
+    if (activePhases.length === 0) return 0;
+    const sum = activePhases.reduce((acc, p) => acc + (phaseProgressValues[p.value] || 0), 0);
+    return Math.round(sum / activePhases.length);
+  }, [phaseProgressValues, activePhases]);
 
   if (isLoading) {
     return (
@@ -104,7 +111,7 @@ export default function ITProjectHubOverview() {
   }
 
   const typeConfig = project.type_projet ? IT_PROJECT_TYPE_CONFIG[project.type_projet] : null;
-  const currentPhaseIndex = IT_PROJECT_PHASES.findIndex(p => p.value === project.phase_courante);
+  const currentPhaseIndex = activePhases.findIndex(p => p.value === project.phase_courante);
   const statutFdr = (project.statut_fdr as StatutFDR) || null;
   const fdrConfig = statutFdr ? STATUT_FDR_CONFIG[statutFdr] : null;
 
@@ -268,7 +275,7 @@ export default function ITProjectHubOverview() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-0">
-                    {IT_PROJECT_PHASES.map((phase, idx) => {
+                    {activePhases.map((phase, idx) => {
                       const milestone = milestones.find(m => m.phase === phase.value);
                       const phaseTasks = tasks.filter(t => t.it_project_phase === phase.value);
                       const totalPhase = phaseTasks.length;
@@ -310,7 +317,7 @@ export default function ITProjectHubOverview() {
                             )}>
                               {isDone ? <CheckCircle2 className="h-4 w-4" /> : phase.order}
                             </div>
-                            {idx < IT_PROJECT_PHASES.length - 1 && (
+                            {idx < activePhases.length - 1 && (
                               <div className={cn(
                                 'w-0.5 flex-1 min-h-[24px]',
                                 idx < currentPhaseIndex ? 'bg-violet-600' : 'bg-border'
@@ -396,10 +403,10 @@ export default function ITProjectHubOverview() {
                                   currentRecord={phaseRecord || null}
                                   onSave={async (mode, value) => {
                                     await upsertPhaseProgress(phase.value, mode, value);
-                                    // Update global project progress
+                                    // Update global project progress (sur les phases actives uniquement)
                                     const newValues = { ...phaseProgressValues, [phase.value]: mode === 'manual' ? (value ?? 0) : autoProgress };
-                                    const sum = IT_PROJECT_PHASES.reduce((acc, p) => acc + (newValues[p.value] || 0), 0);
-                                    const newGlobal = Math.round(sum / IT_PROJECT_PHASES.length);
+                                    const sum = activePhases.reduce((acc, p) => acc + (newValues[p.value] || 0), 0);
+                                    const newGlobal = activePhases.length > 0 ? Math.round(sum / activePhases.length) : 0;
                                     await supabase.from('it_projects').update({ progress: newGlobal }).eq('id', project.id);
                                     refetch();
                                     toast.success(`Avancement de la phase ${phase.label} mis à jour (${mode === 'manual' ? value : autoProgress}%)`);
