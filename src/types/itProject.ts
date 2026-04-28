@@ -156,6 +156,26 @@ export interface ITProjectMilestone {
   updated_at: string;
 }
 
+/**
+ * Lien N<->N entre un jalon de projet IT et un evenement Outlook.
+ * On stocke un snapshot (subject / start_time / ...) au moment du lien
+ * pour pouvoir afficher l'info sur le jalon meme si l'utilisateur courant
+ * n'a pas l'evenement dans son cache personnel outlook_calendar_events.
+ */
+export interface ITMilestoneCalendarLink {
+  id: string;
+  it_project_milestone_id: string;
+  outlook_event_id: string;
+  subject: string;
+  start_time: string;
+  end_time: string;
+  location?: string | null;
+  organizer_email?: string | null;
+  created_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ITProjectSyncLog {
   id: string;
   it_project_id: string;

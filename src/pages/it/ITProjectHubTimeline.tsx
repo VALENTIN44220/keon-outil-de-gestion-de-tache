@@ -2,19 +2,20 @@ import { useMemo, useState } from 'react';
 import { useITProjectHubCode } from '@/hooks/useITProjectHubCode';
 import { Layout } from '@/components/layout/Layout';
 import { ITProjectHubHeader } from '@/components/it/ITProjectHubHeader';
-import { useITProject, useITProjectTasks, useITProjectStats, useITProjectMilestones } from '@/hooks/useITProjectHub';
+import { useITProject, useITProjectTasks, useITProjectStats, useITProjectMilestones, useITMilestoneCalendarLinks } from '@/hooks/useITProjectHub';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Calendar, Milestone, ListTodo, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Calendar, Milestone, ListTodo, Plus, Pencil, Trash2, CalendarClock, X } from 'lucide-react';
 import { format, differenceInDays, min, max, addDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { ITMilestoneDialog } from '@/components/it/ITMilestoneDialog';
+import { ITMilestoneLinkEventDialog } from '@/components/it/ITMilestoneLinkEventDialog';
 import type { ITProjectMilestone, MilestoneStatus } from '@/types/itProject';
 
 interface TimelineItem {
@@ -60,8 +61,12 @@ export default function ITProjectHubTimeline() {
   const { data: milestones = [], addMilestone, updateMilestone, deleteMilestone } = useITProjectMilestones(project?.id);
   const stats = useITProjectStats(tasks, project);
 
+  const milestoneIds = useMemo(() => milestones.map(m => m.id), [milestones]);
+  const { data: linksByMilestone = new Map(), addLink, removeLink } = useITMilestoneCalendarLinks(milestoneIds);
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingMilestone, setEditingMilestone] = useState<ITProjectMilestone | null>(null);
+  const [linkingMilestone, setLinkingMilestone] = useState<ITProjectMilestone | null>(null);
 
   const timelineItems = useMemo((): TimelineItem[] => {
     const items: TimelineItem[] = [];
@@ -214,10 +219,11 @@ export default function ITProjectHubTimeline() {
                 <div className="space-y-2">
                   {milestones.map(m => {
                     const stConf = MILESTONE_STATUS_LABELS[m.statut] || { label: m.statut, className: '' };
+                    const eventLinks = linksByMilestone.get(m.id) || [];
                     return (
-                      <div key={m.id} className="flex items-center gap-3 p-3 rounded-lg border border-border/50 hover:bg-muted/30 transition-colors group">
+                      <div key={m.id} className="flex items-start gap-3 p-3 rounded-lg border border-border/50 hover:bg-muted/30 transition-colors group">
                         {/* Diamond icon */}
-                        <span className="text-violet-500 text-lg flex-shrink-0">◆</span>
+                        <span className="text-violet-500 text-lg flex-shrink-0 mt-0.5">◆</span>
 
                         {/* Info */}
                         <div className="flex-1 min-w-0">
@@ -237,6 +243,39 @@ export default function ITProjectHubTimeline() {
                               <span className="text-[11px] text-muted-foreground italic">Pas de date</span>
                             )}
                           </div>
+                          {/* Liens evenement Outlook */}
+                          {eventLinks.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                              {eventLinks.map(lk => (
+                                <Badge
+                                  key={lk.id}
+                                  variant="outline"
+                                  className="gap-1 text-[10px] font-normal pl-1.5 pr-1 py-0.5 bg-violet-50 border-violet-200 text-violet-700 dark:bg-violet-950/20 dark:border-violet-800 dark:text-violet-300"
+                                >
+                                  <CalendarClock className="h-3 w-3" />
+                                  <span className="truncate max-w-[200px]">{lk.subject}</span>
+                                  <span className="text-violet-500/70">
+                                    · {format(new Date(lk.start_time), 'dd/MM HH:mm', { locale: fr })}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    aria-label="Délier"
+                                    className="ml-0.5 p-0.5 rounded hover:bg-violet-100 dark:hover:bg-violet-900/40"
+                                    onClick={async () => {
+                                      try {
+                                        await removeLink(lk.id);
+                                        toast.success('Évènement délié');
+                                      } catch (e: any) {
+                                        toast.error('Erreur : ' + e.message);
+                                      }
+                                    }}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
                         </div>
 
                         {/* Inline status select */}
@@ -253,6 +292,15 @@ export default function ITProjectHubTimeline() {
 
                         {/* Actions */}
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            title="Lier un évènement Outlook"
+                            onClick={() => setLinkingMilestone(m)}
+                          >
+                            <CalendarClock className="h-3.5 w-3.5" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="icon"
@@ -397,6 +445,24 @@ export default function ITProjectHubTimeline() {
             milestone={editingMilestone}
             nextOrdre={nextOrdre}
             onSave={handleSaveMilestone}
+          />
+        )}
+
+        {/* Link Outlook event dialog */}
+        {linkingMilestone && (
+          <ITMilestoneLinkEventDialog
+            open={!!linkingMilestone}
+            onOpenChange={(o) => { if (!o) setLinkingMilestone(null); }}
+            milestone={linkingMilestone}
+            existingLinks={linksByMilestone.get(linkingMilestone.id) || []}
+            onLink={async (snapshot) => {
+              try {
+                await addLink(linkingMilestone.id, snapshot);
+                toast.success('Évènement lié au jalon');
+              } catch (e: any) {
+                toast.error('Erreur : ' + e.message);
+              }
+            }}
           />
         )}
       </div>
