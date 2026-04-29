@@ -1,7 +1,15 @@
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Pencil, ChevronRight, Receipt, ReceiptText, TrendingUp, TrendingDown } from 'lucide-react';
+import {
+  Pencil,
+  Trash2,
+  ChevronRight,
+  Receipt,
+  ReceiptText,
+  TrendingUp,
+  TrendingDown,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   BEAffaire,
@@ -17,9 +25,10 @@ interface BEAffaireCardProps {
   kpi?: BEAffaireBudgetKPI;
   onSelect: () => void;
   onEdit: () => void;
+  onDelete?: () => void;
 }
 
-export function BEAffaireCard({ affaire, kpi, onSelect, onEdit }: BEAffaireCardProps) {
+export function BEAffaireCard({ affaire, kpi, onSelect, onEdit, onDelete }: BEAffaireCardProps) {
   const statusCfg = BE_AFFAIRE_STATUS_CONFIG[affaire.status];
   const caConstate = kpi?.ca_constate_brut ?? 0;
   const cogsConstate = kpi?.cogs_constate_brut ?? 0;
@@ -59,6 +68,20 @@ export function BEAffaireCard({ affaire, kpi, onSelect, onEdit }: BEAffaireCardP
             >
               <Pencil className="h-3.5 w-3.5" />
             </Button>
+            {onDelete && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
+                title="Supprimer"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
           </div>
         </div>

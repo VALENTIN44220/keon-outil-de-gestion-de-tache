@@ -166,6 +166,67 @@ export function useBEAffaireById(affaireId: string | undefined) {
   });
 }
 
+export interface BEDivaltoAvailableAffaire {
+  code_affaire: string;
+  nb_pieces: number;
+  total_ht: number;
+  /** True si une affaire existe deja avec ce code dans be_affaires. */
+  already_used: boolean;
+}
+
+/**
+ * Suggere des code_affaire issus de be_divalto_mouvements qui correspondent
+ * au projet courant (chars 2-5 du code_affaire = code_projet en 4 lettres).
+ * Pratique pour la creation d'une affaire : on propose tous les codes
+ * Divalto deja imputes au projet, avec leur volume.
+ */
+export function useBEDivaltoAvailableAffaires(
+  projectCode: string | null | undefined,
+  existingAffaireCodes: string[] = [],
+) {
+  const projectCodeUpper = projectCode?.trim().toUpperCase() ?? '';
+  const usable = projectCodeUpper.length === 4;
+
+  return useQuery({
+    queryKey: ['be-divalto-available-affaires', projectCodeUpper],
+    queryFn: async (): Promise<BEDivaltoAvailableAffaire[]> => {
+      if (!usable) return [];
+
+      // On filtre Divalto : code_affaire dont chars 2-5 = projectCode (case-insensitive)
+      // On limite a 100 codes distincts max - amplement suffisant.
+      const { data, error } = await sb
+        .from('be_divalto_mouvements')
+        .select('code_affaire, montant_ht')
+        .ilike('code_affaire', `_${projectCodeUpper}%`)
+        .not('code_affaire', 'is', null);
+      if (error) throw error;
+
+      // Agrege en memoire (Postgrest gratuit n'aime pas le GROUP BY natif)
+      const byCode = new Map<string, { nb: number; ht: number }>();
+      for (const row of (data ?? []) as { code_affaire: string; montant_ht: number | null }[]) {
+        const key = row.code_affaire.trim();
+        const cur = byCode.get(key) ?? { nb: 0, ht: 0 };
+        cur.nb += 1;
+        cur.ht += row.montant_ht ?? 0;
+        byCode.set(key, cur);
+      }
+
+      const usedSet = new Set(existingAffaireCodes.map(c => c.trim().toUpperCase()));
+      const result: BEDivaltoAvailableAffaire[] = Array.from(byCode.entries())
+        .map(([code_affaire, { nb, ht }]) => ({
+          code_affaire,
+          nb_pieces: nb,
+          total_ht: ht,
+          already_used: usedSet.has(code_affaire.toUpperCase()),
+        }))
+        .sort((a, b) => b.total_ht - a.total_ht);
+
+      return result;
+    },
+    enabled: usable,
+  });
+}
+
 /**
  * Verifie si un code_affaire est deja utilise (UNIQUE en base).
  * Usage : validation cote dialog de creation pour eviter le 23505.
