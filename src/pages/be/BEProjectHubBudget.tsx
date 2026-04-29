@@ -7,7 +7,19 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Search, Building2 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Plus, Search, Building2, Loader2 } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
+import { extractErrorMessage } from '@/lib/extractErrorMessage';
 import { BEBudgetKpiCards } from '@/components/be/budget/BEBudgetKpiCards';
 import { BEAffaireCard } from '@/components/be/budget/BEAffaireCard';
 import { BEAffaireDialog } from '@/components/be/budget/BEAffaireDialog';
@@ -17,12 +29,18 @@ import type { BEAffaire } from '@/types/beAffaire';
 export default function BEProjectHubBudget() {
   const code = useBEProjectHubCode();
   const { data: project, isLoading: projectLoading } = useBEProjectByCode(code);
-  const { affaires, kpisByAffaireId, isLoading: affairesLoading } = useBEAffaires(project?.id);
+  const {
+    affaires,
+    kpisByAffaireId,
+    isLoading: affairesLoading,
+    deleteAffaire,
+  } = useBEAffaires(project?.id);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [editingAffaire, setEditingAffaire] = useState<BEAffaire | null>(null);
   const [selectedAffaire, setSelectedAffaire] = useState<BEAffaire | null>(null);
+  const [deletingAffaire, setDeletingAffaire] = useState<BEAffaire | null>(null);
 
   // KPIs projet = somme des affaires (split CA / COGS / Marge)
   const projectKpis = useMemo(() => {
@@ -53,15 +71,37 @@ export default function BEProjectHubBudget() {
     );
   }, [affaires, searchQuery]);
 
-  // Code projet attendu (chars 2-5 de tout code_affaire de ce projet)
-  // Heuristique : on prend les 4 chars de la 1re affaire si dispo,
-  // sinon on tente de deriver depuis project.code_projet (ex: 'NSK_PROJ-DOLE-...').
+  // Code projet attendu (chars 2-5 d'un code_affaire). Priorite :
+  //  1. project.code_projet si exactement 4 chars (cas standard ex. 'VINZ')
+  //  2. Chars 2-5 de la 1re affaire existante (fallback)
   const expectedProjectCode = useMemo(() => {
+    const cp = project?.code_projet?.trim().toUpperCase() ?? '';
+    if (cp.length === 4) return cp;
     if (affaires[0]?.code_affaire && affaires[0].code_affaire.length >= 5) {
       return affaires[0].code_affaire.substring(1, 5).toUpperCase();
     }
     return null;
-  }, [affaires]);
+  }, [project?.code_projet, affaires]);
+
+  const existingAffaireCodes = useMemo(
+    () => affaires.map((a) => a.code_affaire),
+    [affaires],
+  );
+
+  const handleConfirmDelete = async () => {
+    if (!deletingAffaire) return;
+    try {
+      await deleteAffaire.mutateAsync(deletingAffaire.id);
+      toast({ title: 'Affaire supprimée' });
+      setDeletingAffaire(null);
+    } catch (e) {
+      toast({
+        title: 'Erreur',
+        description: extractErrorMessage(e),
+        variant: 'destructive',
+      });
+    }
+  };
 
   if (projectLoading) {
     return (
@@ -157,6 +197,7 @@ export default function BEProjectHubBudget() {
                 kpi={kpisByAffaireId.get(a.id)}
                 onSelect={() => setSelectedAffaire(a)}
                 onEdit={() => setEditingAffaire(a)}
+                onDelete={() => setDeletingAffaire(a)}
               />
             ))}
           </div>
@@ -169,12 +210,14 @@ export default function BEProjectHubBudget() {
         onOpenChange={setCreateOpen}
         beProjectId={project.id}
         expectedProjectCode={expectedProjectCode}
+        existingAffaireCodes={existingAffaireCodes}
       />
       <BEAffaireDialog
         open={!!editingAffaire}
         onOpenChange={(o) => !o && setEditingAffaire(null)}
         beProjectId={project.id}
         expectedProjectCode={expectedProjectCode}
+        existingAffaireCodes={existingAffaireCodes}
         affaire={editingAffaire}
       />
 
@@ -186,6 +229,41 @@ export default function BEProjectHubBudget() {
           setEditingAffaire(a);
         }}
       />
+
+      {/* Confirmation delete */}
+      <AlertDialog
+        open={!!deletingAffaire}
+        onOpenChange={(o) => !o && setDeletingAffaire(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer cette affaire ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deletingAffaire && (
+                <>
+                  L'affaire <code className="font-mono font-semibold">{deletingAffaire.code_affaire}</code>
+                  {deletingAffaire.libelle ? ` (${deletingAffaire.libelle})` : ''} sera supprimée
+                  ainsi que toutes ses lignes budgétaires et leurs liens vers les pièces Divalto.
+                  <br />
+                  <span className="text-foreground font-medium">Les pièces Divalto elles-mêmes restent intactes.</span>
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {deleteAffaire.isPending && (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              )}
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </BEProjectHubLayout>
   );
 }

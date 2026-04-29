@@ -19,10 +19,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Loader2, AlertCircle, CheckCircle2, Sparkles } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { extractErrorMessage } from '@/lib/extractErrorMessage';
-import { useBEAffaires, useBEAffaireCodeIsAvailable } from '@/hooks/useBEAffaires';
+import {
+  useBEAffaires,
+  useBEAffaireCodeIsAvailable,
+  useBEDivaltoAvailableAffaires,
+} from '@/hooks/useBEAffaires';
 import {
   BEAffaire,
   BEAffaireStatus,
@@ -30,12 +34,17 @@ import {
   extractProjectCodeFromAffaire,
 } from '@/types/beAffaire';
 
+const eur = (n: number) =>
+  n.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
+
 interface BEAffaireDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   beProjectId: string;
   /** Code projet (chars 2-5 du code_affaire), pour validation UX. Optionnel. */
   expectedProjectCode?: string | null;
+  /** Codes d'affaires deja existantes pour ce projet (pour griser dans les suggestions). */
+  existingAffaireCodes?: string[];
   /** Si fourni : edition d'une affaire existante. Sinon : creation. */
   affaire?: BEAffaire | null;
 }
@@ -45,10 +54,15 @@ export function BEAffaireDialog({
   onOpenChange,
   beProjectId,
   expectedProjectCode,
+  existingAffaireCodes = [],
   affaire,
 }: BEAffaireDialogProps) {
   const isEdit = !!affaire;
   const { createAffaire, updateAffaire } = useBEAffaires(beProjectId);
+
+  // Suggestions Divalto : codes deja imputes au projet courant
+  const { data: suggestions = [], isFetching: loadingSuggestions } =
+    useBEDivaltoAvailableAffaires(expectedProjectCode, existingAffaireCodes);
 
   const [codeAffaire, setCodeAffaire] = useState('');
   const [libelle, setLibelle] = useState('');
@@ -151,6 +165,50 @@ export function BEAffaireDialog({
               className="font-mono uppercase"
               autoComplete="off"
             />
+
+            {/* Suggestions Divalto pour le projet courant */}
+            {!isEdit && expectedProjectCode && (
+              <div className="rounded-md border bg-muted/30 p-2.5 space-y-1.5">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                  <span>
+                    {loadingSuggestions
+                      ? 'Recherche des codes Divalto…'
+                      : suggestions.length > 0
+                      ? `${suggestions.length} code${suggestions.length > 1 ? 's' : ''} Divalto trouvé${suggestions.length > 1 ? 's' : ''} pour ${expectedProjectCode}`
+                      : `Aucun code Divalto pour ${expectedProjectCode}`}
+                  </span>
+                </div>
+
+                {suggestions.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
+                    {suggestions.slice(0, 30).map((s) => (
+                      <button
+                        key={s.code_affaire}
+                        type="button"
+                        disabled={s.already_used}
+                        onClick={() => setCodeAffaire(s.code_affaire.toUpperCase())}
+                        className={
+                          s.already_used
+                            ? 'inline-flex items-center gap-1 text-[11px] font-mono px-2 py-1 rounded bg-muted/50 text-muted-foreground/60 line-through cursor-not-allowed border border-dashed'
+                            : 'inline-flex items-center gap-1 text-[11px] font-mono px-2 py-1 rounded bg-background hover:bg-primary/10 hover:border-primary/40 border border-border transition-colors cursor-pointer'
+                        }
+                        title={
+                          s.already_used
+                            ? `Déjà utilisé · ${s.nb_pieces} pièces · ${eur(s.total_ht)}`
+                            : `${s.nb_pieces} pièces · ${eur(s.total_ht)}`
+                        }
+                      >
+                        <span className="font-semibold">{s.code_affaire}</span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {eur(s.total_ht)}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Indicateurs */}
             <div className="flex items-center gap-3 text-xs min-h-[20px]">
