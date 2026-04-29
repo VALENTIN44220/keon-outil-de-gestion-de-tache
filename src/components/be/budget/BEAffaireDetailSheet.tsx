@@ -38,6 +38,10 @@ import {
   TrendingUp,
   TrendingDown,
   Loader2,
+  Clock,
+  CalendarDays,
+  CalendarCheck,
+  Coins,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
@@ -49,8 +53,11 @@ import {
   BE_BUDGET_LINE_STATUT_CONFIG,
 } from '@/types/beAffaire';
 import { useBEAffaireBudget } from '@/hooks/useBEAffaireBudget';
+import { useBEAffaireTemps } from '@/hooks/useBEAffaireTemps';
 import { BEBudgetLineDialog } from './BEBudgetLineDialog';
 import { BEBudgetRapprochementPanel } from './BEBudgetRapprochementPanel';
+import { BETempsBudgetDialog } from './BETempsBudgetDialog';
+import { BE_POSTE_ICON, BE_POSTE_LABEL } from '@/types/beTemps';
 
 const eur = (n: number | null | undefined) =>
   (n ?? 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
@@ -71,11 +78,13 @@ export function BEAffaireDetailSheet({
   const codeAffaire = affaire?.code_affaire ?? null;
 
   const { lines, linesLoading, kpis, deleteLine } = useBEAffaireBudget(affaireId);
+  const { budgetLines: tempsBudgetLines, kpi: tempsKpi } = useBEAffaireTemps(affaireId);
 
   const [lineDialogOpen, setLineDialogOpen] = useState(false);
   const [editingLine, setEditingLine] = useState<BEAffaireBudgetLine | null>(null);
   const [expandedLineId, setExpandedLineId] = useState<string | null>(null);
   const [deletingLineId, setDeletingLineId] = useState<string | null>(null);
+  const [tempsDialogOpen, setTempsDialogOpen] = useState(false);
 
   const handleEdit = (line: BEAffaireBudgetLine) => {
     setEditingLine(line);
@@ -189,6 +198,84 @@ export function BEAffaireDetailSheet({
                 )}
               </SheetHeader>
 
+              {/* Section Temps & RH */}
+              <div className="mt-6 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    Temps & RH
+                  </h3>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setTempsDialogOpen(true)}
+                    className="gap-1.5"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                    Saisir le budget temps
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <KpiMini
+                    label="Budgété"
+                    value={`${(tempsKpi?.jours_budgetes ?? 0).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} j`}
+                    icon={CalendarDays}
+                    accent="text-slate-600"
+                    hint={tempsKpi?.cout_rh_budgete ? eur(tempsKpi.cout_rh_budgete) : undefined}
+                  />
+                  <KpiMini
+                    label="Planifié"
+                    value={`${(tempsKpi?.jours_planifies ?? 0).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} j`}
+                    icon={CalendarCheck}
+                    accent="text-blue-600"
+                    hint={tempsKpi?.cout_rh_planifie ? eur(tempsKpi.cout_rh_planifie) : undefined}
+                  />
+                  <KpiMini
+                    label="Déclaré"
+                    value={`${(tempsKpi?.jours_declares ?? 0).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} j`}
+                    icon={Clock}
+                    accent="text-emerald-600"
+                    hint={
+                      tempsKpi?.heures_declarees
+                        ? `${tempsKpi.heures_declarees.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} h`
+                        : undefined
+                    }
+                  />
+                  <KpiMini
+                    label="Coût RH déclaré"
+                    value={eur(tempsKpi?.cout_rh_declare ?? 0)}
+                    icon={Coins}
+                    accent="text-amber-600"
+                  />
+                </div>
+
+                {tempsBudgetLines.length > 0 && (
+                  <div className="rounded-lg border bg-muted/10 p-2">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-1.5 px-1">
+                      Ventilation budget temps par poste
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1">
+                      {tempsBudgetLines.map((b) => (
+                        <div
+                          key={b.id}
+                          className="flex items-center justify-between text-xs px-1 py-0.5"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <span>{BE_POSTE_ICON[b.poste]}</span>
+                            <span className="text-muted-foreground">{BE_POSTE_LABEL[b.poste]}</span>
+                          </span>
+                          <span className="font-semibold tabular-nums">
+                            {b.jours_budgetes.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} j
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Lignes budgetaires */}
               <div className="mt-6 space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold">
@@ -332,6 +419,15 @@ export function BEAffaireDetailSheet({
           onOpenChange={setLineDialogOpen}
           affaireId={affaireId}
           line={editingLine}
+        />
+      )}
+
+      {affaireId && codeAffaire && (
+        <BETempsBudgetDialog
+          open={tempsDialogOpen}
+          onOpenChange={setTempsDialogOpen}
+          affaireId={affaireId}
+          codeAffaire={codeAffaire}
         />
       )}
 
