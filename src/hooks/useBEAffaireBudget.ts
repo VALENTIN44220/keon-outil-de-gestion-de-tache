@@ -10,10 +10,20 @@ const sb = supabase as any;
 export interface BEAffaireBudgetKPIs {
   budget_initial: number;
   budget_revise: number;
-  /** Total HT engage (somme des CCN/CFK rattachees au code_affaire). */
+  /** Total HT engage (somme CCN+CFN rattachees au code_affaire). */
   engage: number;
-  /** Total HT constate (somme des FCN/FFK rattachees au code_affaire). */
+  /** Total HT constate (somme FCN+FFN rattachees au code_affaire). */
   constate: number;
+  /** CA engage (CCN). */
+  ca_engage: number;
+  /** CA constate (FCN). */
+  ca_constate: number;
+  /** COGS engage (CFN). */
+  cogs_engage: number;
+  /** COGS constate (FFN). */
+  cogs_constate: number;
+  /** Marge constatee = CA constate - COGS constate. */
+  marge_constatee: number;
   reste_a_engager: number;
   reste_a_constater: number;
   taux_consommation: number;
@@ -131,6 +141,11 @@ export function useBEAffaireBudget(affaireId: string | undefined) {
   );
   const engage = raw?.engage_montant_brut ?? 0;
   const constate = raw?.constate_montant_brut ?? 0;
+  const ca_engage = raw?.ca_engage_brut ?? 0;
+  const ca_constate = raw?.ca_constate_brut ?? 0;
+  const cogs_engage = raw?.cogs_engage_brut ?? 0;
+  const cogs_constate = raw?.cogs_constate_brut ?? 0;
+  const marge_constatee = raw?.marge_constatee_brut ?? (ca_constate - cogs_constate);
   const forecast_fin_annee = constate + Math.max(engage - constate, 0);
   const ecart_budget = forecast_fin_annee - budget_revise;
 
@@ -139,6 +154,11 @@ export function useBEAffaireBudget(affaireId: string | undefined) {
     budget_revise,
     engage,
     constate,
+    ca_engage,
+    ca_constate,
+    cogs_engage,
+    cogs_constate,
+    marge_constatee,
     reste_a_engager: budget_revise - engage,
     reste_a_constater: engage - constate,
     taux_consommation: budget_revise > 0 ? Math.round((constate / budget_revise) * 100) : 0,

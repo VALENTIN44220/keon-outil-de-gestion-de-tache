@@ -33,7 +33,9 @@ import {
   ChevronDown,
   ChevronRight,
   Wallet,
-  FileCheck2,
+  Receipt,
+  ReceiptText,
+  TrendingUp,
   TrendingDown,
   Loader2,
 } from 'lucide-react';
@@ -151,27 +153,40 @@ export function BEAffaireDetailSheet({
                   </Button>
                 </div>
 
-                {/* KPIs */}
+                {/* KPIs CA / COGS / Marge */}
                 <div className="grid grid-cols-3 gap-2">
                   <KpiMini
-                    label="Budget"
-                    value={eur(kpis.budget_revise || kpis.budget_initial)}
-                    icon={Wallet}
-                    accent="text-blue-600"
-                  />
-                  <KpiMini
-                    label="Engagé"
-                    value={eur(kpis.engage)}
-                    icon={FileCheck2}
+                    label="CA Constaté"
+                    value={eur(kpis.ca_constate)}
+                    icon={Receipt}
                     accent="text-indigo-600"
+                    hint={kpis.ca_engage > 0 ? `Engagé ${eur(kpis.ca_engage)}` : undefined}
                   />
                   <KpiMini
-                    label="Constaté"
-                    value={eur(kpis.constate)}
-                    icon={TrendingDown}
-                    accent="text-violet-600"
+                    label="COGS Constaté"
+                    value={eur(kpis.cogs_constate)}
+                    icon={ReceiptText}
+                    accent="text-amber-600"
+                    hint={kpis.cogs_engage > 0 ? `Engagé ${eur(kpis.cogs_engage)}` : undefined}
+                  />
+                  <KpiMini
+                    label={kpis.marge_constatee < 0 ? 'Marge négative' : 'Marge Constatée'}
+                    value={eur(kpis.marge_constatee)}
+                    icon={kpis.marge_constatee < 0 ? TrendingDown : TrendingUp}
+                    accent={kpis.marge_constatee < 0 ? 'text-red-600' : 'text-emerald-600'}
+                    hint={
+                      kpis.ca_constate > 0
+                        ? `${Math.round((kpis.marge_constatee / kpis.ca_constate) * 100)}% du CA`
+                        : undefined
+                    }
                   />
                 </div>
+                {kpis.budget_initial > 0 && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Wallet className="h-3.5 w-3.5" />
+                    Budget prévisionnel saisi : <span className="font-semibold tabular-nums text-foreground">{eur(kpis.budget_revise || kpis.budget_initial)}</span>
+                  </div>
+                )}
               </SheetHeader>
 
               <div className="mt-6 space-y-3">
@@ -355,9 +370,10 @@ interface KpiMiniProps {
   value: string;
   icon: React.ElementType;
   accent: string;
+  hint?: string;
 }
 
-function KpiMini({ label, value, icon: Icon, accent }: KpiMiniProps) {
+function KpiMini({ label, value, icon: Icon, accent, hint }: KpiMiniProps) {
   return (
     <div className="rounded-lg border bg-card p-3">
       <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mb-1">
@@ -365,6 +381,7 @@ function KpiMini({ label, value, icon: Icon, accent }: KpiMiniProps) {
         {label}
       </div>
       <p className="text-sm font-bold tabular-nums">{value}</p>
+      {hint && <p className="text-[10px] text-muted-foreground/70 mt-0.5">{hint}</p>}
     </div>
   );
 }
