@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Pencil, ChevronRight, FileText, Receipt } from 'lucide-react';
+import { Pencil, ChevronRight, Receipt, ReceiptText, TrendingUp, TrendingDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   BEAffaire,
@@ -21,8 +21,10 @@ interface BEAffaireCardProps {
 
 export function BEAffaireCard({ affaire, kpi, onSelect, onEdit }: BEAffaireCardProps) {
   const statusCfg = BE_AFFAIRE_STATUS_CONFIG[affaire.status];
-  const engage = kpi?.engage_montant_brut ?? 0;
-  const constate = kpi?.constate_montant_brut ?? 0;
+  const caConstate = kpi?.ca_constate_brut ?? 0;
+  const cogsConstate = kpi?.cogs_constate_brut ?? 0;
+  const marge = kpi?.marge_constatee_brut ?? (caConstate - cogsConstate);
+  const margeNeg = marge < 0;
 
   return (
     <Card
@@ -63,29 +65,61 @@ export function BEAffaireCard({ affaire, kpi, onSelect, onEdit }: BEAffaireCardP
       </CardHeader>
 
       <CardContent className="pt-0 space-y-3">
-        {/* Mini KPIs */}
-        <div className="grid grid-cols-2 gap-2">
+        {/* Mini KPIs CA / COGS / Marge */}
+        <div className="grid grid-cols-3 gap-1.5">
           <div className="rounded-md bg-indigo-500/5 border border-indigo-500/10 p-2">
-            <div className="flex items-center gap-1.5 text-[10px] text-indigo-600/80 mb-0.5">
-              <FileText className="h-3 w-3" />
-              <span>Engagé · {kpi?.nb_commandes ?? 0} CCN</span>
-            </div>
-            <p className="text-sm font-bold tabular-nums text-indigo-700">{eur(engage)}</p>
-          </div>
-          <div className="rounded-md bg-violet-500/5 border border-violet-500/10 p-2">
-            <div className="flex items-center gap-1.5 text-[10px] text-violet-600/80 mb-0.5">
+            <div className="flex items-center gap-1 text-[10px] text-indigo-600/80 mb-0.5">
               <Receipt className="h-3 w-3" />
-              <span>Constaté · {kpi?.nb_factures ?? 0} FCN</span>
+              <span>CA</span>
             </div>
-            <p className="text-sm font-bold tabular-nums text-violet-700">{eur(constate)}</p>
+            <p className="text-xs font-bold tabular-nums text-indigo-700 truncate" title={eur(caConstate)}>
+              {eur(caConstate)}
+            </p>
+          </div>
+          <div className="rounded-md bg-amber-500/5 border border-amber-500/10 p-2">
+            <div className="flex items-center gap-1 text-[10px] text-amber-600/80 mb-0.5">
+              <ReceiptText className="h-3 w-3" />
+              <span>COGS</span>
+            </div>
+            <p className="text-xs font-bold tabular-nums text-amber-700 truncate" title={eur(cogsConstate)}>
+              {eur(cogsConstate)}
+            </p>
+          </div>
+          <div
+            className={cn(
+              'rounded-md border p-2',
+              margeNeg
+                ? 'bg-red-500/5 border-red-500/10'
+                : 'bg-emerald-500/5 border-emerald-500/10',
+            )}
+          >
+            <div
+              className={cn(
+                'flex items-center gap-1 text-[10px] mb-0.5',
+                margeNeg ? 'text-red-600/80' : 'text-emerald-600/80',
+              )}
+            >
+              {margeNeg ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
+              <span>Marge</span>
+            </div>
+            <p
+              className={cn(
+                'text-xs font-bold tabular-nums truncate',
+                margeNeg ? 'text-red-700' : 'text-emerald-700',
+              )}
+              title={eur(marge)}
+            >
+              {eur(marge)}
+            </p>
           </div>
         </div>
 
-        {affaire.date_ouverture && (
-          <p className="text-[11px] text-muted-foreground">
-            Ouverte le {new Date(affaire.date_ouverture).toLocaleDateString('fr-FR')}
-          </p>
-        )}
+        <p className="text-[11px] text-muted-foreground">
+          {(kpi?.nb_commandes ?? 0)} cmd · {(kpi?.nb_factures ?? 0)} fact
+          {affaire.date_ouverture && (
+            <> · ouverte le {new Date(affaire.date_ouverture).toLocaleDateString('fr-FR')}</>
+          )}
+        </p>
       </CardContent>
     </Card>
   );

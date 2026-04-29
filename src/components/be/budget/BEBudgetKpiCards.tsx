@@ -1,17 +1,29 @@
 import { Card, CardContent } from '@/components/ui/card';
-import { Wallet, TrendingDown, FileCheck2, AlertTriangle, ListChecks } from 'lucide-react';
+import {
+  ListChecks,
+  Receipt,
+  ReceiptText,
+  TrendingDown,
+  TrendingUp,
+  Wallet,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const eur = (n: number) =>
   n.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
 
 interface BEBudgetKpiCardsProps {
-  budget: number;
-  engage: number;
-  constate: number;
   nbAffaires: number;
-  /** Si fourni : ratio (constate/budget) en %. */
-  tauxConsommation?: number;
+  /** CA engage = somme CCN (commandes client). */
+  caEngage: number;
+  /** CA constate = somme FCN (factures client). */
+  caConstate: number;
+  /** COGS engage = somme CFN (commandes fournisseur). */
+  cogsEngage?: number;
+  /** COGS constate = somme FFN (factures fournisseur). */
+  cogsConstate: number;
+  /** Marge constatee = CA constate - COGS constate. */
+  margeConstatee: number;
 }
 
 interface KpiProps {
@@ -20,11 +32,12 @@ interface KpiProps {
   icon: React.ElementType;
   accent: string;
   hint?: string;
+  emphasis?: boolean;
 }
 
-function Kpi({ label, value, icon: Icon, accent, hint }: KpiProps) {
+function Kpi({ label, value, icon: Icon, accent, hint, emphasis }: KpiProps) {
   return (
-    <Card className="border-border/50">
+    <Card className={cn('border-border/50', emphasis && 'border-primary/30 bg-primary/[0.02]')}>
       <CardContent className="p-4 flex items-center gap-3">
         <div className={cn('p-2.5 rounded-lg', accent)}>
           <Icon className="h-5 w-5" />
@@ -42,14 +55,17 @@ function Kpi({ label, value, icon: Icon, accent, hint }: KpiProps) {
 }
 
 export function BEBudgetKpiCards({
-  budget,
-  engage,
-  constate,
   nbAffaires,
-  tauxConsommation,
+  caEngage,
+  caConstate,
+  cogsConstate,
+  margeConstatee,
 }: BEBudgetKpiCardsProps) {
-  const reste = budget - constate;
-  const enDepassement = constate > budget && budget > 0;
+  // Carnet de commandes = CA engage non encore facture (= CCN - FCN)
+  const carnet = Math.max(caEngage - caConstate, 0);
+  // Taux de marge constatee
+  const tauxMarge = caConstate > 0 ? Math.round((margeConstatee / caConstate) * 100) : null;
+  const margeNegative = margeConstatee < 0;
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -60,33 +76,35 @@ export function BEBudgetKpiCards({
         accent="bg-slate-500/10 text-slate-600"
       />
       <Kpi
-        label="Budget total"
-        value={eur(budget)}
+        label="CA Engagé"
+        value={eur(caEngage)}
         icon={Wallet}
         accent="bg-blue-500/10 text-blue-600"
+        hint={carnet > 0 ? `Carnet : ${eur(carnet)}` : undefined}
       />
       <Kpi
-        label="Engagé (CCN)"
-        value={eur(engage)}
-        icon={FileCheck2}
+        label="CA Constaté"
+        value={eur(caConstate)}
+        icon={Receipt}
         accent="bg-indigo-500/10 text-indigo-600"
       />
       <Kpi
-        label="Constaté (FCN)"
-        value={eur(constate)}
-        icon={TrendingDown}
-        accent="bg-violet-500/10 text-violet-600"
-        hint={tauxConsommation != null ? `${tauxConsommation}% du budget` : undefined}
+        label="COGS Constaté"
+        value={eur(cogsConstate)}
+        icon={ReceiptText}
+        accent="bg-amber-500/10 text-amber-600"
       />
       <Kpi
-        label={enDepassement ? 'Dépassement' : 'Reste'}
-        value={eur(Math.abs(reste))}
-        icon={AlertTriangle}
+        label={margeNegative ? 'Marge négative' : 'Marge Constatée'}
+        value={eur(margeConstatee)}
+        icon={margeNegative ? TrendingDown : TrendingUp}
         accent={
-          enDepassement
+          margeNegative
             ? 'bg-red-500/10 text-red-600'
             : 'bg-emerald-500/10 text-emerald-600'
         }
+        hint={tauxMarge != null ? `${tauxMarge}% du CA` : undefined}
+        emphasis
       />
     </div>
   );

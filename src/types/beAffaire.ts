@@ -118,7 +118,19 @@ export interface BEAffaireBudgetKPI {
   code_affaire: string;
   affaire_libelle: string | null;
   affaire_status: BEAffaireStatus;
+  /** CA client engage (commandes CCN). */
+  ca_engage_brut: number;
+  /** CA client constate (factures FCN). */
+  ca_constate_brut: number;
+  /** COGS fournisseur engage (commandes CFN). */
+  cogs_engage_brut: number;
+  /** COGS fournisseur constate (factures FFN). */
+  cogs_constate_brut: number;
+  /** Marge constatee = CA constate - COGS constate. */
+  marge_constatee_brut: number;
+  /** Compat retro : somme commandes (CCN+CFN). */
   engage_montant_brut: number;
+  /** Compat retro : somme factures (FCN+FFN). */
   constate_montant_brut: number;
   nb_commandes: number;
   nb_factures: number;
@@ -129,6 +141,11 @@ export interface BEProjectBudgetKPI {
   be_project_id: string;
   code_projet: string;
   nb_affaires: number;
+  ca_engage_brut: number;
+  ca_constate_brut: number;
+  cogs_engage_brut: number;
+  cogs_constate_brut: number;
+  marge_constatee_brut: number;
   engage_montant_brut: number;
   constate_montant_brut: number;
   nb_commandes: number;

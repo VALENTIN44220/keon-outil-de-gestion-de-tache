@@ -24,17 +24,23 @@ export default function BEProjectHubBudget() {
   const [editingAffaire, setEditingAffaire] = useState<BEAffaire | null>(null);
   const [selectedAffaire, setSelectedAffaire] = useState<BEAffaire | null>(null);
 
-  // KPIs projet = somme des affaires
+  // KPIs projet = somme des affaires (split CA / COGS / Marge)
   const projectKpis = useMemo(() => {
-    let budget = 0;
-    let engage = 0;
-    let constate = 0;
+    let caEngage = 0;
+    let caConstate = 0;
+    let cogsEngage = 0;
+    let cogsConstate = 0;
+    let margeConstatee = 0;
     for (const a of affaires) {
       const k = kpisByAffaireId.get(a.id);
-      engage += k?.engage_montant_brut ?? 0;
-      constate += k?.constate_montant_brut ?? 0;
+      caEngage      += k?.ca_engage_brut       ?? 0;
+      caConstate    += k?.ca_constate_brut     ?? 0;
+      cogsEngage    += k?.cogs_engage_brut     ?? 0;
+      cogsConstate  += k?.cogs_constate_brut   ?? 0;
+      margeConstatee += k?.marge_constatee_brut
+        ?? ((k?.ca_constate_brut ?? 0) - (k?.cogs_constate_brut ?? 0));
     }
-    return { budget, engage, constate };
+    return { caEngage, caConstate, cogsEngage, cogsConstate, margeConstatee };
   }, [affaires, kpisByAffaireId]);
 
   const filteredAffaires = useMemo(() => {
@@ -86,10 +92,12 @@ export default function BEProjectHubBudget() {
       <div className="space-y-4">
         {/* KPIs projet */}
         <BEBudgetKpiCards
-          budget={projectKpis.budget}
-          engage={projectKpis.engage}
-          constate={projectKpis.constate}
           nbAffaires={affaires.length}
+          caEngage={projectKpis.caEngage}
+          caConstate={projectKpis.caConstate}
+          cogsEngage={projectKpis.cogsEngage}
+          cogsConstate={projectKpis.cogsConstate}
+          margeConstatee={projectKpis.margeConstatee}
         />
 
         {/* Toolbar */}
