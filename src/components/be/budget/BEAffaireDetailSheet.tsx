@@ -244,10 +244,10 @@ export function BEAffaireDetailSheet({
                     }
                   />
                 </div>
-                {kpis.budget_initial > 0 && (
+                {kpisAll.budget_initial > 0 && (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <Wallet className="h-3.5 w-3.5" />
-                    Budget prévisionnel saisi : <span className="font-semibold tabular-nums text-foreground">{eur(kpis.budget_revise || kpis.budget_initial)}</span>
+                    Budget prévisionnel saisi : <span className="font-semibold tabular-nums text-foreground">{eur(kpisAll.budget_revise || kpisAll.budget_initial)}</span>
                   </div>
                 )}
               </SheetHeader>
