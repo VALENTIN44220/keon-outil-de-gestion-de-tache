@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { BEProjectHubLayout } from '@/components/be/BEProjectHubLayout';
 import { useBEProjectByCode } from '@/hooks/useBEProjectHub';
 import { useBEProjectHubCode } from '@/hooks/useBEProjectHubCode';
@@ -18,7 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Search, Building2, Loader2 } from 'lucide-react';
+import { Plus, Search, Building2, Loader2, Coins } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { extractErrorMessage } from '@/lib/extractErrorMessage';
 import { BEBudgetKpiCards } from '@/components/be/budget/BEBudgetKpiCards';
@@ -175,6 +176,12 @@ export default function BEProjectHubBudget() {
                 className="pl-10"
               />
             </div>
+            <Button asChild variant="outline" size="sm" className="gap-1.5" title="Gérer le référentiel TJM et les postes BE des collaborateurs">
+              <Link to="/be/admin/tjm">
+                <Coins className="h-4 w-4" />
+                Référentiel TJM
+              </Link>
+            </Button>
             <Button onClick={() => setCreateOpen(true)} className="gap-1.5">
               <Plus className="h-4 w-4" />
               Nouvelle affaire
