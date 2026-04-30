@@ -42,6 +42,7 @@ import {
   CalendarDays,
   CalendarCheck,
   Coins,
+  Layers,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
@@ -57,6 +58,7 @@ import { useBEAffaireTemps } from '@/hooks/useBEAffaireTemps';
 import { BEBudgetLineDialog } from './BEBudgetLineDialog';
 import { BEBudgetRapprochementPanel } from './BEBudgetRapprochementPanel';
 import { BETempsBudgetDialog } from './BETempsBudgetDialog';
+import { BETempsBreakdown } from './BETempsBreakdown';
 import { BE_POSTE_ICON, BE_POSTE_LABEL } from '@/types/beTemps';
 
 const eur = (n: number | null | undefined) =>
@@ -162,8 +164,8 @@ export function BEAffaireDetailSheet({
                   </Button>
                 </div>
 
-                {/* KPIs CA / COGS / Marge */}
-                <div className="grid grid-cols-3 gap-2">
+                {/* KPIs CA / COGS / Marge brute / Marge directe */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <KpiMini
                     label="CA Constaté"
                     value={eur(kpis.ca_constate)}
@@ -176,16 +178,36 @@ export function BEAffaireDetailSheet({
                     value={eur(kpis.cogs_constate)}
                     icon={ReceiptText}
                     accent="text-amber-600"
-                    hint={kpis.cogs_engage > 0 ? `Engagé ${eur(kpis.cogs_engage)}` : undefined}
                   />
                   <KpiMini
-                    label={kpis.marge_constatee < 0 ? 'Marge négative' : 'Marge Constatée'}
+                    label={kpis.marge_constatee < 0 ? 'Marge brute -' : 'Marge brute'}
                     value={eur(kpis.marge_constatee)}
                     icon={kpis.marge_constatee < 0 ? TrendingDown : TrendingUp}
                     accent={kpis.marge_constatee < 0 ? 'text-red-600' : 'text-emerald-600'}
                     hint={
                       kpis.ca_constate > 0
                         ? `${Math.round((kpis.marge_constatee / kpis.ca_constate) * 100)}% du CA`
+                        : undefined
+                    }
+                  />
+                  <KpiMini
+                    label={(() => {
+                      const md = kpis.marge_constatee - (tempsKpi?.cout_rh_declare ?? 0);
+                      return md < 0 ? 'Marge directe -' : 'Marge directe';
+                    })()}
+                    value={eur(kpis.marge_constatee - (tempsKpi?.cout_rh_declare ?? 0))}
+                    icon={(() => {
+                      const md = kpis.marge_constatee - (tempsKpi?.cout_rh_declare ?? 0);
+                      return md < 0 ? TrendingDown : Layers;
+                    })()}
+                    accent={
+                      kpis.marge_constatee - (tempsKpi?.cout_rh_declare ?? 0) < 0
+                        ? 'text-red-600'
+                        : 'text-emerald-600'
+                    }
+                    hint={
+                      tempsKpi?.cout_rh_declare
+                        ? `- ${eur(tempsKpi.cout_rh_declare)} RH`
                         : undefined
                     }
                   />
@@ -273,6 +295,9 @@ export function BEAffaireDetailSheet({
                     </div>
                   </div>
                 )}
+
+                {/* Detail temps declare : par poste + par collaborateur */}
+                {affaireId && <BETempsBreakdown affaireId={affaireId} />}
               </div>
 
               {/* Lignes budgetaires */}

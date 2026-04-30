@@ -45,23 +45,27 @@ export default function BEProjectHubBudget() {
   const [selectedAffaire, setSelectedAffaire] = useState<BEAffaire | null>(null);
   const [deletingAffaire, setDeletingAffaire] = useState<BEAffaire | null>(null);
 
-  // KPIs projet = somme des affaires (split CA / COGS / Marge)
+  // KPIs projet = somme des affaires (CA / COGS / Marge brute + directe + cout RH)
   const projectKpis = useMemo(() => {
     let caEngage = 0;
     let caConstate = 0;
-    let cogsEngage = 0;
     let cogsConstate = 0;
-    let margeConstatee = 0;
+    let margeBrute = 0;
+    let coutRhDeclare = 0;
+    let margeDirecte = 0;
     for (const a of affaires) {
       const k = kpisByAffaireId.get(a.id);
-      caEngage      += k?.ca_engage_brut       ?? 0;
-      caConstate    += k?.ca_constate_brut     ?? 0;
-      cogsEngage    += k?.cogs_engage_brut     ?? 0;
-      cogsConstate  += k?.cogs_constate_brut   ?? 0;
-      margeConstatee += k?.marge_constatee_brut
+      caEngage     += k?.ca_engage_brut       ?? 0;
+      caConstate   += k?.ca_constate_brut     ?? 0;
+      cogsConstate += k?.cogs_constate_brut   ?? 0;
+      const mb = k?.marge_brute_brut ?? k?.marge_constatee_brut
         ?? ((k?.ca_constate_brut ?? 0) - (k?.cogs_constate_brut ?? 0));
+      margeBrute    += mb;
+      const cr = k?.cout_rh_declare ?? 0;
+      coutRhDeclare += cr;
+      margeDirecte  += k?.marge_directe_brut ?? (mb - cr);
     }
-    return { caEngage, caConstate, cogsEngage, cogsConstate, margeConstatee };
+    return { caEngage, caConstate, cogsConstate, margeBrute, coutRhDeclare, margeDirecte };
   }, [affaires, kpisByAffaireId]);
 
   const filteredAffaires = useMemo(() => {
@@ -153,9 +157,10 @@ export default function BEProjectHubBudget() {
           nbAffaires={affaires.length}
           caEngage={projectKpis.caEngage}
           caConstate={projectKpis.caConstate}
-          cogsEngage={projectKpis.cogsEngage}
           cogsConstate={projectKpis.cogsConstate}
-          margeConstatee={projectKpis.margeConstatee}
+          margeBrute={projectKpis.margeBrute}
+          coutRhDeclare={projectKpis.coutRhDeclare}
+          margeDirecte={projectKpis.margeDirecte}
         />
 
         {/* Toolbar */}
