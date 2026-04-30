@@ -3,6 +3,7 @@ import { BEProjectHubLayout } from '@/components/be/BEProjectHubLayout';
 import { useBEProjectByCode } from '@/hooks/useBEProjectHub';
 import { useBEProjectHubCode } from '@/hooks/useBEProjectHubCode';
 import { useBEAffaires } from '@/hooks/useBEAffaires';
+import { useBEGroupeKpis } from '@/hooks/useBEGroupeKpi';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,6 +25,7 @@ import { BEBudgetKpiCards } from '@/components/be/budget/BEBudgetKpiCards';
 import { BEAffaireCard } from '@/components/be/budget/BEAffaireCard';
 import { BEAffaireDialog } from '@/components/be/budget/BEAffaireDialog';
 import { BEAffaireDetailSheet } from '@/components/be/budget/BEAffaireDetailSheet';
+import { BEGroupeHeader } from '@/components/be/budget/BEGroupeHeader';
 import type { BEAffaire } from '@/types/beAffaire';
 
 export default function BEProjectHubBudget() {
@@ -35,6 +37,7 @@ export default function BEProjectHubBudget() {
     isLoading: affairesLoading,
     deleteAffaire,
   } = useBEAffaires(project?.id);
+  const { byCode: groupeKpiByCode } = useBEGroupeKpis(project?.id);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
@@ -70,6 +73,21 @@ export default function BEProjectHubBudget() {
         (a.libelle ?? '').toLowerCase().includes(q),
     );
   }, [affaires, searchQuery]);
+
+  // Groupement des affaires par prefixe 5 chars (= "affaire globale")
+  const groupedAffaires = useMemo(() => {
+    const groups = new Map<string, typeof affaires>();
+    for (const a of filteredAffaires) {
+      const code = a.code_affaire ?? '';
+      const groupCode = code.length >= 5 ? code.substring(0, 5).toUpperCase() : code.toUpperCase();
+      if (!groups.has(groupCode)) groups.set(groupCode, []);
+      groups.get(groupCode)!.push(a);
+    }
+    // Tri : par code_groupe alpha
+    return Array.from(groups.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([code_groupe, affaires]) => ({ code_groupe, affaires }));
+  }, [filteredAffaires]);
 
   // Code projet attendu (chars 2-5 d'un code_affaire). Priorite :
   //  1. project.code_projet si exactement 4 chars (cas standard ex. 'VINZ')
@@ -189,16 +207,27 @@ export default function BEProjectHubBudget() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {filteredAffaires.map((a) => (
-              <BEAffaireCard
-                key={a.id}
-                affaire={a}
-                kpi={kpisByAffaireId.get(a.id)}
-                onSelect={() => setSelectedAffaire(a)}
-                onEdit={() => setEditingAffaire(a)}
-                onDelete={() => setDeletingAffaire(a)}
-              />
+          <div className="space-y-5">
+            {groupedAffaires.map(({ code_groupe, affaires }) => (
+              <div key={code_groupe} className="space-y-2">
+                <BEGroupeHeader
+                  codeGroupe={code_groupe}
+                  nbAffaires={affaires.length}
+                  kpi={groupeKpiByCode.get(code_groupe)}
+                />
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {affaires.map((a) => (
+                    <BEAffaireCard
+                      key={a.id}
+                      affaire={a}
+                      kpi={kpisByAffaireId.get(a.id)}
+                      onSelect={() => setSelectedAffaire(a)}
+                      onEdit={() => setEditingAffaire(a)}
+                      onDelete={() => setDeletingAffaire(a)}
+                    />
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         )}
