@@ -15,6 +15,7 @@ export interface BEAffaireKpiPeriod {
   ca_constate: number;
   cogs_engage: number;
   cogs_constate: number;
+  ndf: number;
   marge_brute: number;
   marge_directe: number;
   nb_commandes: number;
@@ -67,6 +68,7 @@ export function useBEAffaireKpiByPeriod(
         ca_constate: 0,
         cogs_engage: 0,
         cogs_constate: 0,
+        ndf: 0,
         marge_brute: 0,
         marge_directe: 0,
         nb_commandes: 0,
@@ -102,6 +104,18 @@ export function useBEAffaireKpiByPeriod(
 
       const saisies = (stData ?? []) as SaisieRow[];
 
+      // 2bis) Notes de frais Lucca filtrees par axe_1 = prefixe 5 chars du code_affaire
+      const code5 = codeAffaire.length >= 5 ? codeAffaire.substring(0, 5) : codeAffaire;
+      let ndfQuery = sb
+        .from('lucca_notes_frais')
+        .select('montant_ht,date_depense')
+        .eq('axe_1', code5);
+      if (dateFrom) ndfQuery = ndfQuery.gte('date_depense', dateFrom);
+      if (dateTo) ndfQuery = ndfQuery.lte('date_depense', dateTo);
+      const { data: ndfData, error: ndfErr } = await ndfQuery;
+      if (ndfErr) throw ndfErr;
+      const ndfRows = (ndfData ?? []) as { montant_ht: number | null; date_depense: string }[];
+
       // 3) TJM referentiel
       const { data: tjmData } = await sb.from('be_tjm_referentiel').select('poste,tjm');
       const tjmByPoste = new Map<string, number>();
@@ -120,7 +134,11 @@ export function useBEAffaireKpiByPeriod(
         else if (m.type_mouv === 'FCN') { caConstate += ht; numFactures.add(m.numero_piece); }
         else if (m.type_mouv === 'FFN') { cogsConstate += ht; numFactures.add(m.numero_piece); }
       }
-      const margeBrute = caConstate - cogsConstate;
+      // NDF
+      let ndfTotal = 0;
+      for (const n of ndfRows) ndfTotal += Number(n.montant_ht) || 0;
+
+      const margeBrute = caConstate - cogsConstate - ndfTotal;
 
       // Aggregations Lucca
       let heures = 0;
@@ -144,6 +162,7 @@ export function useBEAffaireKpiByPeriod(
         ca_constate: caConstate,
         cogs_engage: cogsEngage,
         cogs_constate: cogsConstate,
+        ndf: ndfTotal,
         marge_brute: margeBrute,
         marge_directe: margeBrute - coutRh,
         nb_commandes: numCommandes.size,

@@ -13,6 +13,7 @@ export interface BEGroupeKPI {
   ca_constate_brut: number;
   cogs_engage_brut: number;
   cogs_constate_brut: number;
+  ndf_brut: number;
   marge_constatee_brut: number;
   marge_brute_brut: number;
   marge_directe_brut: number;

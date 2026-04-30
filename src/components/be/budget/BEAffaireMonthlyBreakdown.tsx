@@ -59,7 +59,8 @@ export function BEAffaireMonthlyBreakdown({
         mois: format(new Date(r.date), 'MMM yy', { locale: fr }),
         moisIso: r.mois,
         'CA Constaté': r.ca_constate,
-        'COGS Constaté': r.cogs_constate,
+        'COGS Const.': r.cogs_constate,
+        'NDF': r.ndf,
         'Coût RH': r.cout_rh,
         'Marge directe': r.marge_directe,
       })),
@@ -86,7 +87,7 @@ export function BEAffaireMonthlyBreakdown({
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-sm">
             <BarChart3 className="h-4 w-4 text-muted-foreground" />
-            Vue mensuelle · CA / COGS / RH
+            Vue mensuelle · CA / COGS / NDF / RH
           </CardTitle>
           <div className="flex items-center gap-1 p-0.5 bg-muted/50 rounded">
             <Button
@@ -129,9 +130,10 @@ export function BEAffaireMonthlyBreakdown({
                   }}
                 />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="CA Constaté" fill="#6366f1" />
-                <Bar dataKey="COGS Constaté" fill="#f59e0b" />
-                <Bar dataKey="Coût RH" fill="#8b5cf6" />
+                <Bar dataKey="CA Constaté" fill="#6366f1" stackId="rev" />
+                <Bar dataKey="COGS Const." fill="#f59e0b" stackId="cost" />
+                <Bar dataKey="NDF" fill="#fb7185" stackId="cost" />
+                <Bar dataKey="Coût RH" fill="#8b5cf6" stackId="cost" />
                 <Line
                   type="monotone"
                   dataKey="Marge directe"
@@ -148,13 +150,12 @@ export function BEAffaireMonthlyBreakdown({
               <TableHeader>
                 <TableRow className="bg-muted/30 hover:bg-muted/30">
                   <TableHead>Mois</TableHead>
-                  <TableHead className="text-right">CA Engagé</TableHead>
-                  <TableHead className="text-right">CA Constaté</TableHead>
-                  <TableHead className="text-right">COGS Eng.</TableHead>
+                  <TableHead className="text-right">CA Const.</TableHead>
                   <TableHead className="text-right">COGS Const.</TableHead>
+                  <TableHead className="text-right">NDF</TableHead>
+                  <TableHead className="text-right">Marge brute</TableHead>
                   <TableHead className="text-right">Jours</TableHead>
                   <TableHead className="text-right">Coût RH</TableHead>
-                  <TableHead className="text-right">Marge brute</TableHead>
                   <TableHead className="text-right">Marge directe</TableHead>
                 </TableRow>
               </TableHeader>
@@ -167,23 +168,14 @@ export function BEAffaireMonthlyBreakdown({
                       <TableCell className="font-medium capitalize">
                         {format(new Date(r.date), 'MMMM yyyy', { locale: fr })}
                       </TableCell>
-                      <TableCell className="text-right tabular-nums text-muted-foreground">
-                        {r.ca_engage > 0 ? eur(r.ca_engage) : '—'}
-                      </TableCell>
                       <TableCell className="text-right tabular-nums font-semibold">
                         {r.ca_constate > 0 ? eur(r.ca_constate) : '—'}
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-muted-foreground">
-                        {r.cogs_engage > 0 ? eur(r.cogs_engage) : '—'}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums text-muted-foreground">
                         {r.cogs_constate > 0 ? eur(r.cogs_constate) : '—'}
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {r.jours > 0 ? `${numj(r.jours)} j` : '—'}
-                      </TableCell>
                       <TableCell className="text-right tabular-nums text-muted-foreground">
-                        {r.cout_rh > 0 ? eur(r.cout_rh) : '—'}
+                        {r.ndf > 0 ? eur(r.ndf) : '—'}
                       </TableCell>
                       <TableCell
                         className={cn(
@@ -193,6 +185,12 @@ export function BEAffaireMonthlyBreakdown({
                         )}
                       >
                         {r.marge_brute !== 0 ? eur(r.marge_brute) : '—'}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {r.jours > 0 ? `${numj(r.jours)} j` : '—'}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-muted-foreground">
+                        {r.cout_rh > 0 ? eur(r.cout_rh) : '—'}
                       </TableCell>
                       <TableCell
                         className={cn(
@@ -211,7 +209,6 @@ export function BEAffaireMonthlyBreakdown({
           </div>
         )}
 
-        {/* Légende des indicateurs de marge */}
         <div className="flex items-center gap-3 mt-2 text-[10px] text-muted-foreground">
           <span className="flex items-center gap-1">
             <TrendingUp className="h-3 w-3 text-emerald-600" />
