@@ -61,6 +61,7 @@ import { BEBudgetRapprochementPanel } from './BEBudgetRapprochementPanel';
 import { BETempsBudgetDialog } from './BETempsBudgetDialog';
 import { BETempsBreakdown } from './BETempsBreakdown';
 import { BEPeriodSelector, computePeriodRange, type BEPeriodValue } from './BEPeriodSelector';
+import { BEAffaireMonthlyBreakdown } from './BEAffaireMonthlyBreakdown';
 import { BE_POSTE_ICON, BE_POSTE_LABEL } from '@/types/beTemps';
 
 const eur = (n: number | null | undefined) =>
@@ -330,6 +331,17 @@ export function BEAffaireDetailSheet({
                 {/* Detail temps declare : par poste + par collaborateur */}
                 {affaireId && <BETempsBreakdown affaireId={affaireId} />}
               </div>
+
+              {/* Vue mensuelle CA / COGS / RH / Marges */}
+              {codeAffaire && (
+                <div className="mt-6">
+                  <BEAffaireMonthlyBreakdown
+                    codeAffaire={codeAffaire}
+                    dateFrom={period.from}
+                    dateTo={period.to}
+                  />
+                </div>
+              )}
 
               {/* Lignes budgetaires */}
               <div className="mt-6 space-y-3">
