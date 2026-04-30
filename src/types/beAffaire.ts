@@ -126,9 +126,11 @@ export interface BEAffaireBudgetKPI {
   cogs_engage_brut: number;
   /** COGS fournisseur constate (factures FFN). */
   cogs_constate_brut: number;
-  /** Marge brute = CA constate - COGS Divalto (FCN - FFN). Alias historique = marge_constatee_brut. */
+  /** Notes de frais Lucca rattachees au prefixe 5 chars du code_affaire. */
+  ndf_brut: number;
+  /** Marge constatee (compat retro) = CA - COGS Divalto seul. */
   marge_constatee_brut: number;
-  /** Marge brute (alias semantique de marge_constatee_brut). */
+  /** Marge brute = CA constate - COGS Divalto - NDF. */
   marge_brute_brut: number;
   /** Marge sur couts directs = Marge brute - Cout RH declare (Lucca x TJM). */
   marge_directe_brut: number;
@@ -153,6 +155,7 @@ export interface BEProjectBudgetKPI {
   ca_constate_brut: number;
   cogs_engage_brut: number;
   cogs_constate_brut: number;
+  ndf_brut: number;
   marge_constatee_brut: number;
   marge_brute_brut: number;
   marge_directe_brut: number;

@@ -12,6 +12,7 @@ export interface BEAffaireMonthRow {
   ca_constate: number;
   cogs_engage: number;
   cogs_constate: number;
+  ndf: number;
   marge_brute: number;
   marge_directe: number;
   jours: number;
@@ -31,6 +32,11 @@ interface SaisieRow {
   profiles?: { be_poste: string | null } | null;
 }
 
+interface NdfRow {
+  date_depense: string;
+  montant_ht: number | null;
+}
+
 interface TjmRow {
   poste: string;
   tjm: number;
@@ -38,7 +44,7 @@ interface TjmRow {
 
 /**
  * Aggregation MENSUELLE pour une affaire :
- *   CA / COGS / RH par mois sur la plage [dateFrom, dateTo].
+ *   CA / COGS / NDF / RH par mois sur la plage [dateFrom, dateTo].
  * Si dateFrom/dateTo NULL : tout l'historique.
  */
 export function useBEAffaireMonthly(
@@ -72,7 +78,17 @@ export function useBEAffaireMonthly(
       const { data: stData, error: stErr } = await stQuery;
       if (stErr) throw stErr;
 
-      // 3. TJM
+      // 3. NDF Lucca filtrees par axe_1 = prefixe 5 chars du code_affaire
+      const code5 = codeAffaire.length >= 5 ? codeAffaire.substring(0, 5) : codeAffaire;
+      let ndfQuery = sb
+        .from('lucca_notes_frais')
+        .select('date_depense,montant_ht')
+        .eq('axe_1', code5);
+      if (dateFrom) ndfQuery = ndfQuery.gte('date_depense', dateFrom);
+      if (dateTo) ndfQuery = ndfQuery.lte('date_depense', dateTo);
+      const { data: ndfData } = await ndfQuery;
+
+      // 4. TJM
       const { data: tjmData } = await sb.from('be_tjm_referentiel').select('poste,tjm');
       const tjmByPoste = new Map<string, number>();
       for (const t of (tjmData ?? []) as TjmRow[]) {
@@ -89,6 +105,7 @@ export function useBEAffaireMonthly(
             date: `${mois}-01`,
             ca_engage: 0, ca_constate: 0,
             cogs_engage: 0, cogs_constate: 0,
+            ndf: 0,
             marge_brute: 0, marge_directe: 0,
             jours: 0, heures: 0, cout_rh: 0,
           };
@@ -111,6 +128,14 @@ export function useBEAffaireMonthly(
         }
       }
 
+      // NDF
+      for (const n of (ndfData ?? []) as NdfRow[]) {
+        if (!n.date_depense) continue;
+        const mois = n.date_depense.slice(0, 7);
+        const row = ensure(mois);
+        row.ndf += Number(n.montant_ht) || 0;
+      }
+
       // Saisies
       for (const s of (stData ?? []) as SaisieRow[]) {
         if (!s.date_saisie) continue;
@@ -124,9 +149,9 @@ export function useBEAffaireMonthly(
         row.cout_rh += (h / 8) * tjm;
       }
 
-      // Calcul des marges
+      // Calcul des marges (avec NDF)
       for (const row of months.values()) {
-        row.marge_brute = row.ca_constate - row.cogs_constate;
+        row.marge_brute = row.ca_constate - row.cogs_constate - row.ndf;
         row.marge_directe = row.marge_brute - row.cout_rh;
       }
 
