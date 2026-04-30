@@ -55,10 +55,12 @@ import {
 } from '@/types/beAffaire';
 import { useBEAffaireBudget } from '@/hooks/useBEAffaireBudget';
 import { useBEAffaireTemps } from '@/hooks/useBEAffaireTemps';
+import { useBEAffaireKpiByPeriod } from '@/hooks/useBEAffaireKpiByPeriod';
 import { BEBudgetLineDialog } from './BEBudgetLineDialog';
 import { BEBudgetRapprochementPanel } from './BEBudgetRapprochementPanel';
 import { BETempsBudgetDialog } from './BETempsBudgetDialog';
 import { BETempsBreakdown } from './BETempsBreakdown';
+import { BEPeriodSelector, computePeriodRange, type BEPeriodValue } from './BEPeriodSelector';
 import { BE_POSTE_ICON, BE_POSTE_LABEL } from '@/types/beTemps';
 
 const eur = (n: number | null | undefined) =>
@@ -79,7 +81,7 @@ export function BEAffaireDetailSheet({
   const affaireId = affaire?.id;
   const codeAffaire = affaire?.code_affaire ?? null;
 
-  const { lines, linesLoading, kpis, deleteLine } = useBEAffaireBudget(affaireId);
+  const { lines, linesLoading, kpis: kpisAll, deleteLine } = useBEAffaireBudget(affaireId);
   const { budgetLines: tempsBudgetLines, kpi: tempsKpi } = useBEAffaireTemps(affaireId);
 
   const [lineDialogOpen, setLineDialogOpen] = useState(false);
@@ -87,6 +89,34 @@ export function BEAffaireDetailSheet({
   const [expandedLineId, setExpandedLineId] = useState<string | null>(null);
   const [deletingLineId, setDeletingLineId] = useState<string | null>(null);
   const [tempsDialogOpen, setTempsDialogOpen] = useState(false);
+
+  // Filtre periode pour les KPIs (CA / COGS / Marges / Temps & RH)
+  const [period, setPeriod] = useState<BEPeriodValue>(() => {
+    const range = computePeriodRange('all');
+    return { mode: 'all', from: range.from, to: range.to };
+  });
+  const { data: kpiPeriod, isLoading: kpiPeriodLoading } = useBEAffaireKpiByPeriod(
+    codeAffaire,
+    period.from,
+    period.to,
+  );
+
+  // Indique si une periode est active (filtrage applique)
+  const isFiltered = period.mode !== 'all';
+
+  // KPIs affiches : si periode active -> KPI re-agreges, sinon vue all-time
+  const displayKpis = {
+    ca_engage:    isFiltered ? (kpiPeriod?.ca_engage ?? 0)    : kpisAll.ca_engage,
+    ca_constate:  isFiltered ? (kpiPeriod?.ca_constate ?? 0)  : kpisAll.ca_constate,
+    cogs_engage:  isFiltered ? (kpiPeriod?.cogs_engage ?? 0)  : kpisAll.cogs_engage,
+    cogs_constate:isFiltered ? (kpiPeriod?.cogs_constate ?? 0): kpisAll.cogs_constate,
+    marge_brute:  isFiltered ? (kpiPeriod?.marge_brute ?? 0)  : kpisAll.marge_constatee,
+    marge_directe:isFiltered ? (kpiPeriod?.marge_directe ?? 0): (kpisAll.marge_constatee - (tempsKpi?.cout_rh_declare ?? 0)),
+    cout_rh:      isFiltered ? (kpiPeriod?.cout_rh_declare ?? 0) : (tempsKpi?.cout_rh_declare ?? 0),
+    jours_declares: isFiltered ? (kpiPeriod?.jours_declares ?? 0) : (tempsKpi?.jours_declares ?? 0),
+    heures_declarees: isFiltered ? (kpiPeriod?.heures_declarees ?? 0) : (tempsKpi?.heures_declarees ?? 0),
+    nb_collaborateurs: isFiltered ? (kpiPeriod?.nb_collaborateurs ?? 0) : 0,
+  };
 
   const handleEdit = (line: BEAffaireBudgetLine) => {
     setEditingLine(line);
@@ -164,50 +194,51 @@ export function BEAffaireDetailSheet({
                   </Button>
                 </div>
 
+                {/* Selecteur de periode */}
+                <div className="flex items-center justify-between gap-2">
+                  <BEPeriodSelector value={period} onChange={setPeriod} compact />
+                  {isFiltered && kpiPeriodLoading && (
+                    <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Calcul…
+                    </span>
+                  )}
+                </div>
+
                 {/* KPIs CA / COGS / Marge brute / Marge directe */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <KpiMini
                     label="CA Constaté"
-                    value={eur(kpis.ca_constate)}
+                    value={eur(displayKpis.ca_constate)}
                     icon={Receipt}
                     accent="text-indigo-600"
-                    hint={kpis.ca_engage > 0 ? `Engagé ${eur(kpis.ca_engage)}` : undefined}
+                    hint={displayKpis.ca_engage > 0 ? `Engagé ${eur(displayKpis.ca_engage)}` : undefined}
                   />
                   <KpiMini
                     label="COGS Constaté"
-                    value={eur(kpis.cogs_constate)}
+                    value={eur(displayKpis.cogs_constate)}
                     icon={ReceiptText}
                     accent="text-amber-600"
                   />
                   <KpiMini
-                    label={kpis.marge_constatee < 0 ? 'Marge brute -' : 'Marge brute'}
-                    value={eur(kpis.marge_constatee)}
-                    icon={kpis.marge_constatee < 0 ? TrendingDown : TrendingUp}
-                    accent={kpis.marge_constatee < 0 ? 'text-red-600' : 'text-emerald-600'}
+                    label={displayKpis.marge_brute < 0 ? 'Marge brute -' : 'Marge brute'}
+                    value={eur(displayKpis.marge_brute)}
+                    icon={displayKpis.marge_brute < 0 ? TrendingDown : TrendingUp}
+                    accent={displayKpis.marge_brute < 0 ? 'text-red-600' : 'text-emerald-600'}
                     hint={
-                      kpis.ca_constate > 0
-                        ? `${Math.round((kpis.marge_constatee / kpis.ca_constate) * 100)}% du CA`
+                      displayKpis.ca_constate > 0
+                        ? `${Math.round((displayKpis.marge_brute / displayKpis.ca_constate) * 100)}% du CA`
                         : undefined
                     }
                   />
                   <KpiMini
-                    label={(() => {
-                      const md = kpis.marge_constatee - (tempsKpi?.cout_rh_declare ?? 0);
-                      return md < 0 ? 'Marge directe -' : 'Marge directe';
-                    })()}
-                    value={eur(kpis.marge_constatee - (tempsKpi?.cout_rh_declare ?? 0))}
-                    icon={(() => {
-                      const md = kpis.marge_constatee - (tempsKpi?.cout_rh_declare ?? 0);
-                      return md < 0 ? TrendingDown : Layers;
-                    })()}
-                    accent={
-                      kpis.marge_constatee - (tempsKpi?.cout_rh_declare ?? 0) < 0
-                        ? 'text-red-600'
-                        : 'text-emerald-600'
-                    }
+                    label={displayKpis.marge_directe < 0 ? 'Marge directe -' : 'Marge directe'}
+                    value={eur(displayKpis.marge_directe)}
+                    icon={displayKpis.marge_directe < 0 ? TrendingDown : Layers}
+                    accent={displayKpis.marge_directe < 0 ? 'text-red-600' : 'text-emerald-600'}
                     hint={
-                      tempsKpi?.cout_rh_declare
-                        ? `- ${eur(tempsKpi.cout_rh_declare)} RH`
+                      displayKpis.cout_rh > 0
+                        ? `- ${eur(displayKpis.cout_rh)} RH`
                         : undefined
                     }
                   />
@@ -254,19 +285,19 @@ export function BEAffaireDetailSheet({
                     hint={tempsKpi?.cout_rh_planifie ? eur(tempsKpi.cout_rh_planifie) : undefined}
                   />
                   <KpiMini
-                    label="Déclaré"
-                    value={`${(tempsKpi?.jours_declares ?? 0).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} j`}
+                    label={isFiltered ? 'Déclaré (période)' : 'Déclaré'}
+                    value={`${displayKpis.jours_declares.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} j`}
                     icon={Clock}
                     accent="text-emerald-600"
                     hint={
-                      tempsKpi?.heures_declarees
-                        ? `${tempsKpi.heures_declarees.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} h`
+                      displayKpis.heures_declarees
+                        ? `${displayKpis.heures_declarees.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} h`
                         : undefined
                     }
                   />
                   <KpiMini
                     label="Coût RH déclaré"
-                    value={eur(tempsKpi?.cout_rh_declare ?? 0)}
+                    value={eur(displayKpis.cout_rh)}
                     icon={Coins}
                     accent="text-amber-600"
                   />
