@@ -31,10 +31,6 @@ export interface NewSupplierRequestDialogProps {
   onClose: () => void;
 }
 
-function normalizeSiret(raw: string) {
-  return raw.replace(/\s/g, '');
-}
-
 function isEmailLoose(s: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
 }
@@ -96,9 +92,8 @@ export function NewSupplierRequestDialog({ open, onClose }: NewSupplierRequestDi
     if (!delaiPaiement.trim()) return 'Le délai de paiement est obligatoire.';
     const ca = Number(String(caEstime).replace(',', '.').trim());
     if (!Number.isFinite(ca) || ca < 0) return 'Le montant CA annuel estimé doit être un nombre valide.';
-    const s = normalizeSiret(siret);
-    if (s.length !== 14 || !/^\d{14}$/.test(s)) return 'Le N° SIRET doit comporter 14 chiffres.';
-    if (!tva.trim()) return 'Le N° TVA intracommunautaire est obligatoire.';
+    if (!siret.trim()) return 'Le N° d\'identification (SIRET ou équivalent) est obligatoire.';
+    if (!tva.trim()) return 'Le N° TVA ou identifiant fiscal est obligatoire.';
     if (emailContact.trim() && !isEmailLoose(emailContact.trim())) return 'L’email du contact n’est pas valide.';
     if (!ribFile) return 'Le RIB du fournisseur est obligatoire.';
     if (!kbisFile) return 'Le justificatif SIRET / Kbis est obligatoire.';
@@ -143,8 +138,6 @@ export function NewSupplierRequestDialog({ open, onClose }: NewSupplierRequestDi
     setSubmitting(true);
     const lineIndex = crypto.randomUUID();
     const ca = Number(String(caEstime).replace(',', '.').trim());
-    const siretNorm = normalizeSiret(siret);
-
     const row = {
       line_index: lineIndex,
       tiers: null as string | null,
@@ -156,7 +149,7 @@ export function NewSupplierRequestDialog({ open, onClose }: NewSupplierRequestDi
       pays: pays.trim(),
       delai_de_paiement: delaiPaiement.trim(),
       ca_estime: ca,
-      siret: siretNorm,
+      siret: siret.trim(),
       tva: tva.trim(),
       nom_contact: nomContact.trim() || null,
       adresse_mail: emailContact.trim() || null,
@@ -326,12 +319,12 @@ export function NewSupplierRequestDialog({ open, onClose }: NewSupplierRequestDi
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>N° SIRET *</Label>
-                  <Input value={siret} onChange={(e) => setSiret(e.target.value)} placeholder="14 chiffres" className="font-mono" />
+                  <Label>N° d'identification (SIRET, numéro d'entreprise…) *</Label>
+                  <Input value={siret} onChange={(e) => setSiret(e.target.value)} placeholder="Ex : 12345678901234, BE 0123.456.789…" />
                 </div>
                 <div className="space-y-2">
-                  <Label>N° TVA intracommunautaire *</Label>
-                  <Input value={tva} onChange={(e) => setTva(e.target.value)} className="font-mono" />
+                  <Label>N° TVA Intracommunautaire / identifiant fiscal *</Label>
+                  <Input value={tva} onChange={(e) => setTva(e.target.value)} placeholder="Ex : FR 12 345678901, BE 0123.456.789…" />
                 </div>
               </section>
             </TabsContent>
