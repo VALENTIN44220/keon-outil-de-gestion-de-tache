@@ -120,3 +120,36 @@ export function useBETjmReferentiel() {
     },
   });
 }
+
+/** Liste complete du referentiel TJM avec metadonnees pour la page admin. */
+export function useBETjmReferentielFull() {
+  return useQuery({
+    queryKey: ['be-tjm-referentiel-full'],
+    queryFn: async (): Promise<BETjmReferentiel[]> => {
+      const { data, error } = await sb
+        .from('be_tjm_referentiel')
+        .select('*')
+        .order('poste');
+      if (error) throw error;
+      return (data as BETjmReferentiel[]) ?? [];
+    },
+  });
+}
+
+/** Mutation pour mettre a jour le TJM d'un poste. */
+export function useUpdateBETjm() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ poste, tjm, description }: { poste: BEPoste; tjm: number; description?: string | null }) => {
+      const { error } = await sb
+        .from('be_tjm_referentiel')
+        .update({ tjm, description: description ?? undefined })
+        .eq('poste', poste);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['be-tjm-referentiel'] });
+      qc.invalidateQueries({ queryKey: ['be-tjm-referentiel-full'] });
+    },
+  });
+}
