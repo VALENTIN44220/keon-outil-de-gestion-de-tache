@@ -22,7 +22,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Trash2, Clock } from 'lucide-react';
+import { Loader2, Trash2, Clock, Eye, XCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
@@ -35,6 +35,8 @@ import {
 } from '@/lib/supplierWaitingPromote';
 import { supplierWaitingValidationRoleFromProfileName } from '@/lib/supplierWaitingValidationRole';
 import { useAuth } from '@/contexts/AuthContext';
+import { SupplierWaitingDetailDrawer } from './SupplierWaitingDetailDrawer';
+import { SupplierWaitingRejectDialog } from './SupplierWaitingRejectDialog';
 
 export interface SupplierWaitingApprovalListDialogProps {
   open: boolean;
@@ -52,6 +54,10 @@ export function SupplierWaitingApprovalListDialog({ open, onClose }: SupplierWai
   const [validating, setValidating] = useState(false);
   const [promoting, setPromoting] = useState(false);
   const [tierSavingId, setTierSavingId] = useState<string | null>(null);
+
+  // Détail / refus
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const [rejectRow, setRejectRow] = useState<{ id: string; nomfournisseur: string | null } | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -87,7 +93,8 @@ export function SupplierWaitingApprovalListDialog({ open, onClose }: SupplierWai
       (r) =>
         Boolean(r.validated_by_compta_at) &&
         Boolean(r.validated_by_achats_at) &&
-        Boolean(r.tiers?.trim()),
+        Boolean(r.tiers?.trim()) &&
+        !r.rejected_at,
     );
 
   const permissionProfileName =
@@ -95,8 +102,8 @@ export function SupplierWaitingApprovalListDialog({ open, onClose }: SupplierWai
       ? String((profile.permission_profile as { name?: string }).name ?? '')
       : '';
   const validationRole = supplierWaitingValidationRoleFromProfileName(permissionProfileName);
+  const canReject = validationRole === 'achat' || validationRole === 'compta' || validationRole === 'hybrid';
 
-  /** Comptabilité seule : impossible de valider tant que les achats n’ont pas validé chaque ligne sélectionnée. */
   const comptaBlockedUntilAchat =
     !allSelectedReadyForPromote &&
     validationRole === 'compta' &&
@@ -126,9 +133,7 @@ export function SupplierWaitingApprovalListDialog({ open, onClose }: SupplierWai
   };
 
   const handleToggleSelectionMode = () => {
-    if (selectionMode) {
-      setSelectedIds(new Set());
-    }
+    if (selectionMode) setSelectedIds(new Set());
     setSelectionMode((v) => !v);
   };
 
@@ -215,7 +220,7 @@ export function SupplierWaitingApprovalListDialog({ open, onClose }: SupplierWai
       }
       const { error: delErr } = await supabase.from('supplier_waiting_approval').delete().eq('id', deleteId);
       if (delErr) throw delErr;
-      toast({ title: 'Demande retirée de la file d’attente' });
+      toast({ title: 'Demande retirée de la file d\u2019attente' });
       setDeleteId(null);
       await queryClient.invalidateQueries({ queryKey: ['supplier-waiting-approval'] });
     } catch (e: unknown) {
@@ -226,6 +231,11 @@ export function SupplierWaitingApprovalListDialog({ open, onClose }: SupplierWai
     }
   };
 
+  const invalidateList = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['supplier-waiting-approval'] });
+    await refetch();
+  };
+
   return (
     <>
       <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
@@ -233,10 +243,10 @@ export function SupplierWaitingApprovalListDialog({ open, onClose }: SupplierWai
           <DialogHeader className="px-6 pt-6 pb-3 shrink-0 border-b">
             <DialogTitle className="flex items-center gap-2">
               <Clock className="h-5 w-5 text-muted-foreground" />
-              Fournisseurs en attente d’approbation
+              Fournisseurs en attente d&apos;approbation
             </DialogTitle>
             <DialogDescription className="text-left">
-              Classés par date de soumission. L’identifiant de ligne (<span className="font-mono text-xs">line_index</span>)
+              Classés par date de soumission. L&apos;identifiant de ligne (<span className="font-mono text-xs">line_index</span>)
               regroupe une demande ; suppression définitive.
             </DialogDescription>
           </DialogHeader>
@@ -270,7 +280,7 @@ export function SupplierWaitingApprovalListDialog({ open, onClose }: SupplierWai
                     key={r.id}
                     className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 rounded-lg border border-border bg-muted/20 p-3"
                   >
-                    {selectionMode ? (
+                    {selectionMode && !r.rejected_at ? (
                       <div className="flex items-center pt-1 sm:pt-0">
                         <Checkbox
                           id={`waiting-select-${r.id}`}
@@ -280,15 +290,16 @@ export function SupplierWaitingApprovalListDialog({ open, onClose }: SupplierWai
                         />
                       </div>
                     ) : null}
+
                     <div className="flex-1 min-w-0 space-y-0.5">
                       <div className="font-medium truncate">{r.nomfournisseur || '—'}</div>
                       <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
                         <span>{r.entite || '—'}</span>
                         {r.famille ? <span>Famille&nbsp;: {r.famille}</span> : null}
-                        {r.siret ? <span className="font-mono">SIRET {r.siret}</span> : null}
+                        {r.siret ? <span>N° ident. {r.siret}</span> : null}
                       </div>
                       <div className="text-xs text-muted-foreground font-mono truncate" title={r.line_index}>
-                        line_index&nbsp;: {r.line_index.slice(0, 8)}…
+                        line_index&nbsp;: {r.line_index.slice(0, 8)}&hellip;
                       </div>
                       <div className="text-xs text-muted-foreground">
                         Soumis le{' '}
@@ -296,28 +307,49 @@ export function SupplierWaitingApprovalListDialog({ open, onClose }: SupplierWai
                           ? format(new Date(r.created_at), 'dd/MM/yyyy HH:mm', { locale: fr })
                           : '—'}
                       </div>
-                      {(r.validated_by_compta_at || r.validated_by_achats_at) && (
-                        <div className="flex flex-wrap gap-1.5 pt-1">
-                          {r.validated_by_achats_at ? (
-                            <Badge
-                              variant="outline"
-                              className="border-emerald-500/50 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200 text-[10px] font-normal"
-                            >
-                              Validé par les achats
-                            </Badge>
-                          ) : null}
-                          {r.validated_by_compta_at ? (
-                            <Badge
-                              variant="outline"
-                              className="border-emerald-500/50 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200 text-[10px] font-normal"
-                            >
-                              Validé par la comptabilité
-                            </Badge>
-                          ) : null}
-                        </div>
+
+                      {/* Badges statuts */}
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {r.rejected_at ? (
+                          <Badge
+                            variant="destructive"
+                            className="text-[10px] font-normal gap-1"
+                          >
+                            <XCircle className="h-3 w-3" />
+                            Refusé le {format(new Date(r.rejected_at), 'dd/MM/yyyy', { locale: fr })}
+                          </Badge>
+                        ) : (
+                          <>
+                            {r.validated_by_achats_at ? (
+                              <Badge
+                                variant="outline"
+                                className="border-emerald-500/50 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200 text-[10px] font-normal"
+                              >
+                                Validé par les achats
+                              </Badge>
+                            ) : null}
+                            {r.validated_by_compta_at ? (
+                              <Badge
+                                variant="outline"
+                                className="border-emerald-500/50 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200 text-[10px] font-normal"
+                              >
+                                Validé par la comptabilité
+                              </Badge>
+                            ) : null}
+                          </>
+                        )}
+                      </div>
+
+                      {/* Motif de refus (résumé) */}
+                      {r.rejected_at && r.rejection_reason && (
+                        <p className="text-xs text-destructive/80 line-clamp-2 mt-0.5">
+                          Motif&nbsp;: {r.rejection_reason}
+                        </p>
                       )}
                     </div>
-                    {r.validated_by_compta_at ? (
+
+                    {/* Champ TIERS (après validation compta, non refusé) */}
+                    {r.validated_by_compta_at && !r.rejected_at ? (
                       <div className="flex flex-col gap-1 shrink-0 sm:min-w-[140px]">
                         <Label htmlFor={`tiers-${r.id}`} className="text-xs text-muted-foreground">
                           TIERS
@@ -336,16 +368,49 @@ export function SupplierWaitingApprovalListDialog({ open, onClose }: SupplierWai
                         />
                       </div>
                     ) : null}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      className="shrink-0 text-destructive hover:text-destructive"
-                      aria-label="Supprimer la demande"
-                      onClick={() => setDeleteId(r.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+
+                    {/* Actions par ligne */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {/* Voir le détail */}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8"
+                        aria-label="Voir le détail"
+                        title="Voir le détail"
+                        onClick={() => setDetailId(r.id)}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+
+                      {/* Refuser */}
+                      {canReject && !r.rejected_at && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive border-destructive/30 hover:border-destructive/60"
+                          aria-label="Refuser la demande"
+                          title="Refuser"
+                          onClick={() => setRejectRow({ id: r.id, nomfournisseur: r.nomfournisseur })}
+                        >
+                          <XCircle className="h-4 w-4" />
+                        </Button>
+                      )}
+
+                      {/* Supprimer */}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        aria-label="Supprimer la demande"
+                        onClick={() => setDeleteId(r.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -355,7 +420,7 @@ export function SupplierWaitingApprovalListDialog({ open, onClose }: SupplierWai
           <div className="px-6 py-4 border-t border-border shrink-0 flex flex-col gap-2 items-stretch sm:items-end">
             {comptaBlockedUntilAchat ? (
               <p className="text-xs text-amber-800 dark:text-amber-200/90 text-right order-1 max-w-full sm:max-w-md">
-                Aucune validation des achats n’a encore été enregistrée pour au moins une ligne sélectionnée. Les achats
+                Aucune validation des achats n&apos;a encore été enregistrée pour au moins une ligne sélectionnée. Les achats
                 doivent valider avant la comptabilité.
               </p>
             ) : null}
@@ -390,6 +455,24 @@ export function SupplierWaitingApprovalListDialog({ open, onClose }: SupplierWai
         </DialogContent>
       </Dialog>
 
+      {/* Détail drawer */}
+      <SupplierWaitingDetailDrawer
+        waitingId={detailId}
+        onClose={() => setDetailId(null)}
+      />
+
+      {/* Refus dialog */}
+      <SupplierWaitingRejectDialog
+        waitingId={rejectRow?.id ?? null}
+        supplierName={rejectRow?.nomfournisseur ?? null}
+        onClose={() => setRejectRow(null)}
+        onRejected={async () => {
+          setRejectRow(null);
+          await invalidateList();
+        }}
+      />
+
+      {/* Suppression */}
       <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && !isDeleting && setDeleteId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

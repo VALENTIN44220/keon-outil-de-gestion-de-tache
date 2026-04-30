@@ -6,7 +6,10 @@
 -- + Couts RH (Lucca x TJM).
 -- ============================================================================
 
-CREATE OR REPLACE VIEW public.v_be_project_synthese_kpi AS
+-- DROP requis : CREATE OR REPLACE VIEW ne peut pas modifier/supprimer des colonnes.
+DROP VIEW IF EXISTS public.v_be_project_synthese_kpi;
+
+CREATE VIEW public.v_be_project_synthese_kpi AS
 SELECT
   p.id                                     AS be_project_id,
   p.code_projet,

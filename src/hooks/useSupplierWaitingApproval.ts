@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
+// Champs résumés (liste)
 export type SupplierWaitingApprovalRow = {
   id: string;
   line_index: string;
@@ -9,10 +10,52 @@ export type SupplierWaitingApprovalRow = {
   entite: string | null;
   famille: string | null;
   siret: string | null;
+  pays: string | null;
   created_at: string | null;
   validated_by_compta_at: string | null;
   validated_by_achats_at: string | null;
+  submitted_by_user_id: string | null;
+  rejected_at: string | null;
+  rejected_by_user_id: string | null;
+  rejection_reason: string | null;
 };
+
+// Champs complets (détail)
+export type SupplierWaitingApprovalDetail = SupplierWaitingApprovalRow & {
+  description: string | null;
+  commentaires: string | null;
+  tva: string | null;
+  delai_de_paiement: string | null;
+  ca_estime: number | null;
+  nom_contact: string | null;
+  adresse_mail: string | null;
+  telephone: string | null;
+  poste: string | null;
+  validated_by_achats_user_id: string | null;
+  validated_by_compta_user_id: string | null;
+  // Pièces jointes (jointure)
+  attachments?: SupplierWaitingAttachment[];
+};
+
+export type SupplierWaitingAttachment = {
+  id: string;
+  attachment_kind: string;
+  file_name: string;
+  file_url: string;
+  storage_path: string;
+};
+
+const LIST_SELECT =
+  'id,line_index,tiers,nomfournisseur,entite,famille,siret,pays,created_at,' +
+  'validated_by_compta_at,validated_by_achats_at,' +
+  'submitted_by_user_id,rejected_at,rejected_by_user_id,rejection_reason';
+
+const DETAIL_SELECT =
+  LIST_SELECT +
+  ',description,commentaires,tva,delai_de_paiement,ca_estime,' +
+  'nom_contact,adresse_mail,telephone,poste,' +
+  'validated_by_achats_user_id,validated_by_compta_user_id,' +
+  'supplier_waiting_approval_attachments(id,attachment_kind,file_name,file_url,storage_path)';
 
 export function useSupplierWaitingApprovalList(options?: { enabled?: boolean }) {
   return useQuery({
@@ -21,13 +64,35 @@ export function useSupplierWaitingApprovalList(options?: { enabled?: boolean }) 
     queryFn: async () => {
       const { data, error } = await supabase
         .from('supplier_waiting_approval')
-        .select(
-          'id,line_index,tiers,nomfournisseur,entite,famille,siret,created_at,validated_by_compta_at,validated_by_achats_at',
-        )
+        .select(LIST_SELECT)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       return (data ?? []) as SupplierWaitingApprovalRow[];
+    },
+  });
+}
+
+export function useSupplierWaitingApprovalDetail(id: string | null) {
+  return useQuery({
+    queryKey: ['supplier-waiting-approval-detail', id],
+    enabled: !!id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('supplier_waiting_approval')
+        .select(DETAIL_SELECT)
+        .eq('id', id!)
+        .single();
+
+      if (error) throw error;
+      if (!data) return null;
+
+      const raw = data as Record<string, unknown>;
+      const attachments = Array.isArray(raw.supplier_waiting_approval_attachments)
+        ? (raw.supplier_waiting_approval_attachments as SupplierWaitingAttachment[])
+        : [];
+
+      return { ...raw, attachments } as SupplierWaitingApprovalDetail;
     },
   });
 }

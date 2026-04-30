@@ -138,9 +138,11 @@ export function NewSupplierRequestDialog({ open, onClose }: NewSupplierRequestDi
     setSubmitting(true);
     const lineIndex = crypto.randomUUID();
     const ca = Number(String(caEstime).replace(',', '.').trim());
+    const { data: authData } = await supabase.auth.getUser();
     const row = {
       line_index: lineIndex,
       tiers: null as string | null,
+      submitted_by_user_id: authData.user?.id ?? null,
       entite: entite.trim(),
       nomfournisseur: nomSociete.trim(),
       commentaires: raison.trim(),

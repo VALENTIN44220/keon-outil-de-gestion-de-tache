@@ -17,7 +17,10 @@
 --   est NULL (groupe orphelin, pas rattache a un projet).
 -- ============================================================================
 
-CREATE OR REPLACE VIEW public.v_be_groupe_kpi AS
+-- DROP requis : CREATE OR REPLACE VIEW ne peut pas modifier/supprimer des colonnes.
+DROP VIEW IF EXISTS public.v_be_groupe_kpi;
+
+CREATE VIEW public.v_be_groupe_kpi AS
 WITH groupes_divalto AS (
   -- Tous les codes 5 chars distincts vus dans be_divalto_mouvements
   SELECT
