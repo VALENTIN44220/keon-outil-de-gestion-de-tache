@@ -14,6 +14,8 @@ export interface BEGroupeKPI {
   cogs_engage_brut: number;
   cogs_constate_brut: number;
   marge_constatee_brut: number;
+  marge_brute_brut: number;
+  marge_directe_brut: number;
   nb_commandes: number;
   nb_factures: number;
   nb_activites_divalto: number;

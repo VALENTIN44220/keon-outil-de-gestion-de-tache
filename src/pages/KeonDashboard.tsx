@@ -6,6 +6,7 @@ import { useQuestionnaireProjectData } from '@/hooks/useQuestionnaireProjectData
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { useProjectFilters } from '@/hooks/useProjectFilters';
 import { BEProjectsKeonView } from '@/components/projects/BEProjectsKeonView';
+import { BEProjectsAffairesView } from '@/components/projects/BEProjectsAffairesView';
 import { BEProjectCardsView } from '@/components/projects/BEProjectCardsView';
 import { ProjectKanbanView, GroupByField } from '@/components/projects/ProjectKanbanView';
 import { ProjectMultiFiltersPanel } from '@/components/projects/ProjectMultiFiltersPanel';
@@ -274,12 +275,19 @@ export default function KeonDashboard({ variant = 'spv' }: KeonDashboardProps) {
           <>
             {/* Synthèse view */}
             {currentView === 'synthese' && (
-              <BEProjectsKeonView
-                projects={filteredProjects}
-                qstData={qstData}
-                keonProjectIds={keonProjectIds}
-                variant={variant}
-              />
+              variant === 'be' ? (
+                <BEProjectsAffairesView
+                  projects={filteredProjects}
+                  hubBasePath={hubBasePath}
+                />
+              ) : (
+                <BEProjectsKeonView
+                  projects={filteredProjects}
+                  qstData={qstData}
+                  keonProjectIds={keonProjectIds}
+                  variant={variant}
+                />
+              )
             )}
 
             {/* Cards view */}

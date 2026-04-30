@@ -32,8 +32,11 @@ export function BEAffaireCard({ affaire, kpi, onSelect, onEdit, onDelete }: BEAf
   const statusCfg = BE_AFFAIRE_STATUS_CONFIG[affaire.status];
   const caConstate = kpi?.ca_constate_brut ?? 0;
   const cogsConstate = kpi?.cogs_constate_brut ?? 0;
-  const marge = kpi?.marge_constatee_brut ?? (caConstate - cogsConstate);
-  const margeNeg = marge < 0;
+  const margeBrute = kpi?.marge_brute_brut ?? kpi?.marge_constatee_brut ?? (caConstate - cogsConstate);
+  const coutRh = kpi?.cout_rh_declare ?? 0;
+  const margeDirecte = kpi?.marge_directe_brut ?? (margeBrute - coutRh);
+  const bruteNeg = margeBrute < 0;
+  const directeNeg = margeDirecte < 0;
 
   return (
     <Card
@@ -88,8 +91,8 @@ export function BEAffaireCard({ affaire, kpi, onSelect, onEdit, onDelete }: BEAf
       </CardHeader>
 
       <CardContent className="pt-0 space-y-3">
-        {/* Mini KPIs CA / COGS / Marge */}
-        <div className="grid grid-cols-3 gap-1.5">
+        {/* Mini KPIs CA / COGS / Marge brute / Marge directe */}
+        <div className="grid grid-cols-2 gap-1.5">
           <div className="rounded-md bg-indigo-500/5 border border-indigo-500/10 p-2">
             <div className="flex items-center gap-1 text-[10px] text-indigo-600/80 mb-0.5">
               <Receipt className="h-3 w-3" />
@@ -111,28 +114,51 @@ export function BEAffaireCard({ affaire, kpi, onSelect, onEdit, onDelete }: BEAf
           <div
             className={cn(
               'rounded-md border p-2',
-              margeNeg
-                ? 'bg-red-500/5 border-red-500/10'
-                : 'bg-emerald-500/5 border-emerald-500/10',
+              bruteNeg ? 'bg-red-500/5 border-red-500/10' : 'bg-emerald-500/5 border-emerald-500/10',
             )}
           >
             <div
               className={cn(
                 'flex items-center gap-1 text-[10px] mb-0.5',
-                margeNeg ? 'text-red-600/80' : 'text-emerald-600/80',
+                bruteNeg ? 'text-red-600/80' : 'text-emerald-600/80',
               )}
             >
-              {margeNeg ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
-              <span>Marge</span>
+              {bruteNeg ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
+              <span>Marge brute</span>
             </div>
             <p
               className={cn(
                 'text-xs font-bold tabular-nums truncate',
-                margeNeg ? 'text-red-700' : 'text-emerald-700',
+                bruteNeg ? 'text-red-700' : 'text-emerald-700',
               )}
-              title={eur(marge)}
+              title={eur(margeBrute)}
             >
-              {eur(marge)}
+              {eur(margeBrute)}
+            </p>
+          </div>
+          <div
+            className={cn(
+              'rounded-md border p-2',
+              directeNeg ? 'bg-red-500/5 border-red-500/10' : 'bg-emerald-500/5 border-emerald-500/10',
+            )}
+          >
+            <div
+              className={cn(
+                'flex items-center gap-1 text-[10px] mb-0.5',
+                directeNeg ? 'text-red-600/80' : 'text-emerald-600/80',
+              )}
+            >
+              {directeNeg ? <TrendingDown className="h-3 w-3" /> : <TrendingUp className="h-3 w-3" />}
+              <span>Marge directe</span>
+            </div>
+            <p
+              className={cn(
+                'text-xs font-bold tabular-nums truncate',
+                directeNeg ? 'text-red-700' : 'text-emerald-700',
+              )}
+              title={eur(margeDirecte)}
+            >
+              {eur(margeDirecte)}
             </p>
           </div>
         </div>
@@ -140,7 +166,7 @@ export function BEAffaireCard({ affaire, kpi, onSelect, onEdit, onDelete }: BEAf
         <p className="text-[11px] text-muted-foreground">
           {(kpi?.nb_commandes ?? 0)} cmd · {(kpi?.nb_factures ?? 0)} fact
           {affaire.date_ouverture && (
-            <> · ouverte le {new Date(affaire.date_ouverture).toLocaleDateString('fr-FR')}</>
+            <> · démarrée le {new Date(affaire.date_ouverture).toLocaleDateString('fr-FR')}</>
           )}
         </p>
       </CardContent>

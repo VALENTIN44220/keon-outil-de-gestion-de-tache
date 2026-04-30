@@ -21,6 +21,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Loader2, AlertCircle, CheckCircle2, Sparkles } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import { extractErrorMessage } from '@/lib/extractErrorMessage';
 import {
   useBEAffaires,
@@ -69,6 +70,7 @@ export function BEAffaireDialog({
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState<BEAffaireStatus>('ouverte');
   const [dateOuverture, setDateOuverture] = useState('');
+  const [dateAutoSourceCCN, setDateAutoSourceCCN] = useState<string | null>(null);
 
   // (Re)initialise les champs a chaque ouverture
   useEffect(() => {
@@ -78,7 +80,39 @@ export function BEAffaireDialog({
     setDescription(affaire?.description ?? '');
     setStatus(affaire?.status ?? 'ouverte');
     setDateOuverture(affaire?.date_ouverture ?? new Date().toISOString().slice(0, 10));
+    setDateAutoSourceCCN(null);
   }, [open, affaire]);
+
+  // Lookup automatique : si code_affaire saisi, regarder s'il existe une CCN
+  // dans Divalto et utiliser sa date (cddt) comme date de demarrage par defaut.
+  // Ne s'applique qu'en CREATION (pas edition) et tant que l'user n'a pas
+  // modifie manuellement le champ date_ouverture.
+  useEffect(() => {
+    if (isEdit) return;
+    const code = codeAffaire.trim().toUpperCase();
+    if (code.length < 5) return;
+    let cancelled = false;
+    (async () => {
+      const sb = supabase as any;
+      const { data, error } = await sb
+        .from('be_divalto_mouvements')
+        .select('date_piece')
+        .eq('code_affaire', code)
+        .eq('type_mouv', 'CCN')
+        .not('date_piece', 'is', null)
+        .order('date_piece', { ascending: true })
+        .limit(1);
+      if (cancelled) return;
+      if (!error && data && data.length > 0 && data[0].date_piece) {
+        const d = String(data[0].date_piece).slice(0, 10);
+        setDateOuverture(d);
+        setDateAutoSourceCCN(d);
+      } else {
+        setDateAutoSourceCCN(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [codeAffaire, isEdit]);
 
   // Detection auto du code projet a partir du code_affaire saisi
   const detectedProjectCode = useMemo(
@@ -279,7 +313,15 @@ export function BEAffaireDialog({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="date_ouverture">Date d'ouverture</Label>
+              <Label htmlFor="date_ouverture" className="flex items-center gap-1.5">
+                Date de démarrage
+                {dateAutoSourceCCN && dateOuverture === dateAutoSourceCCN && (
+                  <span className="inline-flex items-center gap-1 text-[10px] text-amber-600">
+                    <Sparkles className="h-3 w-3" />
+                    auto CCN
+                  </span>
+                )}
+              </Label>
               <Input
                 id="date_ouverture"
                 type="date"
