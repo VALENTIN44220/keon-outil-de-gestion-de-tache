@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { BEProjectHubLayout } from '@/components/be/BEProjectHubLayout';
 import { useBEProjectByCode } from '@/hooks/useBEProjectHub';
 import { useBEProjectHubCode } from '@/hooks/useBEProjectHubCode';
@@ -41,7 +41,6 @@ import { extractErrorMessage } from '@/lib/extractErrorMessage';
 import { BEBudgetKpiCards } from '@/components/be/budget/BEBudgetKpiCards';
 import { BEAffaireCard } from '@/components/be/budget/BEAffaireCard';
 import { BEAffaireDialog } from '@/components/be/budget/BEAffaireDialog';
-import { BEAffaireDetailSheet } from '@/components/be/budget/BEAffaireDetailSheet';
 import { BEGroupeHeader } from '@/components/be/budget/BEGroupeHeader';
 import {
   BEAffaireTable,
@@ -81,6 +80,7 @@ function loadColumns(): BEAffaireColumnKey[] {
 
 export default function BEProjectHubBudget() {
   const code = useBEProjectHubCode();
+  const navigate = useNavigate();
   const { data: project, isLoading: projectLoading } = useBEProjectByCode(code);
   const {
     affaires,
@@ -98,8 +98,10 @@ export default function BEProjectHubBudget() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editingAffaire, setEditingAffaire] = useState<BEAffaire | null>(null);
-  const [selectedAffaire, setSelectedAffaire] = useState<BEAffaire | null>(null);
   const [deletingAffaire, setDeletingAffaire] = useState<BEAffaire | null>(null);
+
+  const navigateToAffaire = (a: BEAffaire) =>
+    navigate(`/be/projects/${code}/budget/${a.code_affaire}`);
 
   useEffect(() => {
     try { window.localStorage.setItem(VIEW_MODE_KEY, viewMode); } catch { /* noop */ }
@@ -371,7 +373,7 @@ export default function BEProjectHubBudget() {
                       key={a.id}
                       affaire={a}
                       kpi={kpisByAffaireId.get(a.id)}
-                      onSelect={() => setSelectedAffaire(a)}
+                      onSelect={() => navigateToAffaire(a)}
                       onEdit={() => setEditingAffaire(a)}
                       onDelete={() => setDeletingAffaire(a)}
                     />
@@ -386,7 +388,7 @@ export default function BEProjectHubBudget() {
             kpisByAffaireId={kpisByAffaireId}
             visibleColumns={columns}
             onColumnsChange={setColumns}
-            onSelect={setSelectedAffaire}
+            onSelect={navigateToAffaire}
             onEdit={setEditingAffaire}
             onDelete={setDeletingAffaire}
           />
@@ -408,15 +410,6 @@ export default function BEProjectHubBudget() {
         expectedProjectCode={expectedProjectCode}
         existingAffaireCodes={existingAffaireCodes}
         affaire={editingAffaire}
-      />
-
-      <BEAffaireDetailSheet
-        affaire={selectedAffaire}
-        onOpenChange={(o) => !o && setSelectedAffaire(null)}
-        onEditAffaire={(a) => {
-          setSelectedAffaire(null);
-          setEditingAffaire(a);
-        }}
       />
 
       {/* Confirmation delete */}
