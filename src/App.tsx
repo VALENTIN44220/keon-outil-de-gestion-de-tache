@@ -3,7 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 import { Suspense, lazy } from "react";
-import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SimulationProvider } from "@/contexts/SimulationContext";
 import { PermissionsProvider } from "@/contexts/PermissionsContext";
@@ -46,14 +46,7 @@ const BEProjectHubFiles = lazy(() => import("./pages/be/BEProjectHubFiles"));
 const BEProjectHubQuestionnaire = lazy(() => import("./pages/be/BEProjectHubQuestionnaire"));
 const BEProjectHubKeonSynthese = lazy(() => import("./pages/be/BEProjectHubKeonSynthese"));
 const BEProjectHubBudget = lazy(() => import("./pages/be/BEProjectHubBudget"));
-const BEProjectHubBudgetAffaire = lazy(() => import("./pages/be/BEProjectHubBudgetAffaire"));
 const BEAdminTJM = lazy(() => import("./pages/BEAdminTJM"));
-
-// Budget tab is BE-only. If someone lands on /spv/.../budget, send them to overview.
-function SpvBudgetRedirect() {
-  const { code } = useParams();
-  return <Navigate to={`/spv/projects/${code}/overview`} replace />;
-}
 
 // IT Project Hub pages
 const ITProjects = lazy(() => import("./pages/it/ITProjects"));
@@ -121,7 +114,6 @@ const App = () => (
                 { path: "/be/projects/:code/keon-synthese", end: true, element: <ProtectedRoute><BEProjectHubKeonSynthese /></ProtectedRoute> },
                 { path: "/be/projects/:code/timeline", end: true, element: <ProtectedRoute><BEProjectHubTimeline /></ProtectedRoute> },
                 { path: "/be/projects/:code/budget", end: true, element: <ProtectedRoute><BEProjectHubBudget /></ProtectedRoute> },
-                { path: "/be/projects/:code/budget/:codeAffaire", end: true, element: <ProtectedRoute><BEProjectHubBudgetAffaire /></ProtectedRoute> },
                 { path: "/be/admin/tjm", end: true, element: <ProtectedRoute><BEAdminTJM /></ProtectedRoute> },
                 { path: "/be/projects/:code/discussions", end: true, element: <ProtectedRoute><BEProjectHubDiscussions /></ProtectedRoute> },
                 { path: "/be/projects/:code/files", end: true, element: <ProtectedRoute><BEProjectHubFiles /></ProtectedRoute> },
@@ -130,7 +122,7 @@ const App = () => (
                 { path: "/spv/projects/:code/questionnaire", end: true, element: <ProtectedRoute><BEProjectHubQuestionnaire /></ProtectedRoute> },
                 { path: "/spv/projects/:code/keon-synthese", end: true, element: <ProtectedRoute><BEProjectHubKeonSynthese /></ProtectedRoute> },
                 { path: "/spv/projects/:code/timeline", end: true, element: <ProtectedRoute><BEProjectHubTimeline /></ProtectedRoute> },
-                { path: "/spv/projects/:code/budget", end: true, element: <ProtectedRoute><SpvBudgetRedirect /></ProtectedRoute> },
+                { path: "/spv/projects/:code/budget", end: true, element: <ProtectedRoute><BEProjectHubBudget /></ProtectedRoute> },
                 { path: "/spv/projects/:code/discussions", end: true, element: <ProtectedRoute><BEProjectHubDiscussions /></ProtectedRoute> },
                 { path: "/spv/projects/:code/files", end: true, element: <ProtectedRoute><BEProjectHubFiles /></ProtectedRoute> },
 
@@ -176,7 +168,6 @@ const App = () => (
             <Route path="/be/projects/:code/keon-synthese" element={<></>} />
             <Route path="/be/projects/:code/timeline" element={<></>} />
             <Route path="/be/projects/:code/budget" element={<></>} />
-            <Route path="/be/projects/:code/budget/:codeAffaire" element={<></>} />
             <Route path="/be/admin/tjm" element={<></>} />
             <Route path="/be/projects/:code/discussions" element={<></>} />
             <Route path="/be/projects/:code/files" element={<></>} />
