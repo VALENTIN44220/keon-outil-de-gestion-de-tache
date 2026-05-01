@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { useBEProjects } from '@/hooks/useBEProjects';
 import { useQuestionnaireProjectData } from '@/hooks/useQuestionnaireProjectData';
@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Loader2, Search, BarChart2, LayoutGrid, List, Kanban, Leaf, Pencil, Trash2, Building2, LayoutDashboard, FolderOpen } from 'lucide-react';
+import { Loader2, Search, BarChart2, LayoutGrid, List, Kanban, Leaf, Pencil, Trash2, Building2, LayoutDashboard, FolderOpen, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
@@ -185,6 +185,14 @@ export default function KeonDashboard({ variant = 'spv' }: KeonDashboardProps) {
                 : 'Gérez vos projets BE, suivez leur avancement et accédez au hub détaillé de chaque projet.'}
             </p>
           </div>
+          {variant === 'be' && (
+            <Button asChild variant="outline" size="sm" className="gap-1.5 shrink-0" title="Importer en lot des affaires depuis Divalto">
+              <Link to="/be/admin/divalto-import">
+                <Upload className="h-4 w-4" />
+                Importer Divalto
+              </Link>
+            </Button>
+          )}
         </div>
 
         {/* Search + View Toggle + Filters */}
