@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useMemo, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useBEProjectByCode, useBEProjectTasks, useBEProjectStats } from '@/hooks/useBEProjectHub';
 import { useBEProjectHubCode } from '@/hooks/useBEProjectHubCode';
@@ -12,7 +12,6 @@ import { BEProjectDialog } from '@/components/projects/BEProjectDialog';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useQuestionnaireProjectData } from '@/hooks/useQuestionnaireProjectData';
 
 interface BEProjectHubLayoutProps {
   children: ReactNode;
@@ -33,44 +32,13 @@ export function BEProjectHubLayout({ children }: BEProjectHubLayoutProps) {
   const { data: tasks = [], isLoading: tasksLoading } = useBEProjectTasks(project?.id);
   
   const stats = useBEProjectStats(project?.id, tasks);
-  const projectsArray = useMemo(() => (project ? [project] : []), [project]);
-  const { qstData } = useQuestionnaireProjectData(projectsArray);
 
-  // Canonicalize URL namespace based on project SPV flag (prevents /be and /spv duplicates).
-  useEffect(() => {
-    if (!project) return;
-    // Guard: never build a URL with an undefined code_projet (would navigate to
-    // /spv/projects/undefined/overview and lock the app in a stale-mount loop via PersistentRoutes).
-    const projectCode = project.code_projet?.trim();
-    if (!projectCode) return;
-
-    const rawSpv = qstData[project.id]?.['02_GEN_spv_cree'];
-    // Avoid oscillation: don't redirect until the SPV field is actually known.
-    // (qstData loads async; initial empty map would otherwise force a wrong redirect first.)
-    if (!rawSpv || String(rawSpv).trim() === '') return;
-
-    const spvValue = String(rawSpv).toUpperCase().trim();
-    const shouldBeSpv = spvValue === 'OUI';
-    const desiredBase = shouldBeSpv ? '/spv/projects' : '/be/projects';
-    const currentIsSpv = location.pathname.startsWith('/spv/projects/');
-    const currentIsBe = location.pathname.startsWith('/be/projects/');
-    if (!currentIsSpv && !currentIsBe) return;
-
-    // Guard: only canonicalize when the URL is actually about THIS project.
-    // Without this, a stale BEProjectHubLayout (kept mounted by PersistentRoutes for a
-    // previously-visited project) would hijack navigation to other projects/sections and
-    // redirect them to its own URL.
-    const urlMatch = location.pathname.match(/^\/(?:spv|be)\/projects\/([^/]+)/);
-    const urlCode = urlMatch?.[1]?.toUpperCase();
-    if (!urlCode || urlCode !== projectCode.toUpperCase()) return;
-
-    const parts = location.pathname.split('/').filter(Boolean);
-    const activeTab = parts[parts.length - 1] || 'overview';
-    const desiredPath = `${desiredBase}/${projectCode}/${activeTab}`;
-    if (location.pathname !== desiredPath) {
-      navigate(desiredPath, { replace: true });
-    }
-  }, [project, qstData, location.pathname, navigate]);
+  // NOTE: la canonicalisation auto /be/ <-> /spv/ basee sur le flag SPV du projet
+  // a ete supprimee. Le namespace dans l'URL refleche le WORKSPACE de l'utilisateur,
+  // pas le statut du projet :
+  //   - BE = workspace omniscient (acces a tous les projets, y compris SPV-flagged, budget inclus)
+  //   - SPV = workspace cloisonne (projets SPV uniquement, pas de budget)
+  // Le cloisonnement applicatif (lecture/ecriture) reste pilote par les RLS Supabase.
 
   // URL du type /spv/projects//… (segment code vide) : retour liste
   useEffect(() => {

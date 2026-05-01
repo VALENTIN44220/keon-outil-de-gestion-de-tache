@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { BEProjectHubLayout } from '@/components/be/BEProjectHubLayout';
 import { useBEProjectByCode } from '@/hooks/useBEProjectHub';
 import { useBEProjectHubCode } from '@/hooks/useBEProjectHubCode';
@@ -78,7 +78,15 @@ const eur = (n: number | null | undefined) =>
 
 export default function BEProjectHubBudgetAffaire() {
   const projectCode = useBEProjectHubCode();
-  const { codeAffaire: codeAffaireParam } = useParams<{ codeAffaire: string }>();
+  // PersistentRoutes uses matchPath (not <Route>), so useParams() returns empty.
+  // Extract codeAffaire from pathname directly: /be/projects/:code/budget/:codeAffaire
+  const { pathname } = useLocation();
+  const codeAffaireParam = useMemo(() => {
+    const m = pathname.match(/^\/be\/projects\/[^/]+\/budget\/([^/]+)/);
+    if (!m?.[1]) return undefined;
+    try { return decodeURIComponent(m[1]).trim() || undefined; }
+    catch { return m[1].trim() || undefined; }
+  }, [pathname]);
 
   const { data: project, isLoading: projectLoading } = useBEProjectByCode(projectCode);
   const { affaires, isLoading: affairesLoading } = useBEAffaires(project?.id);

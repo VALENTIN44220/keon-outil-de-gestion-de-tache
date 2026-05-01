@@ -3,7 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 import { Suspense, lazy } from "react";
-import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SimulationProvider } from "@/contexts/SimulationContext";
 import { PermissionsProvider } from "@/contexts/PermissionsContext";
@@ -50,8 +50,12 @@ const BEProjectHubBudgetAffaire = lazy(() => import("./pages/be/BEProjectHubBudg
 const BEAdminTJM = lazy(() => import("./pages/BEAdminTJM"));
 
 // Budget tab is BE-only. If someone lands on /spv/.../budget, send them to overview.
+// NOTE: PersistentRoutes uses matchPath (not <Route>), so useParams() doesn't work here.
+// We extract the code directly from the URL.
 function SpvBudgetRedirect() {
-  const { code } = useParams();
+  const { pathname } = useLocation();
+  const code = pathname.match(/^\/spv\/projects\/([^/]+)/)?.[1];
+  if (!code) return <Navigate to="/spv" replace />;
   return <Navigate to={`/spv/projects/${code}/overview`} replace />;
 }
 
