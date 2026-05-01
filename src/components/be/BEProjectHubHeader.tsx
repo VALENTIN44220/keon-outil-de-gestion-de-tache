@@ -47,7 +47,7 @@ const baseNavItems = [
   { value: 'questionnaire', label: 'Questionnaire', icon: ClipboardList },
   { value: 'keon-synthese', label: '📊 Synthèse KEON', icon: BarChart3, keonOnly: true },
   { value: 'timeline', label: 'Timeline', icon: Calendar },
-  { value: 'budget', label: 'Budget', icon: Wallet },
+  { value: 'budget', label: 'Budget', icon: Wallet, beOnly: true },
   { value: 'discussions', label: 'Discussions', icon: MessageSquare },
   { value: 'files', label: 'Fichiers', icon: Paperclip },
 ];
@@ -57,13 +57,18 @@ export function BEProjectHubHeader({ project, stats, onEditProject }: BEProjectH
   const { keonProjectIds } = useQuestionnaireProjectData(projectsArray);
   const isKeonProject = keonProjectIds.has(project.id);
 
-  const navItems = useMemo(
-    () => baseNavItems.filter(item => !item.keonOnly || isKeonProject),
-    [isKeonProject]
-  );
   const navigate = useNavigate();
   const location = useLocation();
   const isSpvContext = location.pathname.startsWith('/spv/projects/');
+  const navItems = useMemo(
+    () =>
+      baseNavItems.filter(
+        (item) =>
+          (!item.keonOnly || isKeonProject) &&
+          (!item.beOnly || !isSpvContext),
+      ),
+    [isKeonProject, isSpvContext],
+  );
   const projectBasePath = isSpvContext ? '/spv/projects' : '/be/projects';
   const projectsListPath = isSpvContext ? '/spv' : '/projects';
 

@@ -59,9 +59,9 @@ export function BEAffaireMonthlyBreakdown({
         mois: format(new Date(r.date), 'MMM yy', { locale: fr }),
         moisIso: r.mois,
         'CA Constaté': r.ca_constate,
-        'COGS Const.': r.cogs_constate,
-        'NDF': r.ndf,
-        'Coût RH': r.cout_rh,
+        'COGS Const.': r.cogs_constate > 0 ? -r.cogs_constate : 0,
+        'NDF': r.ndf > 0 ? -r.ndf : 0,
+        'Coût RH': r.cout_rh > 0 ? -r.cout_rh : 0,
         'Marge directe': r.marge_directe,
       })),
     [rows],
@@ -120,7 +120,10 @@ export function BEAffaireMonthlyBreakdown({
                 <XAxis dataKey="mois" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
                 <RTooltip
-                  formatter={(v: number) => eur(v)}
+                  formatter={(v: number, name: string) => {
+                    const isCost = name === 'COGS Const.' || name === 'NDF' || name === 'Coût RH';
+                    return [eur(isCost ? Math.abs(v) : v), name];
+                  }}
                   labelStyle={{ fontWeight: 600 }}
                   contentStyle={{
                     backgroundColor: 'hsl(var(--card))',
