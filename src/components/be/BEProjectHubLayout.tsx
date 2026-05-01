@@ -39,6 +39,11 @@ export function BEProjectHubLayout({ children }: BEProjectHubLayoutProps) {
   // Canonicalize URL namespace based on project SPV flag (prevents /be and /spv duplicates).
   useEffect(() => {
     if (!project) return;
+    // Guard: never build a URL with an undefined code_projet (would navigate to
+    // /spv/projects/undefined/overview and lock the app in a stale-mount loop via PersistentRoutes).
+    const projectCode = project.code_projet?.trim();
+    if (!projectCode) return;
+
     const rawSpv = qstData[project.id]?.['02_GEN_spv_cree'];
     // Avoid oscillation: don't redirect until the SPV field is actually known.
     // (qstData loads async; initial empty map would otherwise force a wrong redirect first.)
@@ -51,9 +56,17 @@ export function BEProjectHubLayout({ children }: BEProjectHubLayoutProps) {
     const currentIsBe = location.pathname.startsWith('/be/projects/');
     if (!currentIsSpv && !currentIsBe) return;
 
+    // Guard: only canonicalize when the URL is actually about THIS project.
+    // Without this, a stale BEProjectHubLayout (kept mounted by PersistentRoutes for a
+    // previously-visited project) would hijack navigation to other projects/sections and
+    // redirect them to its own URL.
+    const urlMatch = location.pathname.match(/^\/(?:spv|be)\/projects\/([^/]+)/);
+    const urlCode = urlMatch?.[1]?.toUpperCase();
+    if (!urlCode || urlCode !== projectCode.toUpperCase()) return;
+
     const parts = location.pathname.split('/').filter(Boolean);
     const activeTab = parts[parts.length - 1] || 'overview';
-    const desiredPath = `${desiredBase}/${project.code_projet}/${activeTab}`;
+    const desiredPath = `${desiredBase}/${projectCode}/${activeTab}`;
     if (location.pathname !== desiredPath) {
       navigate(desiredPath, { replace: true });
     }
