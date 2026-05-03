@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +22,9 @@ import {
   Coins,
   ChevronRight,
   Building2,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -35,17 +38,37 @@ const eur = (n: number) =>
 const num = (n: number, frac = 1) =>
   n.toLocaleString('fr-FR', { maximumFractionDigits: frac });
 
+type SortKey =
+  | 'code_projet'
+  | 'nb_affaires'
+  | 'ca_constate'
+  | 'cogs'
+  | 'marge_brute'
+  | 'cout_rh'
+  | 'marge_directe'
+  | 'jours';
+
+type FilterMode = 'all' | 'with_ca' | 'with_rh' | 'neg_margin' | 'pos_margin';
+
 interface BEProjectsAffairesViewProps {
-  /** Projets actuellement filtres dans le dashboard. */
   projects: BEProject[];
   hubBasePath: string;
 }
 
-/**
- * Vue "Synthese BE" centree sur les KPIs metier (CA / COGS / Marge / Temps / Cout RH).
- * Lit la vue v_be_project_synthese_kpi qui agrege les indicateurs des affaires
- * de chaque projet BE.
- */
+function kpiSortValue(k: BEProjectSyntheseKPI, key: SortKey): number {
+  switch (key) {
+    case 'nb_affaires': return k.nb_affaires;
+    case 'ca_constate': return k.ca_constate_brut;
+    case 'cogs': return k.cogs_constate_brut;
+    case 'marge_brute': return k.marge_brute_brut ?? k.marge_constatee_brut;
+    case 'cout_rh': return k.cout_rh_declare;
+    case 'marge_directe':
+      return k.marge_directe_brut ?? (k.marge_constatee_brut - k.cout_rh_declare);
+    case 'jours': return k.jours_declares;
+    default: return 0;
+  }
+}
+
 export function BEProjectsAffairesView({
   projects,
   hubBasePath,
@@ -53,20 +76,54 @@ export function BEProjectsAffairesView({
   const navigate = useNavigate();
   const { data: kpis = [], isLoading } = useBEProjectsSyntheseKpi();
 
-  // Filtre les KPIs sur les projets actuellement visibles
+  const [sortKey, setSortKey] = useState<SortKey>('ca_constate');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [filterMode, setFilterMode] = useState<FilterMode>('all');
+
   const visibleProjectIds = useMemo(
     () => new Set(projects.map((p) => p.id)),
     [projects],
   );
+
   const filteredKpis = useMemo(
     () => kpis.filter((k) => visibleProjectIds.has(k.be_project_id)),
     [kpis, visibleProjectIds],
   );
 
-  // Totaux globaux (toutes les KPIs visibles consolidees)
+  const displayKpis = useMemo(() => {
+    let result = [...filteredKpis];
+
+    // Quick filter
+    if (filterMode === 'with_ca')
+      result = result.filter((k) => k.ca_constate_brut > 0 || k.ca_engage_brut > 0);
+    else if (filterMode === 'with_rh')
+      result = result.filter((k) => k.jours_declares > 0);
+    else if (filterMode === 'neg_margin')
+      result = result.filter(
+        (k) => (k.marge_brute_brut ?? k.marge_constatee_brut) < 0,
+      );
+    else if (filterMode === 'pos_margin')
+      result = result.filter(
+        (k) => (k.marge_brute_brut ?? k.marge_constatee_brut) > 0,
+      );
+
+    // Sort
+    result.sort((a, b) => {
+      if (sortKey === 'code_projet') {
+        const cmp = a.code_projet.localeCompare(b.code_projet);
+        return sortDir === 'asc' ? cmp : -cmp;
+      }
+      const va = kpiSortValue(a, sortKey);
+      const vb = kpiSortValue(b, sortKey);
+      return sortDir === 'asc' ? va - vb : vb - va;
+    });
+
+    return result;
+  }, [filteredKpis, sortKey, sortDir, filterMode]);
+
   const totals = useMemo(() => {
     const t = {
-      nb_projets: filteredKpis.length,
+      nb_projets: displayKpis.length,
       nb_affaires: 0,
       ca_engage: 0,
       ca_constate: 0,
@@ -76,45 +133,70 @@ export function BEProjectsAffairesView({
       marge_directe: 0,
       jours_declares: 0,
     };
-    for (const k of filteredKpis) {
+    for (const k of displayKpis) {
       t.nb_affaires += k.nb_affaires;
       t.ca_engage += k.ca_engage_brut;
       t.ca_constate += k.ca_constate_brut;
       t.cogs_constate += k.cogs_constate_brut;
-      t.marge_brute += (k.marge_brute_brut ?? k.marge_constatee_brut);
+      t.marge_brute += k.marge_brute_brut ?? k.marge_constatee_brut;
       t.cout_rh_declare += k.cout_rh_declare;
-      t.marge_directe += (k.marge_directe_brut ?? (k.marge_constatee_brut - k.cout_rh_declare));
+      t.marge_directe +=
+        k.marge_directe_brut ?? (k.marge_constatee_brut - k.cout_rh_declare);
       t.jours_declares += k.jours_declares;
     }
     return t;
-  }, [filteredKpis]);
+  }, [displayKpis]);
 
-  const sortedKpis = useMemo(
-    () =>
-      [...filteredKpis].sort(
-        (a, b) =>
-          (b.ca_constate_brut + b.ca_engage_brut) -
-          (a.ca_constate_brut + a.ca_engage_brut),
-      ),
-    [filteredKpis],
-  );
-
-  // Match nom_projet projet manquant via les projets actuels (si la vue ne l'a pas)
   const projectsById = useMemo(() => {
     const m = new Map<string, BEProject>();
     for (const p of projects) m.set(p.id, p);
     return m;
   }, [projects]);
 
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else {
+      setSortKey(key);
+      setSortDir('desc');
+    }
+  };
+
+  const SortIcon = ({ k }: { k: SortKey }) => {
+    if (sortKey !== k) return <ArrowUpDown className="h-3 w-3 opacity-30 ml-1" />;
+    return sortDir === 'asc'
+      ? <ArrowUp className="h-3 w-3 ml-1 text-primary" />
+      : <ArrowDown className="h-3 w-3 ml-1 text-primary" />;
+  };
+
+  const SortableHead = ({
+    label,
+    k,
+    className,
+  }: { label: string; k: SortKey; className?: string }) => (
+    <TableHead
+      className={cn('cursor-pointer select-none hover:text-foreground whitespace-nowrap', className)}
+      onClick={() => toggleSort(k)}
+    >
+      <span className="inline-flex items-center">
+        {label}
+        <SortIcon k={k} />
+      </span>
+    </TableHead>
+  );
+
+  const FILTER_CHIPS: { key: FilterMode; label: string }[] = [
+    { key: 'all', label: 'Tous' },
+    { key: 'with_ca', label: 'Avec CA' },
+    { key: 'with_rh', label: 'Avec RH déclaré' },
+    { key: 'pos_margin', label: 'Marge brute >' },
+    { key: 'neg_margin', label: 'Marge brute <' },
+  ];
+
   if (isLoading) {
     return (
       <div className="space-y-4">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          <Skeleton className="h-24" />
-          <Skeleton className="h-24" />
-          <Skeleton className="h-24" />
-          <Skeleton className="h-24" />
-          <Skeleton className="h-24" />
+          {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-24" />)}
         </div>
         <Skeleton className="h-72" />
       </div>
@@ -186,57 +268,76 @@ export function BEProjectsAffairesView({
         />
       </div>
 
-      {/* Tableau par projet */}
+      {/* Tableau */}
       <Card className="border-border/50">
-        <CardContent className="p-0">
-          {sortedKpis.length === 0 ? (
+        {/* Filter chips */}
+        <div className="flex items-center gap-1.5 px-4 pt-3 pb-0 flex-wrap">
+          {FILTER_CHIPS.map((chip) => (
+            <button
+              key={chip.key}
+              onClick={() => setFilterMode(chip.key)}
+              className={cn(
+                'text-xs px-2.5 py-1 rounded-full border transition-colors',
+                filterMode === chip.key
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-transparent text-muted-foreground border-border hover:border-primary/50 hover:text-foreground',
+              )}
+            >
+              {chip.label}
+            </button>
+          ))}
+          {filterMode !== 'all' && (
+            <span className="text-xs text-muted-foreground ml-1">
+              — {displayKpis.length} projet{displayKpis.length !== 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+
+        <CardContent className="p-0 mt-3">
+          {displayKpis.length === 0 ? (
             <div className="py-12 text-center text-muted-foreground text-sm">
               <Building2 className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              Aucun projet BE avec données pour les filtres actuels.
+              Aucun projet BE pour ces critères.
             </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/30 hover:bg-muted/30">
-                    <TableHead>Projet</TableHead>
-                    <TableHead className="text-right">Affaires</TableHead>
-                    <TableHead className="text-right">CA Constaté</TableHead>
-                    <TableHead className="text-right">COGS</TableHead>
-                    <TableHead className="text-right">Marge brute</TableHead>
-                    <TableHead className="text-right">Coût RH</TableHead>
-                    <TableHead className="text-right">Marge directe</TableHead>
-                    <TableHead className="text-right">Jours décl.</TableHead>
-                    <TableHead className="w-12"></TableHead>
+                    <SortableHead label="Projet" k="code_projet" />
+                    <SortableHead label="Affaires" k="nb_affaires" className="text-right" />
+                    <SortableHead label="CA Constaté" k="ca_constate" className="text-right" />
+                    <SortableHead label="COGS" k="cogs" className="text-right" />
+                    <SortableHead label="Marge brute" k="marge_brute" className="text-right" />
+                    <SortableHead label="Coût RH" k="cout_rh" className="text-right" />
+                    <SortableHead label="Marge directe" k="marge_directe" className="text-right" />
+                    <SortableHead label="Jours décl." k="jours" className="text-right" />
+                    <TableHead className="w-12" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sortedKpis.map((k) => {
+                  {displayKpis.map((k) => {
                     const project = projectsById.get(k.be_project_id);
                     const margeBrute = k.marge_brute_brut ?? k.marge_constatee_brut;
-                    const margeDirecte = k.marge_directe_brut
-                      ?? (k.marge_constatee_brut - k.cout_rh_declare);
-                    const bruteNeg = margeBrute < 0;
-                    const directeNeg = margeDirecte < 0;
+                    const margeDirecte =
+                      k.marge_directe_brut ??
+                      (k.marge_constatee_brut - k.cout_rh_declare);
                     return (
                       <TableRow
                         key={k.be_project_id}
                         className="cursor-pointer hover:bg-muted/30"
-                        onClick={() => navigate(`${hubBasePath}/${k.code_projet}/budget`)}
+                        onClick={() =>
+                          navigate(`${hubBasePath}/${k.code_projet}/budget`)
+                        }
                       >
                         <TableCell>
-                          <div className="flex flex-col">
-                            <div className="flex items-center gap-2">
-                              <Badge
-                                variant="outline"
-                                className="font-mono text-[10px] h-5"
-                              >
-                                {k.code_projet}
-                              </Badge>
-                              <span className="font-medium text-sm truncate">
-                                {k.nom_projet ?? project?.nom_projet ?? '—'}
-                              </span>
-                            </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="font-mono text-[10px] h-5">
+                              {k.code_projet}
+                            </Badge>
+                            <span className="font-medium text-sm truncate">
+                              {k.nom_projet ?? project?.nom_projet ?? '—'}
+                            </span>
                           </div>
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
@@ -251,8 +352,8 @@ export function BEProjectsAffairesView({
                         <TableCell
                           className={cn(
                             'text-right tabular-nums font-semibold',
-                            bruteNeg && 'text-red-600',
-                            !bruteNeg && margeBrute > 0 && 'text-emerald-600',
+                            margeBrute < 0 && 'text-red-600',
+                            margeBrute > 0 && 'text-emerald-600',
                           )}
                         >
                           {margeBrute !== 0 ? eur(margeBrute) : '—'}
@@ -263,8 +364,8 @@ export function BEProjectsAffairesView({
                         <TableCell
                           className={cn(
                             'text-right tabular-nums font-semibold',
-                            directeNeg && 'text-red-600',
-                            !directeNeg && margeDirecte > 0 && 'text-emerald-600',
+                            margeDirecte < 0 && 'text-red-600',
+                            margeDirecte > 0 && 'text-emerald-600',
                           )}
                         >
                           {margeDirecte !== 0 ? eur(margeDirecte) : '—'}
@@ -281,7 +382,6 @@ export function BEProjectsAffairesView({
                               e.stopPropagation();
                               navigate(`${hubBasePath}/${k.code_projet}/budget`);
                             }}
-                            title="Ouvrir le budget"
                           >
                             <ChevronRight className="h-4 w-4" />
                           </Button>
