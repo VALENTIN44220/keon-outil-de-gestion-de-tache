@@ -19,8 +19,7 @@ import {
   Pencil,
   ClipboardList,
   BarChart3,
-  Wallet,
-  Clock
+  Wallet
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useQuestionnaireProjectData } from '@/hooks/useQuestionnaireProjectData';
