@@ -1,0 +1,1 @@
+-- Migration appliquee directement en prod via Lovable/dashboard. Contenu reel a recuperer via 'supabase db pull' dans une PR separee.

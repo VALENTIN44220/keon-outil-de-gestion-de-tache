@@ -56,11 +56,13 @@ CREATE INDEX IF NOT EXISTS idx_lucca_ndf_compte    ON public.lucca_notes_frais(c
 
 ALTER TABLE public.lucca_notes_frais ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Authenticated users can read lucca_notes_frais" ON public.lucca_notes_frais;
 CREATE POLICY "Authenticated users can read lucca_notes_frais"
   ON public.lucca_notes_frais FOR SELECT TO authenticated USING (true);
 
 -- Ecriture reservee au service_role (notebook Fabric).
 
+DROP TRIGGER IF EXISTS update_lucca_notes_frais_updated_at ON public.lucca_notes_frais;
 CREATE TRIGGER update_lucca_notes_frais_updated_at
   BEFORE UPDATE ON public.lucca_notes_frais
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();

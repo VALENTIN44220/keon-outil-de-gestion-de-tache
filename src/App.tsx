@@ -47,7 +47,9 @@ const BEProjectHubQuestionnaire = lazy(() => import("./pages/be/BEProjectHubQues
 const BEProjectHubKeonSynthese = lazy(() => import("./pages/be/BEProjectHubKeonSynthese"));
 const BEProjectHubBudget = lazy(() => import("./pages/be/BEProjectHubBudget"));
 const BEProjectHubBudgetAffaire = lazy(() => import("./pages/be/BEProjectHubBudgetAffaire"));
+const BEProjectHubTemps = lazy(() => import("./pages/be/BEProjectHubTemps"));
 const BEAdminTJM = lazy(() => import("./pages/BEAdminTJM"));
+const BEAdminDivaltoImport = lazy(() => import("./pages/BEAdminDivaltoImport"));
 
 // Budget tab is BE-only. If someone lands on /spv/.../budget, send them to overview.
 // NOTE: PersistentRoutes uses matchPath (not <Route>), so useParams() doesn't work here.
@@ -126,7 +128,9 @@ const App = () => (
                 { path: "/be/projects/:code/timeline", end: true, element: <ProtectedRoute><BEProjectHubTimeline /></ProtectedRoute> },
                 { path: "/be/projects/:code/budget", end: true, element: <ProtectedRoute><BEProjectHubBudget /></ProtectedRoute> },
                 { path: "/be/projects/:code/budget/:codeAffaire", end: true, element: <ProtectedRoute><BEProjectHubBudgetAffaire /></ProtectedRoute> },
+                { path: "/be/projects/:code/temps", end: true, element: <ProtectedRoute><BEProjectHubTemps /></ProtectedRoute> },
                 { path: "/be/admin/tjm", end: true, element: <ProtectedRoute><BEAdminTJM /></ProtectedRoute> },
+                { path: "/be/admin/divalto-import", end: true, element: <ProtectedRoute><BEAdminDivaltoImport /></ProtectedRoute> },
                 { path: "/be/projects/:code/discussions", end: true, element: <ProtectedRoute><BEProjectHubDiscussions /></ProtectedRoute> },
                 { path: "/be/projects/:code/files", end: true, element: <ProtectedRoute><BEProjectHubFiles /></ProtectedRoute> },
 
@@ -181,7 +185,9 @@ const App = () => (
             <Route path="/be/projects/:code/timeline" element={<></>} />
             <Route path="/be/projects/:code/budget" element={<></>} />
             <Route path="/be/projects/:code/budget/:codeAffaire" element={<></>} />
+            <Route path="/be/projects/:code/temps" element={<></>} />
             <Route path="/be/admin/tjm" element={<></>} />
+            <Route path="/be/admin/divalto-import" element={<></>} />
             <Route path="/be/projects/:code/discussions" element={<></>} />
             <Route path="/be/projects/:code/files" element={<></>} />
             <Route path="/spv/projects/:code/budget" element={<></>} />

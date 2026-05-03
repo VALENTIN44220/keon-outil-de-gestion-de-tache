@@ -48,6 +48,7 @@ const baseNavItems = [
   { value: 'keon-synthese', label: '📊 Synthèse KEON', icon: BarChart3, keonOnly: true },
   { value: 'timeline', label: 'Timeline', icon: Calendar },
   { value: 'budget', label: 'Budget', icon: Wallet, beOnly: true },
+  { value: 'temps', label: 'Temps', icon: Clock, beOnly: true },
   { value: 'discussions', label: 'Discussions', icon: MessageSquare },
   { value: 'files', label: 'Fichiers', icon: Paperclip },
 ];
