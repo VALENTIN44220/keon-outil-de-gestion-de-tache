@@ -50,6 +50,7 @@ const BEProjectHubBudgetAffaire = lazy(() => import("./pages/be/BEProjectHubBudg
 const BEProjectHubTemps = lazy(() => import("./pages/be/BEProjectHubTemps"));
 const BEAdminTJM = lazy(() => import("./pages/BEAdminTJM"));
 const BEAdminDivaltoImport = lazy(() => import("./pages/BEAdminDivaltoImport"));
+const BEDispatchGlobal = lazy(() => import("./pages/be/BEDispatchGlobal"));
 
 // Budget tab is BE-only. If someone lands on /spv/.../budget, send them to overview.
 // NOTE: PersistentRoutes uses matchPath (not <Route>), so useParams() doesn't work here.
@@ -129,6 +130,7 @@ const App = () => (
                 { path: "/be/projects/:code/budget", end: true, element: <ProtectedRoute><BEProjectHubBudget /></ProtectedRoute> },
                 { path: "/be/projects/:code/budget/:codeAffaire", end: true, element: <ProtectedRoute><BEProjectHubBudgetAffaire /></ProtectedRoute> },
                 { path: "/be/projects/:code/temps", end: true, element: <ProtectedRoute><BEProjectHubTemps /></ProtectedRoute> },
+                { path: "/be/dispatch", end: true, element: <ProtectedRoute><BEDispatchGlobal /></ProtectedRoute> },
                 { path: "/be/admin/tjm", end: true, element: <ProtectedRoute><BEAdminTJM /></ProtectedRoute> },
                 { path: "/be/admin/divalto-import", end: true, element: <ProtectedRoute><BEAdminDivaltoImport /></ProtectedRoute> },
                 { path: "/be/projects/:code/discussions", end: true, element: <ProtectedRoute><BEProjectHubDiscussions /></ProtectedRoute> },

@@ -1,5 +1,5 @@
 import React, { Fragment, useState, useEffect, useMemo } from 'react';
-import { LayoutDashboard, BarChart3, ChevronLeft, ChevronRight, Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText, ArrowLeftRight, Calendar, MessageCircle, Building2, ClipboardList, Lightbulb, Monitor, Leaf, Euro, Map as MapIcon } from 'lucide-react';
+import { LayoutDashboard, BarChart3, ChevronLeft, ChevronRight, Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText, ArrowLeftRight, Calendar, MessageCircle, Building2, ClipboardList, Lightbulb, Monitor, Leaf, Euro, Map as MapIcon, Users } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
 import { useAuth } from '@/contexts/AuthContext';
@@ -53,7 +53,22 @@ const menuGroups: MenuGroup[] = [
   {
     label: 'PROJETS',
     items: [
-      { id: 'projects', label: 'Bureau d\'études', icon: FolderOpen, path: '/projects', permissionKey: 'can_access_projects' },
+      {
+        id: 'projects',
+        label: 'Bureau d\'études',
+        icon: FolderOpen,
+        path: '/projects',
+        permissionKey: 'can_access_projects',
+        children: [
+          {
+            id: 'be-dispatch',
+            label: 'Dispatch BE',
+            icon: Users,
+            path: '/be/dispatch',
+            permissionKey: 'can_access_projects' as any,
+          },
+        ],
+      },
       { id: 'spv', label: 'Projets SPV', icon: Leaf, path: '/spv', permissionKey: 'can_access_projects' },
       {
         id: 'it-projects',
