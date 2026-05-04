@@ -64,6 +64,7 @@ import { fr } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { BEStatusBadge } from '@/components/be/BEStatusBadge';
 import { NewBERequestDialog } from '@/components/be/NewBERequestDialog';
+import { useBETaskStatus } from '@/hooks/useBETaskStatus';
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
 
@@ -109,7 +110,7 @@ interface BETaskRow {
   type: string;
   document_url: string | null;
   assignee?: { id: string; display_name: string } | null;
-  sub_process_template?: { id: string; name: string; be_category: string | null } | null;
+  sub_process_template?: { id: string; name: string; be_category: string | null; dispatch_manager_id: string | null } | null;
   be_project?: { code_projet: string; nom_projet: string } | null;
 }
 
@@ -338,26 +339,26 @@ function TaskRow({
   showProject?: boolean;
   onRefresh: () => void;
 }) {
-  const qc = useQueryClient();
-  const presName = (task.sub_process_template as any)?.name ?? task.title;
-  const presCat = (task.sub_process_template as any)?.be_category ?? null;
+  const presName = task.sub_process_template?.name ?? task.title;
+  const presCat = task.sub_process_template?.be_category ?? null;
   const isARelire = task.be_status === 'a_relire';
+  const projectCode = task.be_project?.code_projet;
 
-  const changeStatus = useMutation({
-    mutationFn: async (newStatus: string) => {
-      const { error } = await sb
-        .from('tasks')
-        .update({ be_status: newStatus })
-        .eq('id', task.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success('Statut mis à jour');
-      qc.invalidateQueries({ queryKey: ['be-dispatch-tasks'] });
-      onRefresh();
-    },
-    onError: (err: any) => toast.error(err.message || 'Erreur'),
-  });
+  const { updateBEStatus, isUpdating } = useBETaskStatus();
+
+  const changeStatus = async (newStatus: string) => {
+    await updateBEStatus({
+      taskId: task.id,
+      status: newStatus as any,
+      notify: {
+        taskLabel: presName,
+        projectCode,
+        dispatchManagerId: task.sub_process_template?.dispatch_manager_id ?? null,
+        assigneeId: task.assignee_id,
+      },
+    });
+    onRefresh();
+  };
 
   return (
     <div
@@ -427,8 +428,8 @@ function TaskRow({
                 variant="outline"
                 size="sm"
                 className="h-7 px-2 gap-1 text-xs shrink-0 text-blue-600 border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                onClick={() => changeStatus.mutate('a_relire')}
-                disabled={changeStatus.isPending}
+                onClick={() => changeStatus('a_relire')}
+                disabled={isUpdating}
               >
                 <Send className="h-3 w-3" />
                 <span className="hidden lg:inline">Soumettre</span>
@@ -446,8 +447,8 @@ function TaskRow({
               <Button
                 size="sm"
                 className="h-7 px-2 gap-1 text-xs shrink-0 bg-amber-500 hover:bg-amber-600 text-white"
-                onClick={() => changeStatus.mutate('a_valider')}
-                disabled={changeStatus.isPending}
+                onClick={() => changeStatus('a_valider')}
+                disabled={isUpdating}
               >
                 <CheckCircle2 className="h-3 w-3" />
                 <span className="hidden lg:inline">Valider</span>
@@ -490,7 +491,7 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
           parent_request_id, assignee_id, sub_process_template_id,
           due_date, created_at, type, document_url,
           assignee:profiles!tasks_assignee_id_fkey(id, display_name),
-          sub_process_template:sub_process_templates!tasks_sub_process_template_id_fkey(id, name, be_category),
+          sub_process_template:sub_process_templates!tasks_sub_process_template_id_fkey(id, name, be_category, dispatch_manager_id),
           be_project:be_projects!tasks_be_project_id_fkey(code_projet, nom_projet)
         `)
         .eq('type', 'task')

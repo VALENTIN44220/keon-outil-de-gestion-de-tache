@@ -9,6 +9,7 @@
 import { useCallback } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -138,22 +139,45 @@ export function getBEStatusMeta(status: string | null | undefined): BEStatusMeta
 const sb = supabase as any;
 
 /**
+ * Contexte optionnel pour déclencher une notification in-app après changement de statut.
+ *
+ * - a_relire  : notifie le manager (dispatch_manager_id) que le travail est prêt à relire
+ * - a_valider : notifie le worker (assignee_id) que le manager a validé
+ */
+export interface BEStatusNotifyContext {
+  /** Nom court de la prestation (affiché dans la notification) */
+  taskLabel: string;
+  /** Code du projet BE (affiché dans la notification) */
+  projectCode?: string;
+  /** dispatch_manager_id du sub_process_template — destinataire pour → a_relire */
+  dispatchManagerId?: string | null;
+  /** ID du worker actuellement assigné — destinataire pour → a_valider */
+  assigneeId?: string | null;
+}
+
+/**
  * Fournit une mutation pour mettre à jour le be_status d'une tâche.
+ * Envoie une notification in-app au bon destinataire selon la transition :
+ *   en_cours → a_relire  : notifie le manager (dispatch_manager_id)
+ *   a_relire → a_valider : notifie le worker (assignee_id)
  *
  * @example
  * const { updateBEStatus, isUpdating } = useBETaskStatus();
- * await updateBEStatus({ taskId: task.id, status: 'a_valider' });
+ * await updateBEStatus({ taskId, status: 'a_relire', notify: { ... } });
  */
 export function useBETaskStatus() {
   const qc = useQueryClient();
+  const { user } = useAuth();
 
   const mutation = useMutation({
     mutationFn: async ({
       taskId,
       status,
+      notify,
     }: {
       taskId: string;
       status: BETaskStatus;
+      notify?: BEStatusNotifyContext;
     }) => {
       const { data, error } = await sb
         .from('tasks')
@@ -162,15 +186,45 @@ export function useBETaskStatus() {
         .select('id, be_status, be_project_id')
         .single();
       if (error) throw error;
+
+      // ── Notification in-app ──────────────────────────────────────────────
+      if (notify) {
+        const projectSuffix = notify.projectCode ? ` — ${notify.projectCode}` : '';
+
+        // en_cours → a_relire : prévenir le manager que le travail est soumis
+        if (status === 'a_relire' && notify.dispatchManagerId && notify.dispatchManagerId !== user?.id) {
+          await sb.from('notifications').insert({
+            user_id: notify.dispatchManagerId,
+            title: `À relire : ${notify.taskLabel}`,
+            message: `Une tâche est prête pour votre relecture${projectSuffix}.`,
+            type: 'be_a_relire',
+            related_entity_type: 'task',
+            related_entity_id: taskId,
+          });
+        }
+
+        // a_relire → a_valider : prévenir le worker que le manager a validé
+        if (status === 'a_valider' && notify.assigneeId && notify.assigneeId !== user?.id) {
+          await sb.from('notifications').insert({
+            user_id: notify.assigneeId,
+            title: `Validé : ${notify.taskLabel}`,
+            message: `Votre travail a été validé par le manager${projectSuffix}.`,
+            type: 'be_a_valider',
+            related_entity_type: 'task',
+            related_entity_id: taskId,
+          });
+        }
+      }
+
       return data;
     },
     onSuccess: (data) => {
       const meta = getBEStatusMeta(data.be_status);
       toast.success(`Statut mis à jour : ${meta.label}`);
 
-      // Invalide toutes les queries liées aux tâches et au projet
       qc.invalidateQueries({ queryKey: ['tasks'] });
       qc.invalidateQueries({ queryKey: ['be-project-tasks'] });
+      qc.invalidateQueries({ queryKey: ['be-dispatch-tasks'] });
       if (data.be_project_id) {
         qc.invalidateQueries({ queryKey: ['be-tasks', data.be_project_id] });
       }
@@ -182,7 +236,7 @@ export function useBETaskStatus() {
   });
 
   const updateBEStatus = useCallback(
-    (params: { taskId: string; status: BETaskStatus }) =>
+    (params: { taskId: string; status: BETaskStatus; notify?: BEStatusNotifyContext }) =>
       mutation.mutateAsync(params),
     [mutation],
   );
