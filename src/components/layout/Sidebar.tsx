@@ -1,5 +1,5 @@
 import React, { Fragment, useState, useEffect, useMemo } from 'react';
-import { LayoutDashboard, BarChart3, ChevronLeft, ChevronRight, Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText, ArrowLeftRight, Calendar, MessageCircle, Building2, ClipboardList, Lightbulb, Monitor, Leaf, Euro, Map as MapIcon, Users } from 'lucide-react';
+import { LayoutDashboard, BarChart3, ChevronLeft, ChevronRight, Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText, ArrowLeftRight, Calendar, MessageCircle, Building2, ClipboardList, Lightbulb, Monitor, Leaf, Euro, Map as MapIcon, Users, Wallet, BarChart2 } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
 import { useAuth } from '@/contexts/AuthContext';
@@ -51,24 +51,34 @@ const menuGroups: MenuGroup[] = [
     ],
   },
   {
-    label: 'PROJETS',
+    label: 'BUREAU D\'ÉTUDES',
     items: [
       {
         id: 'projects',
-        label: 'Bureau d\'études',
+        label: 'Projets',
         icon: FolderOpen,
         path: '/projects',
         permissionKey: 'can_access_projects',
-        children: [
-          {
-            id: 'be-dispatch',
-            label: 'Dispatch BE',
-            icon: Users,
-            path: '/be/dispatch',
-            permissionKey: 'can_access_projects' as any,
-          },
-        ],
       },
+      {
+        id: 'be-dispatch',
+        label: 'Dispatch & Affectation',
+        icon: Users,
+        path: '/be/dispatch',
+        permissionKey: 'can_access_projects' as any,
+      },
+      {
+        id: 'be-budget',
+        label: 'Budget',
+        icon: Wallet,
+        path: '/be/budget',
+        permissionKey: 'can_access_projects' as any,
+      },
+    ],
+  },
+  {
+    label: 'PROJETS',
+    items: [
       { id: 'spv', label: 'Projets SPV', icon: Leaf, path: '/spv', permissionKey: 'can_access_projects' },
       {
         id: 'it-projects',
@@ -132,12 +142,14 @@ const groupColors: Record<number, { hex: string; bg: string; text: string; textM
   3: { hex: '#f59e0b', bg: 'bg-[#f59e0b]/15', text: 'text-[#f59e0b]', textMuted: 'text-[#f59e0b]/50', border: 'border-[#f59e0b]', iconBg: 'bg-[#f59e0b]', iconInactive: 'text-[#f59e0b]/60' },
   4: { hex: '#64748b', bg: 'bg-[#64748b]/15', text: 'text-[#64748b]', textMuted: 'text-[#64748b]/50', border: 'border-[#64748b]', iconBg: 'bg-[#64748b]', iconInactive: 'text-[#64748b]/60' },
   5: { hex: '#ec4899', bg: 'bg-[#ec4899]/15', text: 'text-[#ec4899]', textMuted: 'text-[#ec4899]/50', border: 'border-[#ec4899]', iconBg: 'bg-[#ec4899]', iconInactive: 'text-[#ec4899]/60' },
+  6: { hex: '#6366f1', bg: 'bg-[#6366f1]/15', text: 'text-[#6366f1]', textMuted: 'text-[#6366f1]/50', border: 'border-[#6366f1]', iconBg: 'bg-[#6366f1]', iconInactive: 'text-[#6366f1]/60' },
 };
 
 // Map group labels to group index for color lookup
 const groupLabelToIndex: Record<string, number> = {
   '': 0,
   'ÉQUIPE': 1,
+  'BUREAU D\'ÉTUDES': 6,
   'PROJETS': 2,
   'RÉFÉRENTIELS': 3,
   'CONFIGURATION': 4,
