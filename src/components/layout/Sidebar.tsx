@@ -134,6 +134,14 @@ const adminMenuItem = {
   path: '/admin'
 };
 
+// Réservé aux admins globaux uniquement (accès ultra limité)
+const beAdminTjmMenuItem = {
+  id: 'be-admin-tjm',
+  label: 'TJM',
+  icon: Euro,
+  path: '/be/admin/tjm',
+};
+
 // Group-based color system
 const groupColors: Record<number, { hex: string; bg: string; text: string; textMuted: string; border: string; iconBg: string; iconInactive: string }> = {
   0: { hex: '#3b82f6', bg: 'bg-[#3b82f6]/15', text: 'text-[#3b82f6]', textMuted: 'text-[#3b82f6]/50', border: 'border-[#3b82f6]', iconBg: 'bg-[#3b82f6]', iconInactive: 'text-[#3b82f6]/60' },
@@ -363,6 +371,14 @@ export function Sidebar({
         configGroup.items.push(adminMenuItem as any);
       } else {
         groups.push({ label: 'CONFIGURATION', items: [adminMenuItem as any] });
+      }
+    }
+
+    // Inject TJM into BUREAU D'ÉTUDES — admins globaux uniquement
+    if (isAdmin && isPageVisibleOnDevice('be-admin-tjm', currentDevice)) {
+      const beGroup = groups.find(g => g.label === "BUREAU D'ÉTUDES");
+      if (beGroup) {
+        beGroup.items.push(beAdminTjmMenuItem as any);
       }
     }
     
