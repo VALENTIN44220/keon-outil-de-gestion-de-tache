@@ -41,6 +41,10 @@ import {
   FolderOpen,
   ClipboardList,
   Layers,
+  Plus,
+  X,
+  Link as LinkIcon,
+  Info,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -53,8 +57,14 @@ import type { BEAffaire } from '@/types/beAffaire';
 
 const BE_PROCESS_TEMPLATE_ID = 'bd75a3b0-c918-4b43-befe-739b83f7461a';
 
-const STEPS_FULL   = ['Projet & Affaire', 'Prestations', 'Urgence', 'Récapitulatif'] as const;
-const STEPS_SHORT  = ['Prestations', 'Urgence', 'Récapitulatif'] as const;
+// Étape numérotation absolue :
+//   0 = Projet & Affaire   (full flow seulement)
+//   1 = Prestations
+//   2 = Détails            (description + affaire si short flow + liens)
+//   3 = Urgence
+//   4 = Récapitulatif
+const STEPS_FULL  = ['Projet & Affaire', 'Prestations', 'Détails', 'Urgence', 'Récapitulatif'] as const;
+const STEPS_SHORT = ['Prestations', 'Détails', 'Urgence', 'Récapitulatif'] as const;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -171,6 +181,9 @@ export function NewBERequestDialog({
   // ── Étape 3 : Urgence ─────────────────────────────────────────────────────
   const [urgency, setUrgency] = useState<BEUrgency>('normal');
 
+  // ── Liens externes ────────────────────────────────────────────────────────
+  const [links, setLinks] = useState<{ url: string; label: string }[]>([]);
+
   // ── Reset sur ouverture ───────────────────────────────────────────────────
   useEffect(() => {
     if (open) {
@@ -180,6 +193,7 @@ export function NewBERequestDialog({
       setSelectedGroupNames(new Set());
       setUrgency('normal');
       setDescription('');
+      setLinks([]);
       setProjectSearch('');
     }
   }, [open, defaultProjectId, defaultAffaireId, hasDefaultProject]);
@@ -344,6 +358,23 @@ export function NewBERequestDialog({
 
       const { error: childError } = await sb.from('tasks').insert(childInserts);
       if (childError) throw childError;
+
+      // 3. Liens en tant que task_attachments sur la tâche parente
+      const validLinks = links.filter(l => l.url.trim());
+      if (validLinks.length > 0) {
+        const { error: linksError } = await sb.from('task_attachments').insert(
+          validLinks.map(l => ({
+            task_id: request.id,
+            name: l.label.trim() || l.url.trim(),
+            url: l.url.trim(),
+            type: 'link',
+            uploaded_by: user.id,
+          }))
+        );
+        if (linksError) {
+          console.warn('[NewBERequestDialog] links insert error (non-blocking):', linksError);
+        }
+      }
 
       toast.success(
         `Demande créée : ${selectedGroups.length} prestation(s), ${allSelectedSteps.length} tâche(s)`,
@@ -517,19 +548,6 @@ export function NewBERequestDialog({
                   </div>
                 )}
 
-                {/* Description */}
-                <div className="space-y-2">
-                  <Label className="font-medium">
-                    Description{' '}
-                    <span className="font-normal text-muted-foreground text-xs">(optionnel)</span>
-                  </Label>
-                  <Textarea
-                    value={description}
-                    onChange={e => setDescription(e.target.value)}
-                    placeholder="Contexte, contraintes particulières, informations complémentaires..."
-                    rows={3}
-                  />
-                </div>
               </>
             )}
 
@@ -618,8 +636,121 @@ export function NewBERequestDialog({
               </div>
             )}
 
-            {/* ── ÉTAPE 2 : URGENCE ───────────────────────────────────── */}
+            {/* ── ÉTAPE 2 : DÉTAILS ───────────────────────────────────── */}
             {step === 2 && (
+              <div className="space-y-5">
+                {/* Affaire (uniquement en short flow — en full flow, elle est à l'étape 0) */}
+                {hasDefaultProject && (
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2 font-medium">
+                      <FileText className="h-4 w-4" />
+                      Affaire associée{' '}
+                      <span className="font-normal text-muted-foreground text-xs">(optionnel)</span>
+                    </Label>
+                    {affaires.length === 0 ? (
+                      <p className="text-sm text-muted-foreground italic px-1">
+                        Aucune affaire ouverte pour ce projet
+                      </p>
+                    ) : (
+                      <div className="border rounded-lg divide-y max-h-36 overflow-y-auto">
+                        <button
+                          onClick={() => setSelectedAffaireId(null)}
+                          className={cn(
+                            'w-full text-left px-3 py-2 text-sm text-muted-foreground hover:bg-muted/50 transition-colors',
+                            !selectedAffaireId && 'bg-muted/30 font-medium',
+                          )}
+                        >
+                          Sans affaire
+                        </button>
+                        {affaires.map(a => (
+                          <button
+                            key={a.id}
+                            onClick={() => setSelectedAffaireId(a.id)}
+                            className={cn(
+                              'w-full text-left px-3 py-2.5 flex items-center gap-3 hover:bg-muted/50 transition-colors',
+                              selectedAffaireId === a.id && 'bg-primary/10',
+                            )}
+                          >
+                            <Badge variant="outline" className="font-mono text-xs">
+                              {a.code_affaire}
+                            </Badge>
+                            <span className="text-sm truncate">{a.libelle ?? a.code_affaire}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Description */}
+                <div className="space-y-2">
+                  <Label className="font-medium">
+                    Description{' '}
+                    <span className="font-normal text-muted-foreground text-xs">(optionnel)</span>
+                  </Label>
+                  <Textarea
+                    value={description}
+                    onChange={e => setDescription(e.target.value)}
+                    placeholder="Contexte, contraintes particulières, contraintes de délai, informations complémentaires..."
+                    rows={4}
+                  />
+                </div>
+
+                {/* Liens externes */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2 font-medium">
+                    <LinkIcon className="h-4 w-4" />
+                    Liens{' '}
+                    <span className="font-normal text-muted-foreground text-xs">(optionnel — dossiers partagés, références…)</span>
+                  </Label>
+                  <div className="space-y-2">
+                    {links.map((link, i) => (
+                      <div key={i} className="flex items-center gap-2">
+                        <Input
+                          placeholder="https://..."
+                          value={link.url}
+                          onChange={e => setLinks(prev => prev.map((l, j) => j === i ? { ...l, url: e.target.value } : l))}
+                          className="flex-1 text-sm"
+                        />
+                        <Input
+                          placeholder="Intitulé"
+                          value={link.label}
+                          onChange={e => setLinks(prev => prev.map((l, j) => j === i ? { ...l, label: e.target.value } : l))}
+                          className="w-36 text-sm"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-9 w-9 p-0 text-muted-foreground hover:text-destructive shrink-0"
+                          onClick={() => setLinks(prev => prev.filter((_, j) => j !== i))}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 text-xs"
+                      onClick={() => setLinks(prev => [...prev, { url: '', label: '' }])}
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Ajouter un lien
+                    </Button>
+                  </div>
+                </div>
+
+                {links.length === 0 && !description && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                    <Info className="h-3.5 w-3.5" />
+                    Ces informations aideront le manager BE à traiter votre demande.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* ── ÉTAPE 3 : URGENCE ───────────────────────────────────── */}
+            {step === 3 && (
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">
                   Quel est le niveau d'urgence de cette demande ?
@@ -652,8 +783,8 @@ export function NewBERequestDialog({
               </div>
             )}
 
-            {/* ── ÉTAPE 3 : RÉCAPITULATIF ─────────────────────────────── */}
-            {step === 3 && (
+            {/* ── ÉTAPE 4 : RÉCAPITULATIF ─────────────────────────────── */}
+            {step === 4 && (
               <div className="space-y-4">
                 <div className="rounded-lg border divide-y overflow-hidden">
                   {/* Projet */}
@@ -734,6 +865,25 @@ export function NewBERequestDialog({
                     <div className="p-4">
                       <p className="text-xs text-muted-foreground mb-1">Description</p>
                       <p className="text-sm">{description}</p>
+                    </div>
+                  )}
+
+                  {links.filter(l => l.url.trim()).length > 0 && (
+                    <div className="flex items-start gap-3 p-4">
+                      <LinkIcon className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Liens ({links.filter(l => l.url.trim()).length})
+                        </p>
+                        <div className="space-y-1">
+                          {links.filter(l => l.url.trim()).map((l, i) => (
+                            <div key={i} className="flex items-center gap-1.5 text-sm">
+                              <LinkIcon className="h-3 w-3 text-muted-foreground shrink-0" />
+                              <span className="text-primary truncate">{l.label.trim() || l.url.trim()}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
