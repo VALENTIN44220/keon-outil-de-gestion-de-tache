@@ -53,7 +53,8 @@ import type { BEAffaire } from '@/types/beAffaire';
 
 const BE_PROCESS_TEMPLATE_ID = 'bd75a3b0-c918-4b43-befe-739b83f7461a';
 
-const STEPS = ['Projet & Affaire', 'Prestations', 'Urgence', 'Récapitulatif'] as const;
+const STEPS_FULL   = ['Projet & Affaire', 'Prestations', 'Urgence', 'Récapitulatif'] as const;
+const STEPS_SHORT  = ['Prestations', 'Urgence', 'Récapitulatif'] as const;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -138,21 +139,26 @@ export function NewBERequestDialog({
 }: NewBERequestDialogProps) {
   const { user, profile } = useAuth();
 
+  /** Si le projet est pré-connu (contexte hub), on saute l'étape 0. */
+  const hasDefaultProject = !!defaultProjectId;
+
   // ── Navigation ────────────────────────────────────────────────────────────
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(hasDefaultProject ? 1 : 0);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // ── Étape 1 : Projet & Affaire ────────────────────────────────────────────
+  // ── Étape 0 : Projet (affiché uniquement si pas de defaultProjectId) ───────
   const [projects, setProjects] = useState<Pick<BEProject, 'id' | 'code_projet' | 'nom_projet'>[]>([]);
   const [projectsLoading, setProjectsLoading] = useState(false);
   const [projectSearch, setProjectSearch] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(defaultProjectId ?? null);
+  /** Projet sélectionné — chargé séparément quand defaultProjectId est fourni */
+  const [defaultProject, setDefaultProject] = useState<Pick<BEProject, 'id' | 'code_projet' | 'nom_projet'> | null>(null);
 
   const [affaires, setAffaires] = useState<Pick<BEAffaire, 'id' | 'code_affaire' | 'libelle' | 'status'>[]>([]);
   const [selectedAffaireId, setSelectedAffaireId] = useState<string | null>(defaultAffaireId ?? null);
   const [description, setDescription] = useState('');
 
-  // ── Étape 2 : Prestations ─────────────────────────────────────────────────
+  // ── Étape 1 : Prestations ─────────────────────────────────────────────────
   /** Toutes les sous-étapes brutes depuis Supabase */
   const [allSteps, setAllSteps] = useState<SubStep[]>([]);
   const [stepsLoading, setStepsLoading] = useState(false);
@@ -165,7 +171,7 @@ export function NewBERequestDialog({
   // ── Reset sur ouverture ───────────────────────────────────────────────────
   useEffect(() => {
     if (open) {
-      setStep(0);
+      setStep(hasDefaultProject ? 1 : 0);
       setSelectedProjectId(defaultProjectId ?? null);
       setSelectedAffaireId(defaultAffaireId ?? null);
       setSelectedGroupNames(new Set());
@@ -173,7 +179,17 @@ export function NewBERequestDialog({
       setDescription('');
       setProjectSearch('');
     }
-  }, [open, defaultProjectId, defaultAffaireId]);
+  }, [open, defaultProjectId, defaultAffaireId, hasDefaultProject]);
+
+  // ── Chargement du projet par défaut (pour affichage) ─────────────────────
+  useEffect(() => {
+    if (!defaultProjectId || !open) { setDefaultProject(null); return; }
+    sb.from('be_projects')
+      .select('id,code_projet,nom_projet')
+      .eq('id', defaultProjectId)
+      .single()
+      .then(({ data }: any) => setDefaultProject(data ?? null));
+  }, [defaultProjectId, open]);
 
   // ── Chargement projets ────────────────────────────────────────────────────
   useEffect(() => {
@@ -204,9 +220,9 @@ export function NewBERequestDialog({
       .then(({ data }: any) => setAffaires(data ?? []));
   }, [selectedProjectId]);
 
-  // ── Chargement sous-étapes (à l'entrée sur l'étape 1) ────────────────────
+  // ── Chargement sous-étapes (à l'entrée sur l'étape 1 ou si projet par défaut) ──
   useEffect(() => {
-    if (step !== 1) return;
+    if (step !== 1 && !(hasDefaultProject && step === 1)) return;
     setStepsLoading(true);
     sb.from('sub_process_templates')
       .select('id,name,description,be_category,order_index')
@@ -253,13 +269,18 @@ export function NewBERequestDialog({
   }, [prestationGroups]);
 
   // ── Données dérivées ──────────────────────────────────────────────────────
-  const selectedProject = projects.find(p => p.id === selectedProjectId);
+  const selectedProject = defaultProject ?? projects.find(p => p.id === selectedProjectId);
   const selectedAffaire = affaires.find(a => a.id === selectedAffaireId);
   const selectedGroups = prestationGroups.filter(g => selectedGroupNames.has(g.groupName));
   /** Toutes les sous-étapes à créer (toutes les étapes des groupes sélectionnés) */
   const allSelectedSteps = selectedGroups.flatMap(g => g.steps);
 
   // ── Navigation ────────────────────────────────────────────────────────────
+  const STEPS = hasDefaultProject ? STEPS_SHORT : STEPS_FULL;
+  /** Index visuel dans le tableau STEPS affiché */
+  const displayStep = hasDefaultProject ? step - 1 : step;
+  const lastStep = STEPS.length - 1;
+
   const canNext = () => {
     if (step === 0) return !!selectedProjectId;
     if (step === 1) return selectedGroupNames.size > 0;
@@ -343,6 +364,15 @@ export function NewBERequestDialog({
             Nouvelle demande BE
           </DialogTitle>
 
+          {/* Projet contextuel (si pré-sélectionné) */}
+          {hasDefaultProject && selectedProject && (
+            <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+              <FolderOpen className="h-3.5 w-3.5" />
+              <Badge variant="outline" className="font-mono text-xs">{selectedProject.code_projet}</Badge>
+              <span className="font-medium text-foreground">{selectedProject.nom_projet}</span>
+            </div>
+          )}
+
           {/* Indicateur d'étapes */}
           <div className="flex items-center gap-1 mt-3 flex-wrap">
             {STEPS.map((label, i) => (
@@ -350,14 +380,14 @@ export function NewBERequestDialog({
                 <div
                   className={cn(
                     'flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full transition-colors select-none',
-                    i === step
+                    i === displayStep
                       ? 'bg-primary text-primary-foreground font-medium'
-                      : i < step
+                      : i < displayStep
                       ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400'
                       : 'text-muted-foreground',
                   )}
                 >
-                  {i < step ? (
+                  {i < displayStep ? (
                     <Check className="h-3 w-3" />
                   ) : (
                     <span className="w-3 text-center">{i + 1}</span>
@@ -711,17 +741,21 @@ export function NewBERequestDialog({
         <DialogFooter className="flex-row items-center gap-2 px-6 py-4 border-t">
           <Button
             variant="outline"
-            onClick={() => step > 0 ? setStep(s => s - 1) : onOpenChange(false)}
+            onClick={() => {
+              const firstStep = hasDefaultProject ? 1 : 0;
+              if (step > firstStep) setStep(s => s - 1);
+              else onOpenChange(false);
+            }}
             disabled={isSubmitting}
             className="flex items-center gap-1"
           >
             <ChevronLeft className="h-4 w-4" />
-            {step === 0 ? 'Annuler' : 'Retour'}
+            {step === (hasDefaultProject ? 1 : 0) ? 'Annuler' : 'Retour'}
           </Button>
 
           <div className="flex-1" />
 
-          {step < STEPS.length - 1 ? (
+          {displayStep < lastStep ? (
             <Button
               onClick={() => setStep(s => s + 1)}
               disabled={!canNext()}
