@@ -22,7 +22,8 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Trash2, Clock, Eye, XCircle } from 'lucide-react';
+import { Loader2, Trash2, Clock, Eye, XCircle, MessageSquarePlus } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
@@ -37,6 +38,7 @@ import { supplierWaitingValidationRoleFromProfileName } from '@/lib/supplierWait
 import { useAuth } from '@/contexts/AuthContext';
 import { SupplierWaitingDetailDrawer } from './SupplierWaitingDetailDrawer';
 import { SupplierWaitingRejectDialog } from './SupplierWaitingRejectDialog';
+import { SupplierWaitingReviewRequestDialog } from './SupplierWaitingReviewRequestDialog';
 
 export interface SupplierWaitingApprovalListDialogProps {
   open: boolean;
@@ -47,17 +49,22 @@ export function SupplierWaitingApprovalListDialog({ open, onClose }: SupplierWai
   const queryClient = useQueryClient();
   const { profile } = useAuth();
   const { data: rows = [], isLoading, refetch, isRefetching } = useSupplierWaitingApprovalList({ enabled: open });
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [validating, setValidating] = useState(false);
   const [promoting, setPromoting] = useState(false);
   const [tierSavingId, setTierSavingId] = useState<string | null>(null);
 
-  // Détail / refus
+  // Détail / refus / demande modifications
   const [detailId, setDetailId] = useState<string | null>(null);
   const [rejectRow, setRejectRow] = useState<{ id: string; nomfournisseur: string | null } | null>(null);
+  const [reviewRow, setReviewRow] = useState<{ id: string; nomfournisseur: string | null } | null>(null);
+
+  // Soft delete avec raison
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteReason, setDeleteReason] = useState('');
+  const [deleteConfirmed, setDeleteConfirmed] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -208,20 +215,40 @@ export function SupplierWaitingApprovalListDialog({ open, onClose }: SupplierWai
     if (!deleteId) return;
     setIsDeleting(true);
     try {
-      const { data: attachments, error: attErr } = await supabase
-        .from('supplier_waiting_approval_attachments')
-        .select('storage_path')
-        .eq('waiting_approval_id', deleteId);
-      if (attErr) throw attErr;
-      const paths = (attachments ?? []).map((a) => a.storage_path).filter(Boolean);
-      if (paths.length > 0) {
-        const { error: storErr } = await supabase.storage.from('supplier-waiting-attachments').remove(paths);
-        if (storErr) console.error(storErr);
-      }
-      const { error: delErr } = await supabase.from('supplier_waiting_approval').delete().eq('id', deleteId);
+      // Récupère le demandeur pour notification
+      const { data: row } = await supabase
+        .from('supplier_waiting_approval')
+        .select('submitted_by_user_id, nomfournisseur')
+        .eq('id', deleteId)
+        .single();
+
+      // Soft delete
+      const { error: delErr } = await supabase
+        .from('supplier_waiting_approval')
+        .update({
+          deleted_at: new Date().toISOString(),
+          deletion_reason: deleteReason.trim() || null,
+          deleted_by_user_id: (await supabase.auth.getUser()).data.user?.id ?? null,
+        })
+        .eq('id', deleteId);
       if (delErr) throw delErr;
-      toast({ title: 'Demande retirée de la file d\u2019attente' });
+
+      // Notification in-app au demandeur si message fourni
+      if (row?.submitted_by_user_id && deleteReason.trim()) {
+        await supabase.from('notifications').insert({
+          user_id: row.submitted_by_user_id,
+          title: 'Demande fournisseur retirée',
+          message: `Votre demande « ${row.nomfournisseur ?? 'fournisseur'} » a été retirée de la file d'attente. Message : ${deleteReason.trim()}`,
+          type: 'supplier_deleted',
+          related_entity_type: 'supplier_waiting_approval',
+          related_entity_id: deleteId,
+        });
+      }
+
+      toast({ title: 'Demande retirée', description: deleteReason.trim() ? 'Le demandeur a été notifié.' : undefined });
       setDeleteId(null);
+      setDeleteReason('');
+      setDeleteConfirmed(false);
       await queryClient.invalidateQueries({ queryKey: ['supplier-waiting-approval'] });
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : 'Suppression impossible';
@@ -384,6 +411,21 @@ export function SupplierWaitingApprovalListDialog({ open, onClose }: SupplierWai
                         <Eye className="h-4 w-4" />
                       </Button>
 
+                      {/* Demander modifications */}
+                      {canReject && !r.rejected_at && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8 text-amber-600 hover:text-amber-700 border-amber-400/40 hover:border-amber-500/70"
+                          aria-label="Demander des modifications"
+                          title="Demander des modifications"
+                          onClick={() => setReviewRow({ id: r.id, nomfournisseur: r.nomfournisseur })}
+                        >
+                          <MessageSquarePlus className="h-4 w-4" />
+                        </Button>
+                      )}
+
                       {/* Refuser */}
                       {canReject && !r.rejected_at && (
                         <Button
@@ -399,14 +441,15 @@ export function SupplierWaitingApprovalListDialog({ open, onClose }: SupplierWai
                         </Button>
                       )}
 
-                      {/* Supprimer */}
+                      {/* Retirer (soft delete) */}
                       <Button
                         type="button"
                         variant="outline"
                         size="icon"
                         className="h-8 w-8 text-destructive hover:text-destructive"
-                        aria-label="Supprimer la demande"
-                        onClick={() => setDeleteId(r.id)}
+                        aria-label="Retirer la demande"
+                        title="Retirer la demande"
+                        onClick={() => { setDeleteId(r.id); setDeleteReason(''); }}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -472,31 +515,64 @@ export function SupplierWaitingApprovalListDialog({ open, onClose }: SupplierWai
         }}
       />
 
-      {/* Suppression */}
-      <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && !isDeleting && setDeleteId(null)}>
+      {/* Retrait soft-delete avec message au demandeur */}
+      <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && !isDeleting && (setDeleteId(null), setDeleteReason(''), setDeleteConfirmed(false))}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer cette demande&nbsp;?</AlertDialogTitle>
+            <AlertDialogTitle>Retirer cette demande&nbsp;?</AlertDialogTitle>
             <AlertDialogDescription>
-              Les pièces jointes stockées seront supprimées du bucket et la ligne sera effacée définitivement.
+              La demande sera masquée de la file d&apos;attente. Vous pouvez laisser un message au demandeur pour lui expliquer la raison.
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="space-y-3 py-1">
+            <div className="space-y-1.5">
+              <Label htmlFor="delete-reason" className="text-sm font-medium">
+                Message au demandeur <span className="text-muted-foreground font-normal">(optionnel)</span>
+              </Label>
+              <Textarea
+                id="delete-reason"
+                value={deleteReason}
+                onChange={(e) => setDeleteReason(e.target.value)}
+                placeholder="Ex : Fournisseur déjà référencé sous un autre code TIERS…"
+                rows={3}
+                disabled={isDeleting}
+                className="resize-none"
+              />
+            </div>
+            <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5">
+              <Checkbox
+                id="delete-confirm"
+                checked={deleteConfirmed}
+                onCheckedChange={(v) => setDeleteConfirmed(v === true)}
+                disabled={isDeleting}
+                className="border-destructive/60 data-[state=checked]:bg-destructive data-[state=checked]:border-destructive"
+              />
+              <Label htmlFor="delete-confirm" className="text-sm cursor-pointer select-none text-destructive">
+                Je confirme vouloir retirer définitivement cette demande
+              </Label>
+            </div>
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isDeleting}>Annuler</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={isDeleting}
-              onClick={(e) => {
-                e.preventDefault();
-                void handleDelete();
-              }}
+              disabled={isDeleting || !deleteConfirmed}
+              onClick={(e) => { e.preventDefault(); void handleDelete(); }}
             >
               {isDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Supprimer
+              Retirer
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Demande de modifications par champ */}
+      <SupplierWaitingReviewRequestDialog
+        waitingId={reviewRow?.id ?? null}
+        supplierName={reviewRow?.nomfournisseur ?? null}
+        onClose={() => setReviewRow(null)}
+        onSubmitted={async () => { setReviewRow(null); await invalidateList(); }}
+      />
     </>
   );
 }

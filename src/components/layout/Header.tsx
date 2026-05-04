@@ -1,4 +1,5 @@
 import { Search, Plus, LogOut, User } from 'lucide-react';
+import { NotificationBell } from './NotificationBell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
@@ -79,6 +80,8 @@ export function Header({
               <Plus className="w-4 h-4" />
             </Button>
           )}
+
+          <NotificationBell />
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
