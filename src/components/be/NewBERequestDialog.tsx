@@ -326,7 +326,7 @@ export function NewBERequestDialog({
           be_project_id: selectedProjectId,
           be_affaire_id: selectedAffaireId || null,
           be_urgency: urgency,
-          be_status: 'en_cours',
+          be_status: 'soumise',
           user_id: user.id,
           requester_id: profile.id,
           source_process_template_id: BE_PROCESS_TEMPLATE_ID,

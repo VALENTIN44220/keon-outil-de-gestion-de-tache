@@ -5,7 +5,8 @@
  * Mode global  : projectId absent → toutes les tâches BE actives, tous projets
  *
  * Workflow :
- *   en_cours ──[Soumettre]──▶ a_relire ──[Valider]──▶ a_valider ──▶ …
+ *   soumise ──[assignation]──▶ affectee ──[Commencer]──▶ en_cours
+ *   ──[Soumettre]──▶ a_relire ──[Valider]──▶ a_valider ──▶ …
  *
  * Profils proposés dans le sélecteur :
  *   • Tous les profils be_poste IN ('ingenieur_etudes','projeteur')
@@ -14,6 +15,7 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Card,
@@ -63,6 +65,7 @@ import {
   Pencil,
   Send,
   CheckCircle2,
+  Play,
   X,
   Info,
   ExternalLink,
@@ -311,23 +314,77 @@ function DocumentLinkField({
 function AssigneeSelector({
   taskId,
   currentAssigneeId,
+  currentBeStatus,
+  requesterId,
+  taskLabel,
+  projectCode,
   profiles,
   onAssigned,
 }: {
   taskId: string;
   currentAssigneeId: string | null;
+  currentBeStatus: string | null;
+  requesterId?: string | null;
+  taskLabel: string;
+  projectCode?: string | null;
   profiles: Profile[];
   onAssigned: () => void;
 }) {
   const qc = useQueryClient();
+  const { user } = useAuth();
 
   const mutation = useMutation({
     mutationFn: async (assigneeId: string | null) => {
-      const { error } = await sb
-        .from('tasks')
-        .update({ assignee_id: assigneeId })
-        .eq('id', taskId);
+      const isAssigning = !!assigneeId;
+
+      // Calcule le nouveau be_status si nécessaire
+      let newBeStatus: string | undefined;
+      if (isAssigning && currentBeStatus === 'soumise') {
+        newBeStatus = 'affectee';
+      } else if (!isAssigning && currentBeStatus === 'affectee') {
+        newBeStatus = 'soumise';
+      }
+
+      const updatePayload: Record<string, any> = { assignee_id: assigneeId };
+      if (newBeStatus) updatePayload.be_status = newBeStatus;
+
+      const { error } = await sb.from('tasks').update(updatePayload).eq('id', taskId);
       if (error) throw error;
+
+      // Notifications lors d'une affectation
+      if (isAssigning && newBeStatus === 'affectee') {
+        const projectSuffix = projectCode ? ` — ${projectCode}` : '';
+        const assigneeName = profiles.find(p => p.id === assigneeId)?.display_name ?? '';
+        const notifications: any[] = [];
+
+        // Notifier l'assigné (si ce n'est pas soi-même)
+        if (assigneeId !== user?.id) {
+          notifications.push({
+            user_id: assigneeId,
+            title: `Affecté : ${taskLabel}`,
+            message: `Vous avez été affecté(e) à une tâche BE${projectSuffix}.`,
+            type: 'be_affectee',
+            related_entity_type: 'task',
+            related_entity_id: taskId,
+          });
+        }
+
+        // Notifier le demandeur (si différent de l'opérateur et de l'assigné)
+        if (requesterId && requesterId !== user?.id && requesterId !== assigneeId) {
+          notifications.push({
+            user_id: requesterId,
+            title: 'Demande prise en charge',
+            message: `Votre demande a été affectée${assigneeName ? ` à ${assigneeName}` : ''}${projectSuffix}.`,
+            type: 'be_affectee_requester',
+            related_entity_type: 'task',
+            related_entity_id: taskId,
+          });
+        }
+
+        if (notifications.length > 0) {
+          await sb.from('notifications').insert(notifications);
+        }
+      }
     },
     onSuccess: () => {
       toast.success('Tâche assignée');
@@ -397,6 +454,7 @@ function TaskRow({
   profiles,
   showProject,
   isBlocked,
+  requesterId,
   onRequestDetail,
   onRefresh,
 }: {
@@ -404,6 +462,7 @@ function TaskRow({
   profiles: Profile[];
   showProject?: boolean;
   isBlocked?: boolean;
+  requesterId?: string | null;
   onRequestDetail?: () => void;
   onRefresh: () => void;
 }) {
@@ -522,11 +581,38 @@ function TaskRow({
       <AssigneeSelector
         taskId={task.id}
         currentAssigneeId={task.assignee_id}
+        currentBeStatus={task.be_status}
+        requesterId={requesterId}
+        taskLabel={presName}
+        projectCode={projectCode}
         profiles={profiles}
         onAssigned={onRefresh}
       />
 
       {/* Boutons workflow — masqués pour les tâches bloquées */}
+
+      {/* affectee → en_cours : l'assigné démarre la tâche */}
+      {!isBlocked && task.be_status === 'affectee' && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2 gap-1 text-xs shrink-0 text-indigo-600 border-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
+                onClick={() => changeStatus('en_cours')}
+                disabled={isUpdating}
+              >
+                <Play className="h-3 w-3" />
+                <span className="hidden lg:inline">Commencer</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Démarrer la réalisation</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+
+      {/* en_cours → a_relire : l'assigné soumet son travail */}
       {!isBlocked && task.be_status === 'en_cours' && (
         <TooltipProvider>
           <Tooltip>
@@ -547,6 +633,7 @@ function TaskRow({
         </TooltipProvider>
       )}
 
+      {/* a_relire → a_valider : le manager valide */}
       {!isBlocked && task.be_status === 'a_relire' && (
         <TooltipProvider>
           <Tooltip>
@@ -561,13 +648,13 @@ function TaskRow({
                 <span className="hidden lg:inline">Valider</span>
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="top">Valider — passer à « À déposer »</TooltipContent>
+            <TooltipContent side="top">Valider — passer à « À valider »</TooltipContent>
           </Tooltip>
         </TooltipProvider>
       )}
 
       {/* Placeholder pour maintenir l'alignement quand aucun bouton n'est affiché */}
-      {(isBlocked || (task.be_status !== 'en_cours' && task.be_status !== 'a_relire')) && (
+      {(isBlocked || !['affectee', 'en_cours', 'a_relire'].includes(task.be_status ?? '')) && (
         <div className="w-[72px] shrink-0" />
       )}
     </div>
@@ -812,10 +899,11 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
 
           {/* Légende workflow */}
           <p className="text-[11px] text-muted-foreground mt-1">
-            L'intervenant clique sur{' '}
+            Assignez → l'intervenant clique sur{' '}
+            <span className="font-medium text-indigo-600">Commencer</span> puis sur{' '}
             <span className="font-medium text-blue-600">Soumettre</span> quand son travail est
-            prêt, puis le manager clique sur{' '}
-            <span className="font-medium text-amber-600">Valider</span> après relecture.
+            prêt → le manager clique sur{' '}
+            <span className="font-medium text-amber-600">Valider</span>.
           </p>
         </CardHeader>
 
@@ -939,6 +1027,7 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
                             profiles={profiles}
                             showProject={false}
                             isBlocked={blockedTaskIds.has(task.id)}
+                            requesterId={req.requester_id}
                             onRequestDetail={task.parent_request_id ? () => setSelectedRequestId(task.parent_request_id!) : undefined}
                             onRefresh={refetch}
                           />

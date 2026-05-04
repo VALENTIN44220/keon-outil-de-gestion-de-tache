@@ -4,6 +4,11 @@
  * Fournit :
  * - Les métadonnées de chaque statut BE (label, couleurs, icône, transitions autorisées)
  * - Un hook pour mettre à jour le be_status d'une tâche
+ *
+ * Workflow complet :
+ *   soumise ──[assignation auto]──▶ affectee ──[Commencer]──▶ en_cours
+ *   ──[Soumettre]──▶ a_relire ──[Valider]──▶ a_valider
+ *   ──▶ a_deposer ──▶ en_instruction ──▶ [complement_demande | cloturee]
  */
 
 import { useCallback } from 'react';
@@ -15,6 +20,8 @@ import { toast } from 'sonner';
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export type BETaskStatus =
+  | 'soumise'
+  | 'affectee'
   | 'en_cours'
   | 'a_relire'
   | 'a_valider'
@@ -34,7 +41,7 @@ export interface BEStatusMeta {
   bgClass: string;
   /** Classe Tailwind pour le texte */
   textClass: string;
-  /** Transitions vers lesquelles on peut aller depuis ce statut */
+  /** Transitions manuelles autorisées depuis ce statut (dropdown BEStatusBadge) */
   nextStatuses: BETaskStatus[];
   /** Emoji ou symbole court pour usage compact */
   icon: string;
@@ -43,6 +50,28 @@ export interface BEStatusMeta {
 // ─── Métadonnées statiques ───────────────────────────────────────────────────
 
 export const BE_STATUS_META: Record<BETaskStatus, BEStatusMeta> = {
+  soumise: {
+    value: 'soumise',
+    label: 'Soumise',
+    color: '#94a3b8',
+    textColor: '#475569',
+    bgClass: 'bg-slate-100 dark:bg-slate-800',
+    textClass: 'text-slate-600 dark:text-slate-400',
+    // Pas de transition manuelle — l'assignation déclenche automatiquement 'affectee'
+    nextStatuses: [],
+    icon: '📥',
+  },
+  affectee: {
+    value: 'affectee',
+    label: 'Affectée',
+    color: '#6366f1',
+    textColor: '#4338ca',
+    bgClass: 'bg-indigo-100 dark:bg-indigo-900/30',
+    textClass: 'text-indigo-700 dark:text-indigo-400',
+    // Transition manuelle → en_cours (bouton Commencer dans le dispatch)
+    nextStatuses: ['en_cours'],
+    icon: '👤',
+  },
   en_cours: {
     value: 'en_cours',
     label: 'En cours',
@@ -117,6 +146,8 @@ export const BE_STATUS_META: Record<BETaskStatus, BEStatusMeta> = {
 
 /** Liste ordonnée pour affichage */
 export const BE_STATUS_LIST: BEStatusMeta[] = [
+  BE_STATUS_META.soumise,
+  BE_STATUS_META.affectee,
   BE_STATUS_META.en_cours,
   BE_STATUS_META.a_relire,
   BE_STATUS_META.a_valider,
@@ -128,10 +159,10 @@ export const BE_STATUS_LIST: BEStatusMeta[] = [
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** Retourne les métadonnées d'un statut (fallback sur en_cours si inconnu). */
+/** Retourne les métadonnées d'un statut (fallback sur soumise si inconnu). */
 export function getBEStatusMeta(status: string | null | undefined): BEStatusMeta {
-  if (!status) return BE_STATUS_META.en_cours;
-  return BE_STATUS_META[status as BETaskStatus] ?? BE_STATUS_META.en_cours;
+  if (!status) return BE_STATUS_META.soumise;
+  return BE_STATUS_META[status as BETaskStatus] ?? BE_STATUS_META.soumise;
 }
 
 // ─── Hook principal ───────────────────────────────────────────────────────────
@@ -141,8 +172,10 @@ const sb = supabase as any;
 /**
  * Contexte optionnel pour déclencher une notification in-app après changement de statut.
  *
- * - a_relire  : notifie le manager (dispatch_manager_id) que le travail est prêt à relire
- * - a_valider : notifie le worker (assignee_id) que le manager a validé
+ * Notifications émises selon la transition :
+ *   → a_relire          : notifie le manager (dispatch_manager_id)
+ *   → a_valider         : notifie le worker (assignee_id)
+ *   → cloturee          : notifie le demandeur (requester_id)
  */
 export interface BEStatusNotifyContext {
   /** Nom court de la prestation (affiché dans la notification) */
@@ -153,13 +186,13 @@ export interface BEStatusNotifyContext {
   dispatchManagerId?: string | null;
   /** ID du worker actuellement assigné — destinataire pour → a_valider */
   assigneeId?: string | null;
+  /** ID du demandeur — destinataire pour → cloturee */
+  requesterId?: string | null;
 }
 
 /**
  * Fournit une mutation pour mettre à jour le be_status d'une tâche.
- * Envoie une notification in-app au bon destinataire selon la transition :
- *   en_cours → a_relire  : notifie le manager (dispatch_manager_id)
- *   a_relire → a_valider : notifie le worker (assignee_id)
+ * Envoie une notification in-app au bon destinataire selon la transition.
  *
  * @example
  * const { updateBEStatus, isUpdating } = useBETaskStatus();
@@ -190,10 +223,11 @@ export function useBETaskStatus() {
       // ── Notification in-app ──────────────────────────────────────────────
       if (notify) {
         const projectSuffix = notify.projectCode ? ` — ${notify.projectCode}` : '';
+        const notifications: any[] = [];
 
-        // en_cours → a_relire : prévenir le manager que le travail est soumis
+        // → a_relire : prévenir le manager que le travail est soumis
         if (status === 'a_relire' && notify.dispatchManagerId && notify.dispatchManagerId !== user?.id) {
-          await sb.from('notifications').insert({
+          notifications.push({
             user_id: notify.dispatchManagerId,
             title: `À relire : ${notify.taskLabel}`,
             message: `Une tâche est prête pour votre relecture${projectSuffix}.`,
@@ -203,9 +237,9 @@ export function useBETaskStatus() {
           });
         }
 
-        // a_relire → a_valider : prévenir le worker que le manager a validé
+        // → a_valider : prévenir le worker que le manager a validé
         if (status === 'a_valider' && notify.assigneeId && notify.assigneeId !== user?.id) {
-          await sb.from('notifications').insert({
+          notifications.push({
             user_id: notify.assigneeId,
             title: `Validé : ${notify.taskLabel}`,
             message: `Votre travail a été validé par le manager${projectSuffix}.`,
@@ -213,6 +247,22 @@ export function useBETaskStatus() {
             related_entity_type: 'task',
             related_entity_id: taskId,
           });
+        }
+
+        // → cloturee : prévenir le demandeur que la tâche est clôturée
+        if (status === 'cloturee' && notify.requesterId && notify.requesterId !== user?.id) {
+          notifications.push({
+            user_id: notify.requesterId,
+            title: `Clôturée : ${notify.taskLabel}`,
+            message: `Votre prestation a été clôturée${projectSuffix}.`,
+            type: 'be_cloturee',
+            related_entity_type: 'task',
+            related_entity_id: taskId,
+          });
+        }
+
+        if (notifications.length > 0) {
+          await sb.from('notifications').insert(notifications);
         }
       }
 
