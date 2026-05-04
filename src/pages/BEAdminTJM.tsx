@@ -20,12 +20,14 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Coins, Search, Users, Save, Loader2, X } from 'lucide-react';
+import { Coins, Search, Users, Save, Loader2, X, Clock } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { extractErrorMessage } from '@/lib/extractErrorMessage';
 import {
   useBETjmReferentielFull,
   useUpdateBETjm,
+  useBETjmFonctions,
+  useUpdateBETjmFonction,
 } from '@/hooks/useBEAffaireTemps';
 import {
   useBEProfilesPostes,
@@ -42,9 +44,35 @@ import { cn } from '@/lib/utils';
 const eur = (n: number | null | undefined) =>
   (n ?? 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
 
+const eurH = (n: number | null | undefined) =>
+  (n ?? 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 export default function BEAdminTJM() {
   const { data: tjmRows = [], isLoading: tjmLoading } = useBETjmReferentielFull();
   const updateTjm = useUpdateBETjm();
+  const { data: fonctions = [], isLoading: fonctionsLoading } = useBETjmFonctions();
+  const updateFonction = useUpdateBETjmFonction();
+
+  // ── État édition taux horaire fonctions ────────────────────────────────
+  const [editingFonction, setEditingFonction] = useState<Record<string, string>>({});
+
+  const startEditFonction = (fn: string, current: number) =>
+    setEditingFonction((prev) => ({ ...prev, [fn]: String(current) }));
+  const cancelEditFonction = (fn: string) =>
+    setEditingFonction((prev) => { const n = { ...prev }; delete n[fn]; return n; });
+  const saveFonction = async (fn: string) => {
+    const val = parseFloat(editingFonction[fn]);
+    if (isNaN(val) || val < 0) {
+      toast({ title: 'Taux invalide', variant: 'destructive' }); return;
+    }
+    try {
+      await updateFonction.mutateAsync({ fonction: fn, taux_horaire: val });
+      toast({ title: 'Taux mis à jour', description: `${fn} → ${eurH(val)}/h` });
+      cancelEditFonction(fn);
+    } catch (e) {
+      toast({ title: 'Erreur', description: extractErrorMessage(e), variant: 'destructive' });
+    }
+  };
   const { data: profiles = [], isLoading: profilesLoading } = useBEProfilesPostes();
   const updateProfilePoste = useUpdateProfileBEPoste();
 
@@ -222,6 +250,99 @@ export default function BEAdminTJM() {
                     </div>
                   );
                 })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Taux horaires par fonction Lucca */}
+        <Card className="border-border/50">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Clock className="h-5 w-5 text-muted-foreground" />
+              Taux horaires par fonction Lucca
+              <Badge variant="secondary" className="ml-2 text-xs">
+                {fonctions.length} fonctions
+              </Badge>
+            </CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              Salaire moyen horaire (€/h) par fonction. Utilisé en priorité sur le TJM poste pour calculer le coût RH :
+              <span className="font-mono text-primary/80"> coût RH = heures × taux_horaire</span>.
+            </p>
+          </CardHeader>
+          <CardContent>
+            {fonctionsLoading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-10" />)}
+              </div>
+            ) : (
+              <div className="rounded-lg border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/30 hover:bg-muted/30">
+                      <TableHead>Fonction</TableHead>
+                      <TableHead className="text-right w-[220px]">Taux horaire (€/h)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {fonctions.map((fn) => {
+                      const editing = editingFonction[fn.fonction] != null;
+                      return (
+                        <TableRow key={fn.fonction}>
+                          <TableCell className="text-sm font-medium">{fn.fonction}</TableCell>
+                          <TableCell className="text-right">
+                            {editing ? (
+                              <div className="flex items-center justify-end gap-1">
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={editingFonction[fn.fonction]}
+                                  onChange={(e) =>
+                                    setEditingFonction((prev) => ({
+                                      ...prev,
+                                      [fn.fonction]: e.target.value,
+                                    }))
+                                  }
+                                  className="h-8 w-32 text-right tabular-nums"
+                                  autoFocus
+                                />
+                                <Button
+                                  size="icon"
+                                  className="h-8 w-8 shrink-0"
+                                  onClick={() => saveFonction(fn.fonction)}
+                                  disabled={updateFonction.isPending}
+                                >
+                                  {updateFonction.isPending ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    <Save className="h-3.5 w-3.5" />
+                                  )}
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-8 w-8 shrink-0"
+                                  onClick={() => cancelEditFonction(fn.fonction)}
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => startEditFonction(fn.fonction, fn.taux_horaire)}
+                                className="tabular-nums text-sm font-semibold hover:text-primary transition-colors px-2 py-1 rounded hover:bg-muted/50"
+                              >
+                                {eurH(fn.taux_horaire)}/h
+                              </button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
               </div>
             )}
           </CardContent>
