@@ -1,37 +1,71 @@
 -- ============================================================================
--- BE - Calcul cout RH exclusivement via be_tjm_fonctions (Lucca uniquement)
+-- BE - Calcul cout_rh_budgete depuis be_tjm_fonctions + suppression be_tjm_referentiel
 -- ============================================================================
--- Supprime tout recours a be_tjm_referentiel (TJM par poste) dans les vues.
+-- Remplace le cout_rh_budgete = 0 par un calcul base sur le taux horaire moyen
+-- des fonctions Lucca correspondant a chaque poste BE.
 --
--- Formule effective :
---   cout_rh = heures * COALESCE(fa.taux_horaire, fm.taux_horaire, 0)
---   ou fa = be_tjm_fonctions via profiles.job_title  (correspondance auto)
---       fm = be_tjm_fonctions via profiles.be_fonction (affectation manuelle)
+-- Mapping BEPoste → moyenne des fonctions Lucca :
+--   charge_affaires       → Chargé d'affaire senior, Chargé d'Affaires, Chargé de partenariats
+--   ingenieur_etudes      → Ingénieur BE, Ingénieur, Ingénieur d'étude d'exécution,
+--                           Ingénieur Automatisme, Ingénieur R&D
+--   ingenieur_realisation → Ingénieur réalisation, Ingénieur mise en route
+--   projeteur             → Dessinateur Projeteur
+--   developpeur           → Ingénieur BE, IT
+--   autre                 → moyenne globale de toutes les fonctions
 --
--- Colonnes ajoutees a v_be_affaire_temps_par_user :
---   source_taux        : 'auto' | 'manuel' | 'non_valorise'
---   taux_horaire_effectif : taux applique (€/h)
+-- Formule : cout_rh_budgete = jours * 8h * taux_horaire_moyen_poste
 --
--- Note : v_be_affaire_temps_par_poste conserve le groupement par BEPoste
---        (be_poste du profil) pour compatibilite frontend.
---        cout_rh_budgete = 0 provisoire (calcul ajoute dans migration suivante).
+-- La table be_tjm_referentiel est ensuite supprimée (plus utilisée dans aucune vue).
 -- ============================================================================
 
+-- ── Recréation des vues avec cout_rh_budgete calculé ────────────────────────
 DROP VIEW IF EXISTS public.v_be_project_synthese_kpi;
 DROP VIEW IF EXISTS public.v_be_project_budget_kpi;
 DROP VIEW IF EXISTS public.v_be_affaire_budget_kpi;
 DROP VIEW IF EXISTS public.v_be_affaire_temps_kpi;
-DROP VIEW IF EXISTS public.v_be_affaire_temps_par_user;
-DROP VIEW IF EXISTS public.v_be_affaire_temps_par_poste;
 DROP VIEW IF EXISTS public.v_be_groupe_kpi;
 
--- ── v_be_affaire_temps_kpi ──────────────────────────────────────────────────
+-- CTE réutilisable pour le taux horaire moyen par BEPoste
+-- (non extractable comme vue matérialisée dans une fonction, on l'inline dans chaque vue)
+
 CREATE VIEW public.v_be_affaire_temps_kpi AS
-WITH temps_budgete AS (
+WITH taux_par_poste AS (
+  SELECT 'charge_affaires'::text AS poste,
+    AVG(taux_horaire) AS taux
+  FROM public.be_tjm_fonctions
+  WHERE fonction IN ('Chargé d''affaire senior', 'Chargé d''Affaires', 'Chargé de partenariats')
+  UNION ALL
+  SELECT 'ingenieur_etudes',
+    AVG(taux_horaire)
+  FROM public.be_tjm_fonctions
+  WHERE fonction IN ('Ingénieur BE', 'Ingénieur', 'Ingénieur d''étude d''exécution',
+                     'Ingénieur Automatisme', 'Ingénieur R&D')
+  UNION ALL
+  SELECT 'ingenieur_realisation',
+    AVG(taux_horaire)
+  FROM public.be_tjm_fonctions
+  WHERE fonction IN ('Ingénieur réalisation', 'Ingénieur mise en route')
+  UNION ALL
+  SELECT 'projeteur',
+    AVG(taux_horaire)
+  FROM public.be_tjm_fonctions
+  WHERE fonction = 'Dessinateur Projeteur'
+  UNION ALL
+  SELECT 'developpeur',
+    AVG(taux_horaire)
+  FROM public.be_tjm_fonctions
+  WHERE fonction IN ('Ingénieur BE', 'IT')
+  UNION ALL
+  SELECT 'autre',
+    AVG(taux_horaire)
+  FROM public.be_tjm_fonctions
+),
+temps_budgete AS (
   SELECT tb.be_affaire_id,
     SUM(tb.jours_budgetes) AS jours_budgetes_total,
-    0::numeric              AS cout_rh_budgete
+    SUM(tb.jours_budgetes * 8.0 * COALESCE(tp.taux, 0)) AS cout_rh_budgete
   FROM public.be_affaire_temps_budget tb
+  LEFT JOIN taux_par_poste tp ON tp.poste = tb.poste::text
   GROUP BY tb.be_affaire_id
 ),
 temps_planifie AS (
@@ -73,53 +107,28 @@ LEFT JOIN temps_budgete  tb ON tb.be_affaire_id = a.id
 LEFT JOIN temps_planifie tp ON tp.be_affaire_id = a.id
 LEFT JOIN temps_declare  td ON td.be_affaire_id = a.id;
 
--- ── v_be_affaire_temps_par_user ─────────────────────────────────────────────
--- source_taux et taux_horaire_effectif ajoutés ; be_poste retiré.
-CREATE OR REPLACE VIEW public.v_be_affaire_temps_par_user AS
-SELECT a.id AS be_affaire_id, a.code_affaire,
-  l.user_id, l.id_lucca, p.display_name, p.job_title, p.be_fonction,
-  CASE
-    WHEN fa.taux_horaire IS NOT NULL THEN 'auto'
-    WHEN fm.taux_horaire IS NOT NULL THEN 'manuel'
-    ELSE 'non_valorise'
-  END                                                               AS source_taux,
-  COALESCE(fa.taux_horaire, fm.taux_horaire, 0)                    AS taux_horaire_effectif,
-  COUNT(*)                                                          AS nb_saisies,
-  SUM(l.duree_heures)                                               AS heures,
-  SUM(l.duree_heures / 8.0)                                        AS jours,
-  SUM(l.duree_heures * COALESCE(fa.taux_horaire, fm.taux_horaire, 0)) AS cout_rh,
-  MIN(l.date_saisie) AS premiere_saisie,
-  MAX(l.date_saisie) AS derniere_saisie
-FROM public.be_affaires a
-JOIN public.lucca_saisie_temps l ON l.code_site = a.code_affaire
-LEFT JOIN public.profiles p ON p.id = l.user_id
-LEFT JOIN public.be_tjm_fonctions fa ON fa.fonction = p.job_title
-LEFT JOIN public.be_tjm_fonctions fm ON fm.fonction = p.be_fonction
-GROUP BY a.id, a.code_affaire, l.user_id, l.id_lucca,
-  p.display_name, p.job_title, p.be_fonction,
-  fa.taux_horaire, fm.taux_horaire;
-
--- ── v_be_affaire_temps_par_poste ────────────────────────────────────────────
--- Conserve le groupement par BEPoste (be_poste du profil) pour la compatibilite
--- avec le frontend (BE_POSTE_LABEL / BE_POSTE_ICON).
-CREATE OR REPLACE VIEW public.v_be_affaire_temps_par_poste AS
-SELECT a.id AS be_affaire_id, a.code_affaire,
-  COALESCE(p.be_poste, 'non_assigne') AS poste,
-  COUNT(DISTINCT l.user_id)           AS nb_collaborateurs,
-  COUNT(*)                            AS nb_saisies,
-  SUM(l.duree_heures)                 AS heures,
-  SUM(l.duree_heures / 8.0)          AS jours,
-  SUM(l.duree_heures * COALESCE(fa.taux_horaire, fm.taux_horaire, 0)) AS cout_rh
-FROM public.be_affaires a
-JOIN public.lucca_saisie_temps l ON l.code_site = a.code_affaire
-LEFT JOIN public.profiles p ON p.id = l.user_id
-LEFT JOIN public.be_tjm_fonctions fa ON fa.fonction = p.job_title
-LEFT JOIN public.be_tjm_fonctions fm ON fm.fonction = p.be_fonction
-GROUP BY a.id, a.code_affaire, COALESCE(p.be_poste, 'non_assigne');
-
--- ── v_be_groupe_kpi ─────────────────────────────────────────────────────────
+-- ── v_be_groupe_kpi avec cout_rh_budgete calculé ────────────────────────────
 CREATE VIEW public.v_be_groupe_kpi AS
-WITH groupes_divalto AS (
+WITH taux_par_poste AS (
+  SELECT 'charge_affaires'::text AS poste, AVG(taux_horaire) AS taux
+  FROM public.be_tjm_fonctions WHERE fonction IN ('Chargé d''affaire senior', 'Chargé d''Affaires', 'Chargé de partenariats')
+  UNION ALL
+  SELECT 'ingenieur_etudes', AVG(taux_horaire)
+  FROM public.be_tjm_fonctions WHERE fonction IN ('Ingénieur BE', 'Ingénieur', 'Ingénieur d''étude d''exécution', 'Ingénieur Automatisme', 'Ingénieur R&D')
+  UNION ALL
+  SELECT 'ingenieur_realisation', AVG(taux_horaire)
+  FROM public.be_tjm_fonctions WHERE fonction IN ('Ingénieur réalisation', 'Ingénieur mise en route')
+  UNION ALL
+  SELECT 'projeteur', AVG(taux_horaire)
+  FROM public.be_tjm_fonctions WHERE fonction = 'Dessinateur Projeteur'
+  UNION ALL
+  SELECT 'developpeur', AVG(taux_horaire)
+  FROM public.be_tjm_fonctions WHERE fonction IN ('Ingénieur BE', 'IT')
+  UNION ALL
+  SELECT 'autre', AVG(taux_horaire)
+  FROM public.be_tjm_fonctions
+),
+groupes_divalto AS (
   SELECT SUBSTRING(code_affaire, 1, 5) AS code_groupe,
     SUM(CASE WHEN type_mouv = 'CCN' THEN montant_ht END) AS ca_engage,
     SUM(CASE WHEN type_mouv = 'FCN' THEN montant_ht END) AS ca_constate,
@@ -148,9 +157,10 @@ groupes_lucca AS (
 groupes_budget AS (
   SELECT SUBSTRING(a.code_affaire, 1, 5) AS code_groupe,
     SUM(b.jours_budgetes) AS jours_budgetes,
-    0::numeric             AS cout_rh_budgete
+    SUM(b.jours_budgetes * 8.0 * COALESCE(tp.taux, 0)) AS cout_rh_budgete
   FROM public.be_affaires a
   JOIN public.be_affaire_temps_budget b ON b.be_affaire_id = a.id
+  LEFT JOIN taux_par_poste tp ON tp.poste = b.poste::text
   WHERE a.code_affaire IS NOT NULL AND length(a.code_affaire) >= 5
   GROUP BY SUBSTRING(a.code_affaire, 1, 5)
 ),
@@ -191,7 +201,7 @@ LEFT JOIN groupes_lucca l ON l.code_groupe = g.code_groupe
 LEFT JOIN groupes_budget b ON b.code_groupe = g.code_groupe
 LEFT JOIN projet_par_groupe pg ON pg.code_groupe = g.code_groupe;
 
--- ── v_be_affaire_budget_kpi ─────────────────────────────────────────────────
+-- ── Vues dépendantes (inchangées) ───────────────────────────────────────────
 CREATE VIEW public.v_be_affaire_budget_kpi AS
 WITH temps_par_affaire AS (
   SELECT be_affaire_id, jours_declares, cout_rh_declare FROM public.v_be_affaire_temps_kpi
@@ -220,7 +230,6 @@ LEFT JOIN public.be_divalto_mouvements m ON m.code_affaire = a.code_affaire
 LEFT JOIN temps_par_affaire t ON t.be_affaire_id = a.id
 GROUP BY a.id, a.be_project_id, a.code_affaire, a.libelle, a.status;
 
--- ── v_be_project_budget_kpi ─────────────────────────────────────────────────
 CREATE VIEW public.v_be_project_budget_kpi AS
 SELECT p.id AS be_project_id, p.code_projet, COUNT(DISTINCT a.id) AS nb_affaires,
   COALESCE(SUM(k.ca_engage_brut), 0) AS ca_engage_brut,
@@ -239,7 +248,6 @@ LEFT JOIN public.be_affaires a ON a.be_project_id = p.id
 LEFT JOIN public.v_be_affaire_budget_kpi k ON k.be_affaire_id = a.id
 GROUP BY p.id, p.code_projet;
 
--- ── v_be_project_synthese_kpi ───────────────────────────────────────────────
 CREATE VIEW public.v_be_project_synthese_kpi AS
 SELECT p.id AS be_project_id, p.code_projet, p.nom_projet, p.status,
   COUNT(DISTINCT a.id) AS nb_affaires,
@@ -263,3 +271,54 @@ LEFT JOIN public.be_affaires a ON a.be_project_id = p.id
 LEFT JOIN public.v_be_affaire_budget_kpi b ON b.be_affaire_id = a.id
 LEFT JOIN public.v_be_affaire_temps_kpi t ON t.be_affaire_id = a.id
 GROUP BY p.id, p.code_projet, p.nom_projet, p.status;
+
+-- ── Recréation de v_be_temps_detail_mensuel (supprime dép. sur be_tjm_referentiel) ─
+DROP VIEW IF EXISTS public.v_be_temps_detail_mensuel;
+
+CREATE VIEW public.v_be_temps_detail_mensuel AS
+WITH taux_par_poste AS (
+  SELECT 'charge_affaires'::text AS poste, AVG(taux_horaire) AS taux
+  FROM public.be_tjm_fonctions WHERE fonction IN ('Chargé d''affaire senior', 'Chargé d''Affaires', 'Chargé de partenariats')
+  UNION ALL
+  SELECT 'ingenieur_etudes', AVG(taux_horaire)
+  FROM public.be_tjm_fonctions WHERE fonction IN ('Ingénieur BE', 'Ingénieur', 'Ingénieur d''étude d''exécution', 'Ingénieur Automatisme', 'Ingénieur R&D')
+  UNION ALL
+  SELECT 'ingenieur_realisation', AVG(taux_horaire)
+  FROM public.be_tjm_fonctions WHERE fonction IN ('Ingénieur réalisation', 'Ingénieur mise en route')
+  UNION ALL
+  SELECT 'projeteur', AVG(taux_horaire)
+  FROM public.be_tjm_fonctions WHERE fonction = 'Dessinateur Projeteur'
+  UNION ALL
+  SELECT 'developpeur', AVG(taux_horaire)
+  FROM public.be_tjm_fonctions WHERE fonction IN ('Ingénieur BE', 'IT')
+  UNION ALL
+  SELECT 'autre', AVG(taux_horaire)
+  FROM public.be_tjm_fonctions
+)
+SELECT
+  date_trunc('month', t.date_saisie::timestamp with time zone)::date AS mois,
+  t.code_site AS code_affaire,
+  a.id AS be_affaire_id,
+  a.libelle AS affaire_libelle,
+  a.be_project_id,
+  t.user_id,
+  p.display_name AS user_display_name,
+  COALESCE(p.be_poste, 'autre'::text) AS poste,
+  SUM(t.duree_heures) AS heures,
+  SUM(t.duree_heures / 8.0) AS jours,
+  SUM(t.duree_heures * COALESCE(tp.taux, 0::numeric)) AS cout_rh,
+  COUNT(*) AS nb_saisies
+FROM public.lucca_saisie_temps t
+LEFT JOIN public.be_affaires a ON a.code_affaire = t.code_site
+LEFT JOIN public.profiles p ON p.id = t.user_id
+LEFT JOIN taux_par_poste tp ON tp.poste = COALESCE(p.be_poste, 'autre'::text)
+GROUP BY
+  date_trunc('month', t.date_saisie::timestamp with time zone)::date,
+  t.code_site, a.id, a.libelle, a.be_project_id,
+  t.user_id, p.display_name,
+  COALESCE(p.be_poste, 'autre'::text);
+
+-- ── Suppression de be_tjm_referentiel ───────────────────────────────────────
+-- La table n'est plus referencee par aucune vue ni FK.
+-- Les TJM par poste sont desormais derives de be_tjm_fonctions (taux moyen par categorie).
+DROP TABLE IF EXISTS public.be_tjm_referentiel;

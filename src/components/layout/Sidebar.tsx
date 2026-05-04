@@ -53,7 +53,16 @@ const menuGroups: MenuGroup[] = [
   {
     label: 'PROJETS',
     items: [
-      { id: 'projects', label: 'Bureau d\'études', icon: FolderOpen, path: '/projects', permissionKey: 'can_access_projects' },
+      {
+        id: 'projects',
+        label: 'Bureau d\'études',
+        icon: FolderOpen,
+        path: '/projects',
+        permissionKey: 'can_access_projects',
+        children: [
+          { id: 'be-admin-tjm', label: 'Référentiel TJM', icon: Euro, path: '/be/admin/tjm', permissionKey: 'can_access_projects' },
+        ],
+      },
       { id: 'spv', label: 'Projets SPV', icon: Leaf, path: '/spv', permissionKey: 'can_access_projects' },
       {
         id: 'it-projects',
