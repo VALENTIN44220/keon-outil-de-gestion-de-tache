@@ -12,6 +12,8 @@ export interface BEProfileWithPoste {
   id_lucca: string | null;
   status: string;
   be_poste: BEPoste | null;
+  /** Fonction BE (clé vers be_tjm_fonctions). Prioritaire sur be_poste pour le calcul du coût RH. */
+  be_fonction: string | null;
   /** Saisies de temps Lucca rattachees (pour aider a prioriser ceux qui en ont). */
   nb_saisies?: number;
   heures_total?: number;
@@ -25,7 +27,7 @@ export function useBEProfilesPostes() {
       // 1. Profils actifs
       const { data: profiles, error: pe } = await sb
         .from('profiles')
-        .select('id,display_name,job_title,department,id_lucca,status,be_poste')
+        .select('id,display_name,job_title,department,id_lucca,status,be_poste,be_fonction')
         .eq('status', 'active')
         .order('display_name');
       if (pe) throw pe;
@@ -54,6 +56,16 @@ export function useBEProfilesPostes() {
   });
 }
 
+const invalidateRhKpis = (qc: ReturnType<typeof useQueryClient>) => {
+  qc.invalidateQueries({ queryKey: ['be-profiles-postes'] });
+  qc.invalidateQueries({ queryKey: ['be-affaire-temps-kpi'] });
+  qc.invalidateQueries({ queryKey: ['be-affaire-temps-par-user'] });
+  qc.invalidateQueries({ queryKey: ['be-affaire-temps-par-poste'] });
+  qc.invalidateQueries({ queryKey: ['be-projects-synthese-kpi'] });
+  qc.invalidateQueries({ queryKey: ['be-affaires-kpis'] });
+  qc.invalidateQueries({ queryKey: ['be-affaire-kpi-period'] });
+};
+
 /** Mutation : assigne / change / retire un be_poste pour un profil. */
 export function useUpdateProfileBEPoste() {
   const qc = useQueryClient();
@@ -65,15 +77,21 @@ export function useUpdateProfileBEPoste() {
         .eq('id', profileId);
       if (error) throw error;
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['be-profiles-postes'] });
-      // Les KPIs RH dependent du be_poste -> invalider tout
-      qc.invalidateQueries({ queryKey: ['be-affaire-temps-kpi'] });
-      qc.invalidateQueries({ queryKey: ['be-affaire-temps-par-user'] });
-      qc.invalidateQueries({ queryKey: ['be-affaire-temps-par-poste'] });
-      qc.invalidateQueries({ queryKey: ['be-projects-synthese-kpi'] });
-      qc.invalidateQueries({ queryKey: ['be-affaires-kpis'] });
-      qc.invalidateQueries({ queryKey: ['be-affaire-kpi-period'] });
+    onSuccess: () => invalidateRhKpis(qc),
+  });
+}
+
+/** Mutation : assigne / change / retire une be_fonction pour un profil. */
+export function useUpdateProfileBEFonction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ profileId, beFonction }: { profileId: string; beFonction: string | null }) => {
+      const { error } = await sb
+        .from('profiles')
+        .update({ be_fonction: beFonction })
+        .eq('id', profileId);
+      if (error) throw error;
     },
+    onSuccess: () => invalidateRhKpis(qc),
   });
 }

@@ -20,128 +20,71 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Coins, Search, Users, Save, Loader2, X, Clock } from 'lucide-react';
+import { Coins, Save, Loader2, X, Clock, AlertTriangle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { extractErrorMessage } from '@/lib/extractErrorMessage';
 import {
-  useBETjmReferentielFull,
-  useUpdateBETjm,
   useBETjmFonctions,
   useUpdateBETjmFonction,
 } from '@/hooks/useBEAffaireTemps';
 import {
   useBEProfilesPostes,
-  useUpdateProfileBEPoste,
+  useUpdateProfileBEFonction,
 } from '@/hooks/useBEProfilesPostes';
-import {
-  BE_POSTES,
-  BE_POSTE_ICON,
-  BE_POSTE_LABEL,
-  type BEPoste,
-} from '@/types/beTemps';
 import { cn } from '@/lib/utils';
 
-const eur = (n: number | null | undefined) =>
-  (n ?? 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
-
 const eurH = (n: number | null | undefined) =>
-  (n ?? 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  (n ?? 0).toLocaleString('fr-FR', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
 export default function BEAdminTJM() {
-  const { data: tjmRows = [], isLoading: tjmLoading } = useBETjmReferentielFull();
-  const updateTjm = useUpdateBETjm();
+  // ── Référentiel fonctions ────────────────────────────────────────────────
   const { data: fonctions = [], isLoading: fonctionsLoading } = useBETjmFonctions();
   const updateFonction = useUpdateBETjmFonction();
-
-  // ── État édition taux horaire fonctions ────────────────────────────────
   const [editingFonction, setEditingFonction] = useState<Record<string, string>>({});
 
-  const startEditFonction = (fn: string, current: number) =>
-    setEditingFonction((prev) => ({ ...prev, [fn]: String(current) }));
-  const cancelEditFonction = (fn: string) =>
-    setEditingFonction((prev) => { const n = { ...prev }; delete n[fn]; return n; });
-  const saveFonction = async (fn: string) => {
+  const startEdit = (fn: string, cur: number) =>
+    setEditingFonction((p) => ({ ...p, [fn]: String(cur) }));
+  const cancelEdit = (fn: string) =>
+    setEditingFonction((p) => { const n = { ...p }; delete n[fn]; return n; });
+  const saveEdit = async (fn: string) => {
     const val = parseFloat(editingFonction[fn]);
-    if (isNaN(val) || val < 0) {
-      toast({ title: 'Taux invalide', variant: 'destructive' }); return;
-    }
+    if (isNaN(val) || val < 0) { toast({ title: 'Taux invalide', variant: 'destructive' }); return; }
     try {
       await updateFonction.mutateAsync({ fonction: fn, taux_horaire: val });
       toast({ title: 'Taux mis à jour', description: `${fn} → ${eurH(val)}/h` });
-      cancelEditFonction(fn);
+      cancelEdit(fn);
     } catch (e) {
       toast({ title: 'Erreur', description: extractErrorMessage(e), variant: 'destructive' });
     }
   };
+
+  // ── Profils sans correspondance auto ────────────────────────────────────
   const { data: profiles = [], isLoading: profilesLoading } = useBEProfilesPostes();
-  const updateProfilePoste = useUpdateProfileBEPoste();
+  const updateFonctionProfile = useUpdateProfileBEFonction();
 
-  // ── État édition TJM ───────────────────────────────────────────────────
-  const [editingTjm, setEditingTjm] = useState<Record<BEPoste, string>>({} as any);
+  const fonctionSet = useMemo(() => new Set(fonctions.map((f) => f.fonction)), [fonctions]);
 
-  const startEditTjm = (poste: BEPoste, current: number) => {
-    setEditingTjm((prev) => ({ ...prev, [poste]: String(current) }));
-  };
-  const cancelEditTjm = (poste: BEPoste) => {
-    setEditingTjm((prev) => {
-      const next = { ...prev };
-      delete next[poste];
-      return next;
-    });
-  };
-  const saveTjm = async (poste: BEPoste) => {
-    const raw = editingTjm[poste];
-    const val = parseFloat(raw);
-    if (isNaN(val) || val < 0) {
-      toast({ title: 'TJM invalide', variant: 'destructive' });
-      return;
-    }
+  /** Profils avec saisies Lucca dont le job_title ne matche pas le référentiel. */
+  const unmatched = useMemo(
+    () =>
+      profiles.filter(
+        (p) =>
+          (p.nb_saisies ?? 0) > 0 &&
+          (!p.job_title || !fonctionSet.has(p.job_title)),
+      ),
+    [profiles, fonctionSet],
+  );
+
+  const handleFonctionAssign = async (profileId: string, value: string) => {
+    const fn = value === 'none' ? null : value;
     try {
-      await updateTjm.mutateAsync({ poste, tjm: val });
-      toast({ title: 'TJM mis à jour', description: `${BE_POSTE_LABEL[poste]} → ${eur(val)}/jour` });
-      cancelEditTjm(poste);
-    } catch (e) {
-      toast({ title: 'Erreur', description: extractErrorMessage(e), variant: 'destructive' });
-    }
-  };
-
-  // ── État liste profils ───────────────────────────────────────────────
-  const [search, setSearch] = useState('');
-  const [filterPoste, setFilterPoste] = useState<'all' | 'unassigned' | BEPoste>('all');
-  const [filterActifs, setFilterActifs] = useState<'all' | 'with_temps'>('with_temps');
-
-  const filteredProfiles = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return profiles.filter((p) => {
-      if (q) {
-        const match =
-          p.display_name.toLowerCase().includes(q) ||
-          (p.job_title ?? '').toLowerCase().includes(q) ||
-          (p.department ?? '').toLowerCase().includes(q);
-        if (!match) return false;
-      }
-      if (filterPoste === 'unassigned' && p.be_poste != null) return false;
-      if (filterPoste !== 'all' && filterPoste !== 'unassigned' && p.be_poste !== filterPoste)
-        return false;
-      if (filterActifs === 'with_temps' && (p.nb_saisies ?? 0) === 0) return false;
-      return true;
-    });
-  }, [profiles, search, filterPoste, filterActifs]);
-
-  const stats = useMemo(() => {
-    const m: Record<string, number> = { total: profiles.length, unassigned: 0 };
-    for (const p of profiles) {
-      if (!p.be_poste) m.unassigned += 1;
-      else m[p.be_poste] = (m[p.be_poste] ?? 0) + 1;
-    }
-    return m;
-  }, [profiles]);
-
-  const handlePosteChange = async (profileId: string, value: string) => {
-    const newPoste = value === 'none' ? null : (value as BEPoste);
-    try {
-      await updateProfilePoste.mutateAsync({ profileId, bePoste: newPoste });
-      toast({ title: 'Poste mis à jour' });
+      await updateFonctionProfile.mutateAsync({ profileId, beFonction: fn });
+      toast({ title: fn ? `Fonction assignée : ${fn}` : 'Fonction retirée' });
     } catch (e) {
       toast({ title: 'Erreur', description: extractErrorMessage(e), variant: 'destructive' });
     }
@@ -156,125 +99,45 @@ export default function BEAdminTJM() {
             <div className="p-2 rounded-xl bg-violet-500/10">
               <Coins className="h-7 w-7 text-violet-500" />
             </div>
-            Référentiel TJM &amp; postes BE
+            Référentiel TJM BE
           </h1>
-          <p className="text-muted-foreground mt-2">
-            Définissez les TJM par poste BE et assignez un poste à chaque collaborateur.
-            Le coût RH des affaires se calcule via : heures Lucca × TJM(poste du collaborateur).
+          <p className="text-muted-foreground mt-2 text-sm">
+            Les taux horaires Lucca sont appliqués automatiquement via le titre de poste du collaborateur.
+            Les profils sans correspondance peuvent être affectés manuellement ci-dessous.
           </p>
+          <div className="mt-3 flex items-center gap-3 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+              Priorité 1 — job_title → référentiel fonctions (auto)
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
+              Priorité 2 — affectation manuelle ci-dessous
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-slate-400 inline-block" />
+              Fallback — TJM poste BE / 8h
+            </span>
+          </div>
         </div>
 
-        {/* TJM par poste */}
-        <Card className="border-border/50">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Coins className="h-5 w-5 text-muted-foreground" />
-              TJM par poste
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {tjmLoading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-12" />
-                <Skeleton className="h-12" />
-                <Skeleton className="h-12" />
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {BE_POSTES.map((poste) => {
-                  const row = tjmRows.find((r) => r.poste === poste);
-                  const current = row?.tjm ?? 0;
-                  const editing = editingTjm[poste] != null;
-                  return (
-                    <div
-                      key={poste}
-                      className="border rounded-lg p-3 bg-card flex flex-col gap-2"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl">{BE_POSTE_ICON[poste]}</span>
-                        <span className="font-medium text-sm">{BE_POSTE_LABEL[poste]}</span>
-                        <Badge variant="secondary" className="ml-auto text-[10px]">
-                          {stats[poste] ?? 0} prof.
-                        </Badge>
-                      </div>
-                      {editing ? (
-                        <div className="flex items-center gap-1">
-                          <Input
-                            type="number"
-                            step="10"
-                            min="0"
-                            value={editingTjm[poste]}
-                            onChange={(e) =>
-                              setEditingTjm((prev) => ({ ...prev, [poste]: e.target.value }))
-                            }
-                            className="h-9 text-right tabular-nums"
-                            autoFocus
-                          />
-                          <span className="text-xs text-muted-foreground">€/j</span>
-                          <Button
-                            size="icon"
-                            className="h-9 w-9 shrink-0"
-                            onClick={() => saveTjm(poste)}
-                            disabled={updateTjm.isPending}
-                          >
-                            {updateTjm.isPending ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Save className="h-4 w-4" />
-                            )}
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-9 w-9 shrink-0"
-                            onClick={() => cancelEditTjm(poste)}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => startEditTjm(poste, current)}
-                          className="flex items-center justify-between h-9 px-3 rounded border bg-muted/30 hover:bg-muted/60 hover:border-primary/50 transition-colors"
-                        >
-                          <span className="text-xl font-bold tabular-nums">{eur(current)}</span>
-                          <span className="text-[10px] text-muted-foreground">/jour · clic pour éditer</span>
-                        </button>
-                      )}
-                      {row?.description && (
-                        <p className="text-[11px] text-muted-foreground truncate">
-                          {row.description}
-                        </p>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Taux horaires par fonction Lucca */}
+        {/* Taux horaires par fonction */}
         <Card className="border-border/50">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-lg">
               <Clock className="h-5 w-5 text-muted-foreground" />
               Taux horaires par fonction Lucca
-              <Badge variant="secondary" className="ml-2 text-xs">
-                {fonctions.length} fonctions
-              </Badge>
+              <Badge variant="secondary" className="ml-2 text-xs">{fonctions.length} fonctions</Badge>
             </CardTitle>
             <p className="text-xs text-muted-foreground mt-1">
-              Salaire moyen horaire (€/h) par fonction. Utilisé en priorité sur le TJM poste pour calculer le coût RH :
-              <span className="font-mono text-primary/80"> coût RH = heures × taux_horaire</span>.
+              Appliqués automatiquement quand{' '}
+              <code className="bg-muted px-1 rounded text-[11px]">profiles.job_title</code>
+              {' '}correspond exactement au nom de fonction. Cliquez sur un taux pour le modifier.
             </p>
           </CardHeader>
           <CardContent>
             {fonctionsLoading ? (
-              <div className="space-y-2">
-                {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-10" />)}
-              </div>
+              <div className="space-y-2">{Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-10" />)}</div>
             ) : (
               <div className="rounded-lg border overflow-hidden">
                 <Table>
@@ -299,10 +162,7 @@ export default function BEAdminTJM() {
                                   min="0"
                                   value={editingFonction[fn.fonction]}
                                   onChange={(e) =>
-                                    setEditingFonction((prev) => ({
-                                      ...prev,
-                                      [fn.fonction]: e.target.value,
-                                    }))
+                                    setEditingFonction((p) => ({ ...p, [fn.fonction]: e.target.value }))
                                   }
                                   className="h-8 w-32 text-right tabular-nums"
                                   autoFocus
@@ -310,20 +170,17 @@ export default function BEAdminTJM() {
                                 <Button
                                   size="icon"
                                   className="h-8 w-8 shrink-0"
-                                  onClick={() => saveFonction(fn.fonction)}
+                                  onClick={() => saveEdit(fn.fonction)}
                                   disabled={updateFonction.isPending}
                                 >
-                                  {updateFonction.isPending ? (
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                  ) : (
-                                    <Save className="h-3.5 w-3.5" />
-                                  )}
+                                  {updateFonction.isPending
+                                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    : <Save className="h-3.5 w-3.5" />}
                                 </Button>
                                 <Button
-                                  size="icon"
-                                  variant="ghost"
+                                  size="icon" variant="ghost"
                                   className="h-8 w-8 shrink-0"
-                                  onClick={() => cancelEditFonction(fn.fonction)}
+                                  onClick={() => cancelEdit(fn.fonction)}
                                 >
                                   <X className="h-3.5 w-3.5" />
                                 </Button>
@@ -331,7 +188,7 @@ export default function BEAdminTJM() {
                             ) : (
                               <button
                                 type="button"
-                                onClick={() => startEditFonction(fn.fonction, fn.taux_horaire)}
+                                onClick={() => startEdit(fn.fonction, fn.taux_horaire)}
                                 className="tabular-nums text-sm font-semibold hover:text-primary transition-colors px-2 py-1 rounded hover:bg-muted/50"
                               >
                                 {eurH(fn.taux_horaire)}/h
@@ -348,71 +205,32 @@ export default function BEAdminTJM() {
           </CardContent>
         </Card>
 
-        {/* Postes des collaborateurs */}
+        {/* Profils sans correspondance */}
         <Card className="border-border/50">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-lg">
-              <Users className="h-5 w-5 text-muted-foreground" />
-              Postes des collaborateurs
-              <Badge variant="secondary" className="ml-2 text-xs">
-                {filteredProfiles.length} / {profiles.length}
-              </Badge>
-              {stats.unassigned > 0 && (
-                <Badge variant="outline" className="text-xs border-amber-500/40 text-amber-600 bg-amber-500/5">
-                  {stats.unassigned} sans poste
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Profils sans correspondance automatique
+              {!profilesLoading && (
+                <Badge
+                  variant={unmatched.length > 0 ? 'outline' : 'secondary'}
+                  className={cn('ml-2 text-xs', unmatched.length > 0 && 'border-amber-500/40 text-amber-600 bg-amber-500/5')}
+                >
+                  {unmatched.length} profil{unmatched.length !== 1 ? 's' : ''}
                 </Badge>
               )}
             </CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              Collaborateurs avec saisies Lucca dont le titre de poste ne correspond à aucune fonction du référentiel.
+              Affectez-leur une fonction manuellement pour que leur taux horaire soit appliqué.
+            </p>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Filtres */}
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="relative flex-1 min-w-[200px] max-w-md">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Rechercher (nom, fonction, dept)…"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-
-              <Select value={filterPoste} onValueChange={(v) => setFilterPoste(v as any)}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Filtre poste" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous les postes</SelectItem>
-                  <SelectItem value="unassigned">Non assignés</SelectItem>
-                  {BE_POSTES.map((p) => (
-                    <SelectItem key={p} value={p}>
-                      {BE_POSTE_ICON[p]} {BE_POSTE_LABEL[p]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={filterActifs} onValueChange={(v) => setFilterActifs(v as any)}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="with_temps">Avec saisies Lucca</SelectItem>
-                  <SelectItem value="all">Tous les actifs</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Table */}
+          <CardContent>
             {profilesLoading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-10" />
-                <Skeleton className="h-10" />
-                <Skeleton className="h-10" />
-              </div>
-            ) : filteredProfiles.length === 0 ? (
-              <div className="py-8 text-center text-muted-foreground text-sm">
-                Aucun collaborateur ne correspond aux filtres.
+              <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10" />)}</div>
+            ) : unmatched.length === 0 ? (
+              <div className="py-8 text-center text-sm text-muted-foreground">
+                ✅ Tous les profils avec saisies Lucca ont une correspondance automatique.
               </div>
             ) : (
               <div className="rounded-lg border overflow-hidden">
@@ -420,61 +238,53 @@ export default function BEAdminTJM() {
                   <TableHeader>
                     <TableRow className="bg-muted/30 hover:bg-muted/30">
                       <TableHead>Collaborateur</TableHead>
-                      <TableHead>Fonction</TableHead>
-                      <TableHead>Département</TableHead>
-                      <TableHead className="text-right">Saisies Lucca</TableHead>
-                      <TableHead className="w-[220px]">Poste BE</TableHead>
+                      <TableHead>Titre Lucca (non reconnu)</TableHead>
+                      <TableHead className="text-right">Saisies</TableHead>
+                      <TableHead className="w-[280px]">Affecter une fonction (TJM)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredProfiles.map((p) => (
+                    {unmatched.map((p) => (
                       <TableRow key={p.id}>
                         <TableCell>
-                          <div className="flex flex-col">
-                            <span className="text-sm font-medium">{p.display_name}</span>
-                            {p.id_lucca && (
-                              <span className="text-[10px] text-muted-foreground font-mono">
-                                Lucca #{p.id_lucca}
-                              </span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {p.job_title ?? '—'}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {p.department ?? '—'}
-                        </TableCell>
-                        <TableCell className="text-right text-xs tabular-nums">
-                          {(p.nb_saisies ?? 0) > 0 ? (
-                            <span>
-                              {p.nb_saisies}{' '}
-                              <span className="text-muted-foreground">
-                                ({Math.round((p.heures_total ?? 0) / 8)} j)
-                              </span>
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
+                          <div className="text-sm font-medium">{p.display_name}</div>
+                          {p.id_lucca && (
+                            <div className="text-[10px] text-muted-foreground font-mono">Lucca #{p.id_lucca}</div>
                           )}
                         </TableCell>
                         <TableCell>
+                          <span className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
+                            {p.job_title ?? '— sans titre'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right text-xs tabular-nums text-muted-foreground">
+                          {p.nb_saisies} ({Math.round((p.heures_total ?? 0) / 8)} j)
+                        </TableCell>
+                        <TableCell>
                           <Select
-                            value={p.be_poste ?? 'none'}
-                            onValueChange={(v) => handlePosteChange(p.id, v)}
+                            value={p.be_fonction ?? 'none'}
+                            onValueChange={(v) => handleFonctionAssign(p.id, v)}
                           >
                             <SelectTrigger
                               className={cn(
                                 'h-8 text-xs',
-                                !p.be_poste && 'border-amber-500/40 bg-amber-500/5',
+                                p.be_fonction
+                                  ? 'border-blue-500/40 bg-blue-500/5'
+                                  : 'border-amber-500/40 bg-amber-500/5',
                               )}
                             >
-                              <SelectValue />
+                              <SelectValue placeholder="— Choisir une fonction…" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="none">— Aucun</SelectItem>
-                              {BE_POSTES.map((poste) => (
-                                <SelectItem key={poste} value={poste}>
-                                  {BE_POSTE_ICON[poste]} {BE_POSTE_LABEL[poste]}
+                              <SelectItem value="none">— Aucune affectation</SelectItem>
+                              {fonctions.map((fn) => (
+                                <SelectItem key={fn.fonction} value={fn.fonction}>
+                                  <span className="flex items-center justify-between w-full gap-4">
+                                    <span>{fn.fonction}</span>
+                                    <span className="text-muted-foreground tabular-nums text-[11px]">
+                                      {eurH(fn.taux_horaire)}/h
+                                    </span>
+                                  </span>
                                 </SelectItem>
                               ))}
                             </SelectContent>
