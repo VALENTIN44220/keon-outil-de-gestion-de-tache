@@ -38,6 +38,7 @@ interface MenuGroup {
 
 const menuGroups: MenuGroup[] = [
   {
+    label: 'MON ESPACE',
     items: [
       { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard, path: '/', permissionKey: 'can_access_dashboard' },
       { id: 'requests', label: 'Demandes', icon: FileText, path: '/requests', permissionKey: 'can_access_requests' },
@@ -148,6 +149,7 @@ const groupColors: Record<number, { hex: string; bg: string; text: string; textM
 // Map group labels to group index for color lookup
 const groupLabelToIndex: Record<string, number> = {
   '': 0,
+  'MON ESPACE': 0,
   'ÉQUIPE': 1,
   'BUREAU D\'ÉTUDES': 6,
   'SPV': 2,
