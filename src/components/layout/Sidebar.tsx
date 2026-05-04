@@ -77,32 +77,22 @@ const menuGroups: MenuGroup[] = [
     ],
   },
   {
-    label: 'PROJETS',
+    label: 'SPV',
     items: [
       { id: 'spv', label: 'Projets SPV', icon: Leaf, path: '/spv', permissionKey: 'can_access_projects' },
-      {
-        id: 'it-projects',
-        label: 'Projets IT',
-        icon: Monitor,
-        path: '/it/projects',
-        permissionKey: 'can_access_it_projects',
-        children: [
-          {
-            id: 'it-budget',
-            label: 'Budget IT',
-            icon: Euro,
-            path: '/it/budget',
-            permissionKey: 'can_access_it_projects',
-          },
-          {
-            id: 'it-cartographie',
-            label: 'Cartographie IT',
-            icon: MapIcon,
-            path: '/it/cartographie',
-            permissionKey: 'can_access_it_projects',
-          },
-        ],
-      },
+    ],
+  },
+  {
+    label: 'IT / DIGITAL',
+    items: [
+      { id: 'it-projects', label: 'Projets', icon: Monitor, path: '/it/projects', permissionKey: 'can_access_it_projects' },
+      { id: 'it-budget', label: 'Budget', icon: Euro, path: '/it/budget', permissionKey: 'can_access_it_projects' },
+      { id: 'it-cartographie', label: 'Cartographie', icon: MapIcon, path: '/it/cartographie', permissionKey: 'can_access_it_projects' },
+    ],
+  },
+  {
+    label: 'INNOVATION',
+    items: [
       { id: 'innovation', label: 'Projets INNO', icon: Lightbulb, path: '/innovation/requests', permissionKey: 'can_access_dashboard' },
     ],
   },
@@ -151,6 +141,8 @@ const groupColors: Record<number, { hex: string; bg: string; text: string; textM
   4: { hex: '#64748b', bg: 'bg-[#64748b]/15', text: 'text-[#64748b]', textMuted: 'text-[#64748b]/50', border: 'border-[#64748b]', iconBg: 'bg-[#64748b]', iconInactive: 'text-[#64748b]/60' },
   5: { hex: '#ec4899', bg: 'bg-[#ec4899]/15', text: 'text-[#ec4899]', textMuted: 'text-[#ec4899]/50', border: 'border-[#ec4899]', iconBg: 'bg-[#ec4899]', iconInactive: 'text-[#ec4899]/60' },
   6: { hex: '#6366f1', bg: 'bg-[#6366f1]/15', text: 'text-[#6366f1]', textMuted: 'text-[#6366f1]/50', border: 'border-[#6366f1]', iconBg: 'bg-[#6366f1]', iconInactive: 'text-[#6366f1]/60' },
+  7: { hex: '#06b6d4', bg: 'bg-[#06b6d4]/15', text: 'text-[#06b6d4]', textMuted: 'text-[#06b6d4]/50', border: 'border-[#06b6d4]', iconBg: 'bg-[#06b6d4]', iconInactive: 'text-[#06b6d4]/60' },
+  8: { hex: '#eab308', bg: 'bg-[#eab308]/15', text: 'text-[#eab308]', textMuted: 'text-[#eab308]/50', border: 'border-[#eab308]', iconBg: 'bg-[#eab308]', iconInactive: 'text-[#eab308]/60' },
 };
 
 // Map group labels to group index for color lookup
@@ -158,7 +150,9 @@ const groupLabelToIndex: Record<string, number> = {
   '': 0,
   'ÉQUIPE': 1,
   'BUREAU D\'ÉTUDES': 6,
-  'PROJETS': 2,
+  'SPV': 2,
+  'IT / DIGITAL': 7,
+  'INNOVATION': 8,
   'ACHATS': 3,
   'CONFIGURATION': 4,
   'OUTILS': 5,
