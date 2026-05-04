@@ -55,6 +55,9 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
+import { getBEStatusMeta } from '@/hooks/useBETaskStatus';
+import { ExternalLink } from 'lucide-react';
 import { TaskCommentsSection } from './TaskCommentsSection';
 import { TaskChecklist } from './TaskChecklist';
 import { useTasksProgress } from '@/hooks/useChecklists';
@@ -112,6 +115,7 @@ const statusConfig: Record<string, { label: string; icon: typeof CheckCircle2; c
 export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMutated }: TaskDetailDialogProps) {
   const { profile } = useAuth();
   const { isAdmin } = useUserRole();
+  const navigate = useNavigate();
   const [isReassignOpen, setIsReassignOpen] = useState(false);
   const [taskForReassign, setTaskForReassign] = useState<Task | null>(null);
   const [childTasks, setChildTasks] = useState<Task[]>([]);
@@ -120,6 +124,7 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
   const [profilesList, setProfilesList] = useState<{ id: string; display_name: string; manager_id: string | null }[]>([]);
   const [departments, setDepartments] = useState<Map<string, string>>(new Map());
   const [processName, setProcessName] = useState<string | null>(null);
+  const [beProject, setBeProject] = useState<{ code_projet: string; nom_projet: string } | null>(null);
   /** Demandeur / rapporteur hérités de la demande parente quand la tâche ne les a pas en colonne. */
   const [parentRequestPersonIds, setParentRequestPersonIds] = useState<{
     requester_id: string | null;
@@ -268,6 +273,18 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
         if (processData) {
           setProcessName(processData.name);
         }
+      }
+
+      // Fetch BE project info if linked
+      if (task.be_project_id) {
+        const { data: bePrj } = await (supabase as any)
+          .from('be_projects')
+          .select('code_projet, nom_projet')
+          .eq('id', task.be_project_id)
+          .maybeSingle();
+        setBeProject(bePrj ?? null);
+      } else {
+        setBeProject(null);
       }
     } catch (error) {
       console.error('Error fetching related data:', error);
@@ -963,6 +980,33 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
               <span className="text-muted-foreground">Catégorie:</span>
               {task.category ? <Badge variant="outline">{task.category}</Badge> : <span className="italic text-muted-foreground">—</span>}
             </div>
+            {/* ── Section BE ── */}
+            {task.be_status && (
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">Statut BE:</span>
+                <Badge
+                  variant="outline"
+                  className={cn('border font-medium text-xs', getBEStatusMeta(task.be_status).bgClass, getBEStatusMeta(task.be_status).textClass)}
+                  style={{ borderColor: getBEStatusMeta(task.be_status).color + '60' }}
+                >
+                  {getBEStatusMeta(task.be_status).icon} {getBEStatusMeta(task.be_status).label}
+                </Badge>
+              </div>
+            )}
+            {beProject && (
+              <div className="flex items-center gap-2 col-span-2">
+                <ExternalLink className="h-4 w-4 text-blue-500 shrink-0" />
+                <span className="text-muted-foreground shrink-0">Projet BE:</span>
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="h-auto p-0 text-sm font-medium text-primary hover:underline"
+                  onClick={() => { onClose(); navigate(`/be/projects/${beProject.code_projet}/overview`); }}
+                >
+                  {beProject.code_projet} — {beProject.nom_projet}
+                </Button>
+              </div>
+            )}
             {task.it_project_id && (
               <div className="flex items-center gap-2 col-span-2">
                 <Workflow className="h-4 w-4 text-violet-500" />
@@ -1172,12 +1216,23 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
-                                <Badge 
-                                  variant="outline" 
-                                  className={cn("text-xs", statusConfig[childTask.status]?.color)}
-                                >
-                                  {statusConfig[childTask.status]?.label}
-                                </Badge>
+                                {childTask.be_status && (
+                                  <Badge
+                                    variant="outline"
+                                    className={cn('text-xs border font-medium', getBEStatusMeta(childTask.be_status).bgClass, getBEStatusMeta(childTask.be_status).textClass)}
+                                    style={{ borderColor: getBEStatusMeta(childTask.be_status).color + '50' }}
+                                  >
+                                    {getBEStatusMeta(childTask.be_status).icon} {getBEStatusMeta(childTask.be_status).label}
+                                  </Badge>
+                                )}
+                                {!childTask.be_status && (
+                                  <Badge
+                                    variant="outline"
+                                    className={cn("text-xs", statusConfig[childTask.status]?.color)}
+                                  >
+                                    {statusConfig[childTask.status]?.label}
+                                  </Badge>
+                                )}
                                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
                               </div>
                             </div>

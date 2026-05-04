@@ -21,6 +21,13 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -57,7 +64,14 @@ import {
   Send,
   CheckCircle2,
   X,
+  Info,
+  ExternalLink,
+  User,
+  Calendar,
+  FileText,
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { getBEStatusMeta } from '@/hooks/useBETaskStatus';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -383,12 +397,14 @@ function TaskRow({
   profiles,
   showProject,
   isBlocked,
+  onRequestDetail,
   onRefresh,
 }: {
   task: BETaskRow;
   profiles: Profile[];
   showProject?: boolean;
   isBlocked?: boolean;
+  onRequestDetail?: () => void;
   onRefresh: () => void;
 }) {
   const presName = task.sub_process_template?.name ?? task.title;
@@ -480,6 +496,25 @@ function TaskRow({
         </div>
       </div>
 
+      {/* Lien vers la demande parente */}
+      {onRequestDetail && task.parent_request_id && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0 shrink-0 text-muted-foreground/60 hover:text-primary"
+                onClick={onRequestDetail}
+              >
+                <FileText className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Détail de la demande</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
+
       {/* Lien document */}
       <DocumentLinkField taskId={task.id} initialUrl={task.document_url} />
 
@@ -549,6 +584,7 @@ interface BEDispatchViewProps {
 
 export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const isGlobal = !projectId;
 
   // ── Filtres ────────────────────────────────────────────────────────────────
@@ -556,6 +592,7 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
   const [assignFilter, setAssignFilter] = useState<'all' | 'unassigned'>('all');
   const [expandedRequests, setExpandedRequests] = useState<Set<string>>(new Set());
   const [showNewRequest, setShowNewRequest] = useState(false);
+  const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
 
   // ── Chargement tâches ──────────────────────────────────────────────────────
   const { data: tasks = [], isLoading: tasksLoading, refetch } = useQuery({
@@ -594,7 +631,7 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
       let q = sb
         .from('tasks')
         .select(`
-          id, title, be_urgency, created_at,
+          id, title, description, be_urgency, created_at, requester_id,
           requester:profiles!tasks_requester_id_fkey(display_name),
           be_project:be_projects!tasks_be_project_id_fkey(code_projet, nom_projet)
         `)
@@ -690,6 +727,16 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
 
   /** IDs des tâches bloquées par une tâche précédente non encore validée dans la même demande */
   const blockedTaskIds = useMemo(() => computeBlockedTasks(tasks), [tasks]);
+
+  /** Demande sélectionnée pour le panneau de détail */
+  const selectedRequest = useMemo(
+    () => requests.find(r => r.id === selectedRequestId) ?? null,
+    [requests, selectedRequestId],
+  );
+  const selectedChildren = useMemo(
+    () => (selectedRequestId ? (tasksByRequest.get(selectedRequestId) ?? []) : []),
+    [tasksByRequest, selectedRequestId],
+  );
 
   const toggleRequest = (id: string) => {
     setExpandedRequests(prev => {
@@ -815,9 +862,10 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
                 return (
                   <div key={req.id}>
                     {/* En-tête de la demande */}
+                    <div className="w-full flex items-center">
                     <button
                       onClick={() => toggleRequest(req.id)}
-                      className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-muted/30 transition-colors"
+                      className="flex-1 text-left px-4 py-3 flex items-center gap-3 hover:bg-muted/30 transition-colors"
                     >
                       {isExpanded ? (
                         <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -863,6 +911,23 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
                         </div>
                       </div>
                     </button>
+                    {/* Bouton détail demande */}
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 shrink-0 mr-2 text-muted-foreground hover:text-primary"
+                            onClick={(e) => { e.stopPropagation(); setSelectedRequestId(req.id); }}
+                          >
+                            <Info className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="left">Voir le détail de la demande</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    </div>
 
                     {/* Tâches enfant */}
                     {isExpanded && (
@@ -874,6 +939,7 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
                             profiles={profiles}
                             showProject={false}
                             isBlocked={blockedTaskIds.has(task.id)}
+                            onRequestDetail={task.parent_request_id ? () => setSelectedRequestId(task.parent_request_id!) : undefined}
                             onRefresh={refetch}
                           />
                         ))}
@@ -914,6 +980,137 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
           )}
         </CardContent>
       </Card>
+
+      {/* ── Dialog détail demande ──────────────────────────────────────────── */}
+      <Dialog open={!!selectedRequest} onOpenChange={open => { if (!open) setSelectedRequestId(null); }}>
+        <DialogContent className="sm:max-w-[620px] max-h-[85vh] flex flex-col overflow-hidden">
+          <DialogHeader>
+            <div className="flex items-center gap-2 flex-wrap">
+              {selectedRequest?.be_project && (
+                <Badge variant="outline" className="font-mono text-xs">
+                  {selectedRequest.be_project.code_projet}
+                </Badge>
+              )}
+              <UrgencyBadge urgency={selectedRequest?.be_urgency} />
+            </div>
+            <DialogTitle className="text-lg leading-tight pr-8">
+              {selectedRequest?.title}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto space-y-4 pt-2">
+            {/* Métadonnées */}
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              {selectedRequest?.requester?.display_name && (
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground">Demandeur :</span>
+                  <span className="font-medium">{selectedRequest.requester.display_name}</span>
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="text-muted-foreground">Date :</span>
+                <span>{selectedRequest ? format(new Date(selectedRequest.created_at), 'dd MMM yyyy', { locale: fr }) : ''}</span>
+              </div>
+              {selectedRequest?.be_project && (
+                <div className="flex items-center gap-2 col-span-2">
+                  <ExternalLink className="h-4 w-4 text-blue-500 shrink-0" />
+                  <span className="text-muted-foreground">Projet :</span>
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="h-auto p-0 text-sm font-medium text-primary"
+                    onClick={() => {
+                      setSelectedRequestId(null);
+                      navigate(`/be/projects/${selectedRequest.be_project.code_projet}/overview`);
+                    }}
+                  >
+                    {selectedRequest.be_project.code_projet} — {selectedRequest.be_project.nom_projet}
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {/* Description */}
+            {selectedRequest?.description && (
+              <>
+                <Separator />
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Description</p>
+                  <div className="rounded-lg border bg-muted/30 p-3">
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{selectedRequest.description}</p>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Prestations */}
+            {selectedChildren.length > 0 && (
+              <>
+                <Separator />
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                    Prestations ({selectedChildren.length})
+                  </p>
+                  <div className="space-y-2">
+                    {[...selectedChildren]
+                      .sort((a, b) => {
+                        const oa = a.sub_process_template?.order_index ?? 9999;
+                        const ob = b.sub_process_template?.order_index ?? 9999;
+                        return oa - ob;
+                      })
+                      .map(child => {
+                        const meta = getBEStatusMeta(child.be_status);
+                        const isChildBlocked = blockedTaskIds.has(child.id);
+                        const assignee = child.assignee;
+                        return (
+                          <div
+                            key={child.id}
+                            className={cn(
+                              'flex items-center gap-3 p-3 rounded-lg border',
+                              isChildBlocked ? 'opacity-50 bg-muted/20' : 'bg-card',
+                            )}
+                          >
+                            <span
+                              className="w-2.5 h-2.5 rounded-full shrink-0"
+                              style={{ backgroundColor: meta.color }}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">
+                                {child.sub_process_template?.name ?? child.title}
+                              </p>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <Badge
+                                  variant="outline"
+                                  className={cn('text-[10px] px-1.5 py-0 border', meta.bgClass, meta.textClass)}
+                                  style={{ borderColor: meta.color + '50' }}
+                                >
+                                  {meta.icon} {meta.label}
+                                </Badge>
+                                {isChildBlocked && (
+                                  <span className="text-[10px] text-muted-foreground">⏳ En attente</span>
+                                )}
+                              </div>
+                            </div>
+                            {assignee ? (
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
+                                <User className="h-3 w-3" />
+                                <span>{assignee.display_name}</span>
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-amber-600 shrink-0">Non assigné</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog nouvelle demande */}
       <NewBERequestDialog

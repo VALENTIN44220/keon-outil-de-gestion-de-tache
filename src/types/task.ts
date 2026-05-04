@@ -58,6 +58,9 @@ export interface Task {
   // BE Project fields
   be_project_id: string | null;
   be_label_id: string | null;
+  /** Statut du workflow Bureau d'Études (en_cours, a_relire, a_valider, a_deposer, en_instruction, complement_demande, cloturee) */
+  be_status: string | null;
+  be_urgency: string | null;
   // IT Project fields
   it_project_id: string | null;
   it_project_phase: string | null;
