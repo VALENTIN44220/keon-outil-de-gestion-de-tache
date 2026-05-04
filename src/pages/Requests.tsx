@@ -8,7 +8,6 @@ import { AddTaskDialog } from '@/components/tasks/AddTaskDialog';
 import { NewTaskDialog } from '@/components/tasks/NewTaskDialog';
 import { RequestDetailDialog } from '@/components/tasks/RequestDetailDialog';
 import { ConfigurableDashboard } from '@/components/dashboard/ConfigurableDashboard';
-import { BERequestsTracking } from '@/components/be/BERequestsTracking';
 import { useTasksProgress } from '@/hooks/useChecklists';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { usePendingAssignments } from '@/hooks/usePendingAssignments';
@@ -225,11 +224,6 @@ const Requests = () => {
     return requests.filter(r => r.requester_id === profile.id);
   }, [requests, profile?.id]);
 
-  // Sous-ensemble BE (demandes liées à un projet BE)
-  const myBERequests = useMemo(
-    () => myRequests.filter(r => !!r.be_project_id),
-    [myRequests],
-  );
 
   // Compute stats for ConfigurableDashboard
   const dashboardStats = useMemo((): TaskStats => {
@@ -403,22 +397,12 @@ const Requests = () => {
           </TabsContent>
 
           <TabsContent value="tracking" className="mt-6">
-            <div className="space-y-6">
-              {/* Section dédiée aux demandes BE */}
-              {myBERequests.length > 0 && (
-                <BERequestsTracking
-                  requests={myBERequests}
-                  onRequestClick={handleViewRequest}
-                />
-              )}
-              {/* Dashboard générique pour toutes les demandes */}
-              <ConfigurableDashboard
-                tasks={myRequests}
-                stats={dashboardStats}
-                globalProgress={globalProgress}
-                onTaskClick={handleViewRequest}
-              />
-            </div>
+            <ConfigurableDashboard
+              tasks={myRequests}
+              stats={dashboardStats}
+              globalProgress={globalProgress}
+              onTaskClick={handleViewRequest}
+            />
           </TabsContent>
         </Tabs>
       </div>
