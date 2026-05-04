@@ -107,7 +107,7 @@ const menuGroups: MenuGroup[] = [
     ],
   },
   {
-    label: 'RÉFÉRENTIELS',
+    label: 'ACHATS',
     items: [
       { id: 'suppliers', label: 'Fournisseurs', icon: Building2, path: '/suppliers', permissionKey: 'can_access_suppliers' },
     ],
@@ -159,7 +159,7 @@ const groupLabelToIndex: Record<string, number> = {
   'ÉQUIPE': 1,
   'BUREAU D\'ÉTUDES': 6,
   'PROJETS': 2,
-  'RÉFÉRENTIELS': 3,
+  'ACHATS': 3,
   'CONFIGURATION': 4,
   'OUTILS': 5,
 };
