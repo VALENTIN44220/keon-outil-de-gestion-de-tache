@@ -5,6 +5,7 @@ import type {
   BEAffaireTempsKPI,
   BEPoste,
   BETjmReferentiel,
+  BETjmFonction,
 } from '@/types/beTemps';
 
 const sb = supabase as any;
@@ -150,6 +151,50 @@ export function useUpdateBETjm() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['be-tjm-referentiel'] });
       qc.invalidateQueries({ queryKey: ['be-tjm-referentiel-full'] });
+    },
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Référentiel TJM par fonction Lucca (taux horaire réel)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Liste complète des fonctions avec leur taux horaire. */
+export function useBETjmFonctions() {
+  return useQuery({
+    queryKey: ['be-tjm-fonctions'],
+    queryFn: async (): Promise<BETjmFonction[]> => {
+      const { data, error } = await sb
+        .from('be_tjm_fonctions')
+        .select('*')
+        .order('fonction');
+      if (error) throw error;
+      return (data as BETjmFonction[]) ?? [];
+    },
+  });
+}
+
+/** Mutation pour mettre à jour le taux horaire d'une fonction. */
+export function useUpdateBETjmFonction() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      fonction,
+      taux_horaire,
+      description,
+    }: {
+      fonction: string;
+      taux_horaire: number;
+      description?: string | null;
+    }) => {
+      const { error } = await sb
+        .from('be_tjm_fonctions')
+        .update({ taux_horaire, description: description ?? undefined })
+        .eq('fonction', fonction);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['be-tjm-fonctions'] });
     },
   });
 }

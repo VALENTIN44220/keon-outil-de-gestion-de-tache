@@ -57,6 +57,16 @@ export interface BETjmReferentiel {
   updated_at: string;
 }
 
+/** Référentiel TJM par fonction Lucca (taux horaire réel en €/h). */
+export interface BETjmFonction {
+  fonction: string;
+  taux_horaire: number;
+  description: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 /** Vue v_be_affaire_temps_kpi (croisement budgete / planifie / declare). */
 export interface BEAffaireTempsKPI {
   be_affaire_id: string;
