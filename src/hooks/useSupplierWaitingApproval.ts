@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Champs résumés (liste)
 export type SupplierWaitingApprovalRow = {
@@ -18,6 +19,7 @@ export type SupplierWaitingApprovalRow = {
   rejected_at: string | null;
   rejected_by_user_id: string | null;
   rejection_reason: string | null;
+  status: string | null;
 };
 
 // Champs complets (détail)
@@ -33,8 +35,8 @@ export type SupplierWaitingApprovalDetail = SupplierWaitingApprovalRow & {
   poste: string | null;
   validated_by_achats_user_id: string | null;
   validated_by_compta_user_id: string | null;
-  // Pièces jointes (jointure)
   attachments?: SupplierWaitingAttachment[];
+  field_reviews?: SupplierWaitingFieldReview[];
 };
 
 export type SupplierWaitingAttachment = {
@@ -45,8 +47,16 @@ export type SupplierWaitingAttachment = {
   storage_path: string;
 };
 
+export type SupplierWaitingFieldReview = {
+  id: string;
+  field_key: string;
+  comment: string;
+  created_at: string;
+  resolved_at: string | null;
+};
+
 const LIST_SELECT =
-  'id,line_index,tiers,nomfournisseur,entite,famille,siret,pays,created_at,' +
+  'id,line_index,tiers,nomfournisseur,entite,famille,siret,pays,created_at,status,' +
   'validated_by_compta_at,validated_by_achats_at,' +
   'submitted_by_user_id,rejected_at,rejected_by_user_id,rejection_reason';
 
@@ -55,7 +65,8 @@ const DETAIL_SELECT =
   ',description,commentaires,tva,delai_de_paiement,ca_estime,' +
   'nom_contact,adresse_mail,telephone,poste,' +
   'validated_by_achats_user_id,validated_by_compta_user_id,' +
-  'supplier_waiting_approval_attachments(id,attachment_kind,file_name,file_url,storage_path)';
+  'supplier_waiting_approval_attachments(id,attachment_kind,file_name,file_url,storage_path),' +
+  'supplier_waiting_field_reviews(id,field_key,comment,created_at,resolved_at)';
 
 export function useSupplierWaitingApprovalList(options?: { enabled?: boolean }) {
   return useQuery({
@@ -65,6 +76,32 @@ export function useSupplierWaitingApprovalList(options?: { enabled?: boolean }) 
       const { data, error } = await supabase
         .from('supplier_waiting_approval')
         .select(LIST_SELECT)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return (data ?? []) as SupplierWaitingApprovalRow[];
+    },
+  });
+}
+
+/**
+ * Demandes soumises par un utilisateur donné (non supprimées).
+ * @param userId  ID auth de l'utilisateur cible (réel ou simulé). Si absent, utilise l'utilisateur connecté.
+ */
+export function useMySupplierRequests(options?: { enabled?: boolean; userId?: string }) {
+  const { user } = useAuth();
+  const effectiveUserId = options?.userId ?? user?.id;
+
+  return useQuery({
+    queryKey: ['my-supplier-requests', effectiveUserId],
+    enabled: (options?.enabled ?? true) && !!effectiveUserId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('supplier_waiting_approval')
+        .select(LIST_SELECT)
+        .is('deleted_at', null)
+        .eq('submitted_by_user_id', effectiveUserId!)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -91,8 +128,13 @@ export function useSupplierWaitingApprovalDetail(id: string | null) {
       const attachments = Array.isArray(raw.supplier_waiting_approval_attachments)
         ? (raw.supplier_waiting_approval_attachments as SupplierWaitingAttachment[])
         : [];
+      const field_reviews = Array.isArray(raw.supplier_waiting_field_reviews)
+        ? (raw.supplier_waiting_field_reviews as SupplierWaitingFieldReview[]).filter(
+            (r) => r.resolved_at === null,
+          )
+        : [];
 
-      return { ...raw, attachments } as SupplierWaitingApprovalDetail;
+      return { ...raw, attachments, field_reviews } as SupplierWaitingApprovalDetail;
     },
   });
 }

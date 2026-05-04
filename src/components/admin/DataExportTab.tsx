@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Download, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { SupabaseBackupPanel } from './SupabaseBackupPanel';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -385,6 +386,8 @@ export function DataExportTab() {
           </div>
         </CardContent>
       </Card>
+
+      <SupabaseBackupPanel />
     </div>
   );
 }

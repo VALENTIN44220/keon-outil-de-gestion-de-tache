@@ -1,17 +1,15 @@
 import { useMemo } from 'react';
 import { Task } from '@/types/task';
-import { differenceInDays, differenceInHours, parseISO, isAfter, isBefore, startOfDay } from 'date-fns';
+import { differenceInDays, differenceInHours, parseISO, isBefore, startOfDay } from 'date-fns';
 
 export interface TaskNotification {
   id: string;
   taskId: string;
   taskTitle: string;
-  type: 'overdue' | 'due-today' | 'due-soon' | 'new-comment';
+  type: 'overdue' | 'due-today' | 'due-soon';
   message: string;
   priority: 'high' | 'medium' | 'low';
-  dueDate?: string;
-  authorName?: string;
-  createdAt?: string;
+  dueDate: string;
 }
 
 export function useNotifications(tasks: Task[]) {
@@ -37,8 +35,8 @@ export function useNotifications(tasks: Task[]) {
           taskId: task.id,
           taskTitle: task.title,
           type: 'overdue',
-          message: daysOverdue === 1 
-            ? 'En retard depuis hier' 
+          message: daysOverdue === 1
+            ? 'En retard depuis hier'
             : `En retard de ${daysOverdue} jours`,
           priority: 'high',
           dueDate: task.due_date,
@@ -51,8 +49,8 @@ export function useNotifications(tasks: Task[]) {
           taskId: task.id,
           taskTitle: task.title,
           type: 'due-today',
-          message: hoursUntilDue <= 0 
-            ? "Échéance passée aujourd'hui" 
+          message: hoursUntilDue <= 0
+            ? "Échéance passée aujourd'hui"
             : `Échéance dans ${hoursUntilDue}h`,
           priority: 'high',
           dueDate: task.due_date,
@@ -65,8 +63,8 @@ export function useNotifications(tasks: Task[]) {
           taskId: task.id,
           taskTitle: task.title,
           type: 'due-soon',
-          message: daysUntilDue === 1 
-            ? 'Échéance demain' 
+          message: daysUntilDue === 1
+            ? 'Échéance demain'
             : `Échéance dans ${daysUntilDue} jours`,
           priority: daysUntilDue === 1 ? 'medium' : 'low',
           dueDate: task.due_date,

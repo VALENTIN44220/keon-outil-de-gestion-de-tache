@@ -2,7 +2,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-import { Suspense, lazy } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SimulationProvider } from "@/contexts/SimulationContext";
@@ -10,47 +9,51 @@ import { PermissionsProvider } from "@/contexts/PermissionsContext";
 import { TeamHierarchyProvider } from "@/contexts/TeamHierarchyContext";
 import { SimulationBanner } from "@/components/layout/SimulationBanner";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { AuthGate } from "@/components/auth/AuthGate";
 import { ForcePasswordChange } from "@/components/auth/ForcePasswordChange";
 import { PersistentRoutes } from "@/components/routing/PersistentRoutes";
 import { ITProjectsAccessGate } from "@/components/it/ITProjectsAccessGate";
 
-// Route-level code splitting: only load screens when visited.
-const Index = lazy(() => import("./pages/Index"));
-const Auth = lazy(() => import("./pages/Auth"));
-const AuthCallback = lazy(() => import("./pages/AuthCallback"));
-const AcceptInvite = lazy(() => import("./pages/AcceptInvite"));
-const ResetPassword = lazy(() => import("./pages/ResetPassword"));
-const Profile = lazy(() => import("./pages/Profile"));
-const Templates = lazy(() => import("./pages/Templates"));
-const ProcessSettings = lazy(() => import("./pages/ProcessSettings"));
-const SubProcessSettings = lazy(() => import("./pages/SubProcessSettings"));
-const Projects = lazy(() => import("./pages/Projects"));
-const Admin = lazy(() => import("./pages/Admin"));
-const Workload = lazy(() => import("./pages/Workload"));
-const Requests = lazy(() => import("./pages/Requests"));
-const CalendarPage = lazy(() => import("./pages/Calendar"));
-const Chat = lazy(() => import("./pages/Chat"));
-const DesignSystem = lazy(() => import("./pages/DesignSystem"));
-const NotFound = lazy(() => import("./pages/NotFound"));
-const SupplierReference = lazy(() => import("./pages/SupplierReference"));
-const ProcessTracking = lazy(() => import("./pages/ProcessTracking"));
-const Innovation = lazy(() => import("./pages/Innovation"));
-const InnovationRequests = lazy(() => import("./pages/InnovationRequests"));
-const KeonDashboard = lazy(() => import("./pages/KeonDashboard"));
+// Eager imports — the production build already sets `inlineDynamicImports: true`, so
+// `React.lazy` provides no bundle-splitting benefit. Worse, in Vite dev the first navigation
+// to a lazy chunk can trigger Vite's dep-discovery → full page reload (blank page + refresh
+// needed). Using regular imports here makes navigation instant and reliable in dev and prod.
+import Index from "./pages/Index";
+import Auth from "./pages/Auth";
+import AuthCallback from "./pages/AuthCallback";
+import AcceptInvite from "./pages/AcceptInvite";
+import ResetPassword from "./pages/ResetPassword";
+import Profile from "./pages/Profile";
+import Templates from "./pages/Templates";
+import ProcessSettings from "./pages/ProcessSettings";
+import SubProcessSettings from "./pages/SubProcessSettings";
+import Projects from "./pages/Projects";
+import Admin from "./pages/Admin";
+import Workload from "./pages/Workload";
+import Requests from "./pages/Requests";
+import CalendarPage from "./pages/Calendar";
+import Chat from "./pages/Chat";
+import DesignSystem from "./pages/DesignSystem";
+import NotFound from "./pages/NotFound";
+import SupplierReference from "./pages/SupplierReference";
+import ProcessTracking from "./pages/ProcessTracking";
+import Innovation from "./pages/Innovation";
+import InnovationRequests from "./pages/InnovationRequests";
+import KeonDashboard from "./pages/KeonDashboard";
 
 // BE Project Hub pages
-const BEProjectHubOverview = lazy(() => import("./pages/be/BEProjectHubOverview"));
-const BEProjectHubTimeline = lazy(() => import("./pages/be/BEProjectHubTimeline"));
-const BEProjectHubDiscussions = lazy(() => import("./pages/be/BEProjectHubDiscussions"));
-const BEProjectHubFiles = lazy(() => import("./pages/be/BEProjectHubFiles"));
-const BEProjectHubQuestionnaire = lazy(() => import("./pages/be/BEProjectHubQuestionnaire"));
-const BEProjectHubKeonSynthese = lazy(() => import("./pages/be/BEProjectHubKeonSynthese"));
-const BEProjectHubBudget = lazy(() => import("./pages/be/BEProjectHubBudget"));
-const BEProjectHubBudgetAffaire = lazy(() => import("./pages/be/BEProjectHubBudgetAffaire"));
-const BEProjectHubTemps = lazy(() => import("./pages/be/BEProjectHubTemps"));
-const BEAdminTJM = lazy(() => import("./pages/BEAdminTJM"));
-const BEAdminDivaltoImport = lazy(() => import("./pages/BEAdminDivaltoImport"));
-const BEDispatchGlobal = lazy(() => import("./pages/be/BEDispatchGlobal"));
+import BEProjectHubOverview from "./pages/be/BEProjectHubOverview";
+import BEProjectHubTimeline from "./pages/be/BEProjectHubTimeline";
+import BEProjectHubDiscussions from "./pages/be/BEProjectHubDiscussions";
+import BEProjectHubFiles from "./pages/be/BEProjectHubFiles";
+import BEProjectHubQuestionnaire from "./pages/be/BEProjectHubQuestionnaire";
+import BEProjectHubKeonSynthese from "./pages/be/BEProjectHubKeonSynthese";
+import BEProjectHubBudget from "./pages/be/BEProjectHubBudget";
+import BEProjectHubBudgetAffaire from "./pages/be/BEProjectHubBudgetAffaire";
+import BEProjectHubTemps from "./pages/be/BEProjectHubTemps";
+import BEAdminTJM from "./pages/BEAdminTJM";
+import BEAdminDivaltoImport from "./pages/BEAdminDivaltoImport";
+import BEDispatchGlobal from "./pages/be/BEDispatchGlobal";
 
 // Budget tab is BE-only. If someone lands on /spv/.../budget, send them to overview.
 // NOTE: PersistentRoutes uses matchPath (not <Route>), so useParams() doesn't work here.
@@ -63,17 +66,17 @@ function SpvBudgetRedirect() {
 }
 
 // IT Project Hub pages
-const ITProjects = lazy(() => import("./pages/it/ITProjects"));
-const ITProjectImportFDR = lazy(() => import("./pages/it/ITProjectImportFDR"));
-const ITProjectHubOverview = lazy(() => import("./pages/it/ITProjectHubOverview"));
-const ITProjectHubTasks = lazy(() => import("./pages/it/ITProjectHubTasks"));
-const ITProjectHubTimeline = lazy(() => import("./pages/it/ITProjectHubTimeline"));
-const ITProjectHubSync = lazy(() => import("./pages/it/ITProjectHubSync"));
-const ITProjectHubDiscussions = lazy(() => import("./pages/it/ITProjectHubDiscussions"));
-const ITProjectHubFiles = lazy(() => import("./pages/it/ITProjectHubFiles"));
-const ITProjectHubBudget = lazy(() => import("./pages/it/ITProjectHubBudget"));
-const ITBudgetGlobal = lazy(() => import("./pages/it/ITBudgetGlobal"));
-const ITCartographie = lazy(() => import("./pages/it/ITCartographie"));
+import ITProjects from "./pages/it/ITProjects";
+import ITProjectImportFDR from "./pages/it/ITProjectImportFDR";
+import ITProjectHubOverview from "./pages/it/ITProjectHubOverview";
+import ITProjectHubTasks from "./pages/it/ITProjectHubTasks";
+import ITProjectHubTimeline from "./pages/it/ITProjectHubTimeline";
+import ITProjectHubSync from "./pages/it/ITProjectHubSync";
+import ITProjectHubDiscussions from "./pages/it/ITProjectHubDiscussions";
+import ITProjectHubFiles from "./pages/it/ITProjectHubFiles";
+import ITProjectHubBudget from "./pages/it/ITProjectHubBudget";
+import ITBudgetGlobal from "./pages/it/ITBudgetGlobal";
+import ITCartographie from "./pages/it/ITCartographie";
 
 const App = () => (
     <AuthProvider>
@@ -91,13 +94,7 @@ const App = () => (
                 v7_relativeSplatPath: true,
               }}
             >
-            <Suspense
-              fallback={
-                <div className="min-h-[40vh] flex items-center justify-center">
-                  <div className="text-sm text-muted-foreground">Chargement…</div>
-                </div>
-              }
-            >
+            <AuthGate>
             <PersistentRoutes
               routes={[
                 // Keep ALL main app sections mounted to preserve React state across navigation.
@@ -202,6 +199,7 @@ const App = () => (
             <Route path="/it/projects" element={<></>} />
             <Route path="/it/projects/import-fdr" element={<></>} />
             <Route path="/it/budget" element={<></>} />
+            <Route path="/it/cartographie" element={<></>} />
             <Route path="/it/projects/:code/overview" element={<></>} />
             <Route path="/it/projects/:code/tasks" element={<></>} />
             <Route path="/it/projects/:code/timeline" element={<></>} />
@@ -213,7 +211,7 @@ const App = () => (
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
-            </Suspense>
+            </AuthGate>
             </BrowserRouter>
           </ForcePasswordChange>
         </TooltipProvider>
