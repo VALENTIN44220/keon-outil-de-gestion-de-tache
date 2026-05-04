@@ -46,13 +46,23 @@ export default function SupplierReference() {
   const [myRequestsAutoId, setMyRequestsAutoId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState('suppliers');
 
-  // Ouvre "Mes demandes" si l'URL contient ?myRequests=true (depuis une notification)
+  // Ouvre la bonne dialog selon les query params (depuis une notification cliquée)
   useEffect(() => {
     const params = new URLSearchParams(location.search);
+    let handled = false;
+
     if (params.get('myRequests') === 'true') {
       setMyRequestsAutoId(params.get('requestId') ?? null);
       setMyRequestsOpen(true);
-      // Nettoie l'URL sans rechargement
+      handled = true;
+    }
+
+    if (params.get('openWaiting') === 'true') {
+      setWaitingApprovalListOpen(true);
+      handled = true;
+    }
+
+    if (handled) {
       navigate(location.pathname, { replace: true });
     }
   }, [location.search, location.pathname, navigate]);

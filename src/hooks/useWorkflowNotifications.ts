@@ -58,9 +58,11 @@ export function useMarkAllWorkflowNotificationsRead() {
 
   return useMutation({
     mutationFn: async () => {
+      if (!user?.id) return;
       const { error } = await supabase
         .from('notifications')
         .update({ read_at: new Date().toISOString() })
+        .eq('user_id', user.id)
         .is('read_at', null);
       if (error) throw error;
     },

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -7,10 +7,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Paperclip, ExternalLink, CheckCircle2, Clock, XCircle, AlertCircle, Pencil, Send } from 'lucide-react';
+import { Loader2, Paperclip, ExternalLink, CheckCircle2, Clock, XCircle, AlertCircle, Pencil, Send, UploadCloud, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { useSupplierWaitingApprovalDetail, SupplierWaitingFieldReview } from '@/hooks/useSupplierWaitingApproval';
+import { useSupplierWaitingApprovalDetail, SupplierWaitingFieldReview, SupplierWaitingAttachment } from '@/hooks/useSupplierWaitingApproval';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
@@ -19,6 +19,7 @@ import { supplierWaitingValidationRoleFromProfileName, extractPermissionProfileN
 import { useUserRole } from '@/hooks/useUserRole';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSimulation } from '@/contexts/SimulationContext';
+import { isAllowedDemandAttachmentFile } from '@/lib/newSupplierDemandConstants';
 
 interface Props {
   waitingId: string | null;
@@ -119,6 +120,12 @@ export function SupplierWaitingDetailDrawer({ waitingId, onClose }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [showReviewDialog, setShowReviewDialog] = useState(false);
 
+  // Pièces jointes en mode édition
+  type AttachmentKind = 'rib' | 'justificatif_siret';
+  const [newFiles, setNewFiles] = useState<Partial<Record<AttachmentKind, File>>>({});
+  const ribInputRef = useRef<HTMLInputElement>(null);
+  const kbisInputRef = useRef<HTMLInputElement>(null);
+
   const { isAdmin } = useUserRole();
   const permissionProfileName = extractPermissionProfileName(profile);
   const validationRole = supplierWaitingValidationRoleFromProfileName(permissionProfileName);
@@ -141,13 +148,71 @@ export function SupplierWaitingDetailDrawer({ waitingId, onClose }: Props) {
       init[k] = String(data?.[k] ?? '');
     });
     setEditValues(init);
+    setNewFiles({});
     setEditMode(true);
+  };
+
+  const handleFileChange = (kind: AttachmentKind, file: File | null) => {
+    if (!file) return;
+    if (!isAllowedDemandAttachmentFile(file)) {
+      toast({ title: 'Format non autorisé', description: 'PDF, JPG, PNG ou DOCX uniquement.', variant: 'destructive' });
+      return;
+    }
+    setNewFiles((prev) => ({ ...prev, [kind]: file }));
+  };
+
+  /** Remplace (ou ajoute) une pièce jointe d'un type donné pour cette demande. */
+  const replaceAttachment = async (waitingId: string, file: File, kind: AttachmentKind, existingAtt?: SupplierWaitingAttachment) => {
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) throw new Error('Non connecté');
+
+    const ext = file.name.split('.').pop() ?? 'bin';
+    const storagePath = `${waitingId}/${kind}.${ext}`;
+
+    // Supprimer l'ancien fichier storage si existant
+    if (existingAtt?.storage_path) {
+      await supabase.storage.from('supplier-waiting-attachments').remove([existingAtt.storage_path]);
+    }
+
+    // Upload du nouveau fichier (upsert)
+    const { error: upErr } = await supabase.storage
+      .from('supplier-waiting-attachments')
+      .upload(storagePath, file, { upsert: true });
+    if (upErr) throw upErr;
+
+    const { data: signed } = await supabase.storage
+      .from('supplier-waiting-attachments')
+      .createSignedUrl(storagePath, 60 * 60 * 24 * 365);
+    const fileUrl = signed?.signedUrl ?? '';
+
+    if (existingAtt) {
+      // Mettre à jour la ligne existante
+      const { error } = await supabase
+        .from('supplier_waiting_approval_attachments')
+        .update({ file_name: file.name, file_url: fileUrl, storage_path: storagePath })
+        .eq('id', existingAtt.id);
+      if (error) throw error;
+    } else {
+      // Insérer une nouvelle ligne
+      const { error } = await supabase
+        .from('supplier_waiting_approval_attachments')
+        .insert({
+          waiting_approval_id: waitingId,
+          attachment_kind: kind,
+          file_name: file.name,
+          file_url: fileUrl,
+          storage_path: storagePath,
+          uploaded_by: userData.user.id,
+        });
+      if (error) throw error;
+    }
   };
 
   const handleResubmit = async () => {
     if (!waitingId || !data) return;
     setSubmitting(true);
     try {
+      // Mise à jour des champs texte
       const updates: Record<string, unknown> = { status: 'a_completer' };
       (Object.keys(FIELD_LABELS) as EditableField[]).forEach((k) => {
         if (editValues[k] !== undefined) {
@@ -165,6 +230,15 @@ export function SupplierWaitingDetailDrawer({ waitingId, onClose }: Props) {
         .eq('id', waitingId);
       if (updErr) throw updErr;
 
+      // Remplacer les pièces jointes modifiées
+      const attachmentKinds: AttachmentKind[] = ['rib', 'justificatif_siret'];
+      for (const kind of attachmentKinds) {
+        const file = newFiles[kind];
+        if (!file) continue;
+        const existing = data.attachments?.find((a) => a.attachment_kind === kind);
+        await replaceAttachment(waitingId, file, kind, existing);
+      }
+
       // Marquer toutes les revues comme résolues
       await supabase
         .from('supplier_waiting_field_reviews')
@@ -174,8 +248,10 @@ export function SupplierWaitingDetailDrawer({ waitingId, onClose }: Props) {
 
       toast({ title: 'Demande mise à jour', description: 'Votre demande a été soumise à nouveau aux validateurs.' });
       setEditMode(false);
+      setNewFiles({});
       await queryClient.invalidateQueries({ queryKey: ['supplier-waiting-approval'] });
       await queryClient.invalidateQueries({ queryKey: ['supplier-waiting-approval-detail', waitingId] });
+      await queryClient.invalidateQueries({ queryKey: ['my-supplier-requests'] });
       refetch();
     } catch (e: unknown) {
       toast({ title: 'Erreur', description: e instanceof Error ? e.message : 'Mise à jour impossible', variant: 'destructive' });
@@ -347,33 +423,104 @@ export function SupplierWaitingDetailDrawer({ waitingId, onClose }: Props) {
                 </div>
 
                 {/* Pièces jointes */}
-                {data.attachments && data.attachments.length > 0 && (
+                {(editMode || (data.attachments && data.attachments.length > 0)) && (
                   <>
                     <Separator />
                     <div className="space-y-3">
                       <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b pb-1">
                         Pièces jointes
                       </h3>
-                      <ul className="space-y-2">
-                        {data.attachments.map((att) => (
-                          <li key={att.id} className="flex items-center gap-2.5 rounded-md border bg-muted/30 px-3 py-2">
-                            <Paperclip className="h-4 w-4 text-muted-foreground shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm truncate font-medium">{att.file_name}</p>
-                              <p className="text-xs text-muted-foreground capitalize">
-                                {att.attachment_kind === 'rib' ? 'RIB' : att.attachment_kind === 'justificatif_siret' ? 'Justificatif SIRET / Kbis' : att.attachment_kind}
-                              </p>
-                            </div>
-                            {att.file_url && (
-                              <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" asChild>
-                                <a href={att.file_url} target="_blank" rel="noopener noreferrer" title="Ouvrir">
-                                  <ExternalLink className="h-3.5 w-3.5" />
-                                </a>
-                              </Button>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
+
+                      {editMode ? (
+                        // Mode édition : affichage + remplacement de chaque pièce
+                        <div className="space-y-3">
+                          {(['rib', 'justificatif_siret'] as AttachmentKind[]).map((kind) => {
+                            const existing = data.attachments?.find((a) => a.attachment_kind === kind);
+                            const pending = newFiles[kind];
+                            const kindLabel = kind === 'rib' ? 'RIB' : 'Justificatif SIRET / Kbis';
+                            const inputRef = kind === 'rib' ? ribInputRef : kbisInputRef;
+                            return (
+                              <div key={kind} className="rounded-md border bg-muted/20 px-3 py-2.5 space-y-2">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <Paperclip className="h-4 w-4 text-muted-foreground shrink-0" />
+                                    <div className="min-w-0">
+                                      <p className="text-xs font-semibold text-muted-foreground uppercase">{kindLabel}</p>
+                                      {pending ? (
+                                        <p className="text-sm truncate text-primary font-medium">{pending.name} <span className="text-xs text-muted-foreground">(nouveau)</span></p>
+                                      ) : existing ? (
+                                        <p className="text-sm truncate">{existing.file_name}</p>
+                                      ) : (
+                                        <p className="text-sm text-muted-foreground italic">Aucun fichier</p>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-1 shrink-0">
+                                    {existing?.file_url && !pending && (
+                                      <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
+                                        <a href={existing.file_url} target="_blank" rel="noopener noreferrer" title="Ouvrir">
+                                          <ExternalLink className="h-3.5 w-3.5" />
+                                        </a>
+                                      </Button>
+                                    )}
+                                    {pending && (
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7 text-destructive hover:text-destructive"
+                                        title="Annuler le remplacement"
+                                        onClick={() => setNewFiles((p) => { const n = { ...p }; delete n[kind]; return n; })}
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </Button>
+                                    )}
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-7 text-xs gap-1"
+                                      onClick={() => inputRef.current?.click()}
+                                    >
+                                      <UploadCloud className="h-3 w-3" />
+                                      {existing || pending ? 'Remplacer' : 'Ajouter'}
+                                    </Button>
+                                    <input
+                                      ref={inputRef}
+                                      type="file"
+                                      className="hidden"
+                                      accept=".pdf,.jpg,.jpeg,.png,.docx"
+                                      onChange={(e) => handleFileChange(kind, e.target.files?.[0] ?? null)}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        // Mode lecture seule
+                        <ul className="space-y-2">
+                          {data.attachments!.map((att) => (
+                            <li key={att.id} className="flex items-center gap-2.5 rounded-md border bg-muted/30 px-3 py-2">
+                              <Paperclip className="h-4 w-4 text-muted-foreground shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm truncate font-medium">{att.file_name}</p>
+                                <p className="text-xs text-muted-foreground capitalize">
+                                  {att.attachment_kind === 'rib' ? 'RIB' : att.attachment_kind === 'justificatif_siret' ? 'Justificatif SIRET / Kbis' : att.attachment_kind}
+                                </p>
+                              </div>
+                              {att.file_url && (
+                                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" asChild>
+                                  <a href={att.file_url} target="_blank" rel="noopener noreferrer" title="Ouvrir">
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                  </a>
+                                </Button>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
                   </>
                 )}

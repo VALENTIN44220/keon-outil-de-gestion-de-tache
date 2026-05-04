@@ -20,8 +20,29 @@ const TYPE_LABELS: Record<string, string> = {
   supplier_achat_validated:  'Validation achats',
 };
 
-/** Types de notifications liées à une demande fournisseur dont le demandeur doit voir le détail. */
-const REQUESTER_NOTIF_TYPES = new Set(['supplier_review_requested']);
+/** Retourne l'URL cible d'une notification, ou null si pas de navigation. */
+function getNotifUrl(notif: { type: string | null; related_entity_id: string | null }): string | null {
+  const type = notif.type ?? '';
+
+  // Demandeur : modifications requises ou refus → ouvrir "Mes demandes" sur la bonne demande
+  if (type === 'supplier_review_requested' || type === 'supplier_rejection') {
+    const params = new URLSearchParams({ myRequests: 'true' });
+    if (notif.related_entity_id) params.set('requestId', notif.related_entity_id);
+    return `/suppliers?${params.toString()}`;
+  }
+
+  // Validateur comptabilité : achats ont validé → ouvrir la liste d'attente
+  if (type === 'supplier_achat_validated') {
+    return '/suppliers?openWaiting=true';
+  }
+
+  // Suppression d'une demande → page fournisseurs (pas de détail utile)
+  if (type === 'supplier_deleted') {
+    return '/suppliers';
+  }
+
+  return null;
+}
 
 export function NotificationBell() {
   const navigate = useNavigate();
@@ -35,12 +56,8 @@ export function NotificationBell() {
   function handleNotifClick(notif: (typeof notifications)[number]) {
     if (!notif.read_at) markRead(notif.id);
     setOpen(false);
-    // Si c'est une demande de modifications → ouvre directement la demande dans "Mes demandes"
-    if (REQUESTER_NOTIF_TYPES.has(notif.type ?? '')) {
-      const params = new URLSearchParams({ myRequests: 'true' });
-      if (notif.related_entity_id) params.set('requestId', notif.related_entity_id);
-      navigate(`/suppliers?${params.toString()}`);
-    }
+    const url = getNotifUrl(notif);
+    if (url) navigate(url);
   }
 
   return (
