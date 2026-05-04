@@ -28,7 +28,8 @@ export function useBEDivaltoAffairesToImport() {
     queryFn: async (): Promise<BEDivaltoAffaireToImport[]> => {
       const { data, error } = await sb
         .from('v_be_divalto_affaires_to_import')
-        .select('*');
+        .select('*')
+        .limit(10000);
       if (error) throw error;
       return (data as BEDivaltoAffaireToImport[]) ?? [];
     },
