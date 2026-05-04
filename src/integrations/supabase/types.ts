@@ -1,3 +1,4 @@
+Initialising login role...
 export type Json =
   | string
   | number
@@ -10,7 +11,32 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.1"
+    PostgrestVersion: "14.4"
+  }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -169,6 +195,396 @@ export type Database = {
           },
         ]
       }
+      be_affaire_budget_lines: {
+        Row: {
+          be_affaire_id: string
+          commentaire: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          exercice: number | null
+          fournisseur_prevu: string | null
+          id: string
+          montant_budget: number
+          montant_budget_revise: number | null
+          poste: string
+          statut: string
+          type_depense: string | null
+          updated_at: string
+        }
+        Insert: {
+          be_affaire_id: string
+          commentaire?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          exercice?: number | null
+          fournisseur_prevu?: string | null
+          id?: string
+          montant_budget: number
+          montant_budget_revise?: number | null
+          poste: string
+          statut?: string
+          type_depense?: string | null
+          updated_at?: string
+        }
+        Update: {
+          be_affaire_id?: string
+          commentaire?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          exercice?: number | null
+          fournisseur_prevu?: string | null
+          id?: string
+          montant_budget?: number
+          montant_budget_revise?: number | null
+          poste?: string
+          statut?: string
+          type_depense?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "be_affaire_budget_lines_be_affaire_id_fkey"
+            columns: ["be_affaire_id"]
+            isOneToOne: false
+            referencedRelation: "be_affaires"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "be_affaire_budget_lines_be_affaire_id_fkey"
+            columns: ["be_affaire_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_affaire_budget_kpi"
+            referencedColumns: ["be_affaire_id"]
+          },
+          {
+            foreignKeyName: "be_affaire_budget_lines_be_affaire_id_fkey"
+            columns: ["be_affaire_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_affaire_temps_kpi"
+            referencedColumns: ["be_affaire_id"]
+          },
+          {
+            foreignKeyName: "be_affaire_budget_lines_be_affaire_id_fkey"
+            columns: ["be_affaire_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_affaire_temps_par_poste"
+            referencedColumns: ["be_affaire_id"]
+          },
+          {
+            foreignKeyName: "be_affaire_budget_lines_be_affaire_id_fkey"
+            columns: ["be_affaire_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_affaire_temps_par_user"
+            referencedColumns: ["be_affaire_id"]
+          },
+          {
+            foreignKeyName: "be_affaire_budget_lines_be_affaire_id_fkey"
+            columns: ["be_affaire_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_temps_detail_mensuel"
+            referencedColumns: ["be_affaire_id"]
+          },
+        ]
+      }
+      be_affaire_temps_budget: {
+        Row: {
+          be_affaire_id: string
+          commentaire: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          jours_budgetes: number
+          poste: string
+          updated_at: string
+        }
+        Insert: {
+          be_affaire_id: string
+          commentaire?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          jours_budgetes: number
+          poste: string
+          updated_at?: string
+        }
+        Update: {
+          be_affaire_id?: string
+          commentaire?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          jours_budgetes?: number
+          poste?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "be_affaire_temps_budget_be_affaire_id_fkey"
+            columns: ["be_affaire_id"]
+            isOneToOne: false
+            referencedRelation: "be_affaires"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "be_affaire_temps_budget_be_affaire_id_fkey"
+            columns: ["be_affaire_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_affaire_budget_kpi"
+            referencedColumns: ["be_affaire_id"]
+          },
+          {
+            foreignKeyName: "be_affaire_temps_budget_be_affaire_id_fkey"
+            columns: ["be_affaire_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_affaire_temps_kpi"
+            referencedColumns: ["be_affaire_id"]
+          },
+          {
+            foreignKeyName: "be_affaire_temps_budget_be_affaire_id_fkey"
+            columns: ["be_affaire_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_affaire_temps_par_poste"
+            referencedColumns: ["be_affaire_id"]
+          },
+          {
+            foreignKeyName: "be_affaire_temps_budget_be_affaire_id_fkey"
+            columns: ["be_affaire_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_affaire_temps_par_user"
+            referencedColumns: ["be_affaire_id"]
+          },
+          {
+            foreignKeyName: "be_affaire_temps_budget_be_affaire_id_fkey"
+            columns: ["be_affaire_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_temps_detail_mensuel"
+            referencedColumns: ["be_affaire_id"]
+          },
+        ]
+      }
+      be_affaires: {
+        Row: {
+          be_project_id: string
+          code_affaire: string
+          created_at: string
+          created_by: string | null
+          date_cloture: string | null
+          date_ouverture: string | null
+          description: string | null
+          id: string
+          libelle: string | null
+          source_creation: string
+          source_request_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          be_project_id: string
+          code_affaire: string
+          created_at?: string
+          created_by?: string | null
+          date_cloture?: string | null
+          date_ouverture?: string | null
+          description?: string | null
+          id?: string
+          libelle?: string | null
+          source_creation?: string
+          source_request_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          be_project_id?: string
+          code_affaire?: string
+          created_at?: string
+          created_by?: string | null
+          date_cloture?: string | null
+          date_ouverture?: string | null
+          description?: string | null
+          id?: string
+          libelle?: string | null
+          source_creation?: string
+          source_request_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "be_affaires_be_project_id_fkey"
+            columns: ["be_project_id"]
+            isOneToOne: false
+            referencedRelation: "be_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "be_affaires_be_project_id_fkey"
+            columns: ["be_project_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_project_budget_kpi"
+            referencedColumns: ["be_project_id"]
+          },
+          {
+            foreignKeyName: "be_affaires_be_project_id_fkey"
+            columns: ["be_project_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_project_synthese_kpi"
+            referencedColumns: ["be_project_id"]
+          },
+          {
+            foreignKeyName: "be_affaires_source_request_id_fkey"
+            columns: ["source_request_id"]
+            isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "be_affaires_source_request_id_fkey"
+            columns: ["source_request_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      be_budget_line_commandes: {
+        Row: {
+          budget_line_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          numero_piece: string
+        }
+        Insert: {
+          budget_line_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          numero_piece: string
+        }
+        Update: {
+          budget_line_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          numero_piece?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "be_budget_line_commandes_budget_line_id_fkey"
+            columns: ["budget_line_id"]
+            isOneToOne: false
+            referencedRelation: "be_affaire_budget_lines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      be_budget_line_factures: {
+        Row: {
+          budget_line_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          numero_piece: string
+        }
+        Insert: {
+          budget_line_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          numero_piece: string
+        }
+        Update: {
+          budget_line_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          numero_piece?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "be_budget_line_factures_budget_line_id_fkey"
+            columns: ["budget_line_id"]
+            isOneToOne: false
+            referencedRelation: "be_affaire_budget_lines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      be_divalto_mouvements: {
+        Row: {
+          axe_0001: string | null
+          axe_0002: string | null
+          code_affaire: string | null
+          compte_general: string | null
+          created_at: string
+          date_piece: string | null
+          devise: string | null
+          exercice: number | null
+          fabric_synced_at: string
+          id: string
+          libelle: string | null
+          montant_ht: number | null
+          montant_tva: number | null
+          nom_tiers: string | null
+          numero_piece: string
+          prefpino: string
+          raw: Json | null
+          source: string
+          tiers_code: string | null
+          type_mouv: string
+          updated_at: string
+        }
+        Insert: {
+          axe_0001?: string | null
+          axe_0002?: string | null
+          code_affaire?: string | null
+          compte_general?: string | null
+          created_at?: string
+          date_piece?: string | null
+          devise?: string | null
+          exercice?: number | null
+          fabric_synced_at?: string
+          id?: string
+          libelle?: string | null
+          montant_ht?: number | null
+          montant_tva?: number | null
+          nom_tiers?: string | null
+          numero_piece: string
+          prefpino: string
+          raw?: Json | null
+          source: string
+          tiers_code?: string | null
+          type_mouv: string
+          updated_at?: string
+        }
+        Update: {
+          axe_0001?: string | null
+          axe_0002?: string | null
+          code_affaire?: string | null
+          compte_general?: string | null
+          created_at?: string
+          date_piece?: string | null
+          devise?: string | null
+          exercice?: number | null
+          fabric_synced_at?: string
+          id?: string
+          libelle?: string | null
+          montant_ht?: number | null
+          montant_tva?: number | null
+          nom_tiers?: string | null
+          numero_piece?: string
+          prefpino?: string
+          raw?: Json | null
+          source?: string
+          tiers_code?: string | null
+          type_mouv?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       be_project_comments: {
         Row: {
           content: string
@@ -201,6 +617,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "be_projects"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "be_project_comments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_project_budget_kpi"
+            referencedColumns: ["be_project_id"]
+          },
+          {
+            foreignKeyName: "be_project_comments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_project_synthese_kpi"
+            referencedColumns: ["be_project_id"]
           },
           {
             foreignKeyName: "be_project_comments_user_id_fkey"
@@ -490,6 +920,33 @@ export type Database = {
           is_active?: boolean
           name?: string
           order_index?: number
+        }
+        Relationships: []
+      }
+      be_tjm_fonctions: {
+        Row: {
+          created_at: string
+          description: string | null
+          fonction: string
+          taux_horaire: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          fonction: string
+          taux_horaire: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          fonction?: string
+          taux_horaire?: number
+          updated_at?: string
+          updated_by?: string | null
         }
         Relationships: []
       }
@@ -1118,42 +1575,54 @@ export type Database = {
       }
       fou_resultat: {
         Row: {
-          annee: string | null
+          annee: number | null
+          annee_cmd: string | null
+          annee_fac: string | null
           ca_commande: number | null
           ca_facture: number | null
           dos: string
           ecart_cmd_fac: number | null
           fou_key: string
           id: number
-          mois: string | null
+          mois: number | null
+          mois_cmd: string | null
+          mois_fac: string | null
           ref: string
           synced_at: string | null
           tiers: string
           type_date: string | null
         }
         Insert: {
-          annee?: string | null
+          annee?: number | null
+          annee_cmd?: string | null
+          annee_fac?: string | null
           ca_commande?: number | null
           ca_facture?: number | null
           dos: string
           ecart_cmd_fac?: number | null
           fou_key: string
           id?: number
-          mois?: string | null
+          mois?: number | null
+          mois_cmd?: string | null
+          mois_fac?: string | null
           ref: string
           synced_at?: string | null
           tiers: string
           type_date?: string | null
         }
         Update: {
-          annee?: string | null
+          annee?: number | null
+          annee_cmd?: string | null
+          annee_fac?: string | null
           ca_commande?: number | null
           ca_facture?: number | null
           dos?: string
           ecart_cmd_fac?: number | null
           fou_key?: string
           id?: number
-          mois?: string | null
+          mois?: number | null
+          mois_cmd?: string | null
+          mois_fac?: string | null
           ref?: string
           synced_at?: string | null
           tiers?: string
@@ -1428,16 +1897,678 @@ export type Database = {
         }
         Relationships: []
       }
+      it_budget_line_commandes: {
+        Row: {
+          budget_line_id: string
+          created_at: string | null
+          fullcdno: string
+          id: string
+        }
+        Insert: {
+          budget_line_id: string
+          created_at?: string | null
+          fullcdno: string
+          id?: string
+        }
+        Update: {
+          budget_line_id?: string
+          created_at?: string | null
+          fullcdno?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_budget_line_commandes_budget_line_id_fkey"
+            columns: ["budget_line_id"]
+            isOneToOne: false
+            referencedRelation: "it_budget_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "it_budget_line_commandes_budget_line_id_fkey"
+            columns: ["budget_line_id"]
+            isOneToOne: false
+            referencedRelation: "v_it_budget_engage_constate"
+            referencedColumns: ["budget_line_id"]
+          },
+          {
+            foreignKeyName: "it_budget_line_commandes_fullcdno_fkey"
+            columns: ["fullcdno"]
+            isOneToOne: false
+            referencedRelation: "it_divalto_commandes"
+            referencedColumns: ["fullcdno"]
+          },
+        ]
+      }
+      it_budget_line_factures: {
+        Row: {
+          budget_line_id: string
+          created_at: string | null
+          fullcdno_fac: string
+          id: string
+        }
+        Insert: {
+          budget_line_id: string
+          created_at?: string | null
+          fullcdno_fac: string
+          id?: string
+        }
+        Update: {
+          budget_line_id?: string
+          created_at?: string | null
+          fullcdno_fac?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_budget_line_factures_budget_line_id_fkey"
+            columns: ["budget_line_id"]
+            isOneToOne: false
+            referencedRelation: "it_budget_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "it_budget_line_factures_budget_line_id_fkey"
+            columns: ["budget_line_id"]
+            isOneToOne: false
+            referencedRelation: "v_it_budget_engage_constate"
+            referencedColumns: ["budget_line_id"]
+          },
+        ]
+      }
+      it_budget_line_months: {
+        Row: {
+          budget_line_id: string
+          commentaire: string | null
+          created_at: string | null
+          id: string
+          mois: number
+          montant_budget: number
+          montant_budget_revise: number | null
+          pdf_url: string | null
+          ref_commande_divalto: string | null
+          ref_facture_divalto: string | null
+          statut_rapprochement: string
+          updated_at: string | null
+        }
+        Insert: {
+          budget_line_id: string
+          commentaire?: string | null
+          created_at?: string | null
+          id?: string
+          mois: number
+          montant_budget?: number
+          montant_budget_revise?: number | null
+          pdf_url?: string | null
+          ref_commande_divalto?: string | null
+          ref_facture_divalto?: string | null
+          statut_rapprochement?: string
+          updated_at?: string | null
+        }
+        Update: {
+          budget_line_id?: string
+          commentaire?: string | null
+          created_at?: string | null
+          id?: string
+          mois?: number
+          montant_budget?: number
+          montant_budget_revise?: number | null
+          pdf_url?: string | null
+          ref_commande_divalto?: string | null
+          ref_facture_divalto?: string | null
+          statut_rapprochement?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_budget_line_months_budget_line_id_fkey"
+            columns: ["budget_line_id"]
+            isOneToOne: false
+            referencedRelation: "it_budget_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "it_budget_line_months_budget_line_id_fkey"
+            columns: ["budget_line_id"]
+            isOneToOne: false
+            referencedRelation: "v_it_budget_engage_constate"
+            referencedColumns: ["budget_line_id"]
+          },
+        ]
+      }
+      it_budget_lines: {
+        Row: {
+          annee: number
+          budget_type: string
+          categorie: string | null
+          commentaire: string | null
+          created_at: string | null
+          description: string | null
+          entite: string | null
+          exercice: number
+          external_key: string | null
+          fournisseur_prevu: string | null
+          id: string
+          it_project_id: string | null
+          mode_saisie: string | null
+          mois_applicables: number[] | null
+          mois_budget: number | null
+          montant_annuel: number | null
+          montant_budget: number
+          montant_budget_revise: number | null
+          nature_depense: string | null
+          rapprochement_group_id: string | null
+          source_depense: string
+          sous_categorie: string | null
+          statut: string
+          type_depense: string | null
+          updated_at: string | null
+          version: string
+        }
+        Insert: {
+          annee?: number
+          budget_type?: string
+          categorie?: string | null
+          commentaire?: string | null
+          created_at?: string | null
+          description?: string | null
+          entite?: string | null
+          exercice?: number
+          external_key?: string | null
+          fournisseur_prevu?: string | null
+          id?: string
+          it_project_id?: string | null
+          mode_saisie?: string | null
+          mois_applicables?: number[] | null
+          mois_budget?: number | null
+          montant_annuel?: number | null
+          montant_budget?: number
+          montant_budget_revise?: number | null
+          nature_depense?: string | null
+          rapprochement_group_id?: string | null
+          source_depense?: string
+          sous_categorie?: string | null
+          statut?: string
+          type_depense?: string | null
+          updated_at?: string | null
+          version?: string
+        }
+        Update: {
+          annee?: number
+          budget_type?: string
+          categorie?: string | null
+          commentaire?: string | null
+          created_at?: string | null
+          description?: string | null
+          entite?: string | null
+          exercice?: number
+          external_key?: string | null
+          fournisseur_prevu?: string | null
+          id?: string
+          it_project_id?: string | null
+          mode_saisie?: string | null
+          mois_applicables?: number[] | null
+          mois_budget?: number | null
+          montant_annuel?: number | null
+          montant_budget?: number
+          montant_budget_revise?: number | null
+          nature_depense?: string | null
+          rapprochement_group_id?: string | null
+          source_depense?: string
+          sous_categorie?: string | null
+          statut?: string
+          type_depense?: string | null
+          updated_at?: string | null
+          version?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_budget_lines_it_project_id_fkey"
+            columns: ["it_project_id"]
+            isOneToOne: false
+            referencedRelation: "it_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "it_budget_lines_rapprochement_group_id_fkey"
+            columns: ["rapprochement_group_id"]
+            isOneToOne: false
+            referencedRelation: "it_budget_rapprochement_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      it_budget_options: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          option_type: string
+          parent_value: string | null
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          option_type: string
+          parent_value?: string | null
+          value: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          option_type?: string
+          parent_value?: string | null
+          value?: string
+        }
+        Relationships: []
+      }
+      it_budget_rapprochement_groups: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          entite: string | null
+          exercice: number | null
+          id: string
+          nom: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          entite?: string | null
+          exercice?: number | null
+          id?: string
+          nom: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          entite?: string | null
+          exercice?: number | null
+          id?: string
+          nom?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      it_budget_reallocations: {
+        Row: {
+          created_at: string | null
+          decided_at: string | null
+          decided_by: string | null
+          from_budget_line_id: string | null
+          id: string
+          it_project_id: string
+          montant: number
+          motif: string | null
+          statut_validation: string | null
+          to_budget_line_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          decided_at?: string | null
+          decided_by?: string | null
+          from_budget_line_id?: string | null
+          id?: string
+          it_project_id: string
+          montant: number
+          motif?: string | null
+          statut_validation?: string | null
+          to_budget_line_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          decided_at?: string | null
+          decided_by?: string | null
+          from_budget_line_id?: string | null
+          id?: string
+          it_project_id?: string
+          montant?: number
+          motif?: string | null
+          statut_validation?: string | null
+          to_budget_line_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_budget_reallocations_decided_by_fkey"
+            columns: ["decided_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "it_budget_reallocations_from_budget_line_id_fkey"
+            columns: ["from_budget_line_id"]
+            isOneToOne: false
+            referencedRelation: "it_budget_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "it_budget_reallocations_from_budget_line_id_fkey"
+            columns: ["from_budget_line_id"]
+            isOneToOne: false
+            referencedRelation: "v_it_budget_engage_constate"
+            referencedColumns: ["budget_line_id"]
+          },
+          {
+            foreignKeyName: "it_budget_reallocations_it_project_id_fkey"
+            columns: ["it_project_id"]
+            isOneToOne: false
+            referencedRelation: "it_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "it_budget_reallocations_to_budget_line_id_fkey"
+            columns: ["to_budget_line_id"]
+            isOneToOne: false
+            referencedRelation: "it_budget_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "it_budget_reallocations_to_budget_line_id_fkey"
+            columns: ["to_budget_line_id"]
+            isOneToOne: false
+            referencedRelation: "v_it_budget_engage_constate"
+            referencedColumns: ["budget_line_id"]
+          },
+        ]
+      }
+      it_budget_user_preferences: {
+        Row: {
+          columns_config: Json
+          created_at: string
+          filters_config: Json
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          columns_config?: Json
+          created_at?: string
+          filters_config?: Json
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          columns_config?: Json
+          created_at?: string
+          filters_config?: Json
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      it_divalto_commandes: {
+        Row: {
+          axe_0001: string | null
+          axe_0002: string | null
+          date_commande: string | null
+          date_facture: string | null
+          description: string | null
+          dos: string | null
+          fullcdno: string
+          fullfano: string | null
+          id: string
+          montant_ht: number | null
+          nomfournisseur: string | null
+          projet: string | null
+          source_system: string | null
+          synced_at: string | null
+          tiers: string | null
+        }
+        Insert: {
+          axe_0001?: string | null
+          axe_0002?: string | null
+          date_commande?: string | null
+          date_facture?: string | null
+          description?: string | null
+          dos?: string | null
+          fullcdno: string
+          fullfano?: string | null
+          id?: string
+          montant_ht?: number | null
+          nomfournisseur?: string | null
+          projet?: string | null
+          source_system?: string | null
+          synced_at?: string | null
+          tiers?: string | null
+        }
+        Update: {
+          axe_0001?: string | null
+          axe_0002?: string | null
+          date_commande?: string | null
+          date_facture?: string | null
+          description?: string | null
+          dos?: string | null
+          fullcdno?: string
+          fullfano?: string | null
+          id?: string
+          montant_ht?: number | null
+          nomfournisseur?: string | null
+          projet?: string | null
+          source_system?: string | null
+          synced_at?: string | null
+          tiers?: string | null
+        }
+        Relationships: []
+      }
+      it_divalto_factures: {
+        Row: {
+          axe_0001: string | null
+          date_facture: string | null
+          dos: string | null
+          fullcdno_lie: string | null
+          id: string
+          libelle: string | null
+          montant_ht: number | null
+          nomfournisseur: string | null
+          projet: string | null
+          reference: string
+          source: string
+          source_system: string | null
+          synced_at: string | null
+          tiers: string | null
+        }
+        Insert: {
+          axe_0001?: string | null
+          date_facture?: string | null
+          dos?: string | null
+          fullcdno_lie?: string | null
+          id?: string
+          libelle?: string | null
+          montant_ht?: number | null
+          nomfournisseur?: string | null
+          projet?: string | null
+          reference: string
+          source: string
+          source_system?: string | null
+          synced_at?: string | null
+          tiers?: string | null
+        }
+        Update: {
+          axe_0001?: string | null
+          date_facture?: string | null
+          dos?: string | null
+          fullcdno_lie?: string | null
+          id?: string
+          libelle?: string | null
+          montant_ht?: number | null
+          nomfournisseur?: string | null
+          projet?: string | null
+          reference?: string
+          source?: string
+          source_system?: string | null
+          synced_at?: string | null
+          tiers?: string | null
+        }
+        Relationships: []
+      }
+      it_manual_expenses: {
+        Row: {
+          annee: number
+          categorie: string | null
+          commentaire: string | null
+          created_at: string | null
+          date_prevue: string | null
+          description: string | null
+          entite: string | null
+          fournisseur: string | null
+          fournisseur_prevu: string | null
+          id: string
+          it_budget_line_id: string | null
+          it_project_id: string | null
+          mode_decaissement: string
+          mois_applicables: number[] | null
+          montant_prevu: number
+          nature_depense: string | null
+          source_depense: string
+          sous_categorie: string | null
+          statut: string | null
+          type_depense: string | null
+          type_prevision: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          annee?: number
+          categorie?: string | null
+          commentaire?: string | null
+          created_at?: string | null
+          date_prevue?: string | null
+          description?: string | null
+          entite?: string | null
+          fournisseur?: string | null
+          fournisseur_prevu?: string | null
+          id?: string
+          it_budget_line_id?: string | null
+          it_project_id?: string | null
+          mode_decaissement?: string
+          mois_applicables?: number[] | null
+          montant_prevu?: number
+          nature_depense?: string | null
+          source_depense?: string
+          sous_categorie?: string | null
+          statut?: string | null
+          type_depense?: string | null
+          type_prevision?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          annee?: number
+          categorie?: string | null
+          commentaire?: string | null
+          created_at?: string | null
+          date_prevue?: string | null
+          description?: string | null
+          entite?: string | null
+          fournisseur?: string | null
+          fournisseur_prevu?: string | null
+          id?: string
+          it_budget_line_id?: string | null
+          it_project_id?: string | null
+          mode_decaissement?: string
+          mois_applicables?: number[] | null
+          montant_prevu?: number
+          nature_depense?: string | null
+          source_depense?: string
+          sous_categorie?: string | null
+          statut?: string | null
+          type_depense?: string | null
+          type_prevision?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_manual_expenses_it_budget_line_id_fkey"
+            columns: ["it_budget_line_id"]
+            isOneToOne: false
+            referencedRelation: "it_budget_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "it_manual_expenses_it_budget_line_id_fkey"
+            columns: ["it_budget_line_id"]
+            isOneToOne: false
+            referencedRelation: "v_it_budget_engage_constate"
+            referencedColumns: ["budget_line_id"]
+          },
+          {
+            foreignKeyName: "it_manual_expenses_it_project_id_fkey"
+            columns: ["it_project_id"]
+            isOneToOne: false
+            referencedRelation: "it_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      it_milestone_calendar_links: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          end_time: string
+          id: string
+          it_project_milestone_id: string
+          location: string | null
+          organizer_email: string | null
+          outlook_event_id: string
+          start_time: string
+          subject: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          end_time: string
+          id?: string
+          it_project_milestone_id: string
+          location?: string | null
+          organizer_email?: string | null
+          outlook_event_id: string
+          start_time: string
+          subject: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          end_time?: string
+          id?: string
+          it_project_milestone_id?: string
+          location?: string | null
+          organizer_email?: string | null
+          outlook_event_id?: string
+          start_time?: string
+          subject?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_milestone_calendar_links_it_project_milestone_id_fkey"
+            columns: ["it_project_milestone_id"]
+            isOneToOne: false
+            referencedRelation: "it_project_milestones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       it_project_fdr_validation: {
         Row: {
           commentaire: string | null
           created_at: string
           date_validation: string | null
-          etape: number
-          etape_label: string
+          etape: number | null
+          etape_label: string | null
           id: string
-          it_project_id: string
-          statut: string | null
+          it_project_id: string | null
+          statut: string
           updated_at: string
           valideur_id: string | null
         }
@@ -1445,11 +2576,11 @@ export type Database = {
           commentaire?: string | null
           created_at?: string
           date_validation?: string | null
-          etape: number
-          etape_label: string
+          etape?: number | null
+          etape_label?: string | null
           id?: string
-          it_project_id: string
-          statut?: string | null
+          it_project_id?: string | null
+          statut?: string
           updated_at?: string
           valideur_id?: string | null
         }
@@ -1457,11 +2588,11 @@ export type Database = {
           commentaire?: string | null
           created_at?: string
           date_validation?: string | null
-          etape?: number
-          etape_label?: string
+          etape?: number | null
+          etape_label?: string | null
           id?: string
-          it_project_id?: string
-          statut?: string | null
+          it_project_id?: string | null
+          statut?: string
           updated_at?: string
           valideur_id?: string | null
         }
@@ -1473,13 +2604,6 @@ export type Database = {
             referencedRelation: "it_projects"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "it_project_fdr_validation_valideur_id_fkey"
-            columns: ["valideur_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
         ]
       }
       it_project_milestones: {
@@ -1489,11 +2613,11 @@ export type Database = {
           date_reelle: string | null
           description: string | null
           id: string
-          it_project_id: string
+          it_project_id: string | null
           ordre: number | null
           phase: string | null
-          statut: string | null
-          titre: string
+          statut: string
+          titre: string | null
           updated_at: string
         }
         Insert: {
@@ -1502,11 +2626,11 @@ export type Database = {
           date_reelle?: string | null
           description?: string | null
           id?: string
-          it_project_id: string
+          it_project_id?: string | null
           ordre?: number | null
           phase?: string | null
-          statut?: string | null
-          titre: string
+          statut?: string
+          titre?: string | null
           updated_at?: string
         }
         Update: {
@@ -1515,11 +2639,11 @@ export type Database = {
           date_reelle?: string | null
           description?: string | null
           id?: string
-          it_project_id?: string
+          it_project_id?: string | null
           ordre?: number | null
           phase?: string | null
-          statut?: string | null
-          titre?: string
+          statut?: string
+          titre?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1598,7 +2722,7 @@ export type Database = {
           membres_ids: string[] | null
           nom_projet: string
           phase_courante: string | null
-          phases_actives: Json | null
+          phases_actives: Json
           pilier: string | null
           priorite: string | null
           progress: number | null
@@ -1638,7 +2762,7 @@ export type Database = {
           membres_ids?: string[] | null
           nom_projet: string
           phase_courante?: string | null
-          phases_actives?: Json | null
+          phases_actives?: Json
           pilier?: string | null
           priorite?: string | null
           progress?: number | null
@@ -1678,7 +2802,7 @@ export type Database = {
           membres_ids?: string[] | null
           nom_projet?: string
           phase_courante?: string | null
-          phases_actives?: Json | null
+          phases_actives?: Json
           pilier?: string | null
           priorite?: string | null
           progress?: number | null
@@ -1757,6 +2881,207 @@ export type Database = {
           },
         ]
       }
+      it_solution_links: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          criticite: string | null
+          date_mise_en_service: string | null
+          description: string | null
+          direction: string
+          etat_flux: string | null
+          frequence: string | null
+          id: string
+          protocole: string | null
+          source_solution_id: string
+          target_solution_id: string
+          type_flux: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          criticite?: string | null
+          date_mise_en_service?: string | null
+          description?: string | null
+          direction?: string
+          etat_flux?: string | null
+          frequence?: string | null
+          id?: string
+          protocole?: string | null
+          source_solution_id: string
+          target_solution_id: string
+          type_flux?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          criticite?: string | null
+          date_mise_en_service?: string | null
+          description?: string | null
+          direction?: string
+          etat_flux?: string | null
+          frequence?: string | null
+          id?: string
+          protocole?: string | null
+          source_solution_id?: string
+          target_solution_id?: string
+          type_flux?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_solution_links_source_solution_id_fkey"
+            columns: ["source_solution_id"]
+            isOneToOne: false
+            referencedRelation: "it_solutions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "it_solution_links_target_solution_id_fkey"
+            columns: ["target_solution_id"]
+            isOneToOne: false
+            referencedRelation: "it_solutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      it_solution_projects: {
+        Row: {
+          commentaire: string | null
+          created_at: string
+          created_by: string | null
+          project_id: string
+          solution_id: string
+          type_lien: string | null
+        }
+        Insert: {
+          commentaire?: string | null
+          created_at?: string
+          created_by?: string | null
+          project_id: string
+          solution_id: string
+          type_lien?: string | null
+        }
+        Update: {
+          commentaire?: string | null
+          created_at?: string
+          created_by?: string | null
+          project_id?: string
+          solution_id?: string
+          type_lien?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_solution_projects_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "it_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "it_solution_projects_solution_id_fkey"
+            columns: ["solution_id"]
+            isOneToOne: false
+            referencedRelation: "it_solutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      it_solutions: {
+        Row: {
+          categorie: string | null
+          commentaires: string | null
+          connecte_datalake: string | null
+          created_at: string
+          created_by: string | null
+          criticite: string | null
+          domaine_metier: string | null
+          flux_principaux: string | null
+          height: number | null
+          id: string
+          logo_url: string | null
+          nom: string
+          owner_it_id: string | null
+          owner_metier_id: string | null
+          perimetre: string | null
+          position_x: number | null
+          position_y: number | null
+          statut_temporalite: string | null
+          type: string | null
+          updated_at: string
+          usage_principal: string | null
+          visible_dans_schema: boolean
+          width: number | null
+        }
+        Insert: {
+          categorie?: string | null
+          commentaires?: string | null
+          connecte_datalake?: string | null
+          created_at?: string
+          created_by?: string | null
+          criticite?: string | null
+          domaine_metier?: string | null
+          flux_principaux?: string | null
+          height?: number | null
+          id?: string
+          logo_url?: string | null
+          nom: string
+          owner_it_id?: string | null
+          owner_metier_id?: string | null
+          perimetre?: string | null
+          position_x?: number | null
+          position_y?: number | null
+          statut_temporalite?: string | null
+          type?: string | null
+          updated_at?: string
+          usage_principal?: string | null
+          visible_dans_schema?: boolean
+          width?: number | null
+        }
+        Update: {
+          categorie?: string | null
+          commentaires?: string | null
+          connecte_datalake?: string | null
+          created_at?: string
+          created_by?: string | null
+          criticite?: string | null
+          domaine_metier?: string | null
+          flux_principaux?: string | null
+          height?: number | null
+          id?: string
+          logo_url?: string | null
+          nom?: string
+          owner_it_id?: string | null
+          owner_metier_id?: string | null
+          perimetre?: string | null
+          position_x?: number | null
+          position_y?: number | null
+          statut_temporalite?: string | null
+          type?: string | null
+          updated_at?: string
+          usage_principal?: string | null
+          visible_dans_schema?: boolean
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_solutions_owner_it_id_fkey"
+            columns: ["owner_it_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "it_solutions_owner_metier_id_fkey"
+            columns: ["owner_metier_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_titles: {
         Row: {
           created_at: string
@@ -1792,41 +3117,147 @@ export type Database = {
           },
         ]
       }
-      notifications: {
+      lucca_notes_frais: {
         Row: {
+          annee: number | null
+          axe_1: string | null
+          axe_2: string | null
+          c8_id: string | null
+          categorie: string | null
+          compte_general: string | null
           created_at: string
+          date_depense: string
+          display_name_extracted: string | null
+          dos: string | null
+          external_id: string
+          fabric_synced_at: string
           id: string
-          message: string
-          read_at: string | null
-          related_entity_id: string | null
-          related_entity_type: string | null
-          title: string
-          type: string
-          user_id: string
+          id_lucca: number | null
+          journal: string | null
+          libelle_ecriture: string | null
+          montant_ht: number | null
+          numero: string | null
+          raw: Json | null
+          sens: number | null
+          updated_at: string
+          user_id: string | null
         }
         Insert: {
+          annee?: number | null
+          axe_1?: string | null
+          axe_2?: string | null
+          c8_id?: string | null
+          categorie?: string | null
+          compte_general?: string | null
           created_at?: string
+          date_depense: string
+          display_name_extracted?: string | null
+          dos?: string | null
+          external_id: string
+          fabric_synced_at?: string
           id?: string
-          message?: string
-          read_at?: string | null
-          related_entity_id?: string | null
-          related_entity_type?: string | null
-          title?: string
-          type?: string
-          user_id: string
+          id_lucca?: number | null
+          journal?: string | null
+          libelle_ecriture?: string | null
+          montant_ht?: number | null
+          numero?: string | null
+          raw?: Json | null
+          sens?: number | null
+          updated_at?: string
+          user_id?: string | null
         }
         Update: {
+          annee?: number | null
+          axe_1?: string | null
+          axe_2?: string | null
+          c8_id?: string | null
+          categorie?: string | null
+          compte_general?: string | null
           created_at?: string
+          date_depense?: string
+          display_name_extracted?: string | null
+          dos?: string | null
+          external_id?: string
+          fabric_synced_at?: string
           id?: string
-          message?: string
-          read_at?: string | null
-          related_entity_id?: string | null
-          related_entity_type?: string | null
-          title?: string
-          type?: string
-          user_id?: string
+          id_lucca?: number | null
+          journal?: string | null
+          libelle_ecriture?: string | null
+          montant_ht?: number | null
+          numero?: string | null
+          raw?: Json | null
+          sens?: number | null
+          updated_at?: string
+          user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "lucca_notes_frais_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lucca_saisie_temps: {
+        Row: {
+          code_site: string
+          created_at: string
+          date_saisie: string
+          duree_heures: number
+          external_id: string
+          fabric_synced_at: string
+          id: string
+          id_lucca: number
+          libelle: string | null
+          raw: Json | null
+          type_temps: string | null
+          updated_at: string
+          user_id: string | null
+          validated_by_lucca: boolean | null
+        }
+        Insert: {
+          code_site: string
+          created_at?: string
+          date_saisie: string
+          duree_heures: number
+          external_id: string
+          fabric_synced_at?: string
+          id?: string
+          id_lucca: number
+          libelle?: string | null
+          raw?: Json | null
+          type_temps?: string | null
+          updated_at?: string
+          user_id?: string | null
+          validated_by_lucca?: boolean | null
+        }
+        Update: {
+          code_site?: string
+          created_at?: string
+          date_saisie?: string
+          duree_heures?: number
+          external_id?: string
+          fabric_synced_at?: string
+          id?: string
+          id_lucca?: number
+          libelle?: string | null
+          raw?: Json | null
+          type_temps?: string | null
+          updated_at?: string
+          user_id?: string | null
+          validated_by_lucca?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lucca_saisie_temps_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notification_preferences: {
         Row: {
@@ -2120,6 +3551,7 @@ export type Database = {
           can_access_analytics: boolean
           can_access_calendar: boolean
           can_access_dashboard: boolean
+          can_access_it_projects: boolean
           can_access_process_tracking: boolean
           can_access_projects: boolean
           can_access_requests: boolean
@@ -2132,13 +3564,13 @@ export type Database = {
           can_assign_to_all: boolean
           can_assign_to_subordinates: boolean
           can_create_be_projects: boolean | null
-          can_create_it_projects: boolean | null
+          can_create_it_projects: boolean
           can_create_suppliers: boolean
           can_delete_be_projects: boolean | null
-          can_delete_it_projects: boolean | null
+          can_delete_it_projects: boolean
           can_delete_suppliers: boolean
           can_edit_be_projects: boolean | null
-          can_edit_it_projects: boolean | null
+          can_edit_it_projects: boolean
           can_edit_suppliers: boolean
           can_manage_all_tasks: boolean
           can_manage_own_tasks: boolean
@@ -2147,7 +3579,7 @@ export type Database = {
           can_manage_users: boolean
           can_view_all_tasks: boolean
           can_view_be_projects: boolean | null
-          can_view_it_projects: boolean | null
+          can_view_it_projects: boolean
           can_view_own_tasks: boolean
           can_view_subordinates_tasks: boolean
           can_view_suppliers: boolean
@@ -2173,6 +3605,7 @@ export type Database = {
           can_access_analytics?: boolean
           can_access_calendar?: boolean
           can_access_dashboard?: boolean
+          can_access_it_projects?: boolean
           can_access_process_tracking?: boolean
           can_access_projects?: boolean
           can_access_requests?: boolean
@@ -2185,13 +3618,13 @@ export type Database = {
           can_assign_to_all?: boolean
           can_assign_to_subordinates?: boolean
           can_create_be_projects?: boolean | null
-          can_create_it_projects?: boolean | null
+          can_create_it_projects?: boolean
           can_create_suppliers?: boolean
           can_delete_be_projects?: boolean | null
-          can_delete_it_projects?: boolean | null
+          can_delete_it_projects?: boolean
           can_delete_suppliers?: boolean
           can_edit_be_projects?: boolean | null
-          can_edit_it_projects?: boolean | null
+          can_edit_it_projects?: boolean
           can_edit_suppliers?: boolean
           can_manage_all_tasks?: boolean
           can_manage_own_tasks?: boolean
@@ -2200,7 +3633,7 @@ export type Database = {
           can_manage_users?: boolean
           can_view_all_tasks?: boolean
           can_view_be_projects?: boolean | null
-          can_view_it_projects?: boolean | null
+          can_view_it_projects?: boolean
           can_view_own_tasks?: boolean
           can_view_subordinates_tasks?: boolean
           can_view_suppliers?: boolean
@@ -2226,6 +3659,7 @@ export type Database = {
           can_access_analytics?: boolean
           can_access_calendar?: boolean
           can_access_dashboard?: boolean
+          can_access_it_projects?: boolean
           can_access_process_tracking?: boolean
           can_access_projects?: boolean
           can_access_requests?: boolean
@@ -2238,13 +3672,13 @@ export type Database = {
           can_assign_to_all?: boolean
           can_assign_to_subordinates?: boolean
           can_create_be_projects?: boolean | null
-          can_create_it_projects?: boolean | null
+          can_create_it_projects?: boolean
           can_create_suppliers?: boolean
           can_delete_be_projects?: boolean | null
-          can_delete_it_projects?: boolean | null
+          can_delete_it_projects?: boolean
           can_delete_suppliers?: boolean
           can_edit_be_projects?: boolean | null
-          can_edit_it_projects?: boolean | null
+          can_edit_it_projects?: boolean
           can_edit_suppliers?: boolean
           can_manage_all_tasks?: boolean
           can_manage_own_tasks?: boolean
@@ -2253,7 +3687,7 @@ export type Database = {
           can_manage_users?: boolean
           can_view_all_tasks?: boolean
           can_view_be_projects?: boolean | null
-          can_view_it_projects?: boolean | null
+          can_view_it_projects?: boolean
           can_view_own_tasks?: boolean
           can_view_subordinates_tasks?: boolean
           can_view_suppliers?: boolean
@@ -2951,6 +4385,8 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          be_fonction: string | null
+          be_poste: string | null
           company: string | null
           company_id: string | null
           created_at: string
@@ -2970,11 +4406,14 @@ export type Database = {
           permission_profile_id: string | null
           secondary_email: string | null
           status: string
+          suppliers_list_column_order: Json | null
           updated_at: string
           user_id: string
         }
         Insert: {
           avatar_url?: string | null
+          be_fonction?: string | null
+          be_poste?: string | null
           company?: string | null
           company_id?: string | null
           created_at?: string
@@ -2994,11 +4433,14 @@ export type Database = {
           permission_profile_id?: string | null
           secondary_email?: string | null
           status?: string
+          suppliers_list_column_order?: Json | null
           updated_at?: string
           user_id: string
         }
         Update: {
           avatar_url?: string | null
+          be_fonction?: string | null
+          be_poste?: string | null
           company?: string | null
           company_id?: string | null
           created_at?: string
@@ -3018,10 +4460,18 @@ export type Database = {
           permission_profile_id?: string | null
           secondary_email?: string | null
           status?: string
+          suppliers_list_column_order?: Json | null
           updated_at?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "profiles_be_fonction_fkey"
+            columns: ["be_fonction"]
+            isOneToOne: false
+            referencedRelation: "be_tjm_fonctions"
+            referencedColumns: ["fonction"]
+          },
           {
             foreignKeyName: "profiles_company_id_fkey"
             columns: ["company_id"]
@@ -3116,6 +4566,20 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "project_field_values_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_project_budget_kpi"
+            referencedColumns: ["be_project_id"]
+          },
+          {
+            foreignKeyName: "project_field_values_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_project_synthese_kpi"
+            referencedColumns: ["be_project_id"]
+          },
+          {
             foreignKeyName: "project_field_values_updated_by_fkey"
             columns: ["updated_by"]
             isOneToOne: false
@@ -3191,6 +4655,20 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "project_questionnaire_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_project_budget_kpi"
+            referencedColumns: ["be_project_id"]
+          },
+          {
+            foreignKeyName: "project_questionnaire_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_project_synthese_kpi"
+            referencedColumns: ["be_project_id"]
+          },
+          {
             foreignKeyName: "project_questionnaire_updated_by_fkey"
             columns: ["updated_by"]
             isOneToOne: false
@@ -3254,7 +4732,6 @@ export type Database = {
           sous_section: string | null
           spreadsheet_template: Json | null
           type_champ: string
-          updated_at: string
         }
         Insert: {
           champ_id: string
@@ -3273,8 +4750,7 @@ export type Database = {
           section: string
           sous_section?: string | null
           spreadsheet_template?: Json | null
-          type_champ?: string
-          updated_at?: string
+          type_champ: string
         }
         Update: {
           champ_id?: string
@@ -3294,7 +4770,6 @@ export type Database = {
           sous_section?: string | null
           spreadsheet_template?: Json | null
           type_champ?: string
-          updated_at?: string
         }
         Relationships: [
           {
@@ -3499,13 +4974,6 @@ export type Database = {
             referencedRelation: "sub_process_templates"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "request_sub_processes_workflow_run_id_fkey"
-            columns: ["workflow_run_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_runs"
-            referencedColumns: ["id"]
-          },
         ]
       }
       request_trace_numbers: {
@@ -3586,6 +5054,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      saisie_temps: {
+        Row: {
+          code_projet: string
+          created_at: string
+          id: string
+          id_lucca: string
+          mail_lovable: string | null
+          saisie_key: string
+          updated_at: string
+          work_day: string
+          work_hour: number | null
+        }
+        Insert: {
+          code_projet: string
+          created_at?: string
+          id?: string
+          id_lucca: string
+          mail_lovable?: string | null
+          saisie_key: string
+          updated_at?: string
+          work_day: string
+          work_hour?: number | null
+        }
+        Update: {
+          code_projet?: string
+          created_at?: string
+          id?: string
+          id_lucca?: string
+          mail_lovable?: string | null
+          saisie_key?: string
+          updated_at?: string
+          work_day?: string
+          work_hour?: number | null
+        }
+        Relationships: []
       }
       service_group_departments: {
         Row: {
@@ -3699,140 +5203,65 @@ export type Database = {
           },
         ]
       }
-      standard_workflow_config: {
+      sub_process_step_fields: {
         Row: {
-          assignment_group_id: string | null
-          assignment_job_title_id: string | null
-          assignment_target_id: string | null
-          assignment_type: string
-          config_key: string
+          alert_delay_days: number | null
+          alert_enabled: boolean
+          alert_message: string | null
+          alert_target: string | null
           created_at: string
-          created_by: string | null
-          description: string | null
-          fallback_assignment_type: string | null
-          fallback_enabled: boolean
-          fallback_group_id: string | null
-          fallback_job_title_id: string | null
-          fallback_target_id: string | null
+          field_key: string
+          field_label: string
+          field_type: string
           id: string
-          initial_status: string
-          name: string
-          notify_assignee_on_create: boolean
-          notify_channels_complete: string[]
-          notify_channels_create: string[]
-          notify_channels_status: string[]
-          notify_requester_on_complete: boolean
-          notify_requester_on_create: boolean
-          notify_requester_on_status_change: boolean
+          is_required: boolean
+          order_index: number
+          sub_process_template_id: string
           updated_at: string
-          validation_1_target_id: string | null
-          validation_1_type: string | null
-          validation_2_target_id: string | null
-          validation_2_type: string | null
-          validation_levels: number
-          validation_timing: string
-          watcher_config: Json | null
         }
         Insert: {
-          assignment_group_id?: string | null
-          assignment_job_title_id?: string | null
-          assignment_target_id?: string | null
-          assignment_type?: string
-          config_key?: string
+          alert_delay_days?: number | null
+          alert_enabled?: boolean
+          alert_message?: string | null
+          alert_target?: string | null
           created_at?: string
-          created_by?: string | null
-          description?: string | null
-          fallback_assignment_type?: string | null
-          fallback_enabled?: boolean
-          fallback_group_id?: string | null
-          fallback_job_title_id?: string | null
-          fallback_target_id?: string | null
+          field_key: string
+          field_label: string
+          field_type: string
           id?: string
-          initial_status?: string
-          name?: string
-          notify_assignee_on_create?: boolean
-          notify_channels_complete?: string[]
-          notify_channels_create?: string[]
-          notify_channels_status?: string[]
-          notify_requester_on_complete?: boolean
-          notify_requester_on_create?: boolean
-          notify_requester_on_status_change?: boolean
+          is_required?: boolean
+          order_index?: number
+          sub_process_template_id: string
           updated_at?: string
-          validation_1_target_id?: string | null
-          validation_1_type?: string | null
-          validation_2_target_id?: string | null
-          validation_2_type?: string | null
-          validation_levels?: number
-          validation_timing?: string
-          watcher_config?: Json | null
         }
         Update: {
-          assignment_group_id?: string | null
-          assignment_job_title_id?: string | null
-          assignment_target_id?: string | null
-          assignment_type?: string
-          config_key?: string
+          alert_delay_days?: number | null
+          alert_enabled?: boolean
+          alert_message?: string | null
+          alert_target?: string | null
           created_at?: string
-          created_by?: string | null
-          description?: string | null
-          fallback_assignment_type?: string | null
-          fallback_enabled?: boolean
-          fallback_group_id?: string | null
-          fallback_job_title_id?: string | null
-          fallback_target_id?: string | null
+          field_key?: string
+          field_label?: string
+          field_type?: string
           id?: string
-          initial_status?: string
-          name?: string
-          notify_assignee_on_create?: boolean
-          notify_channels_complete?: string[]
-          notify_channels_create?: string[]
-          notify_channels_status?: string[]
-          notify_requester_on_complete?: boolean
-          notify_requester_on_create?: boolean
-          notify_requester_on_status_change?: boolean
+          is_required?: boolean
+          order_index?: number
+          sub_process_template_id?: string
           updated_at?: string
-          validation_1_target_id?: string | null
-          validation_1_type?: string | null
-          validation_2_target_id?: string | null
-          validation_2_type?: string | null
-          validation_levels?: number
-          validation_timing?: string
-          watcher_config?: Json | null
         }
         Relationships: [
           {
-            foreignKeyName: "standard_workflow_config_assignment_group_id_fkey"
-            columns: ["assignment_group_id"]
+            foreignKeyName: "sub_process_step_fields_sub_process_template_id_fkey"
+            columns: ["sub_process_template_id"]
             isOneToOne: false
-            referencedRelation: "collaborator_groups"
-            referencedColumns: ["id"]
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["sub_process_template_id"]
           },
           {
-            foreignKeyName: "standard_workflow_config_assignment_job_title_id_fkey"
-            columns: ["assignment_job_title_id"]
+            foreignKeyName: "sub_process_step_fields_sub_process_template_id_fkey"
+            columns: ["sub_process_template_id"]
             isOneToOne: false
-            referencedRelation: "job_titles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "standard_workflow_config_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "standard_workflow_config_fallback_group_id_fkey"
-            columns: ["fallback_group_id"]
-            isOneToOne: false
-            referencedRelation: "collaborator_groups"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "standard_workflow_config_fallback_job_title_id_fkey"
-            columns: ["fallback_job_title_id"]
-            isOneToOne: false
-            referencedRelation: "job_titles"
+            referencedRelation: "sub_process_templates"
             referencedColumns: ["id"]
           },
         ]
@@ -4012,10 +5441,12 @@ export type Database = {
       sub_process_templates: {
         Row: {
           assignment_type: string
+          be_category: string | null
           created_at: string
           creator_company_id: string | null
           creator_department_id: string | null
           description: string | null
+          dispatch_manager_id: string | null
           fallback_assignment_type: string | null
           fallback_target_assignee_id: string | null
           fallback_target_department_id: string | null
@@ -4041,17 +5472,23 @@ export type Database = {
           target_job_title_id: string | null
           target_manager_id: string | null
           updated_at: string
-          user_id: string
+          user_id: string | null
           validation_config: Json | null
+          validation_level_1_type: string | null
+          validation_level_1_user_id: string | null
+          validation_level_2_type: string | null
+          validation_level_2_user_id: string | null
           visibility_level: Database["public"]["Enums"]["template_visibility"]
           watcher_config: Json | null
         }
         Insert: {
           assignment_type?: string
+          be_category?: string | null
           created_at?: string
           creator_company_id?: string | null
           creator_department_id?: string | null
           description?: string | null
+          dispatch_manager_id?: string | null
           fallback_assignment_type?: string | null
           fallback_target_assignee_id?: string | null
           fallback_target_department_id?: string | null
@@ -4077,17 +5514,23 @@ export type Database = {
           target_job_title_id?: string | null
           target_manager_id?: string | null
           updated_at?: string
-          user_id: string
+          user_id?: string | null
           validation_config?: Json | null
+          validation_level_1_type?: string | null
+          validation_level_1_user_id?: string | null
+          validation_level_2_type?: string | null
+          validation_level_2_user_id?: string | null
           visibility_level?: Database["public"]["Enums"]["template_visibility"]
           watcher_config?: Json | null
         }
         Update: {
           assignment_type?: string
+          be_category?: string | null
           created_at?: string
           creator_company_id?: string | null
           creator_department_id?: string | null
           description?: string | null
+          dispatch_manager_id?: string | null
           fallback_assignment_type?: string | null
           fallback_target_assignee_id?: string | null
           fallback_target_department_id?: string | null
@@ -4113,8 +5556,12 @@ export type Database = {
           target_job_title_id?: string | null
           target_manager_id?: string | null
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
           validation_config?: Json | null
+          validation_level_1_type?: string | null
+          validation_level_1_user_id?: string | null
+          validation_level_2_type?: string | null
+          validation_level_2_user_id?: string | null
           visibility_level?: Database["public"]["Enums"]["template_visibility"]
           watcher_config?: Json | null
         }
@@ -4131,6 +5578,13 @@ export type Database = {
             columns: ["creator_department_id"]
             isOneToOne: false
             referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sub_process_templates_dispatch_manager_id_fkey"
+            columns: ["dispatch_manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -4199,6 +5653,20 @@ export type Database = {
           {
             foreignKeyName: "sub_process_templates_target_manager_id_fkey"
             columns: ["target_manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sub_process_templates_validation_level_1_user_id_fkey"
+            columns: ["validation_level_1_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sub_process_templates_validation_level_2_user_id_fkey"
+            columns: ["validation_level_2_user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -4330,7 +5798,6 @@ export type Database = {
           delai_de_paiement: string | null
           delais_de_paiement_commentaires: string | null
           description: string | null
-          detail_par_entite: string | null
           echeances_de_paiement: string | null
           entite: string | null
           evolution_tarif_2026: string | null
@@ -4375,7 +5842,6 @@ export type Database = {
           delai_de_paiement?: string | null
           delais_de_paiement_commentaires?: string | null
           description?: string | null
-          detail_par_entite?: string | null
           echeances_de_paiement?: string | null
           entite?: string | null
           evolution_tarif_2026?: string | null
@@ -4420,7 +5886,6 @@ export type Database = {
           delai_de_paiement?: string | null
           delais_de_paiement_commentaires?: string | null
           description?: string | null
-          detail_par_entite?: string | null
           echeances_de_paiement?: string | null
           entite?: string | null
           evolution_tarif_2026?: string | null
@@ -4509,6 +5974,212 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      supplier_waiting_approval: {
+        Row: {
+          adresse_mail: string | null
+          avenants: string | null
+          ca_estime: number | null
+          categorie: string | null
+          commentaires: string | null
+          commentaires_date_contrat: string | null
+          commentaires_type_de_contrat: string | null
+          completeness_score: number | null
+          created_at: string | null
+          date_premiere_signature: string | null
+          delai_de_paiement: string | null
+          delais_de_paiement_commentaires: string | null
+          description: string | null
+          echeances_de_paiement: string | null
+          entite: string | null
+          evolution_tarif_2026: string | null
+          exclusivite_non_sollicitation: string | null
+          famille: string | null
+          famille_source_initiale: string | null
+          garanties_bancaire_et_equipement: string | null
+          id: string
+          incoterm: string | null
+          line_index: string
+          nom_contact: string | null
+          nomfournisseur: string | null
+          pays: string | null
+          penalites: string | null
+          poste: string | null
+          rejected_at: string | null
+          rejected_by_user_id: string | null
+          rejection_reason: string | null
+          remise: string | null
+          rfa: string | null
+          segment: string | null
+          siret: string | null
+          site_web: string | null
+          sous_segment: string | null
+          status: string | null
+          submitted_by_user_id: string | null
+          telephone: string | null
+          tiers: string | null
+          transport: string | null
+          tva: string | null
+          type_de_contrat: string | null
+          updated_at: string | null
+          updated_by: string | null
+          validated_by_achats_at: string | null
+          validated_by_achats_user_id: string | null
+          validated_by_compta_at: string | null
+          validated_by_compta_user_id: string | null
+          validite_du_contrat: string | null
+          validite_prix: string | null
+        }
+        Insert: {
+          adresse_mail?: string | null
+          avenants?: string | null
+          ca_estime?: number | null
+          categorie?: string | null
+          commentaires?: string | null
+          commentaires_date_contrat?: string | null
+          commentaires_type_de_contrat?: string | null
+          completeness_score?: number | null
+          created_at?: string | null
+          date_premiere_signature?: string | null
+          delai_de_paiement?: string | null
+          delais_de_paiement_commentaires?: string | null
+          description?: string | null
+          echeances_de_paiement?: string | null
+          entite?: string | null
+          evolution_tarif_2026?: string | null
+          exclusivite_non_sollicitation?: string | null
+          famille?: string | null
+          famille_source_initiale?: string | null
+          garanties_bancaire_et_equipement?: string | null
+          id?: string
+          incoterm?: string | null
+          line_index: string
+          nom_contact?: string | null
+          nomfournisseur?: string | null
+          pays?: string | null
+          penalites?: string | null
+          poste?: string | null
+          rejected_at?: string | null
+          rejected_by_user_id?: string | null
+          rejection_reason?: string | null
+          remise?: string | null
+          rfa?: string | null
+          segment?: string | null
+          siret?: string | null
+          site_web?: string | null
+          sous_segment?: string | null
+          status?: string | null
+          submitted_by_user_id?: string | null
+          telephone?: string | null
+          tiers?: string | null
+          transport?: string | null
+          tva?: string | null
+          type_de_contrat?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+          validated_by_achats_at?: string | null
+          validated_by_achats_user_id?: string | null
+          validated_by_compta_at?: string | null
+          validated_by_compta_user_id?: string | null
+          validite_du_contrat?: string | null
+          validite_prix?: string | null
+        }
+        Update: {
+          adresse_mail?: string | null
+          avenants?: string | null
+          ca_estime?: number | null
+          categorie?: string | null
+          commentaires?: string | null
+          commentaires_date_contrat?: string | null
+          commentaires_type_de_contrat?: string | null
+          completeness_score?: number | null
+          created_at?: string | null
+          date_premiere_signature?: string | null
+          delai_de_paiement?: string | null
+          delais_de_paiement_commentaires?: string | null
+          description?: string | null
+          echeances_de_paiement?: string | null
+          entite?: string | null
+          evolution_tarif_2026?: string | null
+          exclusivite_non_sollicitation?: string | null
+          famille?: string | null
+          famille_source_initiale?: string | null
+          garanties_bancaire_et_equipement?: string | null
+          id?: string
+          incoterm?: string | null
+          line_index?: string
+          nom_contact?: string | null
+          nomfournisseur?: string | null
+          pays?: string | null
+          penalites?: string | null
+          poste?: string | null
+          rejected_at?: string | null
+          rejected_by_user_id?: string | null
+          rejection_reason?: string | null
+          remise?: string | null
+          rfa?: string | null
+          segment?: string | null
+          siret?: string | null
+          site_web?: string | null
+          sous_segment?: string | null
+          status?: string | null
+          submitted_by_user_id?: string | null
+          telephone?: string | null
+          tiers?: string | null
+          transport?: string | null
+          tva?: string | null
+          type_de_contrat?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+          validated_by_achats_at?: string | null
+          validated_by_achats_user_id?: string | null
+          validated_by_compta_at?: string | null
+          validated_by_compta_user_id?: string | null
+          validite_du_contrat?: string | null
+          validite_prix?: string | null
+        }
+        Relationships: []
+      }
+      supplier_waiting_approval_attachments: {
+        Row: {
+          attachment_kind: string
+          created_at: string
+          file_name: string
+          file_url: string
+          id: string
+          storage_path: string
+          uploaded_by: string | null
+          waiting_approval_id: string
+        }
+        Insert: {
+          attachment_kind: string
+          created_at?: string
+          file_name: string
+          file_url: string
+          id?: string
+          storage_path: string
+          uploaded_by?: string | null
+          waiting_approval_id: string
+        }
+        Update: {
+          attachment_kind?: string
+          created_at?: string
+          file_name?: string
+          file_url?: string
+          id?: string
+          storage_path?: string
+          uploaded_by?: string | null
+          waiting_approval_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_waiting_approval_attachments_waiting_approval_id_fkey"
+            columns: ["waiting_approval_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_waiting_approval"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       task_attachments: {
         Row: {
@@ -4756,6 +6427,55 @@ export type Database = {
           },
           {
             foreignKeyName: "task_status_transitions_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_step_field_values: {
+        Row: {
+          created_at: string
+          id: string
+          step_field_id: string
+          task_id: string
+          updated_at: string
+          value: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          step_field_id: string
+          task_id: string
+          updated_at?: string
+          value?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          step_field_id?: string
+          task_id?: string
+          updated_at?: string
+          value?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_step_field_values_step_field_id_fkey"
+            columns: ["step_field_id"]
+            isOneToOne: false
+            referencedRelation: "sub_process_step_fields"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_step_field_values_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "task_step_field_values_task_id_fkey"
             columns: ["task_id"]
             isOneToOne: false
             referencedRelation: "tasks"
@@ -5177,9 +6897,13 @@ export type Database = {
       }
       tasks: {
         Row: {
+          allows_reassignment: boolean
           assignee_id: string | null
+          be_affaire_id: string | null
           be_label_id: string | null
           be_project_id: string | null
+          be_status: string | null
+          be_urgency: string | null
           category: string | null
           category_id: string | null
           created_at: string
@@ -5199,6 +6923,7 @@ export type Database = {
           it_project_id: string | null
           it_project_phase: string | null
           original_assignee_id: string | null
+          parent_complement_id: string | null
           parent_request_id: string | null
           parent_sub_process_run_id: string | null
           planner_labels: string[] | null
@@ -5208,6 +6933,7 @@ export type Database = {
           rbe_validation_comment: string | null
           rbe_validation_status: string | null
           rbe_validator_id: string | null
+          reassignment_stakeholder_id: string | null
           reporter_id: string | null
           request_number: string | null
           request_validated_by_1: string | null
@@ -5258,9 +6984,13 @@ export type Database = {
           workflow_run_id: string | null
         }
         Insert: {
+          allows_reassignment?: boolean
           assignee_id?: string | null
+          be_affaire_id?: string | null
           be_label_id?: string | null
           be_project_id?: string | null
+          be_status?: string | null
+          be_urgency?: string | null
           category?: string | null
           category_id?: string | null
           created_at?: string
@@ -5280,6 +7010,7 @@ export type Database = {
           it_project_id?: string | null
           it_project_phase?: string | null
           original_assignee_id?: string | null
+          parent_complement_id?: string | null
           parent_request_id?: string | null
           parent_sub_process_run_id?: string | null
           planner_labels?: string[] | null
@@ -5289,6 +7020,7 @@ export type Database = {
           rbe_validation_comment?: string | null
           rbe_validation_status?: string | null
           rbe_validator_id?: string | null
+          reassignment_stakeholder_id?: string | null
           reporter_id?: string | null
           request_number?: string | null
           request_validated_by_1?: string | null
@@ -5339,9 +7071,13 @@ export type Database = {
           workflow_run_id?: string | null
         }
         Update: {
+          allows_reassignment?: boolean
           assignee_id?: string | null
+          be_affaire_id?: string | null
           be_label_id?: string | null
           be_project_id?: string | null
+          be_status?: string | null
+          be_urgency?: string | null
           category?: string | null
           category_id?: string | null
           created_at?: string
@@ -5361,6 +7097,7 @@ export type Database = {
           it_project_id?: string | null
           it_project_phase?: string | null
           original_assignee_id?: string | null
+          parent_complement_id?: string | null
           parent_request_id?: string | null
           parent_sub_process_run_id?: string | null
           planner_labels?: string[] | null
@@ -5370,6 +7107,7 @@ export type Database = {
           rbe_validation_comment?: string | null
           rbe_validation_status?: string | null
           rbe_validator_id?: string | null
+          reassignment_stakeholder_id?: string | null
           reporter_id?: string | null
           request_number?: string | null
           request_validated_by_1?: string | null
@@ -5428,6 +7166,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "tasks_be_affaire_id_fkey"
+            columns: ["be_affaire_id"]
+            isOneToOne: false
+            referencedRelation: "be_affaires"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_be_affaire_id_fkey"
+            columns: ["be_affaire_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_affaire_budget_kpi"
+            referencedColumns: ["be_affaire_id"]
+          },
+          {
+            foreignKeyName: "tasks_be_affaire_id_fkey"
+            columns: ["be_affaire_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_affaire_temps_kpi"
+            referencedColumns: ["be_affaire_id"]
+          },
+          {
+            foreignKeyName: "tasks_be_affaire_id_fkey"
+            columns: ["be_affaire_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_affaire_temps_par_poste"
+            referencedColumns: ["be_affaire_id"]
+          },
+          {
+            foreignKeyName: "tasks_be_affaire_id_fkey"
+            columns: ["be_affaire_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_affaire_temps_par_user"
+            referencedColumns: ["be_affaire_id"]
+          },
+          {
+            foreignKeyName: "tasks_be_affaire_id_fkey"
+            columns: ["be_affaire_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_temps_detail_mensuel"
+            referencedColumns: ["be_affaire_id"]
+          },
+          {
             foreignKeyName: "tasks_be_label_id_fkey"
             columns: ["be_label_id"]
             isOneToOne: false
@@ -5442,24 +7222,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "tasks_be_project_id_fkey"
+            columns: ["be_project_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_project_budget_kpi"
+            referencedColumns: ["be_project_id"]
+          },
+          {
+            foreignKeyName: "tasks_be_project_id_fkey"
+            columns: ["be_project_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_project_synthese_kpi"
+            referencedColumns: ["be_project_id"]
+          },
+          {
             foreignKeyName: "tasks_category_id_fkey"
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "categories"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tasks_depends_on_task_id_fkey"
-            columns: ["depends_on_task_id"]
-            isOneToOne: false
-            referencedRelation: "request_progress_view"
-            referencedColumns: ["request_id"]
-          },
-          {
-            foreignKeyName: "tasks_depends_on_task_id_fkey"
-            columns: ["depends_on_task_id"]
-            isOneToOne: false
-            referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
           {
@@ -5477,15 +7257,15 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "tasks_parent_request_id_fkey"
-            columns: ["parent_request_id"]
+            foreignKeyName: "tasks_parent_complement_id_fkey"
+            columns: ["parent_complement_id"]
             isOneToOne: false
             referencedRelation: "request_progress_view"
             referencedColumns: ["request_id"]
           },
           {
-            foreignKeyName: "tasks_parent_request_id_fkey"
-            columns: ["parent_request_id"]
+            foreignKeyName: "tasks_parent_complement_id_fkey"
+            columns: ["parent_complement_id"]
             isOneToOne: false
             referencedRelation: "tasks"
             referencedColumns: ["id"]
@@ -5512,8 +7292,8 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "tasks_rbe_validator_id_fkey"
-            columns: ["rbe_validator_id"]
+            foreignKeyName: "tasks_reassignment_stakeholder_id_fkey"
+            columns: ["reassignment_stakeholder_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -5582,13 +7362,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "tasks_validator_id_fkey"
-            columns: ["validator_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "tasks_validator_level_1_id_fkey"
             columns: ["validator_level_1_id"]
             isOneToOne: false
@@ -5600,13 +7373,6 @@ export type Database = {
             columns: ["validator_level_2_id"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tasks_workflow_run_id_fkey"
-            columns: ["workflow_run_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_runs"
             referencedColumns: ["id"]
           },
         ]
@@ -6000,6 +7766,7 @@ export type Database = {
           can_access_analytics: boolean | null
           can_access_calendar: boolean | null
           can_access_dashboard: boolean | null
+          can_access_it_projects: boolean | null
           can_access_process_tracking: boolean | null
           can_access_projects: boolean | null
           can_access_requests: boolean | null
@@ -6036,6 +7803,7 @@ export type Database = {
           can_access_analytics?: boolean | null
           can_access_calendar?: boolean | null
           can_access_dashboard?: boolean | null
+          can_access_it_projects?: boolean | null
           can_access_process_tracking?: boolean | null
           can_access_projects?: boolean | null
           can_access_requests?: boolean | null
@@ -6072,6 +7840,7 @@ export type Database = {
           can_access_analytics?: boolean | null
           can_access_calendar?: boolean | null
           can_access_dashboard?: boolean | null
+          can_access_it_projects?: boolean | null
           can_access_process_tracking?: boolean | null
           can_access_projects?: boolean | null
           can_access_requests?: boolean | null
@@ -6174,808 +7943,6 @@ export type Database = {
         }
         Relationships: []
       }
-      wf_actions: {
-        Row: {
-          action_type: Database["public"]["Enums"]["wf_action_type"]
-          config_json: Json
-          created_at: string
-          id: string
-          is_active: boolean
-          on_error: string
-          order_index: number
-          step_key: string | null
-          transition_id: string | null
-          updated_at: string
-          workflow_id: string
-        }
-        Insert: {
-          action_type: Database["public"]["Enums"]["wf_action_type"]
-          config_json?: Json
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          on_error?: string
-          order_index?: number
-          step_key?: string | null
-          transition_id?: string | null
-          updated_at?: string
-          workflow_id: string
-        }
-        Update: {
-          action_type?: Database["public"]["Enums"]["wf_action_type"]
-          config_json?: Json
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          on_error?: string
-          order_index?: number
-          step_key?: string | null
-          transition_id?: string | null
-          updated_at?: string
-          workflow_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "wf_actions_transition_id_fkey"
-            columns: ["transition_id"]
-            isOneToOne: false
-            referencedRelation: "wf_transitions"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "wf_actions_workflow_id_fkey"
-            columns: ["workflow_id"]
-            isOneToOne: false
-            referencedRelation: "wf_workflows"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      wf_assignment_rules: {
-        Row: {
-          created_at: string
-          fallback_rule_id: string | null
-          id: string
-          name: string
-          target_id: string | null
-          type: Database["public"]["Enums"]["wf_assignment_type"]
-          updated_at: string
-          watchers_json: Json | null
-        }
-        Insert: {
-          created_at?: string
-          fallback_rule_id?: string | null
-          id?: string
-          name: string
-          target_id?: string | null
-          type: Database["public"]["Enums"]["wf_assignment_type"]
-          updated_at?: string
-          watchers_json?: Json | null
-        }
-        Update: {
-          created_at?: string
-          fallback_rule_id?: string | null
-          id?: string
-          name?: string
-          target_id?: string | null
-          type?: Database["public"]["Enums"]["wf_assignment_type"]
-          updated_at?: string
-          watchers_json?: Json | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "wf_assignment_rules_fallback_rule_id_fkey"
-            columns: ["fallback_rule_id"]
-            isOneToOne: false
-            referencedRelation: "wf_assignment_rules"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      wf_model_tasks: {
-        Row: {
-          assignee_rule_snapshot_json: Json | null
-          assignee_user_id_resolved: string | null
-          created_at: string
-          demand_id: string | null
-          description: string | null
-          due_date: string | null
-          id: string
-          is_blocking: boolean
-          origin_step_key: string | null
-          status: string
-          title: string
-          updated_at: string
-          workflow_id: string
-        }
-        Insert: {
-          assignee_rule_snapshot_json?: Json | null
-          assignee_user_id_resolved?: string | null
-          created_at?: string
-          demand_id?: string | null
-          description?: string | null
-          due_date?: string | null
-          id?: string
-          is_blocking?: boolean
-          origin_step_key?: string | null
-          status?: string
-          title: string
-          updated_at?: string
-          workflow_id: string
-        }
-        Update: {
-          assignee_rule_snapshot_json?: Json | null
-          assignee_user_id_resolved?: string | null
-          created_at?: string
-          demand_id?: string | null
-          description?: string | null
-          due_date?: string | null
-          id?: string
-          is_blocking?: boolean
-          origin_step_key?: string | null
-          status?: string
-          title?: string
-          updated_at?: string
-          workflow_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "wf_model_tasks_demand_id_fkey"
-            columns: ["demand_id"]
-            isOneToOne: false
-            referencedRelation: "request_progress_view"
-            referencedColumns: ["request_id"]
-          },
-          {
-            foreignKeyName: "wf_model_tasks_demand_id_fkey"
-            columns: ["demand_id"]
-            isOneToOne: false
-            referencedRelation: "tasks"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "wf_model_tasks_workflow_id_fkey"
-            columns: ["workflow_id"]
-            isOneToOne: false
-            referencedRelation: "wf_workflows"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      wf_notifications: {
-        Row: {
-          action_url_template: string | null
-          body_template: string | null
-          channels_json: Json
-          created_at: string
-          event: string
-          id: string
-          is_active: boolean
-          recipients_rules_json: Json
-          step_key: string
-          subject_template: string | null
-          updated_at: string
-          workflow_id: string
-        }
-        Insert: {
-          action_url_template?: string | null
-          body_template?: string | null
-          channels_json?: Json
-          created_at?: string
-          event?: string
-          id?: string
-          is_active?: boolean
-          recipients_rules_json?: Json
-          step_key: string
-          subject_template?: string | null
-          updated_at?: string
-          workflow_id: string
-        }
-        Update: {
-          action_url_template?: string | null
-          body_template?: string | null
-          channels_json?: Json
-          created_at?: string
-          event?: string
-          id?: string
-          is_active?: boolean
-          recipients_rules_json?: Json
-          step_key?: string
-          subject_template?: string | null
-          updated_at?: string
-          workflow_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "wf_notifications_workflow_id_fkey"
-            columns: ["workflow_id"]
-            isOneToOne: false
-            referencedRelation: "wf_workflows"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      wf_runtime_instances: {
-        Row: {
-          completed_at: string | null
-          context_data: Json | null
-          created_at: string
-          current_state_label: string | null
-          current_step_key: string | null
-          demand_id: string
-          id: string
-          legacy_run_id: string | null
-          started_at: string
-          status: Database["public"]["Enums"]["wf_instance_status"]
-          updated_at: string
-          workflow_id: string
-        }
-        Insert: {
-          completed_at?: string | null
-          context_data?: Json | null
-          created_at?: string
-          current_state_label?: string | null
-          current_step_key?: string | null
-          demand_id: string
-          id?: string
-          legacy_run_id?: string | null
-          started_at?: string
-          status?: Database["public"]["Enums"]["wf_instance_status"]
-          updated_at?: string
-          workflow_id: string
-        }
-        Update: {
-          completed_at?: string | null
-          context_data?: Json | null
-          created_at?: string
-          current_state_label?: string | null
-          current_step_key?: string | null
-          demand_id?: string
-          id?: string
-          legacy_run_id?: string | null
-          started_at?: string
-          status?: Database["public"]["Enums"]["wf_instance_status"]
-          updated_at?: string
-          workflow_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "wf_runtime_instances_demand_id_fkey"
-            columns: ["demand_id"]
-            isOneToOne: false
-            referencedRelation: "request_progress_view"
-            referencedColumns: ["request_id"]
-          },
-          {
-            foreignKeyName: "wf_runtime_instances_demand_id_fkey"
-            columns: ["demand_id"]
-            isOneToOne: false
-            referencedRelation: "tasks"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "wf_runtime_instances_legacy_run_id_fkey"
-            columns: ["legacy_run_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_runs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "wf_runtime_instances_workflow_id_fkey"
-            columns: ["workflow_id"]
-            isOneToOne: false
-            referencedRelation: "wf_workflows"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      wf_runtime_logs: {
-        Row: {
-          actor_id: string | null
-          created_at: string
-          event: string
-          id: string
-          instance_id: string
-          message: string | null
-          payload_json: Json | null
-          step_key: string | null
-          workflow_id: string
-        }
-        Insert: {
-          actor_id?: string | null
-          created_at?: string
-          event: string
-          id?: string
-          instance_id: string
-          message?: string | null
-          payload_json?: Json | null
-          step_key?: string | null
-          workflow_id: string
-        }
-        Update: {
-          actor_id?: string | null
-          created_at?: string
-          event?: string
-          id?: string
-          instance_id?: string
-          message?: string | null
-          payload_json?: Json | null
-          step_key?: string | null
-          workflow_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "wf_runtime_logs_instance_id_fkey"
-            columns: ["instance_id"]
-            isOneToOne: false
-            referencedRelation: "wf_runtime_instances"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "wf_runtime_logs_workflow_id_fkey"
-            columns: ["workflow_id"]
-            isOneToOne: false
-            referencedRelation: "wf_workflows"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      wf_step_pool_validators: {
-        Row: {
-          assignment_rule_id: string
-          created_at: string
-          id: string
-          step_id: string
-        }
-        Insert: {
-          assignment_rule_id: string
-          created_at?: string
-          id?: string
-          step_id: string
-        }
-        Update: {
-          assignment_rule_id?: string
-          created_at?: string
-          id?: string
-          step_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "wf_step_pool_validators_assignment_rule_id_fkey"
-            columns: ["assignment_rule_id"]
-            isOneToOne: false
-            referencedRelation: "wf_assignment_rules"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "wf_step_pool_validators_step_id_fkey"
-            columns: ["step_id"]
-            isOneToOne: false
-            referencedRelation: "wf_steps"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      wf_step_sequence_validators: {
-        Row: {
-          assignment_rule_id: string
-          created_at: string
-          id: string
-          order_index: number
-          step_id: string
-        }
-        Insert: {
-          assignment_rule_id: string
-          created_at?: string
-          id?: string
-          order_index?: number
-          step_id: string
-        }
-        Update: {
-          assignment_rule_id?: string
-          created_at?: string
-          id?: string
-          order_index?: number
-          step_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "wf_step_sequence_validators_assignment_rule_id_fkey"
-            columns: ["assignment_rule_id"]
-            isOneToOne: false
-            referencedRelation: "wf_assignment_rules"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "wf_step_sequence_validators_step_id_fkey"
-            columns: ["step_id"]
-            isOneToOne: false
-            referencedRelation: "wf_steps"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      wf_steps: {
-        Row: {
-          assignment_rule_id: string | null
-          created_at: string
-          id: string
-          is_active: boolean
-          is_required: boolean
-          legacy_node_id: string | null
-          n_required: number | null
-          name: string
-          order_index: number
-          state_label: string | null
-          step_key: string
-          step_type: Database["public"]["Enums"]["wf_step_type"]
-          updated_at: string
-          validation_mode: Database["public"]["Enums"]["wf_validation_mode"]
-          workflow_id: string
-        }
-        Insert: {
-          assignment_rule_id?: string | null
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          is_required?: boolean
-          legacy_node_id?: string | null
-          n_required?: number | null
-          name: string
-          order_index?: number
-          state_label?: string | null
-          step_key: string
-          step_type?: Database["public"]["Enums"]["wf_step_type"]
-          updated_at?: string
-          validation_mode?: Database["public"]["Enums"]["wf_validation_mode"]
-          workflow_id: string
-        }
-        Update: {
-          assignment_rule_id?: string | null
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          is_required?: boolean
-          legacy_node_id?: string | null
-          n_required?: number | null
-          name?: string
-          order_index?: number
-          state_label?: string | null
-          step_key?: string
-          step_type?: Database["public"]["Enums"]["wf_step_type"]
-          updated_at?: string
-          validation_mode?: Database["public"]["Enums"]["wf_validation_mode"]
-          workflow_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "wf_steps_assignment_rule_id_fkey"
-            columns: ["assignment_rule_id"]
-            isOneToOne: false
-            referencedRelation: "wf_assignment_rules"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "wf_steps_workflow_id_fkey"
-            columns: ["workflow_id"]
-            isOneToOne: false
-            referencedRelation: "wf_workflows"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      wf_task_configs: {
-        Row: {
-          assignment_mode: string
-          completion_action_id: string | null
-          completion_behavior: string
-          completion_target_step_key: string | null
-          completion_target_task_key: string | null
-          created_at: string
-          description: string | null
-          executor_type: string
-          executor_value: string | null
-          id: string
-          initial_status: string
-          is_active: boolean
-          is_required: boolean
-          name: string
-          order_index: number
-          outcome_behaviors_json: Json | null
-          step_key: string
-          task_key: string
-          trigger_condition_json: Json | null
-          trigger_mode: string
-          trigger_task_key: string | null
-          updated_at: string
-          validation_config_id: string | null
-          workflow_id: string
-        }
-        Insert: {
-          assignment_mode?: string
-          completion_action_id?: string | null
-          completion_behavior?: string
-          completion_target_step_key?: string | null
-          completion_target_task_key?: string | null
-          created_at?: string
-          description?: string | null
-          executor_type?: string
-          executor_value?: string | null
-          id?: string
-          initial_status?: string
-          is_active?: boolean
-          is_required?: boolean
-          name: string
-          order_index?: number
-          outcome_behaviors_json?: Json | null
-          step_key: string
-          task_key: string
-          trigger_condition_json?: Json | null
-          trigger_mode?: string
-          trigger_task_key?: string | null
-          updated_at?: string
-          validation_config_id?: string | null
-          workflow_id: string
-        }
-        Update: {
-          assignment_mode?: string
-          completion_action_id?: string | null
-          completion_behavior?: string
-          completion_target_step_key?: string | null
-          completion_target_task_key?: string | null
-          created_at?: string
-          description?: string | null
-          executor_type?: string
-          executor_value?: string | null
-          id?: string
-          initial_status?: string
-          is_active?: boolean
-          is_required?: boolean
-          name?: string
-          order_index?: number
-          outcome_behaviors_json?: Json | null
-          step_key?: string
-          task_key?: string
-          trigger_condition_json?: Json | null
-          trigger_mode?: string
-          trigger_task_key?: string | null
-          updated_at?: string
-          validation_config_id?: string | null
-          workflow_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "wf_task_configs_validation_config_fk"
-            columns: ["validation_config_id"]
-            isOneToOne: false
-            referencedRelation: "wf_validation_configs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "wf_task_configs_workflow_id_fkey"
-            columns: ["workflow_id"]
-            isOneToOne: false
-            referencedRelation: "wf_workflows"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      wf_transitions: {
-        Row: {
-          condition_json: Json | null
-          created_at: string
-          event: string
-          from_step_key: string
-          id: string
-          is_active: boolean
-          to_step_key: string
-          updated_at: string
-          workflow_id: string
-        }
-        Insert: {
-          condition_json?: Json | null
-          created_at?: string
-          event?: string
-          from_step_key: string
-          id?: string
-          is_active?: boolean
-          to_step_key: string
-          updated_at?: string
-          workflow_id: string
-        }
-        Update: {
-          condition_json?: Json | null
-          created_at?: string
-          event?: string
-          from_step_key?: string
-          id?: string
-          is_active?: boolean
-          to_step_key?: string
-          updated_at?: string
-          workflow_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "wf_transitions_workflow_id_fkey"
-            columns: ["workflow_id"]
-            isOneToOne: false
-            referencedRelation: "wf_workflows"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      wf_validation_configs: {
-        Row: {
-          condition_json: Json | null
-          created_at: string
-          description: string | null
-          id: string
-          is_active: boolean
-          n_required: number | null
-          name: string
-          object_type: string
-          on_approved_effect: string
-          on_approved_target_step_key: string | null
-          on_rejected_effect: string
-          on_rejected_target_step_key: string | null
-          order_index: number
-          source_step_key: string | null
-          source_task_key: string | null
-          target_step_key: string | null
-          updated_at: string
-          validation_key: string
-          validation_mode: string
-          validator_type: string
-          validator_value: string | null
-          workflow_id: string
-        }
-        Insert: {
-          condition_json?: Json | null
-          created_at?: string
-          description?: string | null
-          id?: string
-          is_active?: boolean
-          n_required?: number | null
-          name: string
-          object_type?: string
-          on_approved_effect?: string
-          on_approved_target_step_key?: string | null
-          on_rejected_effect?: string
-          on_rejected_target_step_key?: string | null
-          order_index?: number
-          source_step_key?: string | null
-          source_task_key?: string | null
-          target_step_key?: string | null
-          updated_at?: string
-          validation_key: string
-          validation_mode?: string
-          validator_type?: string
-          validator_value?: string | null
-          workflow_id: string
-        }
-        Update: {
-          condition_json?: Json | null
-          created_at?: string
-          description?: string | null
-          id?: string
-          is_active?: boolean
-          n_required?: number | null
-          name?: string
-          object_type?: string
-          on_approved_effect?: string
-          on_approved_target_step_key?: string | null
-          on_rejected_effect?: string
-          on_rejected_target_step_key?: string | null
-          order_index?: number
-          source_step_key?: string | null
-          source_task_key?: string | null
-          target_step_key?: string | null
-          updated_at?: string
-          validation_key?: string
-          validation_mode?: string
-          validator_type?: string
-          validator_value?: string | null
-          workflow_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "wf_validation_configs_workflow_id_fkey"
-            columns: ["workflow_id"]
-            isOneToOne: false
-            referencedRelation: "wf_workflows"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      wf_workflows: {
-        Row: {
-          config_mode: string
-          created_at: string
-          customized_at: string | null
-          default_subprocess_mode: string
-          description: string | null
-          id: string
-          is_active: boolean
-          is_draft: boolean
-          is_standard_template: boolean
-          legacy_workflow_id: string | null
-          name: string
-          published_at: string | null
-          standard_options: Json | null
-          standard_template_id: string | null
-          sub_process_template_id: string | null
-          updated_at: string
-          version: number
-        }
-        Insert: {
-          config_mode?: string
-          created_at?: string
-          customized_at?: string | null
-          default_subprocess_mode?: string
-          description?: string | null
-          id?: string
-          is_active?: boolean
-          is_draft?: boolean
-          is_standard_template?: boolean
-          legacy_workflow_id?: string | null
-          name: string
-          published_at?: string | null
-          standard_options?: Json | null
-          standard_template_id?: string | null
-          sub_process_template_id?: string | null
-          updated_at?: string
-          version?: number
-        }
-        Update: {
-          config_mode?: string
-          created_at?: string
-          customized_at?: string | null
-          default_subprocess_mode?: string
-          description?: string | null
-          id?: string
-          is_active?: boolean
-          is_draft?: boolean
-          is_standard_template?: boolean
-          legacy_workflow_id?: string | null
-          name?: string
-          published_at?: string | null
-          standard_options?: Json | null
-          standard_template_id?: string | null
-          sub_process_template_id?: string | null
-          updated_at?: string
-          version?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "wf_workflows_legacy_workflow_id_fkey"
-            columns: ["legacy_workflow_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_templates"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "wf_workflows_standard_template_id_fkey"
-            columns: ["standard_template_id"]
-            isOneToOne: false
-            referencedRelation: "wf_workflows"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "wf_workflows_sub_process_template_id_fkey"
-            columns: ["sub_process_template_id"]
-            isOneToOne: false
-            referencedRelation: "request_progress_view"
-            referencedColumns: ["sub_process_template_id"]
-          },
-          {
-            foreignKeyName: "wf_workflows_sub_process_template_id_fkey"
-            columns: ["sub_process_template_id"]
-            isOneToOne: false
-            referencedRelation: "sub_process_templates"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       widget_layout_presets: {
         Row: {
           created_at: string
@@ -7002,845 +7969,6 @@ export type Database = {
           widgets_config?: Json
         }
         Relationships: []
-      }
-      workflow_autonumber_sequences: {
-        Row: {
-          created_at: string
-          current_value: number
-          id: string
-          last_reset_at: string
-          updated_at: string
-          variable_id: string
-        }
-        Insert: {
-          created_at?: string
-          current_value?: number
-          id?: string
-          last_reset_at?: string
-          updated_at?: string
-          variable_id: string
-        }
-        Update: {
-          created_at?: string
-          current_value?: number
-          id?: string
-          last_reset_at?: string
-          updated_at?: string
-          variable_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "workflow_autonumber_sequences_variable_id_fkey"
-            columns: ["variable_id"]
-            isOneToOne: true
-            referencedRelation: "workflow_variables"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      workflow_branch_instances: {
-        Row: {
-          branch_id: string
-          completed_at: string | null
-          context_data: Json | null
-          created_at: string
-          current_node_id: string | null
-          fork_node_id: string | null
-          id: string
-          run_id: string
-          started_at: string
-          status: string
-          updated_at: string
-        }
-        Insert: {
-          branch_id: string
-          completed_at?: string | null
-          context_data?: Json | null
-          created_at?: string
-          current_node_id?: string | null
-          fork_node_id?: string | null
-          id?: string
-          run_id: string
-          started_at?: string
-          status?: string
-          updated_at?: string
-        }
-        Update: {
-          branch_id?: string
-          completed_at?: string | null
-          context_data?: Json | null
-          created_at?: string
-          current_node_id?: string | null
-          fork_node_id?: string | null
-          id?: string
-          run_id?: string
-          started_at?: string
-          status?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "workflow_branch_instances_current_node_id_fkey"
-            columns: ["current_node_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_nodes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_branch_instances_fork_node_id_fkey"
-            columns: ["fork_node_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_nodes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_branch_instances_run_id_fkey"
-            columns: ["run_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_runs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      workflow_datalake_sync_logs: {
-        Row: {
-          completed_at: string | null
-          created_at: string
-          direction: Database["public"]["Enums"]["datalake_sync_direction"]
-          duration_ms: number | null
-          error_message: string | null
-          id: string
-          mode: Database["public"]["Enums"]["datalake_sync_mode"]
-          node_id: string | null
-          rows_read: number | null
-          rows_written: number | null
-          run_id: string | null
-          started_at: string | null
-          status: string
-          tables_synced: string[]
-        }
-        Insert: {
-          completed_at?: string | null
-          created_at?: string
-          direction: Database["public"]["Enums"]["datalake_sync_direction"]
-          duration_ms?: number | null
-          error_message?: string | null
-          id?: string
-          mode?: Database["public"]["Enums"]["datalake_sync_mode"]
-          node_id?: string | null
-          rows_read?: number | null
-          rows_written?: number | null
-          run_id?: string | null
-          started_at?: string | null
-          status?: string
-          tables_synced?: string[]
-        }
-        Update: {
-          completed_at?: string | null
-          created_at?: string
-          direction?: Database["public"]["Enums"]["datalake_sync_direction"]
-          duration_ms?: number | null
-          error_message?: string | null
-          id?: string
-          mode?: Database["public"]["Enums"]["datalake_sync_mode"]
-          node_id?: string | null
-          rows_read?: number | null
-          rows_written?: number | null
-          run_id?: string | null
-          started_at?: string | null
-          status?: string
-          tables_synced?: string[]
-        }
-        Relationships: [
-          {
-            foreignKeyName: "workflow_datalake_sync_logs_node_id_fkey"
-            columns: ["node_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_nodes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_datalake_sync_logs_run_id_fkey"
-            columns: ["run_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_runs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      workflow_edges: {
-        Row: {
-          animated: boolean | null
-          branch_label: string | null
-          condition_expression: Json | null
-          created_at: string
-          id: string
-          label: string | null
-          source_handle: string | null
-          source_node_id: string
-          style: Json | null
-          target_handle: string | null
-          target_node_id: string
-          workflow_id: string
-        }
-        Insert: {
-          animated?: boolean | null
-          branch_label?: string | null
-          condition_expression?: Json | null
-          created_at?: string
-          id?: string
-          label?: string | null
-          source_handle?: string | null
-          source_node_id: string
-          style?: Json | null
-          target_handle?: string | null
-          target_node_id: string
-          workflow_id: string
-        }
-        Update: {
-          animated?: boolean | null
-          branch_label?: string | null
-          condition_expression?: Json | null
-          created_at?: string
-          id?: string
-          label?: string | null
-          source_handle?: string | null
-          source_node_id?: string
-          style?: Json | null
-          target_handle?: string | null
-          target_node_id?: string
-          workflow_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "workflow_edges_source_node_id_fkey"
-            columns: ["source_node_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_nodes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_edges_target_node_id_fkey"
-            columns: ["target_node_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_nodes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_edges_workflow_id_fkey"
-            columns: ["workflow_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_templates"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      workflow_events: {
-        Row: {
-          created_at: string
-          entity_id: string
-          entity_type: string
-          error_message: string | null
-          event_type: string
-          id: string
-          payload: Json
-          processed: boolean
-          processed_at: string | null
-          run_id: string | null
-          triggered_by: string | null
-        }
-        Insert: {
-          created_at?: string
-          entity_id: string
-          entity_type: string
-          error_message?: string | null
-          event_type: string
-          id?: string
-          payload?: Json
-          processed?: boolean
-          processed_at?: string | null
-          run_id?: string | null
-          triggered_by?: string | null
-        }
-        Update: {
-          created_at?: string
-          entity_id?: string
-          entity_type?: string
-          error_message?: string | null
-          event_type?: string
-          id?: string
-          payload?: Json
-          processed?: boolean
-          processed_at?: string | null
-          run_id?: string | null
-          triggered_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "workflow_events_run_id_fkey"
-            columns: ["run_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_runs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      workflow_execution_logs: {
-        Row: {
-          action: string
-          actor_id: string | null
-          created_at: string
-          details: Json | null
-          duration_ms: number | null
-          id: string
-          node_id: string | null
-          run_id: string
-        }
-        Insert: {
-          action: string
-          actor_id?: string | null
-          created_at?: string
-          details?: Json | null
-          duration_ms?: number | null
-          id?: string
-          node_id?: string | null
-          run_id: string
-        }
-        Update: {
-          action?: string
-          actor_id?: string | null
-          created_at?: string
-          details?: Json | null
-          duration_ms?: number | null
-          id?: string
-          node_id?: string | null
-          run_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "workflow_execution_logs_run_id_fkey"
-            columns: ["run_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_runs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      workflow_nodes: {
-        Row: {
-          config: Json
-          created_at: string
-          height: number | null
-          id: string
-          label: string
-          node_type: Database["public"]["Enums"]["workflow_node_type"]
-          position_x: number
-          position_y: number
-          style: Json | null
-          task_template_id: string | null
-          updated_at: string
-          width: number | null
-          workflow_id: string
-        }
-        Insert: {
-          config?: Json
-          created_at?: string
-          height?: number | null
-          id?: string
-          label: string
-          node_type: Database["public"]["Enums"]["workflow_node_type"]
-          position_x?: number
-          position_y?: number
-          style?: Json | null
-          task_template_id?: string | null
-          updated_at?: string
-          width?: number | null
-          workflow_id: string
-        }
-        Update: {
-          config?: Json
-          created_at?: string
-          height?: number | null
-          id?: string
-          label?: string
-          node_type?: Database["public"]["Enums"]["workflow_node_type"]
-          position_x?: number
-          position_y?: number
-          style?: Json | null
-          task_template_id?: string | null
-          updated_at?: string
-          width?: number | null
-          workflow_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "workflow_nodes_task_template_id_fkey"
-            columns: ["task_template_id"]
-            isOneToOne: false
-            referencedRelation: "task_templates"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_nodes_workflow_id_fkey"
-            columns: ["workflow_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_templates"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      workflow_notifications: {
-        Row: {
-          action_url: string | null
-          body: string
-          branch_id: string | null
-          channel: Database["public"]["Enums"]["notification_channel"]
-          created_at: string
-          error_message: string | null
-          id: string
-          node_id: string
-          recipient_email: string | null
-          recipient_id: string | null
-          recipient_type: string
-          retry_count: number | null
-          run_id: string
-          sent_at: string | null
-          status: string
-          subject: string
-        }
-        Insert: {
-          action_url?: string | null
-          body: string
-          branch_id?: string | null
-          channel: Database["public"]["Enums"]["notification_channel"]
-          created_at?: string
-          error_message?: string | null
-          id?: string
-          node_id: string
-          recipient_email?: string | null
-          recipient_id?: string | null
-          recipient_type: string
-          retry_count?: number | null
-          run_id: string
-          sent_at?: string | null
-          status?: string
-          subject: string
-        }
-        Update: {
-          action_url?: string | null
-          body?: string
-          branch_id?: string | null
-          channel?: Database["public"]["Enums"]["notification_channel"]
-          created_at?: string
-          error_message?: string | null
-          id?: string
-          node_id?: string
-          recipient_email?: string | null
-          recipient_id?: string | null
-          recipient_type?: string
-          retry_count?: number | null
-          run_id?: string
-          sent_at?: string | null
-          status?: string
-          subject?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "workflow_notifications_node_id_fkey"
-            columns: ["node_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_nodes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_notifications_run_id_fkey"
-            columns: ["run_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_runs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      workflow_runs: {
-        Row: {
-          active_branches: Json | null
-          branch_statuses: Json | null
-          completed_at: string | null
-          completed_branches: Json | null
-          context_data: Json | null
-          created_at: string
-          current_node_id: string | null
-          execution_log: Json | null
-          id: string
-          started_at: string
-          started_by: string | null
-          status: Database["public"]["Enums"]["workflow_run_status"]
-          trigger_entity_id: string
-          trigger_entity_type: string
-          updated_at: string
-          workflow_id: string
-          workflow_version: number
-        }
-        Insert: {
-          active_branches?: Json | null
-          branch_statuses?: Json | null
-          completed_at?: string | null
-          completed_branches?: Json | null
-          context_data?: Json | null
-          created_at?: string
-          current_node_id?: string | null
-          execution_log?: Json | null
-          id?: string
-          started_at?: string
-          started_by?: string | null
-          status?: Database["public"]["Enums"]["workflow_run_status"]
-          trigger_entity_id: string
-          trigger_entity_type: string
-          updated_at?: string
-          workflow_id: string
-          workflow_version: number
-        }
-        Update: {
-          active_branches?: Json | null
-          branch_statuses?: Json | null
-          completed_at?: string | null
-          completed_branches?: Json | null
-          context_data?: Json | null
-          created_at?: string
-          current_node_id?: string | null
-          execution_log?: Json | null
-          id?: string
-          started_at?: string
-          started_by?: string | null
-          status?: Database["public"]["Enums"]["workflow_run_status"]
-          trigger_entity_id?: string
-          trigger_entity_type?: string
-          updated_at?: string
-          workflow_id?: string
-          workflow_version?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "workflow_runs_current_node_id_fkey"
-            columns: ["current_node_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_nodes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_runs_workflow_id_fkey"
-            columns: ["workflow_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_templates"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      workflow_template_versions: {
-        Row: {
-          change_notes: string | null
-          edges_snapshot: Json
-          id: string
-          nodes_snapshot: Json
-          published_at: string
-          published_by: string | null
-          settings_snapshot: Json | null
-          version: number
-          workflow_id: string
-        }
-        Insert: {
-          change_notes?: string | null
-          edges_snapshot: Json
-          id?: string
-          nodes_snapshot: Json
-          published_at?: string
-          published_by?: string | null
-          settings_snapshot?: Json | null
-          version: number
-          workflow_id: string
-        }
-        Update: {
-          change_notes?: string | null
-          edges_snapshot?: Json
-          id?: string
-          nodes_snapshot?: Json
-          published_at?: string
-          published_by?: string | null
-          settings_snapshot?: Json | null
-          version?: number
-          workflow_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "workflow_template_versions_workflow_id_fkey"
-            columns: ["workflow_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_templates"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      workflow_templates: {
-        Row: {
-          canvas_settings: Json | null
-          created_at: string
-          created_by: string | null
-          description: string | null
-          id: string
-          is_default: boolean
-          name: string
-          process_template_id: string | null
-          published_at: string | null
-          status: Database["public"]["Enums"]["workflow_status"]
-          sub_process_template_id: string | null
-          updated_at: string
-          version: number
-        }
-        Insert: {
-          canvas_settings?: Json | null
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          is_default?: boolean
-          name: string
-          process_template_id?: string | null
-          published_at?: string | null
-          status?: Database["public"]["Enums"]["workflow_status"]
-          sub_process_template_id?: string | null
-          updated_at?: string
-          version?: number
-        }
-        Update: {
-          canvas_settings?: Json | null
-          created_at?: string
-          created_by?: string | null
-          description?: string | null
-          id?: string
-          is_default?: boolean
-          name?: string
-          process_template_id?: string | null
-          published_at?: string | null
-          status?: Database["public"]["Enums"]["workflow_status"]
-          sub_process_template_id?: string | null
-          updated_at?: string
-          version?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "workflow_templates_process_template_id_fkey"
-            columns: ["process_template_id"]
-            isOneToOne: false
-            referencedRelation: "process_templates"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_templates_sub_process_template_id_fkey"
-            columns: ["sub_process_template_id"]
-            isOneToOne: false
-            referencedRelation: "request_progress_view"
-            referencedColumns: ["sub_process_template_id"]
-          },
-          {
-            foreignKeyName: "workflow_templates_sub_process_template_id_fkey"
-            columns: ["sub_process_template_id"]
-            isOneToOne: false
-            referencedRelation: "sub_process_templates"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      workflow_validation_instances: {
-        Row: {
-          approver_id: string | null
-          approver_role: string | null
-          approver_type: string
-          branch_id: string | null
-          created_at: string
-          decided_at: string | null
-          decided_by: string | null
-          decision_comment: string | null
-          due_at: string | null
-          id: string
-          node_id: string
-          prerequisite_config: Json | null
-          prerequisites_met: boolean | null
-          reminded_at: string | null
-          reminder_count: number | null
-          run_id: string
-          status: Database["public"]["Enums"]["validation_instance_status"]
-          trigger_mode: string | null
-          triggered_at: string | null
-          triggered_by: string | null
-          updated_at: string
-        }
-        Insert: {
-          approver_id?: string | null
-          approver_role?: string | null
-          approver_type: string
-          branch_id?: string | null
-          created_at?: string
-          decided_at?: string | null
-          decided_by?: string | null
-          decision_comment?: string | null
-          due_at?: string | null
-          id?: string
-          node_id: string
-          prerequisite_config?: Json | null
-          prerequisites_met?: boolean | null
-          reminded_at?: string | null
-          reminder_count?: number | null
-          run_id: string
-          status?: Database["public"]["Enums"]["validation_instance_status"]
-          trigger_mode?: string | null
-          triggered_at?: string | null
-          triggered_by?: string | null
-          updated_at?: string
-        }
-        Update: {
-          approver_id?: string | null
-          approver_role?: string | null
-          approver_type?: string
-          branch_id?: string | null
-          created_at?: string
-          decided_at?: string | null
-          decided_by?: string | null
-          decision_comment?: string | null
-          due_at?: string | null
-          id?: string
-          node_id?: string
-          prerequisite_config?: Json | null
-          prerequisites_met?: boolean | null
-          reminded_at?: string | null
-          reminder_count?: number | null
-          run_id?: string
-          status?: Database["public"]["Enums"]["validation_instance_status"]
-          trigger_mode?: string | null
-          triggered_at?: string | null
-          triggered_by?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "workflow_validation_instances_decided_by_fkey"
-            columns: ["decided_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_validation_instances_node_id_fkey"
-            columns: ["node_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_nodes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_validation_instances_run_id_fkey"
-            columns: ["run_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_runs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      workflow_variable_instances: {
-        Row: {
-          computed_at: string
-          created_at: string
-          current_value: Json | null
-          id: string
-          run_id: string
-          variable_id: string
-        }
-        Insert: {
-          computed_at?: string
-          created_at?: string
-          current_value?: Json | null
-          id?: string
-          run_id: string
-          variable_id: string
-        }
-        Update: {
-          computed_at?: string
-          created_at?: string
-          current_value?: Json | null
-          id?: string
-          run_id?: string
-          variable_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "workflow_variable_instances_run_id_fkey"
-            columns: ["run_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_runs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "workflow_variable_instances_variable_id_fkey"
-            columns: ["variable_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_variables"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      workflow_variables: {
-        Row: {
-          autonumber_padding: number | null
-          autonumber_prefix: string | null
-          autonumber_reset: string | null
-          created_at: string
-          datetime_mode: string | null
-          default_value: Json | null
-          expression: string | null
-          id: string
-          name: string
-          scope: string
-          updated_at: string
-          variable_type: Database["public"]["Enums"]["workflow_variable_type"]
-          workflow_id: string
-        }
-        Insert: {
-          autonumber_padding?: number | null
-          autonumber_prefix?: string | null
-          autonumber_reset?: string | null
-          created_at?: string
-          datetime_mode?: string | null
-          default_value?: Json | null
-          expression?: string | null
-          id?: string
-          name: string
-          scope?: string
-          updated_at?: string
-          variable_type?: Database["public"]["Enums"]["workflow_variable_type"]
-          workflow_id: string
-        }
-        Update: {
-          autonumber_padding?: number | null
-          autonumber_prefix?: string | null
-          autonumber_reset?: string | null
-          created_at?: string
-          datetime_mode?: string | null
-          default_value?: Json | null
-          expression?: string | null
-          id?: string
-          name?: string
-          scope?: string
-          updated_at?: string
-          variable_type?: Database["public"]["Enums"]["workflow_variable_type"]
-          workflow_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "workflow_variables_workflow_id_fkey"
-            columns: ["workflow_id"]
-            isOneToOne: false
-            referencedRelation: "workflow_templates"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       workload_slots: {
         Row: {
@@ -7969,8 +8097,315 @@ export type Database = {
           },
         ]
       }
+      v_be_affaire_budget_kpi: {
+        Row: {
+          affaire_libelle: string | null
+          affaire_status: string | null
+          be_affaire_id: string | null
+          be_project_id: string | null
+          ca_constate_brut: number | null
+          ca_engage_brut: number | null
+          code_affaire: string | null
+          cogs_constate_brut: number | null
+          cogs_engage_brut: number | null
+          constate_montant_brut: number | null
+          cout_rh_declare: number | null
+          engage_montant_brut: number | null
+          jours_declares: number | null
+          marge_brute_brut: number | null
+          marge_constatee_brut: number | null
+          marge_directe_brut: number | null
+          nb_commandes: number | null
+          nb_factures: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "be_affaires_be_project_id_fkey"
+            columns: ["be_project_id"]
+            isOneToOne: false
+            referencedRelation: "be_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "be_affaires_be_project_id_fkey"
+            columns: ["be_project_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_project_budget_kpi"
+            referencedColumns: ["be_project_id"]
+          },
+          {
+            foreignKeyName: "be_affaires_be_project_id_fkey"
+            columns: ["be_project_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_project_synthese_kpi"
+            referencedColumns: ["be_project_id"]
+          },
+        ]
+      }
+      v_be_affaire_temps_kpi: {
+        Row: {
+          be_affaire_id: string | null
+          be_project_id: string | null
+          code_affaire: string | null
+          cout_rh_budgete: number | null
+          cout_rh_declare: number | null
+          cout_rh_planifie: number | null
+          heures_declarees: number | null
+          heures_planifiees: number | null
+          jours_budgetes: number | null
+          jours_declares: number | null
+          jours_planifies: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "be_affaires_be_project_id_fkey"
+            columns: ["be_project_id"]
+            isOneToOne: false
+            referencedRelation: "be_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "be_affaires_be_project_id_fkey"
+            columns: ["be_project_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_project_budget_kpi"
+            referencedColumns: ["be_project_id"]
+          },
+          {
+            foreignKeyName: "be_affaires_be_project_id_fkey"
+            columns: ["be_project_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_project_synthese_kpi"
+            referencedColumns: ["be_project_id"]
+          },
+        ]
+      }
+      v_be_affaire_temps_par_poste: {
+        Row: {
+          be_affaire_id: string | null
+          code_affaire: string | null
+          cout_rh: number | null
+          heures: number | null
+          jours: number | null
+          nb_collaborateurs: number | null
+          nb_saisies: number | null
+          poste: string | null
+        }
+        Relationships: []
+      }
+      v_be_affaire_temps_par_user: {
+        Row: {
+          be_affaire_id: string | null
+          be_fonction: string | null
+          code_affaire: string | null
+          cout_rh: number | null
+          derniere_saisie: string | null
+          display_name: string | null
+          heures: number | null
+          id_lucca: number | null
+          job_title: string | null
+          jours: number | null
+          nb_saisies: number | null
+          premiere_saisie: string | null
+          source_taux: string | null
+          taux_horaire_effectif: number | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lucca_saisie_temps_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_be_fonction_fkey"
+            columns: ["be_fonction"]
+            isOneToOne: false
+            referencedRelation: "be_tjm_fonctions"
+            referencedColumns: ["fonction"]
+          },
+        ]
+      }
+      v_be_divalto_affaires_to_import: {
+        Row: {
+          categorie: string | null
+          code_affaire: string | null
+          code_projet_parent: string | null
+          dernier_mouvement: string | null
+          libelle_principal: string | null
+          montant_total: number | null
+          nb_pieces: number | null
+          parent_project_exists: boolean | null
+          premier_mouvement: string | null
+        }
+        Relationships: []
+      }
+      v_be_groupe_kpi: {
+        Row: {
+          be_project_id: string | null
+          ca_constate_brut: number | null
+          ca_engage_brut: number | null
+          code_groupe: string | null
+          cogs_constate_brut: number | null
+          cogs_engage_brut: number | null
+          cout_rh_budgete: number | null
+          cout_rh_declare: number | null
+          heures_declarees: number | null
+          jours_budgetes: number | null
+          jours_declares: number | null
+          marge_brute_brut: number | null
+          marge_constatee_brut: number | null
+          marge_directe_brut: number | null
+          nb_activites_divalto: number | null
+          nb_collaborateurs: number | null
+          nb_commandes: number | null
+          nb_factures: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "be_affaires_be_project_id_fkey"
+            columns: ["be_project_id"]
+            isOneToOne: false
+            referencedRelation: "be_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "be_affaires_be_project_id_fkey"
+            columns: ["be_project_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_project_budget_kpi"
+            referencedColumns: ["be_project_id"]
+          },
+          {
+            foreignKeyName: "be_affaires_be_project_id_fkey"
+            columns: ["be_project_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_project_synthese_kpi"
+            referencedColumns: ["be_project_id"]
+          },
+        ]
+      }
+      v_be_project_budget_kpi: {
+        Row: {
+          be_project_id: string | null
+          ca_constate_brut: number | null
+          ca_engage_brut: number | null
+          code_projet: string | null
+          cogs_constate_brut: number | null
+          cogs_engage_brut: number | null
+          constate_montant_brut: number | null
+          engage_montant_brut: number | null
+          marge_brute_brut: number | null
+          marge_constatee_brut: number | null
+          marge_directe_brut: number | null
+          nb_affaires: number | null
+          nb_commandes: number | null
+          nb_factures: number | null
+        }
+        Relationships: []
+      }
+      v_be_project_synthese_kpi: {
+        Row: {
+          be_project_id: string | null
+          ca_constate_brut: number | null
+          ca_engage_brut: number | null
+          code_projet: string | null
+          cogs_constate_brut: number | null
+          cogs_engage_brut: number | null
+          cout_rh_budgete: number | null
+          cout_rh_declare: number | null
+          cout_rh_planifie: number | null
+          jours_budgetes: number | null
+          jours_declares: number | null
+          jours_planifies: number | null
+          marge_brute_brut: number | null
+          marge_constatee_brut: number | null
+          marge_directe_brut: number | null
+          nb_affaires: number | null
+          nb_commandes: number | null
+          nb_factures: number | null
+          nom_projet: string | null
+          status: string | null
+        }
+        Relationships: []
+      }
+      v_be_temps_detail_mensuel: {
+        Row: {
+          affaire_libelle: string | null
+          be_affaire_id: string | null
+          be_project_id: string | null
+          code_affaire: string | null
+          cout_rh: number | null
+          heures: number | null
+          jours: number | null
+          mois: string | null
+          nb_saisies: number | null
+          poste: string | null
+          user_display_name: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "be_affaires_be_project_id_fkey"
+            columns: ["be_project_id"]
+            isOneToOne: false
+            referencedRelation: "be_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "be_affaires_be_project_id_fkey"
+            columns: ["be_project_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_project_budget_kpi"
+            referencedColumns: ["be_project_id"]
+          },
+          {
+            foreignKeyName: "be_affaires_be_project_id_fkey"
+            columns: ["be_project_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_project_synthese_kpi"
+            referencedColumns: ["be_project_id"]
+          },
+          {
+            foreignKeyName: "lucca_saisie_temps_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_it_budget_engage_constate: {
+        Row: {
+          annee: number | null
+          budget_line_id: string | null
+          categorie: string | null
+          constate: number | null
+          engage: number | null
+          entite: string | null
+          fournisseur_prevu: string | null
+          it_project_id: string | null
+          nb_commandes: number | null
+          nb_factures: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_budget_lines_it_project_id_fkey"
+            columns: ["it_project_id"]
+            isOneToOne: false
+            referencedRelation: "it_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
+      apply_supplier_waiting_validation: {
+        Args: { p_waiting_ids: string[] }
+        Returns: undefined
+      }
       calculate_supplier_completeness: {
         Args: {
           p_adresse_mail: string
@@ -8019,11 +8454,6 @@ export type Database = {
         Returns: boolean
       }
       cancel_request: { Args: { p_request_id: string }; Returns: undefined }
-      clean_planner_task_title: { Args: { p_title: string }; Returns: string }
-      cleanup_planner_duplicates_for_mapping: {
-        Args: { p_plan_mapping_id: string }
-        Returns: Json
-      }
       compute_next_recurrence: {
         Args: { p_current: string; p_interval: number; p_unit: string }
         Returns: string
@@ -8034,17 +8464,15 @@ export type Database = {
       }
       current_company_id: { Args: never; Returns: string }
       current_department_id: { Args: never; Returns: string }
+      current_profile_global_task_read: { Args: never; Returns: boolean }
       current_profile_id: { Args: never; Returns: string }
-      detect_planner_title_duplicates: {
-        Args: { p_plan_mapping_id: string }
-        Returns: {
-          clean_title: string
-          count: number
-          created_dates: string[]
-          task_ids: string[]
-          task_numbers: string[]
-          titles: string[]
-        }[]
+      current_profile_team_task_hierarchy_mutate: {
+        Args: never
+        Returns: boolean
+      }
+      current_profile_team_task_hierarchy_read: {
+        Args: never
+        Returns: boolean
       }
       emit_workflow_event: {
         Args: {
@@ -8163,13 +8591,44 @@ export type Database = {
         Returns: boolean
       }
       is_inno_admin: { Args: never; Returns: boolean }
-      merge_planner_title_duplicates: {
-        Args: { p_task_ids_to_delete: string[] }
-        Returns: Json
+      merge_it_projects: {
+        Args: { master_id: string; source_ids: string[] }
+        Returns: string
       }
       next_entity_number: {
         Args: { p_entity_type: string; p_project_code: string }
         Returns: string
+      }
+      profile_is_manager_ancestor_of: {
+        Args: {
+          _assignee_profile_id: string
+          _potential_manager_profile_id: string
+        }
+        Returns: boolean
+      }
+      promote_supplier_waiting_to_enrichment: {
+        Args: { p_waiting_ids: string[] }
+        Returns: {
+          attachments: Json
+          enrichment_id: string
+          former_waiting_id: string
+        }[]
+      }
+      register_supplier_famille_from_demand: {
+        Args: { p_famille: string }
+        Returns: undefined
+      }
+      reject_supplier_waiting: {
+        Args: { p_reason: string; p_waiting_id: string }
+        Returns: undefined
+      }
+      transfer_azure_identity: {
+        Args: {
+          p_from_user_id: string
+          p_microsoft_email: string
+          p_to_user_id: string
+        }
+        Returns: undefined
       }
     }
     Enums: {
@@ -8394,6 +8853,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       app_role: ["admin", "moderator", "user", "inno_admin", "codir"],
@@ -8504,3 +8966,4 @@ export const Constants = {
     },
   },
 } as const
+<claude-code-hint v="1" type="plugin" value="supabase@claude-plugins-official" />
