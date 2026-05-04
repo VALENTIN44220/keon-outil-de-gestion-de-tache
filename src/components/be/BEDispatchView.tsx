@@ -272,7 +272,7 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
       const { data, error } = await supabase
         .from('profiles')
         .select('id, display_name')
-        .eq('is_active', true)
+        .in('status', ['active', 'external'])
         .order('display_name');
       if (error) throw error;
       return (data as Profile[]) ?? [];
