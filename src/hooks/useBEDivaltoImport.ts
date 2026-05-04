@@ -46,26 +46,39 @@ interface ImportInput {
   codeProjetByAffaire: Record<string, string | null>;
 }
 
-interface ImportResult {
+export interface ImportResult {
   imported: string[];
-  skippedNoProject: string[];
+  /** Projets BE auto-créés à la volée (fiche minimale à compléter). */
+  createdProjects: string[];
+  /** Codes d'affaire sans code projet extractible (code_affaire trop court). */
+  skippedNoCode: string[];
   errors: { code: string; message: string }[];
 }
 
 /**
  * Importe en masse les affaires selectionnees.
- * - Skip celles dont le projet parent n'existe pas dans be_projects.
- * - Cree les be_affaires avec source_creation = 'import' et statut 'ouverte'.
+ *
+ * Si le projet parent (chars 2-5 du code) n'existe pas encore dans be_projects,
+ * il est AUTO-CRÉÉ avec une fiche minimale (code_projet + nom provisoire).
+ * L'utilisateur pourra compléter la fiche depuis la liste BE.
+ *
+ * Seules les affaires dont le code est trop court pour extraire un code projet
+ * sont réellement skippées.
  */
 export function useImportBEDivaltoAffaires() {
   const qc = useQueryClient();
 
   return useMutation({
     mutationFn: async (input: ImportInput): Promise<ImportResult> => {
-      const result: ImportResult = { imported: [], skippedNoProject: [], errors: [] };
+      const result: ImportResult = {
+        imported: [],
+        createdProjects: [],
+        skippedNoCode: [],
+        errors: [],
+      };
       if (input.codes.length === 0) return result;
 
-      // 1. Resoudre id des projets parents
+      // 1. Collecter les codes projets attendus
       const projetCodes = Array.from(
         new Set(
           input.codes
@@ -74,24 +87,57 @@ export function useImportBEDivaltoAffaires() {
         ),
       );
 
-      const { data: projects, error: projErr } = await sb
+      // 2. Résoudre les projets existants
+      const { data: existingProjects, error: projErr } = await sb
         .from('be_projects')
         .select('id, code_projet')
         .in('code_projet', projetCodes);
       if (projErr) throw projErr;
 
       const projetIdByCode = new Map<string, string>();
-      for (const p of (projects ?? []) as { id: string; code_projet: string }[]) {
+      for (const p of (existingProjects ?? []) as { id: string; code_projet: string }[]) {
         projetIdByCode.set(p.code_projet.toUpperCase(), p.id);
       }
 
-      // 2. Construire les rows a inserer (skip si pas de projet parent)
+      // 3. Auto-créer les projets manquants (fiche minimale, à compléter)
+      const missingProjetCodes = projetCodes.filter(
+        (c) => !projetIdByCode.has(c.toUpperCase()),
+      );
+
+      if (missingProjetCodes.length > 0) {
+        const newProjectRows = missingProjetCodes.map((cp) => ({
+          code_projet: cp.toUpperCase(),
+          // Nom provisoire : l'utilisateur le complètera depuis la liste BE
+          nom_projet: `[À compléter] ${cp.toUpperCase()}`,
+          status: 'active',
+        }));
+
+        const { data: created, error: createErr } = await sb
+          .from('be_projects')
+          .insert(newProjectRows)
+          .select('id, code_projet');
+
+        if (createErr) throw createErr;
+
+        for (const p of (created ?? []) as { id: string; code_projet: string }[]) {
+          projetIdByCode.set(p.code_projet.toUpperCase(), p.id);
+          result.createdProjects.push(p.code_projet);
+        }
+      }
+
+      // 4. Construire les rows be_affaires
       const rows: any[] = [];
       for (const code of input.codes) {
         const codeProjet = input.codeProjetByAffaire[code];
-        const beProjectId = codeProjet ? projetIdByCode.get(codeProjet.toUpperCase()) : undefined;
+        if (!codeProjet) {
+          // Code affaire trop court pour extraire un code projet
+          result.skippedNoCode.push(code);
+          continue;
+        }
+        const beProjectId = projetIdByCode.get(codeProjet.toUpperCase());
         if (!beProjectId) {
-          result.skippedNoProject.push(code);
+          // Ne devrait pas arriver après l'auto-création, mais sécurité
+          result.skippedNoCode.push(code);
           continue;
         }
         rows.push({
@@ -105,22 +151,20 @@ export function useImportBEDivaltoAffaires() {
 
       if (rows.length === 0) return result;
 
-      // 3. Insert (gere conflits sur code_affaire UNIQUE par doublon eventuel)
+      // 5. Insert be_affaires
       const { data: inserted, error: insErr } = await sb
         .from('be_affaires')
         .insert(rows)
         .select('code_affaire');
-      if (insErr) {
-        // En cas d'erreur globale, on remonte tout
-        throw insErr;
-      }
-      result.imported = (inserted ?? []).map((r: any) => r.code_affaire as string);
+      if (insErr) throw insErr;
 
+      result.imported = (inserted ?? []).map((r: any) => r.code_affaire as string);
       return result;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['be-divalto-affaires-to-import'] });
       qc.invalidateQueries({ queryKey: ['be-affaires'] });
+      qc.invalidateQueries({ queryKey: ['be-projects'] });
     },
   });
 }

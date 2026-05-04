@@ -24,6 +24,7 @@ import {
   Loader2,
   Filter,
   Layers,
+  PlusCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
@@ -43,7 +44,7 @@ export default function BEAdminDivaltoImport() {
   const importMut = useImportBEDivaltoAffaires();
 
   const [search, setSearch] = useState('');
-  const [hideOrphans, setHideOrphans] = useState(true);
+  const [hideOrphans, setHideOrphans] = useState(false);
   const [hideZeroAmount, setHideZeroAmount] = useState(true);
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
   const [selectedCodes, setSelectedCodes] = useState<Set<string>>(new Set());
@@ -130,14 +131,20 @@ export default function BEAdminDivaltoImport() {
     try {
       const res = await importMut.mutateAsync({ codes, libelleByCode, codeProjetByAffaire });
       const importedCount = res.imported.length;
-      const skippedCount = res.skippedNoProject.length;
+      const createdCount = res.createdProjects.length;
+      const skippedCount = res.skippedNoCode.length;
+
+      const parts: string[] = [];
+      if (importedCount > 0)
+        parts.push(`${importedCount} affaire${importedCount > 1 ? 's' : ''} importée${importedCount > 1 ? 's' : ''}`);
+      if (createdCount > 0)
+        parts.push(`${createdCount} projet${createdCount > 1 ? 's' : ''} créé${createdCount > 1 ? 's' : ''} automatiquement (à compléter)`);
+      if (skippedCount > 0)
+        parts.push(`${skippedCount} ignorée${skippedCount > 1 ? 's' : ''} (code trop court)`);
+
       toast({
-        title: `Import termine`,
-        description:
-          `${importedCount} affaire${importedCount > 1 ? 's' : ''} importee${importedCount > 1 ? 's' : ''}` +
-          (skippedCount > 0
-            ? `, ${skippedCount} skippee${skippedCount > 1 ? 's' : ''} (projet parent manquant)`
-            : ''),
+        title: 'Import terminé',
+        description: parts.join(' · ') || 'Aucune affaire importée',
       });
       // Reset selection des codes importes
       setSelectedCodes((prev) => {
@@ -164,7 +171,20 @@ export default function BEAdminDivaltoImport() {
     }
     return n;
   }, [selectedCodes, rows]);
-  const totalSelectedSkipped = totalSelected - totalSelectedWithProject;
+  const totalSelectedNewProject = totalSelected - totalSelectedWithProject;
+
+  // Nombre de projets à créer (uniques) parmi la sélection
+  const newProjectCodesInSelection = useMemo(() => {
+    const byCode = new Map(rows.map((r) => [r.code_affaire, r]));
+    const codes = new Set<string>();
+    for (const c of selectedCodes) {
+      const r = byCode.get(c);
+      if (r && !r.parent_project_exists && r.code_projet_parent) {
+        codes.add(r.code_projet_parent);
+      }
+    }
+    return codes;
+  }, [selectedCodes, rows]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-muted/20">
@@ -200,8 +220,12 @@ export default function BEAdminDivaltoImport() {
               label="Selectionnees"
               value={totalSelected}
               accent={totalSelected > 0 ? 'emerald' : undefined}
-              hint={totalSelectedSkipped > 0 ? `${totalSelectedSkipped} sans projet parent` : undefined}
-              hintIcon={totalSelectedSkipped > 0 ? <AlertTriangle className="h-3 w-3" /> : null}
+              hint={
+                newProjectCodesInSelection.size > 0
+                  ? `${newProjectCodesInSelection.size} projet${newProjectCodesInSelection.size > 1 ? 's' : ''} à créer`
+                  : undefined
+              }
+              hintIcon={newProjectCodesInSelection.size > 0 ? <PlusCircle className="h-3 w-3 text-blue-500" /> : null}
             />
             <KpiCard
               label="Categories detectees"
@@ -251,7 +275,7 @@ export default function BEAdminDivaltoImport() {
 
               <label className="flex items-center gap-1.5 text-xs cursor-pointer">
                 <Checkbox checked={hideOrphans} onCheckedChange={(v) => setHideOrphans(!!v)} />
-                Masquer si projet parent absent
+                Masquer si projet parent inconnu
               </label>
 
               <label className="flex items-center gap-1.5 text-xs cursor-pointer">
@@ -296,7 +320,7 @@ export default function BEAdminDivaltoImport() {
                   ) : (
                     <Upload className="h-4 w-4" />
                   )}
-                  Importer {totalSelectedWithProject > 0 ? `(${totalSelectedWithProject})` : ''}
+                  Importer {totalSelected > 0 ? `(${totalSelected})` : ''}
                 </Button>
               </CardContent>
             </Card>
@@ -369,8 +393,13 @@ export default function BEAdminDivaltoImport() {
                             <div className="flex items-center gap-1.5">
                               <code className="text-xs font-mono">{r.code_projet_parent}</code>
                               {noParent ? (
-                                <Badge variant="outline" className="text-[9px] h-4 px-1 border-amber-500/40 text-amber-600">
-                                  manquant
+                                <Badge
+                                  variant="outline"
+                                  className="text-[9px] h-4 px-1 border-blue-400/50 text-blue-600 bg-blue-50 dark:bg-blue-900/20"
+                                  title="Le projet n'existe pas encore — il sera créé automatiquement à l'import"
+                                >
+                                  <PlusCircle className="h-2.5 w-2.5 mr-0.5" />
+                                  à créer
                                 </Badge>
                               ) : (
                                 <CheckCircle2 className="h-3 w-3 text-emerald-600" />
@@ -395,17 +424,19 @@ export default function BEAdminDivaltoImport() {
             </div>
           )}
 
-          {totalSelectedSkipped > 0 && (
-            <Card className="border-amber-500/30 bg-amber-500/5">
+          {newProjectCodesInSelection.size > 0 && (
+            <Card className="border-blue-400/30 bg-blue-50/50 dark:bg-blue-900/10">
               <CardContent className="p-3 text-xs flex items-start gap-2">
-                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                <PlusCircle className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-medium text-amber-700">
-                    {totalSelectedSkipped} affaire{totalSelectedSkipped > 1 ? 's' : ''} sera{totalSelectedSkipped > 1 ? 'ont' : ''} skippée{totalSelectedSkipped > 1 ? 's' : ''} a l'import
+                  <p className="font-medium text-blue-700 dark:text-blue-400">
+                    {newProjectCodesInSelection.size} fiche{newProjectCodesInSelection.size > 1 ? 's' : ''} projet sera{newProjectCodesInSelection.size > 1 ? 'ont' : ''} créée{newProjectCodesInSelection.size > 1 ? 's' : ''} automatiquement :
+                    {' '}<span className="font-mono">{[...newProjectCodesInSelection].join(', ')}</span>
                   </p>
                   <p className="text-muted-foreground mt-0.5">
-                    Le projet parent (chars 2-5 du code) n'existe pas encore dans <code className="font-mono">be_projects</code>.
-                    Crée d'abord le projet depuis la <Link to="/projects" className="underline hover:text-foreground">liste BE</Link>, puis relance l'import.
+                    Ces projets n'existent pas encore dans la liste BE. Une fiche minimale sera générée avec le nom provisoire
+                    <code className="font-mono mx-1">[À compléter] CODE</code>.
+                    Complétez-les depuis la <Link to="/projects" className="underline hover:text-foreground">liste Bureau d'études</Link>.
                   </p>
                 </div>
               </CardContent>
