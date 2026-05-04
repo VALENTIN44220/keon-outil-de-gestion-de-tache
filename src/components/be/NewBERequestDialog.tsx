@@ -2,11 +2,13 @@
  * NewBERequestDialog — Wizard 4 étapes pour créer une demande Bureau d'Études.
  *
  * Étape 1 : Sélection projet BE + affaire optionnelle
- * Étape 2 : Multi-sélection des prestations (groupées par catégorie)
+ * Étape 2 : Multi-sélection des PRESTATIONS (groupées par catégorie)
+ *           → une prestation = toutes ses sous-étapes (ex: "ICPE Déclaration" = 6 étapes)
  * Étape 3 : Niveau d'urgence
  * Étape 4 : Récapitulatif + soumission
  *
- * Crée : 1 tâche parent (type='request') + N tâches enfant (type='task', une par prestation).
+ * Crée : 1 tâche parent (type='request') + N tâches enfant (type='task',
+ *        une par SOUS-ÉTAPE des prestations sélectionnées).
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -38,6 +40,7 @@ import {
   Loader2,
   FolderOpen,
   ClipboardList,
+  Layers,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -52,14 +55,26 @@ const BE_PROCESS_TEMPLATE_ID = 'bd75a3b0-c918-4b43-befe-739b83f7461a';
 
 const STEPS = ['Projet & Affaire', 'Prestations', 'Urgence', 'Récapitulatif'] as const;
 
-// ─── Types locaux ────────────────────────────────────────────────────────────
+// ─── Types ───────────────────────────────────────────────────────────────────
 
-interface Prestation {
+/** Une sous-étape individuelle dans sub_process_templates */
+interface SubStep {
   id: string;
   name: string;
   description: string | null;
   be_category: 'be' | 'be_reglementaire' | null;
   order_index: number | null;
+}
+
+/**
+ * Un groupe de sous-étapes correspondant à une prestation complète.
+ * Exemple : "ICPE Déclaration" avec ses 6 étapes.
+ */
+interface PrestationGroup {
+  /** Nom de la prestation (partie avant " — ") */
+  groupName: string;
+  be_category: 'be' | 'be_reglementaire' | null;
+  steps: SubStep[];
 }
 
 type BEUrgency = 'normal' | 'urgent' | 'critique';
@@ -69,24 +84,23 @@ type BEUrgency = 'normal' | 'urgent' | 'critique';
 interface NewBERequestDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Pré-sélectionner un projet (depuis BEProjectHubOverview par ex.) */
   defaultProjectId?: string;
-  /** Pré-sélectionner une affaire */
   defaultAffaireId?: string;
-  /** Callback après création réussie */
   onCreated?: (requestId: string) => void;
 }
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const sb = supabase as any;
 
-function categoryLabel(cat: string) {
-  return cat === 'be_reglementaire' ? 'Réglementaire' : "Bureau d'Études";
+/** Extrait le nom de la prestation depuis "Prestation — Sous-étape" */
+function extractGroupName(name: string): string {
+  const sep = name.indexOf(' — ');
+  return sep !== -1 ? name.slice(0, sep).trim() : name.trim();
 }
 
-function categoryColor(cat: string) {
-  return cat === 'be_reglementaire' ? 'amber' : 'blue';
+function categoryLabel(cat: string | null) {
+  return cat === 'be_reglementaire' ? 'Réglementaire' : "Bureau d'Études";
 }
 
 const URGENCY_OPTIONS = [
@@ -139,9 +153,11 @@ export function NewBERequestDialog({
   const [description, setDescription] = useState('');
 
   // ── Étape 2 : Prestations ─────────────────────────────────────────────────
-  const [prestations, setPrestations] = useState<Prestation[]>([]);
-  const [prestationsLoading, setPrestationsLoading] = useState(false);
-  const [selectedPrestationIds, setSelectedPrestationIds] = useState<Set<string>>(new Set());
+  /** Toutes les sous-étapes brutes depuis Supabase */
+  const [allSteps, setAllSteps] = useState<SubStep[]>([]);
+  const [stepsLoading, setStepsLoading] = useState(false);
+  /** Noms des prestations sélectionnées (ex: "ICPE Déclaration") */
+  const [selectedGroupNames, setSelectedGroupNames] = useState<Set<string>>(new Set());
 
   // ── Étape 3 : Urgence ─────────────────────────────────────────────────────
   const [urgency, setUrgency] = useState<BEUrgency>('normal');
@@ -152,7 +168,7 @@ export function NewBERequestDialog({
       setStep(0);
       setSelectedProjectId(defaultProjectId ?? null);
       setSelectedAffaireId(defaultAffaireId ?? null);
-      setSelectedPrestationIds(new Set());
+      setSelectedGroupNames(new Set());
       setUrgency('normal');
       setDescription('');
       setProjectSearch('');
@@ -188,10 +204,10 @@ export function NewBERequestDialog({
       .then(({ data }: any) => setAffaires(data ?? []));
   }, [selectedProjectId]);
 
-  // ── Chargement prestations (uniquement à l'étape 1 → 2) ──────────────────
+  // ── Chargement sous-étapes (à l'entrée sur l'étape 1) ────────────────────
   useEffect(() => {
     if (step !== 1) return;
-    setPrestationsLoading(true);
+    setStepsLoading(true);
     sb.from('sub_process_templates')
       .select('id,name,description,be_category,order_index')
       .eq('process_template_id', BE_PROCESS_TEMPLATE_ID)
@@ -199,30 +215,54 @@ export function NewBERequestDialog({
       .order('be_category')
       .order('order_index')
       .then(({ data }: any) => {
-        setPrestations(data ?? []);
-        setPrestationsLoading(false);
+        setAllSteps(data ?? []);
+        setStepsLoading(false);
       });
   }, [step]);
+
+  // ── Groupement des sous-étapes par prestation ─────────────────────────────
+  /**
+   * Groups : Map<groupName, PrestationGroup>
+   * Chaque groupe = une prestation visible dans la liste (une checkbox).
+   * Les sous-étapes sont conservées pour la création des tâches.
+   */
+  const prestationGroups = useMemo((): PrestationGroup[] => {
+    const map = new Map<string, PrestationGroup>();
+    for (const step of allSteps) {
+      const gName = extractGroupName(step.name);
+      if (!map.has(gName)) {
+        map.set(gName, {
+          groupName: gName,
+          be_category: step.be_category,
+          steps: [],
+        });
+      }
+      map.get(gName)!.steps.push(step);
+    }
+    return Array.from(map.values());
+  }, [allSteps]);
+
+  const groupsByCategory = useMemo(() => {
+    const cats: Record<string, PrestationGroup[]> = {};
+    for (const g of prestationGroups) {
+      const key = g.be_category ?? 'be';
+      if (!cats[key]) cats[key] = [];
+      cats[key].push(g);
+    }
+    return cats;
+  }, [prestationGroups]);
 
   // ── Données dérivées ──────────────────────────────────────────────────────
   const selectedProject = projects.find(p => p.id === selectedProjectId);
   const selectedAffaire = affaires.find(a => a.id === selectedAffaireId);
-  const selectedPrestations = prestations.filter(p => selectedPrestationIds.has(p.id));
-
-  const prestationsByCategory = useMemo(() => {
-    const groups: Record<string, Prestation[]> = {};
-    for (const p of prestations) {
-      const key = p.be_category ?? 'be';
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(p);
-    }
-    return groups;
-  }, [prestations]);
+  const selectedGroups = prestationGroups.filter(g => selectedGroupNames.has(g.groupName));
+  /** Toutes les sous-étapes à créer (toutes les étapes des groupes sélectionnés) */
+  const allSelectedSteps = selectedGroups.flatMap(g => g.steps);
 
   // ── Navigation ────────────────────────────────────────────────────────────
   const canNext = () => {
     if (step === 0) return !!selectedProjectId;
-    if (step === 1) return selectedPrestationIds.size > 0;
+    if (step === 1) return selectedGroupNames.size > 0;
     return true;
   };
 
@@ -232,9 +272,7 @@ export function NewBERequestDialog({
     setIsSubmitting(true);
 
     try {
-      const titleSuffix = selectedAffaire
-        ? selectedAffaire.code_affaire
-        : 'Sans affaire';
+      const titleSuffix = selectedAffaire?.code_affaire ?? 'Sans affaire';
       const title = selectedProject
         ? `BE — ${selectedProject.code_projet} — ${titleSuffix}`
         : 'Demande BE';
@@ -261,9 +299,9 @@ export function NewBERequestDialog({
 
       if (reqError) throw reqError;
 
-      // 2. Tâches enfant (une par prestation)
-      const childInserts = selectedPrestations.map(p => ({
-        title: `${title} — ${p.name}`,
+      // 2. Tâches enfant (une par SOUS-ÉTAPE des prestations sélectionnées)
+      const childInserts = allSelectedSteps.map(s => ({
+        title: `${title} — ${s.name}`,
         type: 'task',
         status: 'todo',
         be_project_id: selectedProjectId,
@@ -273,7 +311,7 @@ export function NewBERequestDialog({
         user_id: user.id,
         requester_id: profile.id,
         parent_request_id: request.id,
-        sub_process_template_id: p.id,
+        sub_process_template_id: s.id,
         source_process_template_id: BE_PROCESS_TEMPLATE_ID,
         process_template_id: BE_PROCESS_TEMPLATE_ID,
       }));
@@ -282,7 +320,7 @@ export function NewBERequestDialog({
       if (childError) throw childError;
 
       toast.success(
-        `Demande BE créée avec ${selectedPrestations.length} prestation(s)`,
+        `Demande créée : ${selectedGroups.length} prestation(s), ${allSelectedSteps.length} tâche(s)`,
       );
       onCreated?.(request.id);
       onOpenChange(false);
@@ -294,7 +332,7 @@ export function NewBERequestDialog({
     }
   };
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col gap-0 p-0">
@@ -341,7 +379,6 @@ export function NewBERequestDialog({
             {/* ── ÉTAPE 0 : PROJET & AFFAIRE ──────────────────────────── */}
             {step === 0 && (
               <>
-                {/* Recherche projet */}
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2 font-medium">
                     <FolderOpen className="h-4 w-4" />
@@ -466,83 +503,79 @@ export function NewBERequestDialog({
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <p className="text-sm text-muted-foreground">
-                    Sélectionnez les prestations à inclure dans cette demande.
+                    Sélectionnez les prestations à commander.
+                    <br />
+                    <span className="text-xs">Toutes les sous-étapes de la prestation seront créées automatiquement.</span>
                   </p>
-                  {selectedPrestationIds.size > 0 && (
-                    <Badge className="shrink-0">{selectedPrestationIds.size} sélectionnée(s)</Badge>
+                  {selectedGroupNames.size > 0 && (
+                    <Badge className="shrink-0">{selectedGroupNames.size} prestation(s)</Badge>
                   )}
                 </div>
 
-                {prestationsLoading ? (
+                {stepsLoading ? (
                   <div className="space-y-2">
-                    {[...Array(5)].map((_, i) => (
-                      <Skeleton key={i} className="h-14" />
-                    ))}
+                    {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-14" />)}
                   </div>
                 ) : (
-                  Object.entries(prestationsByCategory).map(([cat, prests]) => (
+                  Object.entries(groupsByCategory).map(([cat, groups]) => (
                     <div key={cat} className="space-y-1">
                       {/* Séparateur de catégorie */}
                       <div className="flex items-center gap-2 mb-2">
-                        <div
-                          className={cn(
-                            'h-0.5 flex-1 rounded',
-                            cat === 'be_reglementaire' ? 'bg-amber-300' : 'bg-blue-300',
-                          )}
-                        />
-                        <span
-                          className={cn(
-                            'text-xs font-semibold uppercase tracking-wide px-2',
-                            cat === 'be_reglementaire'
-                              ? 'text-amber-600 dark:text-amber-400'
-                              : 'text-blue-600 dark:text-blue-400',
-                          )}
-                        >
+                        <div className={cn(
+                          'h-0.5 flex-1 rounded',
+                          cat === 'be_reglementaire' ? 'bg-amber-300' : 'bg-blue-300',
+                        )} />
+                        <span className={cn(
+                          'text-xs font-semibold uppercase tracking-wide px-2',
+                          cat === 'be_reglementaire'
+                            ? 'text-amber-600 dark:text-amber-400'
+                            : 'text-blue-600 dark:text-blue-400',
+                        )}>
                           {categoryLabel(cat)}
                         </span>
-                        <div
-                          className={cn(
-                            'h-0.5 flex-1 rounded',
-                            cat === 'be_reglementaire' ? 'bg-amber-300' : 'bg-blue-300',
-                          )}
-                        />
+                        <div className={cn(
+                          'h-0.5 flex-1 rounded',
+                          cat === 'be_reglementaire' ? 'bg-amber-300' : 'bg-blue-300',
+                        )} />
                       </div>
 
                       <div className="space-y-1.5">
-                        {prests.map(p => (
-                          <label
-                            key={p.id}
-                            className={cn(
-                              'flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all hover:bg-muted/30',
-                              selectedPrestationIds.has(p.id)
-                                ? cat === 'be_reglementaire'
-                                  ? 'border-amber-400 bg-amber-50/50 dark:bg-amber-900/20'
-                                  : 'border-blue-400 bg-blue-50/50 dark:bg-blue-900/20'
-                                : 'border-border',
-                            )}
-                          >
-                            <Checkbox
-                              checked={selectedPrestationIds.has(p.id)}
-                              onCheckedChange={checked => {
-                                setSelectedPrestationIds(prev => {
-                                  const next = new Set(prev);
-                                  if (checked) next.add(p.id);
-                                  else next.delete(p.id);
-                                  return next;
-                                });
-                              }}
-                              className="mt-0.5 shrink-0"
-                            />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium leading-snug">{p.name}</p>
-                              {p.description && (
-                                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                                  {p.description}
-                                </p>
+                        {groups.map(g => {
+                          const isSelected = selectedGroupNames.has(g.groupName);
+                          return (
+                            <label
+                              key={g.groupName}
+                              className={cn(
+                                'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all hover:bg-muted/30',
+                                isSelected
+                                  ? cat === 'be_reglementaire'
+                                    ? 'border-amber-400 bg-amber-50/50 dark:bg-amber-900/20'
+                                    : 'border-blue-400 bg-blue-50/50 dark:bg-blue-900/20'
+                                  : 'border-border',
                               )}
-                            </div>
-                          </label>
-                        ))}
+                            >
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={checked => {
+                                  setSelectedGroupNames(prev => {
+                                    const next = new Set(prev);
+                                    if (checked) next.add(g.groupName);
+                                    else next.delete(g.groupName);
+                                    return next;
+                                  });
+                                }}
+                                className="shrink-0"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium">{g.groupName}</p>
+                                <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                                  <Layers className="h-3 w-3" />
+                                  {g.steps.length} étape{g.steps.length > 1 ? 's' : ''}
+                                </p>
+                              </div>
+                            </label>
+                          );
+                        })}
                       </div>
                     </div>
                   ))
@@ -573,12 +606,7 @@ export function NewBERequestDialog({
                     >
                       <RadioGroupItem value={opt.value} className="shrink-0" />
                       <div>
-                        <p
-                          className={cn(
-                            'font-medium',
-                            urgency === opt.value && opt.textColor,
-                          )}
-                        >
+                        <p className={cn('font-medium', urgency === opt.value && opt.textColor)}>
                           {opt.label}
                         </p>
                         <p className="text-xs text-muted-foreground">{opt.desc}</p>
@@ -606,10 +634,7 @@ export function NewBERequestDialog({
                       </div>
                       {selectedAffaire ? (
                         <p className="text-sm text-muted-foreground mt-1">
-                          Affaire :{' '}
-                          <span className="font-mono font-medium">
-                            {selectedAffaire.code_affaire}
-                          </span>
+                          Affaire : <span className="font-mono font-medium">{selectedAffaire.code_affaire}</span>
                           {selectedAffaire.libelle && ` — ${selectedAffaire.libelle}`}
                         </p>
                       ) : (
@@ -620,64 +645,56 @@ export function NewBERequestDialog({
 
                   {/* Urgence */}
                   <div className="flex items-center gap-3 p-4">
-                    <AlertTriangle
-                      className={cn(
-                        'h-4 w-4 shrink-0',
-                        urgency === 'critique'
-                          ? 'text-red-500'
-                          : urgency === 'urgent'
-                          ? 'text-amber-500'
-                          : 'text-slate-400',
-                      )}
-                    />
+                    <AlertTriangle className={cn(
+                      'h-4 w-4 shrink-0',
+                      urgency === 'critique' ? 'text-red-500' :
+                      urgency === 'urgent' ? 'text-amber-500' : 'text-slate-400',
+                    )} />
                     <div>
                       <p className="text-xs text-muted-foreground mb-1">Urgence</p>
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          urgency === 'critique'
-                            ? 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/40 dark:text-red-400'
-                            : urgency === 'urgent'
-                            ? 'bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/40 dark:text-amber-400'
-                            : 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800 dark:text-slate-300',
-                        )}
-                      >
-                        {urgency === 'normal'
-                          ? 'Normal'
+                      <Badge variant="outline" className={cn(
+                        urgency === 'critique'
+                          ? 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900/40 dark:text-red-400'
                           : urgency === 'urgent'
-                          ? 'Urgent'
-                          : 'Critique'}
+                          ? 'bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/40 dark:text-amber-400'
+                          : 'bg-slate-100 text-slate-700 border-slate-300 dark:bg-slate-800',
+                      )}>
+                        {urgency === 'normal' ? 'Normal' : urgency === 'urgent' ? 'Urgent' : 'Critique'}
                       </Badge>
                     </div>
                   </div>
 
-                  {/* Prestations */}
+                  {/* Prestations sélectionnées */}
                   <div className="flex items-start gap-3 p-4">
                     <ClipboardList className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
                     <div className="flex-1">
                       <p className="text-xs text-muted-foreground mb-2">
-                        Prestations ({selectedPrestations.length})
+                        Prestations commandées ({selectedGroups.length})
+                        <span className="ml-2 text-muted-foreground/70">
+                          → {allSelectedSteps.length} tâche(s) au total
+                        </span>
                       </p>
-                      <div className="space-y-1.5">
-                        {selectedPrestations.map(p => (
-                          <div key={p.id} className="flex items-center gap-2">
-                            <Check className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                            <span className="text-sm">{p.name}</span>
-                            {p.be_category === 'be_reglementaire' && (
-                              <Badge
-                                variant="outline"
-                                className="text-[10px] px-1 py-0 text-amber-600 border-amber-300 dark:text-amber-400"
-                              >
-                                Régl.
-                              </Badge>
-                            )}
+                      <div className="space-y-2">
+                        {selectedGroups.map(g => (
+                          <div key={g.groupName} className="flex items-start gap-2">
+                            <Check className="h-3.5 w-3.5 text-emerald-500 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="text-sm font-medium">{g.groupName}</span>
+                              <span className="text-xs text-muted-foreground ml-2">
+                                ({g.steps.length} étape{g.steps.length > 1 ? 's' : ''})
+                              </span>
+                              {g.be_category === 'be_reglementaire' && (
+                                <Badge variant="outline" className="ml-2 text-[10px] px-1 py-0 text-amber-600 border-amber-300">
+                                  Régl.
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>
                     </div>
                   </div>
 
-                  {/* Description */}
                   {description.trim() && (
                     <div className="p-4">
                       <p className="text-xs text-muted-foreground mb-1">Description</p>
@@ -685,12 +702,6 @@ export function NewBERequestDialog({
                     </div>
                   )}
                 </div>
-
-                <p className="text-xs text-muted-foreground text-center">
-                  Cela créera{' '}
-                  <strong>1 demande</strong> + {selectedPrestations.length}{' '}
-                  tâche(s) enfant
-                </p>
               </div>
             )}
           </div>
@@ -700,9 +711,7 @@ export function NewBERequestDialog({
         <DialogFooter className="flex-row items-center gap-2 px-6 py-4 border-t">
           <Button
             variant="outline"
-            onClick={() =>
-              step > 0 ? setStep(s => s - 1) : onOpenChange(false)
-            }
+            onClick={() => step > 0 ? setStep(s => s - 1) : onOpenChange(false)}
             disabled={isSubmitting}
             className="flex items-center gap-1"
           >
@@ -724,19 +733,13 @@ export function NewBERequestDialog({
           ) : (
             <Button
               onClick={handleSubmit}
-              disabled={isSubmitting || !selectedProjectId || selectedPrestationIds.size === 0}
+              disabled={isSubmitting || !selectedProjectId || selectedGroupNames.size === 0}
               className="flex items-center gap-2"
             >
               {isSubmitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Création…
-                </>
+                <><Loader2 className="h-4 w-4 animate-spin" />Création…</>
               ) : (
-                <>
-                  <Zap className="h-4 w-4" />
-                  Créer la demande
-                </>
+                <><Zap className="h-4 w-4" />Créer la demande</>
               )}
             </Button>
           )}
