@@ -4,7 +4,7 @@ import { BEProject } from '@/types/beProject';
 import { Task } from '@/types/task';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { 
+import {
   ArrowLeft,
   LayoutDashboard,
   Calendar,
@@ -19,7 +19,8 @@ import {
   Pencil,
   ClipboardList,
   BarChart3,
-  Wallet
+  Wallet,
+  Plus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useQuestionnaireProjectData } from '@/hooks/useQuestionnaireProjectData';
@@ -34,6 +35,7 @@ interface BEProjectHubHeaderProps {
     progress: number;
   };
   onEditProject?: () => void;
+  onNewBERequest?: () => void;
 }
 
 const statusLabels: Record<string, { label: string; className: string }> = {
@@ -53,7 +55,7 @@ const baseNavItems = [
   { value: 'files', label: 'Fichiers', icon: Paperclip },
 ];
 
-export function BEProjectHubHeader({ project, stats, onEditProject }: BEProjectHubHeaderProps) {
+export function BEProjectHubHeader({ project, stats, onEditProject, onNewBERequest }: BEProjectHubHeaderProps) {
   const projectsArray = useMemo(() => [project], [project]);
   const { keonProjectIds } = useQuestionnaireProjectData(projectsArray);
   const isKeonProject = keonProjectIds.has(project.id);
@@ -116,6 +118,16 @@ export function BEProjectHubHeader({ project, stats, onEditProject }: BEProjectH
               <Badge className={cn('border shrink-0', statusConfig.className)}>
                 {statusConfig.label}
               </Badge>
+              {onNewBERequest && (
+                <Button
+                  size="sm"
+                  className="h-8 gap-1.5 shrink-0"
+                  onClick={onNewBERequest}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Nouvelle demande
+                </Button>
+              )}
               {onEditProject && (
                 <Button
                   variant="outline"

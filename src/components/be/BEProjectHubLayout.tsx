@@ -9,6 +9,7 @@ import { Building2, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { BEProjectHubHeader } from './BEProjectHubHeader';
 import { BEProjectDialog } from '@/components/projects/BEProjectDialog';
+import { NewBERequestDialog } from '@/components/be/NewBERequestDialog';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -24,6 +25,7 @@ export function BEProjectHubLayout({ children }: BEProjectHubLayoutProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [newRequestOpen, setNewRequestOpen] = useState(false);
   const isSpvContext = location.pathname.startsWith('/spv/projects/');
   const sidebarView = isSpvContext ? 'spv' : 'projects';
   const projectsListPath = isSpvContext ? '/spv' : '/projects';
@@ -108,10 +110,11 @@ export function BEProjectHubLayout({ children }: BEProjectHubLayoutProps) {
       <Sidebar activeView={sidebarView} onViewChange={() => {}} />
       
       <main className="flex-1 flex flex-col min-w-0">
-        <BEProjectHubHeader 
-          project={project} 
-          stats={stats} 
-          onEditProject={() => setEditDialogOpen(true)} 
+        <BEProjectHubHeader
+          project={project}
+          stats={stats}
+          onEditProject={() => setEditDialogOpen(true)}
+          onNewBERequest={() => setNewRequestOpen(true)}
         />
 
         {/* Content */}
@@ -125,6 +128,17 @@ export function BEProjectHubLayout({ children }: BEProjectHubLayoutProps) {
         onClose={() => setEditDialogOpen(false)}
         project={project}
         onSave={handleSaveProject}
+      />
+
+      <NewBERequestDialog
+        open={newRequestOpen}
+        onOpenChange={setNewRequestOpen}
+        defaultProjectId={project.id}
+        onCreated={() => {
+          queryClient.invalidateQueries({ queryKey: ['be-project-tasks', project.id] });
+          queryClient.invalidateQueries({ queryKey: ['be-dispatch-tasks', project.id] });
+          queryClient.invalidateQueries({ queryKey: ['be-dispatch-requests', project.id] });
+        }}
       />
     </div>
   );
