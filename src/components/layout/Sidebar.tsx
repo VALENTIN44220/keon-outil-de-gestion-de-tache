@@ -1,5 +1,5 @@
 import React, { Fragment, useState, useEffect, useMemo } from 'react';
-import { LayoutDashboard, BarChart3, ChevronLeft, ChevronRight, Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText, ArrowLeftRight, Calendar, MessageCircle, Building2, ClipboardList, Lightbulb, Monitor, Leaf, Euro, Map as MapIcon, Users, Wallet, BarChart2 } from 'lucide-react';
+import { LayoutDashboard, BarChart3, ChevronLeft, ChevronRight, ChevronDown, Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText, ArrowLeftRight, Calendar, MessageCircle, Building2, ClipboardList, Lightbulb, Monitor, Leaf, Euro, Map as MapIcon, Users, Wallet, BarChart2 } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
 import { useAuth } from '@/contexts/AuthContext';
@@ -309,6 +309,29 @@ export function Sidebar({
     const saved = localStorage.getItem('sidebar-position');
     return saved === 'right';
   });
+  // Sections repliées par l'utilisateur (persistées). Une section reste dépliée
+  // automatiquement si elle contient la page active (cf. derivedActiveView ci-dessous).
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('sidebar-collapsed-sections');
+      if (!saved) return new Set();
+      const arr = JSON.parse(saved);
+      return new Set(Array.isArray(arr) ? arr : []);
+    } catch {
+      return new Set();
+    }
+  });
+  const toggleSection = (label: string) => {
+    setCollapsedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      try {
+        localStorage.setItem('sidebar-collapsed-sections', JSON.stringify([...next]));
+      } catch { /* ignore */ }
+      return next;
+    });
+  };
   const navigate = useNavigate();
   const location = useLocation();
   const { isAdmin } = useUserRole();
@@ -397,6 +420,27 @@ export function Sidebar({
   }, [location.pathname, filteredGroups, activeView]);
 
   const collapsed = !isMobile && manualCollapsed;
+
+  // Section contenant la page active : on la force dépliée pour garder
+  // l'item courant visible même si l'utilisateur l'avait repliée précédemment.
+  const activeSectionLabel = useMemo(() => {
+    for (const g of filteredGroups) {
+      if (!g.label) continue;
+      const has = g.items.some(
+        (it) =>
+          it.id === derivedActiveView ||
+          (it.children?.some((c) => c.id === derivedActiveView) ?? false),
+      );
+      if (has) return g.label;
+    }
+    return null;
+  }, [filteredGroups, derivedActiveView]);
+
+  const isSectionExpanded = (label: string | undefined) => {
+    if (!label) return true; // Section sans label = toujours visible
+    if (label === activeSectionLabel) return true; // auto-expand
+    return !collapsedSections.has(label);
+  };
 
   useEffect(() => {
     if (!isMobile) {
@@ -524,39 +568,48 @@ export function Sidebar({
                   </div>
                 )}
                 {group.label && (
-                  <div className="px-3 pt-2 pb-1">
+                  <button
+                    type="button"
+                    onClick={() => toggleSection(group.label!)}
+                    className="w-full flex items-center justify-between px-3 pt-2 pb-1 hover:opacity-80 transition-opacity"
+                  >
                     <span className="text-[10px] font-semibold tracking-widest uppercase text-muted-foreground/60">{group.label}</span>
-                  </div>
+                    {isSectionExpanded(group.label)
+                      ? <ChevronDown className="h-3 w-3 text-muted-foreground/40" />
+                      : <ChevronRight className="h-3 w-3 text-muted-foreground/40" />}
+                  </button>
                 )}
-                <div className="space-y-0.5">
-                  {group.items.map((item) => (
-                    <Fragment key={item.id}>
-                      <SidebarNavRow
-                        item={item}
-                        groupLabel={group.label}
-                        isSubItem={false}
-                        derivedActiveView={derivedActiveView}
-                        collapsed={false}
-                        isMobile
-                        onMenuClick={handleMenuClick}
-                        pendingValidationCount={pendingValidationCount}
-                      />
-                      {item.children?.map((child) => (
+                {isSectionExpanded(group.label) && (
+                  <div className="space-y-0.5">
+                    {group.items.map((item) => (
+                      <Fragment key={item.id}>
                         <SidebarNavRow
-                          key={child.id}
-                          item={child}
+                          item={item}
                           groupLabel={group.label}
-                          isSubItem
+                          isSubItem={false}
                           derivedActiveView={derivedActiveView}
                           collapsed={false}
                           isMobile
                           onMenuClick={handleMenuClick}
                           pendingValidationCount={pendingValidationCount}
                         />
-                      ))}
-                    </Fragment>
-                  ))}
-                </div>
+                        {item.children?.map((child) => (
+                          <SidebarNavRow
+                            key={child.id}
+                            item={child}
+                            groupLabel={group.label}
+                            isSubItem
+                            derivedActiveView={derivedActiveView}
+                            collapsed={false}
+                            isMobile
+                            onMenuClick={handleMenuClick}
+                            pendingValidationCount={pendingValidationCount}
+                          />
+                        ))}
+                      </Fragment>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </nav>
@@ -663,10 +716,20 @@ export function Sidebar({
               </div>
             )}
             {group.label && !collapsed && (
-              <div className="px-3 pt-2 pb-1">
+              <button
+                type="button"
+                onClick={() => toggleSection(group.label!)}
+                className="w-full flex items-center justify-between px-3 pt-2 pb-1 hover:opacity-80 transition-opacity"
+              >
                 <span className="text-[10px] font-semibold tracking-widest uppercase text-muted-foreground/60">{group.label}</span>
-              </div>
+                {isSectionExpanded(group.label)
+                  ? <ChevronDown className="h-3 w-3 text-muted-foreground/40" />
+                  : <ChevronRight className="h-3 w-3 text-muted-foreground/40" />}
+              </button>
             )}
+            {/* Quand la sidebar entière est repliée (icônes seules) on garde la liste visible
+                pour ne pas masquer les icônes ; sinon on respecte l'état utilisateur. */}
+            {(collapsed || isSectionExpanded(group.label)) && (
             <div className="space-y-0.5">
               {group.items.map((item) => (
                 <Fragment key={item.id}>
@@ -696,6 +759,7 @@ export function Sidebar({
                 </Fragment>
               ))}
             </div>
+            )}
           </div>
         ))}
       </nav>
