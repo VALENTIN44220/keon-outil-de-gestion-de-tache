@@ -32,6 +32,7 @@ import {
 import {
   useBEProfilesPostes,
   useUpdateProfileBEPoste,
+  useUpdateProfileBEFonction,
 } from '@/hooks/useBEProfilesPostes';
 import {
   BE_POSTES,
@@ -75,6 +76,7 @@ export default function BEAdminTJM() {
   };
   const { data: profiles = [], isLoading: profilesLoading } = useBEProfilesPostes();
   const updateProfilePoste = useUpdateProfileBEPoste();
+  const updateProfileFonction = useUpdateProfileBEFonction();
 
   // ── État édition TJM ───────────────────────────────────────────────────
   const [editingTjm, setEditingTjm] = useState<Record<BEPoste, string>>({} as any);
@@ -142,6 +144,16 @@ export default function BEAdminTJM() {
     try {
       await updateProfilePoste.mutateAsync({ profileId, bePoste: newPoste });
       toast({ title: 'Poste mis à jour' });
+    } catch (e) {
+      toast({ title: 'Erreur', description: extractErrorMessage(e), variant: 'destructive' });
+    }
+  };
+
+  const handleFonctionChange = async (profileId: string, value: string) => {
+    const newFonction = value === 'none' ? null : value;
+    try {
+      await updateProfileFonction.mutateAsync({ profileId, beFonction: newFonction });
+      toast({ title: 'Fonction BE mise à jour' });
     } catch (e) {
       toast({ title: 'Erreur', description: extractErrorMessage(e), variant: 'destructive' });
     }
@@ -420,10 +432,17 @@ export default function BEAdminTJM() {
                   <TableHeader>
                     <TableRow className="bg-muted/30 hover:bg-muted/30">
                       <TableHead>Collaborateur</TableHead>
-                      <TableHead>Fonction</TableHead>
+                      <TableHead>Fonction Lucca</TableHead>
                       <TableHead>Département</TableHead>
-                      <TableHead className="text-right">Saisies Lucca</TableHead>
-                      <TableHead className="w-[220px]">Poste BE</TableHead>
+                      <TableHead className="text-right">Saisies</TableHead>
+                      <TableHead className="w-[210px]">
+                        Fonction BE
+                        <span className="block text-[10px] font-normal text-emerald-600">taux horaire prioritaire</span>
+                      </TableHead>
+                      <TableHead className="w-[180px]">
+                        Poste BE
+                        <span className="block text-[10px] font-normal text-muted-foreground">fallback</span>
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -457,6 +476,33 @@ export default function BEAdminTJM() {
                             <span className="text-muted-foreground">—</span>
                           )}
                         </TableCell>
+                        {/* Fonction BE (prioritaire pour taux horaire) */}
+                        <TableCell>
+                          <Select
+                            value={p.be_fonction ?? 'none'}
+                            onValueChange={(v) => handleFonctionChange(p.id, v)}
+                          >
+                            <SelectTrigger
+                              className={cn(
+                                'h-8 text-xs',
+                                p.be_fonction
+                                  ? 'border-emerald-500/40 bg-emerald-500/5'
+                                  : 'border-border/50',
+                              )}
+                            >
+                              <SelectValue placeholder="— Non assigné" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">— Non assigné</SelectItem>
+                              {fonctions.map((fn) => (
+                                <SelectItem key={fn.fonction} value={fn.fonction}>
+                                  {fn.fonction}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        {/* Poste BE (fallback) */}
                         <TableCell>
                           <Select
                             value={p.be_poste ?? 'none'}
@@ -465,7 +511,8 @@ export default function BEAdminTJM() {
                             <SelectTrigger
                               className={cn(
                                 'h-8 text-xs',
-                                !p.be_poste && 'border-amber-500/40 bg-amber-500/5',
+                                !p.be_poste && !p.be_fonction && 'border-amber-500/40 bg-amber-500/5',
+                                p.be_fonction && 'opacity-50',
                               )}
                             >
                               <SelectValue />
