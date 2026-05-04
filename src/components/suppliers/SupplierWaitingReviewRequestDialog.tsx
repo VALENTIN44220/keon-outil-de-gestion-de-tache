@@ -14,31 +14,33 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, MessageSquarePlus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { useSupplierWaitingApprovalDetail } from '@/hooks/useSupplierWaitingApproval';
 
 interface ReviewField {
   key: string;
   label: string;
   section: string;
+  multiline?: boolean;
 }
 
 const REVIEW_FIELDS: ReviewField[] = [
   // Identification
-  { key: 'nomfournisseur',  label: 'Nom du fournisseur',                section: 'Identification' },
-  { key: 'entite',          label: 'Entité concernée',                  section: 'Identification' },
-  { key: 'famille',         label: 'Famille fournisseur',               section: 'Identification' },
-  { key: 'pays',            label: 'Pays',                              section: 'Identification' },
-  { key: 'siret',           label: 'N° identification (SIRET…)',        section: 'Identification' },
-  { key: 'tva',             label: 'N° TVA / identifiant fiscal',       section: 'Identification' },
+  { key: 'nomfournisseur',    label: 'Nom du fournisseur',                 section: 'Identification' },
+  { key: 'entite',            label: 'Entité concernée',                   section: 'Identification' },
+  { key: 'famille',           label: 'Famille fournisseur',                section: 'Identification' },
+  { key: 'pays',              label: 'Pays',                               section: 'Identification' },
+  { key: 'siret',             label: 'N° identification (SIRET…)',         section: 'Identification' },
+  { key: 'tva',               label: 'N° TVA / identifiant fiscal',        section: 'Identification' },
   // Informations commerciales
-  { key: 'commentaires',    label: 'Raison / description de la demande', section: 'Informations commerciales' },
-  { key: 'description',     label: 'Description du bien / service',     section: 'Informations commerciales' },
-  { key: 'delai_de_paiement', label: 'Délai de paiement',              section: 'Informations commerciales' },
-  { key: 'ca_estime',       label: 'CA annuel estimé (€)',              section: 'Informations commerciales' },
+  { key: 'commentaires',      label: 'Raison / description de la demande', section: 'Informations commerciales', multiline: true },
+  { key: 'description',       label: 'Description du bien / service',      section: 'Informations commerciales', multiline: true },
+  { key: 'delai_de_paiement', label: 'Délai de paiement',                 section: 'Informations commerciales' },
+  { key: 'ca_estime',         label: 'CA annuel estimé (€)',               section: 'Informations commerciales' },
   // Contact
-  { key: 'nom_contact',     label: 'Nom du contact',                   section: 'Contact fournisseur' },
-  { key: 'adresse_mail',    label: 'Email du contact',                 section: 'Contact fournisseur' },
-  { key: 'telephone',       label: 'Téléphone',                        section: 'Contact fournisseur' },
-  { key: 'poste',           label: 'Rôle / poste du contact',          section: 'Contact fournisseur' },
+  { key: 'nom_contact',       label: 'Nom du contact',                    section: 'Contact fournisseur' },
+  { key: 'adresse_mail',      label: 'Email du contact',                  section: 'Contact fournisseur' },
+  { key: 'telephone',         label: 'Téléphone',                         section: 'Contact fournisseur' },
+  { key: 'poste',             label: 'Rôle / poste du contact',           section: 'Contact fournisseur' },
 ];
 
 const SECTIONS = [...new Set(REVIEW_FIELDS.map((f) => f.section))];
@@ -55,6 +57,8 @@ export function SupplierWaitingReviewRequestDialog({ waitingId, supplierName, on
   const [submitting, setSubmitting] = useState(false);
   const open = !!waitingId;
 
+  const { data: supplierData, isLoading: loadingData } = useSupplierWaitingApprovalDetail(waitingId);
+
   const filledCount = Object.values(comments).filter((v) => v.trim()).length;
 
   const handleSubmit = async () => {
@@ -63,14 +67,13 @@ export function SupplierWaitingReviewRequestDialog({ waitingId, supplierName, on
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
-      // Supprimer les revues non résolues précédentes pour repartir propre
+      // Supprimer les revues non résolues précédentes
       await supabase
         .from('supplier_waiting_field_reviews')
         .delete()
         .eq('waiting_id', waitingId)
         .is('resolved_at', null);
 
-      // Insérer les nouvelles revues par champ
       const reviews = Object.entries(comments)
         .filter(([, v]) => v.trim())
         .map(([field_key, comment]) => ({
@@ -83,14 +86,12 @@ export function SupplierWaitingReviewRequestDialog({ waitingId, supplierName, on
       const { error: revErr } = await supabase.from('supplier_waiting_field_reviews').insert(reviews);
       if (revErr) throw revErr;
 
-      // Mettre à jour le statut
       const { error: updErr } = await supabase
         .from('supplier_waiting_approval')
         .update({ status: 'modifications_demandees' })
         .eq('id', waitingId);
       if (updErr) throw updErr;
 
-      // Notifier le demandeur
       const { data: row } = await supabase
         .from('supplier_waiting_approval')
         .select('submitted_by_user_id')
@@ -115,7 +116,7 @@ export function SupplierWaitingReviewRequestDialog({ waitingId, supplierName, on
       setComments({});
       onSubmitted();
     } catch (e: unknown) {
-      toast({ title: 'Erreur', description: e instanceof Error ? e.message : 'Impossible d\'envoyer', variant: 'destructive' });
+      toast({ title: 'Erreur', description: e instanceof Error ? e.message : "Impossible d'envoyer", variant: 'destructive' });
     } finally {
       setSubmitting(false);
     }
@@ -125,54 +126,92 @@ export function SupplierWaitingReviewRequestDialog({ waitingId, supplierName, on
     if (!o && !submitting) { setComments({}); onClose(); }
   };
 
+  const getFieldValue = (key: string): string => {
+    if (!supplierData) return '';
+    const v = (supplierData as Record<string, unknown>)[key];
+    if (v == null || v === '') return '';
+    return String(v);
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[560px] max-h-[85vh] flex flex-col gap-0 p-0">
-        <DialogHeader className="px-6 pt-6 pb-3 border-b shrink-0">
+      <DialogContent className="max-w-[92vw] sm:max-w-5xl max-h-[90vh] h-[90vh] flex flex-col gap-0 p-0 overflow-hidden">
+        <DialogHeader className="px-6 pt-5 pb-3 border-b shrink-0">
           <DialogTitle className="flex items-center gap-2 text-base">
             <MessageSquarePlus className="h-4 w-4 text-amber-600" />
-            Demander des modifications
+            Demander des modifications —{' '}
+            <span className="font-semibold truncate">{supplierName ?? 'ce fournisseur'}</span>
           </DialogTitle>
-          <DialogDescription className="text-left">
-            <span className="font-semibold text-foreground">{supplierName ?? 'Ce fournisseur'}</span>
-            {' '}— Ajoutez un commentaire sur les champs à corriger. Seuls les champs commentés seront envoyés.
+          <DialogDescription className="text-left text-xs">
+            Colonne gauche : valeurs actuelles. Colonne droite : votre commentaire (laissez vide pour ne pas signaler ce champ).
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 min-h-0 px-6 py-4">
-          <div className="space-y-6">
-            {SECTIONS.map((section) => (
-              <div key={section} className="space-y-3">
-                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b pb-1">
-                  {section}
-                </h3>
-                <div className="space-y-3">
-                  {REVIEW_FIELDS.filter((f) => f.section === section).map((field) => (
-                    <div key={field.key} className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">{field.label}</span>
-                        {comments[field.key]?.trim() && (
-                          <Badge variant="outline" className="text-[10px] text-amber-700 border-amber-400/50 py-0">
-                            commentaire ajouté
-                          </Badge>
-                        )}
-                      </div>
-                      <Textarea
-                        value={comments[field.key] ?? ''}
-                        onChange={(e) =>
-                          setComments((prev) => ({ ...prev, [field.key]: e.target.value }))
-                        }
-                        placeholder={`Commentaire sur « ${field.label} »…`}
-                        rows={2}
-                        disabled={submitting}
-                        className="resize-none text-sm"
-                      />
+        <ScrollArea className="flex-1 min-h-0">
+          {loadingData ? (
+            <div className="flex justify-center py-16">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <div className="px-6 py-4 space-y-8">
+              {SECTIONS.map((section) => (
+                <div key={section}>
+                  {/* En-tête de section sur toute la largeur */}
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b pb-1.5 mb-3">
+                    {section}
+                  </h3>
+
+                  {/* Grille 2 colonnes : valeur | commentaire */}
+                  <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                    {/* En-têtes colonnes */}
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                      Valeur actuelle
                     </div>
-                  ))}
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                      Commentaire (optionnel)
+                    </div>
+
+                    {REVIEW_FIELDS.filter((f) => f.section === section).map((field) => {
+                      const currentVal = getFieldValue(field.key);
+                      const hasComment = !!comments[field.key]?.trim();
+                      return (
+                        <>
+                          {/* Colonne gauche : label + valeur */}
+                          <div key={`val-${field.key}`} className="space-y-0.5 self-start pt-1">
+                            <p className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
+                              {field.label}
+                              {hasComment && (
+                                <Badge variant="outline" className="text-[10px] text-amber-700 border-amber-400/50 py-0 px-1.5">
+                                  à corriger
+                                </Badge>
+                              )}
+                            </p>
+                            <p className={`text-sm break-words ${currentVal ? '' : 'text-muted-foreground italic'}`}>
+                              {currentVal || 'Non renseigné'}
+                            </p>
+                          </div>
+
+                          {/* Colonne droite : textarea */}
+                          <div key={`comment-${field.key}`} className="self-start">
+                            <Textarea
+                              value={comments[field.key] ?? ''}
+                              onChange={(e) =>
+                                setComments((prev) => ({ ...prev, [field.key]: e.target.value }))
+                              }
+                              placeholder={`Commentaire sur ce champ…`}
+                              rows={field.multiline ? 3 : 2}
+                              disabled={submitting}
+                              className={`resize-none text-sm ${hasComment ? 'border-amber-400/70 focus-visible:ring-amber-400/50' : ''}`}
+                            />
+                          </div>
+                        </>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </ScrollArea>
 
         <DialogFooter className="px-6 py-4 border-t shrink-0 flex-row justify-between items-center gap-2">

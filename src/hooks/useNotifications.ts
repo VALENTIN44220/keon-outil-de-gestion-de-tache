@@ -1,71 +1,90 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { useMemo } from 'react';
+import { Task } from '@/types/task';
+import { differenceInDays, differenceInHours, parseISO, isBefore, startOfDay } from 'date-fns';
 
-export type Notification = {
+export interface TaskNotification {
   id: string;
-  title: string;
+  taskId: string;
+  taskTitle: string;
+  type: 'overdue' | 'due-today' | 'due-soon';
   message: string;
-  type: string;
-  related_entity_type: string | null;
-  related_entity_id: string | null;
-  read_at: string | null;
-  created_at: string;
-};
-
-export function useNotifications() {
-  const { user } = useAuth();
-
-  return useQuery({
-    queryKey: ['notifications', user?.id],
-    enabled: !!user?.id,
-    refetchInterval: 30_000,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('id,title,message,type,related_entity_type,related_entity_id,read_at,created_at')
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      if (error) throw error;
-      return (data ?? []) as Notification[];
-    },
-  });
+  priority: 'high' | 'medium' | 'low';
+  dueDate: string;
 }
 
-export function useMarkNotificationRead() {
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
+export function useNotifications(tasks: Task[]) {
+  const notifications = useMemo(() => {
+    const now = new Date();
+    const today = startOfDay(now);
+    const result: TaskNotification[] = [];
 
-  return useMutation({
-    mutationFn: async (notificationId: string) => {
-      const { error } = await supabase
-        .from('notifications')
-        .update({ read_at: new Date().toISOString() })
-        .eq('id', notificationId)
-        .is('read_at', null);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
-    },
-  });
-}
+    tasks.forEach((task) => {
+      // Skip completed tasks
+      if (task.status === 'done' || !task.due_date) return;
 
-export function useMarkAllNotificationsRead() {
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
+      const dueDate = parseISO(task.due_date);
+      const dueDateStart = startOfDay(dueDate);
+      const daysUntilDue = differenceInDays(dueDateStart, today);
+      const hoursUntilDue = differenceInHours(dueDate, now);
 
-  return useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase
-        .from('notifications')
-        .update({ read_at: new Date().toISOString() })
-        .is('read_at', null);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications', user?.id] });
-    },
-  });
+      // Overdue tasks
+      if (isBefore(dueDateStart, today)) {
+        const daysOverdue = Math.abs(daysUntilDue);
+        result.push({
+          id: `overdue-${task.id}`,
+          taskId: task.id,
+          taskTitle: task.title,
+          type: 'overdue',
+          message: daysOverdue === 1
+            ? 'En retard depuis hier'
+            : `En retard de ${daysOverdue} jours`,
+          priority: 'high',
+          dueDate: task.due_date,
+        });
+      }
+      // Due today
+      else if (daysUntilDue === 0) {
+        result.push({
+          id: `due-today-${task.id}`,
+          taskId: task.id,
+          taskTitle: task.title,
+          type: 'due-today',
+          message: hoursUntilDue <= 0
+            ? "Échéance passée aujourd'hui"
+            : `Échéance dans ${hoursUntilDue}h`,
+          priority: 'high',
+          dueDate: task.due_date,
+        });
+      }
+      // Due within 3 days
+      else if (daysUntilDue <= 3) {
+        result.push({
+          id: `due-soon-${task.id}`,
+          taskId: task.id,
+          taskTitle: task.title,
+          type: 'due-soon',
+          message: daysUntilDue === 1
+            ? 'Échéance demain'
+            : `Échéance dans ${daysUntilDue} jours`,
+          priority: daysUntilDue === 1 ? 'medium' : 'low',
+          dueDate: task.due_date,
+        });
+      }
+    });
+
+    // Sort by priority (overdue first, then due-today, then due-soon)
+    return result.sort((a, b) => {
+      const priorityOrder = { overdue: 0, 'due-today': 1, 'due-soon': 2 };
+      return priorityOrder[a.type] - priorityOrder[b.type];
+    });
+  }, [tasks]);
+
+  const unreadCount = notifications.length;
+  const hasUrgent = notifications.some(n => n.type === 'overdue' || n.type === 'due-today');
+
+  return {
+    notifications,
+    unreadCount,
+    hasUrgent,
+  };
 }

@@ -34,8 +34,10 @@ import {
   migrateWaitingAttachmentsToEnrichment,
   parseWaitingAttachmentsJson,
 } from '@/lib/supplierWaitingPromote';
-import { supplierWaitingValidationRoleFromProfileName } from '@/lib/supplierWaitingValidationRole';
+import { supplierWaitingValidationRoleFromProfileName, extractPermissionProfileName } from '@/lib/supplierWaitingValidationRole';
+import { useUserRole } from '@/hooks/useUserRole';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSimulation } from '@/contexts/SimulationContext';
 import { SupplierWaitingDetailDrawer } from './SupplierWaitingDetailDrawer';
 import { SupplierWaitingRejectDialog } from './SupplierWaitingRejectDialog';
 import { SupplierWaitingReviewRequestDialog } from './SupplierWaitingReviewRequestDialog';
@@ -47,7 +49,9 @@ export interface SupplierWaitingApprovalListDialogProps {
 
 export function SupplierWaitingApprovalListDialog({ open, onClose }: SupplierWaitingApprovalListDialogProps) {
   const queryClient = useQueryClient();
-  const { profile } = useAuth();
+  const { profile: authProfile } = useAuth();
+  const { getActiveProfile } = useSimulation();
+  const profile = getActiveProfile() ?? authProfile;
   const { data: rows = [], isLoading, refetch, isRefetching } = useSupplierWaitingApprovalList({ enabled: open });
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
@@ -104,12 +108,10 @@ export function SupplierWaitingApprovalListDialog({ open, onClose }: SupplierWai
         !r.rejected_at,
     );
 
-  const permissionProfileName =
-    profile?.permission_profile && typeof profile.permission_profile === 'object' && 'name' in profile.permission_profile
-      ? String((profile.permission_profile as { name?: string }).name ?? '')
-      : '';
+  const { isAdmin } = useUserRole();
+  const permissionProfileName = extractPermissionProfileName(profile);
   const validationRole = supplierWaitingValidationRoleFromProfileName(permissionProfileName);
-  const canReject = validationRole === 'achat' || validationRole === 'compta' || validationRole === 'hybrid';
+  const canReject = isAdmin || validationRole === 'achat' || validationRole === 'compta' || validationRole === 'hybrid';
 
   const comptaBlockedUntilAchat =
     !allSelectedReadyForPromote &&

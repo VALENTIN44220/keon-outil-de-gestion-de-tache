@@ -15,8 +15,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { SupplierWaitingReviewRequestDialog } from './SupplierWaitingReviewRequestDialog';
-import { supplierWaitingValidationRoleFromProfileName } from '@/lib/supplierWaitingValidationRole';
+import { supplierWaitingValidationRoleFromProfileName, extractPermissionProfileName } from '@/lib/supplierWaitingValidationRole';
+import { useUserRole } from '@/hooks/useUserRole';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSimulation } from '@/contexts/SimulationContext';
 
 interface Props {
   waitingId: string | null;
@@ -107,7 +109,9 @@ function EditableField({
 export function SupplierWaitingDetailDrawer({ waitingId, onClose }: Props) {
   const { data, isLoading, refetch } = useSupplierWaitingApprovalDetail(waitingId);
   const queryClient = useQueryClient();
-  const { profile } = useAuth();
+  const { profile: authProfile } = useAuth();
+  const { getActiveProfile } = useSimulation();
+  const profile = getActiveProfile() ?? authProfile;
   const open = !!waitingId;
 
   const [editMode, setEditMode] = useState(false);
@@ -115,12 +119,10 @@ export function SupplierWaitingDetailDrawer({ waitingId, onClose }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [showReviewDialog, setShowReviewDialog] = useState(false);
 
-  const permissionProfileName =
-    profile?.permission_profile && typeof profile.permission_profile === 'object' && 'name' in profile.permission_profile
-      ? String((profile.permission_profile as { name?: string }).name ?? '')
-      : '';
+  const { isAdmin } = useUserRole();
+  const permissionProfileName = extractPermissionProfileName(profile);
   const validationRole = supplierWaitingValidationRoleFromProfileName(permissionProfileName);
-  const canReview = validationRole === 'achat' || validationRole === 'compta' || validationRole === 'hybrid';
+  const canReview = isAdmin || validationRole === 'achat' || validationRole === 'compta' || validationRole === 'hybrid';
 
   const hasModificationsRequested = data?.status === 'modifications_demandees';
   const reviewsByField = Object.fromEntries(

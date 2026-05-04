@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useId } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
@@ -18,6 +18,11 @@ export function useCommentNotifications() {
   const { profile } = useAuth();
   const [commentNotifications, setCommentNotifications] = useState<CommentNotification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // Unique channel name per hook instance. With <PersistentRoutes> keeping every visited page
+  // mounted, the Sidebar (which hosts this hook) is instantiated multiple times in parallel.
+  // Supabase de-duplicates channels by name, so a fixed name causes the 2nd instance to try
+  // .on('postgres_changes') on an already-subscribed channel → "cannot add callbacks after subscribe()".
+  const instanceId = useId();
 
   const fetchRecentComments = useCallback(async () => {
     if (!profile?.id) return;
@@ -96,7 +101,7 @@ export function useCommentNotifications() {
     if (!profile?.id) return;
 
     const channel = supabase
-      .channel('comment-notifications')
+      .channel(`comment-notifications:${instanceId}`)
       .on(
         'postgres_changes',
         {
@@ -148,7 +153,7 @@ export function useCommentNotifications() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [profile?.id]);
+  }, [profile?.id, instanceId]);
 
   const markAsRead = useCallback((notificationId: string) => {
     setCommentNotifications(prev =>

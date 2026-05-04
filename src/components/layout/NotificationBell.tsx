@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +10,8 @@ import {
 } from '@/components/ui/popover';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { useNotifications, useMarkNotificationRead, useMarkAllNotificationsRead } from '@/hooks/useNotifications';
+import { useNavigate } from 'react-router-dom';
+import { useWorkflowNotifications, useMarkWorkflowNotificationRead, useMarkAllWorkflowNotificationsRead } from '@/hooks/useWorkflowNotifications';
 
 const TYPE_LABELS: Record<string, string> = {
   supplier_rejection:        'Demande refusée',
@@ -18,15 +20,31 @@ const TYPE_LABELS: Record<string, string> = {
   supplier_achat_validated:  'Validation achats',
 };
 
+/** Types de notifications liées à une demande fournisseur dont le demandeur doit voir le détail. */
+const REQUESTER_NOTIF_TYPES = new Set(['supplier_review_requested']);
+
 export function NotificationBell() {
-  const { data: notifications = [] } = useNotifications();
-  const { mutate: markRead } = useMarkNotificationRead();
-  const { mutate: markAllRead } = useMarkAllNotificationsRead();
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const { data: notifications = [] } = useWorkflowNotifications();
+  const { mutate: markRead } = useMarkWorkflowNotificationRead();
+  const { mutate: markAllRead } = useMarkAllWorkflowNotificationsRead();
 
   const unreadCount = notifications.filter((n) => !n.read_at).length;
 
+  function handleNotifClick(notif: (typeof notifications)[number]) {
+    if (!notif.read_at) markRead(notif.id);
+    setOpen(false);
+    // Si c'est une demande de modifications → ouvre directement la demande dans "Mes demandes"
+    if (REQUESTER_NOTIF_TYPES.has(notif.type ?? '')) {
+      const params = new URLSearchParams({ myRequests: 'true' });
+      if (notif.related_entity_id) params.set('requestId', notif.related_entity_id);
+      navigate(`/suppliers?${params.toString()}`);
+    }
+  }
+
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="relative h-9 w-9" aria-label="Notifications">
           <Bell className="h-5 w-5" />
@@ -61,7 +79,7 @@ export function NotificationBell() {
                 <li
                   key={notif.id}
                   className={`px-4 py-3 cursor-pointer hover:bg-muted/50 transition-colors ${!notif.read_at ? 'bg-primary/5' : ''}`}
-                  onClick={() => { if (!notif.read_at) markRead(notif.id); }}
+                  onClick={() => handleNotifClick(notif)}
                 >
                   <div className="flex items-start gap-2">
                     {!notif.read_at && (

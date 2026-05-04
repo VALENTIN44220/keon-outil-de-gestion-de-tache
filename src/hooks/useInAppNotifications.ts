@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -18,6 +18,8 @@ export function useInAppNotifications() {
   const { user } = useAuth();
   const [items, setItems] = useState<InAppNotificationRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // Unique channel name per hook instance — see useCommentNotifications for rationale.
+  const instanceId = useId();
 
   const fetchUnread = useCallback(async () => {
     if (!user?.id) {
@@ -55,7 +57,7 @@ export function useInAppNotifications() {
     if (!user?.id) return;
 
     const channel = supabase
-      .channel('in-app-notifications')
+      .channel(`in-app-notifications:${instanceId}`)
       .on(
         'postgres_changes',
         {
@@ -73,7 +75,7 @@ export function useInAppNotifications() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [user?.id, fetchUnread]);
+  }, [user?.id, fetchUnread, instanceId]);
 
   const markAsRead = useCallback(
     async (id: string) => {

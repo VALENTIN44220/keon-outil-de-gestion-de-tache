@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Champs résumés (liste)
 export type SupplierWaitingApprovalRow = {
@@ -76,6 +77,31 @@ export function useSupplierWaitingApprovalList(options?: { enabled?: boolean }) 
         .from('supplier_waiting_approval')
         .select(LIST_SELECT)
         .is('deleted_at', null)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return (data ?? []) as SupplierWaitingApprovalRow[];
+    },
+  });
+}
+
+/**
+ * Demandes soumises par un utilisateur donné (non supprimées).
+ * @param userId  ID auth de l'utilisateur cible (réel ou simulé). Si absent, utilise l'utilisateur connecté.
+ */
+export function useMySupplierRequests(options?: { enabled?: boolean; userId?: string }) {
+  const { user } = useAuth();
+  const effectiveUserId = options?.userId ?? user?.id;
+
+  return useQuery({
+    queryKey: ['my-supplier-requests', effectiveUserId],
+    enabled: (options?.enabled ?? true) && !!effectiveUserId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('supplier_waiting_approval')
+        .select(LIST_SELECT)
+        .is('deleted_at', null)
+        .eq('submitted_by_user_id', effectiveUserId!)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
