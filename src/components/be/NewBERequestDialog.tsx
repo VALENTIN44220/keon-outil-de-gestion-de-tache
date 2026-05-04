@@ -65,6 +65,9 @@ interface SubStep {
   description: string | null;
   be_category: 'be' | 'be_reglementaire' | null;
   order_index: number | null;
+  /** Profil qui réalise l'étape (assigné automatiquement à la création) */
+  dispatch_manager_id: string | null;
+  user_id: string | null;
 }
 
 /**
@@ -225,7 +228,7 @@ export function NewBERequestDialog({
     if (step !== 1 && !(hasDefaultProject && step === 1)) return;
     setStepsLoading(true);
     sb.from('sub_process_templates')
-      .select('id,name,description,be_category,order_index')
+      .select('id,name,description,be_category,order_index,dispatch_manager_id,user_id')
       .eq('process_template_id', BE_PROCESS_TEMPLATE_ID)
       .eq('is_shared', true)
       .order('be_category')
@@ -333,6 +336,8 @@ export function NewBERequestDialog({
         requester_id: profile.id,
         parent_request_id: request.id,
         sub_process_template_id: s.id,
+        // Auto-assignation : on prend user_id en priorité, sinon dispatch_manager_id
+        assignee_id: s.user_id ?? s.dispatch_manager_id ?? null,
         source_process_template_id: BE_PROCESS_TEMPLATE_ID,
         process_template_id: BE_PROCESS_TEMPLATE_ID,
       }));

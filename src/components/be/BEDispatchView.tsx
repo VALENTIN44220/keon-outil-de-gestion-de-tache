@@ -85,6 +85,8 @@ interface Profile {
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
 
+const BE_PROCESS_TEMPLATE_ID = 'bd75a3b0-c918-4b43-befe-739b83f7461a';
+
 const sb = supabase as any;
 
 const URGENCY_META: Record<string, { label: string; color: string; bg: string; textClass: string }> = {
@@ -265,13 +267,29 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
     enabled: !!projectId,
   });
 
-  // ── Chargement profils ─────────────────────────────────────────────────────
+  // ── Chargement profils (uniquement les intervenants BE définis dans les templates) ──
   const { data: profiles = [] } = useQuery({
     queryKey: ['be-team-profiles'],
     queryFn: async (): Promise<Profile[]> => {
+      // 1. Récupère les IDs distincts des intervenants définis dans les sous-étapes BE
+      const { data: tplRows } = await sb
+        .from('sub_process_templates')
+        .select('dispatch_manager_id, user_id')
+        .eq('process_template_id', BE_PROCESS_TEMPLATE_ID);
+
+      const profileIds = new Set<string>();
+      for (const row of tplRows ?? []) {
+        if (row.dispatch_manager_id) profileIds.add(row.dispatch_manager_id);
+        if (row.user_id) profileIds.add(row.user_id);
+      }
+
+      if (profileIds.size === 0) return [];
+
+      // 2. Charge uniquement ces profils (actifs ou externes)
       const { data, error } = await supabase
         .from('profiles')
         .select('id, display_name')
+        .in('id', [...profileIds])
         .in('status', ['active', 'external'])
         .order('display_name');
       if (error) throw error;
