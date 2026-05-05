@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { chunkedInQuery } from '@/lib/chunkedInQuery';
 
 export interface CommentNotification {
   id: string;
@@ -47,30 +48,46 @@ export function useCommentNotifications() {
       // Fetch recent comments (last 24 hours) on these tasks, excluding user's own comments
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       
-      const { data: comments, error: commentsError } = await supabase
-        .from('task_comments')
-        .select(`
-          id,
-          task_id,
-          content,
-          created_at,
-          author:profiles!task_comments_author_id_fkey (
-            id,
-            display_name
-          )
-        `)
-        .in('task_id', taskIds)
-        .neq('author_id', profile.id)
-        .gte('created_at', twentyFourHoursAgo)
-        .order('created_at', { ascending: false })
-        .limit(20);
+      // Chunke pour éviter les URLs trop longues quand l'utilisateur a beaucoup
+      // de tâches (au-delà de ~500 IDs, le filtre .in() dépasse la limite côté
+      // CDN/proxy → 400). Chaque chunk applique le même filtre temps + auteur,
+      // on ne ramène que les 20 plus récents par chunk, puis on consolide.
+      const { data: chunkedComments, errors: commentsErrors } = await chunkedInQuery<{
+        id: string;
+        task_id: string;
+        content: string;
+        created_at: string;
+        author: { id: string; display_name: string } | null;
+      }>(
+        taskIds,
+        (chunk) =>
+          supabase
+            .from('task_comments')
+            .select(`
+              id,
+              task_id,
+              content,
+              created_at,
+              author:profiles!task_comments_author_id_fkey ( id, display_name )
+            `)
+            .in('task_id', chunk)
+            .neq('author_id', profile.id)
+            .gte('created_at', twentyFourHoursAgo)
+            .order('created_at', { ascending: false })
+            .limit(20) as any,
+      );
 
-      if (commentsError) {
-        console.error('Error fetching comment notifications:', commentsError);
+      if (commentsErrors.length > 0) {
+        console.error('Error fetching comment notifications:', commentsErrors[0]);
         setCommentNotifications([]);
         setIsLoading(false);
         return;
       }
+
+      // Trie global + top 20 (chaque chunk a déjà ses propres 20, on consolide)
+      const comments = chunkedComments
+        .sort((a, b) => b.created_at.localeCompare(a.created_at))
+        .slice(0, 20);
 
       const notifications: CommentNotification[] = (comments || []).map(comment => ({
         id: comment.id,
