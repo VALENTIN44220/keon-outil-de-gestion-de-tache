@@ -11,11 +11,12 @@
 
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { useBEProjects } from '@/hooks/useBEProjects';
 import { supabase } from '@/integrations/supabase/client';
+import { NewBERequestDialog } from '@/components/be/NewBERequestDialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,6 +46,7 @@ import {
   ArrowDown,
   ArrowUp,
   X,
+  Plus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { BEAffaire, BEAffaireStatus } from '@/types/beAffaire';
@@ -88,9 +90,11 @@ type SortDir = 'asc' | 'desc';
 
 export default function Projects() {
   const navigate = useNavigate();
+  const qc = useQueryClient();
 
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [isNewRequestOpen, setIsNewRequestOpen] = useState(false);
 
   // Filters
   const [filterProjectStatus, setFilterProjectStatus] = useState<Set<string>>(new Set());
@@ -247,9 +251,17 @@ export default function Projects() {
                 <FolderOpen className="h-5 w-5 text-primary" />
               </div>
               <h3 className="text-lg font-bold tracking-tight">Projets BE</h3>
-              <Badge variant="secondary" className="ml-auto">
+              <Badge variant="secondary">
                 {filteredProjects.length}/{projects.length}
               </Badge>
+              <Button
+                size="sm"
+                className="ml-auto gap-2"
+                onClick={() => setIsNewRequestOpen(true)}
+              >
+                <Plus className="h-4 w-4" />
+                Nouvelle demande
+              </Button>
             </div>
 
             {/* ── Toolbar : recherche + filtres + tri ───────────────────── */}
@@ -595,6 +607,17 @@ export default function Projects() {
           </div>
         </main>
       </div>
+
+      {/* Dialog : nouvelle demande BE (accessible aux non-managers) */}
+      <NewBERequestDialog
+        open={isNewRequestOpen}
+        onOpenChange={setIsNewRequestOpen}
+        onCreated={() => {
+          // Rafraîchir la liste des affaires pour refléter immédiatement le lien
+          // éventuel demande → affaire (si la demande crée/lie une affaire).
+          qc.invalidateQueries({ queryKey: ['all-be-affaires-projects-page'] });
+        }}
+      />
     </div>
   );
 }
