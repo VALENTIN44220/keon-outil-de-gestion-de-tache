@@ -271,6 +271,8 @@ const Requests = () => {
       description: 'Référencer un nouveau fournisseur (Achats)',
       icon: Building2,
       accent: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+      // Même flux que le bouton « Demande de nouveau fournisseur » sur /suppliers :
+      // NewSupplierRequestDialog (formulaire dédié, pas le drilldown générique).
       onClick: () => setIsSupplierOpen(true),
       visible: true,
     },
