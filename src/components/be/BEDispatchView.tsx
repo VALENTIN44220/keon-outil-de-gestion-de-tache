@@ -82,6 +82,8 @@ import { toast } from 'sonner';
 import { BEStatusBadge } from '@/components/be/BEStatusBadge';
 import { NewBERequestDialog } from '@/components/be/NewBERequestDialog';
 import { useBETaskStatus } from '@/hooks/useBETaskStatus';
+import { useUserWeekLoad, type UserWeekLoad } from '@/hooks/useUserWeekLoad';
+import { distributeBESlots, clearBETaskSlots } from '@/lib/be/distributeBESlots';
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
 
@@ -123,6 +125,8 @@ interface BETaskRow {
   assignee_id: string | null;
   sub_process_template_id: string | null;
   due_date: string | null;
+  start_date: string | null;
+  duration_hours: number | null;
   created_at: string;
   type: string;
   document_url: string | null;
@@ -311,6 +315,96 @@ function DocumentLinkField({
   );
 }
 
+/**
+ * Édition inline du temps prévu (heures) d'une tâche BE.
+ * Le manager saisit l'estimation à la création/affectation pour que
+ * `distributeBESlots` puisse matérialiser la charge.
+ */
+function DurationHoursField({
+  taskId,
+  initial,
+  onSaved,
+}: {
+  taskId: string;
+  initial: number | null;
+  onSaved: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(initial != null ? String(initial) : '');
+  const qc = useQueryClient();
+
+  const save = async () => {
+    const trimmed = value.trim();
+    const parsed = trimmed === '' ? null : parseFloat(trimmed);
+    if (parsed != null && (isNaN(parsed) || parsed < 0 || parsed > 1000)) {
+      toast.error('Heures invalides (0 à 1000)');
+      return;
+    }
+    const { error } = await sb
+      .from('tasks')
+      .update({ duration_hours: parsed })
+      .eq('id', taskId);
+    if (error) {
+      toast.error(error.message || 'Erreur de sauvegarde');
+      return;
+    }
+    setEditing(false);
+    qc.invalidateQueries({ queryKey: ['be-dispatch-tasks'] });
+    onSaved();
+  };
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1 shrink-0">
+        <Input
+          type="number"
+          min={0}
+          max={1000}
+          step={0.5}
+          value={value}
+          autoFocus
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') save();
+            if (e.key === 'Escape') {
+              setEditing(false);
+              setValue(initial != null ? String(initial) : '');
+            }
+          }}
+          onBlur={save}
+          className="h-7 w-16 text-xs"
+          placeholder="h"
+        />
+      </div>
+    );
+  }
+
+  const display = initial != null ? `${initial}h` : '—';
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className={cn(
+              'h-7 px-2 text-xs rounded border border-dashed shrink-0 transition-colors',
+              initial != null
+                ? 'border-violet-300 text-violet-700 bg-violet-50 hover:bg-violet-100 dark:border-violet-700 dark:text-violet-300 dark:bg-violet-900/20'
+                : 'border-muted-foreground/30 text-muted-foreground/60 hover:border-primary hover:text-primary',
+            )}
+          >
+            ⏱ {display}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="top">
+          Temps prévu — alimente le plan de charge à l'affectation
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
 function AssigneeSelector({
   taskId,
   currentAssigneeId,
@@ -319,6 +413,10 @@ function AssigneeSelector({
   taskLabel,
   projectCode,
   profiles,
+  loadByUser,
+  durationHours,
+  startDate,
+  dueDate,
   onAssigned,
 }: {
   taskId: string;
@@ -328,6 +426,12 @@ function AssigneeSelector({
   taskLabel: string;
   projectCode?: string | null;
   profiles: Profile[];
+  /** Charge hebdomadaire par utilisateur pour aider le manager à équilibrer. */
+  loadByUser: Map<string, UserWeekLoad>;
+  /** Temps prévu pour la tâche (heures). Sert à matérialiser des slots de plan de charge. */
+  durationHours: number | null;
+  startDate: string | null;
+  dueDate: string | null;
   onAssigned: () => void;
 }) {
   const qc = useQueryClient();
@@ -350,6 +454,46 @@ function AssigneeSelector({
 
       const { error } = await sb.from('tasks').update(updatePayload).eq('id', taskId);
       if (error) throw error;
+
+      // ── Plan de charge : matérialiser ou nettoyer les workload_slots ────
+      // Désassignation : on retire les slots posés pour l'ancien assigné (s'il y en avait).
+      if (!isAssigning && currentAssigneeId) {
+        try {
+          await clearBETaskSlots(taskId, currentAssigneeId);
+        } catch (e) {
+          console.warn('[AssigneeSelector] clearBETaskSlots failed', e);
+        }
+      }
+      // Affectation/Réaffectation : on retire les slots de l'ancien assigné (si différent),
+      // puis on crée les nouveaux slots pour l'assigné cible si la tâche a un temps prévu.
+      if (isAssigning) {
+        if (currentAssigneeId && currentAssigneeId !== assigneeId) {
+          try {
+            await clearBETaskSlots(taskId, currentAssigneeId);
+          } catch (e) {
+            console.warn('[AssigneeSelector] clearBETaskSlots (reassign) failed', e);
+          }
+        }
+        if (assigneeId && durationHours && durationHours > 0) {
+          try {
+            const r = await distributeBESlots({
+              taskId,
+              userId: assigneeId,
+              startDate,
+              dueDate,
+              totalHours: durationHours,
+            });
+            if (r.truncated) {
+              toast.warning(
+                `Plan de charge : seules ${r.hoursPlaced}h sur ${durationHours}h ont pu être posées (fenêtre trop courte).`,
+              );
+            }
+          } catch (e) {
+            console.warn('[AssigneeSelector] distributeBESlots failed', e);
+            toast.warning('Plan de charge non mis à jour (erreur). La tâche est tout de même affectée.');
+          }
+        }
+      }
 
       // Notifications lors d'une affectation
       if (isAssigning && newBeStatus === 'affectee') {
@@ -389,6 +533,8 @@ function AssigneeSelector({
     onSuccess: () => {
       toast.success('Tâche assignée');
       qc.invalidateQueries({ queryKey: ['be-dispatch-tasks'] });
+      // Rafraîchit la charge hebdo affichée sous chaque profil
+      qc.invalidateQueries({ queryKey: ['user-week-load'] });
       onAssigned();
     },
     onError: (err: any) => {
@@ -430,18 +576,44 @@ function AssigneeSelector({
         <SelectItem value="__none__">
           <span className="text-muted-foreground italic">Non assigné</span>
         </SelectItem>
-        {profiles.map(p => (
-          <SelectItem key={p.id} value={p.id}>
-            <div className="flex items-center gap-2">
-              <Avatar className="h-5 w-5">
-                <AvatarFallback className="text-[9px] bg-primary/10">
-                  {p.display_name.slice(0, 2).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              {p.display_name}
-            </div>
-          </SelectItem>
-        ))}
+        {[...profiles]
+          // Tri par charge croissante : les plus disponibles en premier
+          .sort((a, b) => {
+            const la = loadByUser.get(a.id)?.hoursBooked ?? 0;
+            const lb = loadByUser.get(b.id)?.hoursBooked ?? 0;
+            return la - lb;
+          })
+          .map(p => {
+            const load = loadByUser.get(p.id);
+            const pct = load?.percent ?? 0;
+            const loadColor =
+              pct >= 100 ? 'text-red-600 bg-red-100 dark:bg-red-900/30 dark:text-red-400'
+              : pct >= 80 ? 'text-amber-600 bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400'
+              : 'text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400';
+            return (
+              <SelectItem key={p.id} value={p.id}>
+                <div className="flex items-center gap-2 w-full">
+                  <Avatar className="h-5 w-5">
+                    <AvatarFallback className="text-[9px] bg-primary/10">
+                      {p.display_name.slice(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="flex-1">{p.display_name}</span>
+                  {load && (
+                    <span
+                      className={cn(
+                        'text-[9px] font-mono px-1.5 py-0.5 rounded tabular-nums shrink-0',
+                        loadColor,
+                      )}
+                      title={`${load.hoursBooked}h prévues cette semaine sur ${load.capacityHours}h (${pct}%)`}
+                    >
+                      {load.hoursBooked}h/{load.capacityHours}h
+                    </span>
+                  )}
+                </div>
+              </SelectItem>
+            );
+          })}
       </SelectContent>
     </Select>
   );
@@ -452,6 +624,7 @@ function AssigneeSelector({
 function TaskRow({
   task,
   profiles,
+  loadByUser,
   showProject,
   isBlocked,
   requesterId,
@@ -460,6 +633,7 @@ function TaskRow({
 }: {
   task: BETaskRow;
   profiles: Profile[];
+  loadByUser: Map<string, UserWeekLoad>;
   showProject?: boolean;
   isBlocked?: boolean;
   requesterId?: string | null;
@@ -578,6 +752,13 @@ function TaskRow({
       <DocumentLinkField taskId={task.id} initialUrl={task.document_url} />
 
       {/* Sélecteur assignataire (toujours visible même pour les tâches bloquées — pré-assignation possible) */}
+      {/* Temps prévu (heures) — utilisé pour matérialiser les workload_slots à l'affectation */}
+      <DurationHoursField
+        taskId={task.id}
+        initial={task.duration_hours}
+        onSaved={onRefresh}
+      />
+
       <AssigneeSelector
         taskId={task.id}
         currentAssigneeId={task.assignee_id}
@@ -586,6 +767,10 @@ function TaskRow({
         taskLabel={presName}
         projectCode={projectCode}
         profiles={profiles}
+        loadByUser={loadByUser}
+        durationHours={task.duration_hours}
+        startDate={task.start_date}
+        dueDate={task.due_date}
         onAssigned={onRefresh}
       />
 
@@ -690,7 +875,7 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
         .select(`
           id, title, status, be_status, be_urgency,
           parent_request_id, assignee_id, sub_process_template_id,
-          due_date, created_at, type, document_url,
+          due_date, start_date, duration_hours, created_at, type, document_url,
           assignee:profiles!tasks_assignee_id_fkey(id, display_name),
           sub_process_template:sub_process_templates!tasks_sub_process_template_id_fkey(id, name, be_category, dispatch_manager_id, order_index),
           be_project:be_projects!tasks_be_project_id_fkey(code_projet, nom_projet)
@@ -777,6 +962,12 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
       return allProfiles;
     },
   });
+
+  // ── Charge hebdomadaire (heures) par profil pour la semaine en cours ──────
+  // Alimente l'AssigneeSelector pour aider le manager à équilibrer les
+  // affectations selon le plan de charge réel.
+  const profileIds = useMemo(() => profiles.map((p) => p.id), [profiles]);
+  const { loadByUser } = useUserWeekLoad(profileIds);
 
   // ── Regroupement ──────────────────────────────────────────────────────────
   const tasksByRequest = useMemo(() => {
@@ -1025,6 +1216,7 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
                             key={task.id}
                             task={task}
                             profiles={profiles}
+                            loadByUser={loadByUser}
                             showProject={false}
                             isBlocked={blockedTaskIds.has(task.id)}
                             requesterId={req.requester_id}
@@ -1052,6 +1244,7 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
                       key={task.id}
                       task={task}
                       profiles={profiles}
+                      loadByUser={loadByUser}
                       showProject={isGlobal}
                       isBlocked={blockedTaskIds.has(task.id)}
                       onRefresh={refetch}
