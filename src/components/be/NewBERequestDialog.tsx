@@ -254,7 +254,19 @@ export function NewBERequestDialog({
       .eq('is_shared', true)
       .order('be_category')
       .order('order_index')
-      .then(({ data }: any) => {
+      .then(({ data, error }: any) => {
+        if (error) {
+          console.error('[NewBERequestDialog] sub_process_templates fetch error:', error);
+        }
+        // eslint-disable-next-line no-console
+        console.log('[NewBERequestDialog] sub_process_templates loaded:', {
+          total: (data ?? []).length,
+          byCategory: (data ?? []).reduce((acc: Record<string, number>, s: any) => {
+            const k = s.be_category ?? 'NULL';
+            acc[k] = (acc[k] ?? 0) + 1;
+            return acc;
+          }, {}),
+        });
         setAllSteps(data ?? []);
         setStepsLoading(false);
       });
