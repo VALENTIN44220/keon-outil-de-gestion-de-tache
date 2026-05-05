@@ -310,25 +310,40 @@
                      />
                      <GripVertical className="h-4 w-4 text-muted-foreground/50 mt-0.5 shrink-0 group-hover:text-muted-foreground" />
                      <div className="flex-1 min-w-0">
-                       <div className="flex items-center gap-2">
+                       <div className="flex items-start gap-2">
                          <div className={cn(
-                           "w-2 h-2 rounded-full shrink-0",
+                           "w-2 h-2 rounded-full shrink-0 mt-1",
                            getPriorityColor(task.priority)
                          )} />
-                        {/* Badge BE — visible si la tâche est rattachée à un projet ou un statut BE */}
-                        {((task as any).be_project_id || (task as any).be_status) && (
-                          <Badge
-                            variant="outline"
-                            className="h-4 px-1 text-[9px] font-bold border-indigo-300 text-indigo-700 bg-indigo-50 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-700 shrink-0"
-                            title="Tâche Bureau d'Études"
-                          >
-                            BE
-                          </Badge>
-                        )}
-                        <span
-                          className="text-sm font-medium truncate cursor-pointer hover:underline"
-                          onClick={(e) => { e.stopPropagation(); setDetailTask(task); }}
-                        >{task.title}</span>
+                         <div className="flex-1 min-w-0">
+                           <div className="flex items-center gap-1 mb-0.5 flex-wrap">
+                             {/* Badge BE — visible si la tâche est rattachée à un projet ou un statut BE */}
+                             {((task as any).be_project_id || (task as any).be_status) && (
+                               <Badge
+                                 variant="outline"
+                                 className="h-4 px-1 text-[9px] font-bold border-indigo-300 text-indigo-700 bg-indigo-50 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-700 shrink-0"
+                                 title="Tâche Bureau d'Études"
+                               >
+                                 BE
+                               </Badge>
+                             )}
+                             {/* Statut BE compact (a_relire, a_valider, etc.) */}
+                             {(task as any).be_status && (task as any).be_status !== 'cloturee' && (
+                               <Badge
+                                 variant="outline"
+                                 className="h-4 px-1 text-[9px] shrink-0 capitalize"
+                                 title={`Statut BE : ${(task as any).be_status}`}
+                               >
+                                 {String((task as any).be_status).replace(/_/g, ' ')}
+                               </Badge>
+                             )}
+                           </div>
+                           <span
+                             className="text-sm font-medium cursor-pointer hover:underline line-clamp-2 break-words leading-tight"
+                             onClick={(e) => { e.stopPropagation(); setDetailTask(task); }}
+                             title={task.title}
+                           >{task.title}</span>
+                         </div>
                        </div>
                        
                        <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
