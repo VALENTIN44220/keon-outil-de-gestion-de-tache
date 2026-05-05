@@ -131,7 +131,15 @@ interface BETaskRow {
   type: string;
   document_url: string | null;
   assignee?: { id: string; display_name: string } | null;
-  sub_process_template?: { id: string; name: string; be_category: string | null; dispatch_manager_id: string | null; order_index: number | null } | null;
+  sub_process_template?: {
+    id: string;
+    name: string;
+    be_category: string | null;
+    dispatch_manager_id: string | null;
+    order_index: number | null;
+    /** Étapes consécutives partageant le même groupe = parallèles. NULL = séquentielle. */
+    parallel_group: number | null;
+  } | null;
   be_project?: { code_projet: string; nom_projet: string } | null;
 }
 
@@ -144,14 +152,24 @@ const SEQUENCED_UNLOCK_STATUSES = new Set([
 ]);
 
 /**
- * Calcule l'ensemble des IDs de tâches "bloquées" par une tâche précédente non encore validée.
- * Une tâche à order_index N est bloquée si la tâche à order_index N-1 (dans la même demande)
- * n'a pas encore atteint SEQUENCED_UNLOCK_STATUSES.
+ * Calcule l'ensemble des IDs de tâches "bloquées" par un groupe précédent
+ * non encore entièrement validé.
+ *
+ * Algorithme :
+ *   1. Trier les tâches d'une demande par order_index.
+ *   2. Constituer des « groupes » consécutifs :
+ *      - tâches avec le même `parallel_group` non-null → même groupe (parallèles)
+ *      - tâche avec parallel_group=NULL → groupe solo (1 tâche)
+ *   3. Parcourir les groupes : dès qu'un groupe n'est PAS entièrement validé
+ *      (au moins une tâche du groupe pas en SEQUENCED_UNLOCK_STATUSES),
+ *      toutes les tâches des groupes suivants sont bloquées.
+ *
+ * Cas dégénéré (tous parallel_group=NULL) = comportement strictement séquentiel
+ * comme avant — rétrocompatible.
  */
 function computeBlockedTasks(tasks: BETaskRow[]): Set<string> {
   const blocked = new Set<string>();
 
-  // Grouper par demande parente
   const byRequest = new Map<string, BETaskRow[]>();
   for (const t of tasks) {
     if (!t.parent_request_id) continue;
@@ -162,7 +180,6 @@ function computeBlockedTasks(tasks: BETaskRow[]): Set<string> {
   for (const siblings of byRequest.values()) {
     if (siblings.length <= 1) continue;
 
-    // Trier par order_index (fallback: created_at)
     const sorted = [...siblings].sort((a, b) => {
       const oa = a.sub_process_template?.order_index ?? 9999;
       const ob = b.sub_process_template?.order_index ?? 9999;
@@ -170,13 +187,39 @@ function computeBlockedTasks(tasks: BETaskRow[]): Set<string> {
       return a.created_at.localeCompare(b.created_at);
     });
 
-    // Parcourir : dès qu'une tâche n'est PAS encore validée, toutes les suivantes sont bloquées
+    // Constituer les groupes parallèles consécutifs
+    const groups: BETaskRow[][] = [];
+    let currentGroup: BETaskRow[] = [];
+    let currentKey: string | null = null;
+    for (const t of sorted) {
+      const pg = t.sub_process_template?.parallel_group ?? null;
+      // Clé unique par groupe : si pg=null → solo (clé unique par tâche),
+      //                         si pg non-null → partagée
+      const key = pg === null ? `solo-${t.id}` : `pg-${pg}`;
+      if (key === currentKey && currentGroup.length > 0) {
+        currentGroup.push(t);
+      } else {
+        if (currentGroup.length > 0) groups.push(currentGroup);
+        currentGroup = [t];
+        currentKey = key;
+      }
+    }
+    if (currentGroup.length > 0) groups.push(currentGroup);
+
+    // Parcourir les groupes : dès qu'un groupe n'est pas entièrement validé,
+    // les tâches des groupes suivants sont bloquées (mais pas celles du groupe en cours)
     let blocked_from_here = false;
-    for (let i = 0; i < sorted.length; i++) {
+    for (const group of groups) {
       if (blocked_from_here) {
-        blocked.add(sorted[i].id);
-      } else if (!SEQUENCED_UNLOCK_STATUSES.has(sorted[i].be_status ?? '')) {
-        // Cette tâche est la première non-validée → les tâches suivantes sont bloquées
+        for (const t of group) blocked.add(t.id);
+        continue;
+      }
+      const allUnlocked = group.every(t =>
+        SEQUENCED_UNLOCK_STATUSES.has(t.be_status ?? ''),
+      );
+      if (!allUnlocked) {
+        // Le groupe en cours n'est pas finalisé : les groupes suivants sont bloqués.
+        // Les tâches DE ce groupe restent actives (parallèles entre elles).
         blocked_from_here = true;
       }
     }
@@ -855,7 +898,7 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
           parent_request_id, assignee_id, sub_process_template_id,
           due_date, start_date, duration_hours, created_at, type, document_url,
           assignee:profiles!tasks_assignee_id_fkey(id, display_name),
-          sub_process_template:sub_process_templates!tasks_sub_process_template_id_fkey(id, name, be_category, dispatch_manager_id, order_index),
+          sub_process_template:sub_process_templates!tasks_sub_process_template_id_fkey(id, name, be_category, dispatch_manager_id, order_index, parallel_group),
           be_project:be_projects!tasks_be_project_id_fkey(code_projet, nom_projet)
         `)
         .eq('type', 'task')
