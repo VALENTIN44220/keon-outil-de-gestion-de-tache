@@ -83,7 +83,7 @@ import { BEStatusBadge } from '@/components/be/BEStatusBadge';
 import { NewBERequestDialog } from '@/components/be/NewBERequestDialog';
 import { useBETaskStatus } from '@/hooks/useBETaskStatus';
 import { useUserWeekLoad, type UserWeekLoad } from '@/hooks/useUserWeekLoad';
-import { distributeBESlots, clearBETaskSlots } from '@/lib/be/distributeBESlots';
+import { clearBETaskSlots } from '@/lib/be/distributeBESlots';
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
 
@@ -455,8 +455,9 @@ function AssigneeSelector({
       const { error } = await sb.from('tasks').update(updatePayload).eq('id', taskId);
       if (error) throw error;
 
-      // ── Plan de charge : matérialiser ou nettoyer les workload_slots ────
-      // Désassignation : on retire les slots posés pour l'ancien assigné (s'il y en avait).
+      // ── Plan de charge : nettoyer les anciens slots à la désassignation/réaffectation
+      // (la planification effective se fait par drag-drop manuel du manager dans /workload,
+      // pas en automatique — on n'impose pas de créneau).
       if (!isAssigning && currentAssigneeId) {
         try {
           await clearBETaskSlots(taskId, currentAssigneeId);
@@ -464,34 +465,11 @@ function AssigneeSelector({
           console.warn('[AssigneeSelector] clearBETaskSlots failed', e);
         }
       }
-      // Affectation/Réaffectation : on retire les slots de l'ancien assigné (si différent),
-      // puis on crée les nouveaux slots pour l'assigné cible si la tâche a un temps prévu.
-      if (isAssigning) {
-        if (currentAssigneeId && currentAssigneeId !== assigneeId) {
-          try {
-            await clearBETaskSlots(taskId, currentAssigneeId);
-          } catch (e) {
-            console.warn('[AssigneeSelector] clearBETaskSlots (reassign) failed', e);
-          }
-        }
-        if (assigneeId && durationHours && durationHours > 0) {
-          try {
-            const r = await distributeBESlots({
-              taskId,
-              userId: assigneeId,
-              startDate,
-              dueDate,
-              totalHours: durationHours,
-            });
-            if (r.truncated) {
-              toast.warning(
-                `Plan de charge : seules ${r.hoursPlaced}h sur ${durationHours}h ont pu être posées (fenêtre trop courte).`,
-              );
-            }
-          } catch (e) {
-            console.warn('[AssigneeSelector] distributeBESlots failed', e);
-            toast.warning('Plan de charge non mis à jour (erreur). La tâche est tout de même affectée.');
-          }
+      if (isAssigning && currentAssigneeId && currentAssigneeId !== assigneeId) {
+        try {
+          await clearBETaskSlots(taskId, currentAssigneeId);
+        } catch (e) {
+          console.warn('[AssigneeSelector] clearBETaskSlots (reassign) failed', e);
         }
       }
 

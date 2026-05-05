@@ -47,7 +47,7 @@
  }
  
  type SortOption = 'priority' | 'due_date' | 'charge' | 'title';
- type FilterOption = 'all' | 'unassigned' | 'no_date' | 'overdue';
+ type FilterOption = 'all' | 'unassigned' | 'no_date' | 'overdue' | 'be_only';
  
  const priorityOrder: Record<string, number> = {
    urgent: 0,
@@ -104,6 +104,11 @@
        case 'overdue':
          const today = new Date().toISOString().split('T')[0];
          filtered = filtered.filter(t => t.due_date && t.due_date < today);
+         break;
+       case 'be_only':
+         // Tâches BE = liées à un projet BE ou portant un be_status (les tâches
+         // créées via le flux BE ont be_project_id et/ou be_status renseignés)
+         filtered = filtered.filter((t: any) => !!t.be_project_id || !!t.be_status);
          break;
      }
  
@@ -206,9 +211,10 @@
              <DropdownMenuTrigger asChild>
                <Button variant="outline" size="sm" className="h-8 gap-1 text-xs flex-1">
                  <Filter className="h-3 w-3" />
-                 {filterBy === 'all' ? 'Tous' : 
+                 {filterBy === 'all' ? 'Tous' :
                   filterBy === 'unassigned' ? 'Non affectées' :
-                  filterBy === 'no_date' ? 'Sans date' : 'En retard'}
+                  filterBy === 'no_date' ? 'Sans date' :
+                  filterBy === 'be_only' ? 'BE seulement' : 'En retard'}
                </Button>
              </DropdownMenuTrigger>
              <DropdownMenuContent>
@@ -224,6 +230,11 @@
                <DropdownMenuItem onClick={() => setFilterBy('overdue')}>
                  <AlertTriangle className="h-3 w-3 mr-2" />
                  En retard
+               </DropdownMenuItem>
+               <DropdownMenuSeparator />
+               <DropdownMenuItem onClick={() => setFilterBy('be_only')}>
+                 <span className="mr-2 text-[10px] font-bold text-indigo-600">BE</span>
+                 BE seulement
                </DropdownMenuItem>
              </DropdownMenuContent>
            </DropdownMenu>
@@ -304,7 +315,17 @@
                            "w-2 h-2 rounded-full shrink-0",
                            getPriorityColor(task.priority)
                          )} />
-                        <span 
+                        {/* Badge BE — visible si la tâche est rattachée à un projet ou un statut BE */}
+                        {((task as any).be_project_id || (task as any).be_status) && (
+                          <Badge
+                            variant="outline"
+                            className="h-4 px-1 text-[9px] font-bold border-indigo-300 text-indigo-700 bg-indigo-50 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-700 shrink-0"
+                            title="Tâche Bureau d'Études"
+                          >
+                            BE
+                          </Badge>
+                        )}
+                        <span
                           className="text-sm font-medium truncate cursor-pointer hover:underline"
                           onClick={(e) => { e.stopPropagation(); setDetailTask(task); }}
                         >{task.title}</span>
