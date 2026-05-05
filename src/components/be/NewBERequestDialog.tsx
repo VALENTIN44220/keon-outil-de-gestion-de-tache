@@ -75,9 +75,16 @@ interface SubStep {
   description: string | null;
   be_category: 'be' | 'be_reglementaire' | null;
   order_index: number | null;
-  /** Profil qui réalise l'étape (assigné automatiquement à la création) */
+  /** Manager qui dispatche (cas Cible = rôle générique) */
   dispatch_manager_id: string | null;
+  /** Audit : créateur du template (legacy) */
   user_id: string | null;
+  /** Type d'affectation : 'fixed_user' (cible = personne précise) | 'manager_dispatch' | ... */
+  assignment_type: string | null;
+  /** Personne pré-affectée si assignment_type='fixed_user' (Cible = personne précise) */
+  target_assignee_id: string | null;
+  /** Durée prévue par défaut (heures) — héritée par tasks.duration_hours */
+  default_duration_hours: number | null;
 }
 
 /**
@@ -242,7 +249,7 @@ export function NewBERequestDialog({
     if (step !== 1 && !(hasDefaultProject && step === 1)) return;
     setStepsLoading(true);
     sb.from('sub_process_templates')
-      .select('id,name,description,be_category,order_index,dispatch_manager_id,user_id')
+      .select('id,name,description,be_category,order_index,dispatch_manager_id,user_id,assignment_type,target_assignee_id,default_duration_hours')
       .eq('process_template_id', BE_PROCESS_TEMPLATE_ID)
       .eq('is_shared', true)
       .order('be_category')
@@ -338,23 +345,37 @@ export function NewBERequestDialog({
       if (reqError) throw reqError;
 
       // 2. Tâches enfant (une par SOUS-ÉTAPE des prestations sélectionnées)
-      const childInserts = allSelectedSteps.map(s => ({
-        title: `${title} — ${s.name}`,
-        type: 'task',
-        status: 'todo',
-        be_project_id: selectedProjectId,
-        be_affaire_id: selectedAffaireId || null,
-        be_urgency: urgency,
-        be_status: 'en_cours',
-        user_id: user.id,
-        requester_id: profile.id,
-        parent_request_id: request.id,
-        sub_process_template_id: s.id,
-        // Auto-assignation : on prend user_id en priorité, sinon dispatch_manager_id
-        assignee_id: s.user_id ?? s.dispatch_manager_id ?? null,
-        source_process_template_id: BE_PROCESS_TEMPLATE_ID,
-        process_template_id: BE_PROCESS_TEMPLATE_ID,
-      }));
+      const childInserts = allSelectedSteps.map(s => {
+        // Auto-assignation selon le type d'affectation du template :
+        //  - 'fixed_user' (cible = personne précise, ex. Guillaume) → pré-affectation directe
+        //  - 'manager_dispatch' ou autre → on laisse le dispatcher choisir (pas d'assignee initial)
+        // Compat : si un ancien template n'a pas assignment_type renseigné, on retombe sur
+        // dispatch_manager_id (l'auto-assignation au dispatcher est conservée pour ne pas casser).
+        const isFixed = s.assignment_type === 'fixed_user';
+        const initialAssignee = isFixed
+          ? (s.target_assignee_id ?? null)
+          : (s.target_assignee_id ?? s.dispatch_manager_id ?? null);
+        // Statut BE initial : si déjà pré-affecté → 'affectee', sinon 'soumise' (à dispatcher).
+        const initialBeStatus = initialAssignee ? 'affectee' : 'soumise';
+        return {
+          title: `${title} — ${s.name}`,
+          type: 'task',
+          status: 'todo',
+          be_project_id: selectedProjectId,
+          be_affaire_id: selectedAffaireId || null,
+          be_urgency: urgency,
+          be_status: initialBeStatus,
+          user_id: user.id,
+          requester_id: profile.id,
+          parent_request_id: request.id,
+          sub_process_template_id: s.id,
+          assignee_id: initialAssignee,
+          // Hérite de la durée prévue du template (utilisée par /workload pour la taille de drag)
+          duration_hours: s.default_duration_hours ?? null,
+          source_process_template_id: BE_PROCESS_TEMPLATE_ID,
+          process_template_id: BE_PROCESS_TEMPLATE_ID,
+        };
+      });
 
       const { error: childError } = await sb.from('tasks').insert(childInserts);
       if (childError) throw childError;
