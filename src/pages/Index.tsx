@@ -43,6 +43,7 @@ import { PendingValidationsPanel } from '@/components/dashboard/PendingValidatio
 import { PendingTaskValidationsPanel } from '@/components/dashboard/PendingTaskValidationsPanel';
 import { usePendingValidationRequests } from '@/hooks/usePendingValidationRequests';
 import { usePendingTaskValidations } from '@/hooks/usePendingTaskValidations';
+import { useUserRole } from '@/hooks/useUserRole';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 const Index = () => {
@@ -50,6 +51,7 @@ const Index = () => {
   const { isSimulating, simulatedProfile } = useSimulation();
   /** Même profil que `useTasks` (simulation incluse) pour périmètre et filtre stakeholder. */
   const profile = isSimulating && simulatedProfile ? simulatedProfile : authProfile;
+  const { isAdmin } = useUserRole();
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeView, setActiveView] = useState('dashboard');
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
@@ -57,6 +59,12 @@ const Index = () => {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [showFullStats, setShowFullStats] = useState(false);
   const [dashboardMode, setDashboardMode] = useState<'tasks' | 'planner' | 'validations'>('tasks');
+  // Garde : si un non-admin se retrouve sur 'planner' (état persisté ou lien direct),
+  // on retombe sur 'tasks' pour ne pas laisser une zone vide.
+  useEffect(() => {
+    if (!isAdmin && dashboardMode === 'planner') setDashboardMode('tasks');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, dashboardMode]);
   const [taskSubMode, setTaskSubMode] = useState<'grid' | 'kanban' | 'calendar' | 'table' | 'analytics'>('table');
   /** Sous-filtre liste tâches : tout le périmètre ou uniquement les tâches suivies après réaffectation (stakeholder). */
   const [taskTeamSubView, setTaskTeamSubView] = useState<'all' | 'team_stakeholder'>('all');
@@ -489,9 +497,12 @@ const Index = () => {
         <TabsTrigger value="tasks" className="rounded-none border-b-2 border-transparent data-[state=active]:border-keon-blue data-[state=active]:text-keon-blue data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 h-10">
           Tâches & Demandes
         </TabsTrigger>
-        <TabsTrigger value="planner" className="rounded-none border-b-2 border-transparent data-[state=active]:border-keon-blue data-[state=active]:text-keon-blue data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 h-10 gap-1">
-          <Zap className="h-3.5 w-3.5" /> Planner
-        </TabsTrigger>
+        {/* Onglet Planner — accès ultra-limité (admin global uniquement) */}
+        {isAdmin && (
+          <TabsTrigger value="planner" className="rounded-none border-b-2 border-transparent data-[state=active]:border-keon-blue data-[state=active]:text-keon-blue data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 h-10 gap-1">
+            <Zap className="h-3.5 w-3.5" /> Planner
+          </TabsTrigger>
+        )}
         <TabsTrigger value="validations" className="rounded-none border-b-2 border-transparent data-[state=active]:border-keon-blue data-[state=active]:text-keon-blue data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 h-10 gap-1">
           <ShieldCheck className="h-3.5 w-3.5" /> Validations
           {totalValidationCount > 0 && <Badge variant="destructive" className="ml-1 text-[10px] px-1.5 py-0">{totalValidationCount}</Badge>}
@@ -595,9 +606,13 @@ const Index = () => {
         {renderTasksSubContent()}
       </TabsContent>
 
-      <TabsContent value="planner" className="mt-4">
-        <PlannerSyncPanel />
-      </TabsContent>
+      {/* Garde de défense : même si le user atterrit sur ce tab via état persisté,
+          on n'expose PlannerSyncPanel qu'aux admins. */}
+      {isAdmin && (
+        <TabsContent value="planner" className="mt-4">
+          <PlannerSyncPanel />
+        </TabsContent>
+      )}
 
       <TabsContent value="validations" className="mt-4">
         <Tabs defaultValue="requests" className="w-full">
