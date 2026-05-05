@@ -86,6 +86,7 @@ export default function Workload() {
     addMultipleSlots,
     removeSlot,
     moveSlot,
+    moveSlotsWithOffset,
     segmentTaskSlots,
     isHalfDayAvailable,
     getTaskSlotsCount,
@@ -460,6 +461,7 @@ export default function Workload() {
                     }}
                      onSlotAdd={handleAddSlot}
                      onMultiSlotAdd={handleAddMultipleSlots}
+                     onSlotMove={moveSlotsWithOffset}
                      onReassignTask={reassignTaskSlots}
                      isHalfDayAvailable={isHalfDayAvailable}
                      checkSlotLeaveConflict={checkSlotLeaveConflict}

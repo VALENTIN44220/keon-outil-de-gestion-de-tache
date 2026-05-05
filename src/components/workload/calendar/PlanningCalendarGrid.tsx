@@ -46,6 +46,7 @@ import { YearPlanningGrid } from './YearPlanningGrid';
    onToday: () => void;
    onTaskClick: (task: Task, slots: WorkloadSlot[]) => void;
    onSlotDrop: (taskId: string, userId: string, date: string, halfDay: 'morning' | 'afternoon', duration: number) => Promise<void>;
+   onSlotMove?: (slotIds: string[], dayOffset: number, newUserId?: string) => Promise<void>;
    onTaskMove?: (taskId: string, fromUserId: string, toUserId: string, newStartDate: string) => Promise<void>;
    dropTarget: { userId: string; date: string; halfDay: 'morning' | 'afternoon' } | null;
    onDragOver: (userId: string, date: string, halfDay: 'morning' | 'afternoon') => void;
@@ -70,6 +71,7 @@ import { YearPlanningGrid } from './YearPlanningGrid';
    onToday,
    onTaskClick,
    onSlotDrop,
+   onSlotMove,
    onTaskMove,
    dropTarget,
    onDragOver,
@@ -369,6 +371,7 @@ import { YearPlanningGrid } from './YearPlanningGrid';
           showOutlookEvents={showOutlookEvents}
           onTaskClick={onTaskClick}
           onSlotDrop={onSlotDrop}
+          onSlotMove={onSlotMove}
           dropTarget={dropTarget}
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
@@ -419,6 +422,7 @@ import { YearPlanningGrid } from './YearPlanningGrid';
           showOutlookEvents={showOutlookEvents}
           onTaskClick={onTaskClick}
           onSlotDrop={onSlotDrop}
+          onSlotMove={onSlotMove}
           dropTarget={dropTarget}
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
@@ -467,6 +471,7 @@ import { YearPlanningGrid } from './YearPlanningGrid';
           leaves={leaves}
           onTaskClick={onTaskClick}
           onSlotDrop={onSlotDrop}
+          onSlotMove={onSlotMove}
           dropTarget={dropTarget}
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
