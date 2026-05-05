@@ -42,6 +42,7 @@ const menuGroups: MenuGroup[] = [
     items: [
       { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard, path: '/', permissionKey: 'can_access_dashboard' },
       { id: 'requests', label: 'Demandes', icon: FileText, path: '/requests', permissionKey: 'can_access_requests' },
+      { id: 'my-requests', label: 'Mes demandes', icon: ClipboardList, path: '/mes-demandes', permissionKey: 'can_access_requests' },
       { id: 'process-tracking', label: 'Suivi de processus', icon: ClipboardList, path: '/process-tracking', permissionKey: 'can_access_process_tracking' },
     ],
   },

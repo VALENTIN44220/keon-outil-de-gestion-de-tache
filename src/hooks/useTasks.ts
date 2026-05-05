@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useId } from 'react';
 import { Task, TaskStatus, TaskPriority, TaskStats } from '@/types/task';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -195,11 +195,19 @@ export function useTasks(externalScope?: TaskScope) {
   }, [fetchTasks, permissionsLoading]);
 
   // Live-update task statuses without page refresh.
+  // Nom de channel UNIQUE par instance du hook : avec PersistentRoutes,
+  // plusieurs pages (Index, Requests, Workload…) peuvent appeler useTasks()
+  // simultanément avec le même scope. Sans useId, toutes ces instances
+  // tomberaient sur le même channel partagé → erreur Supabase v2 :
+  // « cannot add `postgres_changes` callbacks ... after `subscribe()` »
+  // (= la 2e instance trouve le channel déjà subscribed et ne peut plus
+  // ajouter ses callbacks). Cf. même pattern dans useInAppNotifications.
+  const instanceId = useId();
   useEffect(() => {
     if (!user?.id || !profile?.id) return;
 
     const channel = supabase
-      .channel(`tasks-live-status-${scope}`)
+      .channel(`tasks-live-status-${scope}-${instanceId}`)
       .on(
         'postgres_changes',
         {
@@ -221,7 +229,7 @@ export function useTasks(externalScope?: TaskScope) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id, profile?.id, scope]);
+  }, [user?.id, profile?.id, scope, instanceId]);
 
   const filteredTasks = useMemo(() => {
     return tasks.filter((task) => {

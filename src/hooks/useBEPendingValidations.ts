@@ -12,7 +12,7 @@
  * consommé dans le tab « Validations » du dashboard pour centraliser la
  * vision des choses à valider (legacy + BE).
  */
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useId } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSimulation } from '@/contexts/SimulationContext';
@@ -51,6 +51,9 @@ export function useBEPendingValidations() {
 
   const [tasks, setTasks] = useState<BEPendingValidationTask[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  // Channel name unique par instance pour éviter les collisions quand plusieurs
+  // pages mountées simultanément (PersistentRoutes) appellent ce hook.
+  const instanceId = useId();
 
   const fetchPending = useCallback(async () => {
     if (!profile?.id) {
@@ -103,7 +106,7 @@ export function useBEPendingValidations() {
   useEffect(() => {
     if (!profile?.id) return;
     const channel = supabase
-      .channel(`be-pending-validations:${profile.id}`)
+      .channel(`be-pending-validations:${profile.id}:${instanceId}`)
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'tasks', filter: 'type=eq.task' },
@@ -111,7 +114,7 @@ export function useBEPendingValidations() {
       )
       .subscribe();
     return () => { void supabase.removeChannel(channel); };
-  }, [profile?.id, fetchPending]);
+  }, [profile?.id, fetchPending, instanceId]);
 
   return {
     tasks,
