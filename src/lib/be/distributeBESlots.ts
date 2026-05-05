@@ -136,6 +136,79 @@ export async function distributeBESlots(
 }
 
 /**
+ * resyncBESlots — replanifie les `workload_slots` d'une tâche pour matcher sa
+ * `duration_hours` courante, en CONSERVANT la date de départ et l'assigné
+ * actuels.
+ *
+ * Cas d'usage : l'utilisateur a édité `tasks.duration_hours` via le badge ⏱
+ * du dispatch APRÈS avoir déjà planifié la tâche (slots existants). On veut
+ * que la planification se mette à jour sans effacer la position calendrier.
+ *
+ * Algorithme :
+ *  - Charge les slots existants (par task_id) triés par date asc / half_day asc.
+ *  - Si aucun slot → ne fait rien (la tâche n'est pas planifiée, pas de resync
+ *    à faire — l'utilisateur va drag-drop manuellement plus tard).
+ *  - Sinon, récupère :
+ *      - userId = user du 1er slot existant (= assigné actuel sur le planning)
+ *      - startDate = date du 1er slot existant
+ *      - dueDate = `tasks.due_date` (peut être null = pas de borne)
+ *      - totalHours = `tasks.duration_hours` (la nouvelle valeur)
+ *  - Appelle `distributeBESlots` qui supprime et recrée les slots.
+ *
+ * Idempotent. Pas d'effet si totalHours non défini ou ≤ 0.
+ */
+export async function resyncBESlots(taskId: string): Promise<DistributeBESlotsResult | null> {
+  // 1. Slots existants
+  const { data: existingSlots, error: slotsErr } = await sb
+    .from('workload_slots')
+    .select('user_id, date, half_day')
+    .eq('task_id', taskId)
+    .order('date', { ascending: true })
+    .order('half_day', { ascending: true });
+
+  if (slotsErr) {
+    console.error('[resyncBESlots] fetch slots error', slotsErr);
+    return null;
+  }
+  if (!existingSlots || existingSlots.length === 0) {
+    // Tâche pas planifiée → pas de resync à faire
+    return null;
+  }
+
+  const firstSlot = existingSlots[0];
+  const userId = firstSlot.user_id as string;
+  const startDate = firstSlot.date as string;
+
+  // 2. Tâche pour récupérer duration_hours + due_date courants
+  const { data: task, error: taskErr } = await sb
+    .from('tasks')
+    .select('duration_hours, due_date')
+    .eq('id', taskId)
+    .single();
+
+  if (taskErr || !task) {
+    console.error('[resyncBESlots] fetch task error', taskErr);
+    return null;
+  }
+
+  const totalHours = (task as any).duration_hours as number | null;
+  if (!totalHours || totalHours <= 0) {
+    // Plus de durée → on supprime les slots existants (cohérent : tâche dé-planifiée)
+    await sb.from('workload_slots').delete().eq('task_id', taskId);
+    return { hoursPlaced: 0, slotsCreated: 0, truncated: false };
+  }
+
+  // 3. Re-crée les slots (distributeBESlots fait delete + insert)
+  return distributeBESlots({
+    taskId,
+    userId,
+    startDate,
+    dueDate: (task as any).due_date,
+    totalHours,
+  });
+}
+
+/**
  * Supprime les slots associés à une (task, user) — utilisé lors d'un
  * désassignement.
  */

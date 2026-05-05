@@ -83,7 +83,7 @@ import { BEStatusBadge } from '@/components/be/BEStatusBadge';
 import { NewBERequestDialog } from '@/components/be/NewBERequestDialog';
 import { useBETaskStatus } from '@/hooks/useBETaskStatus';
 import { useUserWeekLoad, type UserWeekLoad } from '@/hooks/useUserWeekLoad';
-import { clearBETaskSlots } from '@/lib/be/distributeBESlots';
+import { clearBETaskSlots, resyncBESlots } from '@/lib/be/distributeBESlots';
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
 
@@ -394,7 +394,29 @@ function DurationHoursField({
       return;
     }
     setEditing(false);
+
+    // Auto-resync : si la tâche est déjà planifiée (slots existants), on
+    // ajuste les slots pour matcher la nouvelle durée. Garde la même date
+    // de départ et le même assigné. Si la nouvelle durée est null/0, les
+    // slots sont supprimés.
+    try {
+      const result = await resyncBESlots(taskId);
+      if (result) {
+        if (result.truncated) {
+          toast.warning(
+            `Plan de charge ajusté : ${result.hoursPlaced}h posées (fenêtre trop courte pour ${parsed}h).`,
+          );
+        } else if (result.slotsCreated > 0) {
+          toast.success(`Plan de charge mis à jour (${result.slotsCreated} demi-journée${result.slotsCreated > 1 ? 's' : ''}).`);
+        }
+      }
+    } catch (e) {
+      console.warn('[DurationHoursField] resyncBESlots failed', e);
+      toast.warning('Plan de charge non resynchronisé (erreur). La durée est tout de même enregistrée.');
+    }
+
     qc.invalidateQueries({ queryKey: ['be-dispatch-tasks'] });
+    qc.invalidateQueries({ queryKey: ['user-week-load'] });
     onSaved();
   };
 
