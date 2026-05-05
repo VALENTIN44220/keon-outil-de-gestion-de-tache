@@ -478,8 +478,9 @@ export function NewBERequestDialog({
           </div>
         </DialogHeader>
 
-        {/* Content */}
-        <ScrollArea className="flex-1 px-6">
+        {/* Content — overflow-y-auto natif (plus fiable que Radix ScrollArea
+            avec une grande liste : scrollbar visible et toujours active) */}
+        <div className="flex-1 overflow-y-auto px-6 min-h-0">
           <div className="py-5 space-y-4">
 
             {/* ── ÉTAPE 0 : PROJET & AFFAIRE ──────────────────────────── */}
@@ -930,7 +931,7 @@ export function NewBERequestDialog({
               </div>
             )}
           </div>
-        </ScrollArea>
+        </div>
 
         {/* Footer */}
         <DialogFooter className="flex-row items-center gap-2 px-6 py-4 border-t">
