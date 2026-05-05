@@ -174,7 +174,7 @@
    }
  
    return (
-     <Card className="w-80 shrink-0 shadow-lg border-0 bg-gradient-to-b from-card to-muted/20 flex flex-col h-full">
+     <Card className="w-96 shrink-0 shadow-lg border-0 bg-gradient-to-b from-card to-muted/20 flex flex-col h-full">
        <CardHeader className="pb-3 shrink-0">
          <div className="flex items-center justify-between mb-3">
            <div className="flex items-center gap-2">
@@ -316,8 +316,26 @@
                            getPriorityColor(task.priority)
                          )} />
                          <div className="flex-1 min-w-0">
+                           {/* Refs courtes (task_number + request_number) — cohérent avec /be/dispatch */}
                            <div className="flex items-center gap-1 mb-0.5 flex-wrap">
-                             {/* Badge BE — visible si la tâche est rattachée à un projet ou un statut BE */}
+                             {(task as any).task_number && (
+                               <Badge
+                                 variant="outline"
+                                 className="h-4 px-1 text-[9px] font-mono font-medium shrink-0"
+                                 title={`Identifiant tâche : ${(task as any).task_number}`}
+                               >
+                                 {(task as any).task_number}
+                               </Badge>
+                             )}
+                             {(task as any).request_number && (task as any).request_number !== (task as any).task_number && (
+                               <Badge
+                                 variant="outline"
+                                 className="h-4 px-1 text-[9px] font-mono shrink-0 text-muted-foreground"
+                                 title={`Demande parente : ${(task as any).request_number}`}
+                               >
+                                 {(task as any).request_number}
+                               </Badge>
+                             )}
                              {((task as any).be_project_id || (task as any).be_status) && (
                                <Badge
                                  variant="outline"
@@ -327,7 +345,6 @@
                                  BE
                                </Badge>
                              )}
-                             {/* Statut BE compact (a_relire, a_valider, etc.) */}
                              {(task as any).be_status && (task as any).be_status !== 'cloturee' && (
                                <Badge
                                  variant="outline"

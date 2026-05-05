@@ -118,6 +118,8 @@ const URGENCY_META: Record<string, { label: string; color: string; bg: string; t
 interface BETaskRow {
   id: string;
   title: string;
+  task_number: string | null;
+  request_number: string | null;
   status: string;
   be_status: string | null;
   be_urgency: 'normal' | 'urgent' | 'critique' | null;
@@ -711,6 +713,16 @@ function TaskRow({
               {task.be_project.code_projet}
             </Badge>
           )}
+          {/* Identifiant tâche — cohérent avec le backlog /workload */}
+          {task.task_number && (
+            <Badge
+              variant="outline"
+              className="font-mono text-[10px] px-1 py-0 shrink-0 text-muted-foreground"
+              title={`Tâche : ${task.task_number}`}
+            >
+              {task.task_number}
+            </Badge>
+          )}
           <span className="text-sm font-medium truncate">{presName}</span>
           {presCat === 'be_reglementaire' && (
             <Badge
@@ -894,7 +906,7 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
       let q = sb
         .from('tasks')
         .select(`
-          id, title, status, be_status, be_urgency,
+          id, title, task_number, request_number, status, be_status, be_urgency,
           parent_request_id, assignee_id, sub_process_template_id,
           due_date, start_date, duration_hours, created_at, type, document_url,
           assignee:profiles!tasks_assignee_id_fkey(id, display_name),
