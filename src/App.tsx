@@ -188,6 +188,7 @@ const App = () => (
             <Route path="/be/projects/:code/budget/:codeAffaire" element={<></>} />
             <Route path="/be/projects/:code/temps" element={<></>} />
             <Route path="/be/budget" element={<></>} />
+            <Route path="/be/dispatch" element={<></>} />
             <Route path="/be/admin/tjm" element={<></>} />
             <Route path="/be/admin/divalto-import" element={<></>} />
             <Route path="/be/projects/:code/discussions" element={<></>} />

@@ -41,9 +41,11 @@ import { Task, TaskStats } from '@/types/task';
 import { BulkActionDialog } from '@/components/tasks/BulkActionDialog';
 import { PendingValidationsPanel } from '@/components/dashboard/PendingValidationsPanel';
 import { PendingTaskValidationsPanel } from '@/components/dashboard/PendingTaskValidationsPanel';
+import { BEPendingValidationsPanel } from '@/components/dashboard/BEPendingValidationsPanel';
 import { MyDayPanel } from '@/components/dashboard/MyDayPanel';
 import { usePendingValidationRequests } from '@/hooks/usePendingValidationRequests';
 import { usePendingTaskValidations } from '@/hooks/usePendingTaskValidations';
+import { useBEPendingValidations } from '@/hooks/useBEPendingValidations';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
@@ -115,7 +117,8 @@ const Index = () => {
   const pendingCount = getPendingCount();
   const { requests: pendingValidations, count: pendingValidationCount, isLoading: isLoadingValidations, refetch: refetchValidations } = usePendingValidationRequests();
   const { tasks: pendingTaskValidations, count: pendingTaskValidationCount, isLoading: isLoadingTaskValidations, refetch: refetchTaskValidations } = usePendingTaskValidations();
-  const totalValidationCount = pendingValidationCount + pendingTaskValidationCount;
+  const { tasks: pendingBEValidations, count: pendingBEValidationCount, isLoading: isLoadingBEValidations, refetch: refetchBEValidations } = useBEPendingValidations();
+  const totalValidationCount = pendingValidationCount + pendingTaskValidationCount + pendingBEValidationCount;
   
   // State for comment notification task detail
   const [selectedTaskForComment, setSelectedTaskForComment] = useState<Task | null>(null);
@@ -644,6 +647,14 @@ const Index = () => {
                 </Badge>
               )}
             </TabsTrigger>
+            <TabsTrigger value="be" className="gap-1.5">
+              BE — à relire
+              {pendingBEValidationCount > 0 && (
+                <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                  {pendingBEValidationCount}
+                </Badge>
+              )}
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="requests">
             <PendingValidationsPanel
@@ -665,6 +676,13 @@ const Index = () => {
                 setSelectedTaskForComment(task);
                 setIsCommentDetailOpen(true);
               }}
+            />
+          </TabsContent>
+          <TabsContent value="be">
+            <BEPendingValidationsPanel
+              tasks={pendingBEValidations}
+              isLoading={isLoadingBEValidations}
+              onRefresh={refetchBEValidations}
             />
           </TabsContent>
         </Tabs>
