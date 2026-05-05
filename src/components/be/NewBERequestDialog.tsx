@@ -258,15 +258,6 @@ export function NewBERequestDialog({
         if (error) {
           console.error('[NewBERequestDialog] sub_process_templates fetch error:', error);
         }
-        // eslint-disable-next-line no-console
-        console.log('[NewBERequestDialog] sub_process_templates loaded:', {
-          total: (data ?? []).length,
-          byCategory: (data ?? []).reduce((acc: Record<string, number>, s: any) => {
-            const k = s.be_category ?? 'NULL';
-            acc[k] = (acc[k] ?? 0) + 1;
-            return acc;
-          }, {}),
-        });
         setAllSteps(data ?? []);
         setStepsLoading(false);
       });
@@ -301,13 +292,6 @@ export function NewBERequestDialog({
       if (!cats[key]) cats[key] = [];
       cats[key].push(g);
     }
-    // DEBUG : à retirer après diagnostic
-    // eslint-disable-next-line no-console
-    console.log('[NewBERequestDialog] groupsByCategory:', {
-      categories: Object.keys(cats),
-      counts: Object.fromEntries(Object.entries(cats).map(([k, v]) => [k, v.length])),
-      groupNames: Object.fromEntries(Object.entries(cats).map(([k, v]) => [k, v.map(g => g.groupName)])),
-    });
     return cats;
   }, [prestationGroups]);
 
