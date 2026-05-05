@@ -41,6 +41,7 @@ import { Task, TaskStats } from '@/types/task';
 import { BulkActionDialog } from '@/components/tasks/BulkActionDialog';
 import { PendingValidationsPanel } from '@/components/dashboard/PendingValidationsPanel';
 import { PendingTaskValidationsPanel } from '@/components/dashboard/PendingTaskValidationsPanel';
+import { MyDayPanel } from '@/components/dashboard/MyDayPanel';
 import { usePendingValidationRequests } from '@/hooks/usePendingValidationRequests';
 import { usePendingTaskValidations } from '@/hooks/usePendingTaskValidations';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -510,6 +511,16 @@ const Index = () => {
       </TabsList>
 
       <TabsContent value="tasks" className="mt-0">
+        {/* Encart « Mon jour » — KPIs personnels en haut, cliquables */}
+        <div className="px-4 pt-4">
+          <MyDayPanel
+            myTasks={allTasks}
+            currentUserId={profile?.id}
+            pendingValidationCount={totalValidationCount}
+            onGoToValidations={() => setDashboardMode('validations')}
+          />
+        </div>
+
         {/* Sub-navigation for tasks tab */}
         <div className="flex items-center bg-keon-50 border-b border-keon-200 px-0 mb-4">
           {taskSubModeOptions.map(({ value, label, icon: Icon }) => (
