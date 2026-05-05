@@ -60,9 +60,10 @@ BEGIN
      AND name = 'ICPE Enregistrement — Réalisation des plans';  -- 1 jour
 
   -- Permis de construire
+  -- Note : le name réel en DB est "Réalisation plan PC" (sans "pour")
   UPDATE sub_process_templates SET default_duration_hours = 8
    WHERE process_template_id = v_be_process_id
-     AND name = 'Permis de construire — Réalisation plan pour PC'; -- 1 jour
+     AND name = 'Permis de construire — Réalisation plan PC'; -- 1 jour
   UPDATE sub_process_templates SET default_duration_hours = 16
    WHERE process_template_id = v_be_process_id
      AND name = 'Permis de construire — Réalisation dossier';      -- 2 jours
@@ -93,7 +94,7 @@ BEGIN
      AND name IN (
        'ICPE Déclaration — Réalisation des plans',
        'ICPE Enregistrement — Réalisation des plans',
-       'Permis de construire — Réalisation plan pour PC',
+       'Permis de construire — Réalisation plan PC',
        'Agrément sanitaire — Réalisation des plans'
      );
 
