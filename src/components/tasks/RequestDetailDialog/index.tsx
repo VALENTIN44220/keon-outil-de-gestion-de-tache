@@ -426,80 +426,95 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange, onTas
     
     setIsCancelling(true);
     try {
-      // 1. Cancel all child tasks
+      // 1. Cancel all child tasks (tolère les erreurs partielles)
       if (childTasks.length > 0) {
         const childTaskIds = childTasks.map(t => t.id);
         const { error: childError } = await supabase
           .from('tasks')
-          .update({ 
-            status: 'cancelled' as TaskStatus, 
-            updated_at: new Date().toISOString() 
+          .update({
+            status: 'cancelled' as TaskStatus,
+            updated_at: new Date().toISOString(),
           })
           .in('id', childTaskIds);
-        
-        if (childError) throw childError;
+
+        if (childError) {
+          console.warn('[handleCancelRequest] childTasks update warning:', childError);
+        }
       }
 
-      // 2. Cancel related request_sub_processes
-      const { error: subProcessError } = await supabase
-        .from('request_sub_processes')
-        .update({ 
-          status: 'cancelled',
-          updated_at: new Date().toISOString() 
-        })
-        .eq('request_id', task.id);
-      
-      if (subProcessError) {
-        console.error('Error cancelling sub-processes:', subProcessError);
+      // 2. Cancel related request_sub_processes (tolère)
+      try {
+        const { error: subProcessError } = await supabase
+          .from('request_sub_processes' as any)
+          .update({
+            status: 'cancelled',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('request_id', task.id);
+        if (subProcessError) {
+          console.warn('[handleCancelRequest] sub_processes warning:', subProcessError);
+        }
+      } catch (e) {
+        console.warn('[handleCancelRequest] request_sub_processes table absente, ignoré', e);
       }
 
-      // 3. Cancel any active workflow runs
-      const { error: workflowError } = await supabase
-        .from('workflow_runs')
-        .update({ 
-          status: 'cancelled' as const,
-          completed_at: new Date().toISOString() 
-        })
-        .eq('trigger_entity_id', task.id)
-        .neq('status', 'completed')
-        .neq('status', 'failed')
-        .neq('status', 'cancelled');
-      
-      if (workflowError) {
-        console.error('Error cancelling workflow runs:', workflowError);
+      // 3. Cancel any active workflow runs (tolère — table peut être absente)
+      try {
+        const { error: workflowError } = await supabase
+          .from('workflow_runs' as any)
+          .update({
+            status: 'cancelled' as const,
+            completed_at: new Date().toISOString(),
+          })
+          .eq('trigger_entity_id', task.id)
+          .neq('status', 'completed')
+          .neq('status', 'failed')
+          .neq('status', 'cancelled');
+        if (workflowError) {
+          console.warn('[handleCancelRequest] workflow_runs warning:', workflowError);
+        }
+      } catch (e) {
+        console.warn('[handleCancelRequest] workflow_runs table absente, ignoré', e);
       }
 
-      // 4. Cancel the main request
+      // 4. Cancel the main request — c'est la SEULE étape critique.
       const { error: requestError } = await supabase
         .from('tasks')
-        .update({ 
-          status: 'cancelled' as TaskStatus, 
-          updated_at: new Date().toISOString() 
+        .update({
+          status: 'cancelled' as TaskStatus,
+          updated_at: new Date().toISOString(),
         })
         .eq('id', task.id);
-      
+
       if (requestError) throw requestError;
 
-      // 5. Emit workflow event
-      await supabase.from('workflow_events').insert({
-        event_type: 'task_status_changed',
-        entity_type: 'request',
-        entity_id: task.id,
-        payload: {
-          from_status: task.status,
-          to_status: 'cancelled',
-          task_title: task.title,
-          cancelled_tasks_count: childTasks.length,
-        },
-      });
+      // 5. Emit workflow event (tolère — table workflow_events supprimée par
+      //    la migration be_001_drop_wf_tables sur certains environnements).
+      try {
+        await supabase.from('workflow_events' as any).insert({
+          event_type: 'task_status_changed',
+          entity_type: 'request',
+          entity_id: task.id,
+          payload: {
+            from_status: task.status,
+            to_status: 'cancelled',
+            task_title: task.title,
+            cancelled_tasks_count: childTasks.length,
+          },
+        });
+      } catch (e) {
+        console.warn('[handleCancelRequest] workflow_events table absente, ignoré', e);
+      }
 
       onStatusChange(task.id, 'cancelled');
       toast.success('Demande annulée avec succès');
       setIsCancelDialogOpen(false);
       onClose();
-    } catch (error) {
-      console.error('Error cancelling request:', error);
-      toast.error('Erreur lors de l\'annulation de la demande');
+    } catch (error: any) {
+      console.error('Error cancelling request — full error:', error);
+      // Affiche le détail réel pour aider au diagnostic (RLS, contrainte, trigger…)
+      const detail = error?.message || error?.details || error?.hint || JSON.stringify(error);
+      toast.error(`Erreur annulation : ${detail}`, { duration: 8000 });
     } finally {
       setIsCancelling(false);
     }
@@ -547,18 +562,22 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange, onTas
         .eq('id', task.id);
       if (requestError) throw requestError;
 
-      // 4) Emit workflow event (best-effort)
-      await supabase.from('workflow_events').insert({
-        event_type: 'task_status_changed',
-        entity_type: 'request',
-        entity_id: task.id,
-        payload: {
-          from_status: task.status,
-          to_status: 'done',
-          task_title: task.title,
-          completed_tasks_count: childTasks.length,
-        },
-      });
+      // 4) Emit workflow event (best-effort — table peut être absente)
+      try {
+        await supabase.from('workflow_events' as any).insert({
+          event_type: 'task_status_changed',
+          entity_type: 'request',
+          entity_id: task.id,
+          payload: {
+            from_status: task.status,
+            to_status: 'done',
+            task_title: task.title,
+            completed_tasks_count: childTasks.length,
+          },
+        });
+      } catch (e) {
+        console.warn('[handleCompleteRequest] workflow_events table absente, ignoré', e);
+      }
 
       onStatusChange(task.id, 'done');
       toast.success('Demande marquée comme complétée');
