@@ -128,6 +128,30 @@ const Index = () => {
   const taskIds = useMemo(() => allTasks.map(t => t.id), [allTasks]);
   const { progressMap, globalProgress, globalStats } = useTasksProgress(taskIds);
 
+  // En mode simulation : on remet les filtres à zéro à chaque bascule pour
+  // éviter qu'un filtre laissé par l'admin (ex. assigneeId = mon ID) cache
+  // les tâches du profil simulé. Sans ça, on a la dissonance : KPI dit "1
+  // tâche active" mais le tableau dit "Aucune tâche" — parce que l'admin
+  // avait coché un filtre côté barre avancée ou filtres croisés.
+  useEffect(() => {
+    setAdvancedFilters({
+      assigneeId: 'all',
+      requesterId: 'all',
+      reporterId: 'all',
+      company: 'all',
+      department: 'all',
+      categoryId: 'all',
+      subcategoryId: 'all',
+      groupBy: 'none',
+    });
+    setCrossFilters(DEFAULT_CROSS_FILTERS);
+    setStatusFilter('all');
+    setPriorityFilter('all');
+    setSearchQuery('');
+    setTaskTeamSubView('all');
+    // Re-déclencher quand le profil actif change (login différent ou simulation).
+  }, [isSimulating, simulatedProfile?.id]);
+
   // Check if advanced filters have active values
   const hasActiveAdvancedFilters = useMemo(() => {
     return Object.entries(advancedFilters).some(([key, value]) => {
