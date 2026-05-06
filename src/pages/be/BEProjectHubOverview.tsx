@@ -49,7 +49,6 @@ import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Task } from '@/types/task';
 import { getStatusLabel, getStatusColor } from '@/services/taskStatusService';
-import { BEDispatchView } from '@/components/be/BEDispatchView';
 
 interface DescriptionItemProps {
   label: string;
@@ -647,8 +646,12 @@ export default function BEProjectHubOverview() {
               )}
             </CardContent>
           </Card>
-          {/* BE Dispatch View */}
-          <BEDispatchView projectId={project?.id} projectCode={project?.code_projet} />
+          {/*
+           * BE Dispatch View — RETIRÉ de la page overview projet : redondant
+           * avec la section « Demandes & Tâches » au-dessus, et brouillon.
+           * Pour les actions de dispatch (assignation, validation, plan de
+           * charge), utiliser /be/dispatch (vue globale avec filtre projet).
+           */}
         </div>
 
         {/* Right Column */}
