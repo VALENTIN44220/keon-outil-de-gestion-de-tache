@@ -447,12 +447,28 @@ function DurationHoursField({
           onBlur={save}
           className="h-7 w-16 text-xs"
           placeholder="h"
+          title="Saisie en heures (1j = 8h)"
         />
+        <span className="text-[10px] text-muted-foreground shrink-0">h</span>
       </div>
     );
   }
 
-  const display = initial != null ? `${initial}h` : '—';
+  // Affichage compact : 1 jour = 8h.
+  //  - < 8h          → "Xh"   (ex. "4h")
+  //  - multiple de 8 → "Nj"   (ex. "8h → 1j", "24h → 3j")
+  //  - sinon         → "Nj Zh" (ex. "10h → 1j 2h")
+  const formatDuration = (h: number): string => {
+    if (h < 8) return `${h}h`;
+    const days = Math.floor(h / 8);
+    const rem = h - days * 8;
+    if (rem === 0) return `${days}j`;
+    return `${days}j ${rem}h`;
+  };
+  const display = initial != null ? formatDuration(initial) : '—';
+  const tooltipText = initial != null
+    ? `Temps prévu : ${initial}h (= ${display}). Alimente le plan de charge à l'affectation.`
+    : `Temps prévu — alimente le plan de charge à l'affectation`;
   return (
     <TooltipProvider>
       <Tooltip>
@@ -471,7 +487,7 @@ function DurationHoursField({
           </button>
         </TooltipTrigger>
         <TooltipContent side="top">
-          Temps prévu — alimente le plan de charge à l'affectation
+          {tooltipText}
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
