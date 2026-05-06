@@ -40,6 +40,7 @@ import SupplierReference from "./pages/SupplierReference";
 import ProcessTracking from "./pages/ProcessTracking";
 import Innovation from "./pages/Innovation";
 import InnovationRequests from "./pages/InnovationRequests";
+import InnovationNew from "./pages/InnovationNew";
 import KeonDashboard from "./pages/KeonDashboard";
 
 // BE Project Hub pages
@@ -118,6 +119,7 @@ const App = () => (
                 { path: "/process-tracking", end: true, element: <ProtectedRoute><ProcessTracking /></ProtectedRoute> },
 
                 { path: "/innovation", end: true, element: <ProtectedRoute><Innovation /></ProtectedRoute> },
+                { path: "/innovation/new", end: true, element: <ProtectedRoute><InnovationNew /></ProtectedRoute> },
                 { path: "/innovation/requests", end: true, element: <ProtectedRoute><InnovationRequests /></ProtectedRoute> },
                 { path: "/innovation/requests/:id", end: true, element: <ProtectedRoute><InnovationRequests /></ProtectedRoute> },
 
@@ -180,6 +182,7 @@ const App = () => (
             <Route path="/suppliers" element={<></>} />
             <Route path="/process-tracking" element={<></>} />
             <Route path="/innovation" element={<></>} />
+            <Route path="/innovation/new" element={<></>} />
             <Route path="/innovation/requests" element={<></>} />
             <Route path="/innovation/requests/:id" element={<></>} />
             <Route path="/spv" element={<></>} />
