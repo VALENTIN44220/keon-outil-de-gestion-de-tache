@@ -65,7 +65,17 @@ export function ArticleSearchSelect({ value, onSelect, disabled, filterConfig }:
 
       const { data, error } = await q;
       if (error) throw error;
-      setArticles(data || []);
+      // Dedoublonne par ref (la table articles peut contenir plusieurs lignes
+      // pour une meme reference selon les imports Divalto / historiques).
+      const seen = new Set<string>();
+      const unique: Article[] = [];
+      for (const a of data || []) {
+        const key = (a.ref || '').trim().toUpperCase();
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        unique.push(a);
+      }
+      setArticles(unique);
     } catch (error) {
       console.error('Error fetching articles:', error);
     } finally {

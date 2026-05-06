@@ -155,6 +155,7 @@ export default function NewMaintenanceRequest() {
                     lines={lines}
                     onChange={setLines}
                     disabled={isSubmitting}
+                    articleFilterConfig={{ ref_prefix: 'AD' }}
                   />
                 </div>
 
