@@ -70,6 +70,13 @@ const menuGroups: MenuGroup[] = [
         permissionKey: 'can_access_projects' as any,
       },
       {
+        id: 'be-suivi',
+        label: 'Suivi',
+        icon: BarChart2,
+        path: '/be/suivi',
+        permissionKey: 'can_access_projects' as any,
+      },
+      {
         id: 'be-budget',
         label: 'Budget',
         icon: Wallet,
