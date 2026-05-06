@@ -212,11 +212,24 @@ export function useBETaskStatus() {
       status: BETaskStatus;
       notify?: BEStatusNotifyContext;
     }) => {
+      // Récupère l'historique courant des transitions pour le merger avec
+      // la nouvelle entrée (on ne veut pas écraser les statuts précédents).
+      const { data: existing } = await sb
+        .from('tasks')
+        .select('be_status_dates')
+        .eq('id', taskId)
+        .single();
+      const currentDates = (existing?.be_status_dates as Record<string, string> | null) ?? {};
+      const updatedDates = { ...currentDates, [status]: new Date().toISOString() };
+
       const { data, error } = await sb
         .from('tasks')
-        .update({ be_status: status })
+        .update({
+          be_status: status,
+          be_status_dates: updatedDates,
+        })
         .eq('id', taskId)
-        .select('id, be_status, be_project_id')
+        .select('id, be_status, be_project_id, be_status_dates')
         .single();
       if (error) throw error;
 

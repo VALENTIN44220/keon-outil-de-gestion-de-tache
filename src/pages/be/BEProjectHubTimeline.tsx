@@ -4,6 +4,7 @@ import { useBEProjectByCode, useBEProjectTasks } from '@/hooks/useBEProjectHub';
 import { useBEProjectHubCode } from '@/hooks/useBEProjectHubCode';
 import { BEProjectGantt } from '@/components/be/gantt/BEProjectGantt';
 import { BEAffairesTimeline } from '@/components/be/timeline/BEAffairesTimeline';
+import { BETasksValidationTimeline } from '@/components/be/timeline/BETasksValidationTimeline';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -15,13 +16,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, Layers, ListTodo } from 'lucide-react';
+import { Search, Layers, ListTodo, Activity } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type ZoomLevelTasks = 'week' | 'month' | 'quarter' | 'year';
 type ZoomLevelAffaires = 'month' | 'quarter' | 'year';
 type PeriodMode = 'all' | 'current_year' | 'custom';
-type TimelineMode = 'affaires' | 'tasks';
+type TimelineMode = 'affaires' | 'tasks' | 'etapes';
 
 export default function BEProjectHubTimeline() {
   const code = useBEProjectHubCode();
@@ -83,6 +84,15 @@ export default function BEProjectHubTimeline() {
                   <ListTodo className="h-4 w-4" />
                   Tâches
                 </Button>
+                <Button
+                  variant={mode === 'etapes' ? 'default' : 'ghost'}
+                  size="sm"
+                  className={cn('h-8 px-3 gap-1.5', mode === 'etapes' && 'shadow-sm')}
+                  onClick={() => setMode('etapes')}
+                >
+                  <Activity className="h-4 w-4" />
+                  Étapes
+                </Button>
               </div>
 
               <div className="relative flex-1 min-w-[200px] max-w-md">
@@ -118,7 +128,7 @@ export default function BEProjectHubTimeline() {
         </Card>
 
         {/* Timeline */}
-        {mode === 'affaires' ? (
+        {mode === 'affaires' && (
           <BEAffairesTimeline
             projectId={project.id}
             zoom={zoomAffaires}
@@ -131,7 +141,8 @@ export default function BEProjectHubTimeline() {
             onCustomEndChange={setCustomEnd}
             searchQuery={searchQuery}
           />
-        ) : (
+        )}
+        {mode === 'tasks' && (
           <BEProjectGantt
             tasks={tasks}
             project={project}
@@ -145,6 +156,13 @@ export default function BEProjectHubTimeline() {
             onCustomEndChange={setCustomEnd}
             searchQuery={searchQuery}
             statusFilter={statusFilter}
+          />
+        )}
+        {mode === 'etapes' && (
+          <BETasksValidationTimeline
+            tasks={tasks}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
           />
         )}
       </div>
