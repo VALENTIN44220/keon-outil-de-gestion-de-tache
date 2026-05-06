@@ -987,6 +987,7 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
         .from('tasks')
         .select(`
           id, title, description, be_urgency, created_at, requester_id,
+          be_project_id, be_affaire_id, request_number,
           requester:profiles!tasks_requester_id_fkey(display_name),
           be_project:be_projects!tasks_be_project_id_fkey(code_projet, nom_projet)
         `)
@@ -1524,6 +1525,12 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
                             onRefresh={refetch}
                           />
                         ))}
+                        {/* Bouton pour ajouter une sous-tâche manuelle (en plus du processus) */}
+                        <AddManualSubTask
+                          parentRequest={req}
+                          profiles={profiles}
+                          onAdded={refetch}
+                        />
                       </div>
                     )}
                   </div>
@@ -1742,5 +1749,144 @@ function KpiCard({
         </CardContent>
       </Card>
     </Comp>
+  );
+}
+
+// ─── Ajout d'une sous-tâche manuelle (hors processus) ────────────────────────
+/**
+ * Permet au manager BE d'ajouter une sous-tâche libre à une demande, en
+ * complément des étapes définies par le processus (sub_process_template).
+ * La tâche créée :
+ *  - hérite de be_project_id, be_affaire_id, be_urgency, requester_id de la demande
+ *  - n'a PAS de sub_process_template_id (signe « ad-hoc »)
+ *  - démarre en be_status='soumise' (à dispatcher) ou 'affectee' si assigné
+ *  - peut être planifiée comme n'importe quelle autre tâche
+ */
+function AddManualSubTask({
+  parentRequest,
+  profiles,
+  onAdded,
+}: {
+  parentRequest: any;
+  profiles: Profile[];
+  onAdded: () => void;
+}) {
+  const { user } = useAuth();
+  const [editing, setEditing] = useState(false);
+  const [title, setTitle] = useState('');
+  const [assigneeId, setAssigneeId] = useState<string>('');
+  const [durationHours, setDurationHours] = useState<string>('');
+  const [dueDate, setDueDate] = useState<string>('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  const reset = () => {
+    setTitle('');
+    setAssigneeId('');
+    setDurationHours('');
+    setDueDate('');
+    setEditing(false);
+  };
+
+  const handleSave = async () => {
+    const t = title.trim();
+    if (!t) {
+      toast.error('Le titre est requis');
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const dur = durationHours.trim() ? parseFloat(durationHours) : null;
+      const insertPayload: Record<string, any> = {
+        title: `${parentRequest.title} — ${t}`,
+        type: 'task',
+        status: 'todo',
+        be_project_id: parentRequest.be_project_id,
+        be_affaire_id: parentRequest.be_affaire_id,
+        be_urgency: parentRequest.be_urgency ?? 'normal',
+        be_status: assigneeId ? 'affectee' : 'soumise',
+        parent_request_id: parentRequest.id,
+        // Pas de sub_process_template_id : tâche ad-hoc, hors processus
+        sub_process_template_id: null,
+        assignee_id: assigneeId || null,
+        duration_hours: dur,
+        due_date: dueDate || null,
+        user_id: user?.id,
+        requester_id: parentRequest.requester_id,
+        source_process_template_id: BE_PROCESS_TEMPLATE_ID,
+        process_template_id: BE_PROCESS_TEMPLATE_ID,
+      };
+      const { error } = await sb.from('tasks').insert(insertPayload);
+      if (error) throw error;
+      toast.success('Sous-tâche ajoutée');
+      reset();
+      onAdded();
+    } catch (e: any) {
+      console.error('[AddManualSubTask] insert error', e);
+      toast.error(e?.message || 'Erreur lors de la création');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        className="w-full px-4 py-2 flex items-center gap-2 text-xs text-muted-foreground hover:bg-muted/30 hover:text-primary border-t border-dashed transition-colors"
+      >
+        <Plus className="h-3.5 w-3.5" />
+        Ajouter une sous-tâche manuelle
+      </button>
+    );
+  }
+
+  return (
+    <div className="px-4 py-3 border-t bg-muted/20 space-y-2">
+      <div className="flex items-center gap-2 flex-wrap">
+        <Input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Titre de la sous-tâche"
+          className="h-8 text-xs flex-1 min-w-[200px]"
+          autoFocus
+        />
+        <Select value={assigneeId || '__none__'} onValueChange={(v) => setAssigneeId(v === '__none__' ? '' : v)}>
+          <SelectTrigger className="h-8 w-[160px] text-xs">
+            <SelectValue placeholder="Assigner..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__">Non assigné</SelectItem>
+            {profiles.map((p) => (
+              <SelectItem key={p.id} value={p.id}>{p.display_name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Input
+          type="number"
+          min={0}
+          step={0.5}
+          value={durationHours}
+          onChange={(e) => setDurationHours(e.target.value)}
+          placeholder="Durée h"
+          className="h-8 w-20 text-xs"
+        />
+        <Input
+          type="date"
+          value={dueDate}
+          onChange={(e) => setDueDate(e.target.value)}
+          className="h-8 w-36 text-xs"
+        />
+        <Button size="sm" className="h-8 text-xs" onClick={handleSave} disabled={isSaving}>
+          {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Ajouter'}
+        </Button>
+        <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={reset} disabled={isSaving}>
+          Annuler
+        </Button>
+      </div>
+      <p className="text-[10px] text-muted-foreground">
+        Cette sous-tâche s'ajoute aux étapes du processus. Elle suivra le même workflow BE.
+      </p>
+    </div>
   );
 }
