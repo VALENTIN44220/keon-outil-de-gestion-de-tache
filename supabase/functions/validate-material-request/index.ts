@@ -162,6 +162,7 @@ serve(async (req) => {
           source_process_template_id: request.source_process_template_id,
           due_date: request.due_date,
           be_project_id: request.be_project_id,
+          module_code: "maintenance",
         })
         .select()
         .single();

@@ -41,6 +41,8 @@ import ProcessTracking from "./pages/ProcessTracking";
 import Innovation from "./pages/Innovation";
 import InnovationRequests from "./pages/InnovationRequests";
 import InnovationNew from "./pages/InnovationNew";
+import MaintenanceDispatch from "./pages/maintenance/MaintenanceDispatch";
+import NewMaintenanceRequest from "./pages/maintenance/NewMaintenanceRequest";
 import KeonDashboard from "./pages/KeonDashboard";
 
 // BE Project Hub pages
@@ -120,6 +122,8 @@ const App = () => (
 
                 { path: "/innovation", end: true, element: <ProtectedRoute><Innovation /></ProtectedRoute> },
                 { path: "/innovation/new", end: true, element: <ProtectedRoute><InnovationNew /></ProtectedRoute> },
+                { path: "/maintenance/dispatch", end: true, element: <ProtectedRoute><MaintenanceDispatch /></ProtectedRoute> },
+                { path: "/maintenance/new", end: true, element: <ProtectedRoute><NewMaintenanceRequest /></ProtectedRoute> },
                 { path: "/innovation/requests", end: true, element: <ProtectedRoute><InnovationRequests /></ProtectedRoute> },
                 { path: "/innovation/requests/:id", end: true, element: <ProtectedRoute><InnovationRequests /></ProtectedRoute> },
 
@@ -183,6 +187,8 @@ const App = () => (
             <Route path="/process-tracking" element={<></>} />
             <Route path="/innovation" element={<></>} />
             <Route path="/innovation/new" element={<></>} />
+            <Route path="/maintenance/dispatch" element={<></>} />
+            <Route path="/maintenance/new" element={<></>} />
             <Route path="/innovation/requests" element={<></>} />
             <Route path="/innovation/requests/:id" element={<></>} />
             <Route path="/spv" element={<></>} />

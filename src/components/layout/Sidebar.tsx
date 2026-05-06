@@ -1,5 +1,5 @@
 import React, { Fragment, useState, useEffect, useMemo } from 'react';
-import { LayoutDashboard, BarChart3, ChevronLeft, ChevronRight, ChevronDown, Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText, ArrowLeftRight, Calendar, MessageCircle, Building2, ClipboardList, Lightbulb, Monitor, Leaf, Euro, Map as MapIcon, Users, Wallet, BarChart2 } from 'lucide-react';
+import { LayoutDashboard, BarChart3, ChevronLeft, ChevronRight, ChevronDown, Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText, ArrowLeftRight, Calendar, MessageCircle, Building2, ClipboardList, Lightbulb, Monitor, Leaf, Euro, Map as MapIcon, Users, Wallet, BarChart2, Package } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
 import { useAuth } from '@/contexts/AuthContext';
@@ -99,6 +99,12 @@ const menuGroups: MenuGroup[] = [
     ],
   },
   {
+    label: 'MAINTENANCE',
+    items: [
+      { id: 'maintenance-dispatch', label: 'Demandes matériel', icon: Package, path: '/maintenance/dispatch', permissionKey: 'can_access_dashboard' },
+    ],
+  },
+  {
     label: 'ACHATS',
     items: [
       { id: 'suppliers', label: 'Fournisseurs', icon: Building2, path: '/suppliers', permissionKey: 'can_access_suppliers' },
@@ -156,6 +162,7 @@ const groupLabelToIndex: Record<string, number> = {
   'SPV': 2,
   'IT / DIGITAL': 7,
   'INNOVATION': 8,
+  'MAINTENANCE': 3,
   'ACHATS': 3,
   'CONFIGURATION': 4,
   'OUTILS': 5,
