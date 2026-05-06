@@ -13,7 +13,7 @@
  *   • + les managers dispatch (dispatch_manager_id dans sub_process_templates BE)
  */
 
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -72,6 +72,12 @@ import {
   User,
   Calendar,
   FileText,
+  Search,
+  Activity,
+  AlertTriangle,
+  ShieldCheck,
+  UserX,
+  FolderOpen,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getBEStatusMeta } from '@/hooks/useBETaskStatus';
@@ -917,6 +923,12 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
   // ── Filtres ────────────────────────────────────────────────────────────────
   const [urgencyFilter, setUrgencyFilter] = useState<string>('all');
   const [assignFilter, setAssignFilter] = useState<'all' | 'unassigned'>('all');
+  // Filtres additionnels (mode global uniquement) — fusion de l'ancien /be/suivi
+  const [projectFilter, setProjectFilter] = useState<string>('all');
+  const [assigneeFilter, setAssigneeFilter] = useState<string>('all');
+  const [statusBEFilter, setStatusBEFilter] = useState<string>('all');
+  const [overdueOnly, setOverdueOnly] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [expandedRequests, setExpandedRequests] = useState<Set<string>>(new Set());
   const [showNewRequest, setShowNewRequest] = useState(false);
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
@@ -1036,27 +1048,127 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
   }, [tasks]);
 
   // ── Filtrage ──────────────────────────────────────────────────────────────
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }, []);
+
+  /** Prédicat partagé par les filtres requête + tâche standalone. */
+  const matchesTaskFilters = useCallback((t: BETaskRow): boolean => {
+    if (urgencyFilter !== 'all' && t.be_urgency !== urgencyFilter) return false;
+    if (assignFilter === 'unassigned' && t.assignee_id) return false;
+    if (statusBEFilter !== 'all' && t.be_status !== statusBEFilter) return false;
+    if (assigneeFilter === 'unassigned') {
+      if (t.assignee_id) return false;
+    } else if (assigneeFilter !== 'all') {
+      if (t.assignee_id !== assigneeFilter) return false;
+    }
+    if (projectFilter !== 'all') {
+      if (t.be_project?.code_projet !== projectFilter) return false;
+    }
+    if (overdueOnly) {
+      if (!t.due_date || t.due_date >= todayStr || t.be_status === 'cloturee') return false;
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matches =
+        (t.task_number ?? '').toLowerCase().includes(q) ||
+        (t.title ?? '').toLowerCase().includes(q) ||
+        (t.sub_process_template?.name ?? '').toLowerCase().includes(q) ||
+        (t.be_project?.code_projet ?? '').toLowerCase().includes(q) ||
+        (t.be_project?.nom_projet ?? '').toLowerCase().includes(q) ||
+        (t.assignee?.display_name ?? '').toLowerCase().includes(q);
+      if (!matches) return false;
+    }
+    return true;
+  }, [urgencyFilter, assignFilter, statusBEFilter, assigneeFilter, projectFilter, overdueOnly, searchQuery, todayStr]);
+
   const filteredRequests = useMemo(() => {
     return requests.filter(req => {
       const children = tasksByRequest.get(req.id) ?? [];
       if (children.length === 0) return false;
-      const matchUrgency = urgencyFilter === 'all' || req.be_urgency === urgencyFilter;
-      const matchAssign = assignFilter === 'all' || children.some(t => !t.assignee_id);
-      return matchUrgency && matchAssign;
+      // La demande est gardée si AU MOINS une de ses tâches matche les filtres
+      // (l'urgence est aussi évaluée au niveau demande pour cohérence avec l'ancien comportement).
+      if (urgencyFilter !== 'all' && req.be_urgency !== urgencyFilter) return false;
+      // Si recherche par n° de demande, on matche aussi sur req.request_number / req.title
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const reqMatches =
+          (req.request_number ?? '').toLowerCase().includes(q) ||
+          (req.title ?? '').toLowerCase().includes(q);
+        if (reqMatches) return true; // demande matche directement
+      }
+      return children.some(matchesTaskFilters);
     });
-  }, [requests, tasksByRequest, urgencyFilter, assignFilter]);
+  }, [requests, tasksByRequest, urgencyFilter, searchQuery, matchesTaskFilters]);
 
   const standaloneFiltered = useMemo(() => {
     const st = tasksByRequest.get('__standalone__') ?? [];
-    return st.filter(t => {
-      const matchUrgency = urgencyFilter === 'all' || t.be_urgency === urgencyFilter;
-      const matchAssign = assignFilter === 'all' || !t.assignee_id;
-      return matchUrgency && matchAssign;
-    });
-  }, [tasksByRequest, urgencyFilter, assignFilter]);
+    return st.filter(matchesTaskFilters);
+  }, [tasksByRequest, matchesTaskFilters]);
 
   const totalUnassigned = useMemo(() => tasks.filter(t => !t.assignee_id).length, [tasks]);
   const totalARelire = useMemo(() => tasks.filter(t => t.be_status === 'a_relire').length, [tasks]);
+
+  // ── KPIs (mode global uniquement) ────────────────────────────────────────
+  const kpis = useMemo(() => {
+    let active = 0;
+    let overdue = 0;
+    let toValidate = 0;
+    let unassigned = 0;
+    const activeProjects = new Set<string>();
+    for (const t of tasks) {
+      if (t.be_status === 'cloturee') continue;
+      active += 1;
+      const projectCode = t.be_project?.code_projet;
+      if (projectCode) activeProjects.add(projectCode);
+      if (t.due_date && t.due_date < todayStr) overdue += 1;
+      if (t.be_status === 'a_relire' || t.be_status === 'a_valider') toValidate += 1;
+      if (!t.assignee_id && t.be_status === 'soumise') unassigned += 1;
+    }
+    return { active, overdue, toValidate, unassigned, activeProjects: activeProjects.size };
+  }, [tasks, todayStr]);
+
+  // Listes uniques pour les selects (mode global)
+  const projectOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const t of tasks) {
+      if (t.be_project) map.set(t.be_project.code_projet, t.be_project.nom_projet);
+    }
+    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [tasks]);
+
+  const assigneeOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const t of tasks) {
+      if (t.assignee) map.set(t.assignee.id, t.assignee.display_name);
+    }
+    return [...map.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [tasks]);
+
+  const activeFilterCount =
+    (urgencyFilter !== 'all' ? 1 : 0) +
+    (assignFilter !== 'all' ? 1 : 0) +
+    (statusBEFilter !== 'all' ? 1 : 0) +
+    (assigneeFilter !== 'all' ? 1 : 0) +
+    (projectFilter !== 'all' ? 1 : 0) +
+    (overdueOnly ? 1 : 0) +
+    (searchQuery.trim() ? 1 : 0);
+
+  const resetFilters = () => {
+    setUrgencyFilter('all');
+    setAssignFilter('all');
+    setStatusBEFilter('all');
+    setAssigneeFilter('all');
+    setProjectFilter('all');
+    setOverdueOnly(false);
+    setSearchQuery('');
+  };
 
   /** IDs des tâches bloquées par une tâche précédente non encore validée dans la même demande */
   const blockedTaskIds = useMemo(() => computeBlockedTasks(tasks), [tasks]);
@@ -1083,6 +1195,46 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <>
+      {/* ── KPIs (mode global uniquement) ──────────────────────────────── */}
+      {isGlobal && (
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-4">
+          <KpiCard
+            label="Prestations actives"
+            value={kpis.active}
+            icon={Activity}
+            accent="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+            onClick={() => { setStatusBEFilter('all'); setOverdueOnly(false); setAssigneeFilter('all'); }}
+          />
+          <KpiCard
+            label="En retard"
+            value={kpis.overdue}
+            icon={AlertTriangle}
+            accent="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300"
+            onClick={() => { setOverdueOnly(true); setStatusBEFilter('all'); setAssigneeFilter('all'); }}
+          />
+          <KpiCard
+            label="À valider / relire"
+            value={kpis.toValidate}
+            icon={ShieldCheck}
+            accent="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+            onClick={() => { setStatusBEFilter('a_relire'); setOverdueOnly(false); setAssigneeFilter('all'); }}
+          />
+          <KpiCard
+            label="Non assignées"
+            value={kpis.unassigned}
+            icon={UserX}
+            accent="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+            onClick={() => { setAssigneeFilter('unassigned'); setStatusBEFilter('all'); setOverdueOnly(false); }}
+          />
+          <KpiCard
+            label="Projets actifs"
+            value={kpis.activeProjects}
+            icon={FolderOpen}
+            accent="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+          />
+        </div>
+      )}
+
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
@@ -1151,6 +1303,83 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
             prêt → le manager clique sur{' '}
             <span className="font-medium text-amber-600">Valider</span>.
           </p>
+
+          {/* ── Barre de filtres avancés (mode global) ─────────────────── */}
+          {isGlobal && (
+            <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                <Input
+                  placeholder="Rechercher (n° tâche, projet, prestation, assigné...)"
+                  className="pl-8 h-8 text-xs"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+
+              <Select value={statusBEFilter} onValueChange={setStatusBEFilter}>
+                <SelectTrigger className="w-[150px] h-8 text-xs">
+                  <SelectValue placeholder="Statut BE" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous statuts</SelectItem>
+                  {(['soumise','affectee','en_cours','a_relire','a_valider','a_deposer','en_instruction','complement_demande','cloturee'] as const).map((s) => {
+                    const meta = getBEStatusMeta(s);
+                    return (
+                      <SelectItem key={s} value={s}>
+                        {meta.icon} {meta.label}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+
+              <Select value={projectFilter} onValueChange={setProjectFilter}>
+                <SelectTrigger className="w-[170px] h-8 text-xs">
+                  <SelectValue placeholder="Projet" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous projets</SelectItem>
+                  {projectOptions.map(([code, name]) => (
+                    <SelectItem key={code} value={code}>
+                      <span className="font-mono text-[10px] mr-1">{code}</span>
+                      {name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
+                <SelectTrigger className="w-[160px] h-8 text-xs">
+                  <SelectValue placeholder="Assigné" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous assignés</SelectItem>
+                  <SelectItem value="unassigned">Non assignées</SelectItem>
+                  {assigneeOptions.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Button
+                variant={overdueOnly ? 'default' : 'outline'}
+                size="sm"
+                className="h-8 text-xs gap-1"
+                onClick={() => setOverdueOnly((v) => !v)}
+              >
+                <AlertTriangle className="h-3.5 w-3.5" />
+                En retard
+              </Button>
+
+              {activeFilterCount > 0 && (
+                <Button variant="ghost" size="sm" className="h-8 text-xs gap-1" onClick={resetFilters}>
+                  <X className="h-3.5 w-3.5" />
+                  Réinitialiser ({activeFilterCount})
+                </Button>
+              )}
+            </div>
+          )}
         </CardHeader>
 
         <CardContent className="p-0">
@@ -1460,5 +1689,42 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
         }}
       />
     </>
+  );
+}
+
+// ─── Card KPI interne ─────────────────────────────────────────────────────────
+function KpiCard({
+  label,
+  value,
+  icon: Icon,
+  accent,
+  onClick,
+}: {
+  label: string;
+  value: number;
+  icon: React.ComponentType<{ className?: string }>;
+  accent: string;
+  onClick?: () => void;
+}) {
+  const clickable = !!onClick;
+  const Comp: any = clickable ? 'button' : 'div';
+  return (
+    <Comp
+      type={clickable ? 'button' : undefined}
+      onClick={onClick}
+      className={cn('text-left', clickable && 'cursor-pointer transition-transform hover:-translate-y-0.5')}
+    >
+      <Card className={cn('border-border/60', clickable && 'hover:shadow-md hover:border-primary/30')}>
+        <CardContent className="p-3 flex items-center gap-3">
+          <div className={cn('p-2 rounded-lg shrink-0', accent)}>
+            <Icon className="h-4 w-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] text-muted-foreground truncate">{label}</p>
+            <p className="text-xl font-bold tabular-nums leading-tight">{value}</p>
+          </div>
+        </CardContent>
+      </Card>
+    </Comp>
   );
 }

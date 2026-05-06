@@ -55,7 +55,6 @@ import BEProjectHubTemps from "./pages/be/BEProjectHubTemps";
 import BEAdminTJM from "./pages/BEAdminTJM";
 import BEAdminDivaltoImport from "./pages/BEAdminDivaltoImport";
 import BEDispatchGlobal from "./pages/be/BEDispatchGlobal";
-import BESuivi from "./pages/be/BESuivi";
 import BEBudgetGlobal from "./pages/be/BEBudgetGlobal";
 
 // Budget tab is BE-only. If someone lands on /spv/.../budget, send them to overview.
@@ -132,7 +131,6 @@ const App = () => (
                 { path: "/be/projects/:code/budget/:codeAffaire", end: true, element: <ProtectedRoute><BEProjectHubBudgetAffaire /></ProtectedRoute> },
                 { path: "/be/projects/:code/temps", end: true, element: <ProtectedRoute><BEProjectHubTemps /></ProtectedRoute> },
                 { path: "/be/dispatch", end: true, element: <ProtectedRoute><BEDispatchGlobal /></ProtectedRoute> },
-                { path: "/be/suivi", end: true, element: <ProtectedRoute><BESuivi /></ProtectedRoute> },
                 { path: "/be/budget", end: true, element: <ProtectedRoute><BEBudgetGlobal /></ProtectedRoute> },
                 { path: "/be/admin/tjm", end: true, element: <ProtectedRoute><BEAdminTJM /></ProtectedRoute> },
                 { path: "/be/admin/divalto-import", end: true, element: <ProtectedRoute><BEAdminDivaltoImport /></ProtectedRoute> },
@@ -194,7 +192,6 @@ const App = () => (
             <Route path="/be/projects/:code/temps" element={<></>} />
             <Route path="/be/budget" element={<></>} />
             <Route path="/be/dispatch" element={<></>} />
-            <Route path="/be/suivi" element={<></>} />
             <Route path="/be/admin/tjm" element={<></>} />
             <Route path="/be/admin/divalto-import" element={<></>} />
             <Route path="/be/projects/:code/discussions" element={<></>} />

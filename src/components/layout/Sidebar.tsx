@@ -64,16 +64,9 @@ const menuGroups: MenuGroup[] = [
       },
       {
         id: 'be-dispatch',
-        label: 'Dispatch & Affectation',
+        label: 'Dispatch & Suivi',
         icon: Users,
         path: '/be/dispatch',
-        permissionKey: 'can_access_projects' as any,
-      },
-      {
-        id: 'be-suivi',
-        label: 'Suivi',
-        icon: BarChart2,
-        path: '/be/suivi',
         permissionKey: 'can_access_projects' as any,
       },
       {
