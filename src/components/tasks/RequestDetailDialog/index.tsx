@@ -863,7 +863,7 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange, onTas
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[750px] max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-[95vw] sm:max-w-[1200px] h-[92vh] max-h-[92vh] overflow-hidden flex flex-col">
         <DialogHeader className="shrink-0">
           <div className="flex items-center gap-2">
             {task.type === 'request' && <Building2 className="h-5 w-5 text-primary" />}
@@ -1061,9 +1061,9 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange, onTas
           )}
         </div>
 
-        {/* Cancel Confirmation Dialog */}
+        {/* Cancel Confirmation Dialog — z-index élevé pour passer au-dessus du Dialog parent */}
         <AlertDialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
-          <AlertDialogContent>
+          <AlertDialogContent className="z-[60]">
             <AlertDialogHeader>
               <AlertDialogTitle>Annuler cette demande ?</AlertDialogTitle>
               <AlertDialogDescription>
@@ -1096,9 +1096,9 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange, onTas
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* Complete Confirmation Dialog */}
+        {/* Complete Confirmation Dialog — z-index élevé */}
         <AlertDialog open={isCompleteDialogOpen} onOpenChange={setIsCompleteDialogOpen}>
-          <AlertDialogContent>
+          <AlertDialogContent className="z-[60]">
             <AlertDialogHeader>
               <AlertDialogTitle>Marquer cette demande comme complétée ?</AlertDialogTitle>
               <AlertDialogDescription>

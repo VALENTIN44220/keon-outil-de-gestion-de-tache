@@ -45,6 +45,7 @@ import {
   X,
   Link as LinkIcon,
   Info,
+  Calendar as CalendarIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -187,6 +188,8 @@ export function NewBERequestDialog({
 
   // ── Étape 3 : Urgence ─────────────────────────────────────────────────────
   const [urgency, setUrgency] = useState<BEUrgency>('normal');
+  /** Date de rendu attendue par le demandeur (renseigne tasks.due_date sur la demande). */
+  const [expectedDate, setExpectedDate] = useState<string>('');
 
   // ── Liens externes ────────────────────────────────────────────────────────
   const [links, setLinks] = useState<{ url: string; label: string }[]>([]);
@@ -199,6 +202,7 @@ export function NewBERequestDialog({
       setSelectedAffaireId(defaultAffaireId ?? null);
       setSelectedGroupNames(new Set());
       setUrgency('normal');
+      setExpectedDate('');
       setDescription('');
       setLinks([]);
       setProjectSearch('');
@@ -337,6 +341,9 @@ export function NewBERequestDialog({
           be_affaire_id: selectedAffaireId || null,
           be_urgency: urgency,
           be_status: 'soumise',
+          // Date de rendu attendue par le demandeur — alimente tasks.due_date
+          // de la demande parente (héritée par les tâches enfants si null sur celles-ci).
+          due_date: expectedDate || null,
           user_id: user.id,
           requester_id: profile.id,
           source_process_template_id: BE_PROCESS_TEMPLATE_ID,
@@ -774,37 +781,58 @@ export function NewBERequestDialog({
               </div>
             )}
 
-            {/* ── ÉTAPE 3 : URGENCE ───────────────────────────────────── */}
+            {/* ── ÉTAPE 3 : URGENCE + DATE DE RENDU ───────────────────── */}
             {step === 3 && (
-              <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Quel est le niveau d'urgence de cette demande ?
-                </p>
-                <RadioGroup
-                  value={urgency}
-                  onValueChange={v => setUrgency(v as BEUrgency)}
-                  className="space-y-3"
-                >
-                  {URGENCY_OPTIONS.map(opt => (
-                    <label
-                      key={opt.value}
-                      className={cn(
-                        'flex items-center gap-4 p-4 rounded-lg border-2 cursor-pointer transition-all',
-                        urgency === opt.value
-                          ? `${opt.bg} border-current ${opt.textColor}`
-                          : 'border-border hover:bg-muted/30',
-                      )}
-                    >
-                      <RadioGroupItem value={opt.value} className="shrink-0" />
-                      <div>
-                        <p className={cn('font-medium', urgency === opt.value && opt.textColor)}>
-                          {opt.label}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{opt.desc}</p>
-                      </div>
-                    </label>
-                  ))}
-                </RadioGroup>
+              <div className="space-y-6">
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Quel est le niveau d'urgence de cette demande ?
+                  </p>
+                  <RadioGroup
+                    value={urgency}
+                    onValueChange={v => setUrgency(v as BEUrgency)}
+                    className="space-y-3"
+                  >
+                    {URGENCY_OPTIONS.map(opt => (
+                      <label
+                        key={opt.value}
+                        className={cn(
+                          'flex items-center gap-4 p-4 rounded-lg border-2 cursor-pointer transition-all',
+                          urgency === opt.value
+                            ? `${opt.bg} border-current ${opt.textColor}`
+                            : 'border-border hover:bg-muted/30',
+                        )}
+                      >
+                        <RadioGroupItem value={opt.value} className="shrink-0" />
+                        <div>
+                          <p className={cn('font-medium', urgency === opt.value && opt.textColor)}>
+                            {opt.label}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{opt.desc}</p>
+                        </div>
+                      </label>
+                    ))}
+                  </RadioGroup>
+                </div>
+
+                {/* Date de rendu attendue */}
+                <div className="space-y-2 border-t pt-4">
+                  <label htmlFor="expectedDate" className="text-sm font-medium">
+                    Date de rendu attendue
+                    <span className="text-xs text-muted-foreground font-normal ml-1">(optionnel)</span>
+                  </label>
+                  <Input
+                    id="expectedDate"
+                    type="date"
+                    value={expectedDate}
+                    onChange={(e) => setExpectedDate(e.target.value)}
+                    min={new Date().toISOString().split('T')[0]}
+                    className="max-w-xs"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Indique au BE la date à laquelle tu attends le rendu de cette demande.
+                  </p>
+                </div>
               </div>
             )}
 
@@ -854,6 +882,21 @@ export function NewBERequestDialog({
                       </Badge>
                     </div>
                   </div>
+
+                  {/* Date de rendu attendue */}
+                  {expectedDate && (
+                    <div className="flex items-center gap-3 p-4">
+                      <CalendarIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-xs text-muted-foreground mb-1">Date de rendu attendue</p>
+                        <span className="text-sm font-medium">
+                          {new Date(expectedDate).toLocaleDateString('fr-FR', {
+                            weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Prestations sélectionnées */}
                   <div className="flex items-start gap-3 p-4">
