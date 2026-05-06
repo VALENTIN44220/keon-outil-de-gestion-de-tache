@@ -88,6 +88,12 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange, onTas
   const [profiles, setProfiles] = useState<Map<string, string>>(new Map());
   const [profilesList, setProfilesList] = useState<Profile[]>([]);
   const [departments, setDepartments] = useState<Map<string, string>>(new Map());
+  /** Détails enrichis du demandeur (société, service, fonction) — chargés à l'ouverture. */
+  const [requesterDetails, setRequesterDetails] = useState<{
+    company: string | null;
+    department: string | null;
+    job_title: string | null;
+  } | null>(null);
   const [processName, setProcessName] = useState<string | null>(null);
   const [subProcessNames, setSubProcessNames] = useState<Map<string, { name: string; departmentId: string | null }>>(new Map());
   
@@ -259,6 +265,27 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange, onTas
         const map = new Map<string, string>();
         depsData.forEach((d) => map.set(d.id, d.name));
         setDepartments(map);
+      }
+
+      // Fetch enriched requester details (société + service + fonction)
+      if (task.requester_id) {
+        const { data: reqProfile } = await supabase
+          .from('profiles')
+          .select('company, department, job_title, department_id')
+          .eq('id', task.requester_id)
+          .maybeSingle();
+        if (reqProfile) {
+          // Préfère le département lié (FK) qui sera dans `depsData` chargé juste avant ;
+          // fallback sur le champ texte legacy `department`.
+          const deptName = (reqProfile as any).department_id
+            ? (depsData?.find((d: any) => d.id === (reqProfile as any).department_id)?.name ?? null)
+            : ((reqProfile as any).department ?? null);
+          setRequesterDetails({
+            company: (reqProfile as any).company ?? null,
+            department: deptName,
+            job_title: (reqProfile as any).job_title ?? null,
+          });
+        }
       }
 
       // Fetch process name if linked
@@ -899,6 +926,7 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange, onTas
                   processName={processName}
                   profiles={profiles}
                   departments={departments}
+                  requesterDetails={requesterDetails}
                   subProcessGroups={subProcessGroups}
                   globalProgress={globalProgress}
                   onSelectSubProcess={handleSelectSubProcess}

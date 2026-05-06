@@ -27,6 +27,12 @@ interface SynthesisTabProps {
   processName: string | null;
   profiles: Map<string, string>;
   departments: Map<string, string>;
+  /** Détails enrichis du demandeur (société, service, fonction). null si pas chargés. */
+  requesterDetails?: {
+    company: string | null;
+    department: string | null;
+    job_title: string | null;
+  } | null;
   subProcessGroups: SubProcessGroup[];
   globalProgress: number;
   onSelectSubProcess: (subProcessId: string) => void;
@@ -37,6 +43,7 @@ export function SynthesisTab({
   processName,
   profiles,
   departments,
+  requesterDetails,
   subProcessGroups,
   globalProgress,
   onSelectSubProcess,
@@ -85,6 +92,13 @@ export function SynthesisTab({
 
         {/* Metadata - Read only, from process/request */}
         <div className="grid grid-cols-2 gap-4 text-sm">
+          {/* Date de création de la demande */}
+          {task.created_at && (
+            <div className="flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <span>Créée le : {format(new Date(task.created_at), 'dd MMMM yyyy', { locale: fr })}</span>
+            </div>
+          )}
           {task.due_date && (
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-muted-foreground" />
@@ -94,13 +108,7 @@ export function SynthesisTab({
           {task.target_department_id && (
             <div className="flex items-center gap-2">
               <Building2 className="h-4 w-4 text-muted-foreground" />
-              <span>Service: {departments.get(task.target_department_id) || 'N/A'}</span>
-            </div>
-          )}
-          {task.requester_id && (
-            <div className="flex items-center gap-2">
-              <User className="h-4 w-4 text-muted-foreground" />
-              <span>Demandeur: {profiles.get(task.requester_id) || 'N/A'}</span>
+              <span>Service cible: {departments.get(task.target_department_id) || 'N/A'}</span>
             </div>
           )}
           {task.category && (
@@ -110,6 +118,39 @@ export function SynthesisTab({
             </div>
           )}
         </div>
+
+        {/* Bloc demandeur enrichi (nom + société + service + fonction) */}
+        {task.requester_id && (
+          <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-1.5">
+            <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
+              <User className="h-3.5 w-3.5" />
+              Demandeur
+            </div>
+            <div className="font-medium text-sm">{profiles.get(task.requester_id) || 'N/A'}</div>
+            {requesterDetails && (
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                {requesterDetails.company && (
+                  <div className="flex items-center gap-1.5">
+                    <Building2 className="h-3 w-3" />
+                    <span>{requesterDetails.company}</span>
+                  </div>
+                )}
+                {requesterDetails.department && (
+                  <div className="flex items-center gap-1.5">
+                    <Layers className="h-3 w-3" />
+                    <span>{requesterDetails.department}</span>
+                  </div>
+                )}
+                {requesterDetails.job_title && (
+                  <div className="flex items-center gap-1.5 col-span-2">
+                    <span className="text-muted-foreground/70">Fonction :</span>
+                    <span>{requesterDetails.job_title}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Process info */}
         {processName && (
