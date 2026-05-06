@@ -131,7 +131,7 @@ serve(async (req) => {
         .eq("request_id", request_id)
         .eq("etat_commande", "En attente validation");
 
-      // 2. Get default assignee from process settings
+      // 2. Get the LOG procurement coordinator (priority) or fallback to default maintenance assignee
       let assigneeId = "bb9c06f6-910b-4d5d-afb0-d31e1d90c77d"; // Default: ANTZ Sylvain
 
       if (request.source_process_template_id) {
@@ -141,7 +141,11 @@ serve(async (req) => {
           .eq("id", request.source_process_template_id)
           .single();
 
-        if (processTemplate?.settings?.default_maintenance_assignee_id) {
+        // Priorite : la commande validee passe au coordinateur LOG (procurement_assignee_id)
+        if (processTemplate?.settings?.procurement_assignee_id) {
+          assigneeId = processTemplate.settings.procurement_assignee_id;
+        } else if (processTemplate?.settings?.default_maintenance_assignee_id) {
+          // Fallback : ancien comportement (Sylvain garde la main)
           assigneeId = processTemplate.settings.default_maintenance_assignee_id;
         }
       }
