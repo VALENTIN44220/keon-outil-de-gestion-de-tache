@@ -140,15 +140,20 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange, onTas
   // Group tasks by sub-process
   const subProcessGroups = useMemo<SubProcessGroup[]>(() => {
     const groups = new Map<string, Task[]>();
-    
+
     childTasks.forEach(task => {
-      const spId = task.source_sub_process_template_id || 'direct';
+      // Identifiant du sous-processus : compat « legacy » (source_sub_process_template_id)
+      // ET BE (sub_process_template_id) — voir fetchRelatedData ci-dessus.
+      const spId =
+        task.source_sub_process_template_id ||
+        (task as any).sub_process_template_id ||
+        'direct';
       if (!groups.has(spId)) {
         groups.set(spId, []);
       }
       groups.get(spId)!.push(task);
     });
-    
+
     return Array.from(groups.entries())
       .filter(([id]) => id !== 'direct') // Only sub-process tasks
       .map(([subProcessId, tasks]) => {
@@ -198,9 +203,18 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange, onTas
 
       if (children) {
         setChildTasks(children as Task[]);
-        
-        // Get unique sub-process IDs
-        const spIds = [...new Set(children.map(c => c.source_sub_process_template_id).filter(Boolean))];
+
+        // Get unique sub-process IDs.
+        // Pour les tâches "classiques" (création via NewRequestDialog drilldown),
+        // l'identifiant du sous-processus source est dans `source_sub_process_template_id`.
+        // Pour les tâches BE (création via NewBERequestDialog), il est dans
+        // `sub_process_template_id`. On accepte les deux pour que le dialog
+        // affiche les onglets de prestation dans les 2 cas.
+        const spIds = [...new Set(
+          children
+            .map((c) => c.source_sub_process_template_id ?? (c as any).sub_process_template_id)
+            .filter(Boolean),
+        )];
         
         if (spIds.length > 0) {
           // Fetch sub-process template names and departments
