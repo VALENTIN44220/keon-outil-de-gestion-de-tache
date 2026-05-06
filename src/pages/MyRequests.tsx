@@ -22,10 +22,16 @@ import { Badge } from '@/components/ui/badge';
 import { Loader2, Eye } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSimulation } from '@/contexts/SimulationContext';
 import { toast } from 'sonner';
 
 const MyRequests = () => {
-  const { profile, user } = useAuth();
+  const { profile: authProfile, user } = useAuth();
+  const { isSimulating, simulatedProfile } = useSimulation();
+  // En mode simulation, on raisonne avec le profil simulé pour que la page
+  // « Mes demandes » reflète bien la perspective de l'utilisateur incarné
+  // (sinon on continuerait d'afficher les demandes de l'admin réel).
+  const profile = isSimulating && simulatedProfile ? simulatedProfile : authProfile;
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeView, setActiveView] = useState('my-requests');
   const [requests, setRequests] = useState<Task[]>([]);
