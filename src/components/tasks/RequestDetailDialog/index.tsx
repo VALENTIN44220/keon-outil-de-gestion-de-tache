@@ -74,13 +74,18 @@ import { RequestCustomFieldsDisplay } from './RequestCustomFieldsDisplay';
 import { ReassignTaskDialog } from '@/components/workload/ReassignTaskDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useSimulation } from '@/contexts/SimulationContext';
 import { canInitiateTaskReassignment } from '@/lib/taskReassignmentPermissions';
 import { canOfferSendForValidationInsteadOfMarkDone } from '@/lib/taskValidationUi';
 import { sendTaskForValidationFromExecutorState } from '@/services/taskStatusService';
 
 export function RequestDetailDialog({ task, open, onClose, onStatusChange, onTaskMutated }: RequestDetailDialogProps) {
   const { profile } = useAuth();
-  const { isAdmin } = useUserRole();
+  const { isAdmin: realIsAdmin } = useUserRole();
+  // En mode simulation, on désactive le bypass admin pour évaluer les permissions
+  // comme le user simulé (cf. TaskDetailDialog).
+  const { isSimulating } = useSimulation();
+  const isAdmin = realIsAdmin && !isSimulating;
   const [isReassignOpen, setIsReassignOpen] = useState(false);
   const [taskForReassign, setTaskForReassign] = useState<Task | null>(null);
   const [childTasks, setChildTasks] = useState<Task[]>([]);

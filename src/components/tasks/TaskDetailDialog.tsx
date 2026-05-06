@@ -68,6 +68,7 @@ import { IT_PROJECT_PHASES } from '@/types/itProject';
 import { ReassignTaskDialog } from '@/components/workload/ReassignTaskDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useSimulation } from '@/contexts/SimulationContext';
 import { canInitiateTaskReassignment } from '@/lib/taskReassignmentPermissions';
 import { canOfferSendForValidationInsteadOfMarkDone, normalizeValidationLevel } from '@/lib/taskValidationUi';
 import {
@@ -114,7 +115,12 @@ const statusConfig: Record<string, { label: string; icon: typeof CheckCircle2; c
 
 export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMutated }: TaskDetailDialogProps) {
   const { profile } = useAuth();
-  const { isAdmin } = useUserRole();
+  const { isAdmin: realIsAdmin } = useUserRole();
+  // En mode simulation, on évalue les permissions COMME le user simulé. L'admin
+  // réel garde son rôle pour interagir avec l'app, mais ses droits avancés
+  // (genre réaffectation libre) ne s'appliquent pas tant qu'il joue un autre user.
+  const { isSimulating } = useSimulation();
+  const isAdmin = realIsAdmin && !isSimulating;
   const navigate = useNavigate();
   const [isReassignOpen, setIsReassignOpen] = useState(false);
   const [taskForReassign, setTaskForReassign] = useState<Task | null>(null);
