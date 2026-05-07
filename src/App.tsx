@@ -45,6 +45,8 @@ import MaintenanceDispatch from "./pages/maintenance/MaintenanceDispatch";
 import NewMaintenanceRequest from "./pages/maintenance/NewMaintenanceRequest";
 import LogistiqueDispatch from "./pages/logistique/LogistiqueDispatch";
 import NewLogistiqueRequest from "./pages/logistique/NewLogistiqueRequest";
+import ITDispatch from "./pages/it/ITDispatch";
+import NewITRequest from "./pages/it/NewITRequest";
 import KeonDashboard from "./pages/KeonDashboard";
 
 // BE Project Hub pages
@@ -128,6 +130,8 @@ const App = () => (
                 { path: "/maintenance/new", end: true, element: <ProtectedRoute><NewMaintenanceRequest /></ProtectedRoute> },
                 { path: "/logistique/dispatch", end: true, element: <ProtectedRoute><LogistiqueDispatch /></ProtectedRoute> },
                 { path: "/logistique/new", end: true, element: <ProtectedRoute><NewLogistiqueRequest /></ProtectedRoute> },
+                { path: "/it/dispatch", end: true, element: <ProtectedRoute><ITDispatch /></ProtectedRoute> },
+                { path: "/it/new", end: true, element: <ProtectedRoute><NewITRequest /></ProtectedRoute> },
                 { path: "/innovation/requests", end: true, element: <ProtectedRoute><InnovationRequests /></ProtectedRoute> },
                 { path: "/innovation/requests/:id", end: true, element: <ProtectedRoute><InnovationRequests /></ProtectedRoute> },
 
@@ -195,6 +199,8 @@ const App = () => (
             <Route path="/maintenance/new" element={<></>} />
             <Route path="/logistique/dispatch" element={<></>} />
             <Route path="/logistique/new" element={<></>} />
+            <Route path="/it/dispatch" element={<></>} />
+            <Route path="/it/new" element={<></>} />
             <Route path="/innovation/requests" element={<></>} />
             <Route path="/innovation/requests/:id" element={<></>} />
             <Route path="/spv" element={<></>} />
