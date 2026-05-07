@@ -39,6 +39,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSimulation } from '@/contexts/SimulationContext';
+import { ITRequestDetailDialog } from '@/components/it/ITRequestDetailDialog';
 
 const STATUS_LABELS: Record<string, string> = {
   todo: 'Affectée',
@@ -72,6 +73,23 @@ export default function ITDispatch() {
   const [filterPrestation, setFilterPrestation] = useState('all');
   const [filterProject, setFilterProject] = useState('all');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  // Map id -> display_name pour tous les profils referenced (requester, assignee, referent_metier)
+  const [profilesMap, setProfilesMap] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    const ids = new Set<string>();
+    for (const r of requests) {
+      if (r.requester_id) ids.add(r.requester_id);
+      if (r.assignee_id) ids.add(r.assignee_id);
+      const ref = r.module_data?.referent_metier_profile_id;
+      if (ref) ids.add(ref as string);
+    }
+    if (ids.size === 0) return;
+    void supabase.from('profiles').select('id, display_name').in('id', Array.from(ids))
+      .then(({ data }) => {
+        if (data) setProfilesMap(new Map(data.map(p => [p.id, p.display_name ?? '?'] as [string, string])));
+      });
+  }, [requests]);
 
   // Map des membres de l equipe IT pour le selecteur de reassignation
   const [teamMembers, setTeamMembers] = useState<Array<{ id: string; display_name: string }>>([]);
@@ -414,14 +432,15 @@ export default function ITDispatch() {
         />
       )}
 
-      {/* Detail dialog cliquable depuis le titre */}
+      {/* Detail dialog dedie IT (compact, hauteur < page, statuts specifiques) */}
       {detailRequest && (
-        <RequestDetailDialog
-          task={detailRequest as unknown as Task}
+        <ITRequestDetailDialog
+          request={detailRequest}
           open={!!detailRequest}
           onClose={() => setDetailRequest(null)}
-          onStatusChange={() => {}}
-          onTaskMutated={refetch}
+          onMutated={refetch}
+          profilesMap={profilesMap}
+          itProjectMap={projectMap}
         />
       )}
 

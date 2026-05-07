@@ -24,6 +24,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { IT_PRESTATIONS } from '@/hooks/useITRequests';
 import { useITProjects } from '@/hooks/useITProjects';
+import { useEffect } from 'react';
 
 export default function NewITRequest() {
   const navigate = useNavigate();
@@ -36,7 +37,15 @@ export default function NewITRequest() {
 
   const [prestationId, setPrestationId] = useState<string>('');
   const [description, setDescription] = useState('');
+  const [priority, setPriority] = useState<string>('medium');
   const [itProjectId, setItProjectId] = useState<string>('none');
+  const [referentMetierId, setReferentMetierId] = useState<string>('none');
+  const [allProfiles, setAllProfiles] = useState<Array<{ id: string; display_name: string }>>([]);
+
+  useEffect(() => {
+    void supabase.from('profiles').select('id, display_name').order('display_name')
+      .then(({ data }) => { if (data) setAllProfiles(data as any); });
+  }, []);
   // Champs conditionnels
   const [nomDossierSp, setNomDossierSp] = useState('');
   const [emailsAcces, setEmailsAcces] = useState('');
@@ -67,7 +76,9 @@ export default function NewITRequest() {
       const title = `${prestation.name} — ${profile.display_name ?? 'demandeur'}`;
       const moduleData: Record<string, any> = {
         prestation: prestation.name,
+        priority,
       };
+      if (referentMetierId !== 'none') moduleData.referent_metier_profile_id = referentMetierId;
       if (isSharePoint) {
         moduleData.nom_dossier_sharepoint = nomDossierSp;
         moduleData.emails_acces = emailsAcces;
@@ -85,6 +96,7 @@ export default function NewITRequest() {
         module_code: 'it',
         source_process_template_id: prestation.id,
         it_project_id: itProjectId !== 'none' ? itProjectId : null,
+        priority: priority as any,
         module_data: moduleData,
       });
 
@@ -141,6 +153,33 @@ export default function NewITRequest() {
                     placeholder="Décrire le besoin, les symptômes, l'urgence..."
                     disabled={isSubmitting}
                   />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Priorité</Label>
+                    <Select value={priority} onValueChange={setPriority} disabled={isSubmitting}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">Faible</SelectItem>
+                        <SelectItem value="medium">Moyenne</SelectItem>
+                        <SelectItem value="high">Haute</SelectItem>
+                        <SelectItem value="urgent">Urgente</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Référent métier (optionnel)</Label>
+                    <Select value={referentMetierId} onValueChange={setReferentMetierId} disabled={isSubmitting}>
+                      <SelectTrigger><SelectValue placeholder="Aucun" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Aucun référent</SelectItem>
+                        {allProfiles.map(p => (
+                          <SelectItem key={p.id} value={p.id}>{p.display_name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 <div>
