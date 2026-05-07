@@ -505,19 +505,12 @@ function RequestRow({
 
   return (
     <>
-      <TableRow>
-        <TableCell className="cursor-pointer" onClick={onToggle}>
+      <TableRow className="cursor-pointer hover:bg-accent/30" onClick={onOpenDetail}>
+        <TableCell onClick={(e) => { e.stopPropagation(); onToggle(); }}>
           {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </TableCell>
-        <TableCell className="font-medium max-w-[260px] truncate">
-          <button
-            type="button"
-            onClick={onOpenDetail}
-            className="text-left hover:underline hover:text-primary truncate w-full"
-            title="Cliquer pour voir le détail complet"
-          >
-            {request.title}
-          </button>
+        <TableCell className="font-medium max-w-[260px] truncate text-primary hover:underline">
+          {request.title}
         </TableCell>
         <TableCell>
           <Badge variant="outline" className="text-xs">{data.prestation ?? '—'}</Badge>
