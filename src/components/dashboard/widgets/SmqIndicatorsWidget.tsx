@@ -76,7 +76,17 @@ export function SmqIndicatorsWidget({ tasks }: SmqIndicatorsWidgetProps) {
       return parseTaskDate(t.date_demande) || parseTaskDate(t.created_at);
     };
     const getCloseDate = (t: Task): Date | null => parseTaskDate(t.date_fermeture);
-    const isClosed = (t: Task) => t.status === 'done' || t.status === 'validated';
+    // Liste etendue des statuts terminaux pour couvrir tous les modules :
+    // BE (cloturee), IT/Logistique/Maintenance (realisee, cloturee, cancelled,
+    // abandonnee), generic (done, validated).
+    const TERMINAL_STATUSES = new Set([
+      'done', 'validated', 'realisee', 'cloturee', 'cancelled', 'abandonnee',
+    ]);
+    // Une tache est consideree fermee si :
+    //  - elle a une date_fermeture renseignee (Planner completedDateTime), OU
+    //  - son status est dans la liste terminale
+    const isClosed = (t: Task) =>
+      !!t.date_fermeture || TERMINAL_STATUSES.has((t.status as string) ?? '');
     const getDurationDays = (closeDate: Date, openDate: Date): number => {
       const diff = differenceInCalendarDays(closeDate, openDate);
       return Number.isNaN(diff) ? 0 : diff;
