@@ -43,6 +43,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSimulation } from '@/contexts/SimulationContext';
 import { ITRequestDetailDialog } from '@/components/it/ITRequestDetailDialog';
+import { useUserRole } from '@/hooks/useUserRole';
+import { Cloud } from 'lucide-react';
 
 const STATUS_LABELS: Record<string, string> = {
   todo: 'À affecter',
@@ -256,6 +258,27 @@ export default function ITDispatch() {
   const { profile: authProfile } = useAuth();
   const { isSimulating, simulatedProfile } = useSimulation();
   const myProfile = isSimulating && simulatedProfile ? simulatedProfile : authProfile;
+  const { isAdmin: realIsAdmin } = useUserRole();
+  const isAdmin = realIsAdmin && !isSimulating;
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const syncPlanner = async () => {
+    setIsSyncing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('microsoft-graph', {
+        body: { action: 'sync_all_plans' },
+      });
+      if (error) throw error;
+      const pulled = (data as any)?.tasks_pulled ?? 0;
+      const updated = (data as any)?.tasks_updated ?? 0;
+      toast.success(`Sync Planner OK — ${pulled} nouvelles tâches, ${updated} mises à jour`);
+      refetch();
+    } catch (e: any) {
+      toast.error(`Erreur sync : ${e.message}`);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const submitComplement = async () => {
     if (!complementDialogReq || !myProfile?.id || !complementMsg.trim()) return;
@@ -321,6 +344,12 @@ export default function ITDispatch() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                {isAdmin && (
+                  <Button variant="outline" size="sm" onClick={syncPlanner} disabled={isSyncing}>
+                    <Cloud className="h-4 w-4 mr-2" />
+                    {isSyncing ? 'Sync...' : 'Sync Planner'}
+                  </Button>
+                )}
                 <Button variant="outline" size="sm" onClick={refetch}>
                   <RefreshCw className="h-4 w-4 mr-2" />Actualiser
                 </Button>

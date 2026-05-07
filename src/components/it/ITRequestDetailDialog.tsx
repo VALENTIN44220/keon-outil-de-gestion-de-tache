@@ -15,7 +15,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { TaskCommentsSection } from '@/components/tasks/TaskCommentsSection';
-import { Calendar, Clock, User, Briefcase, ListChecks, FileText, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Calendar, Clock, User, Briefcase, ListChecks, FileText, AlertCircle, CheckCircle2, Trash2, Paperclip, Link as LinkIcon, ExternalLink } from 'lucide-react';
+import { useUserRole } from '@/hooks/useUserRole';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -75,6 +76,8 @@ export function ITRequestDetailDialog({
   const { profile: authProfile } = useAuth();
   const { isSimulating, simulatedProfile } = useSimulation();
   const myProfile = isSimulating && simulatedProfile ? simulatedProfile : authProfile;
+  const { isAdmin: realIsAdmin } = useUserRole();
+  const isAdmin = realIsAdmin && !isSimulating;
 
   const [complementMsg, setComplementMsg] = useState('');
   const [showComplement, setShowComplement] = useState(false);
@@ -111,6 +114,72 @@ export function ITRequestDetailDialog({
       onMutated?.();
     } catch (e: any) {
       toast.error(`Erreur : ${e.message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm('Supprimer définitivement cette demande IT et tous ses commentaires/historique ?\n\nCette action est irréversible.')) return;
+    setBusy(true);
+    try {
+      const { error } = await supabase.from('tasks').delete().eq('id', request.id);
+      if (error) throw error;
+      toast.success('Demande supprimée');
+      onClose();
+      onMutated?.();
+    } catch (e: any) {
+      toast.error(`Erreur : ${e.message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Pieces jointes : affichage + upload
+  const attachments = (data.attachments as Array<{ name: string; url: string; size?: number }>) ?? [];
+  const links = (data.links as string[]) ?? [];
+  const [newLinkUrl, setNewLinkUrl] = useState('');
+  const [showAddLink, setShowAddLink] = useState(false);
+
+  const handleAddLink = async () => {
+    if (!newLinkUrl.trim()) return;
+    setBusy(true);
+    try {
+      const updated = [...links, newLinkUrl.trim()];
+      const { error } = await supabase.from('tasks')
+        .update({ module_data: { ...data, links: updated } })
+        .eq('id', request.id);
+      if (error) throw error;
+      toast.success('Lien ajouté');
+      setNewLinkUrl('');
+      setShowAddLink(false);
+      onMutated?.();
+    } catch (e: any) {
+      toast.error(`Erreur : ${e.message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleUploadFile = async (file: File) => {
+    if (!myProfile?.id) return;
+    setBusy(true);
+    try {
+      const path = `it-requests/${request.id}/${Date.now()}-${file.name}`;
+      const { error: upErr } = await supabase.storage.from('attachments').upload(path, file, {
+        upsert: false,
+      });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from('attachments').getPublicUrl(path);
+      const updated = [...attachments, { name: file.name, url: pub.publicUrl, size: file.size }];
+      const { error: tErr } = await supabase.from('tasks')
+        .update({ module_data: { ...data, attachments: updated } })
+        .eq('id', request.id);
+      if (tErr) throw tErr;
+      toast.success('Fichier ajouté');
+      onMutated?.();
+    } catch (e: any) {
+      toast.error(`Erreur upload : ${e.message}`);
     } finally {
       setBusy(false);
     }
@@ -238,6 +307,67 @@ export function ITRequestDetailDialog({
             {dateCloture && renderInfoLine('Clôturée le', fmt(dateCloture), <CheckCircle2 className="h-3 w-3" />)}
           </section>
 
+          {/* Pieces jointes + liens */}
+          <Separator />
+          <section>
+            <h3 className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1">
+              <Paperclip className="h-3 w-3" /> PIÈCES JOINTES & LIENS
+            </h3>
+            <div className="space-y-2">
+              {attachments.length === 0 && links.length === 0 && (
+                <p className="text-xs text-muted-foreground italic">Aucune pièce jointe ni lien</p>
+              )}
+              {attachments.map((a, i) => (
+                <div key={i} className="flex items-center gap-2 text-sm border rounded p-2 bg-muted/30">
+                  <Paperclip className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <a href={a.url} target="_blank" rel="noreferrer" className="text-primary hover:underline truncate flex-1">
+                    {a.name}
+                  </a>
+                  {a.size && <span className="text-xs text-muted-foreground">{Math.round(a.size / 1024)} ko</span>}
+                  <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                </div>
+              ))}
+              {links.map((l, i) => (
+                <div key={i} className="flex items-center gap-2 text-sm border rounded p-2 bg-muted/30">
+                  <LinkIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <a href={l} target="_blank" rel="noreferrer" className="text-primary hover:underline truncate flex-1">
+                    {l}
+                  </a>
+                  <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                </div>
+              ))}
+              <div className="flex items-center gap-2 pt-1">
+                <label className="cursor-pointer">
+                  <input
+                    type="file"
+                    className="hidden"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleUploadFile(f); }}
+                    disabled={busy}
+                  />
+                  <Button type="button" size="sm" variant="outline" disabled={busy} asChild>
+                    <span><Paperclip className="h-3 w-3 mr-1" />Ajouter un fichier</span>
+                  </Button>
+                </label>
+                <Button size="sm" variant="outline" onClick={() => setShowAddLink(s => !s)} disabled={busy}>
+                  <LinkIcon className="h-3 w-3 mr-1" />Ajouter un lien
+                </Button>
+              </div>
+              {showAddLink && (
+                <div className="flex items-center gap-2 mt-2">
+                  <input
+                    type="url"
+                    placeholder="https://serveur-interne/..."
+                    className="flex-1 h-8 px-2 text-sm border rounded"
+                    value={newLinkUrl}
+                    onChange={e => setNewLinkUrl(e.target.value)}
+                    disabled={busy}
+                  />
+                  <Button size="sm" onClick={handleAddLink} disabled={busy || !newLinkUrl.trim()}>OK</Button>
+                </div>
+              )}
+            </div>
+          </section>
+
           {/* Champs specifiques prestation */}
           {(data.nom_dossier_sharepoint || data.emails_acces || data.num_ticket_itp || data.num_ticket_blc || data.logiciel_concerne) && (
             <>
@@ -303,7 +433,14 @@ export function ITRequestDetailDialog({
         </div>
 
         <DialogFooter className="p-3 border-t bg-muted/30 flex-row justify-between items-center">
-          <Button variant="ghost" onClick={onClose}>Fermer</Button>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" onClick={onClose}>Fermer</Button>
+            {isAdmin && (
+              <Button variant="ghost" size="sm" onClick={handleDelete} disabled={busy} className="text-destructive hover:text-destructive">
+                <Trash2 className="h-4 w-4 mr-1" /> Supprimer
+              </Button>
+            )}
+          </div>
           {renderActions()}
         </DialogFooter>
       </DialogContent>

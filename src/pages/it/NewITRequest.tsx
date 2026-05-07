@@ -17,7 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Monitor, Save, X } from 'lucide-react';
+import { Monitor, Save, X, Paperclip, Link as LinkIcon, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSimulation } from '@/contexts/SimulationContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -54,6 +54,10 @@ export default function NewITRequest() {
   const [logicielConcerne, setLogicielConcerne] = useState('');
   const [logicielSousCategorie, setLogicielSousCategorie] = useState('');
   const [echeanceSouhaitee, setEcheanceSouhaitee] = useState('');
+  const [attachments, setAttachments] = useState<Array<{ name: string; url: string; size: number }>>([]);
+  const [links, setLinks] = useState<string[]>([]);
+  const [newLink, setNewLink] = useState('');
+  const [uploadingFile, setUploadingFile] = useState(false);
 
   const { projects: itProjects, isLoading: isLoadingProjects } = useITProjects();
 
@@ -102,6 +106,8 @@ export default function NewITRequest() {
         moduleData.logiciel_concerne = logicielConcerne;
         if (logicielSousCategorie) moduleData.logiciel_sous_categorie = logicielSousCategorie;
       }
+      if (attachments.length) moduleData.attachments = attachments;
+      if (links.length) moduleData.links = links;
 
       const { error } = await supabase.from('tasks').insert({
         type: 'request',
@@ -301,6 +307,73 @@ export default function NewITRequest() {
                     )}
                   </>
                 )}
+
+                {/* Pieces jointes + liens */}
+                <div className="space-y-2 pt-2 border-t">
+                  <Label className="text-sm">Pièces jointes & liens (optionnel)</Label>
+                  {attachments.map((a, i) => (
+                    <div key={i} className="flex items-center gap-2 text-sm border rounded p-2 bg-muted/30">
+                      <Paperclip className="h-4 w-4 text-muted-foreground" />
+                      <span className="truncate flex-1">{a.name}</span>
+                      <span className="text-xs text-muted-foreground">{Math.round(a.size / 1024)} ko</span>
+                      <Button type="button" size="icon" variant="ghost" className="h-6 w-6"
+                        onClick={() => setAttachments(arr => arr.filter((_, j) => j !== i))}
+                        disabled={isSubmitting}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                  {links.map((l, i) => (
+                    <div key={i} className="flex items-center gap-2 text-sm border rounded p-2 bg-muted/30">
+                      <LinkIcon className="h-4 w-4 text-muted-foreground" />
+                      <span className="truncate flex-1">{l}</span>
+                      <Button type="button" size="icon" variant="ghost" className="h-6 w-6"
+                        onClick={() => setLinks(arr => arr.filter((_, j) => j !== i))}
+                        disabled={isSubmitting}>
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                  <div className="flex items-center gap-2">
+                    <label>
+                      <input
+                        type="file"
+                        className="hidden"
+                        disabled={isSubmitting || uploadingFile}
+                        onChange={async (e) => {
+                          const f = e.target.files?.[0];
+                          if (!f) return;
+                          setUploadingFile(true);
+                          try {
+                            const path = `it-requests/draft/${Date.now()}-${f.name}`;
+                            const { error } = await supabase.storage.from('attachments').upload(path, f);
+                            if (error) throw error;
+                            const { data: pub } = supabase.storage.from('attachments').getPublicUrl(path);
+                            setAttachments(arr => [...arr, { name: f.name, url: pub.publicUrl, size: f.size }]);
+                            toast.success('Fichier ajouté');
+                          } catch (err: any) { toast.error(`Upload : ${err.message}`); }
+                          finally { setUploadingFile(false); }
+                        }}
+                      />
+                      <Button type="button" size="sm" variant="outline" disabled={isSubmitting || uploadingFile} asChild>
+                        <span><Paperclip className="h-3 w-3 mr-1" />{uploadingFile ? 'Upload...' : 'Ajouter fichier'}</span>
+                      </Button>
+                    </label>
+                    <Input
+                      type="url"
+                      placeholder="https://serveur-interne/..."
+                      value={newLink}
+                      onChange={(e) => setNewLink(e.target.value)}
+                      disabled={isSubmitting}
+                      className="flex-1"
+                    />
+                    <Button type="button" size="sm" variant="outline"
+                      disabled={isSubmitting || !newLink.trim()}
+                      onClick={() => { setLinks(arr => [...arr, newLink.trim()]); setNewLink(''); }}>
+                      <LinkIcon className="h-3 w-3 mr-1" />Ajouter lien
+                    </Button>
+                  </div>
+                </div>
 
                 <div className="flex items-center justify-end gap-2 pt-4 border-t">
                   <Button variant="outline" onClick={() => navigate('/it/dispatch')} disabled={isSubmitting}>
