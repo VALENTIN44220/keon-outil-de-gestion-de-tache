@@ -21,7 +21,10 @@ import {
 } from '@/components/ui/table';
 import {
   Monitor, Plus, Search, RefreshCw, Loader2, Clock, CheckCircle2, ListChecks, AlertCircle, ChevronRight, ChevronDown,
+  TableProperties, Columns, Calendar as CalendarIcon,
 } from 'lucide-react';
+import { KanbanBoard } from '@/components/tasks/KanbanBoard';
+import { CalendarView } from '@/components/tasks/CalendarView';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -42,22 +45,30 @@ import { useSimulation } from '@/contexts/SimulationContext';
 import { ITRequestDetailDialog } from '@/components/it/ITRequestDetailDialog';
 
 const STATUS_LABELS: Record<string, string> = {
-  todo: 'Affectée',
+  todo: 'À affecter',
+  affectee: 'Affectée',
   in_progress: 'En cours',
   'in-progress': 'En cours',
   en_attente_complement_demandeur: 'Attente compléments',
   en_attente_retour_externe: 'Attente tiers',
+  en_attente_retour_ticket_itp: 'Attente ticket ITP',
+  en_attente_retour_ticket_blc: 'Attente ticket BLC',
+  en_attente_chiffrage: 'Attente chiffrage',
   realisee: 'Réalisée',
   done: 'Terminée',
   cancelled: 'Annulée',
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  todo: 'bg-blue-100 text-blue-800 border-blue-300',
+  todo: 'bg-amber-100 text-amber-800 border-amber-300',
+  affectee: 'bg-blue-100 text-blue-800 border-blue-300',
   in_progress: 'bg-violet-100 text-violet-800 border-violet-300',
   'in-progress': 'bg-violet-100 text-violet-800 border-violet-300',
   en_attente_complement_demandeur: 'bg-yellow-100 text-yellow-800 border-yellow-300',
   en_attente_retour_externe: 'bg-orange-100 text-orange-800 border-orange-300',
+  en_attente_retour_ticket_itp: 'bg-orange-100 text-orange-800 border-orange-300',
+  en_attente_retour_ticket_blc: 'bg-orange-100 text-orange-800 border-orange-300',
+  en_attente_chiffrage: 'bg-amber-100 text-amber-800 border-amber-300',
   realisee: 'bg-emerald-100 text-emerald-800 border-emerald-300',
   done: 'bg-green-100 text-green-800 border-green-300',
   cancelled: 'bg-gray-100 text-gray-700 border-gray-300',
@@ -73,6 +84,7 @@ export default function ITDispatch() {
   const [filterPrestation, setFilterPrestation] = useState('all');
   const [filterProject, setFilterProject] = useState('all');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<'table' | 'kanban' | 'calendar'>('table');
 
   // Map id -> display_name pour tous les profils referenced (requester, assignee, referent_metier)
   const [profilesMap, setProfilesMap] = useState<Map<string, string>>(new Map());
@@ -140,7 +152,7 @@ export default function ITDispatch() {
   const kpis = useMemo(() => {
     const actives = requests.filter(r => !['realisee', 'done', 'cancelled'].includes(r.status)).length;
     const enCours = requests.filter(r => ['in_progress', 'in-progress'].includes(r.status)).length;
-    const enAttente = requests.filter(r => ['en_attente_complement_demandeur', 'en_attente_retour_externe'].includes(r.status)).length;
+    const enAttente = requests.filter(r => ['en_attente_complement_demandeur', 'en_attente_retour_externe', 'en_attente_retour_ticket_itp', 'en_attente_retour_ticket_blc', 'en_attente_chiffrage'].includes(r.status)).length;
     const realiseesMois = requests.filter(r => {
       if (!['realisee', 'done'].includes(r.status)) return false;
       const d = new Date(r.updated_at);
@@ -346,8 +358,20 @@ export default function ITDispatch() {
               </CardContent>
             </Card>
 
+            <div className="flex items-center gap-2">
+              <Button variant={viewMode === 'table' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('table')}>
+                <TableProperties className="h-4 w-4 mr-1" /> Tableau
+              </Button>
+              <Button variant={viewMode === 'kanban' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('kanban')}>
+                <Columns className="h-4 w-4 mr-1" /> Kanban
+              </Button>
+              <Button variant={viewMode === 'calendar' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('calendar')}>
+                <CalendarIcon className="h-4 w-4 mr-1" /> Calendrier
+              </Button>
+            </div>
+
             <Card>
-              <CardContent className="p-0">
+              <CardContent className={cn(viewMode === 'table' ? 'p-0' : 'p-4')}>
                 {isLoading ? (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -359,6 +383,23 @@ export default function ITDispatch() {
                       Créer une demande
                     </button>
                   </div>
+                ) : viewMode === 'kanban' ? (
+                  <KanbanBoard
+                    tasks={filtered as unknown as Task[]}
+                    onStatusChange={async (taskId, newStatus) => updateStatus(taskId, newStatus as string)}
+                    onDelete={async () => {}}
+                    progressMap={new Map()}
+                    onTaskUpdated={refetch}
+                    kanbanGroupMode="status"
+                  />
+                ) : viewMode === 'calendar' ? (
+                  <CalendarView
+                    tasks={filtered as unknown as Task[]}
+                    onStatusChange={async (taskId, newStatus) => updateStatus(taskId, newStatus as string)}
+                    onDelete={async () => {}}
+                    progressMap={new Map()}
+                    onTaskUpdated={refetch}
+                  />
                 ) : (
                   <Table>
                     <TableHeader>
@@ -501,6 +542,7 @@ function RequestRow({
   const renderActions = () => {
     switch (request.status) {
       case 'todo':
+      case 'affectee':
         return (
           <Button size="sm" onClick={(e) => { e.stopPropagation(); onStatusChange(request.id, 'in-progress'); }}>Démarrer</Button>
         );

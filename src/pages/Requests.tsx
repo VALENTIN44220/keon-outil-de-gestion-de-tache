@@ -27,7 +27,7 @@ import { usePendingAssignments } from '@/hooks/usePendingAssignments';
 import { useTasks } from '@/hooks/useTasks';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FolderOpen, Building2, Lightbulb, ListChecks, ClipboardList, UserCog, ArrowRight } from 'lucide-react';
+import { FolderOpen, Building2, Lightbulb, ListChecks, ClipboardList, UserCog, ArrowRight, Monitor, Truck, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   SUPPLIER_NEW_REQUEST_PROCESS_TEMPLATE_ID,
@@ -143,20 +143,47 @@ const Requests = () => {
       visible: true,
     },
     {
+      key: 'it',
+      label: 'Demande IT',
+      description: 'Support Divalto/Pipedrive/Lucca/Power BI, intervention ou matériel',
+      icon: Monitor,
+      accent: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300',
+      onClick: () => navigate('/it/new'),
+      visible: true,
+    },
+    {
+      key: 'maintenance',
+      label: 'Demande matériel',
+      description: 'Maintenance : commande de matériel (validation coordinateur)',
+      icon: Package,
+      accent: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+      onClick: () => navigate('/maintenance/new'),
+      visible: true,
+    },
+    {
+      key: 'logistique',
+      label: 'Demande de transport',
+      description: 'Logistique : transport courant ou urgent',
+      icon: Truck,
+      accent: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+      onClick: () => navigate('/logistique/new'),
+      visible: true,
+    },
+    {
       key: 'innovation',
       label: 'Innovation',
       description: 'Nouvelle idée ou demande d\'innovation',
       icon: Lightbulb,
       accent: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
-      onClick: () => navigate('/innovation/requests'),
+      onClick: () => navigate('/innovation/new'),
       visible: true,
     },
     {
       key: 'other',
       label: 'Autre demande',
-      description: 'IT, service achat, ou autre processus configuré',
+      description: 'Service achat ou autre processus configuré',
       icon: ClipboardList,
-      accent: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+      accent: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
       onClick: () => {
         setSelectedProcessTemplateId(undefined);
         setSelectedSubProcessTemplateId(undefined);
