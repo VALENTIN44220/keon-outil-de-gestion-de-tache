@@ -32,6 +32,10 @@ export interface PlanMapping {
   last_sync_at: string | null;
   created_at: string;
   updated_at: string;
+  // Module cible (sync vers un module specifique : it, logistique, ...)
+  target_module_code?: string | null;
+  target_task_type?: 'task' | 'request' | null;
+  target_default_assignee_profile_id?: string | null;
 }
 
 export interface SyncLog {

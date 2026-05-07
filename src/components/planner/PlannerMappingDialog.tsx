@@ -60,6 +60,10 @@ export function PlannerMappingDialog({ open, onOpenChange, mapping, onSave }: Pl
   const [defaultRequesterId, setDefaultRequesterId] = useState<string>(mapping.default_requester_id || 'none');
   const [defaultReporterId, setDefaultReporterId] = useState<string>(mapping.default_reporter_id || 'none');
   const [resolveAssignees, setResolveAssignees] = useState<boolean>(mapping.resolve_assignees !== false);
+  // Module cible
+  const [targetModuleCode, setTargetModuleCode] = useState<string>(mapping.target_module_code || 'none');
+  const [targetTaskType, setTargetTaskType] = useState<string>(mapping.target_task_type || 'task');
+  const [targetDefaultAssignee, setTargetDefaultAssignee] = useState<string>(mapping.target_default_assignee_profile_id || 'none');
   
   // Default values for imported tasks
   const [defaultPriority, setDefaultPriority] = useState<string>(mapping.default_priority || 'none');
@@ -165,6 +169,9 @@ export function PlannerMappingDialog({ open, onOpenChange, mapping, onSave }: Pl
           default_priority: defaultPriority === 'none' ? null : defaultPriority,
           default_status: defaultStatus === 'none' ? null : defaultStatus,
           resolve_assignees: resolveAssignees,
+          target_module_code: targetModuleCode === 'none' ? null : targetModuleCode,
+          target_task_type: targetTaskType,
+          target_default_assignee_profile_id: targetDefaultAssignee === 'none' ? null : targetDefaultAssignee,
         })
         .eq('id', mapping.id);
 
@@ -204,6 +211,60 @@ export function PlannerMappingDialog({ open, onOpenChange, mapping, onSave }: Pl
             </div>
           ) : (
             <div className="space-y-6 pr-1">
+              {/* Module cible (sync vers IT/Logistique/Maintenance/...) */}
+              <div className="space-y-3">
+                <Label className="font-medium">Module cible (avancé)</Label>
+                <p className="text-xs text-muted-foreground">
+                  Si défini, les tâches importées seront créées dans le module choisi
+                  (et apparaîtront dans son dashboard dédié, ex. /it/dispatch).
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">Module</Label>
+                    <Select value={targetModuleCode} onValueChange={setTargetModuleCode}>
+                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Aucun (par défaut)</SelectItem>
+                        <SelectItem value="it">IT / Digital</SelectItem>
+                        <SelectItem value="logistique">Logistique</SelectItem>
+                        <SelectItem value="maintenance">Maintenance</SelectItem>
+                        <SelectItem value="comm">Comm / Marketing</SelectItem>
+                        <SelectItem value="innovation">Innovation</SelectItem>
+                        <SelectItem value="rh">RH / Onboarding</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm">Type de tâche</Label>
+                    <Select value={targetTaskType} onValueChange={setTargetTaskType}>
+                      <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="task">Tâche (task)</SelectItem>
+                        <SelectItem value="request">Demande (request) — pour module IT</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-sm">Assigné par défaut (override)</Label>
+                  <SearchableSelect
+                    value={targetDefaultAssignee}
+                    onValueChange={setTargetDefaultAssignee}
+                    options={[
+                      { value: 'none', label: 'Aucun (utilise resolve_assignees Planner)' },
+                      ...profileOptions,
+                    ]}
+                    placeholder="Sélectionner un assigné..."
+                    searchPlaceholder="Rechercher un collaborateur..."
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Si défini ET aucun assigné Planner résolu, override avec ce profil.
+                  </p>
+                </div>
+              </div>
+
+              <Separator />
+
               {/* Assignee & Requester Mapping */}
               <div className="space-y-4">
                 <Label className="font-medium flex items-center gap-2">
