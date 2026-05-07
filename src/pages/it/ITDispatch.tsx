@@ -35,6 +35,10 @@ import { ConfigurableDashboard } from '@/components/dashboard/ConfigurableDashbo
 import { Task, TaskStats } from '@/types/task';
 import { TaskDetailDialog } from '@/components/tasks/TaskDetailDialog';
 import { RequestDetailDialog } from '@/components/tasks/RequestDetailDialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { useAuth } from '@/contexts/AuthContext';
+import { useSimulation } from '@/contexts/SimulationContext';
 
 const STATUS_LABELS: Record<string, string> = {
   todo: 'Affectée',
@@ -185,6 +189,46 @@ export default function ITDispatch() {
   }, [requests]);
 
   const [analyticsTask, setAnalyticsTask] = useState<Task | null>(null);
+  const [detailRequest, setDetailRequest] = useState<ITRequest | null>(null);
+
+  // Dialog "Demander complement" : on demande la question puis on poste
+  // un commentaire ET on change le status. Sans question -> bloque.
+  const [complementDialogReq, setComplementDialogReq] = useState<ITRequest | null>(null);
+  const [complementMsg, setComplementMsg] = useState('');
+  const [isPostingComplement, setIsPostingComplement] = useState(false);
+  const { profile: authProfile } = useAuth();
+  const { isSimulating, simulatedProfile } = useSimulation();
+  const myProfile = isSimulating && simulatedProfile ? simulatedProfile : authProfile;
+
+  const submitComplement = async () => {
+    if (!complementDialogReq || !myProfile?.id || !complementMsg.trim()) return;
+    setIsPostingComplement(true);
+    try {
+      // 1. Insert le commentaire (BE-010 trigger notifie demandeur + manager)
+      const { error: cErr } = await supabase.from('task_comments').insert({
+        task_id: complementDialogReq.id,
+        author_id: myProfile.id,
+        content: '[Complément demandé] ' + complementMsg.trim(),
+      });
+      if (cErr) throw cErr;
+
+      // 2. Change le status
+      const { error: sErr } = await supabase
+        .from('tasks')
+        .update({ status: 'en_attente_complement_demandeur' })
+        .eq('id', complementDialogReq.id);
+      if (sErr) throw sErr;
+
+      toast.success('Complément demandé — message posté');
+      setComplementDialogReq(null);
+      setComplementMsg('');
+      refetch();
+    } catch (e: any) {
+      toast.error(`Erreur : ${e.message}`);
+    } finally {
+      setIsPostingComplement(false);
+    }
+  };
 
   const KpiCard = ({ icon: Icon, label, value, color }: any) => (
     <Card>
@@ -322,9 +366,11 @@ export default function ITDispatch() {
                           itProjects={itProjects}
                           expanded={expandedIds.has(r.id)}
                           onToggle={() => toggleExpand(r.id)}
+                          onOpenDetail={() => setDetailRequest(r)}
                           onStatusChange={updateStatus}
                           onReassign={reassign}
                           onLinkProject={linkProject}
+                          onAskComplement={() => { setComplementDialogReq(r); setComplementMsg(''); }}
                         />
                       ))}
                     </TableBody>
@@ -367,13 +413,55 @@ export default function ITDispatch() {
           onTaskMutated={refetch}
         />
       )}
+
+      {/* Detail dialog cliquable depuis le titre */}
+      {detailRequest && (
+        <RequestDetailDialog
+          task={detailRequest as unknown as Task}
+          open={!!detailRequest}
+          onClose={() => setDetailRequest(null)}
+          onStatusChange={() => {}}
+          onTaskMutated={refetch}
+        />
+      )}
+
+      {/* Dialog 'Demander complement' */}
+      <Dialog open={!!complementDialogReq} onOpenChange={(open) => { if (!open) setComplementDialogReq(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Demander un complément</DialogTitle>
+            <DialogDescription>
+              Pose ta question au demandeur. Elle sera postée dans le chat de la tâche
+              et le demandeur recevra une notification. La demande passera en
+              « Attente compléments » jusqu'à sa réponse.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Textarea
+              rows={4}
+              value={complementMsg}
+              onChange={(e) => setComplementMsg(e.target.value)}
+              placeholder="Quelle info manque-t-il ? Ex. peux-tu préciser le navigateur utilisé ? le n° de poste ? un screenshot ?"
+              disabled={isPostingComplement}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setComplementDialogReq(null)} disabled={isPostingComplement}>
+              Annuler
+            </Button>
+            <Button onClick={submitComplement} disabled={isPostingComplement || !complementMsg.trim()}>
+              {isPostingComplement ? 'Envoi...' : 'Poster + demander complément'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
 function RequestRow({
   request, projectMap, assigneeMap, teamMembers, itProjects, expanded,
-  onToggle, onStatusChange, onReassign, onLinkProject,
+  onToggle, onOpenDetail, onStatusChange, onReassign, onLinkProject, onAskComplement,
 }: {
   request: ITRequest;
   projectMap: Map<string, string>;
@@ -382,9 +470,11 @@ function RequestRow({
   itProjects: any[];
   expanded: boolean;
   onToggle: () => void;
+  onOpenDetail: () => void;
   onStatusChange: (id: string, newStatus: string) => void;
   onReassign: (id: string, newAssigneeId: string) => void;
   onLinkProject: (id: string, projectId: string | null) => void;
+  onAskComplement: () => void;
 }) {
   const data = request.module_data ?? {};
   const itProjectId = (request as any).it_project_id as string | null;
@@ -399,7 +489,7 @@ function RequestRow({
       case 'in-progress':
         return (
           <div className="flex gap-1">
-            <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); onStatusChange(request.id, 'en_attente_complement_demandeur'); }}>Demander complément</Button>
+            <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); onAskComplement(); }}>Demander complément</Button>
             <Button size="sm" onClick={(e) => { e.stopPropagation(); onStatusChange(request.id, 'realisee'); }}>Réalisée</Button>
           </div>
         );
@@ -415,11 +505,20 @@ function RequestRow({
 
   return (
     <>
-      <TableRow className="cursor-pointer" onClick={onToggle}>
-        <TableCell>
+      <TableRow>
+        <TableCell className="cursor-pointer" onClick={onToggle}>
           {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </TableCell>
-        <TableCell className="font-medium max-w-[260px] truncate">{request.title}</TableCell>
+        <TableCell className="font-medium max-w-[260px] truncate">
+          <button
+            type="button"
+            onClick={onOpenDetail}
+            className="text-left hover:underline hover:text-primary truncate w-full"
+            title="Cliquer pour voir le détail complet"
+          >
+            {request.title}
+          </button>
+        </TableCell>
         <TableCell>
           <Badge variant="outline" className="text-xs">{data.prestation ?? '—'}</Badge>
         </TableCell>
