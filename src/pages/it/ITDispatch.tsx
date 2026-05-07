@@ -29,7 +29,12 @@ import { useITRequests, ITRequest, IT_PRESTATIONS, IT_TEAM_PROFILE_IDS } from '@
 import { useITProjects } from '@/hooks/useITProjects';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { UserCog } from 'lucide-react';
+import { UserCog, BarChart3, Layers } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { ConfigurableDashboard } from '@/components/dashboard/ConfigurableDashboard';
+import { Task, TaskStats } from '@/types/task';
+import { TaskDetailDialog } from '@/components/tasks/TaskDetailDialog';
+import { RequestDetailDialog } from '@/components/tasks/RequestDetailDialog';
 
 const STATUS_LABELS: Record<string, string> = {
   todo: 'Affectée',
@@ -165,6 +170,22 @@ export default function ITDispatch() {
     });
   };
 
+  // Stats Task[] pour ConfigurableDashboard (vue analytique)
+  const tasksAsAny = requests as unknown as Task[];
+  const stats: TaskStats = useMemo(() => {
+    const total = requests.length;
+    const todo = requests.filter(t => t.status === 'todo').length;
+    const inProgress = requests.filter(t => t.status === 'in-progress' || t.status === 'in_progress').length;
+    const done = requests.filter(t => t.status === 'realisee' || t.status === 'done').length;
+    const pendingValidation = requests.filter(t => t.status === 'pending_validation_1' || t.status === 'pending_validation_2').length;
+    const validated = requests.filter(t => t.status === 'validated').length;
+    const refused = requests.filter(t => t.status === 'refused').length;
+    const completionRate = total > 0 ? Math.round(((done + validated) / total) * 100) : 0;
+    return { total, todo, inProgress, done, pendingValidation, validated, refused, completionRate };
+  }, [requests]);
+
+  const [analyticsTask, setAnalyticsTask] = useState<Task | null>(null);
+
   const KpiCard = ({ icon: Icon, label, value, color }: any) => (
     <Card>
       <CardContent className="p-4 flex items-center gap-3">
@@ -208,6 +229,17 @@ export default function ITDispatch() {
               </div>
             </div>
 
+            <Tabs defaultValue="demandes" className="w-full">
+              <TabsList>
+                <TabsTrigger value="demandes" className="gap-2">
+                  <Layers className="h-4 w-4" /> Demandes
+                </TabsTrigger>
+                <TabsTrigger value="analyse" className="gap-2">
+                  <BarChart3 className="h-4 w-4" /> Analyse
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="demandes" className="space-y-6 mt-4">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               <KpiCard icon={ListChecks} label="Actives" value={kpis.actives} color="bg-slate-100 text-slate-700" />
               <KpiCard icon={Clock} label="En cours" value={kpis.enCours} color="bg-violet-100 text-violet-700" />
@@ -300,9 +332,41 @@ export default function ITDispatch() {
                 )}
               </CardContent>
             </Card>
+              </TabsContent>
+
+              <TabsContent value="analyse" className="space-y-6 mt-4">
+                <ConfigurableDashboard
+                  tasks={tasksAsAny}
+                  stats={stats}
+                  globalProgress={stats.completionRate}
+                  processId="it-module"
+                  canEdit={true}
+                  crossFiltersDefaultCollapsed={true}
+                  onTaskClick={(task) => setAnalyticsTask(task)}
+                />
+              </TabsContent>
+            </Tabs>
           </div>
         </main>
       </div>
+
+      {analyticsTask && analyticsTask.type === 'request' ? (
+        <RequestDetailDialog
+          task={analyticsTask}
+          open={!!analyticsTask}
+          onClose={() => setAnalyticsTask(null)}
+          onStatusChange={() => {}}
+          onTaskMutated={refetch}
+        />
+      ) : (
+        <TaskDetailDialog
+          task={analyticsTask}
+          open={!!analyticsTask}
+          onClose={() => setAnalyticsTask(null)}
+          onStatusChange={() => {}}
+          onTaskMutated={refetch}
+        />
+      )}
     </div>
   );
 }
