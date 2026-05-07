@@ -6,7 +6,7 @@
  * en_attente_retour_externe -> realisee.
  */
 import { useState, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { Card, CardContent } from '@/components/ui/card';
@@ -220,6 +220,33 @@ export default function ITDispatch() {
 
   const [analyticsTask, setAnalyticsTask] = useState<Task | null>(null);
   const [detailRequest, setDetailRequest] = useState<ITRequest | null>(null);
+
+  // Deep-link via /it/dispatch?openTask=<id> (depuis cloche notifs)
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const openId = searchParams.get('openTask');
+    if (!openId) return;
+    // Cherche d abord dans la liste deja chargee
+    const found = requests.find(r => r.id === openId);
+    if (found) {
+      setDetailRequest(found);
+      const next = new URLSearchParams(searchParams);
+      next.delete('openTask');
+      setSearchParams(next, { replace: true });
+      return;
+    }
+    // Sinon fetch direct
+    void supabase.from('tasks').select('*').eq('id', openId).maybeSingle()
+      .then(({ data }) => {
+        if (data) {
+          setDetailRequest(data as unknown as ITRequest);
+          const next = new URLSearchParams(searchParams);
+          next.delete('openTask');
+          setSearchParams(next, { replace: true });
+        }
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, requests]);
 
   // Dialog "Demander complement" : on demande la question puis on poste
   // un commentaire ET on change le status. Sans question -> bloque.
