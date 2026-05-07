@@ -552,7 +552,9 @@ export default function ITDispatch() {
                         <TableHead>Projet IT</TableHead>
                         <TableHead>Assigné</TableHead>
                         <TableHead>Statut</TableHead>
-                        <TableHead>Date</TableHead>
+                        <TableHead>Date demande</TableHead>
+                        <TableHead>Date début</TableHead>
+                        <TableHead>Date clôture</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -743,8 +745,18 @@ function RequestRow({
             {STATUS_LABELS[request.status] ?? request.status}
           </Badge>
         </TableCell>
-        <TableCell className="text-xs text-muted-foreground">
+        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
           {format(new Date(request.date_demande ?? request.created_at), 'dd/MM/yyyy', { locale: fr })}
+        </TableCell>
+        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+          {request.date_lancement
+            ? format(new Date(request.date_lancement), 'dd/MM/yyyy', { locale: fr })
+            : <span className="text-muted-foreground/50">—</span>}
+        </TableCell>
+        <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+          {request.date_fermeture
+            ? format(new Date(request.date_fermeture), 'dd/MM/yyyy', { locale: fr })
+            : <span className="text-muted-foreground/50">—</span>}
         </TableCell>
         <TableCell className="text-right">
           <div onClick={e => e.stopPropagation()} className="flex items-center justify-end gap-1">
@@ -754,7 +766,7 @@ function RequestRow({
       </TableRow>
       {expanded && (
         <TableRow>
-          <TableCell colSpan={8} className="bg-muted/30 p-4">
+          <TableCell colSpan={10} className="bg-muted/30 p-4">
             <div className="mb-3 flex items-center gap-3 flex-wrap">
               <span className="text-xs font-semibold text-muted-foreground">Lier à un projet IT :</span>
               <Select
