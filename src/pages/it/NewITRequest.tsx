@@ -51,6 +51,9 @@ export default function NewITRequest() {
   const [emailsAcces, setEmailsAcces] = useState('');
   const [numTicketItp, setNumTicketItp] = useState('');
   const [numTicketBlc, setNumTicketBlc] = useState('');
+  const [logicielConcerne, setLogicielConcerne] = useState('');
+  const [logicielSousCategorie, setLogicielSousCategorie] = useState('');
+  const [echeanceSouhaitee, setEcheanceSouhaitee] = useState('');
 
   const { projects: itProjects, isLoading: isLoadingProjects } = useITProjects();
 
@@ -62,12 +65,22 @@ export default function NewITRequest() {
   const isSharePoint = prestation?.name === 'Ouverture dossier SharePoint';
   const isDivalto = prestation?.name === 'Support Divalto';
   const isPipedrive = prestation?.name === 'Support Pipedrive';
+  const isIntervention = prestation?.name === "Demande d'intervention IT";
+
+  // Cascade : sous-categorie selon le logiciel choisi
+  const SOUS_CATEGORIES: Record<string, string[]> = {
+    microsoft365: ['Outlook', 'Teams', 'Word', 'Excel', 'PowerPoint', 'Visio', 'Project'],
+    imprimante: ['Imprimante BGN', 'Traceur BGN', 'Imprimante MLK', 'Traceur MLK', 'Autre'],
+    gestion_contrats: ['Flux IT', 'Fournisseurs', 'Onboarding', 'Innovation', 'Autre'],
+  };
+  const hasSousCategorie = !!SOUS_CATEGORIES[logicielConcerne];
 
   const canSubmit =
     !isSubmitting &&
     prestationId &&
     description.trim().length > 0 &&
-    (!isSharePoint || (nomDossierSp.trim() && emailsAcces.trim()));
+    (!isSharePoint || (nomDossierSp.trim() && emailsAcces.trim())) &&
+    (!isIntervention || (logicielConcerne && (!hasSousCategorie || logicielSousCategorie)));
 
   const handleSubmit = async () => {
     if (!profile?.id || !user || !canSubmit || !prestation) return;
@@ -85,6 +98,10 @@ export default function NewITRequest() {
       }
       if (isDivalto && numTicketItp) moduleData.num_ticket_itp = numTicketItp;
       if (isPipedrive && numTicketBlc) moduleData.num_ticket_blc = numTicketBlc;
+      if (isIntervention && logicielConcerne) {
+        moduleData.logiciel_concerne = logicielConcerne;
+        if (logicielSousCategorie) moduleData.logiciel_sous_categorie = logicielSousCategorie;
+      }
 
       const { error } = await supabase.from('tasks').insert({
         type: 'request',
@@ -97,6 +114,7 @@ export default function NewITRequest() {
         source_process_template_id: prestation.id,
         it_project_id: itProjectId !== 'none' ? itProjectId : null,
         priority: priority as any,
+        due_date: echeanceSouhaitee || null,
         module_data: moduleData,
       });
 
@@ -183,20 +201,13 @@ export default function NewITRequest() {
                 </div>
 
                 <div>
-                  <Label>Projet IT lié (optionnel)</Label>
-                  <Select value={itProjectId} onValueChange={setItProjectId} disabled={isSubmitting || isLoadingProjects}>
-                    <SelectTrigger>
-                      <SelectValue placeholder={isLoadingProjects ? 'Chargement...' : 'Aucun projet'} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Aucun projet</SelectItem>
-                      {itProjects.map(p => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.code_projet_digital ? `${p.code_projet_digital} — ` : ''}{p.nom_projet}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label>Échéance souhaitée (optionnel)</Label>
+                  <Input
+                    type="date"
+                    value={echeanceSouhaitee}
+                    onChange={e => setEcheanceSouhaitee(e.target.value)}
+                    disabled={isSubmitting}
+                  />
                 </div>
 
                 {/* Champs conditionnels */}
@@ -244,6 +255,51 @@ export default function NewITRequest() {
                       disabled={isSubmitting}
                     />
                   </div>
+                )}
+                {isIntervention && (
+                  <>
+                    <div>
+                      <Label>Logiciel / outil concerné *</Label>
+                      <Select
+                        value={logicielConcerne}
+                        onValueChange={(v) => { setLogicielConcerne(v); setLogicielSousCategorie(''); }}
+                        disabled={isSubmitting}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Choisir..." /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="microsoft365">Microsoft 365</SelectItem>
+                          <SelectItem value="vpn">VPN</SelectItem>
+                          <SelectItem value="imprimante">Imprimante / traceur</SelectItem>
+                          <SelectItem value="acces_reseau">Accès réseau</SelectItem>
+                          <SelectItem value="app_task">Application AppTask</SelectItem>
+                          <SelectItem value="gestion_contrats">Application gestion des contrats</SelectItem>
+                          <SelectItem value="autre">Autre (préciser dans la description)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {hasSousCategorie && (
+                      <div>
+                        <Label>
+                          {logicielConcerne === 'microsoft365' && 'Quel logiciel Microsoft 365 ?'}
+                          {logicielConcerne === 'imprimante' && 'Quelle imprimante / traceur ?'}
+                          {logicielConcerne === 'gestion_contrats' && 'Quel flux ?'}
+                          {' *'}
+                        </Label>
+                        <Select
+                          value={logicielSousCategorie}
+                          onValueChange={setLogicielSousCategorie}
+                          disabled={isSubmitting}
+                        >
+                          <SelectTrigger><SelectValue placeholder="Choisir..." /></SelectTrigger>
+                          <SelectContent>
+                            {SOUS_CATEGORIES[logicielConcerne].map(s => (
+                              <SelectItem key={s} value={s}>{s}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </>
                 )}
 
                 <div className="flex items-center justify-end gap-2 pt-4 border-t">

@@ -239,7 +239,7 @@ export function ITRequestDetailDialog({
           </section>
 
           {/* Champs specifiques prestation */}
-          {(data.nom_dossier_sharepoint || data.emails_acces || data.num_ticket_itp || data.num_ticket_blc) && (
+          {(data.nom_dossier_sharepoint || data.emails_acces || data.num_ticket_itp || data.num_ticket_blc || data.logiciel_concerne) && (
             <>
               <Separator />
               <section>
@@ -251,6 +251,12 @@ export function ITRequestDetailDialog({
                   {data.emails_acces && renderInfoLine('Emails accès', data.emails_acces as string)}
                   {data.num_ticket_itp && renderInfoLine('N° ticket ITP', data.num_ticket_itp as string)}
                   {data.num_ticket_blc && renderInfoLine('N° ticket BLC', data.num_ticket_blc as string)}
+                  {data.logiciel_concerne && renderInfoLine(
+                    'Logiciel / outil concerné',
+                    data.logiciel_sous_categorie
+                      ? `${data.logiciel_concerne} — ${data.logiciel_sous_categorie}`
+                      : data.logiciel_concerne
+                  )}
                 </div>
               </section>
             </>
