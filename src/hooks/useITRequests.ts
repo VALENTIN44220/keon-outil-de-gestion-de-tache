@@ -18,6 +18,13 @@ export interface ITRequest {
   updated_at: string;
   due_date: string | null;
   module_data: Record<string, any> | null;
+  // Dates metier (sync Planner ou trigger app)
+  date_demande?: string | null;      // creation Planner OU manuelle
+  date_lancement?: string | null;    // start Planner
+  date_fermeture?: string | null;    // closure Planner
+  status_dates?: Record<string, string> | null;
+  it_project_id?: string | null;
+  priority?: string | null;
 }
 
 export const IT_PRESTATIONS = [

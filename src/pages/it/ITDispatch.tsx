@@ -44,7 +44,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSimulation } from '@/contexts/SimulationContext';
 import { ITRequestDetailDialog } from '@/components/it/ITRequestDetailDialog';
 import { useUserRole } from '@/hooks/useUserRole';
-import { Cloud } from 'lucide-react';
+import { Cloud, EyeOff, Star } from 'lucide-react';
+import { CrossFiltersPanel } from '@/components/dashboard/CrossFiltersPanel';
+import { CrossFilters, DEFAULT_CROSS_FILTERS } from '@/components/dashboard/types';
 
 const STATUS_LABELS: Record<string, string> = {
   todo: 'À affecter',
@@ -87,6 +89,12 @@ export default function ITDispatch() {
   const [filterProject, setFilterProject] = useState('all');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<'table' | 'kanban' | 'calendar'>('table');
+  // Filtres avances + contextes sauvegardables
+  const [crossFilters, setCrossFilters] = useState<CrossFilters>(DEFAULT_CROSS_FILTERS);
+  // Toggle rapide : masquer les demandes terminees (pre-selectionne par defaut)
+  const TERMINAL_STATUSES = ['realisee', 'cloturee', 'cancelled', 'abandonnee', 'done'];
+  const [hideTerminated, setHideTerminated] = useState(true);
+  const [onlyMine, setOnlyMine] = useState(false);
 
   // Map id -> display_name pour tous les profils referenced (requester, assignee, referent_metier)
   const [profilesMap, setProfilesMap] = useState<Map<string, string>>(new Map());
@@ -134,6 +142,11 @@ export default function ITDispatch() {
 
   const filtered = useMemo(() => {
     return requests.filter((r) => {
+      // Toggles rapides
+      if (hideTerminated && TERMINAL_STATUSES.includes(r.status)) return false;
+      if (onlyMine && r.assignee_id !== myProfile?.id && r.requester_id !== myProfile?.id) return false;
+
+      // Filtres locaux historiques
       if (filterStatus !== 'all' && r.status !== filterStatus) return false;
       if (filterPrestation !== 'all' && r.source_process_template_id !== filterPrestation) return false;
       if (filterProject !== 'all') {
@@ -147,9 +160,24 @@ export default function ITDispatch() {
             !r.description?.toLowerCase().includes(q) &&
             !(r.module_data?.prestation as string)?.toLowerCase().includes(q)) return false;
       }
+
+      // Cross-filters (contextes sauvegardables)
+      if (crossFilters.searchQuery && !r.title?.toLowerCase().includes(crossFilters.searchQuery.toLowerCase())) return false;
+      if (crossFilters.statuses?.length > 0 && !crossFilters.statuses.includes(r.status as any)) return false;
+      if (crossFilters.priorities?.length > 0) {
+        const p = (r as any).priority;
+        if (!p || !crossFilters.priorities.includes(p)) return false;
+      }
+      if (crossFilters.assigneeIds?.length > 0 && !crossFilters.assigneeIds.includes(r.assignee_id || '')) return false;
+      if (crossFilters.dateRange?.start && r.created_at) {
+        if (new Date(r.created_at) < crossFilters.dateRange.start) return false;
+      }
+      if (crossFilters.dateRange?.end && r.created_at) {
+        if (new Date(r.created_at) > crossFilters.dateRange.end) return false;
+      }
       return true;
     });
-  }, [requests, filterStatus, filterPrestation, search]);
+  }, [requests, filterStatus, filterPrestation, filterProject, search, hideTerminated, onlyMine, myProfile?.id, crossFilters]);
 
   const kpis = useMemo(() => {
     const actives = requests.filter(r => !['realisee', 'done', 'cancelled'].includes(r.status)).length;
@@ -414,7 +442,7 @@ export default function ITDispatch() {
               </CardContent>
             </Card>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Button variant={viewMode === 'table' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('table')}>
                 <TableProperties className="h-4 w-4 mr-1" /> Tableau
               </Button>
@@ -424,7 +452,33 @@ export default function ITDispatch() {
               <Button variant={viewMode === 'calendar' ? 'default' : 'outline'} size="sm" onClick={() => setViewMode('calendar')}>
                 <CalendarIcon className="h-4 w-4 mr-1" /> Calendrier
               </Button>
+              <div className="w-px h-6 bg-border mx-1" />
+              <Button
+                variant={hideTerminated ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setHideTerminated(v => !v)}
+                title="Masquer les demandes terminées (Réalisées / Clôturées / Annulées)"
+              >
+                <EyeOff className="h-4 w-4 mr-1" /> Masquer terminées
+              </Button>
+              <Button
+                variant={onlyMine ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setOnlyMine(v => !v)}
+                title="Afficher uniquement les demandes où je suis assigné ou demandeur"
+              >
+                <Star className="h-4 w-4 mr-1" /> Mes demandes
+              </Button>
             </div>
+
+            {/* Cross filters panel : contextes sauvegardables (presets) */}
+            <CrossFiltersPanel
+              filters={crossFilters}
+              onFiltersChange={setCrossFilters}
+              contextId="it-module-dispatch"
+              defaultCollapsed={true}
+              isAdmin={isAdmin}
+            />
 
             <Card>
               <CardContent className={cn(viewMode === 'table' ? 'p-0' : 'p-4')}>
@@ -658,7 +712,7 @@ function RequestRow({
           </Badge>
         </TableCell>
         <TableCell className="text-xs text-muted-foreground">
-          {format(new Date(request.created_at), 'dd/MM/yyyy', { locale: fr })}
+          {format(new Date(request.date_demande ?? request.created_at), 'dd/MM/yyyy', { locale: fr })}
         </TableCell>
         <TableCell className="text-right">
           <div onClick={e => e.stopPropagation()} className="flex items-center justify-end gap-1">

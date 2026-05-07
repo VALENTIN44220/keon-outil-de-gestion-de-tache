@@ -91,14 +91,17 @@ export function ITRequestDetailDialog({
   const itProjectId = (request as any).it_project_id as string | null;
 
   const statusDates = (request as any).status_dates as Record<string, string> | undefined;
+  // Date demande : priorite Planner.createdDateTime (date_demande) > status_dates.todo > created_at app
   const dateOuverture = useMemo(() =>
-    statusDates?.todo ?? request.created_at, [statusDates, request.created_at]);
+    (request as any).date_demande ?? statusDates?.todo ?? request.created_at,
+    [statusDates, request.created_at, request]);
+  const dateLancement = (request as any).date_lancement ?? statusDates?.['in-progress'] ?? null;
   const dateMaj = useMemo(() => {
     if (!statusDates) return request.updated_at;
     const vals = Object.values(statusDates);
     return vals.length ? vals.sort().slice(-1)[0] : request.updated_at;
   }, [statusDates, request.updated_at]);
-  const dateCloture = statusDates?.realisee ?? statusDates?.cloturee ?? null;
+  const dateCloture = (request as any).date_fermeture ?? statusDates?.realisee ?? statusDates?.cloturee ?? null;
 
   const fmt = (iso: string | null | undefined) =>
     iso ? format(parseISO(iso), 'dd/MM/yyyy HH:mm', { locale: fr }) : '—';
@@ -302,6 +305,7 @@ export function ITRequestDetailDialog({
             )}
             {data.priority && renderInfoLine('Priorité', PRIORITY_LABELS[data.priority as string] ?? data.priority, <AlertCircle className="h-3 w-3" />)}
             {renderInfoLine('Date demande', fmt(dateOuverture), <Calendar className="h-3 w-3" />)}
+            {dateLancement && renderInfoLine('Date début', fmt(dateLancement), <Clock className="h-3 w-3" />)}
             {request.due_date && renderInfoLine('Échéance souhaitée', fmtDay(request.due_date), <Clock className="h-3 w-3" />)}
             {renderInfoLine('Dernière maj état', fmt(dateMaj), <Clock className="h-3 w-3" />)}
             {dateCloture && renderInfoLine('Clôturée le', fmt(dateCloture), <CheckCircle2 className="h-3 w-3" />)}
