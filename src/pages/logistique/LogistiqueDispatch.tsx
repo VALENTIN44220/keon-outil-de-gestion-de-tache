@@ -20,7 +20,20 @@ import {
 } from '@/components/ui/table';
 import {
   Truck, Plus, Search, RefreshCw, Loader2, AlertTriangle, Clock, CheckCircle2, ListChecks, ChevronRight, ChevronDown,
+  Trash2, BarChart3, Layers,
 } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { ConfigurableDashboard } from '@/components/dashboard/ConfigurableDashboard';
+import { CrossFiltersPanel } from '@/components/dashboard/CrossFiltersPanel';
+import { CrossFilters, DEFAULT_CROSS_FILTERS } from '@/components/dashboard/types';
+import { ModuleQuickFilters, ModuleViewMode } from '@/components/modules/ModuleQuickFilters';
+import { KanbanBoard } from '@/components/tasks/KanbanBoard';
+import { CalendarView } from '@/components/tasks/CalendarView';
+import { Task, TaskStats } from '@/types/task';
+import { useAuth } from '@/contexts/AuthContext';
+import { useSimulation } from '@/contexts/SimulationContext';
+import { useUserRole } from '@/hooks/useUserRole';
+import { RequestDetailDialog } from '@/components/tasks/RequestDetailDialog';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -52,15 +65,28 @@ const STATUS_LABELS: Record<string, string> = {
   complement_demande: 'Complément demandé',
 };
 
+const TERMINAL_STATUSES = ['cloturee', 'abandonnee', 'cancelled', 'done'];
+
 export default function LogistiqueDispatch() {
   const navigate = useNavigate();
   const { requests, isLoading, refetch } = useLogistiqueRequests();
+  const { profile: authProfile } = useAuth();
+  const { isSimulating, simulatedProfile } = useSimulation();
+  const myProfile = isSimulating && simulatedProfile ? simulatedProfile : authProfile;
+  const { isAdmin: realIsAdmin } = useUserRole();
+  const isAdmin = realIsAdmin && !isSimulating;
+
   const [activeView, setActiveView] = useState('logistique-dispatch');
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterFiliale, setFilterFiliale] = useState<string>('all');
   const [filterUrgent, setFilterUrgent] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<ModuleViewMode>('table');
+  const [hideTerminated, setHideTerminated] = useState(true);
+  const [onlyMine, setOnlyMine] = useState(false);
+  const [crossFilters, setCrossFilters] = useState<CrossFilters>(DEFAULT_CROSS_FILTERS);
+  const [detailRequest, setDetailRequest] = useState<LogistiqueRequest | null>(null);
 
   const filiales = useMemo(() => {
     const set = new Set<string>();
@@ -73,6 +99,8 @@ export default function LogistiqueDispatch() {
 
   const filtered = useMemo(() => {
     return requests.filter((r) => {
+      if (hideTerminated && TERMINAL_STATUSES.includes(r.status)) return false;
+      if (onlyMine && r.assignee_id !== myProfile?.id && r.requester_id !== myProfile?.id) return false;
       if (filterStatus !== 'all' && r.status !== filterStatus) return false;
       if (filterFiliale !== 'all' && r.module_data?.filiale !== filterFiliale) return false;
       if (filterUrgent && !r.module_data?.urgence) return false;
@@ -85,9 +113,38 @@ export default function LogistiqueDispatch() {
         ].filter(Boolean) as string[];
         if (!fields.some(f => f.toLowerCase().includes(q))) return false;
       }
+      // Cross-filters (contextes sauvegardables)
+      if (crossFilters.searchQuery && !r.title?.toLowerCase().includes(crossFilters.searchQuery.toLowerCase())) return false;
+      if (crossFilters.statuses?.length > 0 && !crossFilters.statuses.includes(r.status as any)) return false;
+      if (crossFilters.assigneeIds?.length > 0 && !crossFilters.assigneeIds.includes(r.assignee_id || '')) return false;
       return true;
     });
-  }, [requests, filterStatus, filterFiliale, filterUrgent, search]);
+  }, [requests, filterStatus, filterFiliale, filterUrgent, search, hideTerminated, onlyMine, myProfile?.id, crossFilters]);
+
+  // Stats pour ConfigurableDashboard
+  const stats: TaskStats = useMemo(() => {
+    const total = requests.length;
+    const todo = requests.filter(t => t.status === 'todo').length;
+    const inProgress = requests.filter(t => ['affectee', 'planifiee', 'en_enlevement', 'en_livraison', 'in-progress'].includes(t.status)).length;
+    const done = requests.filter(t => ['livree', 'cloturee', 'done'].includes(t.status)).length;
+    const validated = 0;
+    const refused = 0;
+    const pendingValidation = 0;
+    const completionRate = total > 0 ? Math.round((done / total) * 100) : 0;
+    return { total, todo, inProgress, done, pendingValidation, validated, refused, completionRate };
+  }, [requests]);
+
+  const deleteRequest = async (id: string) => {
+    if (!confirm('Supprimer définitivement cette demande de transport ?')) return;
+    try {
+      const { error } = await supabase.from('tasks').delete().eq('id', id);
+      if (error) throw error;
+      toast.success('Demande supprimée');
+      refetch();
+    } catch (e: any) {
+      toast.error(`Erreur : ${e.message}`);
+    }
+  };
 
   const kpis = useMemo(() => {
     const enCours = requests.filter(r => !['cloturee', 'abandonnee', 'livree'].includes(r.status)).length;
@@ -166,6 +223,17 @@ export default function LogistiqueDispatch() {
               </div>
             </div>
 
+            <Tabs defaultValue="demandes" className="w-full">
+              <TabsList>
+                <TabsTrigger value="demandes" className="gap-2">
+                  <Layers className="h-4 w-4" /> Demandes
+                </TabsTrigger>
+                <TabsTrigger value="analyse" className="gap-2">
+                  <BarChart3 className="h-4 w-4" /> Analyse
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="demandes" className="space-y-6 mt-4">
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
               <KpiCard icon={ListChecks} label="En cours" value={kpis.enCours} color="bg-slate-100 text-slate-700" />
               <KpiCard icon={AlertTriangle} label="Urgentes" value={kpis.urgentes} color="bg-red-100 text-red-700" />
@@ -173,6 +241,23 @@ export default function LogistiqueDispatch() {
               <KpiCard icon={Truck} label="En livraison" value={kpis.enLivraison} color="bg-cyan-100 text-cyan-700" />
               <KpiCard icon={CheckCircle2} label="Livrées" value={kpis.livrees} color="bg-emerald-100 text-emerald-700" />
             </div>
+
+            <ModuleQuickFilters
+              viewMode={viewMode}
+              onViewModeChange={setViewMode}
+              hideTerminated={hideTerminated}
+              onHideTerminatedChange={setHideTerminated}
+              onlyMine={onlyMine}
+              onOnlyMineChange={setOnlyMine}
+            />
+
+            <CrossFiltersPanel
+              filters={crossFilters}
+              onFiltersChange={setCrossFilters}
+              contextId="logistique-module-dispatch"
+              defaultCollapsed={true}
+              isAdmin={isAdmin}
+            />
 
             <Card>
               <CardContent className="pt-4 pb-4">
@@ -204,7 +289,7 @@ export default function LogistiqueDispatch() {
             </Card>
 
             <Card>
-              <CardContent className="p-0">
+              <CardContent className={cn(viewMode === 'table' ? 'p-0' : 'p-4')}>
                 {isLoading ? (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -216,6 +301,23 @@ export default function LogistiqueDispatch() {
                       Créer une demande
                     </button>
                   </div>
+                ) : viewMode === 'kanban' ? (
+                  <KanbanBoard
+                    tasks={filtered as unknown as Task[]}
+                    onStatusChange={async (id, ns) => updateStatus(id, ns as string)}
+                    onDelete={async () => {}}
+                    progressMap={new Map()}
+                    onTaskUpdated={refetch}
+                    kanbanGroupMode="status"
+                  />
+                ) : viewMode === 'calendar' ? (
+                  <CalendarView
+                    tasks={filtered as unknown as Task[]}
+                    onStatusChange={async (id, ns) => updateStatus(id, ns as string)}
+                    onDelete={async () => {}}
+                    progressMap={new Map()}
+                    onTaskUpdated={refetch}
+                  />
                 ) : (
                   <Table>
                     <TableHeader>
@@ -236,7 +338,9 @@ export default function LogistiqueDispatch() {
                           request={r}
                           expanded={expandedIds.has(r.id)}
                           onToggle={() => toggleExpand(r.id)}
+                          onOpenDetail={() => setDetailRequest(r)}
                           onStatusChange={updateStatus}
+                          onDelete={isAdmin ? () => deleteRequest(r.id) : undefined}
                         />
                       ))}
                     </TableBody>
@@ -244,18 +348,47 @@ export default function LogistiqueDispatch() {
                 )}
               </CardContent>
             </Card>
+              </TabsContent>
+
+              <TabsContent value="analyse" className="space-y-6 mt-4">
+                <ConfigurableDashboard
+                  tasks={requests as unknown as Task[]}
+                  stats={stats}
+                  globalProgress={stats.completionRate}
+                  processId="logistique-module"
+                  canEdit={true}
+                  crossFiltersDefaultCollapsed={true}
+                  onTaskClick={(task) => {
+                    const r = requests.find(x => x.id === task.id);
+                    if (r) setDetailRequest(r);
+                  }}
+                />
+              </TabsContent>
+            </Tabs>
           </div>
         </main>
       </div>
+
+      {detailRequest && (
+        <RequestDetailDialog
+          task={detailRequest as unknown as Task}
+          open={!!detailRequest}
+          onClose={() => setDetailRequest(null)}
+          onStatusChange={() => {}}
+          onTaskMutated={refetch}
+        />
+      )}
     </div>
   );
 }
 
-function RequestRow({ request, expanded, onToggle, onStatusChange }: {
+function RequestRow({ request, expanded, onToggle, onOpenDetail, onStatusChange, onDelete }: {
   request: LogistiqueRequest;
   expanded: boolean;
   onToggle: () => void;
+  onOpenDetail?: () => void;
   onStatusChange: (id: string, newStatus: string, extra?: Record<string, any>) => void;
+  onDelete?: () => void;
 }) {
   const isUrgent = !!request.module_data?.urgence;
   const data = request.module_data ?? {};
@@ -296,11 +429,11 @@ function RequestRow({ request, expanded, onToggle, onStatusChange }: {
 
   return (
     <>
-      <TableRow className="cursor-pointer" onClick={onToggle}>
-        <TableCell>
+      <TableRow className="cursor-pointer hover:bg-accent/30" onClick={() => onOpenDetail?.()}>
+        <TableCell onClick={(e) => { e.stopPropagation(); onToggle(); }}>
           {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </TableCell>
-        <TableCell className="font-medium max-w-[280px] truncate">
+        <TableCell className="font-medium max-w-[280px] truncate text-primary hover:underline">
           {isUrgent && <Badge variant="destructive" className="mr-2 text-[10px]">URGENT</Badge>}
           {request.title}
         </TableCell>
@@ -315,8 +448,13 @@ function RequestRow({ request, expanded, onToggle, onStatusChange }: {
           {request.due_date ? format(new Date(request.due_date), 'dd/MM/yyyy', { locale: fr }) : '—'}
         </TableCell>
         <TableCell className="text-right">
-          <div onClick={e => e.stopPropagation()}>
+          <div onClick={e => e.stopPropagation()} className="flex items-center justify-end gap-1">
             {renderActions()}
+            {onDelete && (
+              <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={onDelete} title="Supprimer">
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            )}
           </div>
         </TableCell>
       </TableRow>
