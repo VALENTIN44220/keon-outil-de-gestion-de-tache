@@ -293,13 +293,42 @@ export default function ITDispatch() {
   const syncPlanner = async () => {
     setIsSyncing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('microsoft-graph', {
-        body: { action: 'sync_all_plans' },
-      });
-      if (error) throw error;
-      const pulled = (data as any)?.tasks_pulled ?? 0;
-      const updated = (data as any)?.tasks_updated ?? 0;
-      toast.success(`Sync Planner OK — ${pulled} nouvelles tâches, ${updated} mises à jour`);
+      // Recupere tous les mappings Planner qui ciblent le module IT
+      const { data: mappings, error: mErr } = await (supabase as any)
+        .from('planner_plan_mappings')
+        .select('id, planner_plan_title')
+        .eq('target_module_code', 'it')
+        .eq('sync_enabled', true);
+      if (mErr) throw mErr;
+      if (!mappings || mappings.length === 0) {
+        toast.error('Aucun mapping Planner configuré pour le module IT.');
+        return;
+      }
+
+      let totalPulled = 0;
+      let totalUpdated = 0;
+      let plansSync = 0;
+      const errors: string[] = [];
+
+      for (const m of mappings as Array<{ id: string; planner_plan_title: string }>) {
+        try {
+          const { data, error } = await supabase.functions.invoke('microsoft-graph', {
+            body: { action: 'planner-sync', planMappingId: m.id, skipPush: true },
+          });
+          if (error) throw error;
+          totalPulled += Number((data as any)?.tasksPulled ?? 0);
+          totalUpdated += Number((data as any)?.tasksUpdated ?? 0);
+          plansSync++;
+        } catch (err: any) {
+          errors.push(`${m.planner_plan_title}: ${err.message ?? 'erreur'}`);
+        }
+      }
+
+      if (errors.length > 0) {
+        toast.error(`Sync partielle (${plansSync}/${mappings.length}) — ${errors[0]}`);
+      } else {
+        toast.success(`Sync Planner OK — ${totalPulled} nouvelles, ${totalUpdated} mises à jour (${plansSync} plan(s))`);
+      }
       refetch();
     } catch (e: any) {
       toast.error(`Erreur sync : ${e.message}`);
