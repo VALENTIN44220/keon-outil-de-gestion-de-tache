@@ -23,6 +23,7 @@ import { useSimulation } from '@/contexts/SimulationContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { IT_PRESTATIONS } from '@/hooks/useITRequests';
+import { useITProjects } from '@/hooks/useITProjects';
 
 export default function NewITRequest() {
   const navigate = useNavigate();
@@ -35,11 +36,14 @@ export default function NewITRequest() {
 
   const [prestationId, setPrestationId] = useState<string>('');
   const [description, setDescription] = useState('');
+  const [itProjectId, setItProjectId] = useState<string>('none');
   // Champs conditionnels
   const [nomDossierSp, setNomDossierSp] = useState('');
   const [emailsAcces, setEmailsAcces] = useState('');
   const [numTicketItp, setNumTicketItp] = useState('');
   const [numTicketBlc, setNumTicketBlc] = useState('');
+
+  const { projects: itProjects, isLoading: isLoadingProjects } = useITProjects();
 
   const prestation = useMemo(
     () => IT_PRESTATIONS.find(p => p.id === prestationId),
@@ -80,6 +84,7 @@ export default function NewITRequest() {
         user_id: user.id,
         module_code: 'it',
         source_process_template_id: prestation.id,
+        it_project_id: itProjectId !== 'none' ? itProjectId : null,
         module_data: moduleData,
       });
 
@@ -136,6 +141,23 @@ export default function NewITRequest() {
                     placeholder="Décrire le besoin, les symptômes, l'urgence..."
                     disabled={isSubmitting}
                   />
+                </div>
+
+                <div>
+                  <Label>Projet IT lié (optionnel)</Label>
+                  <Select value={itProjectId} onValueChange={setItProjectId} disabled={isSubmitting || isLoadingProjects}>
+                    <SelectTrigger>
+                      <SelectValue placeholder={isLoadingProjects ? 'Chargement...' : 'Aucun projet'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Aucun projet</SelectItem>
+                      {itProjects.map(p => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.code_projet_digital ? `${p.code_projet_digital} — ` : ''}{p.nom_projet}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {/* Champs conditionnels */}

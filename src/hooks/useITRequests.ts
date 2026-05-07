@@ -30,6 +30,26 @@ export const IT_PRESTATIONS = [
   { id: '11111111-1111-4111-8111-111111111307', name: 'Support matériel bureautique' },
 ];
 
+/**
+ * Equipe IT/Digital — peut etre re-assigne d une demande IT a l autre.
+ * Profile_ids hardcodes (a deplacer dans une table `it_team` plus tard
+ * si l equipe evolue souvent).
+ *  - PERSAD SALAS Ranjit
+ *  - MOLTO Hugues
+ *  - BERTRAND Valentin
+ *  - HILY HOULES Robin (a confirmer)
+ */
+export const IT_TEAM_PROFILE_IDS: string[] = [
+  '49d0e4b8-4c32-405f-8c9c-0c5a1fac334e', // PERSAD SALAS Ranjit
+  '9144d1ff-71dd-4273-8b58-54927ad87773', // MOLTO Hugues
+  '81750c79-efb6-48e2-8788-0ec9a6f13b68', // BERTRAND Valentin
+  '82a41298-92ee-4642-b9d3-f82080c26907', // HILY HOULES Robin
+];
+
+export interface ITRequestExtended extends ITRequest {
+  it_project_id?: string | null;
+}
+
 export function useITRequests() {
   const { user } = useAuth();
   const [requests, setRequests] = useState<ITRequest[]>([]);

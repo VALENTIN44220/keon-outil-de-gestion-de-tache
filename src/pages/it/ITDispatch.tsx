@@ -5,7 +5,7 @@
  * Workflow par boutons : todo -> en_cours -> en_attente_complement /
  * en_attente_retour_externe -> realisee.
  */
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
@@ -25,9 +25,11 @@ import {
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { useITRequests, ITRequest, IT_PRESTATIONS } from '@/hooks/useITRequests';
+import { useITRequests, ITRequest, IT_PRESTATIONS, IT_TEAM_PROFILE_IDS } from '@/hooks/useITRequests';
+import { useITProjects } from '@/hooks/useITProjects';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { UserCog } from 'lucide-react';
 
 const STATUS_LABELS: Record<string, string> = {
   todo: 'Affectée',
@@ -54,16 +56,50 @@ const STATUS_COLORS: Record<string, string> = {
 export default function ITDispatch() {
   const navigate = useNavigate();
   const { requests, isLoading, refetch } = useITRequests();
+  const { projects: itProjects } = useITProjects();
   const [activeView, setActiveView] = useState('it-dispatch');
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterPrestation, setFilterPrestation] = useState('all');
+  const [filterProject, setFilterProject] = useState('all');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  // Map des membres de l equipe IT pour le selecteur de reassignation
+  const [teamMembers, setTeamMembers] = useState<Array<{ id: string; display_name: string }>>([]);
+  useEffect(() => {
+    if (IT_TEAM_PROFILE_IDS.length === 0) return;
+    void supabase
+      .from('profiles')
+      .select('id, display_name')
+      .in('id', IT_TEAM_PROFILE_IDS)
+      .then(({ data }) => {
+        if (data) setTeamMembers(data as any);
+      });
+  }, []);
+
+  const projectMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of itProjects) {
+      m.set(p.id, p.code_projet_digital ? `${p.code_projet_digital} — ${p.nom_projet}` : p.nom_projet);
+    }
+    return m;
+  }, [itProjects]);
+
+  const assigneeMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const t of teamMembers) m.set(t.id, t.display_name);
+    return m;
+  }, [teamMembers]);
 
   const filtered = useMemo(() => {
     return requests.filter((r) => {
       if (filterStatus !== 'all' && r.status !== filterStatus) return false;
       if (filterPrestation !== 'all' && r.source_process_template_id !== filterPrestation) return false;
+      if (filterProject !== 'all') {
+        const pid = (r as any).it_project_id;
+        if (filterProject === 'none' && pid) return false;
+        if (filterProject !== 'none' && pid !== filterProject) return false;
+      }
       if (search.trim()) {
         const q = search.toLowerCase();
         if (!r.title?.toLowerCase().includes(q) &&
@@ -92,6 +128,29 @@ export default function ITDispatch() {
       const { error } = await supabase.from('tasks').update({ status: newStatus }).eq('id', id);
       if (error) throw error;
       toast.success(`Statut → ${STATUS_LABELS[newStatus] ?? newStatus}`);
+      refetch();
+    } catch (e: any) {
+      toast.error(`Erreur : ${e.message}`);
+    }
+  };
+
+  const reassign = async (id: string, newAssigneeId: string) => {
+    try {
+      const { error } = await supabase.from('tasks').update({ assignee_id: newAssigneeId }).eq('id', id);
+      if (error) throw error;
+      const name = assigneeMap.get(newAssigneeId) ?? 'membre IT';
+      toast.success(`Réaffecté à ${name}`);
+      refetch();
+    } catch (e: any) {
+      toast.error(`Erreur : ${e.message}`);
+    }
+  };
+
+  const linkProject = async (id: string, projectId: string | null) => {
+    try {
+      const { error } = await supabase.from('tasks').update({ it_project_id: projectId }).eq('id', id);
+      if (error) throw error;
+      toast.success(projectId ? 'Lié au projet' : 'Détaché du projet');
       refetch();
     } catch (e: any) {
       toast.error(`Erreur : ${e.message}`);
@@ -177,6 +236,18 @@ export default function ITDispatch() {
                       {IT_PRESTATIONS.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                  <Select value={filterProject} onValueChange={setFilterProject}>
+                    <SelectTrigger className="w-[230px]"><SelectValue placeholder="Projet IT" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tous projets</SelectItem>
+                      <SelectItem value="none">Sans projet</SelectItem>
+                      {itProjects.map(p => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.code_projet_digital ? `${p.code_projet_digital} — ` : ''}{p.nom_projet}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </CardContent>
             </Card>
@@ -201,6 +272,8 @@ export default function ITDispatch() {
                         <TableHead className="w-10"></TableHead>
                         <TableHead>Demande</TableHead>
                         <TableHead>Prestation</TableHead>
+                        <TableHead>Projet IT</TableHead>
+                        <TableHead>Assigné</TableHead>
                         <TableHead>Statut</TableHead>
                         <TableHead>Date</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
@@ -211,9 +284,15 @@ export default function ITDispatch() {
                         <RequestRow
                           key={r.id}
                           request={r}
+                          projectMap={projectMap}
+                          assigneeMap={assigneeMap}
+                          teamMembers={teamMembers}
+                          itProjects={itProjects}
                           expanded={expandedIds.has(r.id)}
                           onToggle={() => toggleExpand(r.id)}
                           onStatusChange={updateStatus}
+                          onReassign={reassign}
+                          onLinkProject={linkProject}
                         />
                       ))}
                     </TableBody>
@@ -228,13 +307,23 @@ export default function ITDispatch() {
   );
 }
 
-function RequestRow({ request, expanded, onToggle, onStatusChange }: {
+function RequestRow({
+  request, projectMap, assigneeMap, teamMembers, itProjects, expanded,
+  onToggle, onStatusChange, onReassign, onLinkProject,
+}: {
   request: ITRequest;
+  projectMap: Map<string, string>;
+  assigneeMap: Map<string, string>;
+  teamMembers: Array<{ id: string; display_name: string }>;
+  itProjects: any[];
   expanded: boolean;
   onToggle: () => void;
   onStatusChange: (id: string, newStatus: string) => void;
+  onReassign: (id: string, newAssigneeId: string) => void;
+  onLinkProject: (id: string, projectId: string | null) => void;
 }) {
   const data = request.module_data ?? {};
+  const itProjectId = (request as any).it_project_id as string | null;
 
   const renderActions = () => {
     switch (request.status) {
@@ -266,9 +355,29 @@ function RequestRow({ request, expanded, onToggle, onStatusChange }: {
         <TableCell>
           {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </TableCell>
-        <TableCell className="font-medium max-w-[280px] truncate">{request.title}</TableCell>
+        <TableCell className="font-medium max-w-[260px] truncate">{request.title}</TableCell>
         <TableCell>
           <Badge variant="outline" className="text-xs">{data.prestation ?? '—'}</Badge>
+        </TableCell>
+        <TableCell className="text-xs">
+          {itProjectId ? (
+            <Badge variant="secondary" className="text-xs">{projectMap.get(itProjectId) ?? itProjectId.slice(0, 6)}</Badge>
+          ) : <span className="text-muted-foreground">—</span>}
+        </TableCell>
+        <TableCell className="text-xs">
+          <div onClick={e => e.stopPropagation()}>
+            <Select
+              value={request.assignee_id ?? ''}
+              onValueChange={(v) => onReassign(request.id, v)}
+            >
+              <SelectTrigger className="h-7 text-xs w-[140px]"><SelectValue placeholder="—" /></SelectTrigger>
+              <SelectContent>
+                {teamMembers.map(t => (
+                  <SelectItem key={t.id} value={t.id}>{t.display_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </TableCell>
         <TableCell>
           <Badge variant="outline" className={cn('text-xs', STATUS_COLORS[request.status])}>
@@ -279,14 +388,31 @@ function RequestRow({ request, expanded, onToggle, onStatusChange }: {
           {format(new Date(request.created_at), 'dd/MM/yyyy', { locale: fr })}
         </TableCell>
         <TableCell className="text-right">
-          <div onClick={e => e.stopPropagation()}>
+          <div onClick={e => e.stopPropagation()} className="flex items-center justify-end gap-1">
             {renderActions()}
           </div>
         </TableCell>
       </TableRow>
       {expanded && (
         <TableRow>
-          <TableCell colSpan={6} className="bg-muted/30 p-4">
+          <TableCell colSpan={8} className="bg-muted/30 p-4">
+            <div className="mb-3 flex items-center gap-3 flex-wrap">
+              <span className="text-xs font-semibold text-muted-foreground">Lier à un projet IT :</span>
+              <Select
+                value={itProjectId ?? 'none'}
+                onValueChange={(v) => onLinkProject(request.id, v === 'none' ? null : v)}
+              >
+                <SelectTrigger className="h-7 text-xs w-[300px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">— Aucun projet —</SelectItem>
+                  {itProjects.map(p => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.code_projet_digital ? `${p.code_projet_digital} — ` : ''}{p.nom_projet}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div className="col-span-2">
                 <p className="text-xs font-semibold text-muted-foreground mb-1">Description</p>
