@@ -78,10 +78,20 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: 'bg-gray-100 text-gray-700 border-gray-300',
 };
 
+const TERMINAL_STATUSES = ['realisee', 'cloturee', 'cancelled', 'abandonnee', 'done'];
+
 export default function ITDispatch() {
   const navigate = useNavigate();
   const { requests, isLoading, refetch } = useITRequests();
   const { projects: itProjects } = useITProjects();
+
+  // Auth + simulation : remontes EN PREMIER pour eviter TDZ dans les useMemo plus bas
+  const { profile: authProfile } = useAuth();
+  const { isSimulating, simulatedProfile } = useSimulation();
+  const myProfile = isSimulating && simulatedProfile ? simulatedProfile : authProfile;
+  const { isAdmin: realIsAdmin } = useUserRole();
+  const isAdmin = realIsAdmin && !isSimulating;
+
   const [activeView, setActiveView] = useState('it-dispatch');
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -91,8 +101,6 @@ export default function ITDispatch() {
   const [viewMode, setViewMode] = useState<'table' | 'kanban' | 'calendar'>('table');
   // Filtres avances + contextes sauvegardables
   const [crossFilters, setCrossFilters] = useState<CrossFilters>(DEFAULT_CROSS_FILTERS);
-  // Toggle rapide : masquer les demandes terminees (pre-selectionne par defaut)
-  const TERMINAL_STATUSES = ['realisee', 'cloturee', 'cancelled', 'abandonnee', 'done'];
   const [hideTerminated, setHideTerminated] = useState(true);
   const [onlyMine, setOnlyMine] = useState(false);
 
@@ -283,11 +291,6 @@ export default function ITDispatch() {
   const [complementDialogReq, setComplementDialogReq] = useState<ITRequest | null>(null);
   const [complementMsg, setComplementMsg] = useState('');
   const [isPostingComplement, setIsPostingComplement] = useState(false);
-  const { profile: authProfile } = useAuth();
-  const { isSimulating, simulatedProfile } = useSimulation();
-  const myProfile = isSimulating && simulatedProfile ? simulatedProfile : authProfile;
-  const { isAdmin: realIsAdmin } = useUserRole();
-  const isAdmin = realIsAdmin && !isSimulating;
   const [isSyncing, setIsSyncing] = useState(false);
 
   const syncPlanner = async () => {
