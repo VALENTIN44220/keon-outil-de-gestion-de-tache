@@ -457,15 +457,9 @@ export function ProcessGeneratedWorkflowTab({
               )}
 
               <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => navigate(`/templates/workflow/process/${processId}`)}
-                >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Ouvrir l'éditeur
-                </Button>
-                
+                {/* Bouton 'Ouvrir l'editeur' supprime : la page WorkflowEditor (visual builder)
+                    est obsolete et a ete retiree. La configuration des workflows passe par les
+                    settings du process_template (auto-affectation, short_code, etc.). */}
                 {canManage && (
                   <>
                     {workflowInfo.status === 'draft' && (
@@ -518,10 +512,11 @@ export function ProcessGeneratedWorkflowTab({
                     Générer le workflow
                   </Button>
                 ) : (
-                  <Button onClick={() => navigate(`/templates/workflow/process/${processId}`)}>
-                    <Workflow className="h-4 w-4 mr-2" />
-                    Créer dans l'éditeur
-                  </Button>
+                  /* L'editeur visuel a ete retire. Le mode 'custom' n'est plus operable. */
+                  <p className="text-xs text-muted-foreground">
+                    Le mode workflow personnalisé n'est plus disponible. Utilise le mode standard
+                    et configure les paramètres du process_template.
+                  </p>
                 )
               )}
               {subProcessCount === 0 && workflowMode === 'standard' && (

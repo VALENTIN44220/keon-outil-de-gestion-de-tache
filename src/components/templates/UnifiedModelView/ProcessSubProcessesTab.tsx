@@ -263,14 +263,7 @@ export function ProcessSubProcessesTab({
                       <Settings className="h-4 w-4 mr-1" />
                       Configurer
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => navigate(`/templates/workflow/subprocess/${sp.id}`)}
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                    </Button>
+                    {/* Bouton 'Ouvrir editeur visuel' supprime — l'editeur a ete retire. */}
                     {canManage && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
