@@ -8,9 +8,13 @@
  *  - pas de kanban/calendrier (seulement tableau)
  *  - sub-tableau lignes[] dans le panneau etendu
  */
-import { Package, AlertTriangle, Clock, CheckCircle2, ListChecks, Trash2, User, Calendar, Boxes } from 'lucide-react';
+import { useState } from 'react';
+import { Package, AlertTriangle, Clock, CheckCircle2, ListChecks, Trash2, User, Calendar, Boxes, Truck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -219,11 +223,15 @@ function MaintenanceDetailDialog({ request, open, onClose, refetch, isAdmin, pro
   profilesMap: Map<string, string>;
 }) {
   const { validateMaterialRequest, refuseMaterialRequest, isProcessing } = useMaterialValidation();
+  const [showLivraisonDialog, setShowLivraisonDialog] = useState(false);
   const fmtDay = (iso: string | null | undefined) =>
     iso ? format(parseISO(iso), 'dd/MM/yyyy', { locale: fr }) : '—';
 
   const status = request.etat_global ?? 'En attente validation';
   const isAwaiting = status === 'En attente validation';
+  const moduleData = (request as any).module_data ?? {};
+  const dateLivraisonPrevue = moduleData.date_livraison_prevue as string | undefined;
+  const dateLivraisonEffective = moduleData.date_livraison_effective as string | undefined;
 
   const infoLines: DetailInfoLine[] = [
     {
@@ -246,6 +254,12 @@ function MaintenanceDetailDialog({ request, open, onClose, refetch, isAdmin, pro
       icon: <Boxes className="h-3 w-3" />,
       value: `${request.nb_lignes ?? 0} articles — ${request.qte_totale ?? 0} unités`,
     },
+    ...(dateLivraisonPrevue
+      ? [{ label: 'Livraison prévue', icon: <Truck className="h-3 w-3" />, value: fmtDay(dateLivraisonPrevue) }]
+      : []),
+    ...(dateLivraisonEffective
+      ? [{ label: 'Livré le', icon: <CheckCircle2 className="h-3 w-3" />, value: fmtDay(dateLivraisonEffective) }]
+      : []),
   ];
 
   const sections: DetailSection[] = [
@@ -284,13 +298,22 @@ function MaintenanceDetailDialog({ request, open, onClose, refetch, isAdmin, pro
   const data = (request as any).module_data ?? {};
 
   // Workflow : faire avancer toutes les lignes au prochain etat
-  const advanceAllLignes = async (nextEtat: string) => {
+  // Si extraData fourni, on merge dans tasks.module_data (pour memoriser ex: date_livraison_prevue)
+  const advanceAllLignes = async (nextEtat: string, extraTaskData?: Record<string, any>) => {
     try {
       const { error } = await supabase
         .from('demande_materiel')
         .update({ etat_commande: nextEtat })
         .eq('request_id', request.task_id);
       if (error) throw error;
+      if (extraTaskData) {
+        const merged = { ...moduleData, ...extraTaskData };
+        const { error: tErr } = await supabase
+          .from('tasks')
+          .update({ module_data: merged })
+          .eq('id', request.task_id);
+        if (tErr) throw tErr;
+      }
       toast.success(`Toutes les lignes → ${nextEtat}`);
       refetch();
     } catch (e: any) {
@@ -322,13 +345,18 @@ function MaintenanceDetailDialog({ request, open, onClose, refetch, isAdmin, pro
     // Boutons de progression du workflow procurement
     switch (status) {
       case 'Demande de devis':
-        statusActions.push({ key: 'bc', label: 'BC envoyé', onClick: () => advanceAllLignes('Bon de commande envoyé') });
+        // Au passage en BC : ouvre le dialog pour saisir la date de livraison prevue
+        statusActions.push({ key: 'bc', label: 'BC envoyé', onClick: () => setShowLivraisonDialog(true) });
         break;
       case 'Bon de commande envoyé':
         statusActions.push({ key: 'ar', label: 'AR reçu', onClick: () => advanceAllLignes('AR reçu') });
         break;
       case 'AR reçu':
-        statusActions.push({ key: 'liv', label: 'Commande livrée', onClick: () => advanceAllLignes('Commande livrée') });
+        statusActions.push({
+          key: 'liv',
+          label: 'Commande livrée',
+          onClick: () => advanceAllLignes('Commande livrée', { date_livraison_effective: new Date().toISOString().slice(0, 10) }),
+        });
         break;
       case 'Commande livrée':
         statusActions.push({ key: 'dist', label: 'Distribuée', onClick: () => advanceAllLignes('Commande distribuée') });
@@ -337,26 +365,95 @@ function MaintenanceDetailDialog({ request, open, onClose, refetch, isAdmin, pro
   }
 
   return (
-    <ModuleDetailDialog
-      open={open}
-      onClose={onClose}
-      taskId={request.task_id}
-      title={request.title}
-      description={(request as any).description ?? undefined}
-      status={status}
-      statusLabels={ETATS_LABELS}
-      statusColors={ETATS_COLORS}
-      infoLines={infoLines}
-      sections={sections}
-      attachments={data.attachments as any}
-      links={data.links as any}
-      allowAttachmentMutation={true}
-      attachmentPathPrefix={`maintenance-requests/${request.task_id}`}
-      statusActions={statusActions}
-      refetch={refetch}
-      isAdmin={isAdmin}
-      allowDelete={true}
-      onDeleteConfirm="Supprimer définitivement cette demande matériel ?"
-    />
+    <>
+      <ModuleDetailDialog
+        open={open}
+        onClose={onClose}
+        taskId={request.task_id}
+        title={request.title}
+        description={(request as any).description ?? undefined}
+        status={status}
+        statusLabels={ETATS_LABELS}
+        statusColors={ETATS_COLORS}
+        infoLines={infoLines}
+        sections={sections}
+        attachments={data.attachments as any}
+        links={data.links as any}
+        allowAttachmentMutation={true}
+        attachmentPathPrefix={`maintenance-requests/${request.task_id}`}
+        statusActions={statusActions}
+        refetch={refetch}
+        isAdmin={isAdmin}
+        allowDelete={true}
+        onDeleteConfirm="Supprimer définitivement cette demande matériel ?"
+      />
+      <MaintenanceLivraisonDialog
+        open={showLivraisonDialog}
+        onClose={() => setShowLivraisonDialog(false)}
+        defaultDate={dateLivraisonPrevue}
+        onConfirm={async (date) => {
+          await advanceAllLignes('Bon de commande envoyé', { date_livraison_prevue: date });
+          setShowLivraisonDialog(false);
+        }}
+      />
+    </>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Mini dialog : saisie de la date de livraison prevue lors du passage en BC
+// ────────────────────────────────────────────────────────────────────────
+function MaintenanceLivraisonDialog({ open, onClose, onConfirm, defaultDate }: {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: (date: string) => Promise<void> | void;
+  defaultDate?: string;
+}) {
+  const [date, setDate] = useState(defaultDate ?? '');
+  const [busy, setBusy] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!date) {
+      toast.error('Renseigne la date de livraison prévue');
+      return;
+    }
+    setBusy(true);
+    try {
+      await onConfirm(date);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Truck className="h-5 w-5" /> Bon de commande envoyé
+          </DialogTitle>
+          <DialogDescription>
+            Renseigne la date de livraison prévue annoncée par le fournisseur.
+            Le demandeur sera notifié.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <div className="space-y-1">
+            <Label htmlFor="dlp">Date de livraison prévue *</Label>
+            <Input
+              id="dlp" type="date" value={date}
+              onChange={(e) => setDate(e.target.value)} disabled={busy}
+              min={new Date().toISOString().slice(0, 10)}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose} disabled={busy}>Annuler</Button>
+          <Button onClick={handleSubmit} disabled={busy || !date}>
+            Confirmer & passer en BC
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

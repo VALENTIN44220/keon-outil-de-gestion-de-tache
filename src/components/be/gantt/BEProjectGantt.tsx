@@ -610,9 +610,9 @@ export function BEProjectGantt({
                                   )}
                                   style={{ left, width }}
                                 >
-                                  {width > 80 && (
+                                  {width > 60 && (
                                     <span className="truncate">
-                                      {task.task_number ? `${task.task_number} - ` : ''}
+                                      {/* task.title contient deja le prefixe T-CERE-XXXX (genere par trigger). On ne re-prefixe pas. */}
                                       {task.title}
                                     </span>
                                   )}
