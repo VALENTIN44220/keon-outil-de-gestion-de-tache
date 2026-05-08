@@ -1,7 +1,8 @@
 /**
  * logistiqueDispatchConfig — config du module Logistique pour ModuleDispatchView.
  */
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { LogistiquePlanificationDialog } from '@/components/logistique/LogistiquePlanificationDialog';
 import {
   Truck, AlertTriangle, Clock, CheckCircle2, ListChecks, Trash2,
   User, Calendar, Package, MapPin, Send, FileText,
@@ -19,7 +20,7 @@ import type { TaskStats } from '@/types/task';
 import {
   ModuleDetailDialog, DetailSection, DetailInfoLine, DetailStatusAction,
 } from '@/components/modules/ModuleDetailDialog';
-import type { ModuleDispatchConfig, ModuleKpi } from '@/components/modules/ModuleDispatchView';
+import type { ModuleDispatchConfig, ModuleKpi, ModuleRowCtx } from '@/components/modules/ModuleDispatchView';
 
 const STATUS_COLORS: Record<string, string> = {
   todo: 'bg-amber-100 text-amber-800 border-amber-300',
@@ -257,70 +258,7 @@ export const logistiqueDispatchConfig: ModuleDispatchConfig<LogistiqueRequest, L
     );
   },
 
-  rowActions: (r, ctx) => {
-    const onChange = (newStatus: string, extra?: Record<string, any>, opts?: { assigneeId?: string }) =>
-      updateStatus(r.id, newStatus, extra, ctx.refetch, opts).catch(() => {});
-
-    let actionBtn: React.ReactNode = null;
-    switch (r.status) {
-      case 'todo':
-        actionBtn = (
-          <Button
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              // "Prendre en charge" => affecte la tache a l utilisateur courant
-              onChange('affectee', undefined, { assigneeId: ctx.myProfileId });
-            }}
-          >
-            Prendre en charge
-          </Button>
-        );
-        break;
-      case 'affectee':
-        actionBtn = (
-          <Button size="sm" onClick={(e) => { e.stopPropagation(); onChange('planifiee', { date_prise_en_charge: new Date().toISOString().slice(0,10) }); }}>Planifier</Button>
-        );
-        break;
-      case 'planifiee':
-        actionBtn = (
-          <div className="flex gap-1">
-            <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); onChange('en_enlevement'); }}>Enlèvement</Button>
-            <Button size="sm" onClick={(e) => { e.stopPropagation(); onChange('en_livraison'); }}>En livraison</Button>
-          </div>
-        );
-        break;
-      case 'en_enlevement':
-        actionBtn = (
-          <Button size="sm" onClick={(e) => { e.stopPropagation(); onChange('en_livraison'); }}>Enlevé</Button>
-        );
-        break;
-      case 'en_livraison':
-        actionBtn = (
-          <Button size="sm" onClick={(e) => { e.stopPropagation(); onChange('livree', { date_livraison_effective: new Date().toISOString().slice(0,10) }); }}>Livré</Button>
-        );
-        break;
-      case 'livree':
-        actionBtn = (
-          <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); onChange('cloturee'); }}>Clôturer</Button>
-        );
-        break;
-    }
-    return (
-      <>
-        {actionBtn}
-        {ctx.isAdmin && (
-          <Button
-            size="icon" variant="ghost" className="h-7 w-7 text-destructive"
-            onClick={(e) => { e.stopPropagation(); deleteRequest(r.id, ctx.refetch); }}
-            title="Supprimer"
-          >
-            <Trash2 className="h-3 w-3" />
-          </Button>
-        )}
-      </>
-    );
-  },
+  rowActions: (r, ctx) => <LogistiqueRowActions request={r} ctx={ctx} />,
 
   onKanbanStatusChange: async (id, newStatus) => {
     const { error } = await supabase.from('tasks').update({ status: newStatus }).eq('id', id);
@@ -331,7 +269,25 @@ export const logistiqueDispatchConfig: ModuleDispatchConfig<LogistiqueRequest, L
     if (error) toast.error(`Erreur : ${error.message}`);
   },
 
-  DetailDialog: ({ request, open, onClose, refetch, isAdmin, myProfileId, profilesMap }) => {
+  DetailDialog: (props) => <LogistiqueDetailDialog {...props} />,
+};
+
+// ────────────────────────────────────────────────────────────────────────
+// Composants stateful (en dehors de la config pour pouvoir utiliser hooks)
+// ────────────────────────────────────────────────────────────────────────
+
+interface LogistiqueDetailDialogProps {
+  request: LogistiqueRequest;
+  open: boolean;
+  onClose: () => void;
+  refetch: () => void;
+  isAdmin: boolean;
+  myProfileId?: string;
+  profilesMap: Map<string, string>;
+}
+
+function LogistiqueDetailDialog({ request, open, onClose, refetch, isAdmin, myProfileId, profilesMap }: LogistiqueDetailDialogProps) {
+    const [showPlanif, setShowPlanif] = useState(false);
     const data = request.module_data ?? {};
     const fmtDay = (iso: string | null | undefined) =>
       iso ? format(parseISO(iso), 'dd/MM/yyyy', { locale: fr }) : '—';
@@ -427,8 +383,8 @@ export const logistiqueDispatchConfig: ModuleDispatchConfig<LogistiqueRequest, L
         break;
       case 'affectee':
         statusActions.push({
-          key: 'plan', label: 'Planifier', targetStatus: 'planifiee',
-          extraData: { date_prise_en_charge: todayISO() },
+          key: 'plan', label: 'Planifier',
+          onClick: () => setShowPlanif(true),
         });
         break;
       case 'planifiee':
@@ -453,29 +409,110 @@ export const logistiqueDispatchConfig: ModuleDispatchConfig<LogistiqueRequest, L
     }
 
     return (
-      <ModuleDetailDialog
-        open={open}
-        onClose={onClose}
-        taskId={request.id}
-        title={request.title}
-        description={request.description ?? undefined}
-        status={request.status}
-        statusLabels={STATUS_LABELS}
-        statusColors={STATUS_COLORS}
-        priority={(data.priority as string) ?? undefined}
-        extraBadges={extraBadges}
-        infoLines={infoLines}
-        sections={sections}
-        attachments={data.attachments as any}
-        links={data.links as any}
-        allowAttachmentMutation={true}
-        attachmentPathPrefix={`logistique-requests/${request.id}`}
-        statusActions={statusActions}
-        refetch={refetch}
-        isAdmin={isAdmin}
-        allowDelete={true}
-        onDeleteConfirm="Supprimer définitivement cette demande de transport ?"
-      />
+      <>
+        <ModuleDetailDialog
+          open={open}
+          onClose={onClose}
+          taskId={request.id}
+          title={request.title}
+          description={request.description ?? undefined}
+          status={request.status}
+          statusLabels={STATUS_LABELS}
+          statusColors={STATUS_COLORS}
+          priority={(data.priority as string) ?? undefined}
+          extraBadges={extraBadges}
+          infoLines={infoLines}
+          sections={sections}
+          attachments={data.attachments as any}
+          links={data.links as any}
+          allowAttachmentMutation={true}
+          attachmentPathPrefix={`logistique-requests/${request.id}`}
+          statusActions={statusActions}
+          refetch={refetch}
+          isAdmin={isAdmin}
+          allowDelete={true}
+          onDeleteConfirm="Supprimer définitivement cette demande de transport ?"
+        />
+        <LogistiquePlanificationDialog
+          taskId={request.id}
+          open={showPlanif}
+          onClose={() => setShowPlanif(false)}
+          onPlanned={refetch}
+        />
+      </>
     );
-  },
-};
+  }
+
+// ────────────────────────────────────────────────────────────────────────
+// Row actions (stateful pour gerer le dialog Planifier sur la ligne)
+// ────────────────────────────────────────────────────────────────────────
+
+function LogistiqueRowActions({ request: r, ctx }: { request: LogistiqueRequest; ctx: ModuleRowCtx }) {
+  const [showPlanif, setShowPlanif] = useState(false);
+
+  const onChange = (newStatus: string, extra?: Record<string, any>, opts?: { assigneeId?: string }) =>
+    updateStatus(r.id, newStatus, extra, ctx.refetch, opts).catch(() => {});
+
+  let actionBtn: React.ReactNode = null;
+  switch (r.status) {
+    case 'todo':
+      actionBtn = (
+        <Button
+          size="sm"
+          onClick={(e) => { e.stopPropagation(); onChange('affectee', undefined, { assigneeId: ctx.myProfileId }); }}
+        >
+          Prendre en charge
+        </Button>
+      );
+      break;
+    case 'affectee':
+      actionBtn = (
+        <Button size="sm" onClick={(e) => { e.stopPropagation(); setShowPlanif(true); }}>Planifier</Button>
+      );
+      break;
+    case 'planifiee':
+      actionBtn = (
+        <div className="flex gap-1">
+          <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); onChange('en_enlevement'); }}>Enlèvement</Button>
+          <Button size="sm" onClick={(e) => { e.stopPropagation(); onChange('en_livraison'); }}>En livraison</Button>
+        </div>
+      );
+      break;
+    case 'en_enlevement':
+      actionBtn = (
+        <Button size="sm" onClick={(e) => { e.stopPropagation(); onChange('en_livraison'); }}>Enlevé</Button>
+      );
+      break;
+    case 'en_livraison':
+      actionBtn = (
+        <Button size="sm" onClick={(e) => { e.stopPropagation(); onChange('livree', { date_livraison_effective: new Date().toISOString().slice(0,10) }); }}>Livré</Button>
+      );
+      break;
+    case 'livree':
+      actionBtn = (
+        <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); onChange('cloturee'); }}>Clôturer</Button>
+      );
+      break;
+  }
+
+  return (
+    <>
+      {actionBtn}
+      {ctx.isAdmin && (
+        <Button
+          size="icon" variant="ghost" className="h-7 w-7 text-destructive"
+          onClick={(e) => { e.stopPropagation(); deleteRequest(r.id, ctx.refetch); }}
+          title="Supprimer"
+        >
+          <Trash2 className="h-3 w-3" />
+        </Button>
+      )}
+      <LogistiquePlanificationDialog
+        taskId={r.id}
+        open={showPlanif}
+        onClose={() => setShowPlanif(false)}
+        onPlanned={ctx.refetch}
+      />
+    </>
+  );
+}
