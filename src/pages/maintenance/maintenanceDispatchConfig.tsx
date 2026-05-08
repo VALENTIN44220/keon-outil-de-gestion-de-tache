@@ -283,6 +283,21 @@ function MaintenanceDetailDialog({ request, open, onClose, refetch, isAdmin, pro
 
   const data = (request as any).module_data ?? {};
 
+  // Workflow : faire avancer toutes les lignes au prochain etat
+  const advanceAllLignes = async (nextEtat: string) => {
+    try {
+      const { error } = await supabase
+        .from('demande_materiel')
+        .update({ etat_commande: nextEtat })
+        .eq('request_id', request.task_id);
+      if (error) throw error;
+      toast.success(`Toutes les lignes → ${nextEtat}`);
+      refetch();
+    } catch (e: any) {
+      toast.error(`Erreur : ${e.message ?? 'inconnue'}`);
+    }
+  };
+
   const statusActions: DetailStatusAction[] = [];
   if (isAwaiting) {
     statusActions.push({
@@ -303,6 +318,22 @@ function MaintenanceDetailDialog({ request, open, onClose, refetch, isAdmin, pro
         if (ok) refetch();
       },
     });
+  } else {
+    // Boutons de progression du workflow procurement
+    switch (status) {
+      case 'Demande de devis':
+        statusActions.push({ key: 'bc', label: 'BC envoyé', onClick: () => advanceAllLignes('Bon de commande envoyé') });
+        break;
+      case 'Bon de commande envoyé':
+        statusActions.push({ key: 'ar', label: 'AR reçu', onClick: () => advanceAllLignes('AR reçu') });
+        break;
+      case 'AR reçu':
+        statusActions.push({ key: 'liv', label: 'Commande livrée', onClick: () => advanceAllLignes('Commande livrée') });
+        break;
+      case 'Commande livrée':
+        statusActions.push({ key: 'dist', label: 'Distribuée', onClick: () => advanceAllLignes('Commande distribuée') });
+        break;
+    }
   }
 
   return (
