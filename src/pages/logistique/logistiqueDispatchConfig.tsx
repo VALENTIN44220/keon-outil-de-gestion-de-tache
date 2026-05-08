@@ -432,6 +432,13 @@ function LogistiqueDetailDialog({ request, open, onClose, refetch, isAdmin, myPr
           isAdmin={isAdmin}
           allowDelete={true}
           onDeleteConfirm="Supprimer définitivement cette demande de transport ?"
+          /* "Demander complement" : passe la demande en 'complement_demande' + post un commentaire */
+          complementConfig={
+            !TERMINAL_STATUSES.includes(request.status) && request.status !== 'complement_demande'
+              ? { targetStatus: 'complement_demande', triggerLabel: 'Demander complément' }
+              : undefined
+          }
+          myProfileId={myProfileId}
         />
         <LogistiquePlanificationDialog
           taskId={request.id}
