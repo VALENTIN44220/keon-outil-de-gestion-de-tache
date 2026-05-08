@@ -41,8 +41,12 @@ import { Task, TaskStats } from '@/types/task';
 import { BulkActionDialog } from '@/components/tasks/BulkActionDialog';
 import { PendingValidationsPanel } from '@/components/dashboard/PendingValidationsPanel';
 import { PendingTaskValidationsPanel } from '@/components/dashboard/PendingTaskValidationsPanel';
+import { BEPendingValidationsPanel } from '@/components/dashboard/BEPendingValidationsPanel';
+import { MyDayPanel } from '@/components/dashboard/MyDayPanel';
 import { usePendingValidationRequests } from '@/hooks/usePendingValidationRequests';
 import { usePendingTaskValidations } from '@/hooks/usePendingTaskValidations';
+import { useBEPendingValidations } from '@/hooks/useBEPendingValidations';
+import { useUserRole } from '@/hooks/useUserRole';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 const Index = () => {
@@ -50,6 +54,7 @@ const Index = () => {
   const { isSimulating, simulatedProfile } = useSimulation();
   /** Même profil que `useTasks` (simulation incluse) pour périmètre et filtre stakeholder. */
   const profile = isSimulating && simulatedProfile ? simulatedProfile : authProfile;
+  const { isAdmin } = useUserRole();
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeView, setActiveView] = useState('dashboard');
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
@@ -57,6 +62,12 @@ const Index = () => {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [showFullStats, setShowFullStats] = useState(false);
   const [dashboardMode, setDashboardMode] = useState<'tasks' | 'planner' | 'validations'>('tasks');
+  // Garde : si un non-admin se retrouve sur 'planner' (état persisté ou lien direct),
+  // on retombe sur 'tasks' pour ne pas laisser une zone vide.
+  useEffect(() => {
+    if (!isAdmin && dashboardMode === 'planner') setDashboardMode('tasks');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, dashboardMode]);
   const [taskSubMode, setTaskSubMode] = useState<'grid' | 'kanban' | 'calendar' | 'table' | 'analytics'>('table');
   /** Sous-filtre liste tâches : tout le périmètre ou uniquement les tâches suivies après réaffectation (stakeholder). */
   const [taskTeamSubView, setTaskTeamSubView] = useState<'all' | 'team_stakeholder'>('all');
@@ -106,7 +117,8 @@ const Index = () => {
   const pendingCount = getPendingCount();
   const { requests: pendingValidations, count: pendingValidationCount, isLoading: isLoadingValidations, refetch: refetchValidations } = usePendingValidationRequests();
   const { tasks: pendingTaskValidations, count: pendingTaskValidationCount, isLoading: isLoadingTaskValidations, refetch: refetchTaskValidations } = usePendingTaskValidations();
-  const totalValidationCount = pendingValidationCount + pendingTaskValidationCount;
+  const { tasks: pendingBEValidations, count: pendingBEValidationCount, isLoading: isLoadingBEValidations, refetch: refetchBEValidations } = useBEPendingValidations();
+  const totalValidationCount = pendingValidationCount + pendingTaskValidationCount + pendingBEValidationCount;
   
   // State for comment notification task detail
   const [selectedTaskForComment, setSelectedTaskForComment] = useState<Task | null>(null);
@@ -115,6 +127,30 @@ const Index = () => {
   // Get progress for all tasks
   const taskIds = useMemo(() => allTasks.map(t => t.id), [allTasks]);
   const { progressMap, globalProgress, globalStats } = useTasksProgress(taskIds);
+
+  // En mode simulation : on remet les filtres à zéro à chaque bascule pour
+  // éviter qu'un filtre laissé par l'admin (ex. assigneeId = mon ID) cache
+  // les tâches du profil simulé. Sans ça, on a la dissonance : KPI dit "1
+  // tâche active" mais le tableau dit "Aucune tâche" — parce que l'admin
+  // avait coché un filtre côté barre avancée ou filtres croisés.
+  useEffect(() => {
+    setAdvancedFilters({
+      assigneeId: 'all',
+      requesterId: 'all',
+      reporterId: 'all',
+      company: 'all',
+      department: 'all',
+      categoryId: 'all',
+      subcategoryId: 'all',
+      groupBy: 'none',
+    });
+    setCrossFilters(DEFAULT_CROSS_FILTERS);
+    setStatusFilter('all');
+    setPriorityFilter('all');
+    setSearchQuery('');
+    setTaskTeamSubView('all');
+    // Re-déclencher quand le profil actif change (login différent ou simulation).
+  }, [isSimulating, simulatedProfile?.id]);
 
   // Check if advanced filters have active values
   const hasActiveAdvancedFilters = useMemo(() => {
@@ -489,9 +525,12 @@ const Index = () => {
         <TabsTrigger value="tasks" className="rounded-none border-b-2 border-transparent data-[state=active]:border-keon-blue data-[state=active]:text-keon-blue data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 h-10">
           Tâches & Demandes
         </TabsTrigger>
-        <TabsTrigger value="planner" className="rounded-none border-b-2 border-transparent data-[state=active]:border-keon-blue data-[state=active]:text-keon-blue data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 h-10 gap-1">
-          <Zap className="h-3.5 w-3.5" /> Planner
-        </TabsTrigger>
+        {/* Onglet Planner — accès ultra-limité (admin global uniquement) */}
+        {isAdmin && (
+          <TabsTrigger value="planner" className="rounded-none border-b-2 border-transparent data-[state=active]:border-keon-blue data-[state=active]:text-keon-blue data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 h-10 gap-1">
+            <Zap className="h-3.5 w-3.5" /> Planner
+          </TabsTrigger>
+        )}
         <TabsTrigger value="validations" className="rounded-none border-b-2 border-transparent data-[state=active]:border-keon-blue data-[state=active]:text-keon-blue data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 h-10 gap-1">
           <ShieldCheck className="h-3.5 w-3.5" /> Validations
           {totalValidationCount > 0 && <Badge variant="destructive" className="ml-1 text-[10px] px-1.5 py-0">{totalValidationCount}</Badge>}
@@ -499,6 +538,16 @@ const Index = () => {
       </TabsList>
 
       <TabsContent value="tasks" className="mt-0">
+        {/* Encart « Mon jour » — KPIs personnels en haut, cliquables */}
+        <div className="px-4 pt-4">
+          <MyDayPanel
+            myTasks={allTasks}
+            currentUserId={profile?.id}
+            pendingValidationCount={totalValidationCount}
+            onGoToValidations={() => setDashboardMode('validations')}
+          />
+        </div>
+
         {/* Sub-navigation for tasks tab */}
         <div className="flex items-center bg-keon-50 border-b border-keon-200 px-0 mb-4">
           {taskSubModeOptions.map(({ value, label, icon: Icon }) => (
@@ -595,9 +644,13 @@ const Index = () => {
         {renderTasksSubContent()}
       </TabsContent>
 
-      <TabsContent value="planner" className="mt-4">
-        <PlannerSyncPanel />
-      </TabsContent>
+      {/* Garde de défense : même si le user atterrit sur ce tab via état persisté,
+          on n'expose PlannerSyncPanel qu'aux admins. */}
+      {isAdmin && (
+        <TabsContent value="planner" className="mt-4">
+          <PlannerSyncPanel />
+        </TabsContent>
+      )}
 
       <TabsContent value="validations" className="mt-4">
         <Tabs defaultValue="requests" className="w-full">
@@ -615,6 +668,14 @@ const Index = () => {
               {pendingTaskValidationCount > 0 && (
                 <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
                   {pendingTaskValidationCount}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="be" className="gap-1.5">
+              BE — à relire
+              {pendingBEValidationCount > 0 && (
+                <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                  {pendingBEValidationCount}
                 </Badge>
               )}
             </TabsTrigger>
@@ -639,6 +700,13 @@ const Index = () => {
                 setSelectedTaskForComment(task);
                 setIsCommentDetailOpen(true);
               }}
+            />
+          </TabsContent>
+          <TabsContent value="be">
+            <BEPendingValidationsPanel
+              tasks={pendingBEValidations}
+              isLoading={isLoadingBEValidations}
+              onRefresh={refetchBEValidations}
             />
           </TabsContent>
         </Tabs>

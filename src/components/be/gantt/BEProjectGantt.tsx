@@ -630,6 +630,57 @@ export function BEProjectGantt({
                                 </div>
                               </TooltipContent>
                             </Tooltip>
+
+                            {/* Marqueurs de validation BE — un point sur la timeline
+                                à la date de chaque transition « validante » :
+                                  • a_valider  = manager a validé la soumission
+                                  • cloturee   = clôture finale
+                                Lecture depuis tasks.be_status_dates (JSONB). */}
+                            {(() => {
+                              const beDates = (task as any).be_status_dates as Record<string, string> | null;
+                              if (!beDates) return null;
+                              const markers: { key: string; date: Date; color: string; label: string; icon: string }[] = [];
+                              if (beDates.a_valider) {
+                                markers.push({
+                                  key: 'a_valider',
+                                  date: new Date(beDates.a_valider),
+                                  color: '#f59e0b',
+                                  label: 'Validée',
+                                  icon: '✓',
+                                });
+                              }
+                              if (beDates.cloturee) {
+                                markers.push({
+                                  key: 'cloturee',
+                                  date: new Date(beDates.cloturee),
+                                  color: '#10b981',
+                                  label: 'Clôturée',
+                                  icon: '🏁',
+                                });
+                              }
+                              return markers.map((m) => {
+                                const offset = differenceInDays(m.date, dateRange.start);
+                                if (offset < 0 || offset > timelineData.days.length) return null;
+                                const markerLeft = offset * dayWidth + dayWidth / 2 - 8;
+                                return (
+                                  <Tooltip key={m.key}>
+                                    <TooltipTrigger asChild>
+                                      <div
+                                        className="absolute top-0.5 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold text-white shadow-md ring-2 ring-white cursor-default z-10"
+                                        style={{ left: markerLeft, backgroundColor: m.color }}
+                                      >
+                                        {m.icon}
+                                      </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top">
+                                      <p className="text-xs font-medium">
+                                        {m.label} le {format(m.date, 'dd MMM yyyy', { locale: fr })}
+                                      </p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                );
+                              });
+                            })()}
                           </div>
                         );
                       })}

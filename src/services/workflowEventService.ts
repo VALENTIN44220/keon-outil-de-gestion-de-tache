@@ -162,7 +162,7 @@ export async function processEvent(eventId: string): Promise<boolean> {
         await handleTaskAssigned(event.entity_id, payload);
         break;
       case 'validation_decided':
-        await handleValidationDecided(event.entity_id, payload);
+        await handleValidationDecided(event.entity_id, payload, event.entity_type);
         break;
       case 'sub_process_completed':
         await handleSubProcessCompleted(event.entity_id, payload);
@@ -458,9 +458,72 @@ async function handleTaskAssigned(taskId: string, payload: EventPayload): Promis
 }
 
 /**
- * Handler: Décision de validation (legacy - maintenu pour compatibilité)
+ * Handler: Décision de validation.
+ *
+ * Couvre 2 cas :
+ *  - `entity_type === 'task'`  : notifie l'exécutant + le demandeur de la
+ *    demande parente (= comportement legacy maintenu).
+ *  - `entity_type === 'request'` : notifie le demandeur (`requester_id` ou
+ *    `user_id`) avec un message tenant compte de l'action de refus
+ *    (`refusal_action ∈ {'cancel', 'return'}`) — comble le trou identifié
+ *    dans l'audit (le demandeur n'était PAS notifié des décisions sur ses
+ *    propres demandes).
  */
-async function handleValidationDecided(entityId: string, payload: EventPayload): Promise<void> {
+async function handleValidationDecided(
+  entityId: string,
+  payload: EventPayload,
+  entityType: EntityType,
+): Promise<void> {
+  const isApproved = payload.decision === 'approved';
+  const refusalAction = (payload as any)?.custom_data?.refusal_action as
+    | 'cancel'
+    | 'return'
+    | undefined;
+
+  if (entityType === 'request') {
+    // ── Cas 1 : décision sur une DEMANDE — notifier le demandeur ──────────
+    const { data: request } = await supabase
+      .from('tasks')
+      .select('title, user_id, requester_id')
+      .eq('id', entityId)
+      .single();
+    if (!request) return;
+
+    const recipient = request.requester_id ?? request.user_id;
+    if (!recipient) return;
+
+    let title: string;
+    let message: string;
+    let type: string;
+    if (isApproved) {
+      title = 'Demande validée';
+      message = `Votre demande « ${request.title} » a été validée.`;
+      type = 'request_validated';
+    } else if (refusalAction === 'return') {
+      title = 'Demande renvoyée pour correction';
+      message = `Votre demande « ${request.title} » a été renvoyée. ${payload.comment || ''}`.trim();
+      type = 'request_returned';
+    } else {
+      title = 'Demande refusée';
+      message = `Votre demande « ${request.title} » a été refusée. ${payload.comment || ''}`.trim();
+      type = 'request_refused';
+    }
+
+    // Insertion directe dans la table `notifications` (= flux in-app, lue par
+    // useInAppNotifications avec realtime). Cohérent avec le pattern utilisé
+    // dans le BE (cf. BEDispatchView).
+    await supabase.from('notifications').insert([{
+      user_id: recipient,
+      title,
+      message,
+      type,
+      related_entity_type: 'request',
+      related_entity_id: entityId,
+    }]);
+    return;
+  }
+
+  // ── Cas 2 : décision sur une TÂCHE — comportement legacy ────────────────
   const { data: task } = await supabase
     .from('tasks')
     .select('title, user_id, assignee_id, parent_request_id')
@@ -469,11 +532,10 @@ async function handleValidationDecided(entityId: string, payload: EventPayload):
 
   if (!task) return;
 
-  const isApproved = payload.decision === 'approved';
   const title = isApproved ? 'Validation approuvée' : 'Validation refusée';
   const body = isApproved
     ? `La tâche "${task.title}" a été validée.`
-    : `La tâche "${task.title}" a été refusée. ${payload.comment || ''}`;
+    : `La tâche "${task.title}" a été refusée. ${payload.comment || ''}`.trim();
 
   // Notifier l'exécutant
   if (task.assignee_id) {
@@ -487,17 +549,18 @@ async function handleValidationDecided(entityId: string, payload: EventPayload):
     });
   }
 
-  // Notifier le demandeur si différent
+  // Notifier le demandeur si différent (via la demande parente)
   if (task.parent_request_id) {
     const { data: request } = await supabase
       .from('tasks')
-      .select('user_id')
+      .select('user_id, requester_id')
       .eq('id', task.parent_request_id)
       .single();
+    const requesterId = request?.requester_id ?? request?.user_id;
 
-    if (request?.user_id && request.user_id !== task.assignee_id) {
+    if (requesterId && requesterId !== task.assignee_id) {
       await createNotification({
-        recipient_id: request.user_id,
+        recipient_id: requesterId,
         type: 'validation_decided',
         title,
         body,

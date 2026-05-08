@@ -67,8 +67,29 @@ export function AppNotificationCluster({ collapsed, className }: AppNotification
     markAsRead: markWorkflowRead,
   } = useInAppNotifications();
 
-  const defaultOpenTask = (taskId: string) => {
+  const defaultOpenTask = async (taskId: string) => {
     const path = location.pathname;
+    // Cherche le module_code de la tache pour router vers le bon dispatch
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { data } = await supabase
+        .from('tasks')
+        .select('module_code, type')
+        .eq('id', taskId)
+        .maybeSingle();
+      const mc = (data as any)?.module_code as string | null;
+      const moduleRoutes: Record<string, string> = {
+        it: '/it/dispatch',
+        logistique: '/logistique/dispatch',
+        maintenance: '/maintenance/dispatch',
+      };
+      if (mc && moduleRoutes[mc]) {
+        navigate(`${moduleRoutes[mc]}?openTask=${encodeURIComponent(taskId)}`);
+        return;
+      }
+    } catch (e) {
+      // Fallback ci-dessous
+    }
     if (path === '/requests' || path.startsWith('/requests/')) {
       navigate(`/requests?openTask=${encodeURIComponent(taskId)}`);
       return;

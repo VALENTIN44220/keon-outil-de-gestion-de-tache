@@ -1454,6 +1454,12 @@ Deno.serve(async (req) => {
               plannerDescription = null;
             }
 
+            // Module-aware insertion (cf. planner_plan_mappings.target_*)
+            const targetModuleCode = (mapping as any).target_module_code as string | null;
+            const targetTaskType = ((mapping as any).target_task_type as string | null) || 'task';
+            const targetDefaultAssignee = (mapping as any).target_default_assignee_profile_id as string | null;
+            const finalAssigneeId = assigneeId || targetDefaultAssignee || null;
+
             const { data: newTask, error: insertErr } = await supabase
               .from('tasks')
               .insert({
@@ -1462,9 +1468,9 @@ Deno.serve(async (req) => {
                 status,
                 priority,
                 due_date: pt.dueDateTime ? pt.dueDateTime.substring(0, 10) : null,
-                type: 'task',
+                type: targetTaskType,
                 user_id: userId,
-                assignee_id: assigneeId,
+                assignee_id: finalAssigneeId,
                 requester_id: mapping.default_requester_id || null,
                 reporter_id: mapping.default_reporter_id || null,
                 category_id: mapping.mapped_category_id,
@@ -1476,6 +1482,8 @@ Deno.serve(async (req) => {
                 date_fermeture: pt.completedDateTime
                   ? pt.completedDateTime
                   : ((status === 'done' || status === 'validated') ? (pt.createdDateTime || null) : null),
+                module_code: targetModuleCode,
+                module_data: targetModuleCode ? { source: 'planner', planner_task_id: pt.id } : null,
               })
               .select()
               .single();

@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { BEProjectHubLayout } from '@/components/be/BEProjectHubLayout';
 import { useBEProjectByCode } from '@/hooks/useBEProjectHub';
 import { useBEProjectHubCode } from '@/hooks/useBEProjectHubCode';
@@ -19,18 +19,68 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Search, Building2, Loader2, Coins } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Plus,
+  Search,
+  Building2,
+  Loader2,
+  Coins,
+  LayoutGrid,
+  Table as TableIcon,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { extractErrorMessage } from '@/lib/extractErrorMessage';
 import { BEBudgetKpiCards } from '@/components/be/budget/BEBudgetKpiCards';
 import { BEAffaireCard } from '@/components/be/budget/BEAffaireCard';
 import { BEAffaireDialog } from '@/components/be/budget/BEAffaireDialog';
-import { BEAffaireDetailSheet } from '@/components/be/budget/BEAffaireDetailSheet';
 import { BEGroupeHeader } from '@/components/be/budget/BEGroupeHeader';
-import type { BEAffaire } from '@/types/beAffaire';
+import {
+  BEAffaireTable,
+  BE_AFFAIRE_DEFAULT_COLS,
+  BE_AFFAIRE_COLUMNS,
+  type BEAffaireColumnKey,
+} from '@/components/be/budget/BEAffaireTable';
+import {
+  BE_AFFAIRE_STATUS_CONFIG,
+  type BEAffaire,
+  type BEAffaireStatus,
+} from '@/types/beAffaire';
+
+type ViewMode = 'cards' | 'table';
+const VIEW_MODE_KEY = 'be-budget-view-mode';
+const COLS_KEY = 'be-budget-columns';
+
+function loadViewMode(): ViewMode {
+  if (typeof window === 'undefined') return 'table';
+  const v = window.localStorage.getItem(VIEW_MODE_KEY);
+  return v === 'cards' || v === 'table' ? v : 'table';
+}
+
+function loadColumns(): BEAffaireColumnKey[] {
+  if (typeof window === 'undefined') return BE_AFFAIRE_DEFAULT_COLS;
+  try {
+    const raw = window.localStorage.getItem(COLS_KEY);
+    if (!raw) return BE_AFFAIRE_DEFAULT_COLS;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return BE_AFFAIRE_DEFAULT_COLS;
+    const valid = BE_AFFAIRE_COLUMNS.map((c) => c.key);
+    return parsed.filter((k) => valid.includes(k));
+  } catch {
+    return BE_AFFAIRE_DEFAULT_COLS;
+  }
+}
 
 export default function BEProjectHubBudget() {
   const code = useBEProjectHubCode();
+  const navigate = useNavigate();
   const { data: project, isLoading: projectLoading } = useBEProjectByCode(code);
   const {
     affaires,
@@ -41,10 +91,25 @@ export default function BEProjectHubBudget() {
   const { byCode: groupeKpiByCode } = useBEGroupeKpis(project?.id);
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<BEAffaireStatus | 'all'>('all');
+  const [groupFilter, setGroupFilter] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<ViewMode>(loadViewMode);
+  const [columns, setColumns] = useState<BEAffaireColumnKey[]>(loadColumns);
+
   const [createOpen, setCreateOpen] = useState(false);
   const [editingAffaire, setEditingAffaire] = useState<BEAffaire | null>(null);
-  const [selectedAffaire, setSelectedAffaire] = useState<BEAffaire | null>(null);
   const [deletingAffaire, setDeletingAffaire] = useState<BEAffaire | null>(null);
+
+  const navigateToAffaire = (a: BEAffaire) =>
+    navigate(`/be/projects/${code}/budget/${a.code_affaire}`);
+
+  useEffect(() => {
+    try { window.localStorage.setItem(VIEW_MODE_KEY, viewMode); } catch { /* noop */ }
+  }, [viewMode]);
+
+  useEffect(() => {
+    try { window.localStorage.setItem(COLS_KEY, JSON.stringify(columns)); } catch { /* noop */ }
+  }, [columns]);
 
   // KPIs projet = somme des affaires (CA / COGS / Marge brute + directe + cout RH)
   const projectKpis = useMemo(() => {
@@ -69,34 +134,51 @@ export default function BEProjectHubBudget() {
     return { caEngage, caConstate, cogsConstate, margeBrute, coutRhDeclare, margeDirecte };
   }, [affaires, kpisByAffaireId]);
 
+  // Liste des codes-groupe presents (pour le selecteur)
+  const groupCodes = useMemo(() => {
+    const set = new Set<string>();
+    for (const a of affaires) {
+      const c = a.code_affaire ?? '';
+      const g = c.length >= 5 ? c.substring(0, 5).toUpperCase() : c.toUpperCase();
+      if (g) set.add(g);
+    }
+    return Array.from(set).sort();
+  }, [affaires]);
+
   const filteredAffaires = useMemo(() => {
-    if (!searchQuery.trim()) return affaires;
     const q = searchQuery.trim().toLowerCase();
-    return affaires.filter(
-      (a) =>
-        a.code_affaire.toLowerCase().includes(q) ||
-        (a.libelle ?? '').toLowerCase().includes(q),
-    );
-  }, [affaires, searchQuery]);
+    return affaires.filter((a) => {
+      if (statusFilter !== 'all' && a.status !== statusFilter) return false;
+      if (groupFilter !== 'all') {
+        const c = a.code_affaire ?? '';
+        const g = c.length >= 5 ? c.substring(0, 5).toUpperCase() : c.toUpperCase();
+        if (g !== groupFilter) return false;
+      }
+      if (q) {
+        if (
+          !a.code_affaire.toLowerCase().includes(q) &&
+          !(a.libelle ?? '').toLowerCase().includes(q)
+        )
+          return false;
+      }
+      return true;
+    });
+  }, [affaires, searchQuery, statusFilter, groupFilter]);
 
   // Groupement des affaires par prefixe 5 chars (= "affaire globale")
   const groupedAffaires = useMemo(() => {
     const groups = new Map<string, typeof affaires>();
     for (const a of filteredAffaires) {
-      const code = a.code_affaire ?? '';
-      const groupCode = code.length >= 5 ? code.substring(0, 5).toUpperCase() : code.toUpperCase();
+      const c = a.code_affaire ?? '';
+      const groupCode = c.length >= 5 ? c.substring(0, 5).toUpperCase() : c.toUpperCase();
       if (!groups.has(groupCode)) groups.set(groupCode, []);
       groups.get(groupCode)!.push(a);
     }
-    // Tri : par code_groupe alpha
     return Array.from(groups.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([code_groupe, affaires]) => ({ code_groupe, affaires }));
   }, [filteredAffaires]);
 
-  // Code projet attendu (chars 2-5 d'un code_affaire). Priorite :
-  //  1. project.code_projet si exactement 4 chars (cas standard ex. 'VINZ')
-  //  2. Chars 2-5 de la 1re affaire existante (fallback)
   const expectedProjectCode = useMemo(() => {
     const cp = project?.code_projet?.trim().toUpperCase() ?? '';
     if (cp.length === 4) return cp;
@@ -150,6 +232,9 @@ export default function BEProjectHubBudget() {
     );
   }
 
+  const hasFilters =
+    !!searchQuery.trim() || statusFilter !== 'all' || groupFilter !== 'all';
+
   return (
     <BEProjectHubLayout>
       <div className="space-y-4">
@@ -166,16 +251,71 @@ export default function BEProjectHubBudget() {
 
         {/* Toolbar */}
         <Card className="border-border/50">
-          <CardContent className="p-3 flex items-center gap-3">
+          <CardContent className="p-3 flex flex-wrap items-center gap-2">
             <div className="relative flex-1 min-w-[200px] max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Rechercher une affaire (code, libellé)…"
+                placeholder="Rechercher (code, libellé)…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
               />
             </div>
+
+            <Select
+              value={statusFilter}
+              onValueChange={(v) => setStatusFilter(v as BEAffaireStatus | 'all')}
+            >
+              <SelectTrigger className="w-[140px] h-9">
+                <SelectValue placeholder="Statut" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous statuts</SelectItem>
+                {(Object.keys(BE_AFFAIRE_STATUS_CONFIG) as BEAffaireStatus[]).map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {BE_AFFAIRE_STATUS_CONFIG[s].label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {groupCodes.length > 1 && (
+              <Select value={groupFilter} onValueChange={setGroupFilter}>
+                <SelectTrigger className="w-[140px] h-9">
+                  <SelectValue placeholder="Groupe" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous groupes</SelectItem>
+                  {groupCodes.map((g) => (
+                    <SelectItem key={g} value={g}>
+                      {g}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            <div className="flex items-center gap-0.5 p-0.5 bg-muted/50 rounded">
+              <Button
+                variant={viewMode === 'table' ? 'default' : 'ghost'}
+                size="sm"
+                className={cn('h-8 px-2', viewMode === 'table' && 'shadow-sm')}
+                onClick={() => setViewMode('table')}
+                title="Vue tableau"
+              >
+                <TableIcon className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant={viewMode === 'cards' ? 'default' : 'ghost'}
+                size="sm"
+                className={cn('h-8 px-2', viewMode === 'cards' && 'shadow-sm')}
+                onClick={() => setViewMode('cards')}
+                title="Vue cartes"
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+
             <Button asChild variant="outline" size="sm" className="gap-1.5" title="Gérer le référentiel TJM et les postes BE des collaborateurs">
               <Link to="/be/admin/tjm">
                 <Coins className="h-4 w-4" />
@@ -189,7 +329,7 @@ export default function BEProjectHubBudget() {
           </CardContent>
         </Card>
 
-        {/* Affaires grid */}
+        {/* Liste */}
         {affairesLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             <Skeleton className="h-44" />
@@ -203,14 +343,14 @@ export default function BEProjectHubBudget() {
                 <Building2 className="h-8 w-8 text-muted-foreground" />
               </div>
               <p className="font-medium mb-1">
-                {searchQuery ? 'Aucune affaire trouvée' : 'Aucune affaire pour ce projet'}
+                {hasFilters ? 'Aucune affaire ne correspond aux filtres' : 'Aucune affaire pour ce projet'}
               </p>
               <p className="text-sm text-muted-foreground mb-4">
-                {searchQuery
-                  ? 'Modifiez votre recherche.'
+                {hasFilters
+                  ? 'Modifiez votre recherche ou vos filtres.'
                   : 'Créez la première affaire pour commencer le suivi budgétaire.'}
               </p>
-              {!searchQuery && (
+              {!hasFilters && (
                 <Button onClick={() => setCreateOpen(true)} className="gap-1.5">
                   <Plus className="h-4 w-4" />
                   Créer une affaire
@@ -218,7 +358,7 @@ export default function BEProjectHubBudget() {
               )}
             </CardContent>
           </Card>
-        ) : (
+        ) : viewMode === 'cards' ? (
           <div className="space-y-5">
             {groupedAffaires.map(({ code_groupe, affaires }) => (
               <div key={code_groupe} className="space-y-2">
@@ -233,7 +373,7 @@ export default function BEProjectHubBudget() {
                       key={a.id}
                       affaire={a}
                       kpi={kpisByAffaireId.get(a.id)}
-                      onSelect={() => setSelectedAffaire(a)}
+                      onSelect={() => navigateToAffaire(a)}
                       onEdit={() => setEditingAffaire(a)}
                       onDelete={() => setDeletingAffaire(a)}
                     />
@@ -242,6 +382,16 @@ export default function BEProjectHubBudget() {
               </div>
             ))}
           </div>
+        ) : (
+          <BEAffaireTable
+            affaires={filteredAffaires}
+            kpisByAffaireId={kpisByAffaireId}
+            visibleColumns={columns}
+            onColumnsChange={setColumns}
+            onSelect={navigateToAffaire}
+            onEdit={setEditingAffaire}
+            onDelete={setDeletingAffaire}
+          />
         )}
       </div>
 
@@ -260,15 +410,6 @@ export default function BEProjectHubBudget() {
         expectedProjectCode={expectedProjectCode}
         existingAffaireCodes={existingAffaireCodes}
         affaire={editingAffaire}
-      />
-
-      <BEAffaireDetailSheet
-        affaire={selectedAffaire}
-        onOpenChange={(o) => !o && setSelectedAffaire(null)}
-        onEditAffaire={(a) => {
-          setSelectedAffaire(null);
-          setEditingAffaire(a);
-        }}
       />
 
       {/* Confirmation delete */}

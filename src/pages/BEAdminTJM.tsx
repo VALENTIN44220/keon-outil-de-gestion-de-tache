@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
+import { useUserRole } from '@/hooks/useUserRole';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -42,6 +44,22 @@ const eurH = (n: number | null | undefined) =>
   });
 
 export default function BEAdminTJM() {
+  // ── Garde d'accès : admin global uniquement (ultra limité) ────────────────
+  const { isAdmin, isLoading: roleLoading } = useUserRole();
+  if (roleLoading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        </div>
+      </Layout>
+    );
+  }
+  if (!isAdmin) return <Navigate to="/" replace />;
+  return <BEAdminTJMContent />;
+}
+
+function BEAdminTJMContent() {
   // ── Référentiel fonctions ────────────────────────────────────────────────
   const { data: fonctions = [], isLoading: fonctionsLoading } = useBETjmFonctions();
   const updateFonction = useUpdateBETjmFonction();

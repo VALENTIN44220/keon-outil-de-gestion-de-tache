@@ -38,9 +38,15 @@ export function NotificationBell({
   onCommentNotificationClick,
   onWorkflowInAppClick,
 }: NotificationBellProps) {
-  const commentUnread = commentNotifications.filter((n) => !n.isRead).length;
-  const totalUnread = unreadCount + commentUnread + workflowInAppUnreadCount;
-  const hasUnreadComments = commentNotifications.some((n) => !n.isRead);
+  // Les notifs de la table `notifications` avec type='task_comment' sont
+  // logiquement des commentaires : on les remonte dans l'onglet "Commentaires"
+  // plutôt que "Workflow" pour éviter la confusion utilisateur.
+  const commentInAppNotifs = workflowInAppNotifications.filter((n) => n.type === 'task_comment');
+  const otherWorkflowNotifs = workflowInAppNotifications.filter((n) => n.type !== 'task_comment');
+  const commentUnread = commentNotifications.filter((n) => !n.isRead).length + commentInAppNotifs.length;
+  const otherWorkflowUnread = otherWorkflowNotifs.length;
+  const totalUnread = unreadCount + commentUnread + otherWorkflowUnread;
+  const hasUnreadComments = commentNotifications.some((n) => !n.isRead) || commentInAppNotifs.length > 0;
 
   const getIcon = (type: TaskNotification['type']) => {
     switch (type) {
@@ -77,7 +83,7 @@ export function NotificationBell({
             <span
               className={cn(
                 'absolute -top-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full text-xs font-medium text-primary-foreground',
-                hasUrgent || hasUnreadComments || workflowInAppUnreadCount > 0
+                hasUrgent || hasUnreadComments || otherWorkflowUnread > 0
                   ? 'bg-destructive animate-pulse'
                   : 'bg-primary'
               )}
@@ -110,9 +116,9 @@ export function NotificationBell({
               </TabsTrigger>
               <TabsTrigger value="workflow" className="text-xs px-1">
                 Workflow
-                {workflowInAppUnreadCount > 0 && (
+                {otherWorkflowUnread > 0 && (
                   <span className="ml-1 bg-violet-600 text-white text-xs px-1 py-0.5 rounded-full">
-                    {workflowInAppUnreadCount}
+                    {otherWorkflowUnread}
                   </span>
                 )}
               </TabsTrigger>
@@ -172,7 +178,7 @@ export function NotificationBell({
           </TabsContent>
 
           <TabsContent value="messages" className="m-0">
-            {commentNotifications.length === 0 ? (
+            {commentNotifications.length === 0 && commentInAppNotifs.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <MessageSquare className="h-10 w-10 text-muted-foreground/50 mb-2" />
                 <p className="text-sm text-muted-foreground">
@@ -182,6 +188,32 @@ export function NotificationBell({
             ) : (
               <ScrollArea className="max-h-80">
                 <div className="divide-y divide-border">
+                  {commentInAppNotifs.map((row) => (
+                    <button
+                      key={`inapp-${row.id}`}
+                      type="button"
+                      onClick={() => onWorkflowInAppClick?.(row)}
+                      className="w-full text-left px-4 py-3 hover:bg-accent/50 transition-colors focus:outline-none focus:bg-accent/50 bg-primary/5"
+                    >
+                      <div className="flex gap-3">
+                        <div className="flex-shrink-0 mt-0.5 p-1.5 rounded-full border bg-primary/10 border-primary/20">
+                          <MessageSquare className="h-4 w-4 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium text-foreground truncate">{row.title}</p>
+                            <span className="w-2 h-2 bg-primary rounded-full flex-shrink-0" />
+                          </div>
+                          {row.message ? (
+                            <p className="text-xs text-foreground/80 mt-0.5 line-clamp-2">{row.message}</p>
+                          ) : null}
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {formatDistanceToNow(parseISO(row.created_at), { addSuffix: true, locale: fr })}
+                          </p>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
                   {commentNotifications.map((notification) => (
                     <button
                       key={notification.id}
@@ -227,7 +259,7 @@ export function NotificationBell({
           </TabsContent>
 
           <TabsContent value="workflow" className="m-0">
-            {workflowInAppNotifications.length === 0 ? (
+            {otherWorkflowNotifs.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <Zap className="h-10 w-10 text-muted-foreground/50 mb-2" />
                 <p className="text-sm text-muted-foreground">Aucune notification workflow</p>
@@ -235,7 +267,7 @@ export function NotificationBell({
             ) : (
               <ScrollArea className="max-h-80">
                 <div className="divide-y divide-border">
-                  {workflowInAppNotifications.map((row) => (
+                  {otherWorkflowNotifs.map((row) => (
                     <button
                       key={row.id}
                       type="button"

@@ -4,7 +4,7 @@ import { BEProject } from '@/types/beProject';
 import { Task } from '@/types/task';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { 
+import {
   ArrowLeft,
   LayoutDashboard,
   Calendar,
@@ -19,7 +19,8 @@ import {
   Pencil,
   ClipboardList,
   BarChart3,
-  Wallet
+  Wallet,
+  Plus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useQuestionnaireProjectData } from '@/hooks/useQuestionnaireProjectData';
@@ -34,6 +35,7 @@ interface BEProjectHubHeaderProps {
     progress: number;
   };
   onEditProject?: () => void;
+  onNewBERequest?: () => void;
 }
 
 const statusLabels: Record<string, { label: string; className: string }> = {
@@ -47,23 +49,29 @@ const baseNavItems = [
   { value: 'questionnaire', label: 'Questionnaire', icon: ClipboardList },
   { value: 'keon-synthese', label: '📊 Synthèse KEON', icon: BarChart3, keonOnly: true },
   { value: 'timeline', label: 'Timeline', icon: Calendar },
-  { value: 'budget', label: 'Budget', icon: Wallet },
+  { value: 'budget', label: 'Budget', icon: Wallet, beOnly: true },
+  { value: 'temps', label: 'Temps', icon: Clock, beOnly: true },
   { value: 'discussions', label: 'Discussions', icon: MessageSquare },
   { value: 'files', label: 'Fichiers', icon: Paperclip },
 ];
 
-export function BEProjectHubHeader({ project, stats, onEditProject }: BEProjectHubHeaderProps) {
+export function BEProjectHubHeader({ project, stats, onEditProject, onNewBERequest }: BEProjectHubHeaderProps) {
   const projectsArray = useMemo(() => [project], [project]);
   const { keonProjectIds } = useQuestionnaireProjectData(projectsArray);
   const isKeonProject = keonProjectIds.has(project.id);
 
-  const navItems = useMemo(
-    () => baseNavItems.filter(item => !item.keonOnly || isKeonProject),
-    [isKeonProject]
-  );
   const navigate = useNavigate();
   const location = useLocation();
   const isSpvContext = location.pathname.startsWith('/spv/projects/');
+  const navItems = useMemo(
+    () =>
+      baseNavItems.filter(
+        (item) =>
+          (!item.keonOnly || isKeonProject) &&
+          (!item.beOnly || !isSpvContext),
+      ),
+    [isKeonProject, isSpvContext],
+  );
   const projectBasePath = isSpvContext ? '/spv/projects' : '/be/projects';
   const projectsListPath = isSpvContext ? '/spv' : '/projects';
 
@@ -110,6 +118,16 @@ export function BEProjectHubHeader({ project, stats, onEditProject }: BEProjectH
               <Badge className={cn('border shrink-0', statusConfig.className)}>
                 {statusConfig.label}
               </Badge>
+              {onNewBERequest && (
+                <Button
+                  size="sm"
+                  className="h-8 gap-1.5 shrink-0"
+                  onClick={onNewBERequest}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Nouvelle demande
+                </Button>
+              )}
               {onEditProject && (
                 <Button
                   variant="outline"

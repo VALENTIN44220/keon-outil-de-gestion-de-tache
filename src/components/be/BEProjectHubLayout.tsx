@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useMemo, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useBEProjectByCode, useBEProjectTasks, useBEProjectStats } from '@/hooks/useBEProjectHub';
 import { useBEProjectHubCode } from '@/hooks/useBEProjectHubCode';
@@ -9,10 +9,10 @@ import { Building2, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { BEProjectHubHeader } from './BEProjectHubHeader';
 import { BEProjectDialog } from '@/components/projects/BEProjectDialog';
+import { NewBERequestDialog } from '@/components/be/NewBERequestDialog';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useQuestionnaireProjectData } from '@/hooks/useQuestionnaireProjectData';
 
 interface BEProjectHubLayoutProps {
   children: ReactNode;
@@ -25,6 +25,7 @@ export function BEProjectHubLayout({ children }: BEProjectHubLayoutProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [newRequestOpen, setNewRequestOpen] = useState(false);
   const isSpvContext = location.pathname.startsWith('/spv/projects/');
   const sidebarView = isSpvContext ? 'spv' : 'projects';
   const projectsListPath = isSpvContext ? '/spv' : '/projects';
@@ -33,31 +34,13 @@ export function BEProjectHubLayout({ children }: BEProjectHubLayoutProps) {
   const { data: tasks = [], isLoading: tasksLoading } = useBEProjectTasks(project?.id);
   
   const stats = useBEProjectStats(project?.id, tasks);
-  const projectsArray = useMemo(() => (project ? [project] : []), [project]);
-  const { qstData } = useQuestionnaireProjectData(projectsArray);
 
-  // Canonicalize URL namespace based on project SPV flag (prevents /be and /spv duplicates).
-  useEffect(() => {
-    if (!project) return;
-    const rawSpv = qstData[project.id]?.['02_GEN_spv_cree'];
-    // Avoid oscillation: don't redirect until the SPV field is actually known.
-    // (qstData loads async; initial empty map would otherwise force a wrong redirect first.)
-    if (!rawSpv || String(rawSpv).trim() === '') return;
-
-    const spvValue = String(rawSpv).toUpperCase().trim();
-    const shouldBeSpv = spvValue === 'OUI';
-    const desiredBase = shouldBeSpv ? '/spv/projects' : '/be/projects';
-    const currentIsSpv = location.pathname.startsWith('/spv/projects/');
-    const currentIsBe = location.pathname.startsWith('/be/projects/');
-    if (!currentIsSpv && !currentIsBe) return;
-
-    const parts = location.pathname.split('/').filter(Boolean);
-    const activeTab = parts[parts.length - 1] || 'overview';
-    const desiredPath = `${desiredBase}/${project.code_projet}/${activeTab}`;
-    if (location.pathname !== desiredPath) {
-      navigate(desiredPath, { replace: true });
-    }
-  }, [project, qstData, location.pathname, navigate]);
+  // NOTE: la canonicalisation auto /be/ <-> /spv/ basee sur le flag SPV du projet
+  // a ete supprimee. Le namespace dans l'URL refleche le WORKSPACE de l'utilisateur,
+  // pas le statut du projet :
+  //   - BE = workspace omniscient (acces a tous les projets, y compris SPV-flagged, budget inclus)
+  //   - SPV = workspace cloisonne (projets SPV uniquement, pas de budget)
+  // Le cloisonnement applicatif (lecture/ecriture) reste pilote par les RLS Supabase.
 
   // URL du type /spv/projects//… (segment code vide) : retour liste
   useEffect(() => {
@@ -127,10 +110,11 @@ export function BEProjectHubLayout({ children }: BEProjectHubLayoutProps) {
       <Sidebar activeView={sidebarView} onViewChange={() => {}} />
       
       <main className="flex-1 flex flex-col min-w-0">
-        <BEProjectHubHeader 
-          project={project} 
-          stats={stats} 
-          onEditProject={() => setEditDialogOpen(true)} 
+        <BEProjectHubHeader
+          project={project}
+          stats={stats}
+          onEditProject={() => setEditDialogOpen(true)}
+          onNewBERequest={() => setNewRequestOpen(true)}
         />
 
         {/* Content */}
@@ -144,6 +128,17 @@ export function BEProjectHubLayout({ children }: BEProjectHubLayoutProps) {
         onClose={() => setEditDialogOpen(false)}
         project={project}
         onSave={handleSaveProject}
+      />
+
+      <NewBERequestDialog
+        open={newRequestOpen}
+        onOpenChange={setNewRequestOpen}
+        defaultProjectId={project.id}
+        onCreated={() => {
+          queryClient.invalidateQueries({ queryKey: ['be-project-tasks', project.id] });
+          queryClient.invalidateQueries({ queryKey: ['be-dispatch-tasks', project.id] });
+          queryClient.invalidateQueries({ queryKey: ['be-dispatch-requests', project.id] });
+        }}
       />
     </div>
   );

@@ -646,6 +646,12 @@ export default function BEProjectHubOverview() {
               )}
             </CardContent>
           </Card>
+          {/*
+           * BE Dispatch View — RETIRÉ de la page overview projet : redondant
+           * avec la section « Demandes & Tâches » au-dessus, et brouillon.
+           * Pour les actions de dispatch (assignation, validation, plan de
+           * charge), utiliser /be/dispatch (vue globale avec filtre projet).
+           */}
         </div>
 
         {/* Right Column */}

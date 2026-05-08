@@ -57,6 +57,7 @@
    leaves: UserLeave[];
    onTaskClick: (task: Task, slots: WorkloadSlot[]) => void;
    onSlotDrop: (taskId: string, userId: string, date: string, halfDay: 'morning' | 'afternoon', duration: number) => Promise<void>;
+   onSlotMove?: (slotIds: string[], dayOffset: number, newUserId?: string) => Promise<void>;
    dropTarget: { userId: string; date: string; halfDay: 'morning' | 'afternoon' } | null;
    onDragOver: (userId: string, date: string, halfDay: 'morning' | 'afternoon') => void;
    onDragLeave: () => void;
@@ -85,6 +86,7 @@ interface MemberTaskBar {
    leaves = [],
    onTaskClick,
    onSlotDrop,
+   onSlotMove,
    dropTarget,
    onDragOver,
    onDragLeave,
@@ -350,11 +352,32 @@ interface MemberTaskBar {
    
    const handleDrop = async (e: React.DragEvent, weekIdx: number, memberId: string) => {
      e.preventDefault();
+
+     // Cas 1 — déplacement de slots existants
+     const moveRaw = e.dataTransfer.getData('application/x-slot-move');
+     if (moveRaw && onSlotMove && weeks[weekIdx]) {
+       try {
+         const payload = JSON.parse(moveRaw) as {
+           slotIds: string[];
+           firstDate: string;
+           originUserId: string;
+         };
+         const dropDate = format(weeks[weekIdx].start, 'yyyy-MM-dd');
+         const { differenceInDays, parseISO } = await import('date-fns');
+         const offset = differenceInDays(parseISO(dropDate), parseISO(payload.firstDate));
+         const newUserId = payload.originUserId !== memberId ? memberId : undefined;
+         await onSlotMove(payload.slotIds, offset, newUserId);
+       } catch (err) {
+         console.warn('[QuarterPlanningGrid] slot-move failed', err);
+       }
+       onDragLeave();
+       return;
+     }
+
+     // Cas 2 — nouveau slot depuis le backlog
      const taskId = e.dataTransfer.getData('taskId');
      const duration = parseInt(e.dataTransfer.getData('duration') || '2', 10);
-     
      if (taskId && weeks[weekIdx]) {
-       // Drop at start of week
        const dropDate = format(weeks[weekIdx].start, 'yyyy-MM-dd');
        await onSlotDrop(taskId, memberId, dropDate, 'morning', duration);
      }
@@ -538,8 +561,20 @@ interface MemberTaskBar {
                           <div
                             draggable
                             onDragStart={(e) => {
+                              if (bar.slots.length > 0) {
+                                const sorted = [...bar.slots].sort((a, b) => a.date.localeCompare(b.date));
+                                e.dataTransfer.setData(
+                                  'application/x-slot-move',
+                                  JSON.stringify({
+                                    slotIds: bar.slots.map(s => s.id),
+                                    firstDate: sorted[0].date,
+                                    originUserId: sorted[0].user_id,
+                                  }),
+                                );
+                              }
                               e.dataTransfer.setData('taskId', bar.task.id);
                               e.dataTransfer.setData('duration', String(bar.slots.length || 2));
+                              e.dataTransfer.effectAllowed = 'move';
                             }}
                             onClick={() => onTaskClick(bar.task, bar.slots)}
                             className={cn(

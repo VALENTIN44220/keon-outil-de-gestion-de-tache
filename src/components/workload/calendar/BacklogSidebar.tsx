@@ -47,7 +47,7 @@
  }
  
  type SortOption = 'priority' | 'due_date' | 'charge' | 'title';
- type FilterOption = 'all' | 'unassigned' | 'no_date' | 'overdue';
+ type FilterOption = 'all' | 'unassigned' | 'no_date' | 'overdue' | 'be_only';
  
  const priorityOrder: Record<string, number> = {
    urgent: 0,
@@ -104,6 +104,11 @@
        case 'overdue':
          const today = new Date().toISOString().split('T')[0];
          filtered = filtered.filter(t => t.due_date && t.due_date < today);
+         break;
+       case 'be_only':
+         // Tâches BE = liées à un projet BE ou portant un be_status (les tâches
+         // créées via le flux BE ont be_project_id et/ou be_status renseignés)
+         filtered = filtered.filter((t: any) => !!t.be_project_id || !!t.be_status);
          break;
      }
  
@@ -169,7 +174,7 @@
    }
  
    return (
-     <Card className="w-80 shrink-0 shadow-lg border-0 bg-gradient-to-b from-card to-muted/20 flex flex-col h-full">
+     <Card className="w-96 shrink-0 shadow-lg border-0 bg-gradient-to-b from-card to-muted/20 flex flex-col h-full">
        <CardHeader className="pb-3 shrink-0">
          <div className="flex items-center justify-between mb-3">
            <div className="flex items-center gap-2">
@@ -206,9 +211,10 @@
              <DropdownMenuTrigger asChild>
                <Button variant="outline" size="sm" className="h-8 gap-1 text-xs flex-1">
                  <Filter className="h-3 w-3" />
-                 {filterBy === 'all' ? 'Tous' : 
+                 {filterBy === 'all' ? 'Tous' :
                   filterBy === 'unassigned' ? 'Non affectées' :
-                  filterBy === 'no_date' ? 'Sans date' : 'En retard'}
+                  filterBy === 'no_date' ? 'Sans date' :
+                  filterBy === 'be_only' ? 'BE seulement' : 'En retard'}
                </Button>
              </DropdownMenuTrigger>
              <DropdownMenuContent>
@@ -224,6 +230,11 @@
                <DropdownMenuItem onClick={() => setFilterBy('overdue')}>
                  <AlertTriangle className="h-3 w-3 mr-2" />
                  En retard
+               </DropdownMenuItem>
+               <DropdownMenuSeparator />
+               <DropdownMenuItem onClick={() => setFilterBy('be_only')}>
+                 <span className="mr-2 text-[10px] font-bold text-indigo-600">BE</span>
+                 BE seulement
                </DropdownMenuItem>
              </DropdownMenuContent>
            </DropdownMenu>
@@ -299,15 +310,57 @@
                      />
                      <GripVertical className="h-4 w-4 text-muted-foreground/50 mt-0.5 shrink-0 group-hover:text-muted-foreground" />
                      <div className="flex-1 min-w-0">
-                       <div className="flex items-center gap-2">
+                       <div className="flex items-start gap-2">
                          <div className={cn(
-                           "w-2 h-2 rounded-full shrink-0",
+                           "w-2 h-2 rounded-full shrink-0 mt-1",
                            getPriorityColor(task.priority)
                          )} />
-                        <span 
-                          className="text-sm font-medium truncate cursor-pointer hover:underline"
-                          onClick={(e) => { e.stopPropagation(); setDetailTask(task); }}
-                        >{task.title}</span>
+                         <div className="flex-1 min-w-0">
+                           {/* Refs courtes (task_number + request_number) — cohérent avec /be/dispatch */}
+                           <div className="flex items-center gap-1 mb-0.5 flex-wrap">
+                             {(task as any).task_number && (
+                               <Badge
+                                 variant="outline"
+                                 className="h-4 px-1 text-[9px] font-mono font-medium shrink-0"
+                                 title={`Identifiant tâche : ${(task as any).task_number}`}
+                               >
+                                 {(task as any).task_number}
+                               </Badge>
+                             )}
+                             {(task as any).request_number && (task as any).request_number !== (task as any).task_number && (
+                               <Badge
+                                 variant="outline"
+                                 className="h-4 px-1 text-[9px] font-mono shrink-0 text-muted-foreground"
+                                 title={`Demande parente : ${(task as any).request_number}`}
+                               >
+                                 {(task as any).request_number}
+                               </Badge>
+                             )}
+                             {((task as any).be_project_id || (task as any).be_status) && (
+                               <Badge
+                                 variant="outline"
+                                 className="h-4 px-1 text-[9px] font-bold border-indigo-300 text-indigo-700 bg-indigo-50 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-700 shrink-0"
+                                 title="Tâche Bureau d'Études"
+                               >
+                                 BE
+                               </Badge>
+                             )}
+                             {(task as any).be_status && (task as any).be_status !== 'cloturee' && (
+                               <Badge
+                                 variant="outline"
+                                 className="h-4 px-1 text-[9px] shrink-0 capitalize"
+                                 title={`Statut BE : ${(task as any).be_status}`}
+                               >
+                                 {String((task as any).be_status).replace(/_/g, ' ')}
+                               </Badge>
+                             )}
+                           </div>
+                           <span
+                             className="text-sm font-medium cursor-pointer hover:underline line-clamp-2 break-words leading-tight"
+                             onClick={(e) => { e.stopPropagation(); setDetailTask(task); }}
+                             title={task.title}
+                           >{task.title}</span>
+                         </div>
                        </div>
                        
                        <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground flex-wrap">

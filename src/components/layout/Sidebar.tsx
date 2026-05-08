@@ -1,5 +1,5 @@
 import React, { Fragment, useState, useEffect, useMemo } from 'react';
-import { LayoutDashboard, BarChart3, ChevronLeft, ChevronRight, Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText, ArrowLeftRight, Calendar, MessageCircle, Building2, ClipboardList, Lightbulb, Monitor, Leaf, Euro, Map as MapIcon } from 'lucide-react';
+import { LayoutDashboard, BarChart3, ChevronLeft, ChevronRight, ChevronDown, Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText, ArrowLeftRight, Calendar, MessageCircle, Building2, ClipboardList, Lightbulb, Monitor, Leaf, Euro, Map as MapIcon, Users, Wallet, BarChart2, Package, Truck } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
 import { useAuth } from '@/contexts/AuthContext';
@@ -38,9 +38,11 @@ interface MenuGroup {
 
 const menuGroups: MenuGroup[] = [
   {
+    label: 'MON ESPACE',
     items: [
       { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard, path: '/', permissionKey: 'can_access_dashboard' },
       { id: 'requests', label: 'Demandes', icon: FileText, path: '/requests', permissionKey: 'can_access_requests' },
+      { id: 'my-requests', label: 'Mes demandes', icon: ClipboardList, path: '/mes-demandes', permissionKey: 'can_access_requests' },
       { id: 'process-tracking', label: 'Suivi de processus', icon: ClipboardList, path: '/process-tracking', permissionKey: 'can_access_process_tracking' },
     ],
   },
@@ -51,47 +53,73 @@ const menuGroups: MenuGroup[] = [
     ],
   },
   {
-    label: 'PROJETS',
+    label: 'BUREAU D\'ÉTUDES',
     items: [
       {
         id: 'projects',
-        label: 'Bureau d\'études',
+        label: 'Projets',
         icon: FolderOpen,
         path: '/projects',
         permissionKey: 'can_access_projects',
-        children: [
-          { id: 'be-admin-tjm', label: 'Référentiel TJM', icon: Euro, path: '/be/admin/tjm', permissionKey: 'can_access_projects' },
-        ],
       },
-      { id: 'spv', label: 'Projets SPV', icon: Leaf, path: '/spv', permissionKey: 'can_access_projects' },
       {
-        id: 'it-projects',
-        label: 'Projets IT',
-        icon: Monitor,
-        path: '/it/projects',
-        permissionKey: 'can_access_it_projects',
-        children: [
-          {
-            id: 'it-budget',
-            label: 'Budget IT',
-            icon: Euro,
-            path: '/it/budget',
-            permissionKey: 'can_access_it_projects',
-          },
-          {
-            id: 'it-cartographie',
-            label: 'Cartographie IT',
-            icon: MapIcon,
-            path: '/it/cartographie',
-            permissionKey: 'can_access_it_projects',
-          },
-        ],
+        id: 'be-dispatch',
+        label: 'Dispatch & Suivi',
+        icon: Users,
+        path: '/be/dispatch',
+        permissionKey: 'can_access_projects' as any,
       },
+      {
+        id: 'be-budget',
+        label: 'Budget',
+        icon: Wallet,
+        path: '/be/budget',
+        permissionKey: 'can_access_projects' as any,
+      },
+      {
+        id: 'be-admin-tjm',
+        label: 'Référentiel TJM',
+        icon: Euro,
+        path: '/be/admin/tjm',
+        permissionKey: 'can_access_projects' as any,
+      },
+    ],
+  },
+  {
+    label: 'SPV',
+    items: [
+      { id: 'spv', label: 'Projets SPV', icon: Leaf, path: '/spv', permissionKey: 'can_access_projects' },
+    ],
+  },
+  {
+    label: 'IT / DIGITAL',
+    items: [
+      { id: 'it-dispatch', label: 'Demandes IT', icon: ClipboardList, path: '/it/dispatch', permissionKey: 'can_access_dashboard' },
+      { id: 'it-projects', label: 'Projets', icon: Monitor, path: '/it/projects', permissionKey: 'can_access_it_projects' },
+      { id: 'it-budget', label: 'Budget', icon: Euro, path: '/it/budget', permissionKey: 'can_access_it_projects' },
+      { id: 'it-cartographie', label: 'Cartographie', icon: MapIcon, path: '/it/cartographie', permissionKey: 'can_access_it_projects' },
+    ],
+  },
+  {
+    label: 'INNOVATION',
+    items: [
       { id: 'innovation', label: 'Projets INNO', icon: Lightbulb, path: '/innovation/requests', permissionKey: 'can_access_dashboard' },
     ],
   },
   {
-    label: 'RÉFÉRENTIELS',
+    label: 'MAINTENANCE',
+    items: [
+      { id: 'maintenance-dispatch', label: 'Demandes matériel', icon: Package, path: '/maintenance/dispatch', permissionKey: 'can_access_dashboard' },
+    ],
+  },
+  {
+    label: 'LOGISTIQUE',
+    items: [
+      { id: 'logistique-dispatch', label: 'Transports', icon: Truck, path: '/logistique/dispatch', permissionKey: 'can_access_dashboard' },
+    ],
+  },
+  {
+    label: 'ACHATS',
     items: [
       { id: 'suppliers', label: 'Fournisseurs', icon: Building2, path: '/suppliers', permissionKey: 'can_access_suppliers' },
     ],
@@ -118,6 +146,14 @@ const adminMenuItem = {
   path: '/admin'
 };
 
+// Réservé aux admins globaux uniquement (accès ultra limité)
+const beAdminTjmMenuItem = {
+  id: 'be-admin-tjm',
+  label: 'TJM',
+  icon: Euro,
+  path: '/be/admin/tjm',
+};
+
 // Group-based color system
 const groupColors: Record<number, { hex: string; bg: string; text: string; textMuted: string; border: string; iconBg: string; iconInactive: string }> = {
   0: { hex: '#3b82f6', bg: 'bg-[#3b82f6]/15', text: 'text-[#3b82f6]', textMuted: 'text-[#3b82f6]/50', border: 'border-[#3b82f6]', iconBg: 'bg-[#3b82f6]', iconInactive: 'text-[#3b82f6]/60' },
@@ -126,14 +162,23 @@ const groupColors: Record<number, { hex: string; bg: string; text: string; textM
   3: { hex: '#f59e0b', bg: 'bg-[#f59e0b]/15', text: 'text-[#f59e0b]', textMuted: 'text-[#f59e0b]/50', border: 'border-[#f59e0b]', iconBg: 'bg-[#f59e0b]', iconInactive: 'text-[#f59e0b]/60' },
   4: { hex: '#64748b', bg: 'bg-[#64748b]/15', text: 'text-[#64748b]', textMuted: 'text-[#64748b]/50', border: 'border-[#64748b]', iconBg: 'bg-[#64748b]', iconInactive: 'text-[#64748b]/60' },
   5: { hex: '#ec4899', bg: 'bg-[#ec4899]/15', text: 'text-[#ec4899]', textMuted: 'text-[#ec4899]/50', border: 'border-[#ec4899]', iconBg: 'bg-[#ec4899]', iconInactive: 'text-[#ec4899]/60' },
+  6: { hex: '#6366f1', bg: 'bg-[#6366f1]/15', text: 'text-[#6366f1]', textMuted: 'text-[#6366f1]/50', border: 'border-[#6366f1]', iconBg: 'bg-[#6366f1]', iconInactive: 'text-[#6366f1]/60' },
+  7: { hex: '#06b6d4', bg: 'bg-[#06b6d4]/15', text: 'text-[#06b6d4]', textMuted: 'text-[#06b6d4]/50', border: 'border-[#06b6d4]', iconBg: 'bg-[#06b6d4]', iconInactive: 'text-[#06b6d4]/60' },
+  8: { hex: '#eab308', bg: 'bg-[#eab308]/15', text: 'text-[#eab308]', textMuted: 'text-[#eab308]/50', border: 'border-[#eab308]', iconBg: 'bg-[#eab308]', iconInactive: 'text-[#eab308]/60' },
 };
 
 // Map group labels to group index for color lookup
 const groupLabelToIndex: Record<string, number> = {
   '': 0,
+  'MON ESPACE': 0,
   'ÉQUIPE': 1,
-  'PROJETS': 2,
-  'RÉFÉRENTIELS': 3,
+  'BUREAU D\'ÉTUDES': 6,
+  'SPV': 2,
+  'IT / DIGITAL': 7,
+  'INNOVATION': 8,
+  'MAINTENANCE': 3,
+  'LOGISTIQUE': 7,
+  'ACHATS': 3,
   'CONFIGURATION': 4,
   'OUTILS': 5,
 };
@@ -289,6 +334,29 @@ export function Sidebar({
     const saved = localStorage.getItem('sidebar-position');
     return saved === 'right';
   });
+  // Sections repliées par l'utilisateur (persistées). Une section reste dépliée
+  // automatiquement si elle contient la page active (cf. derivedActiveView ci-dessous).
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('sidebar-collapsed-sections');
+      if (!saved) return new Set();
+      const arr = JSON.parse(saved);
+      return new Set(Array.isArray(arr) ? arr : []);
+    } catch {
+      return new Set();
+    }
+  });
+  const toggleSection = (label: string) => {
+    setCollapsedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      try {
+        localStorage.setItem('sidebar-collapsed-sections', JSON.stringify([...next]));
+      } catch { /* ignore */ }
+      return next;
+    });
+  };
   const navigate = useNavigate();
   const location = useLocation();
   const { isAdmin } = useUserRole();
@@ -347,6 +415,14 @@ export function Sidebar({
         groups.push({ label: 'CONFIGURATION', items: [adminMenuItem as any] });
       }
     }
+
+    // Inject TJM into BUREAU D'ÉTUDES — admins globaux uniquement
+    if (isAdmin && isPageVisibleOnDevice('be-admin-tjm', currentDevice)) {
+      const beGroup = groups.find(g => g.label === "BUREAU D'ÉTUDES");
+      if (beGroup) {
+        beGroup.items.push(beAdminTjmMenuItem as any);
+      }
+    }
     
     return groups;
   }, [effectivePermissions, isAdmin, canAccessScreen, isPageVisibleOnDevice, currentDevice]);
@@ -369,6 +445,27 @@ export function Sidebar({
   }, [location.pathname, filteredGroups, activeView]);
 
   const collapsed = !isMobile && manualCollapsed;
+
+  // Section contenant la page active : on la force dépliée pour garder
+  // l'item courant visible même si l'utilisateur l'avait repliée précédemment.
+  const activeSectionLabel = useMemo(() => {
+    for (const g of filteredGroups) {
+      if (!g.label) continue;
+      const has = g.items.some(
+        (it) =>
+          it.id === derivedActiveView ||
+          (it.children?.some((c) => c.id === derivedActiveView) ?? false),
+      );
+      if (has) return g.label;
+    }
+    return null;
+  }, [filteredGroups, derivedActiveView]);
+
+  const isSectionExpanded = (label: string | undefined) => {
+    if (!label) return true; // Section sans label = toujours visible
+    if (label === activeSectionLabel) return true; // auto-expand
+    return !collapsedSections.has(label);
+  };
 
   useEffect(() => {
     if (!isMobile) {
@@ -496,39 +593,48 @@ export function Sidebar({
                   </div>
                 )}
                 {group.label && (
-                  <div className="px-3 pt-2 pb-1">
+                  <button
+                    type="button"
+                    onClick={() => toggleSection(group.label!)}
+                    className="w-full flex items-center justify-between px-3 pt-2 pb-1 hover:opacity-80 transition-opacity"
+                  >
                     <span className="text-[10px] font-semibold tracking-widest uppercase text-muted-foreground/60">{group.label}</span>
-                  </div>
+                    {isSectionExpanded(group.label)
+                      ? <ChevronDown className="h-3 w-3 text-muted-foreground/40" />
+                      : <ChevronRight className="h-3 w-3 text-muted-foreground/40" />}
+                  </button>
                 )}
-                <div className="space-y-0.5">
-                  {group.items.map((item) => (
-                    <Fragment key={item.id}>
-                      <SidebarNavRow
-                        item={item}
-                        groupLabel={group.label}
-                        isSubItem={false}
-                        derivedActiveView={derivedActiveView}
-                        collapsed={false}
-                        isMobile
-                        onMenuClick={handleMenuClick}
-                        pendingValidationCount={pendingValidationCount}
-                      />
-                      {item.children?.map((child) => (
+                {isSectionExpanded(group.label) && (
+                  <div className="space-y-0.5">
+                    {group.items.map((item) => (
+                      <Fragment key={item.id}>
                         <SidebarNavRow
-                          key={child.id}
-                          item={child}
+                          item={item}
                           groupLabel={group.label}
-                          isSubItem
+                          isSubItem={false}
                           derivedActiveView={derivedActiveView}
                           collapsed={false}
                           isMobile
                           onMenuClick={handleMenuClick}
                           pendingValidationCount={pendingValidationCount}
                         />
-                      ))}
-                    </Fragment>
-                  ))}
-                </div>
+                        {item.children?.map((child) => (
+                          <SidebarNavRow
+                            key={child.id}
+                            item={child}
+                            groupLabel={group.label}
+                            isSubItem
+                            derivedActiveView={derivedActiveView}
+                            collapsed={false}
+                            isMobile
+                            onMenuClick={handleMenuClick}
+                            pendingValidationCount={pendingValidationCount}
+                          />
+                        ))}
+                      </Fragment>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </nav>
@@ -635,10 +741,20 @@ export function Sidebar({
               </div>
             )}
             {group.label && !collapsed && (
-              <div className="px-3 pt-2 pb-1">
+              <button
+                type="button"
+                onClick={() => toggleSection(group.label!)}
+                className="w-full flex items-center justify-between px-3 pt-2 pb-1 hover:opacity-80 transition-opacity"
+              >
                 <span className="text-[10px] font-semibold tracking-widest uppercase text-muted-foreground/60">{group.label}</span>
-              </div>
+                {isSectionExpanded(group.label)
+                  ? <ChevronDown className="h-3 w-3 text-muted-foreground/40" />
+                  : <ChevronRight className="h-3 w-3 text-muted-foreground/40" />}
+              </button>
             )}
+            {/* Quand la sidebar entière est repliée (icônes seules) on garde la liste visible
+                pour ne pas masquer les icônes ; sinon on respecte l'état utilisateur. */}
+            {(collapsed || isSectionExpanded(group.label)) && (
             <div className="space-y-0.5">
               {group.items.map((item) => (
                 <Fragment key={item.id}>
@@ -668,6 +784,7 @@ export function Sidebar({
                 </Fragment>
               ))}
             </div>
+            )}
           </div>
         ))}
       </nav>

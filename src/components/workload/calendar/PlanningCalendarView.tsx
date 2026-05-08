@@ -41,6 +41,8 @@ import { toast } from 'sonner';
    onToday: () => void;
    onSlotAdd: (taskId: string, userId: string, date: string, halfDay: 'morning' | 'afternoon') => Promise<void>;
    onMultiSlotAdd?: (taskId: string, userId: string, date: string, halfDay: 'morning' | 'afternoon', count: number) => Promise<void>;
+   /** Déplacement d'un (ou plusieurs) slot existant(s) — branche le drag-drop direct slot → cellule. */
+   onSlotMove?: (slotIds: string[], dayOffset: number, newUserId?: string) => Promise<void>;
    onReassignTask?: (taskId: string, fromUserId: string, toUserId: string, newStartDate: string) => Promise<void>;
    isHalfDayAvailable?: (userId: string, date: string, halfDay: 'morning' | 'afternoon') => boolean;
    checkSlotLeaveConflict?: (userId: string, date: string, halfDay: 'morning' | 'afternoon') => { hasConflict: boolean; leaveType?: string };
@@ -66,6 +68,7 @@ export function PlanningCalendarView({
   onToday,
   onSlotAdd,
   onMultiSlotAdd,
+  onSlotMove,
   onReassignTask,
   isHalfDayAvailable,
   checkSlotLeaveConflict,
@@ -134,10 +137,34 @@ export function PlanningCalendarView({
      setDropTarget(null);
    }, []);
  
+   /**
+    * Déplacement de slots existants : appelé par les sous-grilles quand
+    * l'utilisateur drag une pill de tâche existante sur une autre date/user.
+    */
+   const handleSlotMove = useCallback(async (
+     slotIds: string[],
+     dayOffset: number,
+     newUserId?: string,
+   ) => {
+     if (!onSlotMove) return;
+     if (slotIds.length === 0) return;
+     if (dayOffset === 0 && !newUserId) return; // rien à faire
+     try {
+       await onSlotMove(slotIds, dayOffset, newUserId);
+       toast.success(slotIds.length > 1 ? 'Créneaux déplacés' : 'Créneau déplacé');
+     } catch (err: any) {
+       if (err?.code === '23505') {
+         toast.error('Conflit : un créneau existe déjà à cette date');
+       } else {
+         toast.error('Erreur lors du déplacement');
+       }
+     }
+   }, [onSlotMove]);
+
    const handleSlotDrop = useCallback(async (
-     taskId: string, 
-     userId: string, 
-     date: string, 
+     taskId: string,
+     userId: string,
+     date: string,
      halfDay: 'morning' | 'afternoon',
      duration: number
    ) => {
@@ -352,6 +379,7 @@ export function PlanningCalendarView({
                onToday={onToday}
                onTaskClick={handleTaskClick}
                onSlotDrop={handleSlotDrop}
+               onSlotMove={handleSlotMove}
                onTaskMove={onReassignTask}
                dropTarget={dropTarget}
                onDragOver={handleDragOver}

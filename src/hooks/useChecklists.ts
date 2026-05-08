@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { ChecklistItem } from '@/types/checklist';
+import { chunkedInQuery } from '@/lib/chunkedInQuery';
 
 export function useChecklists(taskId?: string) {
   const { user, profile } = useAuth();
@@ -163,10 +164,14 @@ export function useTasksProgress(taskIds: string[]) {
     }
 
     setIsLoading(true);
-    const { data, error } = await supabase
-      .from('task_checklists')
-      .select('task_id, is_completed')
-      .in('task_id', taskIds);
+    // Chunke pour éviter les URLs trop longues (au-delà de ~500 IDs, le filtre
+    // .in() dépasse la limite côté CDN/proxy → 400). Cf. src/lib/chunkedInQuery.ts
+    const { data, errors } = await chunkedInQuery<{ task_id: string; is_completed: boolean }>(
+      taskIds,
+      (chunk) =>
+        supabase.from('task_checklists').select('task_id, is_completed').in('task_id', chunk),
+    );
+    const error = errors[0] ?? null;
 
     if (error) {
       console.error('Error fetching task progress:', error);

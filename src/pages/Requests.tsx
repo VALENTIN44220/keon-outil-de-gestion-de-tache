@@ -1,4 +1,18 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+/**
+ * Requests — page « Demandes ».
+ *
+ * Refonte simplifiée (chantier 2 de la roadmap MON ESPACE) :
+ *  - 1 grille de gros boutons « Créer une demande » (par type)
+ *  - 1 CTA vers /mes-demandes pour le suivi
+ *
+ * Le suivi des demandes est sur une page dédiée /mes-demandes.
+ *
+ * Compat legacy conservée :
+ *  - `?supplierRequest=1`         → ouvre NewRequestDialog ciblant le sous-processus fournisseur
+ *  - `/service-achat/nouveau-fournisseur` → idem
+ *  - `?openTask=<uuid>`           → redirige vers /mes-demandes?openTask=<uuid>
+ */
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useNavigate, useLocation, matchPath } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
@@ -6,26 +20,15 @@ import { DeadlineTasksOverrideProvider } from '@/contexts/DeadlineTasksOverrideC
 import { NewRequestDialog } from '@/components/tasks/NewRequestDialog';
 import { AddTaskDialog } from '@/components/tasks/AddTaskDialog';
 import { NewTaskDialog } from '@/components/tasks/NewTaskDialog';
-import { RequestDetailDialog } from '@/components/tasks/RequestDetailDialog';
-import { ConfigurableDashboard } from '@/components/dashboard/ConfigurableDashboard';
-import { useTasksProgress } from '@/hooks/useChecklists';
+import { NewBERequestDialog } from '@/components/be/NewBERequestDialog';
+import { NewSupplierRequestDialog } from '@/components/suppliers/NewSupplierRequestDialog';
 import { useUserPermissions } from '@/hooks/useUserPermissions';
 import { usePendingAssignments } from '@/hooks/usePendingAssignments';
 import { useTasks } from '@/hooks/useTasks';
-import { Task, TaskStats } from '@/types/task';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { 
-  Loader2, 
-  Plus, 
-  Building2,
-  Eye,
-} from 'lucide-react';
-import { ServiceProcessCard } from '@/components/tasks/ServiceProcessCard';
-import { DraggableActionCards } from '@/components/requests/DraggableActionCards';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
-import { toast } from 'sonner';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { FolderOpen, Building2, Lightbulb, ListChecks, ClipboardList, UserCog, ArrowRight, Monitor, Truck, Package } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import {
   SUPPLIER_NEW_REQUEST_PROCESS_TEMPLATE_ID,
   SUPPLIER_NEW_REQUEST_SUB_PROCESS_TEMPLATE_ID,
@@ -33,67 +36,45 @@ import {
   SERVICE_ACHAT_NOUVEAU_FOURNISSEUR_PATH,
 } from '@/lib/supplierRequestFlow';
 
-interface ProcessTemplate {
-  id: string;
-  name: string;
-  description: string | null;
-  department: string | null;
-}
+// ─── Type d'action de la grille de boutons ──────────────────────────────────
 
-interface SubProcessTemplate {
-  id: string;
-  process_template_id: string;
-  name: string;
-  description: string | null;
-  assignment_type: string;
-  show_quick_launch?: boolean;
-}
-
-interface ProcessWithSubProcesses extends ProcessTemplate {
-  sub_processes: SubProcessTemplate[];
+interface RequestAction {
+  key: string;
+  label: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+  /** Couleur d'accent (Tailwind) — fond + texte sur le badge icône. */
+  accent: string;
+  onClick: () => void;
+  /** Si false → bouton masqué (ex. tâche équipe pour non-managers). */
+  visible: boolean;
 }
 
 const Requests = () => {
-  const { profile, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const supplierServiceAchatPathHandledRef = useRef(false);
   const [activeView, setActiveView] = useState('requests');
-  const [mainTab, setMainTab] = useState('create');
+
+  // Dialogs
+  const [isBERequestOpen, setIsBERequestOpen] = useState(false);
+  const [isSupplierOpen, setIsSupplierOpen] = useState(false);
   const [isNewRequestOpen, setIsNewRequestOpen] = useState(false);
   const [isAddTaskOpen, setIsAddTaskOpen] = useState(false);
   const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
-  const [requests, setRequests] = useState<Task[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [processes, setProcesses] = useState<ProcessWithSubProcesses[]>([]);
   const [selectedProcessTemplateId, setSelectedProcessTemplateId] = useState<string | undefined>();
   const [selectedSubProcessTemplateId, setSelectedSubProcessTemplateId] = useState<string | undefined>();
-  const [selectedRequest, setSelectedRequest] = useState<Task | null>(null);
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
 
-  const {
-    allTasks,
-    searchQuery,
-    setSearchQuery,
-    updateTaskStatus,
-    deleteTask,
-    addTask,
-    refetch,
-  } = useTasks();
+  // useTasks pour piloter la création (addTask) + DeadlineTasksOverrideProvider
+  // (sinon les composants enfants n'ont pas de contexte d'override)
+  const { allTasks, searchQuery, setSearchQuery, addTask } = useTasks();
+  const { refetch: refetchPending } = usePendingAssignments();
+  const { isManager } = useUserPermissions();
 
-  const { getPendingCount, refetch: refetchPending } = usePendingAssignments();
-  const { canAssignToTeam, isManager } = useUserPermissions();
-
-  // Fetch processes for service requests
-  useEffect(() => {
-    fetchProcesses();
-  }, []);
-
-  // Ancien lien ?supplierRequest=1 — même flux que la route Service achat (sous-processus ciblé).
+  // Compat ?supplierRequest=1
   useEffect(() => {
     if (searchParams.get(SUPPLIER_REQUEST_QUERY_PARAM) !== '1') return;
-    setMainTab('create');
     setSelectedProcessTemplateId(SUPPLIER_NEW_REQUEST_PROCESS_TEMPLATE_ID);
     setSelectedSubProcessTemplateId(SUPPLIER_NEW_REQUEST_SUB_PROCESS_TEMPLATE_ID);
     setIsNewRequestOpen(true);
@@ -102,7 +83,7 @@ const Requests = () => {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  // Route dédiée : formulaire « nouveau fournisseur » (processus DEMANDE SERVICE ACHAT), pas l’accueil générique.
+  // Compat /service-achat/nouveau-fournisseur
   useEffect(() => {
     const onServiceAchatPath = matchPath(
       { path: SERVICE_ACHAT_NOUVEAU_FOURNISSEUR_PATH, end: true },
@@ -114,14 +95,22 @@ const Requests = () => {
     }
     if (supplierServiceAchatPathHandledRef.current) return;
     supplierServiceAchatPathHandledRef.current = true;
-    setMainTab('create');
     setSelectedProcessTemplateId(SUPPLIER_NEW_REQUEST_PROCESS_TEMPLATE_ID);
     setSelectedSubProcessTemplateId(SUPPLIER_NEW_REQUEST_SUB_PROCESS_TEMPLATE_ID);
     setIsNewRequestOpen(true);
   }, [location.pathname]);
 
+  // Deep-link ?openTask=<uuid> → rediriger vers la page de suivi
+  useEffect(() => {
+    const taskId = searchParams.get('openTask');
+    if (!taskId) return;
+    navigate(`/mes-demandes?openTask=${taskId}`, { replace: true });
+  }, [searchParams, navigate]);
+
   const handleCloseNewRequestDialog = useCallback(() => {
     setIsNewRequestOpen(false);
+    setSelectedProcessTemplateId(undefined);
+    setSelectedSubProcessTemplateId(undefined);
     if (
       matchPath({ path: SERVICE_ACHAT_NOUVEAU_FOURNISSEUR_PATH, end: true }, location.pathname)
     ) {
@@ -129,342 +118,198 @@ const Requests = () => {
     }
   }, [location.pathname, navigate]);
 
-  const fetchProcesses = async () => {
-    const { data: processData } = await supabase
-      .from('process_templates')
-      .select('id, name, description, target_department_id, departments:target_department_id(name)')
-      .eq('is_shared', true)
-      .order('name');
-    
-    if (!processData) {
-      setProcesses([]);
-      return;
-    }
-
-    const { data: subProcessData } = await supabase
-      .from('sub_process_templates')
-      .select('id, process_template_id, name, description, assignment_type, show_quick_launch')
-      .eq('is_shared', true)
-      .order('order_index');
-
-    const processesWithSubs: ProcessWithSubProcesses[] = processData.map((process: any) => ({
-      ...process,
-      // Ensure card displays the real linked department name (FK) rather than legacy text field.
-      department: process.departments?.name || null,
-      sub_processes: (subProcessData || []).filter(sp => sp.process_template_id === process.id)
-    }));
-
-    setProcesses(processesWithSubs);
-  };
-
-  // Fetch all requests where user is requester
-  const fetchRequests = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (!currentUser) return;
-
-      // Fetch all requests the user has access to (RLS handles filtering)
-      const { data, error } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('type', 'request')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setRequests((data || []) as Task[]);
-    } catch (error) {
-      console.error('Error fetching requests:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchRequests();
-  }, [fetchRequests]);
-
-  // Live-update request statuses without full refresh.
-  useEffect(() => {
-    if (!user?.id) return;
-
-    const channel = supabase
-      .channel('requests-live-status')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'tasks',
-          filter: 'type=eq.request',
-        },
-        (payload: any) => {
-          const updated = payload?.new;
-          if (!updated?.id) return;
-          setRequests((prev) =>
-            prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t))
-          );
-          setSelectedRequest((prev) => (prev && prev.id === updated.id ? { ...prev, ...updated } : prev));
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user?.id]);
-
-  // Get progress for all requests
-  const requestIds = useMemo(() => requests.map(r => r.id), [requests]);
-  const { progressMap } = useTasksProgress(requestIds);
-
-  // Filter to user's own outgoing requests for the dashboard
-  const myRequests = useMemo(() => {
-    if (!profile?.id) return [];
-    return requests.filter(r => r.requester_id === profile.id);
-  }, [requests, profile?.id]);
-
-  // Compute stats for ConfigurableDashboard
-  const dashboardStats = useMemo((): TaskStats => {
-    const total = myRequests.length;
-    const todo = myRequests.filter(t => t.status === 'todo').length;
-    const inProgress = myRequests.filter(t => t.status === 'in-progress').length;
-    const done = myRequests.filter(t => t.status === 'done').length;
-    const pendingValidation = myRequests.filter(t => t.status === 'pending_validation_1' || t.status === 'pending_validation_2').length;
-    const validated = myRequests.filter(t => t.status === 'validated').length;
-    const refused = myRequests.filter(t => t.status === 'refused').length;
-    return {
-      total,
-      todo,
-      inProgress,
-      done,
-      pendingValidation,
-      validated,
-      refused,
-      completionRate: total > 0 ? Math.round(((done + validated) / total) * 100) : 0,
-    };
-  }, [myRequests]);
-
-  const globalProgress = dashboardStats.completionRate;
-
-  const openNotificationTarget = useCallback(
-    async (taskId: string) => {
-      let task = requests.find((r) => r.id === taskId) || allTasks.find((t) => t.id === taskId);
-      if (!task) {
-        const { data, error } = await supabase.from('tasks').select('*').eq('id', taskId).maybeSingle();
-        if (error || !data) {
-          toast.error('Élément introuvable ou inaccessible');
-          return;
-        }
-        task = data as Task;
-      }
-      setSelectedRequest(task);
-      setIsDetailOpen(true);
-    },
-    [requests, allTasks]
-  );
-
-  // Deep link depuis la cloche (sidebar) : /requests?openTask=…
-  useEffect(() => {
-    const taskId = searchParams.get('openTask');
-    if (!taskId) return;
-    void openNotificationTarget(taskId);
-    const next = new URLSearchParams(searchParams);
-    next.delete('openTask');
-    setSearchParams(next, { replace: true });
-  }, [searchParams, setSearchParams, openNotificationTarget]);
-
-  const handleRefresh = () => {
-    fetchRequests();
+  const handleCreated = () => {
     refetchPending();
   };
 
-  // Requests are loaded in local state (not from useTasks), so we must update them locally too.
-  const handleRequestStatusChange = useCallback(
-    async (taskId: string, status: any) => {
-      await updateTaskStatus(taskId, status);
-      const now = new Date().toISOString();
-      setRequests((prev) =>
-        prev.map((t) => (t.id === taskId ? { ...t, status, updated_at: now } : t))
-      );
-      setSelectedRequest((prev) => (prev && prev.id === taskId ? { ...prev, status, updated_at: now } : prev));
+  // ── Liste des actions / boutons ────────────────────────────────────────────
+  const actions: RequestAction[] = [
+    {
+      key: 'be',
+      label: 'Demande BE',
+      description: 'Bureau d\'études : prestations, dossiers, plans',
+      icon: FolderOpen,
+      accent: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
+      onClick: () => setIsBERequestOpen(true),
+      visible: true,
     },
-    [updateTaskStatus]
-  );
+    {
+      key: 'supplier',
+      label: 'Nouveau fournisseur',
+      description: 'Référencer un nouveau fournisseur (Achats)',
+      icon: Building2,
+      accent: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+      onClick: () => setIsSupplierOpen(true),
+      visible: true,
+    },
+    {
+      key: 'it',
+      label: 'Demande IT',
+      description: 'Support Divalto/Pipedrive/Lucca/Power BI, intervention ou matériel',
+      icon: Monitor,
+      accent: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300',
+      onClick: () => navigate('/it/new'),
+      visible: true,
+    },
+    {
+      key: 'maintenance',
+      label: 'Demande matériel',
+      description: 'Maintenance : commande de matériel (validation coordinateur)',
+      icon: Package,
+      accent: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+      onClick: () => navigate('/maintenance/new'),
+      visible: true,
+    },
+    {
+      key: 'logistique',
+      label: 'Demande de transport',
+      description: 'Logistique : transport courant ou urgent',
+      icon: Truck,
+      accent: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+      onClick: () => navigate('/logistique/new'),
+      visible: true,
+    },
+    {
+      key: 'innovation',
+      label: 'Innovation',
+      description: 'Nouvelle idée ou demande d\'innovation',
+      icon: Lightbulb,
+      accent: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
+      onClick: () => navigate('/innovation/new'),
+      visible: true,
+    },
+    {
+      key: 'other',
+      label: 'Autre demande',
+      description: 'Service achat ou autre processus configuré',
+      icon: ClipboardList,
+      accent: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
+      onClick: () => {
+        setSelectedProcessTemplateId(undefined);
+        setSelectedSubProcessTemplateId(undefined);
+        setIsNewRequestOpen(true);
+      },
+      visible: true,
+    },
+    {
+      key: 'personal',
+      label: 'Tâche personnelle',
+      description: 'Une note ou une tâche pour moi-même',
+      icon: ListChecks,
+      accent: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
+      onClick: () => setIsAddTaskOpen(true),
+      visible: true,
+    },
+    {
+      key: 'team',
+      label: 'Tâche pour mon équipe',
+      description: 'Confier une tâche à un collaborateur (N-1)',
+      icon: UserCog,
+      accent: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
+      onClick: () => setIsNewTaskOpen(true),
+      visible: isManager,
+    },
+  ];
 
-  const handleOpenRequest = (task: Task, subProcessId?: string, processId?: string) => {
-    setSelectedProcessTemplateId(processId);
-    setSelectedSubProcessTemplateId(subProcessId);
-    setIsNewRequestOpen(true);
-  };
-
-  const handleViewRequest = (request: Task) => {
-    setSelectedRequest(request);
-    setIsDetailOpen(true);
-  };
-
-  // Collect all quick launch sub-processes with color index
-  const quickLaunchItems = useMemo(() => {
-    const items: { subProcess: SubProcessTemplate; processId: string; processName: string; colorIndex: number }[] = [];
-    for (let i = 0; i < processes.length; i++) {
-      const process = processes[i];
-      for (const sp of process.sub_processes) {
-        if (sp.show_quick_launch) {
-          items.push({ subProcess: sp, processId: process.id, processName: process.name, colorIndex: i });
-        }
-      }
-    }
-    return items;
-  }, [processes]);
-
-  const renderCreateTab = () => (
-    <div className="space-y-6">
-      {/* Draggable quick action cards */}
-      <DraggableActionCards
-        isManager={isManager}
-        quickLaunchItems={quickLaunchItems}
-        onPersonalTask={() => setIsAddTaskOpen(true)}
-        onTeamTask={() => setIsNewTaskOpen(true)}
-        onCustomRequest={() => setIsNewRequestOpen(true)}
-        onQuickLaunch={(subProcessId, processId) => handleOpenRequest(null as any, subProcessId, processId)}
-      />
-
-      {/* Service requests by process */}
-      {processes.length > 0 && (
-        <div className="space-y-5">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-primary/10">
-              <Building2 className="h-5 w-5 text-primary" />
-            </div>
-            <h3 className="text-lg font-bold tracking-tight">
-              Demandes aux services
-            </h3>
-            <Badge variant="secondary" className="ml-auto">
-              {processes.length} processus
-            </Badge>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {processes.map((process, index) => (
-              <ServiceProcessCard
-                key={process.id}
-                id={process.id}
-                name={process.name}
-                department={process.department}
-                subProcesses={process.sub_processes}
-                onCreateRequest={(processId) => handleOpenRequest(null as any, undefined, processId)}
-                onQuickLaunch={(processId, subProcessId) => handleOpenRequest(null as any, subProcessId, processId)}
-                colorIndex={index}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
-  const renderContent = () => {
-    if (isLoading) {
-      return (
-        <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      );
-    }
-
-    return (
-      <div className="space-y-6">
-        {/* Main tabs */}
-        <Tabs value={mainTab} onValueChange={setMainTab}>
-          <TabsList className="grid w-full max-w-md grid-cols-2">
-            <TabsTrigger value="create" className="gap-2">
-              <Plus className="h-4 w-4" />
-              Nouvelle demande
-            </TabsTrigger>
-            <TabsTrigger value="tracking" className="gap-2">
-              <Eye className="h-4 w-4" />
-              Suivi des demandes
-              {myRequests.length > 0 && (
-                <Badge variant="secondary" className="ml-1">
-                  {myRequests.length}
-                </Badge>
-              )}
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="create" className="mt-6">
-            {renderCreateTab()}
-          </TabsContent>
-
-          <TabsContent value="tracking" className="mt-6">
-            <ConfigurableDashboard
-              tasks={myRequests}
-              stats={dashboardStats}
-              globalProgress={globalProgress}
-              onTaskClick={handleViewRequest}
-            />
-          </TabsContent>
-        </Tabs>
-      </div>
-    );
-  };
+  const visibleActions = actions.filter((a) => a.visible);
 
   return (
     <DeadlineTasksOverrideProvider value={allTasks}>
-    <div className="flex h-screen bg-background">
-      <Sidebar 
-        activeView={activeView} 
-        onViewChange={setActiveView} 
-      />
-      
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header 
-          title="Demandes"
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
+      <div className="flex h-screen bg-background">
+        <Sidebar activeView={activeView} onViewChange={setActiveView} />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <Header
+            title="Demandes"
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+          />
+          <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-6">
+            <div className="space-y-6">
+              {/* En-tête + CTA suivi */}
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                  <h2 className="text-lg font-bold tracking-tight">Créer une demande</h2>
+                  <p className="text-xs text-muted-foreground">
+                    Choisis le type qui correspond à ton besoin
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => navigate('/mes-demandes')}
+                >
+                  Voir mes demandes
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+
+              {/* Grille des boutons */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {visibleActions.map((a) => {
+                  const Icon = a.icon;
+                  return (
+                    <button
+                      key={a.key}
+                      type="button"
+                      onClick={a.onClick}
+                      className="text-left transition-transform hover:-translate-y-0.5"
+                    >
+                      <Card className="border-border/60 hover:shadow-md hover:border-primary/40 h-full">
+                        <CardContent className="p-4 flex items-start gap-3">
+                          <div className={cn('p-2.5 rounded-xl shrink-0', a.accent)}>
+                            <Icon className="h-5 w-5" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold text-sm truncate">{a.label}</p>
+                            <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                              {a.description}
+                            </p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </main>
+        </div>
+
+        {/* ── Dialogs ──────────────────────────────────────────────────────── */}
+        <NewBERequestDialog
+          open={isBERequestOpen}
+          onOpenChange={setIsBERequestOpen}
+          onCreated={handleCreated}
         />
-        
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-6">
-          {renderContent()}
-        </main>
+
+        <NewSupplierRequestDialog
+          open={isSupplierOpen}
+          onClose={() => setIsSupplierOpen(false)}
+        />
+
+        <AddTaskDialog
+          open={isAddTaskOpen}
+          onClose={() => setIsAddTaskOpen(false)}
+          onAdd={addTask}
+        />
+
+        <NewTaskDialog
+          open={isNewTaskOpen}
+          onClose={() => setIsNewTaskOpen(false)}
+          mode="team"
+          onAdd={addTask}
+        />
+
+        <NewRequestDialog
+          open={isNewRequestOpen}
+          onClose={handleCloseNewRequestDialog}
+          onAdd={addTask}
+          initialProcessTemplateId={selectedProcessTemplateId}
+          initialSubProcessTemplateId={selectedSubProcessTemplateId}
+          onTasksCreated={handleCreated}
+        />
       </div>
-
-      {/* Dialogs */}
-      <AddTaskDialog
-        open={isAddTaskOpen}
-        onClose={() => setIsAddTaskOpen(false)}
-        onAdd={addTask}
-      />
-      
-      <NewTaskDialog
-        open={isNewTaskOpen}
-        onClose={() => setIsNewTaskOpen(false)}
-        mode="team"
-        onAdd={addTask}
-      />
-      
-      <NewRequestDialog
-        open={isNewRequestOpen}
-        onClose={handleCloseNewRequestDialog}
-        onAdd={addTask}
-        initialProcessTemplateId={selectedProcessTemplateId}
-        initialSubProcessTemplateId={selectedSubProcessTemplateId}
-        onTasksCreated={handleRefresh}
-      />
-
-      {selectedRequest && (
-        <RequestDetailDialog
-          task={selectedRequest}
-          open={isDetailOpen}
-          onClose={() => {
-            setIsDetailOpen(false);
-            setSelectedRequest(null);
-            handleRefresh();
-          }}
-          onStatusChange={handleRequestStatusChange}
-          onTaskMutated={handleRefresh}
-        />
-      )}
-    </div>
     </DeadlineTasksOverrideProvider>
   );
 };

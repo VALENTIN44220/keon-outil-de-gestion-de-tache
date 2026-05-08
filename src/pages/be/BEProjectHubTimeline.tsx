@@ -118,7 +118,7 @@ export default function BEProjectHubTimeline() {
         </Card>
 
         {/* Timeline */}
-        {mode === 'affaires' ? (
+        {mode === 'affaires' && (
           <BEAffairesTimeline
             projectId={project.id}
             zoom={zoomAffaires}
@@ -131,7 +131,8 @@ export default function BEProjectHubTimeline() {
             onCustomEndChange={setCustomEnd}
             searchQuery={searchQuery}
           />
-        ) : (
+        )}
+        {mode === 'tasks' && (
           <BEProjectGantt
             tasks={tasks}
             project={project}

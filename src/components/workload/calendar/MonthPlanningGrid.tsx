@@ -71,6 +71,7 @@
    showOutlookEvents?: boolean;
    onTaskClick: (task: Task, slots: WorkloadSlot[]) => void;
    onSlotDrop: (taskId: string, userId: string, date: string, halfDay: 'morning' | 'afternoon', duration: number) => Promise<void>;
+   onSlotMove?: (slotIds: string[], dayOffset: number, newUserId?: string) => Promise<void>;
    dropTarget: { userId: string; date: string; halfDay: 'morning' | 'afternoon' } | null;
    onDragOver: (userId: string, date: string, halfDay: 'morning' | 'afternoon') => void;
    onDragLeave: () => void;
@@ -96,6 +97,7 @@ interface DayTask {
    showOutlookEvents = true,
    onTaskClick,
    onSlotDrop,
+   onSlotMove,
    dropTarget,
    onDragOver,
    onDragLeave,
@@ -303,15 +305,37 @@ interface DayTask {
    
    const handleDrop = async (e: React.DragEvent, date: string) => {
      e.preventDefault();
+
+     // Cas 1 — déplacement de slots existants (drag depuis pill du calendrier)
+     const moveRaw = e.dataTransfer.getData('application/x-slot-move');
+     if (moveRaw && onSlotMove) {
+       try {
+         const payload = JSON.parse(moveRaw) as {
+           slotIds: string[];
+           firstDate: string;
+           originUserId: string;
+         };
+         const targetUserId = selectedMembers.size === 1
+           ? Array.from(selectedMembers)[0]
+           : payload.originUserId;
+         const { differenceInDays, parseISO } = await import('date-fns');
+         const offset = differenceInDays(parseISO(date), parseISO(payload.firstDate));
+         const newUserId = payload.originUserId !== targetUserId ? targetUserId : undefined;
+         await onSlotMove(payload.slotIds, offset, newUserId);
+       } catch (err) {
+         console.warn('[MonthPlanningGrid] slot-move failed', err);
+       }
+       onDragLeave();
+       return;
+     }
+
+     // Cas 2 — nouveau slot depuis le backlog
      const taskId = e.dataTransfer.getData('taskId');
      const duration = parseInt(e.dataTransfer.getData('duration') || '2', 10);
-     
      if (taskId) {
-       // If only one member selected, assign to them
-       const targetUserId = selectedMembers.size === 1 
-         ? Array.from(selectedMembers)[0] 
+       const targetUserId = selectedMembers.size === 1
+         ? Array.from(selectedMembers)[0]
          : workloadData[0]?.memberId;
-       
        if (targetUserId) {
          await onSlotDrop(taskId, targetUserId, date, 'morning', duration);
        }
@@ -515,8 +539,20 @@ interface DayTask {
                               <div
                                 draggable
                                 onDragStart={(e) => {
+                                  if (slots.length > 0) {
+                                    const sorted = [...slots].sort((a, b) => a.date.localeCompare(b.date));
+                                    e.dataTransfer.setData(
+                                      'application/x-slot-move',
+                                      JSON.stringify({
+                                        slotIds: slots.map(s => s.id),
+                                        firstDate: sorted[0].date,
+                                        originUserId: sorted[0].user_id,
+                                      }),
+                                    );
+                                  }
                                   e.dataTransfer.setData('taskId', task.id);
                                   e.dataTransfer.setData('duration', String(slots.length || 2));
+                                  e.dataTransfer.effectAllowed = 'move';
                                 }}
                                 onClick={() => onTaskClick(task, slots)}
                                 className={cn(

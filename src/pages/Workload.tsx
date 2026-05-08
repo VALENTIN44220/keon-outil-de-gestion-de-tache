@@ -86,6 +86,7 @@ export default function Workload() {
     addMultipleSlots,
     removeSlot,
     moveSlot,
+    moveSlotsWithOffset,
     segmentTaskSlots,
     isHalfDayAvailable,
     getTaskSlotsCount,
@@ -188,16 +189,24 @@ export default function Workload() {
     }
   };
 
-  // Get task duration in half-days (from existing slots or default)
+  // Get task duration in half-days (slots existants > duration_hours > défaut 2)
+  // Pour les tâches BE, `duration_hours` est saisi par le manager dans le dispatch
+  // → on l'utilise comme taille de drag par défaut (1 demi-journée = 4h).
   const getTaskDuration = useCallback((taskId: string): number | null => {
-    // First check if task already has slots - use that count as duration
+    // 1. Slots déjà posés → on conserve cette taille pour la cohérence
     const existingSlotCount = slots.filter(s => s.task_id === taskId).length;
     if (existingSlotCount > 0) {
       return existingSlotCount;
     }
-    // Default to 2 half-days (1 day) for new tasks
+    // 2. Estimation `duration_hours` portée par la tâche (typiquement BE)
+    const t = tasks.find(t => t.id === taskId) as any;
+    const durationHours = t?.duration_hours;
+    if (typeof durationHours === 'number' && durationHours > 0) {
+      return Math.max(1, Math.ceil(durationHours / 4));
+    }
+    // 3. Défaut : 2 demi-journées (= 1 jour)
     return 2;
-  }, [slots]);
+  }, [slots, tasks]);
 
   // Get task progress from checklists (placeholder - needs checklist data)
   const getTaskProgress = useCallback((taskId: string): { completed: number; total: number } | null => {
@@ -452,6 +461,7 @@ export default function Workload() {
                     }}
                      onSlotAdd={handleAddSlot}
                      onMultiSlotAdd={handleAddMultipleSlots}
+                     onSlotMove={moveSlotsWithOffset}
                      onReassignTask={reassignTaskSlots}
                      isHalfDayAvailable={isHalfDayAvailable}
                      checkSlotLeaveConflict={checkSlotLeaveConflict}
