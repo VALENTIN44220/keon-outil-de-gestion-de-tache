@@ -572,8 +572,8 @@ interface DayTask {
                                   <Flag className="h-2.5 w-2.5 shrink-0 text-current opacity-70" />
                                 )}
 
-                                {/* Title */}
-                                <span className="truncate flex-1 font-medium">{task.title}</span>
+                                {/* Title - 2 lignes max pour eviter la troncature aggressive */}
+                                <span className="line-clamp-2 break-words leading-tight flex-1 font-medium">{task.title}</span>
 
                                 {/* User avatar (team view) */}
                                 {selectedMembers.size !== 1 && (
@@ -660,7 +660,7 @@ interface DayTask {
                                     >
                                       <div className={cn("w-2 h-2 rounded-full shrink-0", priorityDot)} />
                                        <div className="flex-1 min-w-0">
-                                         <div className="text-xs font-medium truncate">{task.title}</div>
+                                         <div className="text-xs font-medium line-clamp-2 break-words leading-tight">{task.title}</div>
                                          <div className="text-[10px] text-muted-foreground flex items-center gap-1">
                                            <Clock className="h-3 w-3" />
                                            {getStatusLabel(task.status)}

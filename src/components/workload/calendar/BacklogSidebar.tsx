@@ -75,10 +75,12 @@
    const [detailTask, setDetailTask] = useState<Task | null>(null);
  
    const availableTasks = useMemo(() => {
-    return (tasks || []).filter(t => 
-       t.status !== 'done' && 
-       t.status !== 'validated' && 
-      !(plannedTaskIds || []).includes(t.id)
+    return (tasks || []).filter(t =>
+       t.status !== 'done' &&
+       t.status !== 'validated' &&
+      !(plannedTaskIds || []).includes(t.id) &&
+      // Exclure les taches verrouillees par dependance (parent non termine)
+      !((t as any).is_dependency_locked === true)
      );
    }, [tasks, plannedTaskIds]);
  

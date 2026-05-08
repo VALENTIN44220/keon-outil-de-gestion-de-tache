@@ -692,7 +692,7 @@ interface TaskPill {
                                >
                                  <div className={cn("w-2 h-2 rounded-full shrink-0", priority.dot)} />
                                  {hasConflict && <AlertTriangle className="h-3.5 w-3.5 text-orange-500 shrink-0" />}
-                                 <span className="truncate flex-1 font-semibold">{task.title}</span>
+                                 <span className="line-clamp-2 break-words leading-tight flex-1 font-semibold">{task.title}</span>
                                  {durationDays >= 1 && (
                                    <Badge variant="outline" className="shrink-0 text-[10px] px-1.5 py-0 h-5 bg-background/50">
                                      <Clock className="h-3 w-3 mr-0.5" />

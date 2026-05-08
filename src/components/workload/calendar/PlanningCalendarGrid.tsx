@@ -808,7 +808,7 @@ import { YearPlanningGrid } from './YearPlanningGrid';
                                    onMouseLeave={() => setHoveredTask(null)}
                                  >
                                    {hasConflict && <AlertTriangle className="h-3 w-3 shrink-0" />}
-                                   <span className="truncate flex-1">{task.title}</span>
+                                   <span className="line-clamp-2 break-words leading-tight flex-1">{task.title}</span>
                                    {slots.length > 1 && (
                                      <span className="text-[10px] opacity-80 shrink-0">
                                        {Math.ceil(slots.length / 2)}j

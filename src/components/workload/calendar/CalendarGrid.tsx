@@ -783,7 +783,7 @@ function HalfDayCell({
                   )}
                 >
                   <Clock className="h-3 w-3 shrink-0 opacity-70" />
-                  <span className="truncate">{task?.title || 'Tâche'}</span>
+                  <span className="line-clamp-2 break-words leading-tight">{task?.title || 'Tâche'}</span>
                 </div>
               </TooltipTrigger>
               <TooltipContent side="top" className="max-w-xs">
