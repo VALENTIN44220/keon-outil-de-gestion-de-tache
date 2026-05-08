@@ -131,6 +131,8 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
   const [departments, setDepartments] = useState<Map<string, string>>(new Map());
   const [processName, setProcessName] = useState<string | null>(null);
   const [beProject, setBeProject] = useState<{ code_projet: string; nom_projet: string } | null>(null);
+  const [beLabel, setBeLabel] = useState<{ code: string; name: string; color: string | null } | null>(null);
+  const [beAffaire, setBeAffaire] = useState<{ code_affaire: string; libelle: string } | null>(null);
   /** Demandeur / rapporteur hérités de la demande parente quand la tâche ne les a pas en colonne. */
   const [parentRequestPersonIds, setParentRequestPersonIds] = useState<{
     requester_id: string | null;
@@ -291,6 +293,32 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
         setBeProject(bePrj ?? null);
       } else {
         setBeProject(null);
+      }
+
+      // Fetch BE label (libelle de tache : ex 'Agrement sanitaire')
+      const beLabelId = (task as any).be_label_id;
+      if (beLabelId) {
+        const { data: lbl } = await (supabase as any)
+          .from('be_task_labels')
+          .select('code, name, color')
+          .eq('id', beLabelId)
+          .maybeSingle();
+        setBeLabel(lbl ?? null);
+      } else {
+        setBeLabel(null);
+      }
+
+      // Fetch BE affaire (sous-affaire d'un projet)
+      const beAffaireId = (task as any).be_affaire_id;
+      if (beAffaireId) {
+        const { data: aff } = await (supabase as any)
+          .from('be_affaires')
+          .select('code_affaire, libelle')
+          .eq('id', beAffaireId)
+          .maybeSingle();
+        setBeAffaire(aff ?? null);
+      } else {
+        setBeAffaire(null);
       }
     } catch (error) {
       console.error('Error fetching related data:', error);
@@ -1013,6 +1041,45 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
                 >
                   {beProject.code_projet} — {beProject.nom_projet}
                 </Button>
+              </div>
+            )}
+            {/* Sous-affaire BE (affichee si differente du projet principal) */}
+            {beAffaire && (
+              <div className="flex items-center gap-2 col-span-2">
+                <span className="text-muted-foreground shrink-0">Sous-affaire BE:</span>
+                <Badge variant="outline" className="text-xs font-mono">{beAffaire.code_affaire}</Badge>
+                <span className="text-sm">{beAffaire.libelle}</span>
+              </div>
+            )}
+            {/* Libelle BE (type de tache : Agrement sanitaire, Permis de construire, etc.) */}
+            {beLabel && (
+              <div className="flex items-center gap-2 col-span-2">
+                <span className="text-muted-foreground shrink-0">Libellé BE:</span>
+                <Badge
+                  variant="outline"
+                  className="text-xs font-medium"
+                  style={beLabel.color ? { borderColor: beLabel.color, color: beLabel.color } : undefined}
+                >
+                  {beLabel.code} — {beLabel.name}
+                </Badge>
+              </div>
+            )}
+            {/* Urgence BE (if set) */}
+            {(task as any).be_urgency && (
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Urgence:</span>
+                {(() => {
+                  const u = (task as any).be_urgency as string;
+                  const cfg: Record<string, { label: string; cls: string }> = {
+                    'standard': { label: 'Standard', cls: 'bg-slate-100 text-slate-700 border-slate-300' },
+                    'urgent': { label: 'Urgent', cls: 'bg-orange-100 text-orange-800 border-orange-300' },
+                    'critique': { label: 'Critique', cls: 'bg-red-100 text-red-800 border-red-300' },
+                    'low': { label: 'Faible', cls: 'bg-emerald-100 text-emerald-700 border-emerald-300' },
+                  };
+                  const c = cfg[u] ?? { label: u, cls: 'bg-amber-100 text-amber-800 border-amber-300' };
+                  return <Badge variant="outline" className={cn('text-xs font-medium', c.cls)}>{c.label}</Badge>;
+                })()}
               </div>
             )}
             {task.it_project_id && (
