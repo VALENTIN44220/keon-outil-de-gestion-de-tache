@@ -395,119 +395,11 @@ export function NewTaskDialog({ open, onClose, mode, onAdd, onTasksCreated }: Ne
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-          {/* Creation mode selection */}
-          <div className="space-y-3">
-            <Label>Comment souhaitez-vous créer cette tâche ?</Label>
-            <RadioGroup
-              value={creationMode}
-              onValueChange={(v) => setCreationMode(v as CreationMode)}
-              className="grid grid-cols-3 gap-4"
-            >
-              <Label
-                htmlFor="empty"
-                className={`flex flex-col items-center gap-2 p-4 border rounded-lg cursor-pointer transition-colors ${
-                  creationMode === 'empty' ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'
-                }`}
-              >
-                <RadioGroupItem value="empty" id="empty" className="sr-only" />
-                <FileText className="h-8 w-8 text-muted-foreground" />
-                <span className="font-medium text-sm">Tâche vide</span>
-              </Label>
-              
-              <Label
-                htmlFor="template"
-                className={`flex flex-col items-center gap-2 p-4 border rounded-lg cursor-pointer transition-colors ${
-                  creationMode === 'template' ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'
-                }`}
-              >
-                <RadioGroupItem value="template" id="template" className="sr-only" />
-                <FileText className="h-8 w-8 text-muted-foreground" />
-                <span className="font-medium text-sm">Depuis un modèle</span>
-              </Label>
-              
-              <Label
-                htmlFor="process"
-                className={`flex flex-col items-center gap-2 p-4 border rounded-lg cursor-pointer transition-colors ${
-                  creationMode === 'process' ? 'border-primary bg-primary/5' : 'hover:bg-muted/50'
-                }`}
-              >
-                <RadioGroupItem value="process" id="process" className="sr-only" />
-                <Workflow className="h-8 w-8 text-muted-foreground" />
-                <span className="font-medium text-sm">Processus complet</span>
-              </Label>
-            </RadioGroup>
-          </div>
+          {/* Selecteur de mode (Tache vide / Depuis un modele / Processus complet)
+              SUPPRIME : seul le mode 'Tache vide' existe encore. */}
 
-          {/* Template selection */}
-          {creationMode === 'template' && (
-            <div className="space-y-2">
-              <Label>Sélectionner un modèle de tâche</Label>
-              {isLoadingTemplates ? (
-                <div className="flex items-center justify-center py-4">
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                </div>
-              ) : (
-                <Select value={selectedTemplateId || ''} onValueChange={setSelectedTemplateId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choisir un modèle..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {taskTemplates.map(template => (
-                      <SelectItem key={template.id} value={template.id}>
-                        {template.title}
-                        {template.priority && (
-                          <Badge variant="outline" className="ml-2">
-                            {template.priority}
-                          </Badge>
-                        )}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-          )}
-
-          {/* Process selection */}
-          {creationMode === 'process' && (
-            <div className="space-y-2">
-              <Label>Sélectionner un processus</Label>
-              {isLoadingTemplates ? (
-                <div className="flex items-center justify-center py-4">
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                </div>
-              ) : (
-                <Select value={selectedProcessId || ''} onValueChange={setSelectedProcessId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Choisir un processus..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {processes.map(process => (
-                      <SelectItem key={process.id} value={process.id}>
-                        {process.name}
-                        <Badge variant="secondary" className="ml-2">
-                          {process.task_templates.length} tâches
-                        </Badge>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-              {selectedProcessId && (
-                <div className="mt-2 p-3 bg-muted/50 rounded-lg">
-                  <p className="text-sm text-muted-foreground mb-2">Tâches à créer :</p>
-                  <ul className="text-sm space-y-1">
-                    {processes.find(p => p.id === selectedProcessId)?.task_templates.map((t, i) => (
-                      <li key={t.id}>• {t.title}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Task form (for empty or template mode) */}
-          {(creationMode === 'empty' || creationMode === 'template') && (
+          {/* Task form */}
+          {(creationMode === 'empty') && (
             <>
               <div className="space-y-2">
                 <Label htmlFor="title">Titre *</Label>
@@ -643,14 +535,11 @@ export function NewTaskDialog({ open, onClose, mode, onAdd, onTasksCreated }: Ne
             <Button type="button" variant="outline" onClick={onClose}>
               Annuler
             </Button>
-            <Button 
+            <Button
               type="submit"
-              disabled={
-                (creationMode !== 'process' && !title.trim()) ||
-                (creationMode === 'process' && !selectedProcessId)
-              }
+              disabled={!title.trim()}
             >
-              {creationMode === 'process' ? 'Créer les tâches' : 'Créer la tâche'}
+              Créer la tâche
             </Button>
           </div>
         </form>
