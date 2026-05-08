@@ -909,7 +909,10 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange, onTas
               <Badge variant="secondary">Demande</Badge>
             )}
           </div>
-          <DialogTitle className="text-xl mt-2">{task.title}</DialogTitle>
+          <DialogTitle className="text-xl mt-2">
+            {/* Le numero est deja affiche en badge, on retire le prefixe redondant. */}
+            {(task.title ?? '').replace(/^([TD]-[A-Z][A-Z0-9-]*\d+\s*—\s*)+/, '')}
+          </DialogTitle>
         </DialogHeader>
 
         {isLoading ? (
