@@ -242,7 +242,31 @@ export function BEProjectGantt({
 
   const today = new Date();
   const todayIndex = differenceInDays(today, dateRange.start);
-  const leftPanelWidth = 400;
+  // Largeur du panneau gauche : redimensionnable a la souris, persistee en localStorage
+  const [leftPanelWidth, setLeftPanelWidth] = useState<number>(() => {
+    if (typeof window === 'undefined') return 400;
+    const saved = window.localStorage.getItem('be-gantt-left-panel-width');
+    const n = saved ? parseInt(saved, 10) : 400;
+    return isNaN(n) ? 400 : Math.max(220, Math.min(900, n));
+  });
+  const startResizing = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = leftPanelWidth;
+    let lastW = startW;
+    const onMove = (ev: MouseEvent) => {
+      const next = Math.max(220, Math.min(900, startW + (ev.clientX - startX)));
+      lastW = next;
+      setLeftPanelWidth(next);
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      try { window.localStorage.setItem('be-gantt-left-panel-width', String(lastW)); } catch {}
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
 
   return (
     <TooltipProvider>
@@ -325,9 +349,9 @@ export function BEProjectGantt({
         </div>
 
         {/* Gantt Grid */}
-        <div className="flex overflow-hidden">
+        <div className="flex overflow-hidden relative">
           {/* Left Panel - Tasks List */}
-          <div 
+          <div
             className="flex-shrink-0 border-r bg-card z-10"
             style={{ width: leftPanelWidth }}
           >
@@ -419,6 +443,15 @@ export function BEProjectGantt({
                 })
               )}
             </ScrollArea>
+          </div>
+
+          {/* Drag handle pour redimensionner le panneau gauche */}
+          <div
+            onMouseDown={startResizing}
+            className="w-1.5 cursor-col-resize bg-border hover:bg-primary/40 active:bg-primary transition-colors flex-shrink-0 relative group"
+            title="Glisser pour redimensionner"
+          >
+            <div className="absolute inset-y-0 -left-1 -right-1" />
           </div>
 
           {/* Right Panel - Timeline */}
