@@ -358,6 +358,7 @@ export function ModuleDispatchView<
                   contextId={config.contextId}
                   defaultCollapsed={true}
                   isAdmin={isAdmin}
+                  disableAutoApplyDefault={true}
                 />
 
                 <Card>

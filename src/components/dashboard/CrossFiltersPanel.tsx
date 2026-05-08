@@ -51,6 +51,12 @@ interface CrossFiltersPanelProps {
   onVisibleColumnsChange?: (cols: string[]) => void;
   /** Whether the current user is admin (can set global presets) */
   isAdmin?: boolean;
+  /**
+   * Si true : ne pas auto-appliquer le preset global par defaut au premier
+   * chargement. Utile pour les dispatchs modules dont les statuts metier
+   * ne correspondent pas au preset global "Affaires non terminees".
+   */
+  disableAutoApplyDefault?: boolean;
 }
 
 const PERIODS = [
@@ -220,6 +226,7 @@ export function CrossFiltersPanel({
   onVisibleColumnsChange,
   isAdmin,
   defaultCollapsed = false,
+  disableAutoApplyDefault = false,
 }: CrossFiltersPanelProps) {
   const { user } = useAuth();
   const [collapsed, setCollapsed] = useState(() => defaultCollapsed);
@@ -322,7 +329,7 @@ export function CrossFiltersPanel({
         setPresets(allPresets);
         // Auto-apply default preset ONLY on first load per context
         const contextKey = `${user.id}_${processId ?? '__global__'}${contextId ? `_${contextId}` : ''}`;
-        if (!appliedDefaultContexts.has(contextKey)) {
+        if (!disableAutoApplyDefault && !appliedDefaultContexts.has(contextKey)) {
           // Priority: user's own default > global standard
           const userDefault = allPresets.find((p: FilterPreset) => p.is_default && p.user_id === user.id);
           const globalDefault = allPresets.find((p: FilterPreset) => p.is_global);
