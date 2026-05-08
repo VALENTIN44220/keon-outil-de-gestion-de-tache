@@ -177,8 +177,12 @@ export function DenseTableView({ tasks, onStatusChange, onDelete, progressMap, o
     switch (colKey) {
       case 'request_number':
         return <span className="font-mono text-xs text-muted-foreground">{task.request_number || task.task_number || '—'}</span>;
-      case 'title':
-        return <span className="font-medium text-foreground truncate max-w-[280px] block">{task.title}</span>;
+      case 'title': {
+        // Le N° (T-XXXX-XXXX / D-XXXX-XXXX) est deja affiche dans la colonne 'request_number'.
+        // On retire le prefixe redondant du titre pour gagner en lisibilite.
+        const cleanTitle = (task.title ?? '').replace(/^([TD]-[A-Z][A-Z0-9-]*\d+\s*—\s*)+/, '');
+        return <span className="font-medium text-foreground truncate max-w-[280px] block" title={task.title}>{cleanTitle}</span>;
+      }
       case 'status':
         return <Badge variant="outline" className={cn('text-[10px] px-1.5 py-0', STATUS_COLORS[task.status])}>{STATUS_LABELS[task.status] || task.status}</Badge>;
       case 'priority':

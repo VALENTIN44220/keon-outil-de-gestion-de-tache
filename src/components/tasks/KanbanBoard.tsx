@@ -213,7 +213,8 @@ function KanbanTaskCard({ task, onStatusChange, onDelete, taskProgress, onTaskUp
           "text-sm font-medium leading-snug mb-2 line-clamp-2",
           task.status === 'done' && "line-through text-muted-foreground"
         )}>
-          {task.title}
+          {/* Le n° de tache est deja affiche en badge ci-dessus, on retire le prefixe redondant */}
+          {(task.title ?? '').replace(/^([TD]-[A-Z][A-Z0-9-]*\d+\s*—\s*)+/, '')}
         </h4>
 
         {/* Progress bar if available */}
