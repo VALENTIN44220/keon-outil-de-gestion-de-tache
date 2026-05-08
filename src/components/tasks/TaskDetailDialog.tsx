@@ -957,17 +957,14 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
                 )}
               </span>
             </div>
-            <div className="flex items-center gap-2">
-              <User className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Rapporteur:</span>
-              <span>
-                {displayReporterId ? (
-                  profiles.get(displayReporterId) || 'N/A'
-                ) : (
-                  <span className="italic text-muted-foreground">—</span>
-                )}
-              </span>
-            </div>
+            {/* Rapporteur : affiche seulement si renseigne (sinon redondant avec Demandeur) */}
+            {displayReporterId && displayReporterId !== displayRequesterId && (
+              <div className="flex items-center gap-2">
+                <User className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Rapporteur:</span>
+                <span>{profiles.get(displayReporterId) || 'N/A'}</span>
+              </div>
+            )}
             {task.reassignment_stakeholder_id && (
               <div className="flex items-center gap-2">
                 <UserRoundPlus className="h-4 w-4 text-muted-foreground" />
@@ -977,15 +974,20 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
                 </span>
               </div>
             )}
-            <div className="flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Service:</span>
-              <span>{task.target_department_id ? departments.get(task.target_department_id) || 'N/A' : <span className="italic text-muted-foreground">—</span>}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-muted-foreground">Catégorie:</span>
-              {task.category ? <Badge variant="outline">{task.category}</Badge> : <span className="italic text-muted-foreground">—</span>}
-            </div>
+            {/* Service / Categorie : affiches seulement si renseignes */}
+            {task.target_department_id && (
+              <div className="flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Service:</span>
+                <span>{departments.get(task.target_department_id) || 'N/A'}</span>
+              </div>
+            )}
+            {task.category && (
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">Catégorie:</span>
+                <Badge variant="outline">{task.category}</Badge>
+              </div>
+            )}
             {/* ── Section BE ── */}
             {task.be_status && (
               <div className="flex items-center gap-2">
@@ -1026,26 +1028,34 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
                 />
               </div>
             )}
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Début:</span>
-              <span>{task.start_date ? format(new Date(task.start_date), 'dd MMMM yyyy', { locale: fr }) : <span className="italic text-muted-foreground">—</span>}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Échéance:</span>
-              <span>{task.due_date ? format(new Date(task.due_date), 'dd MMMM yyyy', { locale: fr }) : <span className="italic text-muted-foreground">—</span>}</span>
-            </div>
+            {/* Dates : affiche seulement celles qui ont une valeur. Doublons evites. */}
+            {task.start_date && (
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Début:</span>
+                <span>{format(new Date(task.start_date), 'dd MMMM yyyy', { locale: fr })}</span>
+              </div>
+            )}
+            {task.due_date && (
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Échéance:</span>
+                <span>{format(new Date(task.due_date), 'dd MMMM yyyy', { locale: fr })}</span>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground">Créée le:</span>
               <span>{format(new Date(task.created_at), 'dd MMMM yyyy', { locale: fr })}</span>
             </div>
-            <div className="flex items-center gap-2">
-              <CalendarClock className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Date d'ouverture:</span>
-              <span>{format(new Date(task.date_demande || task.created_at), 'dd MMMM yyyy', { locale: fr })}</span>
-            </div>
+            {/* Date d'ouverture = date_demande, on ne montre que si elle differe de created_at */}
+            {task.date_demande && task.date_demande.slice(0, 10) !== task.created_at.slice(0, 10) && (
+              <div className="flex items-center gap-2">
+                <CalendarClock className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Date de demande:</span>
+                <span>{format(new Date(task.date_demande), 'dd MMMM yyyy', { locale: fr })}</span>
+              </div>
+            )}
             {(task.status === 'done' || task.status === 'validated') && (task.date_fermeture || task.updated_at) && (
               <div className="flex items-center gap-2">
                 <CalendarCheck className="h-4 w-4 text-success" />
@@ -1053,16 +1063,13 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
                 <span className="text-success">{format(new Date(task.date_fermeture || task.updated_at), 'dd MMMM yyyy', { locale: fr })}</span>
               </div>
             )}
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Date de demande:</span>
-              <span>{task.date_demande ? format(new Date(task.date_demande), 'dd MMMM yyyy', { locale: fr }) : <span className="italic text-muted-foreground">—</span>}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">Date de lancement:</span>
-              <span>{task.date_lancement ? format(new Date(task.date_lancement), 'dd MMMM yyyy', { locale: fr }) : <span className="italic text-muted-foreground">—</span>}</span>
-            </div>
+            {task.date_lancement && (
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">Date de lancement:</span>
+                <span>{format(new Date(task.date_lancement), 'dd MMMM yyyy', { locale: fr })}</span>
+              </div>
+            )}
           </div>
 
           {canShowReassignRoot && (
