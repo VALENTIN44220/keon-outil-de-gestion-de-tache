@@ -20,7 +20,15 @@ export function useMaterialValidation() {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        // Tente de recuperer le vrai message d'erreur depuis la reponse
+        const ctx = (error as any).context;
+        const detail = (data as any)?.error
+          ?? (ctx?.body && typeof ctx.body === 'string' ? ctx.body : null)
+          ?? (await ctx?.json?.().catch(() => null))?.error
+          ?? error.message;
+        throw new Error(detail);
+      }
       toast.success('Demande validée — tâche de commande créée');
       return true;
     } catch (error) {
@@ -44,7 +52,14 @@ export function useMaterialValidation() {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        const ctx = (error as any).context;
+        const detail = (data as any)?.error
+          ?? (ctx?.body && typeof ctx.body === 'string' ? ctx.body : null)
+          ?? (await ctx?.json?.().catch(() => null))?.error
+          ?? error.message;
+        throw new Error(detail);
+      }
       toast.success('Demande refusée');
       return true;
     } catch (error) {
