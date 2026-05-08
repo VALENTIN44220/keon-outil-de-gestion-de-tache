@@ -173,7 +173,12 @@ serve(async (req) => {
 
       if (taskError) {
         console.error("Error creating task:", taskError);
-        return new Response(JSON.stringify({ error: "Failed to create task" }), {
+        return new Response(JSON.stringify({
+          error: `Failed to create task: ${taskError.message}`,
+          code: taskError.code,
+          details: taskError.details,
+          hint: taskError.hint,
+        }), {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
