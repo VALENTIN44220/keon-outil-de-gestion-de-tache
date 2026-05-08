@@ -17,12 +17,12 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Monitor, Save, X, Paperclip, Link as LinkIcon, Trash2 } from 'lucide-react';
+import { Monitor, Save, X, Paperclip, Link as LinkIcon, Trash2, FileDown, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSimulation } from '@/contexts/SimulationContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { IT_PRESTATIONS } from '@/hooks/useITRequests';
+import { IT_PRESTATIONS, IT_PRESTATIONS_REQUIRING_CDC, IT_CDC_TEMPLATE_URL } from '@/hooks/useITRequests';
 import { useITProjects } from '@/hooks/useITProjects';
 import { useEffect } from 'react';
 
@@ -70,6 +70,7 @@ export default function NewITRequest() {
   const isDivalto = prestation?.name === 'Support Divalto';
   const isPipedrive = prestation?.name === 'Support Pipedrive';
   const isIntervention = prestation?.name === "Demande d'intervention IT";
+  const requiresCdc = !!prestationId && IT_PRESTATIONS_REQUIRING_CDC.includes(prestationId);
 
   // Cascade : sous-categorie selon le logiciel choisi
   const SOUS_CATEGORIES: Record<string, string[]> = {
@@ -84,7 +85,9 @@ export default function NewITRequest() {
     prestationId &&
     description.trim().length > 0 &&
     (!isSharePoint || (nomDossierSp.trim() && emailsAcces.trim())) &&
-    (!isIntervention || (logicielConcerne && (!hasSousCategorie || logicielSousCategorie)));
+    (!isIntervention || (logicielConcerne && (!hasSousCategorie || logicielSousCategorie))) &&
+    // Pour les prestations qui exigent un CDC : il doit etre joint
+    (!requiresCdc || attachments.length > 0);
 
   const handleSubmit = async () => {
     if (!profile?.id || !user || !canSubmit || !prestation) return;
@@ -167,6 +170,27 @@ export default function NewITRequest() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* Bandeau CDC obligatoire pour Application dediee */}
+                {requiresCdc && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
+                    <div className="flex items-center gap-2 text-amber-900 text-sm font-medium">
+                      <AlertCircle className="h-4 w-4" /> CDC obligatoire pour cette prestation
+                    </div>
+                    <p className="text-xs text-amber-800">
+                      Telecharge le modele, complete-le, puis joins-le ci-dessous (champ Pieces jointes).
+                      Sans CDC rempli en piece jointe, la demande ne pourra pas etre soumise.
+                    </p>
+                    <a
+                      href={IT_CDC_TEMPLATE_URL}
+                      download
+                      className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+                    >
+                      <FileDown className="h-4 w-4" />
+                      Télécharger le modèle de CDC (cdc_keon_v0.docx)
+                    </a>
+                  </div>
+                )}
 
                 <div>
                   <Label>Description / contexte *</Label>

@@ -33,9 +33,19 @@ export const IT_PRESTATIONS = [
   { id: '11111111-1111-4111-8111-111111111303', name: 'Support Pipedrive' },
   { id: '11111111-1111-4111-8111-111111111304', name: 'Support Lucca' },
   { id: '11111111-1111-4111-8111-111111111305', name: 'Reporting Power BI' },
+  { id: '11111111-1111-4111-8111-111111111309', name: 'Reporting hors Power BI' },
+  { id: '11111111-1111-4111-8111-111111111310', name: 'Application dédiée' },
   { id: '11111111-1111-4111-8111-111111111306', name: "Demande d'intervention IT" },
   { id: '11111111-1111-4111-8111-111111111307', name: 'Support matériel bureautique' },
 ];
+
+/** Process_templates qui exigent un CDC rempli en piece jointe a la demande */
+export const IT_PRESTATIONS_REQUIRING_CDC: string[] = [
+  '11111111-1111-4111-8111-111111111310', // Application dédiée
+];
+
+/** URL du modele de CDC (statique, dans /public/templates) */
+export const IT_CDC_TEMPLATE_URL = '/templates/cdc_keon_v0.docx';
 
 /**
  * Equipe IT/Digital — peut etre re-assigne d une demande IT a l autre.

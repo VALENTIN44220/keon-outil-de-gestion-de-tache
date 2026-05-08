@@ -388,7 +388,8 @@ export function BEProjectGantt({
                                   </span>
                                 )}
                                 <span className="text-sm truncate" title={task.title}>
-                                  {task.title}
+                                  {/* On retire le prefixe (T-CERE-XXXX — / D-CERE-XXXX — ) deja affiche dans le badge a gauche */}
+                                  {(task.title ?? '').replace(/^([TD]-[A-Z][A-Z0-9-]*\d+\s*—\s*)+/, '')}
                                 </span>
                               </div>
                               <Badge 
@@ -610,6 +611,10 @@ export function BEProjectGantt({
                                   )}
                                   style={{ left, width }}
                                 >
+                                  {/* Toujours afficher au moins le n° de tache (lisible meme si la barre est etroite) */}
+                                  {width <= 60 && task.task_number && (
+                                    <span className="truncate text-[10px]">{task.task_number}</span>
+                                  )}
                                   {width > 60 && (
                                     <span className="truncate">
                                       {/* task.title contient deja le prefixe T-CERE-XXXX (genere par trigger). On ne re-prefixe pas. */}
