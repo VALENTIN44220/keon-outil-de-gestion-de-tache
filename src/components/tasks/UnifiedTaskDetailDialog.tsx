@@ -15,7 +15,9 @@ import { Task } from '@/types/task';
 import { RequestDetailDialog } from '@/components/tasks/RequestDetailDialog';
 import { ITRequestDetailDialog } from '@/components/it/ITRequestDetailDialog';
 import { logistiqueDispatchConfig } from '@/pages/logistique/logistiqueDispatchConfig';
+import { maintenanceDispatchConfig } from '@/pages/maintenance/maintenanceDispatchConfig';
 import { LogistiqueRequest } from '@/hooks/useLogistiqueRequests';
+import { MaintenanceRequest } from '@/hooks/useMaintenanceRequests';
 import { ITRequest } from '@/hooks/useITRequests';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -65,6 +67,24 @@ export function UnifiedTaskDetailDialog(props: UnifiedTaskDetailDialogProps) {
     return (
       <Dialog
         request={task as unknown as LogistiqueRequest}
+        open={open}
+        onClose={onClose}
+        refetch={() => onTaskMutated?.()}
+        isAdmin={isAdmin}
+        myProfileId={myProfile?.id}
+        profilesMap={profilesMap}
+      />
+    );
+  }
+
+  // ── Maintenance ─────────────────────────────────────────────────────────
+  if (moduleCode === 'maintenance' && maintenanceDispatchConfig.DetailDialog) {
+    const Dialog = maintenanceDispatchConfig.DetailDialog;
+    // Maintenance utilise task_id : adapter
+    const adapted = { ...task, task_id: (task as any).task_id ?? task.id } as unknown as MaintenanceRequest;
+    return (
+      <Dialog
+        request={adapted}
         open={open}
         onClose={onClose}
         refetch={() => onTaskMutated?.()}
