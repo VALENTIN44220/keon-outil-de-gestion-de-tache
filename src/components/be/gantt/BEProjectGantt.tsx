@@ -377,18 +377,13 @@ export function BEProjectGantt({
                           const assignee = taskWithAssignee.assignee;
                           
                           return (
-                            <div 
-                              key={task.id} 
-                              className="h-10 grid grid-cols-[1fr,80px,80px,60px] gap-2 px-3 items-center border-b hover:bg-muted/20 transition-colors"
+                            <div
+                              key={task.id}
+                              className="min-h-[2.5rem] py-1.5 grid grid-cols-[1fr,80px,80px,60px] gap-2 px-3 items-center border-b hover:bg-muted/20 transition-colors"
                             >
-                              <div className="flex items-center gap-2 min-w-0">
-                                {task.task_number && (
-                                  <span className="text-xs font-mono text-muted-foreground shrink-0">
-                                    {task.task_number}
-                                  </span>
-                                )}
-                                <span className="text-sm truncate" title={task.title}>
-                                  {/* On retire le prefixe (T-CERE-XXXX — / D-CERE-XXXX — ) deja affiche dans le badge a gauche */}
+                              <div className="min-w-0">
+                                <span className="text-sm leading-tight line-clamp-2 break-words" title={task.title}>
+                                  {/* Retrait du prefixe T-CERE-XXXX / D-CERE-XXXX deja redondant */}
                                   {(task.title ?? '').replace(/^([TD]-[A-Z][A-Z0-9-]*\d+\s*—\s*)+/, '')}
                                 </span>
                               </div>
@@ -611,16 +606,10 @@ export function BEProjectGantt({
                                   )}
                                   style={{ left, width }}
                                 >
-                                  {/* Toujours afficher au moins le n° de tache (lisible meme si la barre est etroite) */}
-                                  {width <= 60 && task.task_number && (
-                                    <span className="truncate text-[10px]">{task.task_number}</span>
-                                  )}
-                                  {width > 60 && (
-                                    <span className="truncate">
-                                      {/* task.title contient deja le prefixe T-CERE-XXXX (genere par trigger). On ne re-prefixe pas. */}
-                                      {task.title}
-                                    </span>
-                                  )}
+                                  <span className="truncate">
+                                    {/* On retire le prefixe T-CERE-XXXX / D-CERE-XXXX (redondant). */}
+                                    {(task.title ?? '').replace(/^([TD]-[A-Z][A-Z0-9-]*\d+\s*—\s*)+/, '')}
+                                  </span>
                                 </div>
                               </TooltipTrigger>
                               <TooltipContent side="top" className="max-w-xs">
