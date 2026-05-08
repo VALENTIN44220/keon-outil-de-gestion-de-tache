@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Building2, Paperclip, Sparkles, User, Loader2 } from 'lucide-react';
+import { Building2, Paperclip, Sparkles, User, Loader2, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -18,6 +18,7 @@ import { SearchableSelect } from '@/components/ui/searchable-select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useSupplierFamillesAll } from '@/hooks/useSupplierCategorisation';
+import { SupplierFamillesBrowserDialog } from '@/components/suppliers/SupplierFamillesBrowserDialog';
 import {
   CONTACT_ROLE_OPTIONS,
   isAllowedDemandAttachmentFile,
@@ -47,6 +48,7 @@ export function NewSupplierRequestDialog({ open, onClose }: NewSupplierRequestDi
   const [nomSociete, setNomSociete] = useState('');
   const [raison, setRaison] = useState('');
   const [famille, setFamille] = useState('');
+  const [famillesBrowserOpen, setFamillesBrowserOpen] = useState(false);
   const [description, setDescription] = useState('');
   const [pays, setPays] = useState('');
   const [delaiPaiement, setDelaiPaiement] = useState('');
@@ -272,7 +274,19 @@ export function NewSupplierRequestDialog({ open, onClose }: NewSupplierRequestDi
                   <Textarea value={raison} onChange={(e) => setRaison(e.target.value)} rows={3} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Famille de fournisseur *</Label>
+                  <div className="flex items-center justify-between">
+                    <Label>Famille de fournisseur *</Label>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setFamillesBrowserOpen(true)}
+                      className="h-7"
+                    >
+                      <Layers className="h-3.5 w-3.5 mr-1" />
+                      Familles disponibles
+                    </Button>
+                  </div>
                   <SearchableSelect
                     value={famille}
                     onValueChange={handleFamilleChange}
@@ -282,6 +296,11 @@ export function NewSupplierRequestDialog({ open, onClose }: NewSupplierRequestDi
                     searchPlaceholder="Rechercher une famille…"
                     allowCustom
                     customPlaceholder="Saisir une famille…"
+                  />
+                  <SupplierFamillesBrowserDialog
+                    open={famillesBrowserOpen}
+                    onClose={() => setFamillesBrowserOpen(false)}
+                    onSelectFamille={(f) => handleFamilleChange(f)}
                   />
                 </div>
                 <div className="space-y-2">

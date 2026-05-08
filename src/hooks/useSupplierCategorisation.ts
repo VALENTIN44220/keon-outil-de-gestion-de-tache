@@ -36,6 +36,40 @@ export function useSupplierCategories() {
   });
 }
 
+/**
+ * Toutes les paires (categorie, famille) actives, pour le navigateur tabulaire.
+ */
+export function useSupplierCategorisationRows() {
+  return useQuery({
+    queryKey: ["categories_ref", "rows_all"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("supplier_categorisation")
+        .select("categorie,famille,active")
+        .eq("active", true);
+      if (error) throw error;
+      const rows = (data ?? [])
+        .map((r: any) => ({
+          categorie: (r.categorie ?? "").trim(),
+          famille: (r.famille ?? "").trim(),
+        }))
+        .filter((r: { categorie: string; famille: string }) => r.categorie && r.famille);
+      // Dedup
+      const seen = new Set<string>();
+      const out: Array<{ categorie: string; famille: string }> = [];
+      for (const r of rows) {
+        const key = `${r.categorie}::${r.famille}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(r);
+      }
+      out.sort((a, b) => a.categorie.localeCompare(b.categorie, "fr") || a.famille.localeCompare(b.famille, "fr"));
+      return out;
+    },
+    staleTime: 10 * 60 * 1000,
+  });
+}
+
 /** Familles actives (toutes catégories), pour sélecteurs sans filtre catégorie. */
 export function useSupplierFamillesAll() {
   return useQuery({
