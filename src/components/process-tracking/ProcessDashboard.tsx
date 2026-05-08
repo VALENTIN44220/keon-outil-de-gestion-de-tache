@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, lazy, Suspense, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { TaskDetailDialog } from '@/components/tasks/TaskDetailDialog';
-import { RequestDetailDialog } from '@/components/tasks/RequestDetailDialog';
+import { UnifiedTaskDetailDialog } from '@/components/tasks/UnifiedTaskDetailDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { Task, TaskStats } from '@/types/task';
 import { ConfigurableDashboard } from '@/components/dashboard/ConfigurableDashboard';
@@ -248,7 +248,7 @@ export function ProcessDashboard({ processId, departmentId, departmentIds, proce
 
     {/* Task/Request detail dialogs */}
     {selectedTask && selectedTask.type === 'request' ? (
-      <RequestDetailDialog
+      <UnifiedTaskDetailDialog
         task={selectedTask}
         open={!!selectedTask}
         onClose={() => setSelectedTask(null)}

@@ -13,7 +13,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { DeadlineTasksOverrideProvider } from '@/contexts/DeadlineTasksOverrideContext';
-import { RequestDetailDialog } from '@/components/tasks/RequestDetailDialog';
+import { UnifiedTaskDetailDialog } from '@/components/tasks/UnifiedTaskDetailDialog';
 import { ConfigurableDashboard } from '@/components/dashboard/ConfigurableDashboard';
 import { useTasks } from '@/hooks/useTasks';
 import { usePendingAssignments } from '@/hooks/usePendingAssignments';
@@ -184,7 +184,7 @@ const MyRequests = () => {
         </div>
 
         {selectedRequest && (
-          <RequestDetailDialog
+          <UnifiedTaskDetailDialog
             task={selectedRequest}
             open={isDetailOpen}
             onClose={() => {

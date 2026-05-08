@@ -18,7 +18,7 @@ import { CreateFromTemplateDialog } from '@/components/tasks/CreateFromTemplateD
 import { PendingAssignmentsView } from '@/components/tasks/PendingAssignmentsView';
 import { TeamModule } from '@/components/team/TeamModule';
 import { TaskDetailDialog } from '@/components/tasks/TaskDetailDialog';
-import { RequestDetailDialog } from '@/components/tasks/RequestDetailDialog';
+import { UnifiedTaskDetailDialog } from '@/components/tasks/UnifiedTaskDetailDialog';
 import { PlannerSyncPanel } from '@/components/planner/PlannerSyncPanel';
 import { useTasks } from '@/hooks/useTasks';
 import { useTaskScope, TaskScope } from '@/hooks/useTaskScope';
@@ -775,7 +775,7 @@ const Index = () => {
       )}
 
       {selectedRequest && (
-        <RequestDetailDialog
+        <UnifiedTaskDetailDialog
           task={selectedRequest}
           open={isRequestDetailOpen}
           onClose={() => {
