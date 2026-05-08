@@ -25,7 +25,7 @@ import type { TaskStats } from '@/types/task';
 import {
   ModuleDetailDialog, DetailSection, DetailInfoLine, DetailStatusAction,
 } from '@/components/modules/ModuleDetailDialog';
-import type { ModuleDispatchConfig, ModuleKpi } from '@/components/modules/ModuleDispatchView';
+import type { ModuleDispatchConfig, ModuleKpi, ModuleRowCtx } from '@/components/modules/ModuleDispatchView';
 
 const ETATS_COLORS: Record<string, string> = {
   'En attente validation': 'bg-amber-100 text-amber-800 border-amber-300',
@@ -166,7 +166,6 @@ export const maintenanceDispatchConfig: ModuleDispatchConfig<MaintenanceRequest,
 // ────────────────────────────────────────────────────────────────────────
 // Stateful row actions (Valider / Refuser)
 // ────────────────────────────────────────────────────────────────────────
-import type { ModuleRowCtx } from '@/components/modules/ModuleDispatchView';
 
 function MaintenanceRowActions({ request: r, ctx }: { request: MaintenanceRequest; ctx: ModuleRowCtx }) {
   const { validateMaterialRequest, refuseMaterialRequest, isProcessing } = useMaterialValidation();
