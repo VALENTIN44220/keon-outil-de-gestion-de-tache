@@ -306,7 +306,7 @@ export const BUDGET_LINE_STATUT_CONFIG: Record<BudgetLineStatut, { label: string
   anomalie:        { label: 'Anomalie',           className: 'bg-red-100 text-red-700 border-red-300' },
 };
 
-export type BudgetType = 'mensuel' | 'annuel';
+export type BudgetType = 'mensuel' | 'mensuel_variable' | 'annuel';
 
 export interface ITBudgetLine {
   id: string;

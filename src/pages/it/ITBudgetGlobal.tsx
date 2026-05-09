@@ -8,6 +8,7 @@ import { useITBudgetGlobalBreakdown } from '@/hooks/useITBudgetGlobalBreakdown';
 import { useITBudgetRapprochement } from '@/hooks/useITBudgetRapprochement';
 import { lineAnnualBudgetRevise } from '@/lib/itBudgetTotals';
 import { BudgetLineRapprochementPanel } from '@/components/it/BudgetLineRapprochementPanel';
+import { BudgetLineNdfPanel } from '@/components/it/BudgetLineNdfPanel';
 import { BulkRapprochementDialog } from '@/components/it/BulkRapprochementDialog';
 import { AssignGroupDialog } from '@/components/it/AssignGroupDialog';
 import { useITBudgetGroups } from '@/hooks/useITBudgetGroups';
@@ -170,6 +171,23 @@ function ExpandedMonths({ line }: { line: ITBudgetLine }) {
     isLoading,
   } = useITBudgetRapprochement(line.id, line.fournisseur_prevu ?? null);
 
+  // Pour mensuel_variable : on lit les montants par mois depuis it_budget_line_months
+  const [monthlyAmounts, setMonthlyAmounts] = useState<number[]>(Array(12).fill(0));
+  useEffect(() => {
+    if ((line.budget_type as string) !== 'mensuel_variable') {
+      setMonthlyAmounts(Array(12).fill(0));
+      return;
+    }
+    void supabase.from('it_budget_line_months').select('mois, montant_budget').eq('budget_line_id', line.id)
+      .then(({ data }) => {
+        const arr = Array(12).fill(0);
+        for (const r of (data ?? []) as Array<{ mois: number; montant_budget: number | string }>) {
+          if (r.mois >= 1 && r.mois <= 12) arr[r.mois - 1] = Number(r.montant_budget) || 0;
+        }
+        setMonthlyAmounts(arr);
+      });
+  }, [line.id, line.budget_type]);
+
   const MOIS_LABELS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
 
   type MonthRow = {
@@ -190,6 +208,8 @@ function ExpandedMonths({ line }: { line: ITBudgetLine }) {
     const montant = line.montant_budget_revise ?? line.montant_budget ?? 0;
     if (line.budget_type === 'mensuel') {
       for (let i = 0; i < 12; i++) init[i].budget = montant;
+    } else if ((line.budget_type as string) === 'mensuel_variable') {
+      for (let i = 0; i < 12; i++) init[i].budget = monthlyAmounts[i] ?? 0;
     } else if (line.budget_type === 'annuel' && line.mois_budget) {
       const idx = line.mois_budget - 1;
       if (idx >= 0 && idx < 12) init[idx].budget = montant;
@@ -217,7 +237,7 @@ function ExpandedMonths({ line }: { line: ITBudgetLine }) {
     }
 
     return init;
-  }, [commandesLiees, facturesLieesGrouped, line.budget_type, line.mois_budget, line.montant_budget, line.montant_budget_revise]);
+  }, [commandesLiees, facturesLieesGrouped, line.budget_type, line.mois_budget, line.montant_budget, line.montant_budget_revise, monthlyAmounts]);
 
   const totals = rows.reduce(
     (acc, r) => ({
@@ -454,6 +474,8 @@ export default function ITBudgetGlobal() {
   const [lineNatureDepense, setLineNatureDepense] = useState('');
   const [lineDescription, setLineDescription] = useState('');
   const [lineBudgetType, setLineBudgetType] = useState<BudgetType>('mensuel');
+  const [lineMontantsMois, setLineMontantsMois] = useState<string[]>(Array(12).fill(''));
+  const [linePaiementViaNdf, setLinePaiementViaNdf] = useState(false);
   const [lineMoisDecaissement, setLineMoisDecaissement] = useState<string>('1');
   const [lineMontantBudget, setLineMontantBudget] = useState('');
   const [lineMontantRevise, setLineMontantRevise] = useState('');
@@ -522,6 +544,8 @@ export default function ITBudgetGlobal() {
     setLineNatureDepense('');
     setLineDescription('');
     setLineBudgetType('mensuel');
+    setLineMontantsMois(Array(12).fill(''));
+    setLinePaiementViaNdf(false);
     setLineMoisDecaissement('1');
     setLineMontantBudget('');
     setLineMontantRevise('');
@@ -538,7 +562,7 @@ export default function ITBudgetGlobal() {
     setLineDialogOpen(true);
   };
 
-  const openEditLine = (line: ITBudgetLine) => {
+  const openEditLine = async (line: ITBudgetLine) => {
     const lx = line as LineExtra;
     setEditingLine(line);
     const cat = line.categorie?.trim() || '';
@@ -557,6 +581,21 @@ export default function ITBudgetGlobal() {
     setLineEntite((lx.entite as string) || '');
     setLineAnnee(String(lx.annee ?? line.exercice ?? filters.annee));
     setLineItProjectId(line.it_project_id ?? '');
+    setLinePaiementViaNdf(Boolean((line as any).paiement_via_ndf));
+    // Charge les 12 montants mensuels si la ligne est en 'mensuel_variable'
+    if ((line.budget_type as string) === 'mensuel_variable') {
+      const { data } = await supabase
+        .from('it_budget_line_months')
+        .select('mois, montant_budget')
+        .eq('budget_line_id', line.id);
+      const arr = Array(12).fill('');
+      for (const r of (data ?? []) as Array<{ mois: number; montant_budget: number | string }>) {
+        if (r.mois >= 1 && r.mois <= 12) arr[r.mois - 1] = String(r.montant_budget ?? '');
+      }
+      setLineMontantsMois(arr);
+    } else {
+      setLineMontantsMois(Array(12).fill(''));
+    }
     setLineDialogOpen(true);
   };
 
@@ -768,10 +807,27 @@ export default function ITBudgetGlobal() {
   };
 
   const submitLine = async () => {
-    const montant = Number(lineMontantBudget.replace(',', '.'));
-    if (!Number.isFinite(montant)) {
-      toast({ title: 'Montant invalide', variant: 'destructive' });
-      return;
+    // Pour mensuel_variable on calcule la somme des 12 montants mensuels (montant_budget devient le total / 12 pour compat)
+    let montant: number;
+    let mensualValeurs: number[] = [];
+    if (lineBudgetType === 'mensuel_variable') {
+      mensualValeurs = lineMontantsMois.map((s) => {
+        const n = Number(String(s).replace(',', '.'));
+        return Number.isFinite(n) ? n : 0;
+      });
+      const total = mensualValeurs.reduce((a, b) => a + b, 0);
+      if (total <= 0) {
+        toast({ title: 'Renseigne au moins un montant mensuel', variant: 'destructive' });
+        return;
+      }
+      // montant_budget : moyenne (pour compat affichage), montant_annuel : somme reelle
+      montant = total / 12;
+    } else {
+      montant = Number(lineMontantBudget.replace(',', '.'));
+      if (!Number.isFinite(montant)) {
+        toast({ title: 'Montant invalide', variant: 'destructive' });
+        return;
+      }
     }
     const reviseRaw = lineMontantRevise.trim();
     const montantRevise = reviseRaw === '' ? null : Number(reviseRaw.replace(',', '.'));
@@ -815,7 +871,9 @@ export default function ITBudgetGlobal() {
       const baseUpdates = {
         categorie: lineCategorieSelect || null,
         sous_categorie: lineSousCategorie || null,
-        fournisseur_prevu: lineFournisseur || null,
+        // Si la depense est payee via NDF, pas de fournisseur a rapprocher
+        fournisseur_prevu: linePaiementViaNdf ? null : (lineFournisseur || null),
+        paiement_via_ndf: linePaiementViaNdf,
         type_depense: lineTypeDepense,
         nature_depense: lineNatureDepense || null,
         description: lineDescription || null,
@@ -823,6 +881,10 @@ export default function ITBudgetGlobal() {
         mois_budget: mois,
         montant_budget: montant,
         montant_budget_revise: montantRevise,
+        montant_annuel:
+          lineBudgetType === 'mensuel_variable'
+            ? mensualValeurs.reduce((a, b) => a + b, 0)
+            : (lineBudgetType === 'mensuel' ? montant * 12 : (mois ? montant : null)),
         statut: lineStatut,
         commentaire: lineCommentaire || null,
         exercice: lineAnneeNum,
@@ -830,6 +892,7 @@ export default function ITBudgetGlobal() {
         annee: lineAnneeNum,
       } as Record<string, unknown>;
 
+      let savedLineId: string | null = null;
       if (editingLine) {
         const updates: Record<string, unknown> = { ...baseUpdates };
         if (lineItProjectId.trim()) updates.it_project_id = lineItProjectId.trim();
@@ -837,6 +900,7 @@ export default function ITBudgetGlobal() {
           id: editingLine.id,
           updates: updates as Partial<ITBudgetLine>,
         });
+        savedLineId = editingLine.id;
         toast({ title: 'Ligne budgétaire mise à jour' });
       } else {
         const payload: Record<string, unknown> = {
@@ -846,8 +910,22 @@ export default function ITBudgetGlobal() {
           external_key: null,
         };
         if (lineItProjectId.trim()) payload.it_project_id = lineItProjectId.trim();
-        await addLine.mutateAsync(payload as Omit<ITBudgetLine, 'id' | 'created_at' | 'updated_at'>);
+        const created = await addLine.mutateAsync(payload as Omit<ITBudgetLine, 'id' | 'created_at' | 'updated_at'>);
+        savedLineId = (created as any)?.id ?? null;
         toast({ title: 'Ligne budgétaire créée' });
+      }
+
+      // Pour 'mensuel_variable' : on persiste les 12 montants dans it_budget_line_months
+      if (lineBudgetType === 'mensuel_variable' && savedLineId) {
+        const rows = mensualValeurs.map((m, i) => ({
+          budget_line_id: savedLineId!,
+          mois: i + 1,
+          montant_budget: m,
+        }));
+        // Upsert mois par mois (composite cle budget_line_id + mois)
+        await supabase
+          .from('it_budget_line_months')
+          .upsert(rows, { onConflict: 'budget_line_id,mois' });
       }
       setLineDialogOpen(false);
       setEditingLine(null);
@@ -1946,7 +2024,9 @@ export default function ITBudgetGlobal() {
           <Tabs defaultValue="general">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="general">Général</TabsTrigger>
-              <TabsTrigger value="rapprochement">Rapprochement Divalto</TabsTrigger>
+              <TabsTrigger value="rapprochement">
+                {linePaiementViaNdf ? 'Rapprochement NDF' : 'Rapprochement Divalto'}
+              </TabsTrigger>
             </TabsList>
             <TabsContent value="general" className="space-y-3 py-2 mt-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -2010,14 +2090,28 @@ export default function ITBudgetGlobal() {
                 placeholder="— Sous-catégorie —"
               />
             </div>
-            <div className="space-y-2">
-              <Label>Fournisseur prévu</Label>
-              <SupplierCombobox
-                value={lineFournisseur ?? ''}
-                onValueChange={(v) => setLineFournisseur(v)}
-                placeholder="— Aucun —"
+            <div className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
+              <input
+                type="checkbox"
+                id="paiement-ndf"
+                checked={linePaiementViaNdf}
+                onChange={(e) => setLinePaiementViaNdf(e.target.checked)}
+                className="h-4 w-4"
               />
+              <Label htmlFor="paiement-ndf" className="cursor-pointer text-sm">
+                Paiement via note de frais (pas de fournisseur, rapprochement avec NDF Lucca)
+              </Label>
             </div>
+            {!linePaiementViaNdf && (
+              <div className="space-y-2">
+                <Label>Fournisseur prévu</Label>
+                <SupplierCombobox
+                  value={lineFournisseur ?? ''}
+                  onValueChange={(v) => setLineFournisseur(v)}
+                  placeholder="— Aucun —"
+                />
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Type de dépense</Label>
               <Select value={lineTypeDepense} onValueChange={(v) => setLineTypeDepense(v as TypeDepense)}>
@@ -2060,6 +2154,7 @@ export default function ITBudgetGlobal() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="mensuel">Mensuel (même montant/mois)</SelectItem>
+                    <SelectItem value="mensuel_variable">Mensuel variable (montant différent/mois)</SelectItem>
                     <SelectItem value="annuel">Annuel (décaissement unique)</SelectItem>
                   </SelectContent>
                 </Select>
@@ -2082,25 +2177,58 @@ export default function ITBudgetGlobal() {
                 </div>
               )}
             </div>
-            <div className="space-y-2">
-              <Label>
-                {lineBudgetType === 'mensuel'
-                  ? 'Montant mensuel (requis)'
-                  : 'Montant annuel (requis)'}
-              </Label>
-              <Input
-                type="number"
-                step="0.01"
-                required
-                value={lineMontantBudget}
-                onChange={(e) => setLineMontantBudget(e.target.value)}
-              />
-              <p className="text-[11px] text-muted-foreground">
-                {lineBudgetType === 'mensuel'
-                  ? 'Ce montant sera appliqué à chaque mois de l’année.'
-                  : 'Montant total décaissé sur le mois sélectionné.'}
-              </p>
-            </div>
+            {lineBudgetType === 'mensuel_variable' ? (
+              <div className="space-y-2">
+                <Label>Montant par mois (requis pour les mois concernés)</Label>
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                  {MOIS_LONGS.map((label, i) => (
+                    <div key={label} className="space-y-1">
+                      <Label className="text-[11px] text-muted-foreground">{label}</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0"
+                        value={lineMontantsMois[i]}
+                        onChange={(e) => {
+                          const next = [...lineMontantsMois];
+                          next[i] = e.target.value;
+                          setLineMontantsMois(next);
+                        }}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Total annuel calculé :{' '}
+                  <strong>
+                    {lineMontantsMois
+                      .reduce((a, s) => a + (Number(String(s).replace(',', '.')) || 0), 0)
+                      .toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                  </strong>
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>
+                  {lineBudgetType === 'mensuel'
+                    ? 'Montant mensuel (requis)'
+                    : 'Montant annuel (requis)'}
+                </Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  required
+                  value={lineMontantBudget}
+                  onChange={(e) => setLineMontantBudget(e.target.value)}
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  {lineBudgetType === 'mensuel'
+                    ? 'Ce montant sera appliqué à chaque mois de l’année.'
+                    : 'Montant total décaissé sur le mois sélectionné.'}
+                </p>
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Budget révisé (optionnel)</Label>
               <Input type="number" step="0.01" value={lineMontantRevise} onChange={(e) => setLineMontantRevise(e.target.value)} />
@@ -2126,10 +2254,17 @@ export default function ITBudgetGlobal() {
             </div>
             </TabsContent>
             <TabsContent value="rapprochement" className="py-2 mt-2">
-              <BudgetLineRapprochementPanel
-                budgetLineId={editingLine?.id ?? null}
-                fournisseurPrevu={lineFournisseur || null}
-              />
+              {linePaiementViaNdf ? (
+                <BudgetLineNdfPanel
+                  budgetLineId={editingLine?.id ?? null}
+                  annee={Number(lineAnnee) || new Date().getFullYear()}
+                />
+              ) : (
+                <BudgetLineRapprochementPanel
+                  budgetLineId={editingLine?.id ?? null}
+                  fournisseurPrevu={lineFournisseur || null}
+                />
+              )}
             </TabsContent>
           </Tabs>
           <DialogFooter>
