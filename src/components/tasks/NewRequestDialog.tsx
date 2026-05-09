@@ -1144,19 +1144,20 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                     department={currentUser?.department}
                   />
 
-                  {/* Title Field */}
+                  {/* Title Field — editable (saisie libre par l'utilisateur) */}
                   {(!commonFieldsConfig || commonFieldsConfig.title?.visible !== false) && (
                     <div className="space-y-2.5">
                       <Label htmlFor="title" className="text-sm font-semibold flex items-center gap-1.5 text-foreground">
-                        Titre de la demande
-                        <span className="text-xs text-muted-foreground ml-1">(automatique)</span>
+                        Titre de la demande *
                       </Label>
-                      <div className="flex items-center h-12 px-4 rounded-xl border-2 bg-muted/50 text-base text-foreground">
-                        {title || 'Titre auto-généré à la création'}
-                      </div>
-                      <p className="text-xs text-muted-foreground pl-1">
-                        Le titre est généré automatiquement à la création de la demande
-                      </p>
+                      <Input
+                        id="title"
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        placeholder="Décrivez brièvement votre demande..."
+                        className="h-12 px-4 rounded-xl border-2 text-base"
+                        required
+                      />
                     </div>
                   )}
 
