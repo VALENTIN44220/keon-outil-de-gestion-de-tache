@@ -2,24 +2,22 @@ import { useCallback, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Building2, Briefcase, Users, Layers, Shield, UserCog, Download,
-  UsersRound, UserRoundCog, Workflow, Database,
+  UsersRound, UserRoundCog, Database,
   FolderKanban, Tags, MonitorSmartphone, GitMerge
 } from 'lucide-react';
 import { CompaniesTab } from './CompaniesTab';
 import { DepartmentsTab } from './DepartmentsTab';
 import { JobTitlesTab } from './JobTitlesTab';
 import { HierarchyLevelsTab } from './HierarchyLevelsTab';
-import { AccessRightsTab } from './AccessRightsTab'; // ← NOUVEAU (remplace les 3 ci-dessous)
-// import { PermissionProfilesTab } from './PermissionProfilesTab'; // ← SUPPRIMÉ
-// import { PermissionMatrixTab } from './PermissionMatrixTab';     // ← SUPPRIMÉ
-// import { UserPermissionViewerTab } from './UserPermissionViewerTab'; // ← SUPPRIMÉ
+import { AccessRightsTab } from './AccessRightsTab'; // remplace les anciens onglets PermissionProfiles / PermissionMatrix / UserPermissionViewer (supprimes)
 import { UsersTab } from './UsersTab';
 import { DataExportTab } from './DataExportTab';
 import { CollaboratorGroupsTab } from './CollaboratorGroupsTab';
 
 import { DatabaseResetDialog } from './DatabaseResetDialog';
 import { UserSimulationSelector } from './UserSimulationSelector';
-import { StandardWorkflowConfigTab } from './StandardWorkflowConfigTab';
+// StandardWorkflowConfigTab supprime (legacy : la config workflow par module passe
+// desormais par process_templates.settings, plus besoin d'un onglet dedie ici)
 import { TableLookupConfigTab } from './TableLookupConfigTab';
 import { ServiceGroupsTab } from './ServiceGroupsTab';
 import { CategoriesManagementTab } from './CategoriesManagementTab';
@@ -103,9 +101,7 @@ export function AdminTabs(props: AdminTabsProps) {
           <TabsTrigger value="simulation" className="px-2 py-1.5" title="Simulation utilisateur">
             <UserRoundCog className="h-4 w-4" />
           </TabsTrigger>
-          <TabsTrigger value="workflow-migration" className="px-2 py-1.5" title="Workflow Standard">
-            <Workflow className="h-4 w-4" />
-          </TabsTrigger>
+          {/* Onglet 'Workflow Standard' supprime (config legacy obsolete avec les modules) */}
           <TabsTrigger value="table-lookup" className="px-2 py-1.5" title="Champs table">
             <Database className="h-4 w-4" />
           </TabsTrigger>
@@ -216,9 +212,7 @@ export function AdminTabs(props: AdminTabsProps) {
           </div>
         </TabsContent>
 
-        <TabsContent value="workflow-migration">
-          <StandardWorkflowConfigTab />
-        </TabsContent>
+        {/* TabsContent 'workflow-migration' supprime */}
 
         <TabsContent value="table-lookup">
           <TableLookupConfigTab />
