@@ -94,7 +94,16 @@ export const IT_BUDGET_COLUMNS: ITBudgetColumnDef[] = [
     key: 'description',
     label: 'Description',
     defaultVisible: false,
-    render: (l) => <span className="truncate block max-w-[220px]">{l.description ?? '—'}</span>,
+    render: (l) => (
+      <span className="flex items-center gap-1.5">
+        {(l as any).is_reforecast && (
+          <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-violet-100 text-violet-800 border-violet-300">
+            REFORECAST
+          </Badge>
+        )}
+        <span className="truncate block max-w-[220px]">{l.description ?? '—'}</span>
+      </span>
+    ),
   },
   {
     key: 'commentaire',
@@ -114,9 +123,14 @@ export const IT_BUDGET_COLUMNS: ITBudgetColumnDef[] = [
     label: 'Budget révisé',
     defaultVisible: true,
     align: 'right',
-    render: (l, h) => (
-      <span className="tabular-nums">{h.eur(l.montant_budget_revise ?? l.montant_budget ?? 0)}</span>
-    ),
+    render: (l, h) => {
+      const isRevised = l.montant_budget_revise != null && Number(l.montant_budget_revise) !== Number(l.montant_budget);
+      return (
+        <span className={cn('tabular-nums', isRevised && 'font-semibold text-violet-700')} title={isRevised ? 'Reforecast appliqué' : undefined}>
+          {h.eur(l.montant_budget_revise ?? l.montant_budget ?? 0)}
+        </span>
+      );
+    },
   },
   {
     key: 'montant_annuel',

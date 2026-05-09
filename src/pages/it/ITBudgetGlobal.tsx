@@ -10,7 +10,6 @@ import { lineAnnualBudgetRevise } from '@/lib/itBudgetTotals';
 import { BudgetLineRapprochementPanel } from '@/components/it/BudgetLineRapprochementPanel';
 import { BudgetLineNdfPanel } from '@/components/it/BudgetLineNdfPanel';
 import { ITRHTab } from '@/components/it/ITRHTab';
-import { ITReforecastTab } from '@/components/it/ITReforecastTab';
 import { BulkRapprochementDialog } from '@/components/it/BulkRapprochementDialog';
 import { AssignGroupDialog } from '@/components/it/AssignGroupDialog';
 import { useITBudgetGroups } from '@/hooks/useITBudgetGroups';
@@ -343,7 +342,7 @@ export default function ITBudgetGlobal() {
     [prefs.filters_config, updateFilters]
   );
 
-  const [activeTab, setActiveTab] = useState<'synthese' | 'lignes' | 'reforecast' | 'depenses' | 'rh'>('synthese');
+  const [activeTab, setActiveTab] = useState<'synthese' | 'lignes' | 'depenses' | 'rh'>('synthese');
 
   const {
     lines,
@@ -479,6 +478,9 @@ export default function ITBudgetGlobal() {
   const [lineBudgetType, setLineBudgetType] = useState<BudgetType>('mensuel');
   const [lineMontantsMois, setLineMontantsMois] = useState<string[]>(Array(12).fill(''));
   const [linePaiementViaNdf, setLinePaiementViaNdf] = useState(false);
+  const [lineIsReforecast, setLineIsReforecast] = useState(false);
+  const [lineReforecastEnabled, setLineReforecastEnabled] = useState(false);
+  const [lineMontantsMoisRevise, setLineMontantsMoisRevise] = useState<string[]>(Array(12).fill(''));
   const [lineMoisDecaissement, setLineMoisDecaissement] = useState<string>('1');
   const [lineMontantBudget, setLineMontantBudget] = useState('');
   const [lineMontantRevise, setLineMontantRevise] = useState('');
@@ -549,6 +551,9 @@ export default function ITBudgetGlobal() {
     setLineBudgetType('mensuel');
     setLineMontantsMois(Array(12).fill(''));
     setLinePaiementViaNdf(false);
+    setLineIsReforecast(false);
+    setLineReforecastEnabled(false);
+    setLineMontantsMoisRevise(Array(12).fill(''));
     setLineMoisDecaissement('1');
     setLineMontantBudget('');
     setLineMontantRevise('');
@@ -585,19 +590,28 @@ export default function ITBudgetGlobal() {
     setLineAnnee(String(lx.annee ?? line.exercice ?? filters.annee));
     setLineItProjectId(line.it_project_id ?? '');
     setLinePaiementViaNdf(Boolean((line as any).paiement_via_ndf));
-    // Charge les 12 montants mensuels si la ligne est en 'mensuel_variable'
+    setLineIsReforecast(Boolean((line as any).is_reforecast));
+    // Active la section reforecast si la ligne a une revision en place
+    setLineReforecastEnabled(line.montant_budget_revise != null);
+    // Charge les 12 montants mensuels (initial + revise) si la ligne est en 'mensuel_variable'
     if ((line.budget_type as string) === 'mensuel_variable') {
       const { data } = await supabase
         .from('it_budget_line_months')
-        .select('mois, montant_budget')
+        .select('mois, montant_budget, montant_revise')
         .eq('budget_line_id', line.id);
-      const arr = Array(12).fill('');
-      for (const r of (data ?? []) as Array<{ mois: number; montant_budget: number | string }>) {
-        if (r.mois >= 1 && r.mois <= 12) arr[r.mois - 1] = String(r.montant_budget ?? '');
+      const arrInit = Array(12).fill('');
+      const arrRev = Array(12).fill('');
+      for (const r of (data ?? []) as Array<{ mois: number; montant_budget: number | string; montant_revise: number | string | null }>) {
+        if (r.mois >= 1 && r.mois <= 12) {
+          arrInit[r.mois - 1] = String(r.montant_budget ?? '');
+          arrRev[r.mois - 1] = r.montant_revise != null ? String(r.montant_revise) : '';
+        }
       }
-      setLineMontantsMois(arr);
+      setLineMontantsMois(arrInit);
+      setLineMontantsMoisRevise(arrRev);
     } else {
       setLineMontantsMois(Array(12).fill(''));
+      setLineMontantsMoisRevise(Array(12).fill(''));
     }
     setLineDialogOpen(true);
   };
@@ -871,19 +885,37 @@ export default function ITBudgetGlobal() {
         addOption.mutate({ option_type: 'nature_depense', value: lineNatureDepense });
       }
 
+      // Si reforecast active sur mensuel_variable : on calcule la somme des montants revises
+      let montantReviseFinal: number | null = montantRevise;
+      let mensualReviseValeurs: number[] = [];
+      if (lineReforecastEnabled && lineBudgetType === 'mensuel_variable') {
+        mensualReviseValeurs = lineMontantsMoisRevise.map((s) => {
+          const n = Number(String(s).replace(',', '.'));
+          return Number.isFinite(n) ? n : 0;
+        });
+        const totalRev = mensualReviseValeurs.reduce((a, b) => a + b, 0);
+        // si toutes les valeurs sont à 0 ET qu'aucun montant_revise n'a ete saisi : pas de revision
+        const hasAnyValue = lineMontantsMoisRevise.some((s) => String(s).trim() !== '');
+        montantReviseFinal = hasAnyValue ? totalRev : null;
+      } else if (!lineReforecastEnabled) {
+        // Si la section reforecast est desactivee, on annule la revision
+        montantReviseFinal = null;
+      }
+
       const baseUpdates = {
         categorie: lineCategorieSelect || null,
         sous_categorie: lineSousCategorie || null,
         // Si la depense est payee via NDF, pas de fournisseur a rapprocher
         fournisseur_prevu: linePaiementViaNdf ? null : (lineFournisseur || null),
         paiement_via_ndf: linePaiementViaNdf,
+        is_reforecast: lineIsReforecast,
         type_depense: lineTypeDepense,
         nature_depense: lineNatureDepense || null,
         description: lineDescription || null,
         budget_type: lineBudgetType,
         mois_budget: mois,
         montant_budget: montant,
-        montant_budget_revise: montantRevise,
+        montant_budget_revise: montantReviseFinal,
         montant_annuel:
           lineBudgetType === 'mensuel_variable'
             ? mensualValeurs.reduce((a, b) => a + b, 0)
@@ -924,8 +956,13 @@ export default function ITBudgetGlobal() {
           budget_line_id: savedLineId!,
           mois: i + 1,
           montant_budget: m,
+          // Si reforecast active : on persiste aussi le montant revise mensuel
+          montant_revise: lineReforecastEnabled
+            ? (mensualReviseValeurs[i] !== undefined && lineMontantsMoisRevise[i].trim() !== ''
+                ? mensualReviseValeurs[i]
+                : null)
+            : null,
         }));
-        // Upsert mois par mois (composite cle budget_line_id + mois)
         await supabase
           .from('it_budget_line_months')
           .upsert(rows, { onConflict: 'budget_line_id,mois' });
@@ -1233,10 +1270,6 @@ export default function ITBudgetGlobal() {
                 <TabsTrigger value="lignes" className="gap-2">
                   <List className="h-4 w-4" />
                   Lignes budgétaires
-                </TabsTrigger>
-                <TabsTrigger value="reforecast" className="gap-2">
-                  <Target className="h-4 w-4" />
-                  Reforecast
                 </TabsTrigger>
                 <TabsTrigger value="depenses" className="gap-2">
                   <PenLine className="h-4 w-4" />
@@ -2020,14 +2053,6 @@ export default function ITBudgetGlobal() {
               <TabsContent value="rh" className="space-y-4 mt-4">
                 <ITRHTab annee={Number(filters.annee) || new Date().getFullYear()} />
               </TabsContent>
-
-              <TabsContent value="reforecast" className="space-y-4 mt-4">
-                <ITReforecastTab
-                  lines={lines}
-                  onAddLine={openAddLine}
-                  onRefresh={() => queryClient.invalidateQueries({ queryKey: ['it-budget-global-lines'] })}
-                />
-              </TabsContent>
             </Tabs>
 
             <div className="pt-2">
@@ -2123,6 +2148,18 @@ export default function ITBudgetGlobal() {
               />
               <Label htmlFor="paiement-ndf" className="cursor-pointer text-sm">
                 Paiement via note de frais (pas de fournisseur, rapprochement avec NDF Lucca)
+              </Label>
+            </div>
+            <div className="flex items-center gap-2 rounded-md border bg-violet-50 dark:bg-violet-950/40 border-violet-200 px-3 py-2">
+              <input
+                type="checkbox"
+                id="is-reforecast"
+                checked={lineIsReforecast}
+                onChange={(e) => setLineIsReforecast(e.target.checked)}
+                className="h-4 w-4"
+              />
+              <Label htmlFor="is-reforecast" className="cursor-pointer text-sm">
+                Ligne ajoutée en <strong>reforecast</strong> (n'existait pas dans le budget initial)
               </Label>
             </div>
             {!linePaiementViaNdf && (
@@ -2252,9 +2289,90 @@ export default function ITBudgetGlobal() {
                 </p>
               </div>
             )}
-            <div className="space-y-2">
-              <Label>Budget révisé (optionnel)</Label>
-              <Input type="number" step="0.01" value={lineMontantRevise} onChange={(e) => setLineMontantRevise(e.target.value)} />
+            {/* ── Section REFORECAST : ajustement des montants ── */}
+            <div className="rounded-lg border-2 border-violet-200 bg-violet-50/50 dark:bg-violet-950/30 p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Target className="h-4 w-4 text-violet-700" />
+                  <Label className="font-medium cursor-pointer" htmlFor="reforecast-toggle">
+                    Reforecast — ajuster le montant pour cette ligne
+                  </Label>
+                </div>
+                <input
+                  id="reforecast-toggle"
+                  type="checkbox"
+                  checked={lineReforecastEnabled}
+                  onChange={(e) => setLineReforecastEnabled(e.target.checked)}
+                  className="h-4 w-4"
+                />
+              </div>
+              {lineReforecastEnabled && (
+                <>
+                  {lineBudgetType === 'mensuel_variable' ? (
+                    <div className="space-y-2">
+                      <Label className="text-xs">Montant révisé par mois (vide = pas de révision)</Label>
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                        {MOIS_LONGS.map((label, i) => (
+                          <div key={label} className="space-y-0.5">
+                            <Label className="text-[10px] text-muted-foreground">{label}</Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              placeholder={lineMontantsMois[i] || '0'}
+                              value={lineMontantsMoisRevise[i]}
+                              onChange={(e) => {
+                                const next = [...lineMontantsMoisRevise];
+                                next[i] = e.target.value;
+                                setLineMontantsMoisRevise(next);
+                              }}
+                              className="h-8 text-sm"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        Total révisé :{' '}
+                        <strong>
+                          {lineMontantsMoisRevise
+                            .reduce((a, s) => a + (Number(String(s).replace(',', '.')) || 0), 0)
+                            .toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                        </strong>
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <Label className="text-xs">
+                        Nouveau montant {lineBudgetType === 'mensuel' ? 'mensuel' : 'annuel'} révisé
+                      </Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder={`Initial : ${lineMontantBudget || '0'}`}
+                        value={lineMontantRevise}
+                        onChange={(e) => setLineMontantRevise(e.target.value)}
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        Initial : {lineMontantBudget ? Number(lineMontantBudget).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' }) : '—'}
+                        {lineMontantRevise && lineMontantBudget && (() => {
+                          const init = Number(lineMontantBudget);
+                          const rev = Number(lineMontantRevise);
+                          const delta = rev - init;
+                          return (
+                            <span className={delta > 0 ? ' text-amber-700' : delta < 0 ? ' text-emerald-700' : ''}>
+                              {' '}· Δ {delta > 0 ? '+' : ''}{delta.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                            </span>
+                          );
+                        })()}
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
+              {!lineReforecastEnabled && (
+                <p className="text-[11px] text-muted-foreground">
+                  Active pour saisir un montant révisé qui remplacera le budget initial dans les KPIs "Budget révisé".
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Statut</Label>
