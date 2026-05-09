@@ -270,8 +270,12 @@ export function DenseTableView({ tasks, onStatusChange, onDelete, progressMap, o
         if (!p) return <span className="text-xs text-muted-foreground">—</span>;
         return <span className="text-xs">{p.completed}/{p.total} ({p.progress}%)</span>;
       }
-      case 'created_at':
-        return <span className="text-xs">{format(new Date(task.created_at), 'dd/MM/yy HH:mm', { locale: fr })}</span>;
+      case 'created_at': {
+        // Pour les taches importees de Planner : date_demande = createdDateTime Planner (la vraie date de creation).
+        // created_at = date d'import en base. On affiche date_demande en priorite.
+        const realCreated = (task as any).date_demande || task.created_at;
+        return <span className="text-xs">{format(new Date(realCreated), 'dd/MM/yy HH:mm', { locale: fr })}</span>;
+      }
       case 'updated_at':
         return <span className="text-xs">{format(new Date(task.updated_at), 'dd/MM/yy HH:mm', { locale: fr })}</span>;
       case 'planner_labels': {

@@ -78,7 +78,7 @@ const ALL_COLUMNS: ColumnDef[] = [
     if (t.parent_request_id) return <Badge variant="outline" className="text-xs bg-keon-orange/10 text-keon-orange border-keon-orange/30">Demande</Badge>;
     return <Badge variant="outline" className="text-xs bg-muted text-muted-foreground">Directe</Badge>;
   }},
-  { key: 'created_at', label: 'Créé le', defaultVisible: false, render: (t) => renderDate(t.created_at) },
+  { key: 'created_at', label: 'Créé le', defaultVisible: false, render: (t) => renderDate((t as any).date_demande || t.created_at) },
   { key: 'updated_at', label: 'Modifié le', defaultVisible: false, render: (t) => renderDate(t.updated_at) },
   { key: 'category', label: 'Catégorie', defaultVisible: false, render: (t) => t.category || '-' },
   { key: 'description', label: 'Description', defaultVisible: false, render: (t) => <span className="max-w-[200px] truncate block">{t.description || '-'}</span> },

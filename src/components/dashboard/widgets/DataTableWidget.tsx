@@ -78,7 +78,7 @@ const ALL_COLUMNS: ColumnDef[] = [
     };
     return <Badge className={cn('text-xs', colorMap[status] || '')}>{label}</Badge>;
   }},
-  { key: 'created_at', label: 'Créé le', defaultVisible: false, render: (t) => renderDate(t.created_at) },
+  { key: 'created_at', label: 'Créé le', defaultVisible: false, render: (t) => renderDate((t as any).date_demande || t.created_at) },
   { key: 'updated_at', label: 'Modifié le', defaultVisible: false, render: (t) => renderDate(t.updated_at) },
   { key: 'type', label: 'Type', defaultVisible: false, render: (t) => t.type === 'request' ? 'Demande' : 'Tâche' },
   { key: 'task_number', label: 'N° Tâche', defaultVisible: false, render: (t) => t.task_number || '-' },
