@@ -9,6 +9,7 @@ import { useITBudgetRapprochement } from '@/hooks/useITBudgetRapprochement';
 import { lineAnnualBudgetRevise } from '@/lib/itBudgetTotals';
 import { BudgetLineRapprochementPanel } from '@/components/it/BudgetLineRapprochementPanel';
 import { BudgetLineNdfPanel } from '@/components/it/BudgetLineNdfPanel';
+import { ITRHTab } from '@/components/it/ITRHTab';
 import { BulkRapprochementDialog } from '@/components/it/BulkRapprochementDialog';
 import { AssignGroupDialog } from '@/components/it/AssignGroupDialog';
 import { useITBudgetGroups } from '@/hooks/useITBudgetGroups';
@@ -72,6 +73,7 @@ import {
   AlertTriangle,
   List,
   PenLine,
+  Users,
   PieChart as PieChartIcon,
   Pencil,
   Trash2,
@@ -340,7 +342,7 @@ export default function ITBudgetGlobal() {
     [prefs.filters_config, updateFilters]
   );
 
-  const [activeTab, setActiveTab] = useState<'synthese' | 'lignes' | 'depenses'>('synthese');
+  const [activeTab, setActiveTab] = useState<'synthese' | 'lignes' | 'depenses' | 'rh'>('synthese');
 
   const {
     lines,
@@ -1235,6 +1237,10 @@ export default function ITBudgetGlobal() {
                   <PenLine className="h-4 w-4" />
                   Dépenses manuelles
                 </TabsTrigger>
+                <TabsTrigger value="rh" className="gap-2">
+                  <Users className="h-4 w-4" />
+                  RH
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="synthese" className="space-y-6 mt-4">
@@ -2004,6 +2010,10 @@ export default function ITBudgetGlobal() {
                   </div>
                 )}
                 {expensesLoading && <p className="text-xs text-muted-foreground">Chargement des dépenses…</p>}
+              </TabsContent>
+
+              <TabsContent value="rh" className="space-y-4 mt-4">
+                <ITRHTab annee={Number(filters.annee) || new Date().getFullYear()} />
               </TabsContent>
             </Tabs>
 
