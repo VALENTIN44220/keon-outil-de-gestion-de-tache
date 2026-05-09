@@ -481,6 +481,9 @@ export default function ITBudgetGlobal() {
   const [lineIsReforecast, setLineIsReforecast] = useState(false);
   const [lineReforecastEnabled, setLineReforecastEnabled] = useState(false);
   const [lineMontantsMoisRevise, setLineMontantsMoisRevise] = useState<string[]>(Array(12).fill(''));
+  // Type de budget reforecast : peut differer du type initial. NULL/'' = meme que initial.
+  const [lineBudgetTypeRevise, setLineBudgetTypeRevise] = useState<BudgetType | ''>('');
+  const [lineMoisDecaissementRevise, setLineMoisDecaissementRevise] = useState<string>('1');
   const [lineMoisDecaissement, setLineMoisDecaissement] = useState<string>('1');
   const [lineMontantBudget, setLineMontantBudget] = useState('');
   const [lineMontantRevise, setLineMontantRevise] = useState('');
@@ -554,6 +557,8 @@ export default function ITBudgetGlobal() {
     setLineIsReforecast(false);
     setLineReforecastEnabled(false);
     setLineMontantsMoisRevise(Array(12).fill(''));
+    setLineBudgetTypeRevise('');
+    setLineMoisDecaissementRevise('1');
     setLineMoisDecaissement('1');
     setLineMontantBudget('');
     setLineMontantRevise('');
@@ -592,7 +597,9 @@ export default function ITBudgetGlobal() {
     setLinePaiementViaNdf(Boolean((line as any).paiement_via_ndf));
     setLineIsReforecast(Boolean((line as any).is_reforecast));
     // Active la section reforecast si la ligne a une revision en place
-    setLineReforecastEnabled(line.montant_budget_revise != null);
+    setLineReforecastEnabled(line.montant_budget_revise != null || (line as any).budget_type_revise != null);
+    setLineBudgetTypeRevise(((line as any).budget_type_revise as BudgetType) || '');
+    setLineMoisDecaissementRevise((line as any).mois_budget_revise != null ? String((line as any).mois_budget_revise) : '1');
     // Charge les 12 montants mensuels (initial + revise) si la ligne est en 'mensuel_variable'
     if ((line.budget_type as string) === 'mensuel_variable') {
       const { data } = await supabase
@@ -885,20 +892,23 @@ export default function ITBudgetGlobal() {
         addOption.mutate({ option_type: 'nature_depense', value: lineNatureDepense });
       }
 
-      // Si reforecast active sur mensuel_variable : on calcule la somme des montants revises
+      // ── Reforecast : peut avoir un type different du type initial ──
+      // Type effectif pour le calcul du revise = budget_type_revise ?? budget_type
+      const effectiveReviseType: BudgetType = (lineBudgetTypeRevise || lineBudgetType) as BudgetType;
       let montantReviseFinal: number | null = montantRevise;
       let mensualReviseValeurs: number[] = [];
-      if (lineReforecastEnabled && lineBudgetType === 'mensuel_variable') {
-        mensualReviseValeurs = lineMontantsMoisRevise.map((s) => {
-          const n = Number(String(s).replace(',', '.'));
-          return Number.isFinite(n) ? n : 0;
-        });
-        const totalRev = mensualReviseValeurs.reduce((a, b) => a + b, 0);
-        // si toutes les valeurs sont à 0 ET qu'aucun montant_revise n'a ete saisi : pas de revision
-        const hasAnyValue = lineMontantsMoisRevise.some((s) => String(s).trim() !== '');
-        montantReviseFinal = hasAnyValue ? totalRev : null;
-      } else if (!lineReforecastEnabled) {
-        // Si la section reforecast est desactivee, on annule la revision
+      if (lineReforecastEnabled) {
+        if (effectiveReviseType === 'mensuel_variable') {
+          mensualReviseValeurs = lineMontantsMoisRevise.map((s) => {
+            const n = Number(String(s).replace(',', '.'));
+            return Number.isFinite(n) ? n : 0;
+          });
+          const hasAnyValue = lineMontantsMoisRevise.some((s) => String(s).trim() !== '');
+          montantReviseFinal = hasAnyValue ? mensualReviseValeurs.reduce((a, b) => a + b, 0) : null;
+        }
+        // Pour mensuel/annuel revise : montantReviseFinal vient de lineMontantRevise (deja parse)
+      } else {
+        // Section reforecast desactivee : on annule toute revision
         montantReviseFinal = null;
       }
 
@@ -909,6 +919,11 @@ export default function ITBudgetGlobal() {
         fournisseur_prevu: linePaiementViaNdf ? null : (lineFournisseur || null),
         paiement_via_ndf: linePaiementViaNdf,
         is_reforecast: lineIsReforecast,
+        // Reforecast : type / mois revisable independamment du type initial
+        budget_type_revise: lineReforecastEnabled && lineBudgetTypeRevise ? lineBudgetTypeRevise : null,
+        mois_budget_revise: lineReforecastEnabled && (lineBudgetTypeRevise || lineBudgetType) === 'annuel'
+          ? Number(lineMoisDecaissementRevise) || null
+          : null,
         type_depense: lineTypeDepense,
         nature_depense: lineNatureDepense || null,
         description: lineDescription || null,
@@ -950,19 +965,28 @@ export default function ITBudgetGlobal() {
         toast({ title: 'Ligne budgétaire créée' });
       }
 
-      // Pour 'mensuel_variable' : on persiste les 12 montants dans it_budget_line_months
-      if (lineBudgetType === 'mensuel_variable' && savedLineId) {
-        const rows = mensualValeurs.map((m, i) => ({
-          budget_line_id: savedLineId!,
-          mois: i + 1,
-          montant_budget: m,
-          // Si reforecast active : on persiste aussi le montant revise mensuel
-          montant_revise: lineReforecastEnabled
-            ? (mensualReviseValeurs[i] !== undefined && lineMontantsMoisRevise[i].trim() !== ''
-                ? mensualReviseValeurs[i]
-                : null)
-            : null,
-        }));
+      // Persistance des montants par mois dans it_budget_line_months :
+      // - Si type initial = mensuel_variable : on stocke montant_budget par mois
+      // - Si type revise = mensuel_variable (different ou pas) : on stocke montant_revise par mois
+      const needsMonthRows =
+        savedLineId && (
+          lineBudgetType === 'mensuel_variable' ||
+          (lineReforecastEnabled && lineBudgetTypeRevise === 'mensuel_variable')
+        );
+      if (needsMonthRows) {
+        const rows = Array.from({ length: 12 }, (_, i) => {
+          const initVal = lineBudgetType === 'mensuel_variable' ? mensualValeurs[i] : 0;
+          const revRaw = lineMontantsMoisRevise[i];
+          const revIsSet = lineReforecastEnabled
+            && lineBudgetTypeRevise === 'mensuel_variable'
+            && String(revRaw ?? '').trim() !== '';
+          return {
+            budget_line_id: savedLineId!,
+            mois: i + 1,
+            montant_budget: initVal,
+            montant_revise: revIsSet ? mensualReviseValeurs[i] : null,
+          };
+        });
         await supabase
           .from('it_budget_line_months')
           .upsert(rows, { onConflict: 'budget_line_id,mois' });
@@ -2308,9 +2332,48 @@ export default function ITBudgetGlobal() {
               </div>
               {lineReforecastEnabled && (
                 <>
-                  {lineBudgetType === 'mensuel_variable' ? (
+                  {/* Le type de budget reforecast peut differer du type initial */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Type de budget reforecast</Label>
+                      <Select
+                        value={lineBudgetTypeRevise || lineBudgetType}
+                        onValueChange={(v) => setLineBudgetTypeRevise(v as BudgetType)}
+                      >
+                        <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="mensuel">Mensuel (même montant/mois)</SelectItem>
+                          <SelectItem value="mensuel_variable">Mensuel variable (différent/mois)</SelectItem>
+                          <SelectItem value="annuel">Annuel (décaissement unique)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[10px] text-muted-foreground">
+                        Initial : {
+                          lineBudgetType === 'mensuel' ? 'Mensuel'
+                          : lineBudgetType === 'mensuel_variable' ? 'Mensuel variable'
+                          : 'Annuel'
+                        }
+                      </p>
+                    </div>
+                    {(lineBudgetTypeRevise || lineBudgetType) === 'annuel' && (
+                      <div className="space-y-1">
+                        <Label className="text-xs">Mois de décaissement révisé</Label>
+                        <Select value={lineMoisDecaissementRevise} onValueChange={setLineMoisDecaissementRevise}>
+                          <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {MOIS_LONGS.map((label, i) => (
+                              <SelectItem key={label} value={String(i + 1)}>{label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Inputs montants selon le type revise */}
+                  {(lineBudgetTypeRevise || lineBudgetType) === 'mensuel_variable' ? (
                     <div className="space-y-2">
-                      <Label className="text-xs">Montant révisé par mois (vide = pas de révision)</Label>
+                      <Label className="text-xs">Montant révisé par mois (vide = pas de révision sur ce mois)</Label>
                       <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                         {MOIS_LONGS.map((label, i) => (
                           <div key={label} className="space-y-0.5">
@@ -2318,7 +2381,7 @@ export default function ITBudgetGlobal() {
                             <Input
                               type="number"
                               step="0.01"
-                              placeholder={lineMontantsMois[i] || '0'}
+                              placeholder={lineBudgetType === 'mensuel_variable' ? (lineMontantsMois[i] || '0') : (lineBudgetType === 'mensuel' ? lineMontantBudget : '')}
                               value={lineMontantsMoisRevise[i]}
                               onChange={(e) => {
                                 const next = [...lineMontantsMoisRevise];
@@ -2342,7 +2405,7 @@ export default function ITBudgetGlobal() {
                   ) : (
                     <div className="space-y-1">
                       <Label className="text-xs">
-                        Nouveau montant {lineBudgetType === 'mensuel' ? 'mensuel' : 'annuel'} révisé
+                        Nouveau montant {(lineBudgetTypeRevise || lineBudgetType) === 'mensuel' ? 'mensuel' : 'annuel'} révisé
                       </Label>
                       <Input
                         type="number"
