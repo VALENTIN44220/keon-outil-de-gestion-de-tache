@@ -1,5 +1,6 @@
 import { Search, Plus, LogOut, User } from 'lucide-react';
-import { NotificationBell } from './NotificationBell';
+// NotificationBell legacy supprime : la cloche de notifications est desormais
+// affichee uniquement dans la Sidebar via AppNotificationCluster.
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
@@ -81,7 +82,7 @@ export function Header({
             </Button>
           )}
 
-          <NotificationBell />
+          {/* La cloche de notifications est unique : elle vit dans la Sidebar (AppNotificationCluster) */}
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
