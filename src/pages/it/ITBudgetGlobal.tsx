@@ -10,6 +10,7 @@ import { lineAnnualBudgetRevise } from '@/lib/itBudgetTotals';
 import { BudgetLineRapprochementPanel } from '@/components/it/BudgetLineRapprochementPanel';
 import { BudgetLineNdfPanel } from '@/components/it/BudgetLineNdfPanel';
 import { ITRHTab } from '@/components/it/ITRHTab';
+import { ITReforecastTab } from '@/components/it/ITReforecastTab';
 import { BulkRapprochementDialog } from '@/components/it/BulkRapprochementDialog';
 import { AssignGroupDialog } from '@/components/it/AssignGroupDialog';
 import { useITBudgetGroups } from '@/hooks/useITBudgetGroups';
@@ -342,7 +343,7 @@ export default function ITBudgetGlobal() {
     [prefs.filters_config, updateFilters]
   );
 
-  const [activeTab, setActiveTab] = useState<'synthese' | 'lignes' | 'depenses' | 'rh'>('synthese');
+  const [activeTab, setActiveTab] = useState<'synthese' | 'lignes' | 'reforecast' | 'depenses' | 'rh'>('synthese');
 
   const {
     lines,
@@ -1233,6 +1234,10 @@ export default function ITBudgetGlobal() {
                   <List className="h-4 w-4" />
                   Lignes budgétaires
                 </TabsTrigger>
+                <TabsTrigger value="reforecast" className="gap-2">
+                  <Target className="h-4 w-4" />
+                  Reforecast
+                </TabsTrigger>
                 <TabsTrigger value="depenses" className="gap-2">
                   <PenLine className="h-4 w-4" />
                   Dépenses manuelles
@@ -2014,6 +2019,14 @@ export default function ITBudgetGlobal() {
 
               <TabsContent value="rh" className="space-y-4 mt-4">
                 <ITRHTab annee={Number(filters.annee) || new Date().getFullYear()} />
+              </TabsContent>
+
+              <TabsContent value="reforecast" className="space-y-4 mt-4">
+                <ITReforecastTab
+                  lines={lines}
+                  onAddLine={openAddLine}
+                  onRefresh={() => queryClient.invalidateQueries({ queryKey: ['it-budget-global-lines'] })}
+                />
               </TabsContent>
             </Tabs>
 
