@@ -1,6 +1,8 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState, useEffect } from 'react';
 import { Task } from '@/types/task';
 import { differenceInDays, differenceInHours, parseISO, isBefore, startOfDay } from 'date-fns';
+
+const DISMISSED_KEY = 'deadline-notifs-dismissed-ids';
 
 export interface TaskNotification {
   id: string;
@@ -13,6 +15,18 @@ export interface TaskNotification {
 }
 
 export function useNotifications(tasks: Task[]) {
+  // Notifs ecartees manuellement (cle = id de notification, persistance localStorage)
+  const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => {
+    try {
+      const raw = window.localStorage.getItem(DISMISSED_KEY);
+      return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+    } catch { return new Set(); }
+  });
+
+  useEffect(() => {
+    try { window.localStorage.setItem(DISMISSED_KEY, JSON.stringify(Array.from(dismissedIds))); } catch { /* ignore */ }
+  }, [dismissedIds]);
+
   const notifications = useMemo(() => {
     const now = new Date();
     const today = startOfDay(now);
@@ -73,18 +87,30 @@ export function useNotifications(tasks: Task[]) {
     });
 
     // Sort by priority (overdue first, then due-today, then due-soon)
-    return result.sort((a, b) => {
+    const sorted = result.sort((a, b) => {
       const priorityOrder = { overdue: 0, 'due-today': 1, 'due-soon': 2 };
       return priorityOrder[a.type] - priorityOrder[b.type];
     });
-  }, [tasks]);
+    // Filtre les notifs ecartees manuellement
+    return sorted.filter(n => !dismissedIds.has(n.id));
+  }, [tasks, dismissedIds]);
 
   const unreadCount = notifications.length;
   const hasUrgent = notifications.some(n => n.type === 'overdue' || n.type === 'due-today');
+
+  /** Ecartement total : on memorise tous les ids actuels comme dismissed. */
+  const dismissAll = useCallback(() => {
+    setDismissedIds((prev) => {
+      const next = new Set(prev);
+      for (const n of notifications) next.add(n.id);
+      return next;
+    });
+  }, [notifications]);
 
   return {
     notifications,
     unreadCount,
     hasUrgent,
+    dismissAll,
   };
 }

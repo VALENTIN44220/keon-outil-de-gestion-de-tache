@@ -95,11 +95,27 @@ export function useInAppNotifications() {
     [user?.id]
   );
 
+  /** Marque toutes les notifications de l'utilisateur comme lues (vide la liste). */
+  const deleteAll = useCallback(async () => {
+    if (!user?.id) return;
+    const { error } = await supabase
+      .from('notifications')
+      .update({ read_at: new Date().toISOString() })
+      .eq('user_id', user.id)
+      .is('read_at', null);
+    if (error) {
+      console.error('deleteAll notifications:', error);
+      return;
+    }
+    setItems([]);
+  }, [user?.id]);
+
   return {
     notifications: items,
     unreadCount: items.length,
     isLoading,
     refetch: fetchUnread,
     markAsRead,
+    deleteAll,
   };
 }

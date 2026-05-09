@@ -22,6 +22,7 @@ import { Loader2, Plus, Trash2, Pencil, Shield, RotateCcw } from "lucide-react";
 import type { PermissionProfile, UserProfile } from "@/types/admin";
 import type { UserPermissionOverride, AllPermissionKeys } from "@/types/permissions";
 import { SCREEN_PERMISSIONS, SCREEN_LABELS } from "@/types/permissions";
+import { PageAccessMatrix } from "./PageAccessMatrix";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -222,9 +223,11 @@ interface ProfileFormProps {
   processTemplates: ProcessTemplate[];
   profileProcessIds: string[];
   onToggleProcess: (id: string) => void;
+  /** Si fourni : on affiche la matrice d'acces aux pages (3-state). */
+  profileId?: string | null;
 }
 
-function ProfileForm({ values, onChange, processTemplates, profileProcessIds, onToggleProcess }: ProfileFormProps) {
+function ProfileForm({ values, onChange, processTemplates: _processTemplates, profileProcessIds: _profileProcessIds, onToggleProcess: _onToggleProcess, profileId }: ProfileFormProps) {
   return (
     <div className="space-y-5 overflow-y-auto max-h-[70vh] pr-1">
       <div className="grid grid-cols-2 gap-3">
@@ -264,56 +267,21 @@ function ProfileForm({ values, onChange, processTemplates, profileProcessIds, on
         ))}
       </div>
 
-      {/* Screen access */}
+      {/* Acces aux pages : matrice 3-state (Non visible / Lecture / Lecture+Ecr.) */}
       <div className="border rounded-xl p-4 bg-slate-50/50">
-        <SectionHead icon="🖥️" label="Accès aux écrans" />
-        <div className="flex flex-wrap gap-2">
-          {SCREEN_PERMISSIONS.map((key) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => onChange(key, !values[key])}
-              className={[
-                "px-3 py-1 rounded-full text-xs font-medium border-2 transition-all",
-                values[key]
-                  ? "bg-green-50 border-green-200 text-green-700"
-                  : "bg-slate-100 border-slate-200 text-slate-400",
-              ].join(" ")}
-            >
-              {values[key] ? "✓ " : ""}
-              {SCREEN_LABELS[key]}
-            </button>
-          ))}
-        </div>
+        <SectionHead icon="🖥️" label="Accès aux pages" />
+        {profileId ? (
+          <PageAccessMatrix profileId={profileId} />
+        ) : (
+          <p className="text-xs italic text-muted-foreground">
+            Crée d'abord le profil. Tu pourras configurer les accès page par page après création.
+          </p>
+        )}
       </div>
 
-      {/* Process visibility */}
-      {processTemplates.length > 0 && (
-        <div className="border rounded-xl p-4 bg-slate-50/50">
-          <SectionHead icon="🔄" label="Visibilité des processus" />
-          <div className="flex flex-wrap gap-2">
-            {processTemplates.map((p) => {
-              const active = profileProcessIds.includes(p.id);
-              return (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => onToggleProcess(p.id)}
-                  className={[
-                    "px-3 py-1 rounded-full text-xs font-medium border-2 transition-all",
-                    active
-                      ? "bg-blue-50 border-blue-200 text-blue-700"
-                      : "bg-slate-100 border-slate-200 text-slate-400",
-                  ].join(" ")}
-                >
-                  {active ? "✓ " : ""}
-                  {p.name}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      {/* Section 'Visibilite des processus' supprimee : la visibilite des processus
+          est desormais geree par les permissions de page (page 'templates' = acces
+          a la gestion des process_templates). */}
     </div>
   );
 }
@@ -778,33 +746,7 @@ export function AccessRightsTab({
                 </div>
               </div>
 
-              {/* Process visibility */}
-              <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-                <SectionHead icon="🔄" label="Visibilité des processus" />
-                {processTemplates.length === 0 ? (
-                  <p className="text-sm text-slate-400 italic">Aucun processus configuré</p>
-                ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {processTemplates.map((p) => {
-                      const active = (profileProcessIds[selectedProfile.id] ?? []).includes(p.id);
-                      return (
-                        <span
-                          key={p.id}
-                          className={[
-                            "px-3 py-1 rounded-full text-xs font-medium border-2",
-                            active
-                              ? "bg-blue-50 border-blue-200 text-blue-700"
-                              : "bg-slate-50 border-slate-200 text-slate-400",
-                          ].join(" ")}
-                        >
-                          {active ? "✓ " : ""}
-                          {p.name}
-                        </span>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+              {/* Section 'Visibilite des processus' supprimee */}
 
               {/* Users assigned to this profile */}
               <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
@@ -1010,33 +952,7 @@ export function AccessRightsTab({
                     </div>
                   </div>
 
-                  {/* Process visibility */}
-                  {processTemplates.length > 0 && (
-                    <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-                      <SectionHead icon="🔄" label="Visibilité des processus" />
-                      <div className="flex flex-wrap gap-2">
-                        {processTemplates.map((p) => {
-                          const { value, isOverride } = getEffectiveProcess(p.id);
-                          return (
-                            <button
-                              key={p.id}
-                              type="button"
-                              onClick={() => handleToggleUserProcess(p.id)}
-                              className={[
-                                "px-3 py-1 rounded-full text-xs font-medium border-2 transition-all hover:opacity-80",
-                                isOverride ? "border-amber-400" : value ? "border-blue-200" : "border-slate-200",
-                                value ? "bg-blue-50 text-blue-700" : "bg-slate-50 text-slate-400",
-                              ].join(" ")}
-                            >
-                              {value ? "✓ " : ""}
-                              {p.name}
-                              {isOverride && <span className="ml-1 text-[9px] font-bold text-amber-500">⚡</span>}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
+                  {/* Section 'Visibilite des processus' supprimee */}
 
                   {/* Override summary */}
                   {hasAnyOverride() && (
@@ -1123,6 +1039,7 @@ export function AccessRightsTab({
             onChange={(k, v) => setEditValues((prev) => ({ ...prev, [k]: v }))}
             processTemplates={processTemplates}
             profileProcessIds={editValues._processes}
+            profileId={selectedProfile?.id ?? null}
             onToggleProcess={(id) =>
               setEditValues((prev) => {
                 const current = prev._processes;

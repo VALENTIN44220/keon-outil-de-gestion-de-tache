@@ -59,12 +59,13 @@ export function AppNotificationCluster({ collapsed, className }: AppNotification
 
   const tasksForDeadlineNotifs = deadlineOverride !== undefined ? deadlineOverride : defaultDeadlineTasks;
 
-  const { notifications, unreadCount, hasUrgent } = useNotifications(tasksForDeadlineNotifs);
-  const { commentNotifications, markAsRead: markCommentNotificationRead } = useCommentNotifications();
+  const { notifications, unreadCount, hasUrgent, dismissAll: dismissAllDeadlines } = useNotifications(tasksForDeadlineNotifs);
+  const { commentNotifications, markAsRead: markCommentNotificationRead, markAllAsRead: markAllCommentRead } = useCommentNotifications();
   const {
     notifications: workflowInApp,
     unreadCount: workflowUnread,
     markAsRead: markWorkflowRead,
+    deleteAll: deleteAllWorkflow,
   } = useInAppNotifications();
 
   const defaultOpenTask = async (taskId: string) => {
@@ -130,6 +131,9 @@ export function AppNotificationCluster({ collapsed, className }: AppNotification
             defaultOpenTask(row.related_entity_id);
           }
         }}
+        onClearDeadlines={dismissAllDeadlines}
+        onClearComments={() => void markAllCommentRead()}
+        onClearWorkflow={() => void deleteAllWorkflow()}
       />
     </div>
   );

@@ -1,4 +1,4 @@
-import { Bell, AlertTriangle, Clock, Calendar, MessageSquare, Zap } from 'lucide-react';
+import { Bell, AlertTriangle, Clock, Calendar, MessageSquare, Zap, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Popover,
@@ -25,6 +25,12 @@ interface NotificationBellProps {
   onNotificationClick?: (taskId: string) => void;
   onCommentNotificationClick?: (taskId: string, notificationId: string) => void;
   onWorkflowInAppClick?: (row: InAppNotificationRow) => void;
+  /** Vider la liste des echeances (masquer toutes les notifs deadlines) */
+  onClearDeadlines?: () => void;
+  /** Vider la liste des commentaires (mark as read en DB) */
+  onClearComments?: () => void;
+  /** Vider la liste des notifs workflow (DELETE en DB) */
+  onClearWorkflow?: () => void;
 }
 
 export function NotificationBell({
@@ -37,7 +43,11 @@ export function NotificationBell({
   onNotificationClick,
   onCommentNotificationClick,
   onWorkflowInAppClick,
+  onClearDeadlines,
+  onClearComments,
+  onClearWorkflow,
 }: NotificationBellProps) {
+  void workflowInAppUnreadCount;
   // Les notifs de la table `notifications` avec type='task_comment' sont
   // logiquement des commentaires : on les remonte dans l'onglet "Commentaires"
   // plutôt que "Workflow" pour éviter la confusion utilisateur.
@@ -96,7 +106,26 @@ export function NotificationBell({
       <PopoverContent align="end" className="w-96 p-0">
         <Tabs defaultValue="deadlines" className="w-full">
           <div className="border-b border-border px-4 py-3">
-            <h3 className="font-semibold text-foreground mb-2">Notifications</h3>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold text-foreground">Notifications</h3>
+              {(notifications.length > 0 || commentNotifications.length > 0 || workflowInAppNotifications.length > 0) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs text-muted-foreground hover:text-destructive"
+                  onClick={() => {
+                    if (!confirm('Vider toutes les notifications (échéances, commentaires, workflow) ?')) return;
+                    onClearDeadlines?.();
+                    onClearComments?.();
+                    onClearWorkflow?.();
+                  }}
+                  title="Vider toutes les notifications"
+                >
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  Tout vider
+                </Button>
+              )}
+            </div>
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="deadlines" className="text-xs px-1">
                 Échéances
