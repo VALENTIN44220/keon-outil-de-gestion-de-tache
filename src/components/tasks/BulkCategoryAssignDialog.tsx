@@ -306,7 +306,9 @@ export function BulkCategoryAssignDialog({ open, onOpenChange, tasks, onComplete
                           {task.task_number && (
                             <span className="text-xs font-mono text-muted-foreground">{task.task_number}</span>
                           )}
-                          <span className="text-sm font-medium truncate">{task.title}</span>
+                          <span className="text-sm font-medium truncate" title={task.title}>
+                            {(task.title ?? '').replace(/^([TD]-[A-Z][A-Z0-9-]*\d+\s*—\s*)+/, '')}
+                          </span>
                         </div>
                         <div className="flex items-center gap-2 mt-0.5">
                           <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${statusColors[task.status] || ''}`}>

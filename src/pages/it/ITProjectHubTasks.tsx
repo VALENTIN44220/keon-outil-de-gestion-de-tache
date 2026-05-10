@@ -408,9 +408,11 @@ function TaskRow({ task, kind, hasChildren, isCollapsed, onToggleCollapse, onSel
         {number || '—'}
       </span>
 
-      {/* Title */}
+      {/* Title — on retire le prefixe T-XXXX-XXXX / D-XXXX-XXXX deja affiche dans la colonne N° */}
       <div className="flex-1 min-w-0 flex items-center gap-2">
-        <span className="text-sm font-medium truncate">{task.title}</span>
+        <span className="text-sm font-medium truncate" title={task.title}>
+          {(task.title ?? '').replace(/^([TD]-[A-Z][A-Z0-9-]*\d+\s*—\s*)+/, '')}
+        </span>
         <Tooltip>
           <TooltipTrigger asChild>
             <ExternalLink className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />

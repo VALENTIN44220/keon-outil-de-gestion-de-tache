@@ -164,8 +164,10 @@ export function PendingTaskValidationsPanel({
                       <button
                         onClick={() => onTaskClick?.(task)}
                         className="font-medium text-sm text-foreground hover:text-primary truncate text-left"
+                        title={task.title}
                       >
-                        {task.title}
+                        {/* Le n° apparait deja en badge plus bas */}
+                        {(task.title ?? '').replace(/^([TD]-[A-Z][A-Z0-9-]*\d+\s*—\s*)+/, '')}
                       </button>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">

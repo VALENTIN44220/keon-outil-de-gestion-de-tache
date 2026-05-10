@@ -144,7 +144,8 @@ export function TaskCard({ task, onStatusChange, onDelete, compact = false, task
               task.status === 'done' && "line-through text-muted-foreground"
             )}
           >
-            {task.title}
+            {/* Le n° est deja affiche en badge ci-dessus, on retire le prefixe redondant du titre */}
+            {(task.title ?? '').replace(/^([TD]-[A-Z][A-Z0-9-]*\d+\s*—\s*)+/, '')}
             <Pencil className="inline-block ml-2 h-3 w-3 opacity-30" />
           </h3>
 
