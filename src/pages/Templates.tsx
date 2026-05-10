@@ -7,11 +7,17 @@ import { TemplateAdvancedFilters, TemplateFiltersState, defaultFilters } from '@
 import { AddProcessDialog } from '@/components/templates/AddProcessDialog';
 import { DeleteProcessDialog } from '@/components/templates/DeleteProcessDialog';
 import { SubProcessTemplatesList } from '@/components/templates/SubProcessTemplatesList';
+import { TaskTemplatesList } from '@/components/templates/TaskTemplatesList';
+import { CustomFieldsTab } from '@/components/templates/CustomFieldsTab';
 import { AddIndependentSubProcessDialog } from '@/components/templates/AddIndependentSubProcessDialog';
+import { NewPrestationBEWizard } from '@/components/templates/NewPrestationBEWizard';
+import { AddIndependentTaskDialog } from '@/components/templates/AddIndependentTaskDialog';
+import { BulkTaskTemplateImportDialog } from '@/components/templates/BulkTaskTemplateImportDialog';
 import { useProcessTemplates } from '@/hooks/useProcessTemplates';
 import { useAllSubProcessTemplates } from '@/hooks/useAllSubProcessTemplates';
+import { useAllTaskTemplates } from '@/hooks/useAllTaskTemplates';
 import { useAuth } from '@/contexts/AuthContext';
-import { Loader2, Layers, GitBranch, Plus } from 'lucide-react';
+import { Loader2, Layers, GitBranch, ListTodo, Plus, FormInput, Upload } from 'lucide-react';
 import { ProcessWithTasks } from '@/types/template';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -20,9 +26,12 @@ import { toast } from 'sonner';
 const Templates = () => {
   const navigate = useNavigate();
   const [activeView, setActiveView] = useState('templates');
-  const [activeTab, setActiveTab] = useState<'processes' | 'subprocesses'>('processes');
+  const [activeTab, setActiveTab] = useState<'processes' | 'subprocesses' | 'tasks' | 'fields'>('processes');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isAddSubProcessDialogOpen, setIsAddSubProcessDialogOpen] = useState(false);
+  const [isPrestationBEWizardOpen, setIsPrestationBEWizardOpen] = useState(false);
+  const [isAddTaskDialogOpen, setIsAddTaskDialogOpen] = useState(false);
+  const [isBulkTaskImportOpen, setIsBulkTaskImportOpen] = useState(false);
   const [deletingProcess, setDeletingProcess] = useState<ProcessWithTasks | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState<TemplateFiltersState>(defaultFilters);
@@ -45,6 +54,13 @@ const Templates = () => {
     deleteSubProcess,
     refetch: refetchSubProcesses,
   } = useAllSubProcessTemplates();
+
+  const {
+    tasks: taskTemplates,
+    isLoading: isLoadingTasks,
+    deleteTask,
+    refetch: refetchTasks,
+  } = useAllTaskTemplates();
 
   const { user } = useAuth();
 
@@ -74,6 +90,33 @@ const Templates = () => {
     if (filters.visibility && sp.visibility_level !== filters.visibility) return false;
     if (filters.dateFrom && new Date(sp.created_at) < new Date(filters.dateFrom)) return false;
     if (filters.dateTo && new Date(sp.created_at) > new Date(filters.dateTo)) return false;
+    return true;
+  });
+
+  // Get sub-processes belonging to the selected process (for transitive filtering)
+  const subProcessIdsForProcess = filters.processId
+    ? subProcesses.filter((sp) => sp.process_template_id === filters.processId).map((sp) => sp.id)
+    : [];
+
+  // Apply filters to task templates
+  const filteredTasks = taskTemplates.filter((t) => {
+    if (searchQuery && !t.title.toLowerCase().includes(searchQuery.toLowerCase()) && 
+        !t.description?.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    
+    // Process filter: include tasks directly on the process OR tasks on sub-processes of that process
+    if (filters.processId) {
+      const directMatch = t.process_template_id === filters.processId;
+      const viaSubProcess = t.sub_process_template_id && subProcessIdsForProcess.includes(t.sub_process_template_id);
+      if (!directMatch && !viaSubProcess) return false;
+    }
+    
+    if (filters.subProcessId && t.sub_process_template_id !== filters.subProcessId) return false;
+    if (filters.companyId && t.creator_company_id !== filters.companyId) return false;
+    if (filters.departmentId && t.creator_department_id !== filters.departmentId) return false;
+    if (filters.creatorId && t.user_id !== filters.creatorId) return false;
+    if (filters.visibility && t.visibility_level !== filters.visibility) return false;
+    if (filters.dateFrom && new Date(t.created_at) < new Date(filters.dateFrom)) return false;
+    if (filters.dateTo && new Date(t.created_at) > new Date(filters.dateTo)) return false;
     return true;
   });
 
@@ -113,6 +156,8 @@ const Templates = () => {
         return () => setIsAddDialogOpen(true);
       case 'subprocesses':
         return () => setIsAddSubProcessDialogOpen(true);
+      case 'tasks':
+        return () => setIsAddTaskDialogOpen(true);
       default:
         return undefined;
     }
@@ -124,6 +169,8 @@ const Templates = () => {
         return 'Nouveau processus';
       case 'subprocesses':
         return 'Nouveau sous-processus';
+      case 'tasks':
+        return 'Nouvelle tâche';
       default:
         return undefined;
     }
@@ -151,6 +198,14 @@ const Templates = () => {
               <TabsTrigger value="subprocesses" className="gap-2">
                 <GitBranch className="h-4 w-4" />
                 Sous-processus ({subProcesses.length})
+              </TabsTrigger>
+              <TabsTrigger value="tasks" className="gap-2">
+                <ListTodo className="h-4 w-4" />
+                Tâches ({taskTemplates.length})
+              </TabsTrigger>
+              <TabsTrigger value="fields" className="gap-2">
+                <FormInput className="h-4 w-4" />
+                Champs personnalisés
               </TabsTrigger>
             </TabsList>
 
@@ -211,6 +266,16 @@ const Templates = () => {
             </TabsContent>
 
             <TabsContent value="subprocesses">
+              <div className="flex justify-end mb-3">
+                <Button
+                  size="sm"
+                  onClick={() => setIsPrestationBEWizardOpen(true)}
+                  className="gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  Nouvelle prestation BE
+                </Button>
+              </div>
               <SubProcessTemplatesList
                 subProcesses={filteredSubProcesses}
                 isLoading={isLoadingSubProcesses}
@@ -220,6 +285,30 @@ const Templates = () => {
               />
             </TabsContent>
 
+            <TabsContent value="tasks">
+              <div className="flex justify-end mb-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsBulkTaskImportOpen(true)}
+                  className="gap-2"
+                >
+                  <Upload className="h-4 w-4" />
+                  Import en masse
+                </Button>
+              </div>
+              <TaskTemplatesList
+                tasks={filteredTasks}
+                isLoading={isLoadingTasks}
+                onDelete={deleteTask}
+                onRefresh={refetchTasks}
+                viewMode={viewMode}
+              />
+            </TabsContent>
+
+            <TabsContent value="fields">
+              <CustomFieldsTab />
+            </TabsContent>
           </Tabs>
         </main>
       </div>
@@ -234,6 +323,24 @@ const Templates = () => {
         open={isAddSubProcessDialogOpen}
         onClose={() => setIsAddSubProcessDialogOpen(false)}
         onSuccess={refetchSubProcesses}
+      />
+
+      <NewPrestationBEWizard
+        open={isPrestationBEWizardOpen}
+        onClose={() => setIsPrestationBEWizardOpen(false)}
+        onSuccess={refetchSubProcesses}
+      />
+
+      <AddIndependentTaskDialog
+        open={isAddTaskDialogOpen}
+        onClose={() => setIsAddTaskDialogOpen(false)}
+        onSuccess={refetchTasks}
+      />
+
+      <BulkTaskTemplateImportDialog
+        open={isBulkTaskImportOpen}
+        onClose={() => setIsBulkTaskImportOpen(false)}
+        onSuccess={refetchTasks}
       />
 
       <DeleteProcessDialog
