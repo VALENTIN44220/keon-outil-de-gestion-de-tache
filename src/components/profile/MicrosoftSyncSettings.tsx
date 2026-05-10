@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Mail, Calendar, Link2, Unlink, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Loader2, Mail, Calendar, Link2, Unlink, RefreshCw, CheckCircle2, AlertCircle, CalendarRange } from 'lucide-react';
 import { useMicrosoftConnection } from '@/hooks/useMicrosoftConnection';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -23,8 +24,24 @@ export function MicrosoftSyncSettings() {
     exchangeCode,
     syncCalendar,
     disconnect,
+    updateSyncWindow,
     refresh,
   } = useMicrosoftConnection();
+
+  // Preset key derive du couple (past, future)
+  const PRESETS: Array<{ key: string; label: string; past: number; future: number }> = [
+    { key: 'F30',     label: '30 jours à venir',          past: 0,   future: 30 },
+    { key: 'F90',     label: '90 jours à venir',          past: 0,   future: 90 },
+    { key: 'P30F30',  label: '30j passés + 30j à venir',  past: 30,  future: 30 },
+    { key: 'P180F180',label: '6 mois passés + 6 mois à venir', past: 180, future: 180 },
+    { key: 'P365F365',label: '1 an passé + 1 an à venir',  past: 365, future: 365 },
+  ];
+  const currentPresetKey = (() => {
+    const past = connection.calendar_sync_past_days ?? 0;
+    const future = connection.calendar_sync_future_days ?? 30;
+    const found = PRESETS.find((p) => p.past === past && p.future === future);
+    return found?.key ?? 'CUSTOM';
+  })();
 
   // Handle OAuth callback
   useEffect(() => {
@@ -160,17 +177,50 @@ export function MicrosoftSyncSettings() {
 
         {/* Feature toggles */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Calendar className="h-5 w-5 text-primary" />
-              <div>
-                <Label>Calendrier Outlook</Label>
-                <p className="text-xs text-muted-foreground">
-                  Afficher les événements Outlook dans le calendrier unifié
-                </p>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Calendar className="h-5 w-5 text-primary" />
+                <div>
+                  <Label>Calendrier Outlook</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Afficher les événements Outlook dans le calendrier unifié
+                  </p>
+                </div>
               </div>
+              <Switch checked={connection.is_calendar_sync_enabled} />
             </div>
-            <Switch checked={connection.is_calendar_sync_enabled} />
+
+            {/* Periode de synchronisation */}
+            <div className="ml-8 pl-1 border-l-2 border-muted space-y-1.5">
+              <Label className="text-xs flex items-center gap-1.5">
+                <CalendarRange className="h-3.5 w-3.5" /> Fenêtre de synchronisation
+              </Label>
+              <Select
+                value={currentPresetKey}
+                onValueChange={(key) => {
+                  const p = PRESETS.find((x) => x.key === key);
+                  if (p) void updateSyncWindow(p.past, p.future);
+                }}
+              >
+                <SelectTrigger className="h-9 w-full max-w-md">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PRESETS.map((p) => (
+                    <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>
+                  ))}
+                  {currentPresetKey === 'CUSTOM' && (
+                    <SelectItem value="CUSTOM" disabled>
+                      Personnalisée ({connection.calendar_sync_past_days ?? 0}j passé / {connection.calendar_sync_future_days ?? 30}j futur)
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                Définit la plage récupérée à chaque synchronisation. Plus la fenêtre est large, plus la sync est longue.
+              </p>
+            </div>
           </div>
 
           <div className="flex items-center justify-between">

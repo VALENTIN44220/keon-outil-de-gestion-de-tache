@@ -10,6 +10,9 @@ interface MicrosoftConnection {
   is_calendar_sync_enabled?: boolean;
   is_email_sync_enabled?: boolean;
   last_sync_at?: string;
+  // Fenetre de sync configurable par l'utilisateur
+  calendar_sync_past_days?: number;
+  calendar_sync_future_days?: number;
 }
 
 
@@ -124,8 +127,11 @@ export function useMicrosoftConnection() {
 
     setIsSyncing(true);
     try {
-      const start = startDate || new Date().toISOString();
-      const end = endDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      // Utilise la fenetre configuree par l'utilisateur (defaut 0 / 30j)
+      const pastDays = connection.calendar_sync_past_days ?? 0;
+      const futureDays = connection.calendar_sync_future_days ?? 30;
+      const start = startDate || new Date(Date.now() - pastDays * 24 * 60 * 60 * 1000).toISOString();
+      const end = endDate || new Date(Date.now() + futureDays * 24 * 60 * 60 * 1000).toISOString();
 
       const { data, error } = await supabase.functions.invoke('microsoft-graph', {
         body: { action: 'sync-calendar', startDate: start, endDate: end },
@@ -172,6 +178,26 @@ export function useMicrosoftConnection() {
     }
   };
 
+  const updateSyncWindow = async (pastDays: number, futureDays: number): Promise<boolean> => {
+    if (!user) return false;
+    try {
+      const { error } = await supabase
+        .from('user_microsoft_connections')
+        .update({
+          calendar_sync_past_days: pastDays,
+          calendar_sync_future_days: futureDays,
+        })
+        .eq('user_id', user.id);
+      if (error) throw error;
+      toast.success('Fenêtre de synchronisation mise à jour');
+      await checkConnection();
+      return true;
+    } catch (e: any) {
+      toast.error(`Erreur : ${e.message}`);
+      return false;
+    }
+  };
+
   const disconnect = async (): Promise<boolean> => {
     try {
       const { error } = await supabase.functions.invoke('microsoft-graph', {
@@ -199,6 +225,7 @@ export function useMicrosoftConnection() {
     syncCalendar,
     sendEmail,
     disconnect,
+    updateSyncWindow,
     refresh: checkConnection,
   };
 }

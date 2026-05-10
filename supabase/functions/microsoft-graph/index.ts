@@ -863,7 +863,7 @@ Deno.serve(async (req) => {
       }
       const { data: connection } = await supabase
         .from('user_microsoft_connections')
-        .select('email, display_name, is_calendar_sync_enabled, is_email_sync_enabled, last_sync_at')
+        .select('email, display_name, is_calendar_sync_enabled, is_email_sync_enabled, last_sync_at, calendar_sync_past_days, calendar_sync_future_days')
         .eq('user_id', userId)
         .single();
       return new Response(JSON.stringify({ connected: !!connection, ...connection }), {
