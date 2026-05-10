@@ -77,6 +77,10 @@ export function PlannerImportPreviewDialog({
   const [bucketFilter, setBucketFilter] = useState<string>('all');
   const [assigneeFilter, setAssigneeFilter] = useState<string>('all');
   const [hideLinked, setHideLinked] = useState(true);
+  // Filtres date : 'created' ou 'due', + plage from/to (YYYY-MM-DD)
+  const [dateField, setDateField] = useState<'created' | 'due'>('created');
+  const [dateFrom, setDateFrom] = useState<string>('');
+  const [dateTo, setDateTo] = useState<string>('');
 
   // Reset everything when the dialog is opened/closed
   useEffect(() => {
@@ -149,9 +153,17 @@ export function PlannerImportPreviewDialog({
           return false;
       }
       if (q && !t.title.toLowerCase().includes(q)) return false;
+      // Filtre date : compare la date choisie (created ou due) a la plage [from, to]
+      if (dateFrom || dateTo) {
+        const refDate = dateField === 'created' ? t.createdDateTime : t.dueDateTime;
+        if (!refDate) return false; // si pas de date sur la tache et qu'un filtre date est actif, on l'ecarte
+        const d = refDate.slice(0, 10); // YYYY-MM-DD
+        if (dateFrom && d < dateFrom) return false;
+        if (dateTo && d > dateTo) return false;
+      }
       return true;
     });
-  }, [tasks, search, stateFilter, bucketFilter, assigneeFilter, hideLinked]);
+  }, [tasks, search, stateFilter, bucketFilter, assigneeFilter, hideLinked, dateField, dateFrom, dateTo]);
 
   const allFilteredSelected = filteredTasks.length > 0 && filteredTasks.every((t) => selectedIds.has(t.id));
   const someFilteredSelected = filteredTasks.some((t) => selectedIds.has(t.id));
@@ -299,6 +311,32 @@ export function PlannerImportPreviewDialog({
             />
             Masquer déjà liées
           </label>
+        </div>
+
+        {/* Filtres date */}
+        <div className="flex flex-wrap items-end gap-2 -mt-1">
+          <div className="w-[160px]">
+            <Select value={dateField} onValueChange={(v) => setDateField(v as 'created' | 'due')}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="created">Date de création</SelectItem>
+                <SelectItem value="due">Date d'échéance</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="block text-[10px] text-muted-foreground mb-0.5">Du</label>
+            <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 w-[150px]" />
+          </div>
+          <div>
+            <label className="block text-[10px] text-muted-foreground mb-0.5">Au</label>
+            <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 w-[150px]" />
+          </div>
+          {(dateFrom || dateTo) && (
+            <Button variant="ghost" size="sm" onClick={() => { setDateFrom(''); setDateTo(''); }} className="h-9">
+              Réinitialiser
+            </Button>
+          )}
         </div>
 
         {/* Bulk action row */}
