@@ -256,6 +256,51 @@ const ALL_COLUMNS: SupplierColumnDef[] = [
   { key: 'siret', label: 'SIRET', defaultVisible: false, render: (s) => s.siret || '—' },
   { key: 'tva', label: 'TVA', defaultVisible: false, render: (s) => s.tva || '—' },
   { key: 'ca_estime', label: 'CA estimé', defaultVisible: false, render: (s) => s.ca_estime != null ? new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(s.ca_estime) : '—' },
+  // CA reel calcule depuis les factures Divalto (FFN)
+  {
+    key: 'ca_realise_annee_courante',
+    label: 'CA réel (année)',
+    defaultVisible: true,
+    render: (s) => {
+      const v = (s as any).ca_realise_annee_courante as number | undefined;
+      return v != null && v > 0
+        ? <span className="font-semibold tabular-nums">{new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v)}</span>
+        : <span className="text-muted-foreground">—</span>;
+    },
+  },
+  {
+    key: 'ca_realise_annee_precedente',
+    label: 'CA réel (N-1)',
+    defaultVisible: false,
+    render: (s) => {
+      const v = (s as any).ca_realise_annee_precedente as number | undefined;
+      return v != null && v > 0
+        ? <span className="tabular-nums text-muted-foreground">{new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v)}</span>
+        : <span className="text-muted-foreground">—</span>;
+    },
+  },
+  {
+    key: 'ca_realise_total',
+    label: 'CA réel cumulé',
+    defaultVisible: false,
+    render: (s) => {
+      const v = (s as any).ca_realise_total as number | undefined;
+      return v != null && v > 0
+        ? <span className="tabular-nums">{new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v)}</span>
+        : <span className="text-muted-foreground">—</span>;
+    },
+  },
+  {
+    key: 'nb_factures_total',
+    label: 'Nb factures',
+    defaultVisible: false,
+    render: (s) => {
+      const v = (s as any).nb_factures_total as number | undefined;
+      return v != null && v > 0
+        ? <span className="text-xs tabular-nums">{v}</span>
+        : <span className="text-muted-foreground">—</span>;
+    },
+  },
   { key: 'description', label: 'Description', defaultVisible: false, render: (s) => <span title={s.description || ''} className="max-w-[300px] block whitespace-pre-wrap">{s.description || '—'}</span> },
   { key: 'status', label: 'Statut', defaultVisible: false, render: (s) => s.status || '—' },
   {

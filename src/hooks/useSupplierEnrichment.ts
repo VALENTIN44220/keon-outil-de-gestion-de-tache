@@ -50,6 +50,13 @@ export interface SupplierEnrichment {
   siret: string | null;
   tva: string | null;
 
+  // CA reel calcule depuis les factures Divalto (v_supplier_ca_realise)
+  ca_realise_total?: number | null;
+  ca_realise_annee_courante?: number | null;
+  ca_realise_annee_precedente?: number | null;
+  nb_factures_total?: number | null;
+  derniere_facture_at?: string | null;
+
   completeness_score: number;
   status: 'a_completer' | 'en_cours' | 'complet';
 
@@ -160,8 +167,33 @@ export function useSupplierEnrichment(filters: SupplierFilters, page = 0, pageSi
       const { data, error, count } = await q.range(from, to);
       if (error) throw error;
 
+      const suppliers = (data ?? []) as SupplierEnrichment[];
+
+      // Enrichit avec le CA reel calcule depuis Divalto (v_supplier_ca_realise)
+      if (suppliers.length > 0) {
+        const ids = suppliers.map((s) => s.id);
+        const { data: caRows } = await (supabase as any)
+          .from('v_supplier_ca_realise')
+          .select('supplier_id, ca_realise_total, ca_realise_annee_courante, ca_realise_annee_precedente, nb_factures_total, derniere_facture_at')
+          .in('supplier_id', ids);
+        const caMap = new Map<string, any>();
+        for (const r of (caRows ?? []) as Array<{ supplier_id: string }>) {
+          caMap.set(r.supplier_id, r);
+        }
+        for (const s of suppliers) {
+          const ca = caMap.get(s.id);
+          if (ca) {
+            s.ca_realise_total = Number(ca.ca_realise_total) || 0;
+            s.ca_realise_annee_courante = Number(ca.ca_realise_annee_courante) || 0;
+            s.ca_realise_annee_precedente = Number(ca.ca_realise_annee_precedente) || 0;
+            s.nb_factures_total = Number(ca.nb_factures_total) || 0;
+            s.derniere_facture_at = ca.derniere_facture_at || null;
+          }
+        }
+      }
+
       return {
-        suppliers: (data ?? []) as SupplierEnrichment[],
+        suppliers,
         total: count ?? 0,
       };
     },
