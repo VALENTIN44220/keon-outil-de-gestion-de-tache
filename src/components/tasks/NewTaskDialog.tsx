@@ -78,6 +78,7 @@ export function NewTaskDialog({ open, onClose, mode, onAdd, onTasksCreated }: Ne
   const [assigneeId, setAssigneeId] = useState<string | null>(null);
   const [requesterId, setRequesterId] = useState<string | null>(null);
   const [reporterId, setReporterId] = useState<string | null>(null);
+  const [durationHours, setDurationHours] = useState<string>('');
   const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
   const [links, setLinks] = useState<LinkItem[]>([]);
   
@@ -218,6 +219,7 @@ export function NewTaskDialog({ open, onClose, mode, onAdd, onTasksCreated }: Ne
       subcategory_id: subcategoryId,
       start_date: null,
       due_date: dueDate || null,
+      duration_hours: durationHours ? parseFloat(durationHours) : null,
       assignee_id: assigneeId,
       requester_id: requesterId,
       reporter_id: reporterId,
@@ -356,6 +358,7 @@ export function NewTaskDialog({ open, onClose, mode, onAdd, onTasksCreated }: Ne
     setAssigneeId(null);
     setRequesterId(null);
     setReporterId(null);
+    setDurationHours('');
     setChecklistItems([]);
     setLinks([]);
     setSelectedTemplateId(null);
@@ -458,6 +461,19 @@ export function NewTaskDialog({ open, onClose, mode, onAdd, onTasksCreated }: Ne
                     onChange={(e) => setDueDate(e.target.value)}
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="durationHours">Durée estimée (heures)</Label>
+                <Input
+                  id="durationHours"
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={durationHours}
+                  onChange={(e) => setDurationHours(e.target.value)}
+                  placeholder="Ex : 2, 4, 8..."
+                />
               </div>
 
               {/* Assignee selection - only for team mode */}

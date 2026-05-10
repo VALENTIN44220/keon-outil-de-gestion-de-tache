@@ -88,6 +88,8 @@ export interface Task {
   request_validation_refusal_action?: string | null;
   // Planner labels
   planner_labels?: string[] | null;
+  // Duration
+  duration_hours?: number | null;
   // Dates
   date_demande?: string | null;
   date_lancement?: string | null;
