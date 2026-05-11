@@ -10,7 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Save, Loader2, Eye, Lock, FormInput, Search, GitBranch } from 'lucide-react';
+import { Save, Loader2, Eye, Lock, FormInput, Search, GitBranch, Briefcase, Cpu, Building } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { RequestValidationConfigPanel } from '@/components/templates/RequestValidationConfigPanel';
 import { RecurrenceConfig, RecurrenceData } from '@/components/templates/RecurrenceConfig';
@@ -21,8 +21,21 @@ import {
   CommonFieldConfig,
   DEFAULT_COMMON_FIELDS_CONFIG,
   COMMON_FIELD_LABELS,
+  FIELD_FLOW_GROUPS,
+  FieldFlow,
   mergeCommonFieldsConfig,
 } from '@/types/commonFieldsConfig';
+
+// ID du processus Bureau d'Études (constante référencée dans les seeds BE)
+const BE_PROCESS_ID = 'bd75a3b0-c918-4b43-befe-739b83f7461a';
+
+// Métadonnées d'affichage par flux
+const FLOW_META: Record<FieldFlow, { color: string; bg: string; border: string; icon: React.ElementType }> = {
+  common:  { color: 'text-slate-700',  bg: 'bg-slate-50',    border: 'border-slate-200',  icon: FormInput },
+  generic: { color: 'text-indigo-700', bg: 'bg-indigo-50/40', border: 'border-indigo-200', icon: Building },
+  be:      { color: 'text-amber-700',  bg: 'bg-amber-50/40',  border: 'border-amber-200',  icon: Briefcase },
+  it:      { color: 'text-sky-700',    bg: 'bg-sky-50/40',    border: 'border-sky-200',    icon: Cpu },
+};
 
 interface ProcessSettingsTabProps {
   process: ProcessWithTasks;
@@ -56,6 +69,12 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
   const [beProjectSearch, setBeProjectSearch] = useState('');
   const [itProjects, setItProjects] = useState<{ id: string; nom_projet: string; code_projet_digital: string }[]>([]);
   const [itProjectSearch, setItProjectSearch] = useState('');
+  const [beAffaires, setBeAffaires] = useState<{ id: string; code_affaire: string; libelle: string | null }[]>([]);
+  const [beAffaireSearch, setBeAffaireSearch] = useState('');
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+
+  // Détecte si on est sur le processus BE → mise en avant du flux BE
+  const isBEProcess = process.id === BE_PROCESS_ID;
 
   // Subprocess selection mode
   const [subprocessSelectionMode, setSubprocessSelectionMode] = useState<'multiple' | 'single'>(
@@ -115,7 +134,7 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
     );
   }, [process.id, process.name, process.description]);
 
-  // Fetch BE projects for imposed value selector
+  // Fetch BE projects + BE affaires + IT projects + categories for imposed value selectors
   useEffect(() => {
     (async () => {
       const { data } = await supabase
@@ -130,6 +149,20 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
         .select('id, nom_projet, code_projet_digital')
         .order('nom_projet');
       if (data) setItProjects(data);
+    })();
+    (async () => {
+      const { data } = await (supabase as any)
+        .from('be_affaires')
+        .select('id, code_affaire, libelle')
+        .order('code_affaire');
+      if (data) setBeAffaires(data);
+    })();
+    (async () => {
+      const { data } = await (supabase as any)
+        .from('categories')
+        .select('id, name')
+        .order('name');
+      if (data) setCategories(data);
     })();
   }, []);
 
@@ -253,8 +286,6 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
       setIsSavingRecurrence(false);
     }
   };
-
-  const fieldKeys = Object.keys(commonFieldsConfig) as (keyof CommonFieldsConfig)[];
 
   const targetDepartmentName = useMemo(() => {
     if (!formData.target_department_id) return null;
@@ -444,203 +475,367 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
         </CardContent>
       </Card>
 
-      {/* Configuration des champs généraux */}
+      {/* Configuration des champs réels par flux */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <FormInput className="h-4 w-4 text-primary" />
-            Champs généraux de la demande
+            Champs du formulaire de demande
           </CardTitle>
           <CardDescription className="text-xs">
-            Configurez la visibilité et l'éditabilité des champs du formulaire de création de demande
+            Configurez la visibilité, l'éditabilité et les valeurs par défaut des champs
+            réellement présents dans les formulaires de création de demande, regroupés par flux.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-1">
-          {/* Header row */}
-          <div className="grid grid-cols-[1fr_80px_80px_140px] gap-2 items-center px-2 pb-2 border-b">
-            <span className="text-xs font-medium text-muted-foreground">Champ</span>
-            <span className="text-xs font-medium text-muted-foreground text-center flex items-center gap-1 justify-center">
-              <Eye className="h-3 w-3" /> Visible
-            </span>
-            <span className="text-xs font-medium text-muted-foreground text-center flex items-center gap-1 justify-center">
-              <Lock className="h-3 w-3" /> Modifiable
-            </span>
-            <span className="text-xs font-medium text-muted-foreground text-center">
-              Valeur imposée
-            </span>
-          </div>
+        <CardContent className="space-y-4">
 
-          {fieldKeys.map((key) => {
-            const config = commonFieldsConfig[key];
-            const showPriorityDefault = key === 'priority' && config.visible && !config.editable;
-            const showProjectDefault = key === 'be_project' && !config.editable;
-            const showItProjectDefault = key === 'it_project' && !config.editable;
+          {/* Une section par flux */}
+          {FIELD_FLOW_GROUPS
+            // Ordre adaptatif : sur le processus BE, on affiche d'abord le groupe BE
+            .sort((a, b) => {
+              if (a.flow === 'common') return -1;
+              if (b.flow === 'common') return 1;
+              if (isBEProcess) {
+                if (a.flow === 'be') return -1;
+                if (b.flow === 'be') return 1;
+              }
+              return 0;
+            })
+            .map((group) => {
+              const meta = FLOW_META[group.flow];
+              const Icon = meta.icon;
+              const isRelevantForCurrent =
+                group.flow === 'common' ||
+                (isBEProcess && group.flow === 'be') ||
+                (!isBEProcess && group.flow !== 'be');
 
-            // Title is always auto-generated — skip config row
-            if (key === 'title') {
               return (
-                <div key={key} className="space-y-2">
-                  <div className="grid grid-cols-[1fr_80px_80px_140px] gap-2 items-center px-2 py-2 rounded bg-muted/30">
-                    <span className="text-sm font-medium">{COMMON_FIELD_LABELS[key]}</span>
-                    <div className="flex justify-center">
-                      <Switch checked={true} disabled />
-                    </div>
-                    <div className="flex justify-center">
-                      <Switch checked={false} disabled />
-                    </div>
-                    <span className="text-xs text-muted-foreground text-center">Automatique</span>
-                  </div>
-                  <div className="ml-4 pl-4 border-l-2 border-primary/30 pb-2">
-                    <p className="text-xs text-muted-foreground">
-                      Le titre est toujours généré automatiquement : <code className="bg-muted px-1 rounded">{'Nom du processus - Date'}</code>
-                    </p>
-                  </div>
-                </div>
-              );
-            }
-
-            return (
-              <div key={key} className="space-y-2">
-                <div className="grid grid-cols-[1fr_80px_80px_140px] gap-2 items-center px-2 py-2 rounded hover:bg-muted/50">
-                  <span className="text-sm font-medium">{COMMON_FIELD_LABELS[key]}</span>
-
-                  <div className="flex justify-center">
-                    <Switch
-                      checked={config.visible}
-                      onCheckedChange={(checked) =>
-                        updateFieldConfig(key, { visible: checked })
-                      }
-                      disabled={!canManage}
-                    />
-                  </div>
-
-                  <div className="flex justify-center">
-                    <Switch
-                      checked={config.editable}
-                      onCheckedChange={(checked) =>
-                        updateFieldConfig(key, { editable: checked })
-                      }
-                      disabled={!canManage || (key !== 'be_project' && key !== 'it_project' && !config.visible)}
-                    />
-                  </div>
-
-                  <div className="flex justify-center">
-                    {showPriorityDefault ? (
-                      <Select
-                        value={config.default_value || 'medium'}
-                        onValueChange={(v) => updateFieldConfig(key, { default_value: v })}
-                        disabled={!canManage}
-                      >
-                        <SelectTrigger className="h-7 text-xs w-28">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="low">Basse</SelectItem>
-                          <SelectItem value="medium">Moyenne</SelectItem>
-                          <SelectItem value="high">Haute</SelectItem>
-                          <SelectItem value="urgent">Urgente</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    ) : showProjectDefault ? (
-                      <Select
-                        value={config.default_value || ''}
-                        onValueChange={(v) => updateFieldConfig(key, { default_value: v || null })}
-                        disabled={!canManage}
-                      >
-                        <SelectTrigger className="h-7 text-xs w-36">
-                          <SelectValue placeholder="Choisir...">
-                            {config.default_value
-                              ? (() => {
-                                  const p = beProjects.find(pr => pr.id === config.default_value);
-                                  return p ? p.code_projet : 'Projet';
-                                })()
-                              : 'Choisir...'}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <div className="p-1.5 border-b">
-                            <div className="relative">
-                              <Search className="absolute left-2 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
-                              <Input
-                                placeholder="Rechercher..."
-                                value={beProjectSearch}
-                                onChange={(e) => setBeProjectSearch(e.target.value)}
-                                className="h-7 pl-7 text-xs"
-                              />
-                            </div>
-                          </div>
-                          <div className="max-h-48 overflow-y-auto">
-                            {beProjects
-                              .filter(p =>
-                                !beProjectSearch ||
-                                p.nom_projet.toLowerCase().includes(beProjectSearch.toLowerCase()) ||
-                                p.code_projet.toLowerCase().includes(beProjectSearch.toLowerCase())
-                              )
-                              .map(p => (
-                                <SelectItem key={p.id} value={p.id}>
-                                  <div className="flex items-center gap-1.5">
-                                    <Badge variant="outline" className="font-mono text-[10px] px-1 py-0">{p.code_projet}</Badge>
-                                    <span className="text-xs truncate max-w-[120px]">{p.nom_projet}</span>
-                                  </div>
-                                </SelectItem>
-                              ))}
-                          </div>
-                        </SelectContent>
-                      </Select>
-                    ) : showItProjectDefault ? (
-                      <Select
-                        value={config.default_value || ''}
-                        onValueChange={(v) => updateFieldConfig(key, { default_value: v || null })}
-                        disabled={!canManage}
-                      >
-                        <SelectTrigger className="h-7 text-xs w-36">
-                          <SelectValue placeholder="Choisir...">
-                            {config.default_value
-                              ? (() => {
-                                  const p = itProjects.find(pr => pr.id === config.default_value);
-                                  return p ? p.code_projet_digital : 'Projet IT';
-                                })()
-                              : 'Choisir...'}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <div className="p-1.5 border-b">
-                            <div className="relative">
-                              <Search className="absolute left-2 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
-                              <Input
-                                placeholder="Rechercher..."
-                                value={itProjectSearch}
-                                onChange={(e) => setItProjectSearch(e.target.value)}
-                                className="h-7 pl-7 text-xs"
-                              />
-                            </div>
-                          </div>
-                          <div className="max-h-48 overflow-y-auto">
-                            {itProjects
-                              .filter(p =>
-                                !itProjectSearch ||
-                                p.nom_projet.toLowerCase().includes(itProjectSearch.toLowerCase()) ||
-                                p.code_projet_digital.toLowerCase().includes(itProjectSearch.toLowerCase())
-                              )
-                              .map(p => (
-                                <SelectItem key={p.id} value={p.id}>
-                                  <div className="flex items-center gap-1.5">
-                                    <Badge variant="outline" className="font-mono text-[10px] px-1 py-0">{p.code_projet_digital}</Badge>
-                                    <span className="text-xs truncate max-w-[120px]">{p.nom_projet}</span>
-                                  </div>
-                                </SelectItem>
-                              ))}
-                          </div>
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
+                <div
+                  key={group.flow}
+                  className={cn(
+                    'rounded-lg border p-3',
+                    meta.bg,
+                    meta.border,
+                    !isRelevantForCurrent && 'opacity-60'
+                  )}
+                >
+                  {/* En-tête de groupe */}
+                  <div className="flex items-center gap-2 mb-2">
+                    <Icon className={cn('h-4 w-4', meta.color)} />
+                    <h4 className={cn('text-sm font-semibold', meta.color)}>{group.label}</h4>
+                    {!isRelevantForCurrent && (
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                        Non utilisé ici
+                      </Badge>
                     )}
                   </div>
+                  <p className="text-[11px] text-muted-foreground mb-3">{group.description}</p>
+
+                  {/* En-tête du tableau */}
+                  <div className="grid grid-cols-[1fr_70px_70px_160px] gap-2 items-center px-1 pb-1.5 border-b border-current/10">
+                    <span className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground">Champ</span>
+                    <span className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center flex items-center gap-1 justify-center">
+                      <Eye className="h-3 w-3" />
+                    </span>
+                    <span className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center flex items-center gap-1 justify-center">
+                      <Lock className="h-3 w-3" />
+                    </span>
+                    <span className="text-[10px] uppercase tracking-wide font-medium text-muted-foreground text-center">
+                      Valeur imposée
+                    </span>
+                  </div>
+
+                  {/* Lignes du tableau */}
+                  {group.fields.map((key) => {
+                    const config = commonFieldsConfig[key];
+
+                    // Le titre est toujours auto-généré → rendu spécifique
+                    if (key === 'title') {
+                      return (
+                        <div key={key} className="space-y-1">
+                          <div className="grid grid-cols-[1fr_70px_70px_160px] gap-2 items-center px-1 py-1.5">
+                            <span className="text-sm font-medium">{COMMON_FIELD_LABELS[key]}</span>
+                            <div className="flex justify-center">
+                              <Switch checked={true} disabled />
+                            </div>
+                            <div className="flex justify-center">
+                              <Switch checked={false} disabled />
+                            </div>
+                            <span className="text-[11px] text-muted-foreground text-center italic">
+                              Auto-généré
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground ml-1">
+                            Format : <code className="bg-white/60 px-1 rounded">{config.title_pattern || '{process} - {date}'}</code>
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    // Renderer du sélecteur de valeur imposée selon la nature du champ
+                    const renderDefault = () => {
+                      // Le sélecteur de défaut n'est pertinent que si visible (et imposé = non éditable, ou avec valeur par défaut)
+                      if (!config.visible) return <span className="text-[11px] text-muted-foreground">—</span>;
+
+                      switch (key) {
+                        case 'priority':
+                          return (
+                            <Select
+                              value={config.default_value || 'medium'}
+                              onValueChange={(v) => updateFieldConfig(key, { default_value: v })}
+                              disabled={!canManage}
+                            >
+                              <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="low">Basse</SelectItem>
+                                <SelectItem value="medium">Moyenne</SelectItem>
+                                <SelectItem value="high">Haute</SelectItem>
+                                <SelectItem value="urgent">Urgente</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          );
+
+                        case 'be_urgency':
+                          return (
+                            <Select
+                              value={config.default_value || 'normal'}
+                              onValueChange={(v) => updateFieldConfig(key, { default_value: v })}
+                              disabled={!canManage}
+                            >
+                              <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="normal">Normal</SelectItem>
+                                <SelectItem value="urgent">Urgent</SelectItem>
+                                <SelectItem value="critique">Critique</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          );
+
+                        case 'be_project':
+                          return (
+                            <Select
+                              value={config.default_value || ''}
+                              onValueChange={(v) => updateFieldConfig(key, { default_value: v || null })}
+                              disabled={!canManage}
+                            >
+                              <SelectTrigger className="h-7 text-xs">
+                                <SelectValue placeholder="Aucun">
+                                  {config.default_value
+                                    ? beProjects.find(p => p.id === config.default_value)?.code_projet || 'Projet'
+                                    : 'Aucun'}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <div className="p-1.5 border-b">
+                                  <div className="relative">
+                                    <Search className="absolute left-2 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
+                                    <Input
+                                      placeholder="Rechercher..."
+                                      value={beProjectSearch}
+                                      onChange={(e) => setBeProjectSearch(e.target.value)}
+                                      className="h-7 pl-7 text-xs"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="max-h-48 overflow-y-auto">
+                                  {beProjects
+                                    .filter(p => !beProjectSearch ||
+                                      p.nom_projet.toLowerCase().includes(beProjectSearch.toLowerCase()) ||
+                                      p.code_projet.toLowerCase().includes(beProjectSearch.toLowerCase()))
+                                    .slice(0, 100)
+                                    .map(p => (
+                                      <SelectItem key={p.id} value={p.id}>
+                                        <div className="flex items-center gap-1.5">
+                                          <Badge variant="outline" className="font-mono text-[10px] px-1 py-0">{p.code_projet}</Badge>
+                                          <span className="text-xs truncate max-w-[120px]">{p.nom_projet}</span>
+                                        </div>
+                                      </SelectItem>
+                                    ))}
+                                </div>
+                              </SelectContent>
+                            </Select>
+                          );
+
+                        case 'be_affaire':
+                          return (
+                            <Select
+                              value={config.default_value || ''}
+                              onValueChange={(v) => updateFieldConfig(key, { default_value: v || null })}
+                              disabled={!canManage}
+                            >
+                              <SelectTrigger className="h-7 text-xs">
+                                <SelectValue placeholder="Aucune">
+                                  {config.default_value
+                                    ? beAffaires.find(a => a.id === config.default_value)?.code_affaire || 'Affaire'
+                                    : 'Aucune'}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <div className="p-1.5 border-b">
+                                  <div className="relative">
+                                    <Search className="absolute left-2 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
+                                    <Input
+                                      placeholder="Rechercher..."
+                                      value={beAffaireSearch}
+                                      onChange={(e) => setBeAffaireSearch(e.target.value)}
+                                      className="h-7 pl-7 text-xs"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="max-h-48 overflow-y-auto">
+                                  {beAffaires
+                                    .filter(a => !beAffaireSearch ||
+                                      a.code_affaire.toLowerCase().includes(beAffaireSearch.toLowerCase()) ||
+                                      (a.libelle ?? '').toLowerCase().includes(beAffaireSearch.toLowerCase()))
+                                    .slice(0, 100)
+                                    .map(a => (
+                                      <SelectItem key={a.id} value={a.id}>
+                                        <div className="flex items-center gap-1.5">
+                                          <Badge variant="outline" className="font-mono text-[10px] px-1 py-0">{a.code_affaire}</Badge>
+                                          <span className="text-xs truncate max-w-[120px]">{a.libelle ?? '—'}</span>
+                                        </div>
+                                      </SelectItem>
+                                    ))}
+                                </div>
+                              </SelectContent>
+                            </Select>
+                          );
+
+                        case 'it_project':
+                          return (
+                            <Select
+                              value={config.default_value || ''}
+                              onValueChange={(v) => updateFieldConfig(key, { default_value: v || null })}
+                              disabled={!canManage}
+                            >
+                              <SelectTrigger className="h-7 text-xs">
+                                <SelectValue placeholder="Aucun">
+                                  {config.default_value
+                                    ? itProjects.find(p => p.id === config.default_value)?.code_projet_digital || 'Projet IT'
+                                    : 'Aucun'}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <div className="p-1.5 border-b">
+                                  <div className="relative">
+                                    <Search className="absolute left-2 top-1.5 h-3.5 w-3.5 text-muted-foreground" />
+                                    <Input
+                                      placeholder="Rechercher..."
+                                      value={itProjectSearch}
+                                      onChange={(e) => setItProjectSearch(e.target.value)}
+                                      className="h-7 pl-7 text-xs"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="max-h-48 overflow-y-auto">
+                                  {itProjects
+                                    .filter(p => !itProjectSearch ||
+                                      p.nom_projet.toLowerCase().includes(itProjectSearch.toLowerCase()) ||
+                                      p.code_projet_digital.toLowerCase().includes(itProjectSearch.toLowerCase()))
+                                    .slice(0, 100)
+                                    .map(p => (
+                                      <SelectItem key={p.id} value={p.id}>
+                                        <div className="flex items-center gap-1.5">
+                                          <Badge variant="outline" className="font-mono text-[10px] px-1 py-0">{p.code_projet_digital}</Badge>
+                                          <span className="text-xs truncate max-w-[120px]">{p.nom_projet}</span>
+                                        </div>
+                                      </SelectItem>
+                                    ))}
+                                </div>
+                              </SelectContent>
+                            </Select>
+                          );
+
+                        case 'it_project_phase':
+                          return (
+                            <Input
+                              value={config.default_value || ''}
+                              onChange={(e) => updateFieldConfig(key, { default_value: e.target.value || null })}
+                              placeholder="Phase (ex: Cadrage)"
+                              className="h-7 text-xs"
+                              disabled={!canManage}
+                            />
+                          );
+
+                        case 'category':
+                          return (
+                            <Select
+                              value={config.default_value || ''}
+                              onValueChange={(v) => updateFieldConfig(key, { default_value: v || null })}
+                              disabled={!canManage}
+                            >
+                              <SelectTrigger className="h-7 text-xs">
+                                <SelectValue placeholder="Aucune">
+                                  {config.default_value
+                                    ? categories.find(c => c.id === config.default_value)?.name || 'Catégorie'
+                                    : 'Aucune'}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent className="max-h-60">
+                                {categories.map(c => (
+                                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          );
+
+                        case 'target_department':
+                          return (
+                            <Select
+                              value={config.default_value || ''}
+                              onValueChange={(v) => updateFieldConfig(key, { default_value: v || null })}
+                              disabled={!canManage}
+                            >
+                              <SelectTrigger className="h-7 text-xs">
+                                <SelectValue placeholder="Aucun">
+                                  {config.default_value
+                                    ? departments.find(d => d.id === config.default_value)?.name || 'Service'
+                                    : 'Aucun'}
+                                </SelectValue>
+                              </SelectTrigger>
+                              <SelectContent className="max-h-60">
+                                {departments.map(d => (
+                                  <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          );
+
+                        default:
+                          return <span className="text-[11px] text-muted-foreground">—</span>;
+                      }
+                    };
+
+                    return (
+                      <div
+                        key={key}
+                        className="grid grid-cols-[1fr_70px_70px_160px] gap-2 items-center px-1 py-1.5 rounded hover:bg-white/40"
+                      >
+                        <span className="text-sm">{COMMON_FIELD_LABELS[key]}</span>
+                        <div className="flex justify-center">
+                          <Switch
+                            checked={config.visible}
+                            onCheckedChange={(v) => updateFieldConfig(key, { visible: v })}
+                            disabled={!canManage}
+                          />
+                        </div>
+                        <div className="flex justify-center">
+                          <Switch
+                            checked={config.editable}
+                            onCheckedChange={(v) => updateFieldConfig(key, { editable: v })}
+                            disabled={!canManage || !config.visible}
+                          />
+                        </div>
+                        <div className="flex justify-center">
+                          {renderDefault()}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          }
 
           {canManage && (
             <div className="pt-3 border-t mt-2">
