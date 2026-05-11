@@ -377,10 +377,19 @@ interface TaskPill {
          originUserId: sorted[0].user_id,
        };
        e.dataTransfer.setData('application/x-slot-move', JSON.stringify(payload));
+       // ⚠️ Important : on NE met PAS taskId/duration ici.
+       // Si on les définissait aussi, et que onSlotMove échouait (ex. conflit
+       // d'unicité sur un créneau cible), handleDrop tomberait dans Cas 2
+       // (onSlotDrop) et créerait un DOUBLON à la nouvelle position au lieu
+       // de déplacer le slot existant. C'était l'origine du bug
+       // « le second créneau reste collé ».
+       e.dataTransfer.effectAllowed = 'move';
+     } else {
+       // Drag depuis le backlog (pas de slots existants) — on garde taskId/duration
+       e.dataTransfer.setData('taskId', task.id);
+       e.dataTransfer.setData('duration', String(slots.length));
+       e.dataTransfer.effectAllowed = 'move';
      }
-     e.dataTransfer.setData('taskId', task.id);
-     e.dataTransfer.setData('duration', String(slots.length));
-     e.dataTransfer.effectAllowed = 'move';
      setDraggingTask(task.id);
    };
  

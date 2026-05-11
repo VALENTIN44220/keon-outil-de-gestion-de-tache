@@ -540,6 +540,11 @@ interface DayTask {
                                 draggable
                                 onDragStart={(e) => {
                                   if (slots.length > 0) {
+                                    // Slot existant : on ne met QUE le payload de
+                                    // déplacement. Si on définissait aussi taskId/
+                                    // duration, un échec de onSlotMove ferait
+                                    // tomber dans Cas 2 (onSlotDrop) et créerait
+                                    // un doublon. Voir handleDrop / WeekPlanningGrid.
                                     const sorted = [...slots].sort((a, b) => a.date.localeCompare(b.date));
                                     e.dataTransfer.setData(
                                       'application/x-slot-move',
@@ -549,9 +554,11 @@ interface DayTask {
                                         originUserId: sorted[0].user_id,
                                       }),
                                     );
+                                  } else {
+                                    // Drag depuis le backlog (pas de slot existant)
+                                    e.dataTransfer.setData('taskId', task.id);
+                                    e.dataTransfer.setData('duration', String(slots.length || 2));
                                   }
-                                  e.dataTransfer.setData('taskId', task.id);
-                                  e.dataTransfer.setData('duration', String(slots.length || 2));
                                   e.dataTransfer.effectAllowed = 'move';
                                 }}
                                 onClick={() => onTaskClick(task, slots)}

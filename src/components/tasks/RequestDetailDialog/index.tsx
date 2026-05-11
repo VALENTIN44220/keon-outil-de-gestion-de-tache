@@ -1031,6 +1031,19 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange, onTas
               )}
             </div>
 
+            {/* Chaîne de validation de la demande / tâche principale.
+                Affiche les niveaux 1 et 2 configurés au template et leur statut. */}
+            <TaskValidationChainPanel
+              task={task}
+              profiles={profiles}
+              managerOfAssigneeId={
+                task.assignee_id
+                  ? profilesList.find(p => p.id === task.assignee_id)?.manager_id ?? null
+                  : null
+              }
+              requesterId={task.requester_id}
+            />
+
             {processName && (
               <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
                 <div className="flex items-center gap-2">

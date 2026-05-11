@@ -16,6 +16,7 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSimulation } from '@/contexts/SimulationContext';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Card,
@@ -714,6 +715,25 @@ function TaskRow({
 
   const { updateBEStatus, isUpdating } = useBETaskStatus();
 
+  // ── Identité de l'utilisateur courant (avec support simulation) ──────────
+  // Permet d'afficher les boutons d'action UNIQUEMENT à la personne concernée :
+  //  - "Commencer" / "Soumettre" → uniquement à l'assignée de la tâche
+  //  - "Valider" (a_relire → a_valider) → uniquement au dispatch manager
+  //    (ou aux validateurs niveau 1/2 si configurés sur la prestation)
+  const { profile: authProfile } = useAuth();
+  const { isSimulating, simulatedProfile } = useSimulation();
+  const currentProfileId = (isSimulating && simulatedProfile ? simulatedProfile : authProfile)?.id ?? null;
+
+  const isAssignee = currentProfileId !== null && task.assignee_id === currentProfileId;
+  const isDispatchManager = currentProfileId !== null
+    && task.sub_process_template?.dispatch_manager_id === currentProfileId;
+  // Validateurs explicites configurés sur task_templates (héritage à la création)
+  const isValidator1 = currentProfileId !== null
+    && (task as any).validator_level_1_id === currentProfileId;
+  const isValidator2 = currentProfileId !== null
+    && (task as any).validator_level_2_id === currentProfileId;
+  const canValidateAtRelire = isDispatchManager || isValidator1 || isValidator2;
+
   const changeStatus = async (newStatus: string) => {
     await updateBEStatus({
       taskId: task.id,
@@ -767,7 +787,19 @@ function TaskRow({
               {task.task_number}
             </Badge>
           )}
-          <span className="text-sm font-medium truncate">{presName}</span>
+          <span
+            className="text-sm font-medium leading-tight break-words"
+            style={{
+              // Permet le retour à la ligne mais limite à 2 lignes max via line-clamp
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+            }}
+            title={presName}
+          >
+            {presName}
+          </span>
           {presCat === 'be_reglementaire' && (
             <Badge
               variant="outline"
@@ -853,8 +885,8 @@ function TaskRow({
 
       {/* Boutons workflow — masqués pour les tâches bloquées */}
 
-      {/* affectee → en_cours : l'assigné démarre la tâche */}
-      {!isBlocked && task.be_status === 'affectee' && (
+      {/* affectee → en_cours : SEULEMENT l'assignée peut démarrer */}
+      {!isBlocked && task.be_status === 'affectee' && isAssignee && (
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -874,8 +906,8 @@ function TaskRow({
         </TooltipProvider>
       )}
 
-      {/* en_cours → a_relire : l'assigné soumet son travail */}
-      {!isBlocked && task.be_status === 'en_cours' && (
+      {/* en_cours → a_relire : SEULEMENT l'assignée peut soumettre */}
+      {!isBlocked && task.be_status === 'en_cours' && isAssignee && (
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -895,8 +927,9 @@ function TaskRow({
         </TooltipProvider>
       )}
 
-      {/* a_relire → a_valider : le manager valide */}
-      {!isBlocked && task.be_status === 'a_relire' && (
+      {/* a_relire → a_valider : SEULEMENT le manager de dispatch
+          (ou un validateur niveau 1/2 explicitement configuré) */}
+      {!isBlocked && task.be_status === 'a_relire' && canValidateAtRelire && (
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -959,6 +992,8 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
           id, title, task_number, request_number, status, be_status, be_urgency,
           parent_request_id, assignee_id, sub_process_template_id,
           due_date, start_date, duration_hours, created_at, type, document_url,
+          validation_level_1, validation_level_2,
+          validator_level_1_id, validator_level_2_id,
           assignee:profiles!tasks_assignee_id_fkey(id, display_name),
           sub_process_template:sub_process_templates!tasks_sub_process_template_id_fkey(id, name, be_category, dispatch_manager_id, order_index, parallel_group),
           be_project:be_projects!tasks_be_project_id_fkey(code_projet, nom_projet)
