@@ -1,20 +1,24 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Input } from '@/components/ui/input';
 import {
   Plus,
   GitBranch,
   Loader2,
-  GripVertical,
   Users,
   User,
-  ExternalLink,
   Trash2,
   MoreVertical,
   Settings,
+  ListTodo,
+  CheckCircle2,
+  Search,
+  ChevronRight,
+  Wand2,
+  ExternalLink,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -26,6 +30,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { SubProcessConfigView } from '../SubProcessConfigView';
+import { NewPrestationBEWizard } from '../NewPrestationBEWizard';
+
+// Constante : ID du processus Bureau d'Études
+const BE_PROCESS_ID = 'bd75a3b0-c918-4b43-befe-739b83f7461a';
 
 interface SubProcess {
   id: string;
@@ -35,6 +43,8 @@ interface SubProcess {
   order_index: number;
   is_mandatory: boolean;
   taskCount: number;
+  hasValidation: boolean;
+  totalDurationDays: number;
 }
 
 interface ProcessSubProcessesTabProps {
@@ -52,6 +62,12 @@ export function ProcessSubProcessesTab({
   const [subProcesses, setSubProcesses] = useState<SubProcess[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedSubProcessId, setSelectedSubProcessId] = useState<string | null>(null);
+  const [isBEWizardOpen, setIsBEWizardOpen] = useState(false);
+  const [search, setSearch] = useState('');
+
+  const isBEProcess = processId === BE_PROCESS_ID;
+  const label = isBEProcess ? 'prestation' : 'sous-processus';
+  const labelPlural = isBEProcess ? 'prestations' : 'sous-processus';
 
   useEffect(() => {
     fetchSubProcesses();
@@ -69,22 +85,38 @@ export function ProcessSubProcessesTab({
           assignment_type,
           order_index,
           is_mandatory,
-          task_templates (id)
+          task_templates (
+            id,
+            default_duration_days,
+            validation_level_1,
+            validation_level_2
+          )
         `)
         .eq('process_template_id', processId)
         .order('order_index');
 
       if (data) {
         setSubProcesses(
-          data.map((sp: any) => ({
-            id: sp.id,
-            name: sp.name,
-            description: sp.description,
-            assignment_type: sp.assignment_type,
-            order_index: sp.order_index,
-            is_mandatory: sp.is_mandatory || false,
-            taskCount: sp.task_templates?.length || 0,
-          }))
+          data.map((sp: any) => {
+            const tasks = sp.task_templates || [];
+            return {
+              id: sp.id,
+              name: sp.name,
+              description: sp.description,
+              assignment_type: sp.assignment_type,
+              order_index: sp.order_index,
+              is_mandatory: sp.is_mandatory || false,
+              taskCount: tasks.length,
+              hasValidation: tasks.some((t: any) =>
+                (t.validation_level_1 && t.validation_level_1 !== 'none') ||
+                (t.validation_level_2 && t.validation_level_2 !== 'none')
+              ),
+              totalDurationDays: tasks.reduce(
+                (acc: number, t: any) => acc + (t.default_duration_days ?? 0),
+                0
+              ),
+            };
+          })
         );
       }
     } catch (error) {
@@ -93,6 +125,17 @@ export function ProcessSubProcessesTab({
       setIsLoading(false);
     }
   };
+
+  // Filtered list with search
+  const filteredSubProcesses = useMemo(() => {
+    if (!search.trim()) return subProcesses;
+    const q = search.toLowerCase();
+    return subProcesses.filter(
+      (sp) =>
+        sp.name.toLowerCase().includes(q) ||
+        (sp.description ?? '').toLowerCase().includes(q)
+    );
+  }, [subProcesses, search]);
 
   const handleDelete = async (id: string) => {
     try {
@@ -103,7 +146,7 @@ export function ProcessSubProcessesTab({
 
       if (error) throw error;
 
-      toast.success('Sous-processus supprimé');
+      toast.success(`${isBEProcess ? 'Prestation' : 'Sous-processus'} supprimé`);
       fetchSubProcesses();
       onUpdate();
     } catch (error) {
@@ -123,7 +166,7 @@ export function ProcessSubProcessesTab({
     }
   };
 
-  const handleCreate = async () => {
+  const handleCreateGeneric = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -131,8 +174,8 @@ export function ProcessSubProcessesTab({
         return;
       }
 
-      const nextOrder = subProcesses.length > 0 
-        ? Math.max(...subProcesses.map(sp => sp.order_index)) + 1 
+      const nextOrder = subProcesses.length > 0
+        ? Math.max(...subProcesses.map(sp => sp.order_index)) + 1
         : 0;
 
       const { data, error } = await supabase
@@ -186,84 +229,177 @@ export function ProcessSubProcessesTab({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      {/* ── Header ─────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
-          <h3 className="text-base font-semibold">Sous-processus</h3>
+          <h3 className="text-base font-semibold capitalize">{labelPlural}</h3>
           <p className="text-sm text-muted-foreground">
-            Gérez les étapes de ce processus
+            {isBEProcess
+              ? 'Gérez les prestations du Bureau d\'Études et leurs étapes (validations niveau 1 & 2)'
+              : 'Gérez les étapes de ce processus'}
           </p>
         </div>
+
         {canManage && (
-          <Button size="sm" onClick={handleCreate}>
-            <Plus className="h-4 w-4 mr-2" />
-            Ajouter
-          </Button>
+          <div className="flex items-center gap-2">
+            {isBEProcess ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleCreateGeneric}
+                  className="gap-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  Manuel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => setIsBEWizardOpen(true)}
+                  className="gap-2 bg-amber-500 hover:bg-amber-600 text-white"
+                >
+                  <Wand2 className="h-4 w-4" />
+                  Nouvelle prestation BE
+                </Button>
+              </>
+            ) : (
+              <Button size="sm" onClick={handleCreateGeneric} className="gap-2">
+                <Plus className="h-4 w-4" />
+                Ajouter
+              </Button>
+            )}
+          </div>
         )}
       </div>
 
-      {subProcesses.length === 0 ? (
+      {/* ── Search bar (only if > 10 items) ─────────────────────────── */}
+      {subProcesses.length > 10 && (
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder={`Rechercher parmi ${subProcesses.length} ${labelPlural}…`}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 h-9"
+          />
+        </div>
+      )}
+
+      {/* ── Empty state ─────────────────────────────────────────────── */}
+      {filteredSubProcesses.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
             <GitBranch className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
             <p className="text-muted-foreground mb-4">
-              Aucun sous-processus configuré
+              {search
+                ? `Aucune ${label} ne correspond à « ${search} »`
+                : `Aucune ${label} configurée`}
             </p>
-            {canManage && (
-              <Button onClick={handleCreate}>
-                <Plus className="h-4 w-4 mr-2" />
-                Créer un sous-processus
-              </Button>
+            {canManage && !search && (
+              isBEProcess ? (
+                <Button
+                  onClick={() => setIsBEWizardOpen(true)}
+                  className="bg-amber-500 hover:bg-amber-600 text-white gap-2"
+                >
+                  <Wand2 className="h-4 w-4" />
+                  Créer une prestation BE
+                </Button>
+              ) : (
+                <Button onClick={handleCreateGeneric}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Créer un sous-processus
+                </Button>
+              )
             )}
           </CardContent>
         </Card>
       ) : (
+        /* ── List ──────────────────────────────────────────────────── */
         <div className="space-y-2">
-          {subProcesses.map((sp, index) => (
-            <Card key={sp.id} className="group">
-              <CardContent className="p-4">
-                <div className="flex items-start gap-3">
-                  {canManage && (
-                    <div className="text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity cursor-grab">
-                      <GripVertical className="h-5 w-5" />
-                    </div>
-                  )}
+          {/* Counter */}
+          {search && (
+            <p className="text-xs text-muted-foreground">
+              {filteredSubProcesses.length} résultat{filteredSubProcesses.length > 1 ? 's' : ''} sur {subProcesses.length}
+            </p>
+          )}
+
+          {filteredSubProcesses.map((sp, index) => (
+            <Card
+              key={sp.id}
+              className={cn(
+                'group transition-all hover:shadow-md hover:border-primary/30',
+                'border-l-4',
+                sp.is_mandatory ? 'border-l-warning' : 'border-l-transparent'
+              )}
+            >
+              <CardContent className="p-3">
+                <div className="flex items-center gap-3">
+
+                  {/* Order index */}
+                  <span className="text-xs font-mono text-muted-foreground shrink-0 w-6 text-right">
+                    #{index + 1}
+                  </span>
+
+                  {/* Main content */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-medium text-muted-foreground">
-                        {index + 1}.
-                      </span>
-                      <span className="font-medium truncate">{sp.name}</span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-sm truncate">{sp.name}</span>
                       {sp.is_mandatory && (
-                        <Badge variant="destructive" className="text-xs">
+                        <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
                           Obligatoire
+                        </Badge>
+                      )}
+                      {sp.hasValidation && (
+                        <Badge className="text-[10px] px-1.5 py-0 bg-emerald-100 text-emerald-700 border-emerald-200 gap-1">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Validation
                         </Badge>
                       )}
                     </div>
                     {sp.description && (
-                      <p className="text-sm text-muted-foreground line-clamp-1 mb-2">
+                      <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
                         {sp.description}
                       </p>
                     )}
-                    <div className="flex flex-wrap gap-2">
-                      <Badge variant="outline" className="text-xs gap-1">
+                    <div className="flex items-center gap-3 mt-1.5 text-[11px] text-muted-foreground">
+                      <span className="flex items-center gap-1">
                         {getAssignmentIcon(sp.assignment_type)}
                         {getAssignmentLabel(sp.assignment_type)}
-                      </Badge>
-                      <Badge variant="secondary" className="text-xs">
-                        {sp.taskCount} tâche(s)
-                      </Badge>
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <ListTodo className="h-3 w-3" />
+                        {sp.taskCount} étape{sp.taskCount > 1 ? 's' : ''}
+                      </span>
+                      {sp.totalDurationDays > 0 && (
+                        <span>
+                          ~ {sp.totalDurationDays} j
+                        </span>
+                      )}
                     </div>
                   </div>
+
+                  {/* Actions */}
                   <div className="flex items-center gap-1 shrink-0">
                     <Button
                       variant="outline"
                       size="sm"
+                      className="h-8 text-xs gap-1"
                       onClick={() => setSelectedSubProcessId(sp.id)}
+                      title="Configurer dans un panneau latéral"
                     >
-                      <Settings className="h-4 w-4 mr-1" />
-                      Configurer
+                      <Settings className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">Config.</span>
                     </Button>
-                    {/* Bouton 'Ouvrir editeur visuel' supprime — l'editeur a ete retire. */}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-xs gap-1"
+                      onClick={() => navigate(`/templates/subprocess/${sp.id}`)}
+                      title="Ouvrir la page de gestion détaillée"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">Ouvrir</span>
+                    </Button>
                     {canManage && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -272,13 +408,17 @@ export function ProcessSubProcessesTab({
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleDelete(sp.id)}>
+                          <DropdownMenuItem
+                            className="text-destructive focus:text-destructive"
+                            onClick={() => handleDelete(sp.id)}
+                          >
                             <Trash2 className="h-4 w-4 mr-2" />
                             Supprimer
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     )}
+                    <ChevronRight className="h-4 w-4 text-muted-foreground/30 ml-0.5" />
                   </div>
                 </div>
               </CardContent>
@@ -287,7 +427,7 @@ export function ProcessSubProcessesTab({
         </div>
       )}
 
-      {/* Sub-process Configuration Panel */}
+      {/* ── Side-panel : SubProcessConfigView ────────────────────────── */}
       {selectedSubProcessId && (
         <SubProcessConfigView
           subProcessId={selectedSubProcessId}
@@ -298,6 +438,18 @@ export function ProcessSubProcessesTab({
             onUpdate();
           }}
           canManage={canManage}
+        />
+      )}
+
+      {/* ── BE Wizard ─────────────────────────────────────────────────── */}
+      {isBEProcess && (
+        <NewPrestationBEWizard
+          open={isBEWizardOpen}
+          onClose={() => setIsBEWizardOpen(false)}
+          onSuccess={() => {
+            fetchSubProcesses();
+            onUpdate();
+          }}
         />
       )}
     </div>

@@ -16,25 +16,21 @@ import {
   Layers,
   Building2,
   Eye,
-  Users,
   ArrowLeft,
-  ListTodo,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { ProcessWithTasks } from '@/types/template';
 import { ProcessSettingsTab } from '@/components/templates/UnifiedModelView/ProcessSettingsTab';
 import { ProcessAccessTab } from '@/components/templates/UnifiedModelView/ProcessAccessTab';
 import { ProcessSubProcessesTab } from '@/components/templates/UnifiedModelView/ProcessSubProcessesTab';
-
-import { ProcessAssignmentTab } from '@/components/templates/UnifiedModelView/ProcessAssignmentTab';
 import { ProcessCustomFieldsTab } from '@/components/templates/UnifiedModelView/ProcessCustomFieldsTab';
-
 import { ProcessNotificationsTab } from '@/components/templates/UnifiedModelView/ProcessNotificationsTab';
-
-import { ProcessTaskManagement } from '@/components/process-tracking/ProcessTaskManagement';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useTasks } from '@/hooks/useTasks';
+
+// ID du processus Bureau d'Études (constante référencée dans les seeds BE)
+const BE_PROCESS_ID = 'bd75a3b0-c918-4b43-befe-739b83f7461a';
 
 
 export default function ProcessSettings() {
@@ -45,7 +41,9 @@ export default function ProcessSettings() {
   const { notifications, unreadCount, hasUrgent } = useNotifications(allTasks);
 
   const [activeView, setActiveView] = useState('templates');
-  const [activeTab, setActiveTab] = useState('settings');
+  // Default tab: "subprocesses" (Prestations) — c'est l'élément central
+  // de la configuration d'un processus (surtout BE)
+  const [activeTab, setActiveTab] = useState('subprocesses');
   const [process, setProcess] = useState<ProcessWithTasks | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [canManage, setCanManage] = useState(false);
@@ -104,14 +102,18 @@ export default function ProcessSettings() {
     await fetchProcess();
   };
 
+  const isBEProcess = process?.id === BE_PROCESS_ID;
+  const subProcessLabel = isBEProcess ? 'Prestations' : 'Sous-proc.';
+
+  // Onglets réordonnés : ce qui est utilisé en premier (Prestations) en tête.
+  // Onglets retirés : "Affectation" (config legacy non utilisée) et
+  // "Gestion des tâches" (page legacy hors-template).
   const tabs = [
+    { id: 'subprocesses', label: subProcessLabel, icon: GitBranch },
     { id: 'settings', label: 'Paramètres', icon: Settings },
-    { id: 'access', label: 'Accès', icon: Eye },
-    { id: 'subprocesses', label: 'Sous-proc.', icon: GitBranch },
     { id: 'fields', label: 'Champs', icon: FormInput },
-    { id: 'assignment', label: 'Affectation', icon: Users },
-    { id: 'notifications', label: 'Notifs', icon: Bell },
-    { id: 'tasks', label: 'Gestion des tâches', icon: ListTodo },
+    { id: 'access', label: 'Accès', icon: Eye },
+    { id: 'notifications', label: 'Notifications', icon: Bell },
   ];
 
   if (isLoading) {
@@ -236,29 +238,11 @@ export default function ProcessSettings() {
 
 
 
-                <TabsContent value="assignment" className="mt-0">
-                  <ProcessAssignmentTab
-                    process={process}
-                    onUpdate={handleUpdate}
-                    canManage={canManage}
-                  />
-                </TabsContent>
-
                 <TabsContent value="notifications" className="mt-0">
                   <ProcessNotificationsTab
                     processId={process.id}
                     canManage={canManage}
                     onUpdate={handleUpdate}
-                  />
-                </TabsContent>
-
-
-
-
-                <TabsContent value="tasks" className="mt-0">
-                  <ProcessTaskManagement
-                    processId={process.id}
-                    canWrite={canManage}
                   />
                 </TabsContent>
               </div>
