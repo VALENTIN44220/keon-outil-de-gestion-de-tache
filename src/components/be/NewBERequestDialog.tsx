@@ -53,6 +53,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import type { BEProject } from '@/types/beProject';
 import type { BEAffaire } from '@/types/beAffaire';
+import {
+  CommonFieldsConfig,
+  DEFAULT_COMMON_FIELDS_CONFIG,
+  mergeCommonFieldsConfig,
+} from '@/types/commonFieldsConfig';
 
 // ─── Constantes ─────────────────────────────────────────────────────────────
 
@@ -193,6 +198,40 @@ export function NewBERequestDialog({
 
   // ── Liens externes ────────────────────────────────────────────────────────
   const [links, setLinks] = useState<{ url: string; label: string }[]>([]);
+
+  // ── Configuration admin "Champs du formulaire de demande" ────────────────
+  // Lue depuis process_templates.settings.common_fields_config du processus BE.
+  // Contrôle visibilité, éditabilité et valeur par défaut des champs.
+  const [fieldsConfig, setFieldsConfig] = useState<CommonFieldsConfig>(DEFAULT_COMMON_FIELDS_CONFIG);
+
+  useEffect(() => {
+    if (!open) return;
+    sb.from('process_templates')
+      .select('settings')
+      .eq('id', BE_PROCESS_TEMPLATE_ID)
+      .single()
+      .then(({ data }: any) => {
+        const cfg = mergeCommonFieldsConfig(data?.settings?.common_fields_config ?? null);
+        setFieldsConfig(cfg);
+
+        // Applique les valeurs par défaut imposées par l'admin
+        if (cfg.be_urgency?.default_value && !defaultProjectId) {
+          setUrgency(cfg.be_urgency.default_value as BEUrgency);
+        }
+        if (cfg.be_project?.default_value && !defaultProjectId) {
+          setSelectedProjectId(cfg.be_project.default_value);
+        }
+        if (cfg.be_affaire?.default_value && !defaultAffaireId) {
+          setSelectedAffaireId(cfg.be_affaire.default_value);
+        }
+        if (cfg.description?.default_value) {
+          setDescription(cfg.description.default_value);
+        }
+        if (cfg.due_date?.default_value) {
+          setExpectedDate(cfg.due_date.default_value);
+        }
+      });
+  }, [open, defaultProjectId, defaultAffaireId]);
 
   // ── Reset sur ouverture ───────────────────────────────────────────────────
   useEffect(() => {
@@ -714,21 +753,25 @@ export function NewBERequestDialog({
                   </div>
                 )}
 
-                {/* Description */}
-                <div className="space-y-2">
-                  <Label className="font-medium">
-                    Description{' '}
-                    <span className="font-normal text-muted-foreground text-xs">(optionnel)</span>
-                  </Label>
-                  <Textarea
-                    value={description}
-                    onChange={e => setDescription(e.target.value)}
-                    placeholder="Contexte, contraintes particulières, contraintes de délai, informations complémentaires..."
-                    rows={4}
-                  />
-                </div>
+                {/* Description — masquable / lockable via common_fields_config */}
+                {fieldsConfig.description.visible && (
+                  <div className="space-y-2">
+                    <Label className="font-medium">
+                      Description{' '}
+                      <span className="font-normal text-muted-foreground text-xs">(optionnel)</span>
+                    </Label>
+                    <Textarea
+                      value={description}
+                      onChange={e => setDescription(e.target.value)}
+                      placeholder="Contexte, contraintes particulières, contraintes de délai, informations complémentaires..."
+                      rows={4}
+                      disabled={!fieldsConfig.description.editable}
+                    />
+                  </div>
+                )}
 
-                {/* Liens externes */}
+                {/* Liens externes — masquables via common_fields_config (champ attachments) */}
+                {fieldsConfig.attachments.visible && (
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2 font-medium">
                     <LinkIcon className="h-4 w-4" />
@@ -743,18 +786,21 @@ export function NewBERequestDialog({
                           value={link.url}
                           onChange={e => setLinks(prev => prev.map((l, j) => j === i ? { ...l, url: e.target.value } : l))}
                           className="flex-1 text-sm"
+                          disabled={!fieldsConfig.attachments.editable}
                         />
                         <Input
                           placeholder="Intitulé"
                           value={link.label}
                           onChange={e => setLinks(prev => prev.map((l, j) => j === i ? { ...l, label: e.target.value } : l))}
                           className="w-36 text-sm"
+                          disabled={!fieldsConfig.attachments.editable}
                         />
                         <Button
                           variant="ghost"
                           size="sm"
                           className="h-9 w-9 p-0 text-muted-foreground hover:text-destructive shrink-0"
                           onClick={() => setLinks(prev => prev.filter((_, j) => j !== i))}
+                          disabled={!fieldsConfig.attachments.editable}
                         >
                           <X className="h-3.5 w-3.5" />
                         </Button>
@@ -765,12 +811,14 @@ export function NewBERequestDialog({
                       size="sm"
                       className="gap-1.5 text-xs"
                       onClick={() => setLinks(prev => [...prev, { url: '', label: '' }])}
+                      disabled={!fieldsConfig.attachments.editable}
                     >
                       <Plus className="h-3.5 w-3.5" />
                       Ajouter un lien
                     </Button>
                   </div>
                 </div>
+                )}
 
                 {links.length === 0 && !description && (
                   <p className="text-xs text-muted-foreground flex items-center gap-1.5">
@@ -784,55 +832,66 @@ export function NewBERequestDialog({
             {/* ── ÉTAPE 3 : URGENCE + DATE DE RENDU ───────────────────── */}
             {step === 3 && (
               <div className="space-y-6">
-                <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    Quel est le niveau d'urgence de cette demande ?
-                  </p>
-                  <RadioGroup
-                    value={urgency}
-                    onValueChange={v => setUrgency(v as BEUrgency)}
-                    className="space-y-3"
-                  >
-                    {URGENCY_OPTIONS.map(opt => (
-                      <label
-                        key={opt.value}
-                        className={cn(
-                          'flex items-center gap-4 p-4 rounded-lg border-2 cursor-pointer transition-all',
-                          urgency === opt.value
-                            ? `${opt.bg} border-current ${opt.textColor}`
-                            : 'border-border hover:bg-muted/30',
-                        )}
-                      >
-                        <RadioGroupItem value={opt.value} className="shrink-0" />
-                        <div>
-                          <p className={cn('font-medium', urgency === opt.value && opt.textColor)}>
-                            {opt.label}
-                          </p>
-                          <p className="text-xs text-muted-foreground">{opt.desc}</p>
-                        </div>
-                      </label>
-                    ))}
-                  </RadioGroup>
-                </div>
+                {/* Urgence — masquable / lockable via common_fields_config */}
+                {fieldsConfig.be_urgency.visible && (
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      Quel est le niveau d'urgence de cette demande ?
+                      {!fieldsConfig.be_urgency.editable && (
+                        <Badge variant="outline" className="ml-2 text-[10px]">Imposée par le BE</Badge>
+                      )}
+                    </p>
+                    <RadioGroup
+                      value={urgency}
+                      onValueChange={v => setUrgency(v as BEUrgency)}
+                      className="space-y-3"
+                      disabled={!fieldsConfig.be_urgency.editable}
+                    >
+                      {URGENCY_OPTIONS.map(opt => (
+                        <label
+                          key={opt.value}
+                          className={cn(
+                            'flex items-center gap-4 p-4 rounded-lg border-2 transition-all',
+                            urgency === opt.value
+                              ? `${opt.bg} border-current ${opt.textColor}`
+                              : 'border-border hover:bg-muted/30',
+                            fieldsConfig.be_urgency.editable ? 'cursor-pointer' : 'cursor-not-allowed opacity-70',
+                          )}
+                        >
+                          <RadioGroupItem value={opt.value} className="shrink-0" disabled={!fieldsConfig.be_urgency.editable} />
+                          <div>
+                            <p className={cn('font-medium', urgency === opt.value && opt.textColor)}>
+                              {opt.label}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{opt.desc}</p>
+                          </div>
+                        </label>
+                      ))}
+                    </RadioGroup>
+                  </div>
+                )}
 
-                {/* Date de rendu attendue */}
-                <div className="space-y-2 border-t pt-4">
-                  <label htmlFor="expectedDate" className="text-sm font-medium">
-                    Date de rendu attendue
-                    <span className="text-xs text-muted-foreground font-normal ml-1">(optionnel)</span>
-                  </label>
-                  <Input
-                    id="expectedDate"
-                    type="date"
-                    value={expectedDate}
-                    onChange={(e) => setExpectedDate(e.target.value)}
-                    min={new Date().toISOString().split('T')[0]}
-                    className="max-w-xs"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Indique au BE la date à laquelle tu attends le rendu de cette demande.
-                  </p>
-                </div>
+                {/* Date de rendu attendue — masquable / lockable via common_fields_config */}
+                {fieldsConfig.due_date.visible && (
+                  <div className="space-y-2 border-t pt-4">
+                    <label htmlFor="expectedDate" className="text-sm font-medium">
+                      Date de rendu attendue
+                      <span className="text-xs text-muted-foreground font-normal ml-1">(optionnel)</span>
+                    </label>
+                    <Input
+                      id="expectedDate"
+                      type="date"
+                      value={expectedDate}
+                      onChange={(e) => setExpectedDate(e.target.value)}
+                      min={new Date().toISOString().split('T')[0]}
+                      className="max-w-xs"
+                      disabled={!fieldsConfig.due_date.editable}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Indique au BE la date à laquelle tu attends le rendu de cette demande.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
