@@ -71,6 +71,7 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { useSimulation } from '@/contexts/SimulationContext';
 import { canInitiateTaskReassignment } from '@/lib/taskReassignmentPermissions';
 import { canOfferSendForValidationInsteadOfMarkDone, normalizeValidationLevel } from '@/lib/taskValidationUi';
+import { TaskValidationChainPanel } from '@/components/tasks/TaskValidationChainPanel';
 import {
   sendTaskForValidationFromExecutorState,
   rejectValidationWithExecutorPolicy,
@@ -959,6 +960,17 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
               </div>
             </div>
           )}
+
+          {/* Chaîne de validation — affichée uniquement si validation_level_1
+              ou validation_level_2 est configuré sur le template de tâche.
+              Donne à l'exécutant comme au validateur la visibilité sur :
+              "qui valide à quel niveau" + "où en sommes-nous". */}
+          <TaskValidationChainPanel
+            task={task}
+            profiles={profiles}
+            managerOfAssigneeId={rootTaskAssigneeManagerId}
+            requesterId={displayRequesterId}
+          />
 
           {/* Metadata */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">

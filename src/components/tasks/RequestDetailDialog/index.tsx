@@ -78,6 +78,7 @@ import { useSimulation } from '@/contexts/SimulationContext';
 import { canInitiateTaskReassignment } from '@/lib/taskReassignmentPermissions';
 import { canOfferSendForValidationInsteadOfMarkDone } from '@/lib/taskValidationUi';
 import { sendTaskForValidationFromExecutorState } from '@/services/taskStatusService';
+import { TaskValidationChainPanel } from '@/components/tasks/TaskValidationChainPanel';
 
 export function RequestDetailDialog({ task, open, onClose, onStatusChange, onTaskMutated }: RequestDetailDialogProps) {
   const { profile } = useAuth();
@@ -797,6 +798,14 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange, onTas
                     <p className="text-sm whitespace-pre-wrap">{selectedChildTask.description}</p>
                   </div>
                 )}
+
+                {/* Chaîne de validation de l'étape sélectionnée */}
+                <TaskValidationChainPanel
+                  task={selectedChildTask}
+                  profiles={profiles}
+                  managerOfAssigneeId={selectedChildAssigneeManagerId}
+                  requesterId={task.requester_id}
+                />
 
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   {selectedChildTask.due_date && (
