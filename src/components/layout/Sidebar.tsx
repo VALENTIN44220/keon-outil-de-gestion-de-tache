@@ -1,5 +1,11 @@
 import React, { Fragment, useState, useEffect, useMemo } from 'react';
-import { LayoutDashboard, BarChart3, ChevronLeft, ChevronRight, ChevronDown, Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText, ArrowLeftRight, Calendar, MessageCircle, Building2, ClipboardList, Lightbulb, Monitor, Leaf, Euro, Map as MapIcon, Users, Wallet, BarChart2, Package, Truck } from 'lucide-react';
+import {
+  LayoutDashboard, ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
+  Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText,
+  ArrowLeftRight, Calendar, MessageCircle, Building2, ClipboardList,
+  Lightbulb, Monitor, Leaf, Euro, Map as MapIcon, Users, Wallet,
+  Package, Truck, Plus, Minus, ChevronsDownUp, ChevronsUpDown,
+} from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
 import { useAuth } from '@/contexts/AuthContext';
@@ -55,34 +61,10 @@ const menuGroups: MenuGroup[] = [
   {
     label: 'BUREAU D\'ÉTUDES',
     items: [
-      {
-        id: 'projects',
-        label: 'Projets',
-        icon: FolderOpen,
-        path: '/projects',
-        permissionKey: 'can_access_projects',
-      },
-      {
-        id: 'be-dispatch',
-        label: 'Dispatch & Suivi',
-        icon: Users,
-        path: '/be/dispatch',
-        permissionKey: 'can_access_be_dispatch',
-      },
-      {
-        id: 'be-budget',
-        label: 'Budget',
-        icon: Wallet,
-        path: '/be/budget',
-        permissionKey: 'can_access_be_budget',
-      },
-      {
-        id: 'be-admin-tjm',
-        label: 'Référentiel TJM',
-        icon: Euro,
-        path: '/be/admin/tjm',
-        permissionKey: 'can_access_be_tjm',
-      },
+      { id: 'projects', label: 'Projets', icon: FolderOpen, path: '/projects', permissionKey: 'can_access_projects' },
+      { id: 'be-dispatch', label: 'Dispatch & Suivi', icon: Users, path: '/be/dispatch', permissionKey: 'can_access_be_dispatch' },
+      { id: 'be-budget', label: 'Budget', icon: Wallet, path: '/be/budget', permissionKey: 'can_access_be_budget' },
+      { id: 'be-admin-tjm', label: 'Référentiel TJM', icon: Euro, path: '/be/admin/tjm', permissionKey: 'can_access_be_tjm' },
     ],
   },
   {
@@ -143,50 +125,35 @@ const adminMenuItem = {
   id: 'admin',
   label: 'Administration',
   icon: ShieldCheck,
-  path: '/admin'
+  path: '/admin',
 };
 
-// Group-based color system
-const groupColors: Record<number, { hex: string; bg: string; text: string; textMuted: string; border: string; iconBg: string; iconInactive: string }> = {
-  0: { hex: '#3b82f6', bg: 'bg-[#3b82f6]/15', text: 'text-[#3b82f6]', textMuted: 'text-[#3b82f6]/50', border: 'border-[#3b82f6]', iconBg: 'bg-[#3b82f6]', iconInactive: 'text-[#3b82f6]/60' },
-  1: { hex: '#8b5cf6', bg: 'bg-[#8b5cf6]/15', text: 'text-[#8b5cf6]', textMuted: 'text-[#8b5cf6]/50', border: 'border-[#8b5cf6]', iconBg: 'bg-[#8b5cf6]', iconInactive: 'text-[#8b5cf6]/60' },
-  2: { hex: '#10b981', bg: 'bg-[#10b981]/15', text: 'text-[#10b981]', textMuted: 'text-[#10b981]/50', border: 'border-[#10b981]', iconBg: 'bg-[#10b981]', iconInactive: 'text-[#10b981]/60' },
-  3: { hex: '#f59e0b', bg: 'bg-[#f59e0b]/15', text: 'text-[#f59e0b]', textMuted: 'text-[#f59e0b]/50', border: 'border-[#f59e0b]', iconBg: 'bg-[#f59e0b]', iconInactive: 'text-[#f59e0b]/60' },
-  4: { hex: '#64748b', bg: 'bg-[#64748b]/15', text: 'text-[#64748b]', textMuted: 'text-[#64748b]/50', border: 'border-[#64748b]', iconBg: 'bg-[#64748b]', iconInactive: 'text-[#64748b]/60' },
-  5: { hex: '#ec4899', bg: 'bg-[#ec4899]/15', text: 'text-[#ec4899]', textMuted: 'text-[#ec4899]/50', border: 'border-[#ec4899]', iconBg: 'bg-[#ec4899]', iconInactive: 'text-[#ec4899]/60' },
-  6: { hex: '#6366f1', bg: 'bg-[#6366f1]/15', text: 'text-[#6366f1]', textMuted: 'text-[#6366f1]/50', border: 'border-[#6366f1]', iconBg: 'bg-[#6366f1]', iconInactive: 'text-[#6366f1]/60' },
-  7: { hex: '#06b6d4', bg: 'bg-[#06b6d4]/15', text: 'text-[#06b6d4]', textMuted: 'text-[#06b6d4]/50', border: 'border-[#06b6d4]', iconBg: 'bg-[#06b6d4]', iconInactive: 'text-[#06b6d4]/60' },
-  8: { hex: '#eab308', bg: 'bg-[#eab308]/15', text: 'text-[#eab308]', textMuted: 'text-[#eab308]/50', border: 'border-[#eab308]', iconBg: 'bg-[#eab308]', iconInactive: 'text-[#eab308]/60' },
+// ─── Section accent colors (1 couleur par section, sobre) ────────────────────
+const SECTION_COLORS: Record<string, string> = {
+  'MON ESPACE':      '#3b82f6', // blue-500
+  'ÉQUIPE':          '#8b5cf6', // violet-500
+  'BUREAU D\'ÉTUDES':'#10b981', // emerald-500
+  'SPV':             '#059669', // emerald-600
+  'IT / DIGITAL':    '#0ea5e9', // sky-500
+  'INNOVATION':      '#f59e0b', // amber-500
+  'MAINTENANCE':     '#ef4444', // red-500
+  'LOGISTIQUE':      '#06b6d4', // cyan-500
+  'ACHATS':          '#f97316', // orange-500
+  'CONFIGURATION':   '#64748b', // slate-500
+  'OUTILS':          '#a855f7', // purple-500
 };
 
-// Map group labels to group index for color lookup
-const groupLabelToIndex: Record<string, number> = {
-  '': 0,
-  'MON ESPACE': 0,
-  'ÉQUIPE': 1,
-  'BUREAU D\'ÉTUDES': 6,
-  'SPV': 2,
-  'IT / DIGITAL': 7,
-  'INNOVATION': 8,
-  'MAINTENANCE': 3,
-  'LOGISTIQUE': 7,
-  'ACHATS': 3,
-  'CONFIGURATION': 4,
-  'OUTILS': 5,
-};
+const getSectionColor = (label?: string) => SECTION_COLORS[label ?? ''] ?? '#64748b';
 
-const getGroupColorIndex = (groupLabel?: string): number => {
-  return groupLabelToIndex[groupLabel || ''] ?? 0;
-};
-
+// ─── Nav row ─────────────────────────────────────────────────────────────────
 type SidebarNavRowProps = {
   item: SidebarMenuItem;
   groupLabel: string | undefined;
   isSubItem: boolean;
   derivedActiveView: string;
-  /** Desktop/tablet: sidebar replié (icônes seules) */
   collapsed: boolean;
   isMobile: boolean;
+  isActiveSection: boolean;
   onMenuClick: (itemId: string, path: string) => void;
   pendingValidationCount: number;
 };
@@ -198,110 +165,87 @@ function SidebarNavRow({
   derivedActiveView,
   collapsed,
   isMobile,
+  isActiveSection,
   onMenuClick,
   pendingValidationCount,
 }: SidebarNavRowProps) {
   const Icon = item.icon;
   const isActive = derivedActiveView === item.id;
-  const gc = groupColors[getGroupColorIndex(groupLabel)];
+  const accentColor = getSectionColor(groupLabel);
 
-  if (isMobile) {
-    return (
-      <button
-        type="button"
-        onClick={() => onMenuClick(item.id, item.path)}
-        className={cn(
-          'w-full flex items-center gap-3 transition-all duration-200 font-body group relative',
-          isSubItem ? 'pl-1 ml-1.5 border-l-2 border-muted-foreground/40 py-2 rounded-r-xl' : 'px-3 py-2.5 rounded-xl',
-          isActive && [gc.bg, 'border-l-4', gc.border],
-          !isActive && 'hover:bg-muted/60 border-l-4 border-transparent',
-        )}
-      >
-        <div
-          className={cn(
-            'flex items-center justify-center rounded-xl transition-all duration-200 relative',
-            isSubItem ? 'p-1.5' : 'p-2',
-            isActive
-              ? [gc.iconBg, 'text-white shadow-md']
-              : [gc.iconInactive, 'bg-muted/50 group-hover:bg-muted'],
-          )}
-        >
-          <Icon className={cn('relative z-10', isSubItem ? 'w-3.5 h-3.5' : 'w-4 h-4')} />
-          {isActive && <div className={cn('absolute inset-0 rounded-xl blur-sm opacity-50', gc.iconBg)} />}
-        </div>
-        <span
-          className={cn(
-            'font-medium transition-colors flex-1 text-left',
-            isSubItem ? 'text-[13px]' : 'text-sm',
-            isActive ? [gc.text, 'font-semibold'] : [gc.textMuted, 'group-hover:opacity-80'],
-          )}
-        >
-          {item.label}
-        </span>
-        {item.id === 'dashboard' && pendingValidationCount > 0 && (
-          <Badge variant="destructive" className="text-[10px] px-1.5 py-0 min-w-[20px] justify-center">
-            {pendingValidationCount}
-          </Badge>
-        )}
-        {isActive && <div className={cn('w-2 h-2 rounded-full', gc.iconBg)} />}
-      </button>
-    );
-  }
+  const iconSize = collapsed ? 'w-[18px] h-[18px]' : isSubItem ? 'w-3.5 h-3.5' : 'w-[15px] h-[15px]';
+
+  // Styles selon état
+  const itemStyle = isActive
+    ? { backgroundColor: `${accentColor}14`, color: accentColor }
+    : {};
+  const iconStyle = isActive
+    ? { backgroundColor: accentColor, color: '#fff' }
+    : (isActiveSection && !isActive)
+      ? { color: accentColor, opacity: 0.6 }
+      : {};
+  const textStyle = isActive
+    ? { color: accentColor }
+    : {};
+
+  const baseClass = cn(
+    'w-full flex items-center transition-all duration-150 group rounded-lg',
+    collapsed
+      ? 'justify-center p-2.5 mx-auto'
+      : isSubItem
+        ? 'gap-2.5 pl-3 pr-2 py-1.5 ml-2 border-l border-slate-200'
+        : 'gap-2.5 px-2.5 py-2',
+    !isActive && 'hover:bg-slate-50',
+  );
 
   return (
     <button
       type="button"
       onClick={() => onMenuClick(item.id, item.path)}
-      className={cn(
-        'w-full flex items-center gap-3 transition-all duration-200 font-body group relative',
-        collapsed
-          ? isSubItem
-            ? 'justify-center p-1.5'
-            : 'justify-center p-2'
-          : isSubItem
-            ? 'px-2 py-2 pl-1 ml-1.5 border-l-2 border-muted-foreground/40 rounded-r-xl'
-            : 'px-3 py-2.5 rounded-xl',
-        isActive && !collapsed && [gc.bg, 'border-l-4', gc.border],
-        !isActive && !collapsed && 'hover:bg-muted/60 border-l-4 border-transparent',
-      )}
+      className={baseClass}
+      style={itemStyle}
       title={collapsed ? item.label : undefined}
     >
+      {/* Icône */}
       <div
         className={cn(
-          'flex items-center justify-center rounded-xl transition-all duration-200 relative',
-          collapsed ? (isSubItem ? 'p-2' : 'p-3') : isSubItem ? 'p-1.5' : 'p-2',
-          isActive
-            ? [gc.iconBg, 'text-white shadow-md']
-            : [gc.iconInactive, 'bg-transparent'],
+          'flex items-center justify-center rounded-md flex-shrink-0 transition-all duration-150',
+          isActive ? 'shadow-sm' : '',
+          collapsed ? 'w-8 h-8' : isSubItem ? 'w-6 h-6' : 'w-7 h-7',
         )}
+        style={iconStyle}
       >
-        <Icon className={cn('relative z-10', collapsed ? 'w-5 h-5' : isSubItem ? 'w-3.5 h-3.5' : 'w-4 h-4')} />
-        {isActive && <div className={cn('absolute inset-0 rounded-xl blur-sm opacity-50', gc.iconBg)} />}
-        {collapsed && item.id === 'dashboard' && pendingValidationCount > 0 && (
-          <div className="absolute -top-1 -right-1 w-4 h-4 bg-destructive text-destructive-foreground rounded-full text-[9px] flex items-center justify-center font-bold z-20">
-            {pendingValidationCount}
-          </div>
-        )}
+        <Icon className={iconSize} />
       </div>
 
+      {/* Label + badge */}
       {!collapsed && (
         <>
           <span
             className={cn(
-              'font-medium transition-colors flex-1 text-left',
-              isSubItem ? 'text-[13px]' : 'text-sm',
-              isActive ? [gc.text, 'font-semibold'] : [gc.textMuted, 'group-hover:opacity-80'],
+              'flex-1 text-left text-[13px] truncate transition-colors',
+              isActive ? 'font-semibold' : 'font-normal text-slate-500 group-hover:text-slate-700',
             )}
+            style={textStyle}
           >
             {item.label}
           </span>
           {item.id === 'dashboard' && pendingValidationCount > 0 && (
-            <Badge variant="destructive" className="text-[10px] px-1.5 py-0 min-w-[20px] justify-center">
+            <Badge variant="destructive" className="text-[10px] px-1.5 py-0 min-w-[18px] justify-center h-4">
               {pendingValidationCount}
             </Badge>
           )}
-          {isActive && <div className={cn('w-2 h-2 rounded-full', gc.iconBg)} />}
+          {isActive && (
+            <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: accentColor }} />
+          )}
         </>
+      )}
+
+      {/* Collapsed : badge validation */}
+      {collapsed && item.id === 'dashboard' && pendingValidationCount > 0 && (
+        <div className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-destructive text-white rounded-full text-[8px] flex items-center justify-center font-bold z-20">
+          {pendingValidationCount}
+        </div>
       )}
     </button>
   );
@@ -311,10 +255,8 @@ function flattenMenuItemsForMatch(groups: MenuGroup[]): SidebarMenuItem[] {
   return groups.flatMap((g) => g.items.flatMap((i) => (i.children?.length ? [i, ...i.children] : [i])));
 }
 
-export function Sidebar({
-  activeView,
-  onViewChange
-}: SidebarProps) {
+// ─── Sidebar principale ───────────────────────────────────────────────────────
+export function Sidebar({ activeView, onViewChange }: SidebarProps) {
   const isMobile = useIsMobile();
   const [manualCollapsed, setManualCollapsed] = useState(() => {
     const saved = localStorage.getItem('sidebar-collapsed');
@@ -326,8 +268,8 @@ export function Sidebar({
     const saved = localStorage.getItem('sidebar-position');
     return saved === 'right';
   });
-  // Sections repliées par l'utilisateur (persistées). Une section reste dépliée
-  // automatiquement si elle contient la page active (cf. derivedActiveView ci-dessous).
+
+  // Sections repliées (persistées en localStorage)
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => {
     try {
       const saved = localStorage.getItem('sidebar-collapsed-sections');
@@ -338,17 +280,17 @@ export function Sidebar({
       return new Set();
     }
   });
+
   const toggleSection = (label: string) => {
     setCollapsedSections((prev) => {
       const next = new Set(prev);
       if (next.has(label)) next.delete(label);
       else next.add(label);
-      try {
-        localStorage.setItem('sidebar-collapsed-sections', JSON.stringify([...next]));
-      } catch { /* ignore */ }
+      try { localStorage.setItem('sidebar-collapsed-sections', JSON.stringify([...next])); } catch { /* */ }
       return next;
     });
   };
+
   const navigate = useNavigate();
   const location = useLocation();
   const { isAdmin } = useUserRole();
@@ -358,21 +300,17 @@ export function Sidebar({
   const { count: pendingValidationCount } = usePendingValidationRequests();
   const { isPageVisibleOnDevice, isLoading: isVisibilityLoading } = usePageDeviceVisibility();
 
-  // Determine current device type based on actual viewport width
   const [currentDevice, setCurrentDevice] = useState<'mobile' | 'tablet' | 'desktop'>('desktop');
-
   useEffect(() => {
     const updateDevice = () => {
       const w = window.innerWidth;
-      if (w < 640) setCurrentDevice('mobile');
-      else if (w < 1024) setCurrentDevice('tablet');
-      else setCurrentDevice('desktop');
+      setCurrentDevice(w < 640 ? 'mobile' : w < 1024 ? 'tablet' : 'desktop');
     };
     updateDevice();
     window.addEventListener('resize', updateDevice);
     return () => window.removeEventListener('resize', updateDevice);
   }, []);
-  
+
   const profile = isSimulating && simulatedProfile ? simulatedProfile : authProfile;
 
   const filteredGroups = useMemo(() => {
@@ -381,9 +319,7 @@ export function Sidebar({
       if (!screenOk) return null;
       if (item.children?.length) {
         if (!isPageVisibleOnDevice(item.id, currentDevice)) return null;
-        const children = item.children
-          .map((c) => filterItem(c))
-          .filter((c): c is SidebarMenuItem => c != null);
+        const children = item.children.map(filterItem).filter((c): c is SidebarMenuItem => c != null);
         return { ...item, children };
       }
       return isPageVisibleOnDevice(item.id, currentDevice) ? item : null;
@@ -392,39 +328,26 @@ export function Sidebar({
     const groups: MenuGroup[] = menuGroups
       .map((group) => ({
         label: group.label,
-        items: group.items
-          .map((item) => filterItem(item))
-          .filter((item): item is SidebarMenuItem => item != null),
+        items: group.items.map(filterItem).filter((i): i is SidebarMenuItem => i != null),
       }))
       .filter((group) => group.items.length > 0);
-    
-    // Add admin into CONFIGURATION group or as its own group
-    if (isAdmin && isPageVisibleOnDevice('admin', currentDevice)) {
-      const configGroup = groups.find(g => g.label === 'CONFIGURATION');
-      if (configGroup) {
-        configGroup.items.push(adminMenuItem as any);
-      } else {
-        groups.push({ label: 'CONFIGURATION', items: [adminMenuItem as any] });
-      }
-    }
 
-    // 'Referentiel TJM' est deja declare dans le menu BE par defaut (cf. config en haut).
-    // L'injection admin specifique a ete supprimee car elle creait un doublon.
+    if (isAdmin && isPageVisibleOnDevice('admin', currentDevice)) {
+      const configGroup = groups.find((g) => g.label === 'CONFIGURATION');
+      if (configGroup) configGroup.items.push(adminMenuItem as any);
+      else groups.push({ label: 'CONFIGURATION', items: [adminMenuItem as any] });
+    }
 
     return groups;
   }, [effectivePermissions, isAdmin, canAccessScreen, isPageVisibleOnDevice, currentDevice]);
 
-  // Derive active menu item from URL to avoid desync when navigation happens outside the sidebar.
   const derivedActiveView = useMemo(() => {
     const pathname = location.pathname || '/';
     const allItems = flattenMenuItemsForMatch(filteredGroups);
-
     let best: { id: string; path: string } | null = null;
     for (const item of allItems) {
       const p = item.path;
-      const isMatch = p === '/'
-        ? pathname === '/'
-        : (pathname === p || pathname.startsWith(p + '/') || pathname.startsWith(p));
+      const isMatch = p === '/' ? pathname === '/' : pathname === p || pathname.startsWith(p + '/') || pathname.startsWith(p);
       if (!isMatch) continue;
       if (!best || p.length > best.path.length) best = { id: item.id, path: p };
     }
@@ -433,15 +356,11 @@ export function Sidebar({
 
   const collapsed = !isMobile && manualCollapsed;
 
-  // Section contenant la page active : on la force dépliée pour garder
-  // l'item courant visible même si l'utilisateur l'avait repliée précédemment.
   const activeSectionLabel = useMemo(() => {
     for (const g of filteredGroups) {
       if (!g.label) continue;
       const has = g.items.some(
-        (it) =>
-          it.id === derivedActiveView ||
-          (it.children?.some((c) => c.id === derivedActiveView) ?? false),
+        (it) => it.id === derivedActiveView || (it.children?.some((c) => c.id === derivedActiveView) ?? false),
       );
       if (has) return g.label;
     }
@@ -449,15 +368,28 @@ export function Sidebar({
   }, [filteredGroups, derivedActiveView]);
 
   const isSectionExpanded = (label: string | undefined) => {
-    if (!label) return true; // Section sans label = toujours visible
-    if (label === activeSectionLabel) return true; // auto-expand
+    if (!label) return true;
+    if (label === activeSectionLabel) return true; // auto-expand section active
     return !collapsedSections.has(label);
   };
 
-  useEffect(() => {
-    if (!isMobile) {
-      localStorage.setItem('sidebar-collapsed', manualCollapsed ? 'true' : 'false');
+  // Tout déplier / tout replier
+  const allLabels = filteredGroups.map((g) => g.label).filter((l): l is string => !!l);
+  const allExpanded = allLabels.every((l) => isSectionExpanded(l));
+  const toggleAll = () => {
+    if (allExpanded) {
+      // Replier tout sauf la section active
+      const next = new Set(allLabels.filter((l) => l !== activeSectionLabel));
+      setCollapsedSections(next);
+      try { localStorage.setItem('sidebar-collapsed-sections', JSON.stringify([...next])); } catch { /* */ }
+    } else {
+      setCollapsedSections(new Set());
+      try { localStorage.setItem('sidebar-collapsed-sections', '[]'); } catch { /* */ }
     }
+  };
+
+  useEffect(() => {
+    if (!isMobile) localStorage.setItem('sidebar-collapsed', manualCollapsed ? 'true' : 'false');
   }, [manualCollapsed, isMobile]);
 
   const toggleSidebarPosition = () => {
@@ -469,16 +401,8 @@ export function Sidebar({
   useEffect(() => {
     async function fetchPermissionProfile() {
       if (profile?.permission_profile_id) {
-        const { data, error } = await supabase
-          .from('permission_profiles')
-          .select('name')
-          .eq('id', profile.permission_profile_id)
-          .single();
-        if (data && !error) {
-          setPermissionProfileName(data.name);
-        } else {
-          setPermissionProfileName(null);
-        }
+        const { data, error } = await supabase.from('permission_profiles').select('name').eq('id', profile.permission_profile_id).single();
+        setPermissionProfileName(data && !error ? data.name : null);
       } else {
         setPermissionProfileName(null);
       }
@@ -489,168 +413,171 @@ export function Sidebar({
   const getInitials = (name: string | null | undefined) => {
     if (!name) return '?';
     const parts = name.trim().split(' ');
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-    }
-    return name.slice(0, 2).toUpperCase();
+    return parts.length >= 2 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : name.slice(0, 2).toUpperCase();
   };
 
   const handleMenuClick = (itemId: string, path: string) => {
     onViewChange(itemId);
     const currentPath = window.location.pathname;
-    if (path === '/') {
-      if (currentPath !== '/') {
-        navigate('/');
-      }
-    } else if (currentPath !== path) {
-      navigate(path);
-    }
-    if (isMobile) {
-      setMobileOpen(false);
-    }
+    if (path === '/') { if (currentPath !== '/') navigate('/'); }
+    else if (currentPath !== path) navigate(path);
+    if (isMobile) setMobileOpen(false);
   };
 
-  // Mobile: floating logo button + overlay sidebar
+  // ── Contenu navigation partagé mobile/desktop ─────────────────────────────
+  const renderNav = (isCollapsed: boolean, isMob: boolean) => (
+    <nav className="flex-1 overflow-y-auto px-2 py-1 space-y-0.5">
+      {filteredGroups.map((group, gi) => {
+        const sectionColor = getSectionColor(group.label);
+        const isActiveS = group.label === activeSectionLabel;
+        const expanded = isCollapsed || isSectionExpanded(group.label);
+
+        return (
+          <div key={gi} className={gi > 0 ? 'pt-1' : ''}>
+            {/* En-tête de section */}
+            {group.label && !isCollapsed && (
+              <button
+                type="button"
+                onClick={() => toggleSection(group.label!)}
+                className={cn(
+                  'w-full flex items-center justify-between px-2 py-1.5 rounded-md group transition-colors',
+                  isActiveS ? 'hover:bg-slate-50' : 'hover:bg-slate-50',
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  {/* Pastille couleur section */}
+                  <div
+                    className="w-[3px] h-3.5 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: isActiveS ? sectionColor : '#cbd5e1' }}
+                  />
+                  <span
+                    className={cn(
+                      'text-[10px] font-bold tracking-wider uppercase transition-colors',
+                      isActiveS ? 'text-slate-700' : 'text-slate-400 group-hover:text-slate-500',
+                    )}
+                    style={isActiveS ? { color: sectionColor } : {}}
+                  >
+                    {group.label}
+                  </span>
+                </div>
+                {/* Bouton + / − */}
+                <div
+                  className={cn(
+                    'w-4 h-4 rounded flex items-center justify-center transition-colors',
+                    expanded ? 'text-slate-400' : 'text-slate-400 group-hover:text-slate-600',
+                  )}
+                >
+                  {expanded
+                    ? <Minus className="w-2.5 h-2.5" />
+                    : <Plus className="w-2.5 h-2.5" />}
+                </div>
+              </button>
+            )}
+
+            {/* Items */}
+            {expanded && (
+              <div className={cn('space-y-px', !isCollapsed && 'mt-0.5')}>
+                {group.items.map((item) => (
+                  <Fragment key={item.id}>
+                    <SidebarNavRow
+                      item={item}
+                      groupLabel={group.label}
+                      isSubItem={false}
+                      derivedActiveView={derivedActiveView}
+                      collapsed={isCollapsed}
+                      isMobile={isMob}
+                      isActiveSection={isActiveS}
+                      onMenuClick={handleMenuClick}
+                      pendingValidationCount={pendingValidationCount}
+                    />
+                    {item.children?.map((child) => (
+                      <SidebarNavRow
+                        key={child.id}
+                        item={child}
+                        groupLabel={group.label}
+                        isSubItem
+                        derivedActiveView={derivedActiveView}
+                        collapsed={isCollapsed}
+                        isMobile={isMob}
+                        isActiveSection={isActiveS}
+                        onMenuClick={handleMenuClick}
+                        pendingValidationCount={pendingValidationCount}
+                      />
+                    ))}
+                  </Fragment>
+                ))}
+              </div>
+            )}
+
+            {/* Séparateur entre sections */}
+            {gi < filteredGroups.length - 1 && !isCollapsed && (
+              <div className="mx-2 mt-1.5 h-px bg-slate-100" />
+            )}
+          </div>
+        );
+      })}
+    </nav>
+  );
+
+  // ── MOBILE ────────────────────────────────────────────────────────────────
   if (isMobile) {
     return (
       <>
-        {/* Floating KEON logo button */}
         {!mobileOpen && (
           <button
             onClick={() => setMobileOpen(true)}
-            className="fixed top-3 left-3 z-50 p-1.5 rounded-xl bg-white shadow-premium-lg border border-border"
+            className="fixed top-3 left-3 z-50 p-1.5 rounded-xl bg-white shadow-lg border border-slate-200"
             aria-label="Ouvrir le menu"
           >
             <img src={keonLogo} alt="KEON" className="h-10 w-10 object-cover rounded-lg" />
             {pendingValidationCount > 0 && (
-              <div className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground rounded-full text-[10px] flex items-center justify-center font-bold">
+              <div className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-white rounded-full text-[10px] flex items-center justify-center font-bold">
                 {pendingValidationCount}
               </div>
             )}
           </button>
         )}
 
-        {/* Backdrop */}
         {mobileOpen && (
-          <div
-            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
-            onClick={() => setMobileOpen(false)}
-          />
+          <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
         )}
 
-        {/* Slide-in sidebar */}
-        <aside
-          className={cn(
-            "fixed top-0 left-0 h-screen w-64 z-50 bg-white shadow-premium-xl border-r border-border flex flex-col transition-transform duration-300 ease-in-out",
-            mobileOpen ? "translate-x-0" : "-translate-x-full"
-          )}
-        >
-          {/* Logo header */}
-          <div className="p-4 flex items-center justify-between relative">
-            <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-primary via-accent to-success opacity-80" />
-            <button onClick={() => setMobileOpen(false)} className="flex items-center gap-3">
-              <div className="relative">
-                <img src={keonLogo} alt="KEON Group" className="h-10 w-auto rounded-lg shadow-sm" />
-                <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-success rounded-full border-2 border-white" />
+        <aside className={cn(
+          "fixed top-0 left-0 h-screen w-64 z-50 bg-white border-r border-slate-200 flex flex-col transition-transform duration-300",
+          mobileOpen ? 'translate-x-0' : '-translate-x-full',
+        )}>
+          {/* Header mobile */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+            <div className="flex items-center gap-3">
+              <img src={keonLogo} alt="KEON" className="h-8 w-8 rounded-lg" />
+              <div>
+                <p className="text-sm font-semibold text-slate-800 leading-none">KEON</p>
+                <p className="text-[10px] text-slate-400">Task Manager</p>
               </div>
-              <div className="flex flex-col">
-                <span className="font-display text-sm font-semibold text-foreground tracking-wide">KEON</span>
-                <span className="text-[10px] text-muted-foreground">Task Manager</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setMobileOpen(false)}
-              className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all duration-200"
-            >
-              <ChevronLeft className="w-5 h-5" />
+            </div>
+            <button onClick={() => setMobileOpen(false)} className="p-1.5 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-50">
+              <ChevronLeft className="w-4 h-4" />
             </button>
           </div>
 
-          <div className="px-3 my-2">
-            <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
-          </div>
+          {renderNav(false, true)}
 
-          {/* Navigation */}
-          <nav className="flex-1 px-3 overflow-y-auto">
-            {filteredGroups.map((group, groupIndex) => (
-              <div key={groupIndex}>
-                {groupIndex > 0 && (
-                  <div className="pt-3 pb-1">
-                    <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
-                  </div>
-                )}
-                {group.label && (
-                  <button
-                    type="button"
-                    onClick={() => toggleSection(group.label!)}
-                    className="w-full flex items-center justify-between px-3 pt-2 pb-1 hover:opacity-80 transition-opacity"
-                  >
-                    <span className="text-[10px] font-semibold tracking-widest uppercase text-muted-foreground/60">{group.label}</span>
-                    {isSectionExpanded(group.label)
-                      ? <ChevronDown className="h-3 w-3 text-muted-foreground/40" />
-                      : <ChevronRight className="h-3 w-3 text-muted-foreground/40" />}
-                  </button>
-                )}
-                {isSectionExpanded(group.label) && (
-                  <div className="space-y-0.5">
-                    {group.items.map((item) => (
-                      <Fragment key={item.id}>
-                        <SidebarNavRow
-                          item={item}
-                          groupLabel={group.label}
-                          isSubItem={false}
-                          derivedActiveView={derivedActiveView}
-                          collapsed={false}
-                          isMobile
-                          onMenuClick={handleMenuClick}
-                          pendingValidationCount={pendingValidationCount}
-                        />
-                        {item.children?.map((child) => (
-                          <SidebarNavRow
-                            key={child.id}
-                            item={child}
-                            groupLabel={group.label}
-                            isSubItem
-                            derivedActiveView={derivedActiveView}
-                            collapsed={false}
-                            isMobile
-                            onMenuClick={handleMenuClick}
-                            pendingValidationCount={pendingValidationCount}
-                          />
-                        ))}
-                      </Fragment>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </nav>
-
-          <div className="px-3 my-2">
-            <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
-          </div>
-
-          <div className="px-2 pb-2">
+          <div className="border-t border-slate-100 px-2 py-2">
             <AppNotificationCluster collapsed={false} />
           </div>
 
-          {/* User section */}
-          <div className="p-3">
+          <div className="px-3 py-2 border-t border-slate-100">
             <UserProfilePopover>
-              <button className="w-full flex items-center gap-3 rounded-xl transition-all duration-200 cursor-pointer group px-3 py-3 hover:bg-muted">
-                <Avatar className="flex-shrink-0 ring-2 ring-primary/20 group-hover:ring-primary/40 transition-all h-10 w-10">
-                  <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || 'Utilisateur'} />
-                  <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-white text-sm font-semibold">
+              <button className="w-full flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-slate-50 transition-colors">
+                <Avatar className="h-8 w-8 flex-shrink-0">
+                  <AvatarImage src={profile?.avatar_url || undefined} />
+                  <AvatarFallback className="bg-primary text-white text-xs font-semibold">
                     {getInitials(profile?.display_name)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0 text-left">
-                  <p className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition-colors">
-                    {profile?.display_name || 'Utilisateur'}
-                  </p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {permissionProfileName || profile?.job_title || 'Non défini'}
-                  </p>
+                  <p className="text-sm font-medium text-slate-700 truncate">{profile?.display_name || 'Utilisateur'}</p>
+                  <p className="text-[11px] text-slate-400 truncate">{permissionProfileName || profile?.job_title || ''}</p>
                 </div>
               </button>
             </UserProfilePopover>
@@ -660,155 +587,109 @@ export function Sidebar({
     );
   }
 
-  // Desktop/Tablet: standard sidebar
+  // ── DESKTOP ───────────────────────────────────────────────────────────────
   return (
-    <aside 
-      data-sidebar-position={isRightSide ? 'right' : 'left'} 
+    <aside
       className={cn(
-        "top-0 h-screen flex flex-col transition-all duration-300 ease-in-out",
-        collapsed 
-          ? "relative w-[72px] flex-shrink-0 bg-white" 
-          : "sticky flex-shrink-0 w-64 z-40 bg-white shadow-premium-xl",
-        isRightSide ? "right-0" : "left-0",
-        "border-r border-border"
+        'sticky top-0 h-screen flex flex-col bg-white border-r border-slate-200 transition-all duration-300 flex-shrink-0',
+        collapsed ? 'w-[60px]' : 'w-60',
+        // Déplacer à droite via order CSS (fonctionne si le parent est flex)
+        isRightSide && 'order-last border-r-0 border-l border-slate-200',
       )}
     >
-      {/* Logo with gradient accent */}
-      <div className="p-4 flex items-center justify-between relative">
-        <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-primary via-accent to-success opacity-80" />
-        
+      {/* ── Header logo + contrôles ── */}
+      <div className={cn(
+        'flex items-center border-b border-slate-100 flex-shrink-0',
+        collapsed ? 'flex-col gap-1 px-1 py-3' : 'gap-2 px-3 py-3',
+      )}>
+        {/* Logo */}
         {!collapsed && (
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <img src={keonLogo} alt="KEON Group" className="h-10 w-auto rounded-lg shadow-sm" />
-              <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-success rounded-full border-2 border-white" />
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <div className="relative flex-shrink-0">
+              <img src={keonLogo} alt="KEON" className="h-8 w-8 rounded-lg object-cover" />
+              <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white" />
             </div>
-            <div className="flex flex-col">
-              <span className="font-display text-sm font-semibold text-foreground tracking-wide">KEON</span>
-              <span className="text-[10px] text-muted-foreground">Task Manager</span>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-slate-800 leading-none">KEON</p>
+              <p className="text-[10px] text-slate-400">Task Manager</p>
             </div>
           </div>
         )}
-        
-        <div className="flex items-center gap-1">
+        {collapsed && (
+          <div className="relative flex-shrink-0">
+            <img src={keonLogo} alt="KEON" className="h-8 w-8 rounded-lg object-cover" />
+            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white" />
+          </div>
+        )}
+
+        {/* Boutons contrôle */}
+        <div className={cn('flex items-center gap-0.5 flex-shrink-0', collapsed && 'flex-col mt-1')}>
+          {/* Changer côté — toujours visible */}
+          <button
+            onClick={toggleSidebarPosition}
+            title={isRightSide ? 'Déplacer à gauche' : 'Déplacer à droite'}
+            className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+          >
+            <ArrowLeftRight className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Tout déplier / tout replier — uniquement sidebar dépliée */}
           {!collapsed && (
-            <button 
-              onClick={toggleSidebarPosition} 
-              className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all duration-200"
-              title={isRightSide ? "Déplacer à gauche" : "Déplacer à droite"}
+            <button
+              onClick={toggleAll}
+              title={allExpanded ? 'Tout replier' : 'Tout déplier'}
+              className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
             >
-              <ArrowLeftRight className="w-4 h-4" />
+              {allExpanded
+                ? <ChevronsDownUp className="w-3.5 h-3.5" />
+                : <ChevronsUpDown className="w-3.5 h-3.5" />}
             </button>
           )}
-          <button 
-            onClick={() => setManualCollapsed(!manualCollapsed)} 
-            className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all duration-200"
-            title={collapsed ? "Étendre" : "Replier"}
+
+          {/* Replier / déplier sidebar */}
+          <button
+            onClick={() => setManualCollapsed(!manualCollapsed)}
+            title={collapsed ? 'Déplier la sidebar' : 'Replier la sidebar'}
+            className="p-1.5 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
           >
-            {collapsed 
-              ? (isRightSide ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />) 
-              : (isRightSide ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />)
+            {isRightSide
+              ? (collapsed ? <ChevronLeft className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />)
+              : (collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />)
             }
           </button>
         </div>
-        
       </div>
 
-      <div className="px-3 my-2">
-        <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
-      </div>
+      {/* ── Navigation ── */}
+      {renderNav(collapsed, false)}
 
-      {/* Navigation */}
-      <nav className="flex-1 px-3 overflow-y-auto">
-        {filteredGroups.map((group, groupIndex) => (
-          <div key={groupIndex}>
-            {groupIndex > 0 && (
-              <div className="pt-3 pb-1">
-                <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
-              </div>
-            )}
-            {group.label && !collapsed && (
-              <button
-                type="button"
-                onClick={() => toggleSection(group.label!)}
-                className="w-full flex items-center justify-between px-3 pt-2 pb-1 hover:opacity-80 transition-opacity"
-              >
-                <span className="text-[10px] font-semibold tracking-widest uppercase text-muted-foreground/60">{group.label}</span>
-                {isSectionExpanded(group.label)
-                  ? <ChevronDown className="h-3 w-3 text-muted-foreground/40" />
-                  : <ChevronRight className="h-3 w-3 text-muted-foreground/40" />}
-              </button>
-            )}
-            {/* Quand la sidebar entière est repliée (icônes seules) on garde la liste visible
-                pour ne pas masquer les icônes ; sinon on respecte l'état utilisateur. */}
-            {(collapsed || isSectionExpanded(group.label)) && (
-            <div className="space-y-0.5">
-              {group.items.map((item) => (
-                <Fragment key={item.id}>
-                  <SidebarNavRow
-                    item={item}
-                    groupLabel={group.label}
-                    isSubItem={false}
-                    derivedActiveView={derivedActiveView}
-                    collapsed={collapsed}
-                    isMobile={false}
-                    onMenuClick={handleMenuClick}
-                    pendingValidationCount={pendingValidationCount}
-                  />
-                  {item.children?.map((child) => (
-                    <SidebarNavRow
-                      key={child.id}
-                      item={child}
-                      groupLabel={group.label}
-                      isSubItem
-                      derivedActiveView={derivedActiveView}
-                      collapsed={collapsed}
-                      isMobile={false}
-                      onMenuClick={handleMenuClick}
-                      pendingValidationCount={pendingValidationCount}
-                    />
-                  ))}
-                </Fragment>
-              ))}
-            </div>
-            )}
-          </div>
-        ))}
-      </nav>
+      {/* ── Notifications + Profil ── */}
+      <div className="flex-shrink-0 border-t border-slate-100">
+        <div className={cn('px-2 py-1.5', collapsed && 'px-1')}>
+          <AppNotificationCluster collapsed={collapsed} />
+        </div>
 
-      <div className="px-3 my-2">
-        <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
-      </div>
-
-      <div className={cn('px-2 pb-2', collapsed && 'px-1')}>
-        <AppNotificationCluster collapsed={collapsed} />
-      </div>
-
-      {/* User section */}
-      <div className="p-3">
-        <UserProfilePopover>
-          <button className={cn(
-            "w-full flex items-center gap-3 rounded-xl transition-all duration-200 cursor-pointer group",
-            collapsed ? "justify-center p-2" : "px-3 py-3 hover:bg-muted"
-          )}>
-            <Avatar className="flex-shrink-0 ring-2 ring-primary/20 group-hover:ring-primary/40 transition-all h-10 w-10">
-              <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || 'Utilisateur'} />
-              <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-white text-sm font-semibold">
-                {getInitials(profile?.display_name)}
-              </AvatarFallback>
-            </Avatar>
-            {!collapsed && (
-              <div className="flex-1 min-w-0 text-left">
-                <p className="text-sm font-semibold text-foreground truncate group-hover:text-primary transition-colors">
-                  {profile?.display_name || 'Utilisateur'}
-                </p>
-                <p className="text-xs text-muted-foreground truncate">
-                  {permissionProfileName || profile?.job_title || 'Non défini'}
-                </p>
-              </div>
-            )}
-          </button>
-        </UserProfilePopover>
+        <div className={cn('px-2 pb-3', collapsed && 'px-1 pb-2')}>
+          <UserProfilePopover>
+            <button className={cn(
+              'w-full flex items-center rounded-lg transition-colors hover:bg-slate-50',
+              collapsed ? 'justify-center p-2' : 'gap-2.5 px-2 py-2',
+            )}>
+              <Avatar className="flex-shrink-0 h-8 w-8">
+                <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.display_name || ''} />
+                <AvatarFallback className="bg-primary text-white text-xs font-semibold">
+                  {getInitials(profile?.display_name)}
+                </AvatarFallback>
+              </Avatar>
+              {!collapsed && (
+                <div className="flex-1 min-w-0 text-left">
+                  <p className="text-[13px] font-medium text-slate-700 truncate">{profile?.display_name || 'Utilisateur'}</p>
+                  <p className="text-[11px] text-slate-400 truncate">{permissionProfileName || profile?.job_title || ''}</p>
+                </div>
+              )}
+            </button>
+          </UserProfilePopover>
+        </div>
       </div>
     </aside>
   );
