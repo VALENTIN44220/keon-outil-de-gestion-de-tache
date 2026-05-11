@@ -18,19 +18,36 @@ import { SCREEN_PERMISSIONS, FEATURE_PERMISSIONS } from '@/types/permissions';
 import type { PermissionProfile } from '@/types/admin';
 
 const DEFAULT_PERMISSIONS: EffectivePermissions = {
+  // Mon espace
   can_access_dashboard: true,
   can_access_requests: true,
+  can_access_my_requests: true,
   can_access_tasks: true,
-  can_access_templates: true,
+  can_access_process_tracking: true,
   can_access_workload: true,
   can_access_calendar: true,
+  // BE
   can_access_projects: true,
+  can_access_be_dispatch: true,
+  can_access_be_budget: false,
+  can_access_be_tjm: false,
+  // SPV
+  can_access_spv: true,
+  // IT
+  can_access_it_dispatch: true,
   can_access_it_projects: false,
-  can_access_team: true,
+  can_access_it_budget: false,
+  can_access_it_cartographie: false,
+  // Modules
+  can_access_innovation: true,
+  can_access_maintenance: true,
+  can_access_logistique: true,
+  // Transverse
   can_access_suppliers: false,
-  can_access_process_tracking: true,
-  can_access_settings: false,
+  can_access_templates: false,
+  can_access_team: true,
   can_access_analytics: false,
+  can_access_settings: false,
   can_manage_users: false,
   can_manage_templates: false,
   can_view_own_tasks: true,

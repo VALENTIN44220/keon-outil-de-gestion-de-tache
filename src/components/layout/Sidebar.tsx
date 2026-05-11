@@ -42,7 +42,7 @@ const menuGroups: MenuGroup[] = [
     items: [
       { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard, path: '/', permissionKey: 'can_access_dashboard' },
       { id: 'requests', label: 'Demandes', icon: FileText, path: '/requests', permissionKey: 'can_access_requests' },
-      { id: 'my-requests', label: 'Mes demandes', icon: ClipboardList, path: '/mes-demandes', permissionKey: 'can_access_requests' },
+      { id: 'my-requests', label: 'Mes demandes', icon: ClipboardList, path: '/mes-demandes', permissionKey: 'can_access_my_requests' },
       { id: 'process-tracking', label: 'Suivi de processus', icon: ClipboardList, path: '/process-tracking', permissionKey: 'can_access_process_tracking' },
     ],
   },
@@ -67,55 +67,55 @@ const menuGroups: MenuGroup[] = [
         label: 'Dispatch & Suivi',
         icon: Users,
         path: '/be/dispatch',
-        permissionKey: 'can_access_projects' as any,
+        permissionKey: 'can_access_be_dispatch',
       },
       {
         id: 'be-budget',
         label: 'Budget',
         icon: Wallet,
         path: '/be/budget',
-        permissionKey: 'can_access_projects' as any,
+        permissionKey: 'can_access_be_budget',
       },
       {
         id: 'be-admin-tjm',
         label: 'Référentiel TJM',
         icon: Euro,
         path: '/be/admin/tjm',
-        permissionKey: 'can_access_projects' as any,
+        permissionKey: 'can_access_be_tjm',
       },
     ],
   },
   {
     label: 'SPV',
     items: [
-      { id: 'spv', label: 'Projets SPV', icon: Leaf, path: '/spv', permissionKey: 'can_access_projects' },
+      { id: 'spv', label: 'Projets SPV', icon: Leaf, path: '/spv', permissionKey: 'can_access_spv' },
     ],
   },
   {
     label: 'IT / DIGITAL',
     items: [
-      { id: 'it-dispatch', label: 'Demandes IT', icon: ClipboardList, path: '/it/dispatch', permissionKey: 'can_access_dashboard' },
+      { id: 'it-dispatch', label: 'Demandes IT', icon: ClipboardList, path: '/it/dispatch', permissionKey: 'can_access_it_dispatch' },
       { id: 'it-projects', label: 'Projets', icon: Monitor, path: '/it/projects', permissionKey: 'can_access_it_projects' },
-      { id: 'it-budget', label: 'Budget', icon: Euro, path: '/it/budget', permissionKey: 'can_access_it_projects' },
-      { id: 'it-cartographie', label: 'Cartographie', icon: MapIcon, path: '/it/cartographie', permissionKey: 'can_access_it_projects' },
+      { id: 'it-budget', label: 'Budget', icon: Euro, path: '/it/budget', permissionKey: 'can_access_it_budget' },
+      { id: 'it-cartographie', label: 'Cartographie', icon: MapIcon, path: '/it/cartographie', permissionKey: 'can_access_it_cartographie' },
     ],
   },
   {
     label: 'INNOVATION',
     items: [
-      { id: 'innovation', label: 'Projets INNO', icon: Lightbulb, path: '/innovation/requests', permissionKey: 'can_access_dashboard' },
+      { id: 'innovation', label: 'Projets INNO', icon: Lightbulb, path: '/innovation/requests', permissionKey: 'can_access_innovation' },
     ],
   },
   {
     label: 'MAINTENANCE',
     items: [
-      { id: 'maintenance-dispatch', label: 'Demandes matériel', icon: Package, path: '/maintenance/dispatch', permissionKey: 'can_access_dashboard' },
+      { id: 'maintenance-dispatch', label: 'Demandes matériel', icon: Package, path: '/maintenance/dispatch', permissionKey: 'can_access_maintenance' },
     ],
   },
   {
     label: 'LOGISTIQUE',
     items: [
-      { id: 'logistique-dispatch', label: 'Transports', icon: Truck, path: '/logistique/dispatch', permissionKey: 'can_access_dashboard' },
+      { id: 'logistique-dispatch', label: 'Transports', icon: Truck, path: '/logistique/dispatch', permissionKey: 'can_access_logistique' },
     ],
   },
   {

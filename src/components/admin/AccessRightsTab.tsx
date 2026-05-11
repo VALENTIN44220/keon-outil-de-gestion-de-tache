@@ -21,7 +21,7 @@ import {
 import { Loader2, Plus, Trash2, Pencil, Shield, RotateCcw } from "lucide-react";
 import type { PermissionProfile, UserProfile } from "@/types/admin";
 import type { UserPermissionOverride, AllPermissionKeys } from "@/types/permissions";
-import { SCREEN_PERMISSIONS, SCREEN_LABELS } from "@/types/permissions";
+import { SCREEN_PERMISSIONS, SCREEN_LABELS, SCREEN_PERMISSION_GROUPS } from "@/types/permissions";
 import { PageAccessMatrix } from "./PageAccessMatrix";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -123,6 +123,7 @@ const FEATURE_GROUPS: Array<{
 ];
 
 const DEFAULT_PERMISSIONS: Record<string, boolean> = {
+  // Fonctionnelles
   can_manage_users: false,
   can_manage_templates: false,
   can_view_own_tasks: true,
@@ -145,19 +146,36 @@ const DEFAULT_PERMISSIONS: Record<string, boolean> = {
   can_create_suppliers: false,
   can_edit_suppliers: false,
   can_delete_suppliers: false,
+  // Accès écrans — Mon espace
   can_access_dashboard: true,
   can_access_requests: true,
+  can_access_my_requests: true,
   can_access_tasks: true,
-  can_access_templates: false,
+  can_access_process_tracking: false,
   can_access_workload: true,
   can_access_calendar: true,
+  // BE
   can_access_projects: true,
+  can_access_be_dispatch: true,
+  can_access_be_budget: false,
+  can_access_be_tjm: false,
+  // SPV
+  can_access_spv: true,
+  // IT
+  can_access_it_dispatch: true,
   can_access_it_projects: false,
-  can_access_team: true,
+  can_access_it_budget: false,
+  can_access_it_cartographie: false,
+  // Modules
+  can_access_innovation: true,
+  can_access_maintenance: true,
+  can_access_logistique: true,
+  // Transverse
   can_access_suppliers: false,
-  can_access_process_tracking: false,
-  can_access_settings: false,
+  can_access_templates: false,
+  can_access_team: true,
   can_access_analytics: false,
+  can_access_settings: false,
 };
 
 // ─── Small UI helpers ─────────────────────────────────────────────────────────
@@ -735,14 +753,21 @@ export function AccessRightsTab({
                 </div>
               </div>
 
-              {/* Screen access */}
+              {/* Screen access — groupé par module */}
               <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
                 <SectionHead icon="🖥️" label="Accès aux écrans" />
-                <div className="flex flex-wrap gap-2">
-                  {SCREEN_PERMISSIONS.map((key) => {
-                    const active = !!(selectedProfile as unknown as Record<string, unknown>)[key];
-                    return <ScreenChip key={key} label={SCREEN_LABELS[key]} active={active} />;
-                  })}
+                <div className="space-y-3">
+                  {SCREEN_PERMISSION_GROUPS.map((group) => (
+                    <div key={group.label}>
+                      <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">{group.label}</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {group.keys.map((key) => {
+                          const active = !!(selectedProfile as unknown as Record<string, unknown>)[key];
+                          return <ScreenChip key={key} label={SCREEN_LABELS[key]} active={active} />;
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -898,22 +923,29 @@ export function AccessRightsTab({
                     <span className="text-amber-500">⚡ Surcharge manuelle — cliquez pour modifier</span>
                   </div>
 
-                  {/* Screen access */}
+                  {/* Screen access — groupé par module */}
                   <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
                     <SectionHead icon="🖥️" label="Accès aux écrans" />
-                    <div className="flex flex-wrap gap-2">
-                      {SCREEN_PERMISSIONS.map((key) => {
-                        const { value, isOverride } = getEffectiveValue(key);
-                        return (
-                          <ScreenChip
-                            key={key}
-                            label={SCREEN_LABELS[key]}
-                            active={value}
-                            overridden={isOverride}
-                            onClick={() => handleToggleUserPermission(key as AllPermissionKeys)}
-                          />
-                        );
-                      })}
+                    <div className="space-y-3">
+                      {SCREEN_PERMISSION_GROUPS.map((group) => (
+                        <div key={group.label}>
+                          <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">{group.label}</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {group.keys.map((key) => {
+                              const { value, isOverride } = getEffectiveValue(key);
+                              return (
+                                <ScreenChip
+                                  key={key}
+                                  label={SCREEN_LABELS[key]}
+                                  active={value}
+                                  overridden={isOverride}
+                                  onClick={() => handleToggleUserPermission(key as AllPermissionKeys)}
+                                />
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
