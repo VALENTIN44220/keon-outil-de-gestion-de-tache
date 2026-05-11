@@ -22,7 +22,6 @@ import { Loader2, Plus, Trash2, Pencil, Shield, RotateCcw } from "lucide-react";
 import type { PermissionProfile, UserProfile } from "@/types/admin";
 import type { UserPermissionOverride, AllPermissionKeys } from "@/types/permissions";
 import { SCREEN_PERMISSIONS, SCREEN_LABELS, SCREEN_PERMISSION_GROUPS } from "@/types/permissions";
-import { PageAccessMatrix } from "./PageAccessMatrix";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -241,11 +240,9 @@ interface ProfileFormProps {
   processTemplates: ProcessTemplate[];
   profileProcessIds: string[];
   onToggleProcess: (id: string) => void;
-  /** Si fourni : on affiche la matrice d'acces aux pages (3-state). */
-  profileId?: string | null;
 }
 
-function ProfileForm({ values, onChange, processTemplates: _processTemplates, profileProcessIds: _profileProcessIds, onToggleProcess: _onToggleProcess, profileId }: ProfileFormProps) {
+function ProfileForm({ values, onChange, processTemplates: _processTemplates, profileProcessIds: _profileProcessIds, onToggleProcess: _onToggleProcess }: ProfileFormProps) {
   return (
     <div className="space-y-5 overflow-y-auto max-h-[70vh] pr-1">
       <div className="grid grid-cols-2 gap-3">
@@ -267,12 +264,32 @@ function ProfileForm({ values, onChange, processTemplates: _processTemplates, pr
         </div>
       </div>
 
+      {/* Accès aux pages — groupé par module */}
+      <div className="border rounded-xl p-4 bg-slate-50/50">
+        <SectionHead icon="🖥️" label="Accès aux pages" />
+        <div className="space-y-4">
+          {SCREEN_PERMISSION_GROUPS.map((group) => (
+            <div key={group.label}>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">{group.label}</p>
+              <div className="grid grid-cols-2 gap-2">
+                {group.keys.map((key) => (
+                  <label key={key} className="flex items-center gap-2 cursor-pointer text-sm">
+                    <Checkbox checked={!!values[key]} onCheckedChange={(v) => onChange(key, !!v)} id={`screen-${key}`} />
+                    <span className={values[key] ? "text-slate-700" : "text-slate-400"}>{SCREEN_LABELS[key]}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Feature permissions */}
       <div className="border rounded-xl p-4 space-y-4 bg-slate-50/50">
         <SectionHead icon="⚙️" label="Permissions fonctionnelles" />
         {FEATURE_GROUPS.map((group) => (
           <div key={group.label}>
-            <p className="text-xs font-semibold text-slate-400 mb-2">{group.label}</p>
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">{group.label}</p>
             <div className="grid grid-cols-2 gap-2">
               {group.items.map(({ key, label }) => (
                 <label key={key} className="flex items-center gap-2 cursor-pointer text-sm">
@@ -284,22 +301,6 @@ function ProfileForm({ values, onChange, processTemplates: _processTemplates, pr
           </div>
         ))}
       </div>
-
-      {/* Acces aux pages : matrice 3-state (Non visible / Lecture / Lecture+Ecr.) */}
-      <div className="border rounded-xl p-4 bg-slate-50/50">
-        <SectionHead icon="🖥️" label="Accès aux pages" />
-        {profileId ? (
-          <PageAccessMatrix profileId={profileId} />
-        ) : (
-          <p className="text-xs italic text-muted-foreground">
-            Crée d'abord le profil. Tu pourras configurer les accès page par page après création.
-          </p>
-        )}
-      </div>
-
-      {/* Section 'Visibilite des processus' supprimee : la visibilite des processus
-          est desormais geree par les permissions de page (page 'templates' = acces
-          a la gestion des process_templates). */}
     </div>
   );
 }
@@ -1071,7 +1072,6 @@ export function AccessRightsTab({
             onChange={(k, v) => setEditValues((prev) => ({ ...prev, [k]: v }))}
             processTemplates={processTemplates}
             profileProcessIds={editValues._processes}
-            profileId={selectedProfile?.id ?? null}
             onToggleProcess={(id) =>
               setEditValues((prev) => {
                 const current = prev._processes;
