@@ -179,6 +179,120 @@ function buildEdgeLegend(links: ITSolutionLink[], by: EdgeColorBy): { color: str
 const DEFAULT_NODE_W = 220;
 const DEFAULT_NODE_H = 90;
 
+// ─── Routage intelligent : choix automatique du côté de connexion ─────────
+
+type Side = 'top' | 'right' | 'bottom' | 'left';
+
+interface NodeBox {
+  cx: number;
+  cy: number;
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+  w: number;
+  h: number;
+}
+
+/**
+ * Choisit le côté optimal de sortie et d'entrée pour minimiser les
+ * croisements et éviter de passer sous d'autres cartes.
+ *
+ * Stratégie en deux étapes :
+ *  1. Direction cardinale dominante (vecteur source→cible projeté sur
+ *     l'axe horizontal ou vertical le plus marqué).
+ *  2. Si l'axe choisi traverse une autre carte, on bascule sur l'axe
+ *     perpendiculaire pour contourner.
+ */
+function pickBestSides(
+  src: NodeBox,
+  tgt: NodeBox,
+  others: NodeBox[]
+): { srcSide: Side; tgtSide: Side } {
+  const dx = tgt.cx - src.cx;
+  const dy = tgt.cy - src.cy;
+
+  // Préférence axe horizontal vs vertical selon distance dominante
+  const horizontalFirst = Math.abs(dx) >= Math.abs(dy);
+
+  const horizontal: { srcSide: Side; tgtSide: Side } = dx >= 0
+    ? { srcSide: 'right', tgtSide: 'left' }
+    : { srcSide: 'left',  tgtSide: 'right' };
+
+  const vertical: { srcSide: Side; tgtSide: Side } = dy >= 0
+    ? { srcSide: 'bottom', tgtSide: 'top' }
+    : { srcSide: 'top',    tgtSide: 'bottom' };
+
+  const preferred  = horizontalFirst ? horizontal : vertical;
+  const fallback   = horizontalFirst ? vertical   : horizontal;
+
+  // Vérifie si la voie préférée traverse une autre carte
+  if (pathCrossesAny(src, tgt, preferred, others)) {
+    if (!pathCrossesAny(src, tgt, fallback, others)) {
+      return fallback;
+    }
+  }
+  return preferred;
+}
+
+/** Renvoie le point d'ancrage du handle sur le côté donné. */
+function anchorPoint(box: NodeBox, side: Side): { x: number; y: number } {
+  switch (side) {
+    case 'top':    return { x: box.cx, y: box.top };
+    case 'bottom': return { x: box.cx, y: box.bottom };
+    case 'left':   return { x: box.left,  y: box.cy };
+    case 'right':  return { x: box.right, y: box.cy };
+  }
+}
+
+/**
+ * Approximation : la trajectoire smoothstep d'un côté à l'autre est
+ * une "L" (segment perpendiculaire au côté, puis virage, puis segment
+ * vers le côté cible). On teste l'intersection des deux segments
+ * du L avec chacune des autres cartes.
+ */
+function pathCrossesAny(
+  src: NodeBox,
+  tgt: NodeBox,
+  sides: { srcSide: Side; tgtSide: Side },
+  others: NodeBox[]
+): boolean {
+  const a = anchorPoint(src, sides.srcSide);
+  const b = anchorPoint(tgt, sides.tgtSide);
+
+  // Détermine le point de virage selon les côtés choisis :
+  // horizontal → vertical : virage à (b.x, a.y)
+  // vertical   → horizontal : virage à (a.x, b.y)
+  const turn = (sides.srcSide === 'left' || sides.srcSide === 'right')
+    ? { x: b.x, y: a.y }
+    : { x: a.x, y: b.y };
+
+  return others.some((o) =>
+    segmentIntersectsBox(a.x, a.y, turn.x, turn.y, o) ||
+    segmentIntersectsBox(turn.x, turn.y, b.x, b.y, o)
+  );
+}
+
+/** Test d'intersection segment / rectangle (AABB) avec marge. */
+function segmentIntersectsBox(
+  x1: number, y1: number, x2: number, y2: number,
+  box: NodeBox, padding = 6
+): boolean {
+  const minX = Math.min(x1, x2);
+  const maxX = Math.max(x1, x2);
+  const minY = Math.min(y1, y2);
+  const maxY = Math.max(y1, y2);
+  const bx1 = box.left   - padding;
+  const bx2 = box.right  + padding;
+  const by1 = box.top    - padding;
+  const by2 = box.bottom + padding;
+  // AABB des deux : pas d'intersection
+  if (maxX < bx1 || minX > bx2 || maxY < by1 || minY > by2) return false;
+  // Le segment est strictement horizontal ou vertical pour les anchor→turn,
+  // donc l'AABB suffit comme test d'intersection.
+  return true;
+}
+
 type SolutionNodeData = Record<string, unknown> & {
   solution: ITSolution;
   borderColor: string;
@@ -416,8 +530,25 @@ export function ITCartographieGraph({ solutions, links, onSelectSolution }: Prop
   );
 
   const buildEdges = useCallback((): Edge<SolutionLinkData>[] => {
-    // Indexe les aretes par paire {source, target} non orientee pour reperer
-    // les liens parallèles (et A->B / B->A regroupes ensemble).
+    // ── Construit la liste des bounding boxes pour le routage intelligent ──
+    const boxes: Record<string, NodeBox> = {};
+    for (const s of solutions) {
+      const pos = initialPositions[s.id];
+      if (!pos) continue;
+      const w = s.width ?? DEFAULT_NODE_W;
+      const h = s.height ?? DEFAULT_NODE_H;
+      boxes[s.id] = {
+        cx: pos.x + w / 2,
+        cy: pos.y + h / 2,
+        left: pos.x,
+        right: pos.x + w,
+        top: pos.y,
+        bottom: pos.y + h,
+        w, h,
+      };
+    }
+
+    // ── Indexe les aretes parallèles (A->B / B->A regroupes) ──
     const groupKeyOf = (l: ITSolutionLink) => {
       const a = l.source_solution_id;
       const b = l.target_solution_id;
@@ -436,10 +567,28 @@ export function ITCartographieGraph({ solutions, links, onSelectSolution }: Prop
       const idx = groupIndex.get(k) ?? 0;
       groupIndex.set(k, idx + 1);
       const count = groupCounts.get(k) ?? 1;
+
+      // ── Routage intelligent : choisit le meilleur côté pour entrer/sortir ──
+      const srcBox = boxes[l.source_solution_id];
+      const tgtBox = boxes[l.target_solution_id];
+      let sourceHandle = 's-right';
+      let targetHandle = 't-left';
+      if (srcBox && tgtBox) {
+        // Autres cartes susceptibles d'être traversées
+        const others = Object.entries(boxes)
+          .filter(([id]) => id !== l.source_solution_id && id !== l.target_solution_id)
+          .map(([, box]) => box);
+        const { srcSide, tgtSide } = pickBestSides(srcBox, tgtBox, others);
+        sourceHandle = `s-${srcSide}`;
+        targetHandle = `t-${tgtSide}`;
+      }
+
       return {
         id: l.id,
         source: l.source_solution_id,
         target: l.target_solution_id,
+        sourceHandle,
+        targetHandle,
         type: 'characterized',
         animated: l.criticite === 'tres_forte' || l.criticite === 'forte',
         markerEnd: { type: MarkerType.ArrowClosed, color },
@@ -456,7 +605,7 @@ export function ITCartographieGraph({ solutions, links, onSelectSolution }: Prop
         },
       };
     });
-  }, [links, edgeColorBy]);
+  }, [links, edgeColorBy, solutions, initialPositions]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<SolutionNodeData>>(buildNodes());
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge<SolutionLinkData>>(buildEdges());
@@ -482,16 +631,63 @@ export function ITCartographieGraph({ solutions, links, onSelectSolution }: Prop
     pendingTimers.current.set(id, t);
   }, [updateSolutionLayout]);
 
+  /**
+   * Re-route les liens (= recalcule sourceHandle/targetHandle) à partir
+   * des positions courantes des nœuds. Utilisé après un drag ou un resize
+   * pour éviter d'attendre le round-trip Supabase (600 ms+).
+   */
+  const reRouteEdges = useCallback((currentNodes: Node<SolutionNodeData>[]) => {
+    const boxes: Record<string, NodeBox> = {};
+    for (const n of currentNodes) {
+      const w = (n.style?.width as number) ?? n.width ?? DEFAULT_NODE_W;
+      const h = (n.style?.height as number) ?? n.height ?? DEFAULT_NODE_H;
+      boxes[n.id] = {
+        cx: n.position.x + w / 2,
+        cy: n.position.y + h / 2,
+        left: n.position.x,
+        right: n.position.x + w,
+        top: n.position.y,
+        bottom: n.position.y + h,
+        w, h,
+      };
+    }
+    setEdges((prev) =>
+      prev.map((e) => {
+        const srcBox = boxes[e.source];
+        const tgtBox = boxes[e.target];
+        if (!srcBox || !tgtBox) return e;
+        const others = Object.entries(boxes)
+          .filter(([id]) => id !== e.source && id !== e.target)
+          .map(([, box]) => box);
+        const { srcSide, tgtSide } = pickBestSides(srcBox, tgtBox, others);
+        const sourceHandle = `s-${srcSide}`;
+        const targetHandle = `t-${tgtSide}`;
+        if (e.sourceHandle === sourceHandle && e.targetHandle === targetHandle) return e;
+        return { ...e, sourceHandle, targetHandle };
+      })
+    );
+  }, [setEdges]);
+
   const handleNodesChange = useCallback((changes: NodeChange[]) => {
     onNodesChange(changes);
+    let layoutChanged = false;
     for (const c of changes) {
       if (c.type === 'position' && c.position && !c.dragging) {
         schedulePersist(c.id, { x: c.position.x, y: c.position.y });
+        layoutChanged = true;
       } else if (c.type === 'dimensions' && c.dimensions && c.resizing === false) {
         schedulePersist(c.id, { w: c.dimensions.width, h: c.dimensions.height });
+        layoutChanged = true;
       }
     }
-  }, [onNodesChange, schedulePersist]);
+    // Re-route immédiat à la fin du drag/resize sans attendre la persistance
+    if (layoutChanged) {
+      setNodes((curr) => {
+        reRouteEdges(curr);
+        return curr;
+      });
+    }
+  }, [onNodesChange, schedulePersist, reRouteEdges, setNodes]);
 
   /**
    * onConnect : declenche apres qu'on a tire un lien entre 2 handles. On
