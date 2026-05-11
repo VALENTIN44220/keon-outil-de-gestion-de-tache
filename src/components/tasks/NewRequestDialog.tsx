@@ -482,6 +482,18 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
           if (cfg.it_project && !cfg.it_project.editable && cfg.it_project.default_value) {
             setItProjectId(cfg.it_project.default_value);
           }
+          // Nouveaux champs : catégorie, service cible, phase projet IT
+          if (cfg.category && !cfg.category.editable && cfg.category.default_value) {
+            setCategoryId(cfg.category.default_value);
+          }
+          if (cfg.target_department && !cfg.target_department.editable && cfg.target_department.default_value) {
+            setTargetDepartmentId(cfg.target_department.default_value);
+            // Active automatiquement la checkbox "Avertir un service" si valeur imposée
+            setNotifyTargetDepartment(true);
+          }
+          if (cfg.it_project_phase && cfg.it_project_phase.default_value) {
+            setItProjectPhase(cfg.it_project_phase.default_value);
+          }
           // Title is always auto-generated
           const titlePattern = cfg.title?.title_pattern || '{process} - {date}';
           const resolvedTitle = resolveTitlePattern(titlePattern, {
@@ -1183,8 +1195,10 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                     </div>
                   )}
 
-                  {/* Category Selection (when no process) */}
-                  {!linkedProcessId && (
+                  {/* Category Selection — affichée si pas de process lié OU si la config
+                      d'un process lié rend la catégorie visible.
+                      Désactivée si editable: false (valeur imposée par l'admin). */}
+                  {(!linkedProcessId || (commonFieldsConfig?.category?.visible !== false)) && (
                     <CategorySelect
                       categories={categories}
                       selectedCategoryId={categoryId}
@@ -1193,7 +1207,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                       onSubcategoryChange={setSubcategoryId}
                       onAddCategory={handleAddCategory}
                       onAddSubcategory={handleAddSubcategory}
-                      disabled={processImposedValues}
+                      disabled={processImposedValues || commonFieldsConfig?.category?.editable === false}
                     />
                   )}
 
@@ -1232,12 +1246,19 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                           onChange={(v) => { setItProjectId(v); if (!v) setItProjectPhase(null); }}
                         />
                       </div>
-                      {itProjectId && (
+                      {itProjectId && (commonFieldsConfig?.it_project_phase?.visible !== false) && (
                         <div className="space-y-1.5">
                           <Label className="text-sm font-semibold flex items-center gap-2 text-foreground">
                             Phase du projet IT
+                            {commonFieldsConfig?.it_project_phase && !commonFieldsConfig.it_project_phase.editable && (
+                              <span className="text-xs text-muted-foreground">(imposée)</span>
+                            )}
                           </Label>
-                          <ITProjectPhaseSelect value={itProjectPhase} onChange={setItProjectPhase} />
+                          <ITProjectPhaseSelect
+                            value={itProjectPhase}
+                            onChange={setItProjectPhase}
+                            disabled={commonFieldsConfig?.it_project_phase?.editable === false}
+                          />
                         </div>
                       )}
                     </>
@@ -1310,18 +1331,23 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mt-4">
+                        {/* Service cible — masquable / lockable via common_fields_config */}
+                        {(commonFieldsConfig?.target_department?.visible !== false) && (
                         <div className="space-y-2.5">
                           <Label className="text-sm font-semibold flex items-center gap-1.5 text-foreground">
                             Service cible
                             {linkedProcessId && (
                               <span className="text-xs text-muted-foreground ml-1">(prérempli si possible)</span>
                             )}
+                            {commonFieldsConfig?.target_department && !commonFieldsConfig.target_department.editable && (
+                              <span className="text-xs text-muted-foreground ml-1">(imposé)</span>
+                            )}
                           </Label>
                           <div className="flex items-center gap-2">
                             <Checkbox
                               checked={notifyTargetDepartment}
                               onCheckedChange={(v) => setNotifyTargetDepartment(Boolean(v))}
-                              disabled={isSubmitting}
+                              disabled={isSubmitting || commonFieldsConfig?.target_department?.editable === false}
                               id="notifyTargetDepartment"
                             />
                             <Label
@@ -1334,7 +1360,11 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                           <Select
                             value={targetDepartmentId || '__none__'}
                             onValueChange={(v) => setTargetDepartmentId(v === '__none__' ? null : v)}
-                            disabled={isSubmitting || !notifyTargetDepartment}
+                            disabled={
+                              isSubmitting ||
+                              !notifyTargetDepartment ||
+                              commonFieldsConfig?.target_department?.editable === false
+                            }
                           >
                             <SelectTrigger className="h-12 rounded-xl border-2 focus:ring-primary/20 focus:border-primary transition-all">
                               <SelectValue placeholder="Non spécifié" />
@@ -1351,6 +1381,7 @@ export function NewRequestDialog({ open, onClose, onAdd, onTasksCreated, initial
                             </SelectContent>
                           </Select>
                         </div>
+                        )}
 
                         <div className="space-y-2.5">
                           <Label className="text-sm font-semibold flex items-center gap-1.5 text-foreground">
