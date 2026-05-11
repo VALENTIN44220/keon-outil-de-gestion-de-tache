@@ -68,17 +68,24 @@ export function AppNotificationCluster({ collapsed, className }: AppNotification
     deleteAll: deleteAllWorkflow,
   } = useInAppNotifications();
 
+  // ID du processus Bureau d'Études — détection des tâches/demandes BE
+  const BE_PROCESS_ID = 'bd75a3b0-c918-4b43-befe-739b83f7461a';
+
   const defaultOpenTask = async (taskId: string) => {
     const path = location.pathname;
-    // Cherche le module_code de la tache pour router vers le bon dispatch
+    // On charge plusieurs colonnes pour pouvoir router correctement
+    // selon la nature de la tâche (module IT/Logistique/Maintenance ou flux BE).
     try {
       const { supabase } = await import('@/integrations/supabase/client');
       const { data } = await supabase
         .from('tasks')
-        .select('module_code, type')
+        .select('module_code, type, source_process_template_id, process_template_id, be_status, parent_request_id, requester_id')
         .eq('id', taskId)
         .maybeSingle();
-      const mc = (data as any)?.module_code as string | null;
+      const t = (data as any) ?? {};
+      const mc = t.module_code as string | null;
+
+      // 1. Modules IT / Logistique / Maintenance via module_code
       const moduleRoutes: Record<string, string> = {
         it: '/it/dispatch',
         logistique: '/logistique/dispatch',
@@ -88,14 +95,32 @@ export function AppNotificationCluster({ collapsed, className }: AppNotification
         navigate(`${moduleRoutes[mc]}?openTask=${encodeURIComponent(taskId)}`);
         return;
       }
+
+      // 2. Flux BE : détecté par process_template_id, be_status, ou parent BE
+      const isBE =
+        t.source_process_template_id === BE_PROCESS_ID ||
+        t.process_template_id === BE_PROCESS_ID ||
+        Boolean(t.be_status);
+      if (isBE) {
+        // Pour une demande BE (type='request') ou une tâche enfant BE,
+        // la page la plus utile est /be/dispatch qui affiche la liste +
+        // ouvre le dialogue de détail.
+        navigate(`/be/dispatch?openTask=${encodeURIComponent(taskId)}`);
+        return;
+      }
     } catch (e) {
       // Fallback ci-dessous
     }
+
+    // 3. Si on est déjà sur /requests, on reste dessus
     if (path === '/requests' || path.startsWith('/requests/')) {
       navigate(`/requests?openTask=${encodeURIComponent(taskId)}`);
       return;
     }
-    navigate(`/?openTask=${encodeURIComponent(taskId)}`);
+
+    // 4. Fallback : /mes-demandes (la page existe et sait ouvrir une tâche
+    //    via ?openTask=...), évite l'écran blanc à la racine.
+    navigate(`/mes-demandes?openTask=${encodeURIComponent(taskId)}`);
   };
 
   return (

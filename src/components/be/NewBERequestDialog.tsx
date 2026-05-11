@@ -50,6 +50,7 @@ import {
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSimulation } from '@/contexts/SimulationContext';
 import { toast } from 'sonner';
 import type { BEProject } from '@/types/beProject';
 import type { BEAffaire } from '@/types/beAffaire';
@@ -163,7 +164,12 @@ export function NewBERequestDialog({
   defaultAffaireId,
   onCreated,
 }: NewBERequestDialogProps) {
-  const { user, profile } = useAuth();
+  const { user, profile: authProfile } = useAuth();
+  const { isSimulating, simulatedProfile } = useSimulation();
+  // En simulation, on raisonne avec le profil simulé pour que la demande
+  // créée soit attribuée à l'utilisateur incarné (ex: Germain), pas à l'admin.
+  // user.id (auth) reste celui de l'admin réel — c'est lui qui INSERT (RLS).
+  const profile = isSimulating && simulatedProfile ? simulatedProfile : authProfile;
 
   /** Si le projet est pré-connu (contexte hub), on saute l'étape 0. */
   const hasDefaultProject = !!defaultProjectId;
@@ -426,8 +432,98 @@ export function NewBERequestDialog({
         };
       });
 
-      const { error: childError } = await sb.from('tasks').insert(childInserts);
+      const { data: createdChildren, error: childError } = await sb
+        .from('tasks')
+        .insert(childInserts)
+        .select('id, title, assignee_id, be_status, sub_process_template_id');
       if (childError) throw childError;
+
+      // 2bis. Notifications inbox — informe les managers/dispatchers et les
+      // assignés que de nouvelles tâches BE leur arrivent. On résout
+      // profile.id → user_id (auth.users.id) via la table profiles, puis
+      // on INSERT en lot dans public.notifications.
+      try {
+        // Collecte les profile_ids à notifier (sans doublons, sans le créateur)
+        const profileIdsToNotify = new Set<string>();
+        // Manager de dispatch des prestations sélectionnées (= reçoit la demande)
+        for (const step of allSelectedSteps) {
+          if (step.dispatch_manager_id && step.dispatch_manager_id !== profile.id) {
+            profileIdsToNotify.add(step.dispatch_manager_id);
+          }
+        }
+        // Assignés directs des tâches "fixed_user"
+        for (const c of (createdChildren ?? [])) {
+          if (c.assignee_id && c.assignee_id !== profile.id) {
+            profileIdsToNotify.add(c.assignee_id);
+          }
+        }
+
+        if (profileIdsToNotify.size > 0) {
+          // Résout profile.id → user_id (auth) pour la table notifications
+          const { data: prfs } = await sb
+            .from('profiles')
+            .select('id, user_id')
+            .in('id', Array.from(profileIdsToNotify));
+          const userIdByProfile = new Map<string, string>();
+          (prfs ?? []).forEach((p: any) => {
+            if (p.user_id) userIdByProfile.set(p.id, p.user_id);
+          });
+
+          const notifs: Array<{
+            user_id: string;
+            title: string;
+            message: string;
+            type: string;
+            related_entity_type: string;
+            related_entity_id: string;
+          }> = [];
+
+          // Notif au dispatch manager (sur la demande parente)
+          const dispatchProfileIds = new Set<string>();
+          for (const step of allSelectedSteps) {
+            if (step.dispatch_manager_id && step.dispatch_manager_id !== profile.id) {
+              dispatchProfileIds.add(step.dispatch_manager_id);
+            }
+          }
+          for (const pid of dispatchProfileIds) {
+            const uid = userIdByProfile.get(pid);
+            if (!uid) continue;
+            notifs.push({
+              user_id: uid,
+              title: 'Nouvelle demande BE à dispatcher',
+              message: `${title} (${selectedGroups.length} prestation${selectedGroups.length > 1 ? 's' : ''})`,
+              type: 'be_request_created',
+              related_entity_type: 'task',
+              related_entity_id: request.id,
+            });
+          }
+
+          // Notif aux assignés directs (sur chaque tâche enfant)
+          for (const c of (createdChildren ?? [])) {
+            if (!c.assignee_id || c.assignee_id === profile.id) continue;
+            const uid = userIdByProfile.get(c.assignee_id);
+            if (!uid) continue;
+            notifs.push({
+              user_id: uid,
+              title: 'Nouvelle tâche BE qui t\'est affectée',
+              message: c.title,
+              type: 'be_task_assigned',
+              related_entity_type: 'task',
+              related_entity_id: c.id,
+            });
+          }
+
+          if (notifs.length > 0) {
+            const { error: notifError } = await sb.from('notifications').insert(notifs);
+            if (notifError) {
+              console.warn('[NewBERequestDialog] notifications insert error (non-blocking):', notifError);
+            }
+          }
+        }
+      } catch (notifErr) {
+        // Non-bloquant : la création reste valide même si les notifs échouent
+        console.warn('[NewBERequestDialog] notification step failed (non-blocking):', notifErr);
+      }
 
       // 3. Liens en tant que task_attachments sur la tâche parente
       const validLinks = links.filter(l => l.url.trim());
