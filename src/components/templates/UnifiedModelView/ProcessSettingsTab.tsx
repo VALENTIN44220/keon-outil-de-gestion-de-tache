@@ -412,68 +412,71 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
         </CardContent>
       </Card>
 
-      {/* Configuration des sous-processus */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <GitBranch className="h-4 w-4 text-primary" />
-            Configuration des sous-processus
-            <Badge variant={subprocessSelectionMode === 'single' ? 'default' : 'secondary'} className={cn(
-              'ml-2 text-[10px]',
-              subprocessSelectionMode === 'single' && 'bg-violet-500 hover:bg-violet-600'
-            )}>
-              {subprocessSelectionMode === 'single' ? 'Sélection exclusive' : 'Sélection multiple'}
-            </Badge>
-          </CardTitle>
-          <CardDescription className="text-xs">
-            Définissez comment le demandeur peut sélectionner les sous-processus lors de la création
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">Mode de sélection</Label>
-            <RadioGroup
-              value={subprocessSelectionMode}
-              onValueChange={(v) => setSubprocessSelectionMode(v as 'multiple' | 'single')}
-              disabled={!canManage}
-              className="space-y-3"
-            >
-              <div className="flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/30 transition-colors">
-                <RadioGroupItem value="multiple" id="mode-multiple" className="mt-0.5" />
-                <div>
-                  <Label htmlFor="mode-multiple" className="text-sm font-medium cursor-pointer">
-                    Sélection multiple
-                  </Label>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Le demandeur peut cocher plusieurs sous-processus
-                  </p>
+      {/* Configuration des sous-processus — masquée sur BE (le wizard BE
+          gère sa propre sélection multiple de prestations) */}
+      {!isBEProcess && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <GitBranch className="h-4 w-4 text-primary" />
+              Configuration des sous-processus
+              <Badge variant={subprocessSelectionMode === 'single' ? 'default' : 'secondary'} className={cn(
+                'ml-2 text-[10px]',
+                subprocessSelectionMode === 'single' && 'bg-violet-500 hover:bg-violet-600'
+              )}>
+                {subprocessSelectionMode === 'single' ? 'Sélection exclusive' : 'Sélection multiple'}
+              </Badge>
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Définissez comment le demandeur peut sélectionner les sous-processus lors de la création
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Mode de sélection</Label>
+              <RadioGroup
+                value={subprocessSelectionMode}
+                onValueChange={(v) => setSubprocessSelectionMode(v as 'multiple' | 'single')}
+                disabled={!canManage}
+                className="space-y-3"
+              >
+                <div className="flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/30 transition-colors">
+                  <RadioGroupItem value="multiple" id="mode-multiple" className="mt-0.5" />
+                  <div>
+                    <Label htmlFor="mode-multiple" className="text-sm font-medium cursor-pointer">
+                      Sélection multiple
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Le demandeur peut cocher plusieurs sous-processus
+                    </p>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/30 transition-colors">
-                <RadioGroupItem value="single" id="mode-single" className="mt-0.5" />
-                <div>
-                  <Label htmlFor="mode-single" className="text-sm font-medium cursor-pointer">
-                    Sélection exclusive
-                  </Label>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    Le demandeur ne peut choisir qu'un seul sous-processus
-                  </p>
+                <div className="flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/30 transition-colors">
+                  <RadioGroupItem value="single" id="mode-single" className="mt-0.5" />
+                  <div>
+                    <Label htmlFor="mode-single" className="text-sm font-medium cursor-pointer">
+                      Sélection exclusive
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Le demandeur ne peut choisir qu'un seul sous-processus
+                    </p>
+                  </div>
                 </div>
-              </div>
-            </RadioGroup>
-          </div>
-
-          {canManage && (
-            <div className="pt-3 border-t">
-              <Button size="sm" onClick={handleSaveSelectionMode} disabled={isSavingSelectionMode}>
-                {isSavingSelectionMode && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
-                <Save className="h-3 w-3 mr-1" />
-                Enregistrer le mode
-              </Button>
+              </RadioGroup>
             </div>
-          )}
-        </CardContent>
-      </Card>
+
+            {canManage && (
+              <div className="pt-3 border-t">
+                <Button size="sm" onClick={handleSaveSelectionMode} disabled={isSavingSelectionMode}>
+                  {isSavingSelectionMode && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                  <Save className="h-3 w-3 mr-1" />
+                  Enregistrer le mode
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Configuration des champs réels par flux */}
       <Card>
@@ -849,34 +852,81 @@ export function ProcessSettingsTab({ process, onUpdate, canManage }: ProcessSett
         </CardContent>
       </Card>
 
-      {/* Validation de la demande */}
-      <RequestValidationConfigPanel
-        entityType="process"
-        entityId={process.id}
-        currentSettings={(process as any).settings || null}
-        canManage={canManage}
-        onUpdate={onUpdate}
-      />
+      {/* Validation de la demande — masquée sur BE (chaque étape a sa
+          propre validation niveau 1 + niveau 2 via task_templates) */}
+      {!isBEProcess && (
+        <RequestValidationConfigPanel
+          entityType="process"
+          entityId={process.id}
+          currentSettings={(process as any).settings || null}
+          canManage={canManage}
+          onUpdate={onUpdate}
+        />
+      )}
 
-      {/* Récurrence automatique */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Récurrence automatique</CardTitle>
-          <CardDescription className="text-xs">
-            Configurez la génération automatique de demandes à intervalle régulier
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <RecurrenceConfig value={recurrence} onChange={setRecurrence} />
-          {canManage && (
-            <Button size="sm" onClick={handleSaveRecurrence} disabled={isSavingRecurrence}>
-              {isSavingRecurrence && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
-              <Save className="h-3 w-3 mr-1" />
-              Enregistrer la récurrence
-            </Button>
-          )}
-        </CardContent>
-      </Card>
+      {/* Récurrence automatique — masquée sur BE (les prestations sont
+          déclenchées par le BE en réponse à une demande projet) */}
+      {!isBEProcess && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Récurrence automatique</CardTitle>
+            <CardDescription className="text-xs">
+              Configurez la génération automatique de demandes à intervalle régulier
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <RecurrenceConfig value={recurrence} onChange={setRecurrence} />
+            {canManage && (
+              <Button size="sm" onClick={handleSaveRecurrence} disabled={isSavingRecurrence}>
+                {isSavingRecurrence && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+                <Save className="h-3 w-3 mr-1" />
+                Enregistrer la récurrence
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Encart explicatif spécifique au processus BE */}
+      {isBEProcess && (
+        <Card className="border-amber-200 bg-amber-50/40">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2 text-amber-700">
+              <Briefcase className="h-4 w-4" />
+              Configuration spécifique au flux Bureau d'Études
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-xs text-amber-900/80">
+            <p>
+              Le flux BE a son propre système de création de demandes (wizard "Nouvelle demande BE")
+              qui pilote la configuration différemment des autres processus. Les sections suivantes
+              ont donc été masquées sur cette page car elles ne sont pas utilisées :
+            </p>
+            <ul className="list-disc list-inside space-y-1 ml-1">
+              <li>
+                <strong>Mode de sélection des sous-processus</strong> — le wizard BE permet
+                toujours une sélection multiple des prestations.
+              </li>
+              <li>
+                <strong>Validation de la demande</strong> — la validation se fait à l'étape
+                (niveau 1 puis niveau 2) sur chaque task_template d'une prestation, pas
+                au niveau de la demande globale.
+              </li>
+              <li>
+                <strong>Récurrence automatique</strong> — les prestations BE sont déclenchées
+                manuellement par les chefs de projets, pas par une planification cyclique.
+              </li>
+            </ul>
+            <p className="pt-2 border-t border-amber-200">
+              Pour configurer les <strong>prestations</strong>, leurs <strong>étapes</strong>
+              et leurs <strong>validations</strong>, utilise l'onglet
+              <Badge variant="outline" className="mx-1 border-amber-300 bg-white/60">Prestations</Badge>
+              ou la page de gestion détaillée de chaque prestation
+              <code className="ml-1 bg-white/60 px-1 rounded">/templates/subprocess/:id</code>.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
