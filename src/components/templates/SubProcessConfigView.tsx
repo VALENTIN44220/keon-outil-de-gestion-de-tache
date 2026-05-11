@@ -47,7 +47,24 @@ import {
   Eye,
   EyeOff,
   Workflow,
+  Briefcase,
+  ShieldCheck,
 } from 'lucide-react';
+
+// ID du processus Bureau d'Études — détection automatique du flux BE
+const BE_PROCESS_ID = 'bd75a3b0-c918-4b43-befe-739b83f7461a';
+
+const BE_CATEGORY_LABELS: Record<string, string> = {
+  be: 'BE — Standard',
+  be_reglementaire: 'BE — Réglementaire',
+};
+
+const VALIDATION_LABELS: Record<string, string> = {
+  none: 'Aucune',
+  manager: 'Manager',
+  requester: 'Demandeur',
+  free: 'Libre',
+};
 import { supabase } from '@/integrations/supabase/client';
 import { SubProcessTemplate, TaskTemplate, ASSIGNMENT_TYPE_LABELS } from '@/types/template';
 import { toast } from 'sonner';
@@ -129,7 +146,18 @@ export function SubProcessConfigView({
     target_group_id: null as string | null,
     modifiable_at_request: false,
     show_quick_launch: false,
+    // Champs BE
+    be_category: '' as string,
+    dispatch_manager_id: null as string | null,
   });
+
+  // Détection BE : processus parent = BE OU colonne be_category définie
+  const isBEPrestation =
+    subProcess?.process_template_id === BE_PROCESS_ID ||
+    Boolean((subProcess as any)?.be_category);
+
+  const taskLabel = isBEPrestation ? 'étape' : 'tâche';
+  const taskLabelPlural = isBEPrestation ? 'Étapes' : 'Tâches';
 
   // Table filters config (stored in form_schema.table_filters, keyed by table_name)
   const [tableFilters, setTableFilters] = useState<Record<string, { ref_prefix: string; exclude_des: string }>>({});
@@ -176,6 +204,8 @@ export function SubProcessConfigView({
           target_group_id: spData.target_group_id,
           modifiable_at_request: false,
           show_quick_launch: (spData as any).show_quick_launch ?? false,
+          be_category: ((spData as any).be_category as string) || '',
+          dispatch_manager_id: ((spData as any).dispatch_manager_id as string | null) || null,
         });
 
         // Load table filters and hidden request fields from form_schema
@@ -286,6 +316,14 @@ export function SubProcessConfigView({
         enabled_filter_tables: enabledFilterTables,
       };
 
+      // Sur une prestation BE, on persiste aussi catégorie + manager de dispatch
+      const beFields = isBEPrestation
+        ? {
+            be_category: formData.be_category || null,
+            dispatch_manager_id: formData.dispatch_manager_id || null,
+          }
+        : {};
+
       const { error } = await supabase
         .from('sub_process_templates')
         .update({
@@ -294,6 +332,7 @@ export function SubProcessConfigView({
           is_mandatory: formData.is_mandatory,
           show_quick_launch: formData.show_quick_launch,
           form_schema: updatedSchema,
+          ...beFields,
         } as any)
         .eq('id', subProcessId);
 
@@ -406,15 +445,24 @@ export function SubProcessConfigView({
 
   if (!subProcess) return null;
 
-  const tabs = [
-    { id: 'general', label: 'Général', icon: Settings },
-    { id: 'tasks', label: 'Tâches', icon: ListTodo },
-    { id: 'assignment', label: 'Affectation', icon: Users },
-    { id: 'output', label: 'Sortie table', icon: Database },
-    { id: 'visibility', label: 'Visibilité', icon: Eye },
-    { id: 'notifications', label: 'Notifications', icon: Bell },
-    { id: 'workflow', label: 'Workflow', icon: Workflow },
-  ];
+  // Onglets adaptatifs au flux BE
+  //  - BE       : Général · Étapes · Notifications   (3 onglets, simple)
+  //  - Autres   : 7 onglets complets (avec affectation, sortie table, visibilité, workflow)
+  const tabs = isBEPrestation
+    ? [
+        { id: 'general',       label: 'Général',         icon: Settings },
+        { id: 'tasks',         label: taskLabelPlural,   icon: ListTodo },
+        { id: 'notifications', label: 'Notifications',   icon: Bell },
+      ]
+    : [
+        { id: 'general',       label: 'Général',         icon: Settings },
+        { id: 'tasks',         label: 'Tâches',          icon: ListTodo },
+        { id: 'assignment',    label: 'Affectation',     icon: Users },
+        { id: 'output',        label: 'Sortie table',    icon: Database },
+        { id: 'visibility',    label: 'Visibilité',      icon: Eye },
+        { id: 'notifications', label: 'Notifications',   icon: Bell },
+        { id: 'workflow',      label: 'Workflow',        icon: Workflow },
+      ];
 
   return (
     <>
@@ -430,16 +478,25 @@ export function SubProcessConfigView({
                 <GitBranch className="h-5 w-5 text-primary" />
                 {subProcess.name}
               </SheetTitle>
-              <div className="flex gap-2 mt-2">
+              <div className="flex gap-2 mt-2 flex-wrap">
+                {isBEPrestation && (
+                  <Badge className="bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-100 gap-1">
+                    <Briefcase className="h-3 w-3" />
+                    Prestation BE
+                    {formData.be_category && ` — ${BE_CATEGORY_LABELS[formData.be_category]}`}
+                  </Badge>
+                )}
                 {subProcess.is_mandatory ? (
                   <Badge variant="destructive">Obligatoire</Badge>
                 ) : (
                   <Badge variant="secondary">Optionnel</Badge>
                 )}
-                <Badge variant="outline">
-                  {ASSIGNMENT_TYPE_LABELS[subProcess.assignment_type] || 'Standard'}
-                </Badge>
-                <Badge variant="outline">{tasks.length} tâche(s)</Badge>
+                {!isBEPrestation && (
+                  <Badge variant="outline">
+                    {ASSIGNMENT_TYPE_LABELS[subProcess.assignment_type] || 'Standard'}
+                  </Badge>
+                )}
+                <Badge variant="outline">{tasks.length} {taskLabel}(s)</Badge>
               </div>
             </div>
           </div>
@@ -451,7 +508,10 @@ export function SubProcessConfigView({
           className="flex-1 flex flex-col min-h-0"
         >
           <div className="px-6 pt-4 shrink-0">
-            <TabsList className="w-full grid grid-cols-8">
+            <TabsList
+              className="w-full"
+              style={{ display: 'grid', gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
+            >
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 return (
@@ -468,6 +528,27 @@ export function SubProcessConfigView({
             <div className="p-6">
               {/* General Tab */}
               <TabsContent value="general" className="mt-0 space-y-4">
+
+                {/* Bannière BE — explique que les onglets sont simplifiés */}
+                {isBEPrestation && (
+                  <Card className="border-amber-200 bg-amber-50/40">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2 text-amber-700">
+                        <Briefcase className="h-4 w-4" />
+                        Prestation Bureau d'Études
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-xs text-amber-900/80">
+                      <p>
+                        L'affectation est gérée par le <strong>Manager de dispatch</strong>,
+                        et chaque étape porte sa propre validation (niveau 1 + niveau 2).
+                        Les onglets <em>Affectation</em>, <em>Sortie table</em>,
+                        <em> Visibilité</em> et <em>Workflow</em> sont masqués.
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
+
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-base">Informations générales</CardTitle>
@@ -481,6 +562,64 @@ export function SubProcessConfigView({
                         disabled={!canManage}
                       />
                     </div>
+
+                    {/* Champs spécifiques BE — Catégorie + Manager de dispatch */}
+                    {isBEPrestation && (
+                      <>
+                        <div className="space-y-2">
+                          <Label className="flex items-center gap-1.5">
+                            <Briefcase className="h-3.5 w-3.5 text-amber-600" />
+                            Catégorie BE
+                          </Label>
+                          <Select
+                            value={formData.be_category || '__none__'}
+                            onValueChange={(v) =>
+                              setFormData({ ...formData, be_category: v === '__none__' ? '' : v })
+                            }
+                            disabled={!canManage}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Sélectionner une catégorie" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__">Non catégorisée</SelectItem>
+                              <SelectItem value="be">{BE_CATEGORY_LABELS.be}</SelectItem>
+                              <SelectItem value="be_reglementaire">{BE_CATEGORY_LABELS.be_reglementaire}</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="flex items-center gap-1.5">
+                            <ShieldCheck className="h-3.5 w-3.5 text-amber-600" />
+                            Manager de dispatch
+                          </Label>
+                          <Select
+                            value={formData.dispatch_manager_id || '__none__'}
+                            onValueChange={(v) =>
+                              setFormData({ ...formData, dispatch_manager_id: v === '__none__' ? null : v })
+                            }
+                            disabled={!canManage}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Sélectionner le manager…" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__">Aucun (à définir)</SelectItem>
+                              {profiles.map((p) => (
+                                <SelectItem key={p.id} value={p.id}>
+                                  {p.display_name || 'Sans nom'}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-[11px] text-muted-foreground">
+                            Reçoit les étapes non pré-affectées et dispatche aux projeteurs.
+                          </p>
+                        </div>
+                      </>
+                    )}
+
                     <div className="space-y-2">
                       <Label>Description</Label>
                       <Textarea
@@ -681,11 +820,18 @@ export function SubProcessConfigView({
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <div>
-                      <CardTitle className="text-base">Tâches du sous-processus</CardTitle>
+                      <CardTitle className="text-base">
+                        {isBEPrestation ? `${taskLabelPlural} de la prestation` : 'Tâches du sous-processus'}
+                      </CardTitle>
                       <CardDescription className="space-y-1">
-                        <span>Liste des tâches avec leurs checklists.</span>
+                        <span>
+                          {isBEPrestation
+                            ? 'Liste ordonnée des étapes avec leur durée et leurs validations niveau 1 et 2.'
+                            : 'Liste des tâches avec leurs checklists.'}
+                        </span>
                         <span className="block text-xs text-amber-900/90 dark:text-amber-200/90">
-                          Pour activer « Envoyer pour validation » côté exécutant, ouvrez une tâche avec « Modifier » et renseignez la section « Qui valide avant la clôture ? ».
+                          Pour modifier les validations d'une {taskLabel}, ouvrez-la avec « Modifier »
+                          et renseignez la section « Qui valide avant la clôture ? ».
                         </span>
                       </CardDescription>
                     </div>
@@ -700,11 +846,19 @@ export function SubProcessConfigView({
                     {tasks.length === 0 ? (
                       <div className="text-center py-8 text-muted-foreground">
                         <ListTodo className="h-10 w-10 mx-auto mb-3 opacity-50" />
-                        <p>Aucune tâche configurée</p>
+                        <p>Aucune {taskLabel} configurée</p>
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        {tasks.map((task, index) => (
+                        {tasks.map((task, index) => {
+                          const v1Type = (task as any).validation_level_1 || 'none';
+                          const v2Type = (task as any).validation_level_2 || 'none';
+                          const v1Id   = (task as any).validator_level_1_id as string | null;
+                          const v2Id   = (task as any).validator_level_2_id as string | null;
+                          const v1Name = v1Id ? profiles.find(p => p.id === v1Id)?.display_name : null;
+                          const v2Name = v2Id ? profiles.find(p => p.id === v2Id)?.display_name : null;
+
+                          return (
                           <div
                             key={task.id}
                             className="flex items-center gap-3 p-3 border rounded-lg group"
@@ -719,7 +873,7 @@ export function SubProcessConfigView({
                                 </span>
                                 <span className="font-medium">{task.title}</span>
                               </div>
-                              <div className="flex gap-2 mt-1">
+                              <div className="flex gap-2 mt-1 flex-wrap">
                                 <Badge variant="secondary" className="text-xs">
                                   {task.default_duration_days} {(task as any).default_duration_unit === 'hours' ? 'heure(s)' : 'jour(s)'}
                                 </Badge>
@@ -728,7 +882,28 @@ export function SubProcessConfigView({
                                     {task.checklist_count} sous-action(s)
                                   </Badge>
                                 )}
-                                {(task.validation_level_1 !== 'none' || task.validation_level_2 !== 'none') && (
+                                {/* Sur BE : affichage détaillé des 2 niveaux de validation */}
+                                {isBEPrestation && v1Type !== 'none' && (
+                                  <Badge className="text-xs gap-1 bg-emerald-100 text-emerald-700 border-emerald-200 hover:bg-emerald-100">
+                                    <ShieldCheck className="h-3 w-3" />
+                                    Val. 1 : {VALIDATION_LABELS[v1Type]}
+                                    {v1Name && <span className="font-normal">— {v1Name}</span>}
+                                  </Badge>
+                                )}
+                                {isBEPrestation && v2Type !== 'none' && (
+                                  <Badge className="text-xs gap-1 bg-sky-100 text-sky-700 border-sky-200 hover:bg-sky-100">
+                                    <ShieldCheck className="h-3 w-3" />
+                                    Val. 2 : {VALIDATION_LABELS[v2Type]}
+                                    {v2Name && <span className="font-normal">— {v2Name}</span>}
+                                  </Badge>
+                                )}
+                                {isBEPrestation && v1Type === 'none' && v2Type === 'none' && (
+                                  <Badge variant="outline" className="text-xs text-muted-foreground">
+                                    Sans validation
+                                  </Badge>
+                                )}
+                                {/* Sur non-BE : badge unique simple */}
+                                {!isBEPrestation && (v1Type !== 'none' || v2Type !== 'none') && (
                                   <Badge variant="outline" className="text-xs border-amber-300 text-amber-900 dark:text-amber-100">
                                     Validation avant clôture
                                   </Badge>
@@ -745,9 +920,9 @@ export function SubProcessConfigView({
                                 >
                                   <Edit2 className="h-4 w-4" />
                                 </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
                                   className="h-8 w-8 text-destructive"
                                   onClick={() => handleDeleteTask(task.id)}
                                 >
@@ -756,14 +931,16 @@ export function SubProcessConfigView({
                               </div>
                             )}
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </CardContent>
                 </Card>
               </TabsContent>
 
-              {/* Assignment Tab — Read-only summary, config lives in Workflow */}
+              {/* Assignment Tab — masqué sur BE (utilise dispatch_manager_id) */}
+              {!isBEPrestation && (
               <TabsContent value="assignment" className="mt-0 space-y-4">
                 <Card>
                   <CardHeader>
@@ -836,10 +1013,12 @@ export function SubProcessConfigView({
                   </CardContent>
                 </Card>
               </TabsContent>
+              )}
 
               {/* Validations Tab removed — managed via workflow steps */}
 
-              {/* Visibility Tab - Request detail fields */}
+              {/* Visibility Tab — masqué sur BE (configurable au niveau processus) */}
+              {!isBEPrestation && (
               <TabsContent value="visibility" className="mt-0 space-y-4">
                 <Card>
                   <CardHeader>
@@ -962,18 +1141,21 @@ export function SubProcessConfigView({
                   </CardContent>
                 </Card>
               </TabsContent>
+              )}
 
-              {/* Output Tab */}
-              <TabsContent value="output" className="mt-0 space-y-4">
-                <TableOutputMappingPanel
-                  processTemplateId={subProcess?.process_template_id || null}
-                  subProcessTemplateId={subProcessId}
-                  canManage={canManage}
-                  onUpdate={onUpdate}
-                />
-              </TabsContent>
+              {/* Output Tab — masqué sur BE (non utilisé pour les prestations BE) */}
+              {!isBEPrestation && (
+                <TabsContent value="output" className="mt-0 space-y-4">
+                  <TableOutputMappingPanel
+                    processTemplateId={subProcess?.process_template_id || null}
+                    subProcessTemplateId={subProcessId}
+                    canManage={canManage}
+                    onUpdate={onUpdate}
+                  />
+                </TabsContent>
+              )}
 
-              {/* Notifications Tab */}
+              {/* Notifications Tab — toujours présent */}
               <TabsContent value="notifications" className="mt-0 space-y-4">
                 <SubProcessNotificationsPanel
                   subProcessId={subProcessId}
@@ -982,14 +1164,16 @@ export function SubProcessConfigView({
                 />
               </TabsContent>
 
-              {/* Workflow Tab */}
-              <TabsContent value="workflow" className="mt-0 space-y-4">
-                <WorkflowConfigTab
-                  subProcessId={subProcessId}
-                  subProcessName={subProcess.name}
-                  canManage={canManage}
-                />
-              </TabsContent>
+              {/* Workflow Tab — masqué sur BE (étapes linéaires) */}
+              {!isBEPrestation && (
+                <TabsContent value="workflow" className="mt-0 space-y-4">
+                  <WorkflowConfigTab
+                    subProcessId={subProcessId}
+                    subProcessName={subProcess.name}
+                    canManage={canManage}
+                  />
+                </TabsContent>
+              )}
 
             </div>
           </ScrollArea>
