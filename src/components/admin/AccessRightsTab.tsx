@@ -340,6 +340,7 @@ export function AccessRightsTab({
   const [userOverrides, setUserOverrides] = useState<UserPermissionOverride | null>(null);
   const [isLoadingOverrides, setIsLoadingOverrides] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [isAssigningProfile, setIsAssigningProfile] = useState(false);
 
   // Process data
   const [processTemplates, setProcessTemplates] = useState<ProcessTemplate[]>([]);
@@ -526,6 +527,35 @@ export function AccessRightsTab({
       toast.error((e as Error).message || "Erreur");
     } finally {
       setIsResetting(false);
+    }
+  };
+
+  // ── Affectation d'un profil à un utilisateur ──────────────────────────────
+  // Permet à l'admin de changer le permission_profile_id d'un user depuis la
+  // fiche utilisateur. Une valeur null = retrait du profil (l'utilisateur
+  // n'aura plus que les défauts + ses surcharges éventuelles).
+  const handleAssignProfile = async (newProfileId: string | null) => {
+    if (!selectedUserId) return;
+    setIsAssigningProfile(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ permission_profile_id: newProfileId })
+        .eq("id", selectedUserId);
+      if (error) throw error;
+      const profileName = newProfileId
+        ? permissionProfiles.find((p) => p.id === newProfileId)?.name ?? "le profil"
+        : null;
+      toast.success(
+        newProfileId
+          ? `Profil « ${profileName} » affecté à ${selectedUser?.display_name ?? "cet utilisateur"}`
+          : `Profil retiré de ${selectedUser?.display_name ?? "cet utilisateur"}`
+      );
+      onRefresh();
+    } catch (e: unknown) {
+      toast.error((e as Error).message || "Erreur lors de l'affectation");
+    } finally {
+      setIsAssigningProfile(false);
     }
   };
 
@@ -870,52 +900,87 @@ export function AccessRightsTab({
               ) : (
                 <>
                   {/* Header */}
-                  <div className="bg-white rounded-2xl border border-slate-200 p-5 flex items-center gap-4 shadow-sm">
-                    <div
-                      className="w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold"
-                      style={{
-                        background: getProfileColor(selectedUser.permission_profile_id ?? "") + "20",
-                        color: getProfileColor(selectedUser.permission_profile_id ?? ""),
-                      }}
-                    >
-                      {(selectedUser.display_name ?? "?")[0]}
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-bold text-lg text-slate-900">{selectedUser.display_name}</h3>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <div
-                          className="w-2.5 h-2.5 rounded-full"
-                          style={{ background: getProfileColor(selectedUser.permission_profile_id ?? "") }}
-                        />
-                        <span
-                          className="text-sm font-medium"
-                          style={{ color: getProfileColor(selectedUser.permission_profile_id ?? "") }}
-                        >
-                          {userProfileDef?.name ?? "Sans profil"}
-                        </span>
-                        {selectedUser.company && (
-                          <span className="text-sm text-slate-400">· {selectedUser.company.name}</span>
-                        )}
+                  <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+                    <div className="flex items-center gap-4">
+                      <div
+                        className="w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold flex-shrink-0"
+                        style={{
+                          background: getProfileColor(selectedUser.permission_profile_id ?? "") + "20",
+                          color: getProfileColor(selectedUser.permission_profile_id ?? ""),
+                        }}
+                      >
+                        {(selectedUser.display_name ?? "?")[0]}
                       </div>
-                    </div>
-                    {hasAnyOverride() && (
-                      <span className="text-xs font-bold bg-amber-100 text-amber-700 border border-amber-200 px-3 py-1 rounded-full">
-                        Surcharges actives
-                      </span>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={!hasAnyOverride() || isResetting}
-                      onClick={handleResetOverrides}
-                    >
-                      {isResetting ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      ) : (
-                        <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-lg text-slate-900 truncate">{selectedUser.display_name}</h3>
+                        <div className="flex items-center gap-2 mt-0.5 text-sm text-slate-500">
+                          {selectedUser.company && <span className="truncate">{selectedUser.company.name}</span>}
+                          {selectedUser.department && (
+                            <>
+                              <span>·</span>
+                              <span className="truncate">{selectedUser.department.name}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      {hasAnyOverride() && (
+                        <span className="text-xs font-bold bg-amber-100 text-amber-700 border border-amber-200 px-3 py-1 rounded-full flex-shrink-0">
+                          Surcharges actives
+                        </span>
                       )}
-                      Réinitialiser
-                    </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={!hasAnyOverride() || isResetting}
+                        onClick={handleResetOverrides}
+                        className="flex-shrink-0"
+                      >
+                        {isResetting ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                        )}
+                        Réinitialiser
+                      </Button>
+                    </div>
+
+                    {/* ─── Sélecteur d'affectation du profil ───────────────── */}
+                    <div className="mt-4 pt-4 border-t border-slate-100 flex items-center gap-3">
+                      <Shield className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                      <Label className="text-xs font-semibold text-slate-600 whitespace-nowrap">
+                        Profil de droits :
+                      </Label>
+                      <div className="flex-1 max-w-md">
+                        <select
+                          value={selectedUser.permission_profile_id ?? "__none__"}
+                          disabled={isAssigningProfile}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            void handleAssignProfile(v === "__none__" ? null : v);
+                          }}
+                          className="w-full h-9 px-3 rounded-lg border-2 border-slate-200 bg-white text-sm font-medium hover:border-slate-300 focus:border-indigo-500 focus:outline-none transition-colors disabled:opacity-50"
+                          style={
+                            selectedUser.permission_profile_id
+                              ? {
+                                  borderColor: getProfileColor(selectedUser.permission_profile_id) + "60",
+                                  color: getProfileColor(selectedUser.permission_profile_id),
+                                }
+                              : {}
+                          }
+                        >
+                          <option value="__none__">Sans profil</option>
+                          {permissionProfiles.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      {isAssigningProfile && <Loader2 className="w-4 h-4 animate-spin text-slate-400" />}
+                      <span className="text-[11px] text-slate-400 hidden md:inline">
+                        Modifie aussi les surcharges via les permissions ci-dessous
+                      </span>
+                    </div>
                   </div>
 
                   {/* Legend */}
