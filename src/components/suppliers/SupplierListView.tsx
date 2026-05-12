@@ -904,7 +904,7 @@ export function SupplierListView({
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Rechercher par Nom Fournisseur..."
+                placeholder="Rechercher par code TIERS ou nom fournisseur..."
                 value={filters.search}
                 onChange={(e) => updateFilters({ search: e.target.value })}
                 className={cn("pl-9", isFilterActive(filters.search, '') && 'ring-2 ring-primary/40 border-primary')}

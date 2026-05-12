@@ -115,7 +115,7 @@ function applyFilters(q: any, filters: SupplierFilters, opts?: { excludeStatus?:
 
   const search = (filters.search || '').trim();
   if (search) {
-    query = query.ilike('nomfournisseur', `%${search}%`);
+    query = query.or(`tiers.ilike.%${search}%,nomfournisseur.ilike.%${search}%`);
   }
 
   if (!opts?.excludeStatus && filters.status && filters.status !== 'all') {
