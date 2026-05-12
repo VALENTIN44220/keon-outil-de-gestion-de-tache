@@ -45,6 +45,8 @@ import {
   Trash2,
   ExternalLink,
   Clock,
+  Hash,
+  CalendarClock,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -91,9 +93,21 @@ type SupplierRow = {
   telephone: string | null;
   site_web: string | null;
   commentaires: string | null;
+  commentaires_date_contrat: string | null;
+  commentaires_type_de_contrat: string | null;
+  ca_estime: number | null;
+  description: string | null;
+  siret: string | null;
+  tva: string | null;
   completeness_score: number | null;
   status: "a_completer" | "en_cours" | "complet" | null;
+  created_at: string | null;
   updated_at: string | null;
+  updated_by: string | null;
+  validated_by_achats_at?: string | null;
+  validated_by_achats_user_id?: string | null;
+  validated_by_compta_at?: string | null;
+  validated_by_compta_user_id?: string | null;
 };
 
 interface SupplierAttachment {
@@ -136,11 +150,13 @@ export function SupplierDetailDrawer({ supplierId, open, onClose, canEdit = true
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     segmentation: true,
     contrat: true,
+    referenceLegale: true,
     paiement: true,
     logistique: true,
     contact: true,
     piecesjointes: true,
     commentaires: true,
+    tracabilite: false,
   });
 
   const statusConfig: Record<"a_completer" | "en_cours" | "complet", { label: string; color: string }> = {
@@ -241,7 +257,19 @@ export function SupplierDetailDrawer({ supplierId, open, onClose, canEdit = true
     const timeout = setTimeout(async () => {
       setSaveStatus("saving");
       try {
-        const { id, ...payload } = pendingSave as any;
+        const stripKeys = new Set([
+          "id",
+          "created_at",
+          "updated_at",
+          "updated_by",
+          "validated_by_achats_at",
+          "validated_by_achats_user_id",
+          "validated_by_compta_at",
+          "validated_by_compta_user_id",
+        ]);
+        const payload = Object.fromEntries(
+          Object.entries(pendingSave as Record<string, unknown>).filter(([k]) => !stripKeys.has(k)),
+        );
         const { error } = await supabase
           .from("supplier_purchase_enrichment")
           .update(payload)
@@ -626,6 +654,56 @@ export function SupplierDetailDrawer({ supplierId, open, onClose, canEdit = true
                     </div>
                   </CollapsibleSection>
 
+                  {/* Référence légale, fiscal & CA */}
+                  <CollapsibleSection
+                    title="Référence légale, fiscal & CA"
+                    icon={<FileText className="h-4 w-4" />}
+                    open={openSections.referenceLegale}
+                    onToggle={() => toggleSection("referenceLegale")}
+                  >
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField label="SIRET">
+                        <Input
+                          value={formData.siret || ""}
+                          onChange={(e) => handleFieldChange("siret", e.target.value)}
+                          placeholder="14 chiffres…"
+                          disabled={!canEdit}
+                        />
+                      </FormField>
+                      <FormField label="N° TVA">
+                        <Input
+                          value={formData.tva || ""}
+                          onChange={(e) => handleFieldChange("tva", e.target.value)}
+                          placeholder="FR…"
+                          disabled={!canEdit}
+                        />
+                      </FormField>
+                      <FormField label="CA estimé (€)" className="col-span-2">
+                        <Input
+                          type="number"
+                          min={0}
+                          step={1000}
+                          value={formData.ca_estime != null && !Number.isNaN(formData.ca_estime) ? formData.ca_estime : ""}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            handleFieldChange("ca_estime", v === "" ? null : Number(v));
+                          }}
+                          placeholder="Montant"
+                          disabled={!canEdit}
+                        />
+                      </FormField>
+                      <FormField label="Description" className="col-span-2">
+                        <Textarea
+                          value={formData.description || ""}
+                          onChange={(e) => handleFieldChange("description", e.target.value)}
+                          placeholder="Activité, périmètre, notes internes…"
+                          rows={4}
+                          disabled={!canEdit}
+                        />
+                      </FormField>
+                    </div>
+                  </CollapsibleSection>
+
                   {/* Paiement */}
                   <CollapsibleSection
                     title="Paiement"
@@ -809,9 +887,80 @@ export function SupplierDetailDrawer({ supplierId, open, onClose, canEdit = true
                     open={openSections.commentaires}
                     onToggle={() => toggleSection("commentaires")}
                   >
-                    <FormField label="Notes">
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <FormField label="Commentaires (type de contrat)">
+                        <Input
+                          value={formData.commentaires_type_de_contrat || ""}
+                          onChange={(e) => handleFieldChange("commentaires_type_de_contrat", e.target.value)}
+                          placeholder="Référence ou précision contrat"
+                          disabled={!canEdit}
+                        />
+                      </FormField>
+                      <FormField label="Commentaires (date contrat)">
+                        <Input
+                          type="date"
+                          value={formData.commentaires_date_contrat || ""}
+                          onChange={(e) => handleFieldChange("commentaires_date_contrat", e.target.value || null)}
+                          disabled={!canEdit}
+                        />
+                      </FormField>
+                    </div>
+                    <FormField label="Notes générales">
                       <Textarea value={formData.commentaires || ""} onChange={(e) => handleFieldChange("commentaires", e.target.value)} placeholder="Notes, remarques, historique..." rows={4} disabled={!canEdit} />
                     </FormField>
+                  </CollapsibleSection>
+
+                  {/* Traçabilité (lecture seule côté métier) */}
+                  <CollapsibleSection
+                    title="Traçabilité"
+                    icon={<CalendarClock className="h-4 w-4" />}
+                    open={openSections.tracabilite}
+                    onToggle={() => toggleSection("tracabilite")}
+                  >
+                    <div className="rounded-lg border bg-muted/30 p-4 space-y-3 text-sm">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Identifiant fiche</Label>
+                          <div className="font-mono text-xs break-all mt-0.5">{supplier.id}</div>
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Créé le</Label>
+                          <div className="font-medium mt-0.5">
+                            {formData.created_at ? format(new Date(formData.created_at), "dd/MM/yyyy HH:mm", { locale: fr }) : "—"}
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Mis à jour par (profil)</Label>
+                          <div className="font-mono text-xs break-all mt-0.5">{formData.updated_by || "—"}</div>
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Validé Achats</Label>
+                          <div className="mt-0.5">
+                            {formData.validated_by_achats_at
+                              ? format(new Date(formData.validated_by_achats_at), "dd/MM/yyyy HH:mm", { locale: fr })
+                              : "—"}
+                          </div>
+                          {formData.validated_by_achats_user_id ? (
+                            <div className="text-xs text-muted-foreground font-mono break-all">{formData.validated_by_achats_user_id}</div>
+                          ) : null}
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Validé Compta</Label>
+                          <div className="mt-0.5">
+                            {formData.validated_by_compta_at
+                              ? format(new Date(formData.validated_by_compta_at), "dd/MM/yyyy HH:mm", { locale: fr })
+                              : "—"}
+                          </div>
+                          {formData.validated_by_compta_user_id ? (
+                            <div className="text-xs text-muted-foreground font-mono break-all">{formData.validated_by_compta_user_id}</div>
+                          ) : null}
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground flex items-start gap-1.5">
+                        <Hash className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                        Les dates de validation et l&apos;auteur de dernière modification sont gérés par le système.
+                      </p>
+                    </div>
                   </CollapsibleSection>
                 </div>
               </div>

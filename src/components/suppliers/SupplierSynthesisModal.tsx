@@ -4,7 +4,16 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, Building2, FileText, CreditCard, Truck, User, Globe, BarChart3 } from 'lucide-react';
+import {
+  Loader2,
+  Building2,
+  FileText,
+  CreditCard,
+  Truck,
+  User,
+  Globe,
+  BarChart3,
+} from 'lucide-react';
 import { useSupplierById } from '@/hooks/useSupplierEnrichment';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -44,6 +53,21 @@ function dateColorClass(iso?: string | null) {
   if (t === 'soon') return 'text-warning';
   if (t === 'future') return 'text-success';
   return 'text-muted-foreground';
+}
+
+function formatEuro(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(Number(value))) return '—';
+  return new Intl.NumberFormat('fr-FR', {
+    style: 'currency',
+    currency: 'EUR',
+    maximumFractionDigits: 0,
+  }).format(Number(value));
+}
+
+function dash(v: unknown): string {
+  if (v === null || v === undefined) return '—';
+  const s = String(v).trim();
+  return s.length ? s : '—';
 }
 
 export function SupplierSynthesisModal({ supplierId, open, onClose }: SupplierSynthesisModalProps) {
@@ -102,11 +126,9 @@ export function SupplierSynthesisModal({ supplierId, open, onClose }: SupplierSy
               </div>
             </DialogHeader>
 
-            {/* Content */}
+            {/* Contenu fiche fournisseur (hors traçabilité / validation système) */}
             <div className="flex-1 overflow-y-auto p-5">
               <div className="space-y-5">
-
-                {/* Info Cards Row */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                   <InfoCard icon={<Building2 className="h-4 w-4" />} label="Catégorie / Famille" value={[supplier.categorie, supplier.famille].filter(Boolean).join(' › ') || '—'} />
                   <InfoCard icon={<BarChart3 className="h-4 w-4" />} label="Segment" value={[supplier.segment, supplier.sous_segment].filter(Boolean).join(' / ') || '—'} />
@@ -114,7 +136,6 @@ export function SupplierSynthesisModal({ supplierId, open, onClose }: SupplierSy
                   <InfoCard icon={<Building2 className="h-4 w-4" />} label="Entité" value={supplier.entite || '—'} />
                 </div>
 
-                {/* Dates Row */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                   <DateCard label="Validité prix" date={supplier.validite_prix} />
                   <DateCard label="Validité contrat" date={supplier.validite_du_contrat} />
@@ -122,41 +143,71 @@ export function SupplierSynthesisModal({ supplierId, open, onClose }: SupplierSy
                   <InfoCard icon={<Truck className="h-4 w-4" />} label="Incoterm" value={supplier.incoterm || '—'} />
                 </div>
 
-                {/* Contract details */}
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
                   <InfoCard icon={<CreditCard className="h-4 w-4" />} label="Délai paiement" value={supplier.delai_de_paiement || '—'} />
                   <InfoCard icon={<CreditCard className="h-4 w-4" />} label="Remise" value={supplier.remise || '—'} />
                   <InfoCard icon={<CreditCard className="h-4 w-4" />} label="RFA" value={supplier.rfa || '—'} />
                 </div>
 
-                {/* Contact */}
+                <SynthesisFieldSection title="Référence & fiscal" icon={<FileText className="h-4 w-4 text-primary" />}>
+                  <DetailGrid>
+                    <DetailCell label="Famille source initiale" value={dash(supplier.famille_source_initiale)} />
+                    <DetailCell label="SIRET" value={dash(supplier.siret)} />
+                    <DetailCell label="TVA" value={dash(supplier.tva)} />
+                    <DetailCell label="CA estimé" value={formatEuro(supplier.ca_estime)} />
+                  </DetailGrid>
+                  <LongField label="Description" text={supplier.description} />
+                </SynthesisFieldSection>
+
+                <SynthesisFieldSection title="Contrat & tarifs" icon={<FileText className="h-4 w-4 text-primary" />}>
+                  <DetailGrid>
+                    <DetailCell label="Évolution tarif 2026" value={dash(supplier.evolution_tarif_2026)} />
+                  </DetailGrid>
+                  <LongField label="Avenants" text={supplier.avenants} />
+                </SynthesisFieldSection>
+
+                <SynthesisFieldSection title="Paiement & conditions" icon={<CreditCard className="h-4 w-4 text-primary" />}>
+                  <DetailGrid>
+                    <DetailCell label="Échéances de paiement" value={dash(supplier.echeances_de_paiement)} />
+                    <DetailCell label="Exclusivité / non-sollicitation" value={dash(supplier.exclusivite_non_sollicitation)} />
+                  </DetailGrid>
+                  <LongField label="Commentaires délai de paiement" text={supplier.delais_de_paiement_commentaires} />
+                  <LongField label="Pénalités" text={supplier.penalites} />
+                </SynthesisFieldSection>
+
+                <SynthesisFieldSection title="Logistique" icon={<Truck className="h-4 w-4 text-primary" />}>
+                  <DetailGrid>
+                    <DetailCell label="Transport" value={dash(supplier.transport)} />
+                  </DetailGrid>
+                  <LongField
+                    label="Garanties bancaires & équipement"
+                    text={supplier.garanties_bancaire_et_equipement != null ? String(supplier.garanties_bancaire_et_equipement) : null}
+                  />
+                </SynthesisFieldSection>
+
                 <Card className="p-4">
                   <div className="flex items-center gap-2 mb-3 text-sm font-semibold">
                     <User className="h-4 w-4 text-primary" /> Contact
                   </div>
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
-                    <div><span className="text-muted-foreground text-xs">Nom</span><div className="font-medium">{supplier.nom_contact || '—'}</div></div>
-                    <div><span className="text-muted-foreground text-xs">Poste</span><div>{supplier.poste || '—'}</div></div>
-                    <div><span className="text-muted-foreground text-xs">Email</span><div>{supplier.adresse_mail || '—'}</div></div>
-                    <div><span className="text-muted-foreground text-xs">Tél.</span><div>{supplier.telephone || '—'}</div></div>
-                  </div>
+                  <DetailGrid>
+                    <DetailCell label="Nom du contact" value={dash(supplier.nom_contact)} />
+                    <DetailCell label="Poste" value={dash(supplier.poste)} />
+                    <DetailCell label="Email" value={dash(supplier.adresse_mail)} />
+                    <DetailCell label="Téléphone" value={dash(supplier.telephone)} />
+                    <DetailCell label="Site web" value={dash(supplier.site_web)} className="col-span-2 lg:col-span-4" />
+                  </DetailGrid>
                 </Card>
 
-                {/* Comments */}
-                {(supplier.commentaires || supplier.avenants || supplier.evolution_tarif_2026) && (
-                  <Card className="p-4">
-                    <div className="text-sm font-semibold mb-2">Notes & Commentaires</div>
-                    <div className="space-y-2 text-sm">
-                      {supplier.commentaires && <div><span className="text-muted-foreground text-xs">Commentaires :</span><div className="whitespace-pre-wrap">{supplier.commentaires}</div></div>}
-                      {supplier.avenants && <div><span className="text-muted-foreground text-xs">Avenants :</span><div className="whitespace-pre-wrap">{supplier.avenants}</div></div>}
-                      {supplier.evolution_tarif_2026 && <div><span className="text-muted-foreground text-xs">Évolution tarif 2026 :</span><div className="whitespace-pre-wrap">{supplier.evolution_tarif_2026}</div></div>}
-                    </div>
-                  </Card>
-                )}
+                <SynthesisFieldSection title="Commentaires structurés" icon={<FileText className="h-4 w-4 text-primary" />}>
+                  <DetailGrid>
+                    <DetailCell label="Commentaires (contrat)" value={dash(supplier.commentaires_type_de_contrat)} />
+                    <DetailCell label="Commentaires (date contrat)" value={dash(supplier.commentaires_date_contrat)} />
+                  </DetailGrid>
+                  <LongField label="Commentaires généraux" text={supplier.commentaires} />
+                </SynthesisFieldSection>
 
                 <Separator />
 
-                {/* Financial Dashboard */}
                 <SupplierFinancialDashboard tiers={supplier.tiers} />
               </div>
             </div>
@@ -190,5 +241,58 @@ function DateCard({ label, date }: { label: string; date?: string | null }) {
         {safeFormatDate(date)}
       </div>
     </Card>
+  );
+}
+
+function SynthesisFieldSection({
+  title,
+  icon,
+  children,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card className="p-4">
+      <div className="flex items-center gap-2 mb-3 text-sm font-semibold">
+        {icon}
+        {title}
+      </div>
+      {children}
+    </Card>
+  );
+}
+
+function DetailGrid({ children }: { children: React.ReactNode }) {
+  return <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm">{children}</div>;
+}
+
+function DetailCell({
+  label,
+  value,
+  title,
+  className,
+}: {
+  label: string;
+  value: string;
+  title?: string;
+  className?: string;
+}) {
+  return (
+    <div className={cn('min-w-0', className)} title={title}>
+      <span className="text-muted-foreground text-xs block">{label}</span>
+      <div className="text-sm font-medium break-words">{value}</div>
+    </div>
+  );
+}
+
+function LongField({ label, text }: { label: string; text?: string | null }) {
+  const display = text?.trim() ? text : '—';
+  return (
+    <div className="mt-3 border-t border-border/60 pt-3 first:mt-0 first:border-t-0 first:pt-0">
+      <span className="text-muted-foreground text-xs block mb-1">{label}</span>
+      <div className="text-sm whitespace-pre-wrap break-words">{display}</div>
+    </div>
   );
 }
