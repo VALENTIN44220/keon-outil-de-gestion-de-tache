@@ -49,6 +49,8 @@ import {
   UserRoundPlus,
   Send,
   ShieldCheck,
+  Play,
+  Link as LinkIcon,
 } from 'lucide-react';
 import { RequestValidationButton } from './RequestValidationButton';
 import { format } from 'date-fns';
@@ -56,7 +58,7 @@ import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { getBEStatusMeta } from '@/hooks/useBETaskStatus';
+import { getBEStatusMeta, useBETaskStatus } from '@/hooks/useBETaskStatus';
 import { ExternalLink } from 'lucide-react';
 import { TaskCommentsSection } from './TaskCommentsSection';
 import { TaskChecklist } from './TaskChecklist';
@@ -120,8 +122,13 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
   // En mode simulation, on évalue les permissions COMME le user simulé. L'admin
   // réel garde son rôle pour interagir avec l'app, mais ses droits avancés
   // (genre réaffectation libre) ne s'appliquent pas tant qu'il joue un autre user.
-  const { isSimulating } = useSimulation();
+  const { isSimulating, simulatedProfile } = useSimulation();
   const isAdmin = realIsAdmin && !isSimulating;
+  // Profile effectif pour les checks "est-ce que c'est moi qui ai cette tâche ?"
+  // En simulation, on raisonne avec le user incarné (sinon le bouton "Commencer"
+  // n'apparaît jamais pour Magalie simulée par Valentin).
+  const currentProfileId = (isSimulating && simulatedProfile ? simulatedProfile : profile)?.id ?? null;
+  const { updateBEStatus, isUpdating: isBeUpdating } = useBETaskStatus();
   const navigate = useNavigate();
   const [isReassignOpen, setIsReassignOpen] = useState(false);
   const [taskForReassign, setTaskForReassign] = useState<Task | null>(null);
@@ -139,6 +146,15 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
     requester_id: string | null;
     reporter_id: string | null;
   } | null>(null);
+  /** Pièces jointes / liens fournis par le demandeur sur la demande parente
+      (le wizard BE stocke les liens sur la tâche parent_request, pas sur la
+      tâche enfant — donc l'exécutant doit les voir d'ici). */
+  const [parentAttachments, setParentAttachments] = useState<Array<{
+    id: string;
+    name: string;
+    url: string;
+    type: string | null;
+  }>>([]);
 
   // Child task editing state
   const [selectedChildTask, setSelectedChildTask] = useState<Task | null>(null);
@@ -230,18 +246,29 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
       }
 
       if (task.parent_request_id) {
-        const { data: pr } = await supabase
-          .from('tasks')
-          .select('requester_id, reporter_id')
-          .eq('id', task.parent_request_id)
-          .maybeSingle();
+        const [{ data: pr }, { data: parentAtts }] = await Promise.all([
+          supabase
+            .from('tasks')
+            .select('requester_id, reporter_id')
+            .eq('id', task.parent_request_id)
+            .maybeSingle(),
+          // Récupère les liens/fichiers que le demandeur a fournis sur la
+          // demande parente (le wizard BE les attache à task_id = request.id)
+          supabase
+            .from('task_attachments')
+            .select('id, name, url, type')
+            .eq('task_id', task.parent_request_id)
+            .order('created_at', { ascending: true }),
+        ]);
         setParentRequestPersonIds(
           pr
             ? { requester_id: pr.requester_id ?? null, reporter_id: pr.reporter_id ?? null }
             : null,
         );
+        setParentAttachments((parentAtts as any[]) ?? []);
       } else {
         setParentRequestPersonIds(null);
+        setParentAttachments([]);
       }
 
       // Fetch profiles with manager_id for permission checking
@@ -902,7 +929,80 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
           <DialogTitle className="text-xl pr-8">{task.title}</DialogTitle>
           {task.status !== 'done' && task.status !== 'validated' && (
             <div className="mt-3 flex justify-end gap-2 flex-wrap">
-              {/* Boutons manager : valider / rejeter */}
+              {/* ── Boutons workflow BE — si la tâche a un be_status (= tâche
+                  BE) et l'utilisateur courant est l'assigné ou le validateur ── */}
+              {(() => {
+                const beStatus = (task as any).be_status as string | null | undefined;
+                if (!beStatus) return null;
+                const isAssignee = currentProfileId !== null && task.assignee_id === currentProfileId;
+                const isValidator1 = currentProfileId !== null && (task as any).validator_level_1_id === currentProfileId;
+                const isValidator2 = currentProfileId !== null && (task as any).validator_level_2_id === currentProfileId;
+                const canValidateBE = isAdmin || isValidator1 || isValidator2;
+
+                const beAction = async (newStatus: string) => {
+                  await updateBEStatus({
+                    taskId: task.id,
+                    status: newStatus as any,
+                    notify: {
+                      taskLabel: task.title,
+                      assigneeId: task.assignee_id,
+                      dispatchManagerId: null,
+                    },
+                  });
+                  onTaskMutated?.();
+                };
+
+                return (
+                  <>
+                    {/* affectee → en_cours : l'assignée démarre */}
+                    {beStatus === 'affectee' && isAssignee && (
+                      <Button
+                        onClick={() => void beAction('en_cours')}
+                        disabled={isBeUpdating}
+                        className="gap-2 bg-indigo-600 hover:bg-indigo-700"
+                      >
+                        <Play className="h-4 w-4" />
+                        Commencer
+                      </Button>
+                    )}
+                    {/* en_cours → a_relire : l'assignée soumet */}
+                    {beStatus === 'en_cours' && isAssignee && (
+                      <Button
+                        onClick={() => void beAction('a_relire')}
+                        disabled={isBeUpdating}
+                        className="gap-2 bg-blue-600 hover:bg-blue-700"
+                      >
+                        <Send className="h-4 w-4" />
+                        Soumettre pour relecture
+                      </Button>
+                    )}
+                    {/* a_relire → a_valider : le manager / validateur valide */}
+                    {beStatus === 'a_relire' && canValidateBE && (
+                      <Button
+                        onClick={() => void beAction('a_valider')}
+                        disabled={isBeUpdating}
+                        className="gap-2 bg-amber-500 hover:bg-amber-600 text-white"
+                      >
+                        <ShieldCheck className="h-4 w-4" />
+                        Valider
+                      </Button>
+                    )}
+                    {/* a_valider / a_deposer → cloturee */}
+                    {(beStatus === 'a_valider' || beStatus === 'a_deposer') && canValidateBE && (
+                      <Button
+                        onClick={() => void beAction('cloturee')}
+                        disabled={isBeUpdating}
+                        className="gap-2 bg-emerald-600 hover:bg-emerald-700"
+                      >
+                        <CheckCircle2 className="h-4 w-4" />
+                        Clôturer
+                      </Button>
+                    )}
+                  </>
+                );
+              })()}
+
+              {/* Boutons manager : valider / rejeter (pour validation_level_X classique) */}
               {canValidateTask && (
                 <>
                   <Button
@@ -922,7 +1022,7 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
                   </Button>
                 </>
               )}
-              {/* Bouton exécutant */}
+              {/* Bouton exécutant : envoyer pour validation classique */}
               {!canValidateTask && rootOfferSend && rootCanSubmitValidation && (
                 <Button
                   onClick={() => void handleRootSendForValidation()}
@@ -937,7 +1037,10 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
                   Envoyer pour validation
                 </Button>
               )}
-              {!canValidateTask && !rootOfferSend && task.status !== 'pending_validation_1' && task.status !== 'pending_validation_2' && (
+              {/* Marquer terminé : seulement si pas de be_status (tâche non-BE)
+                  et pas en validation pending */}
+              {!canValidateTask && !rootOfferSend && !(task as any).be_status
+                && task.status !== 'pending_validation_1' && task.status !== 'pending_validation_2' && (
                 <Button
                   onClick={() => { onStatusChange(task.id, 'done'); onClose(); }}
                   className="gap-2"
@@ -971,6 +1074,39 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
             managerOfAssigneeId={rootTaskAssigneeManagerId}
             requesterId={displayRequesterId}
           />
+
+          {/* Liens fournis par le demandeur sur la demande parente
+              (le wizard BE attache les liens à la demande parente,
+              pas à chaque tâche enfant — d'où le fetch séparé). */}
+          {parentAttachments.length > 0 && (
+            <div className="rounded-lg border border-sky-200 bg-sky-50/40 p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <LinkIcon className="h-4 w-4 text-sky-700" />
+                <h4 className="text-sm font-semibold text-sky-800">
+                  Liens fournis par le demandeur
+                </h4>
+                <span className="ml-auto text-[10px] text-sky-700/70">
+                  ({parentAttachments.length})
+                </span>
+              </div>
+              <ul className="space-y-1.5">
+                {parentAttachments.map((att) => (
+                  <li key={att.id} className="flex items-center gap-2 text-sm">
+                    <LinkIcon className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                    <a
+                      href={att.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sky-700 hover:text-sky-900 hover:underline truncate"
+                      title={att.url}
+                    >
+                      {att.name || att.url}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* Metadata */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
