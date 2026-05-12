@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSimulation } from '@/contexts/SimulationContext';
 
 export interface InAppNotificationRow {
   id: string;
@@ -16,13 +17,22 @@ export interface InAppNotificationRow {
 
 export function useInAppNotifications() {
   const { user } = useAuth();
+  const { isSimulating, simulatedProfile } = useSimulation();
+  // En simulation, on regarde la boîte de notifs de l'utilisateur incarné
+  // (profiles.user_id = auth user_id du simulé). Côté DB, l'admin doit avoir
+  // un bypass RLS pour SELECT sur notifications (sinon ces lignes seront
+  // filtrées par RLS et retourneront empty).
+  const effectiveUserId = isSimulating && simulatedProfile?.user_id
+    ? simulatedProfile.user_id
+    : user?.id;
+
   const [items, setItems] = useState<InAppNotificationRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   // Unique channel name per hook instance — see useCommentNotifications for rationale.
   const instanceId = useId();
 
   const fetchUnread = useCallback(async () => {
-    if (!user?.id) {
+    if (!effectiveUserId) {
       setItems([]);
       setIsLoading(false);
       return;
@@ -33,7 +43,7 @@ export function useInAppNotifications() {
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', effectiveUserId)
         .is('read_at', null)
         .order('created_at', { ascending: false })
         .limit(50);
@@ -47,14 +57,14 @@ export function useInAppNotifications() {
     } finally {
       setIsLoading(false);
     }
-  }, [user?.id]);
+  }, [effectiveUserId]);
 
   useEffect(() => {
     void fetchUnread();
   }, [fetchUnread]);
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!effectiveUserId) return;
 
     const channel = supabase
       .channel(`in-app-notifications:${instanceId}`)
@@ -64,7 +74,7 @@ export function useInAppNotifications() {
           event: '*',
           schema: 'public',
           table: 'notifications',
-          filter: `user_id=eq.${user.id}`,
+          filter: `user_id=eq.${effectiveUserId}`,
         },
         () => {
           void fetchUnread();
@@ -75,16 +85,16 @@ export function useInAppNotifications() {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [user?.id, fetchUnread, instanceId]);
+  }, [effectiveUserId, fetchUnread, instanceId]);
 
   const markAsRead = useCallback(
     async (id: string) => {
-      if (!user?.id) return;
+      if (!effectiveUserId) return;
       const { error } = await supabase
         .from('notifications')
         .update({ read_at: new Date().toISOString() })
         .eq('id', id)
-        .eq('user_id', user.id);
+        .eq('user_id', effectiveUserId);
 
       if (error) {
         console.error('markAsRead notification:', error);
@@ -92,23 +102,23 @@ export function useInAppNotifications() {
       }
       setItems((prev) => prev.filter((n) => n.id !== id));
     },
-    [user?.id]
+    [effectiveUserId]
   );
 
   /** Marque toutes les notifications de l'utilisateur comme lues (vide la liste). */
   const deleteAll = useCallback(async () => {
-    if (!user?.id) return;
+    if (!effectiveUserId) return;
     const { error } = await supabase
       .from('notifications')
       .update({ read_at: new Date().toISOString() })
-      .eq('user_id', user.id)
+      .eq('user_id', effectiveUserId)
       .is('read_at', null);
     if (error) {
       console.error('deleteAll notifications:', error);
       return;
     }
     setItems([]);
-  }, [user?.id]);
+  }, [effectiveUserId]);
 
   return {
     notifications: items,

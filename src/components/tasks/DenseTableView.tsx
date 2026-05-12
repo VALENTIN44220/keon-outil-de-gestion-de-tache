@@ -181,7 +181,23 @@ export function DenseTableView({ tasks, onStatusChange, onDelete, progressMap, o
         // Le N° (T-XXXX-XXXX / D-XXXX-XXXX) est deja affiche dans la colonne 'request_number'.
         // On retire le prefixe redondant du titre pour gagner en lisibilite.
         const cleanTitle = (task.title ?? '').replace(/^([TD]-[A-Z][A-Z0-9-]*\d+\s*—\s*)+/, '');
-        return <span className="font-medium text-foreground truncate max-w-[280px] block" title={task.title}>{cleanTitle}</span>;
+        return (
+          <span
+            className="font-medium text-foreground block leading-tight"
+            style={{
+              // Retour à la ligne sur 2 lignes max (au lieu d'ellipse brutale)
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              maxWidth: '420px',
+              wordBreak: 'break-word',
+            }}
+            title={task.title}
+          >
+            {cleanTitle}
+          </span>
+        );
       }
       case 'status':
         return <Badge variant="outline" className={cn('text-[10px] px-1.5 py-0', STATUS_COLORS[task.status])}>{STATUS_LABELS[task.status] || task.status}</Badge>;

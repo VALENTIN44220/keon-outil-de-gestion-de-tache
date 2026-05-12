@@ -498,30 +498,57 @@ export function useWorkloadPlanning({
   };
 
   // Move multiple slots by offset (for drag & drop)
+  // Si newUserId est fourni, on déplace ET on réaffecte la tâche au nouvel
+  // utilisateur (sinon la tâche reste affectée à l'ancien dans /be/dispatch
+  // alors que le slot est passé à un autre dans /workload, c'est incohérent).
   const moveSlotsWithOffset = async (
-    slotIds: string[], 
+    slotIds: string[],
     dayOffset: number,
     newUserId?: string
   ) => {
     const slotsToMove = slots.filter(s => slotIds.includes(s.id));
-    
+
+    // Collecte les task_ids concernés ET vérifie que tous les slots d'une
+    // tâche sont déplacés ensemble vers le même newUserId (sinon assigner
+    // à un seul user n'a pas de sens).
+    const taskIdsToReassign = new Set<string>();
+
     for (const slot of slotsToMove) {
       const currentDate = parseISO(slot.date);
       const newDate = format(addDays(currentDate, dayOffset), 'yyyy-MM-dd');
-      
+
       const update: Record<string, any> = { date: newDate };
       if (newUserId && newUserId !== slot.user_id) {
         update.user_id = newUserId;
+        if (slot.task_id) taskIdsToReassign.add(slot.task_id);
       }
-      
+
       const { error } = await supabase
         .from('workload_slots')
         .update(update)
         .eq('id', slot.id);
-      
+
       if (error) throw error;
     }
-    
+
+    // Synchronise tasks.assignee_id pour que /be/dispatch et le tableau de
+    // bord montrent le bon affecté. Le user_id du slot est l'auth user_id,
+    // on doit le convertir en profile.id pour tasks.assignee_id.
+    if (newUserId && taskIdsToReassign.size > 0) {
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', newUserId)
+        .maybeSingle();
+      const newAssigneeProfileId = prof?.id;
+      if (newAssigneeProfileId) {
+        await supabase
+          .from('tasks')
+          .update({ assignee_id: newAssigneeProfileId })
+          .in('id', Array.from(taskIdsToReassign));
+      }
+    }
+
     await fetchData();
   };
 
