@@ -102,10 +102,11 @@ export function AppNotificationCluster({ collapsed, className }: AppNotification
         t.process_template_id === BE_PROCESS_ID ||
         Boolean(t.be_status);
       if (isBE) {
-        // Pour une demande BE (type='request') ou une tâche enfant BE,
-        // la page la plus utile est /be/dispatch qui affiche la liste +
-        // ouvre le dialogue de détail.
-        navigate(`/be/dispatch?openTask=${encodeURIComponent(taskId)}`);
+        // On route vers /  (Index) qui sait ouvrir n'importe quelle tâche
+        // via ?openTask=... — fonctionne pour TOUS les rôles (assigné,
+        // demandeur, validateur, admin). /be/dispatch n'est accessible
+        // qu'au manager BE, donc impraticable comme cible générique.
+        navigate(`/?openTask=${encodeURIComponent(taskId)}`);
         return;
       }
     } catch (e) {
@@ -118,9 +119,9 @@ export function AppNotificationCluster({ collapsed, className }: AppNotification
       return;
     }
 
-    // 4. Fallback : /mes-demandes (la page existe et sait ouvrir une tâche
-    //    via ?openTask=...), évite l'écran blanc à la racine.
-    navigate(`/mes-demandes?openTask=${encodeURIComponent(taskId)}`);
+    // 4. Fallback générique : / (Index) qui sait ouvrir une tâche via
+    //    ?openTask=... — évite l'écran blanc à la racine.
+    navigate(`/?openTask=${encodeURIComponent(taskId)}`);
   };
 
   return (

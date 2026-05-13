@@ -527,8 +527,10 @@ export function NewBERequestDialog({
 
       // 3. Liens en tant que task_attachments sur la tâche parente
       const validLinks = links.filter(l => l.url.trim());
+      let insertedLinks = 0;
+      let linksFailed = false;
       if (validLinks.length > 0) {
-        const { error: linksError } = await sb.from('task_attachments').insert(
+        const { data: insertedRows, error: linksError } = await sb.from('task_attachments').insert(
           validLinks.map(l => ({
             task_id: request.id,
             name: l.label.trim() || l.url.trim(),
@@ -536,14 +538,25 @@ export function NewBERequestDialog({
             type: 'link',
             uploaded_by: user.id,
           }))
-        );
+        ).select('id');
         if (linksError) {
-          console.warn('[NewBERequestDialog] links insert error (non-blocking):', linksError);
+          console.warn('[NewBERequestDialog] links insert error:', linksError);
+          linksFailed = true;
+          toast.error(
+            `Liens non sauvegardés (${validLinks.length}) : ${linksError.message}`,
+          );
+        } else {
+          insertedLinks = (insertedRows ?? []).length;
         }
       }
 
+      // Toast succès enrichi : indique le nb de liens inséré pour ne plus
+      // laisser place au doute sur la sauvegarde des liens
       toast.success(
-        `Demande créée : ${selectedGroups.length} prestation(s), ${allSelectedSteps.length} tâche(s)`,
+        `Demande créée : ${selectedGroups.length} prestation(s), ${allSelectedSteps.length} tâche(s)` +
+          (validLinks.length > 0
+            ? ` · ${insertedLinks}/${validLinks.length} lien${insertedLinks > 1 ? 's' : ''} sauvegardé${insertedLinks > 1 ? 's' : ''}`
+            : ''),
       );
       onCreated?.(request.id);
       onOpenChange(false);

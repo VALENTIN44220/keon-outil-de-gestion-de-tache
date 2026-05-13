@@ -61,7 +61,22 @@ function renderDate(dateStr: string | null) {
 
 const ALL_COLUMNS: ColumnDef[] = [
   { key: 'request_number', label: 'N° Demande', defaultVisible: true, render: (t) => t.request_number || '-' },
-  { key: 'title', label: 'Titre', defaultVisible: true, render: (t) => <span className="font-medium max-w-[250px] truncate block">{t.title}</span>, width: 'max-w-[250px]' },
+  { key: 'title', label: 'Titre', defaultVisible: true, render: (t) => (
+    <span
+      className="font-medium block leading-tight"
+      style={{
+        display: '-webkit-box',
+        WebkitLineClamp: 2,
+        WebkitBoxOrient: 'vertical',
+        overflow: 'hidden',
+        maxWidth: '420px',
+        wordBreak: 'break-word',
+      }}
+      title={t.title}
+    >
+      {t.title}
+    </span>
+  ), width: 'max-w-[420px]' },
   { key: 'status', label: 'Statut', defaultVisible: true, render: (t) => renderStatus(t.status) },
   { key: 'priority', label: 'Priorité', defaultVisible: true, render: (t) => renderPriority(t.priority) },
   { key: 'due_date', label: 'Échéance', defaultVisible: true, render: (t) => renderDate(t.due_date) },
@@ -83,7 +98,22 @@ const ALL_COLUMNS: ColumnDef[] = [
   { key: 'type', label: 'Type', defaultVisible: false, render: (t) => t.type === 'request' ? 'Demande' : 'Tâche' },
   { key: 'task_number', label: 'N° Tâche', defaultVisible: false, render: (t) => t.task_number || '-' },
   { key: 'category', label: 'Catégorie', defaultVisible: false, render: (t) => t.category || '-' },
-  { key: 'description', label: 'Description', defaultVisible: false, render: (t) => <span className="max-w-[200px] truncate block">{t.description || '-'}</span> },
+  { key: 'description', label: 'Description', defaultVisible: false, render: (t) => (
+    <span
+      className="block leading-tight text-sm"
+      style={{
+        display: '-webkit-box',
+        WebkitLineClamp: 2,
+        WebkitBoxOrient: 'vertical',
+        overflow: 'hidden',
+        maxWidth: '320px',
+        wordBreak: 'break-word',
+      }}
+      title={t.description || ''}
+    >
+      {t.description || '-'}
+    </span>
+  ) },
   { key: 'assignee_id', label: 'Assigné à', defaultVisible: false, render: (t) => t.assignee_id ? '✓' : '-' },
   { key: 'requester_id', label: 'Demandeur', defaultVisible: false, render: (t) => t.requester_id ? '✓' : '-' },
   { key: 'validated_at', label: 'Validé le', defaultVisible: false, render: (t) => renderDate(t.validated_at) },
