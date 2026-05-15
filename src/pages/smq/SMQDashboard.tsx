@@ -20,6 +20,7 @@ import { format, parseISO, differenceInDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { useNCDeclarations } from '@/hooks/useNCDeclarations';
+import { SMQChartsPanel } from '@/components/smq/SMQChartsPanel';
 import {
   NC_STATUS_META,
   NC_IDENTIFICATION_LABELS,
@@ -85,6 +86,9 @@ export default function SMQDashboard() {
             <KPI icon={CheckCircle2} label="Clôturées"   value={kpi.clo}       color="bg-emerald-100 text-emerald-700" />
             <KPI icon={TrendingUp}  label="Délai moyen"  value={kpi.delaiMoyen ? `${kpi.delaiMoyen} j` : '—'} color="bg-violet-100 text-violet-700" />
           </div>
+
+          {/* ── Indicateurs visuels ───────────────────────────────────── */}
+          <SMQChartsPanel items={items} />
 
           {/* ── Filtres ──────────────────────────────────────────────── */}
           <div className="flex flex-wrap items-center gap-2 bg-card rounded-xl border p-3">
