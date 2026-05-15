@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useId } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { ChatMessage, SendMessageParams } from '@/types/chat';
@@ -250,12 +250,16 @@ export function useChatMessages(conversationId: string | null) {
     }
   }, [conversationId, fetchMessages]);
 
+  // Nom de channel unique par instance (évite "postgres_changes after
+  // subscribe()" sur remount).
+  const instanceId = useId();
+
   // Realtime subscription for this conversation
   useEffect(() => {
     if (!conversationId) return;
 
     const channel = supabase
-      .channel(`chat-messages-${conversationId}`)
+      .channel(`chat-messages-${conversationId}:${instanceId}`)
       .on(
         'postgres_changes',
         {
@@ -316,9 +320,9 @@ export function useChatMessages(conversationId: string | null) {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      void supabase.removeChannel(channel);
     };
-  }, [conversationId]);
+  }, [conversationId, instanceId]);
 
   return {
     messages,

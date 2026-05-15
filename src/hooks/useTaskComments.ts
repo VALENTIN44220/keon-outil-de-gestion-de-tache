@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useId } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSimulation } from '@/contexts/SimulationContext';
@@ -72,12 +72,18 @@ export function useTaskComments(taskId: string | null) {
     fetchComments();
   }, [fetchComments]);
 
+  // Nom de channel unique par instance de hook : empêche Supabase Realtime
+  // de réutiliser un channel déjà subscribed (qui throw "cannot add
+  // postgres_changes callbacks after subscribe()" et fait planter la page
+  // en blanc). Même pattern que useInAppNotifications/useCommentNotifications.
+  const instanceId = useId();
+
   // Subscribe to realtime updates
   useEffect(() => {
     if (!taskId) return;
 
     const channel = supabase
-      .channel(`task_comments_${taskId}`)
+      .channel(`task_comments_${taskId}:${instanceId}`)
       .on(
         'postgres_changes',
         {
@@ -94,9 +100,9 @@ export function useTaskComments(taskId: string | null) {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      void supabase.removeChannel(channel);
     };
-  }, [taskId, fetchComments]);
+  }, [taskId, fetchComments, instanceId]);
 
   const addComment = async (content: string) => {
     if (!taskId || !userProfileId || !content.trim()) return;

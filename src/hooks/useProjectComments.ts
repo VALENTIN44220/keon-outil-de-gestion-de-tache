@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useId } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSimulation } from '@/contexts/SimulationContext';
@@ -49,6 +49,11 @@ export function useProjectComments(projectId: string | null) {
     }
   }, [projectId]);
 
+  // Nom de channel unique par instance — évite "cannot add postgres_changes
+  // callbacks after subscribe()" quand le hook se re-monte avec le même
+  // projectId (StrictMode dev, navigation, plusieurs vues du même projet).
+  const instanceId = useId();
+
   // Subscribe to realtime updates
   useEffect(() => {
     if (!projectId) return;
@@ -56,7 +61,7 @@ export function useProjectComments(projectId: string | null) {
     fetchComments();
 
     const channel = supabase
-      .channel(`project-comments-${projectId}`)
+      .channel(`project-comments-${projectId}:${instanceId}`)
       .on(
         'postgres_changes',
         {
@@ -72,9 +77,9 @@ export function useProjectComments(projectId: string | null) {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      void supabase.removeChannel(channel);
     };
-  }, [projectId, fetchComments]);
+  }, [projectId, fetchComments, instanceId]);
 
   const addComment = async (content: string) => {
     if (!projectId || !profile?.id || !content.trim()) return false;
