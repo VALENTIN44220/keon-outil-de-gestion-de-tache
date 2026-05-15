@@ -219,6 +219,7 @@ export interface SupplierColumnDef {
 const ALL_COLUMNS: SupplierColumnDef[] = [
   { key: 'tiers', label: 'TIERS', defaultVisible: true, className: 'w-[120px]', render: (s) => <span className="font-mono font-medium">{s.tiers}</span> },
   { key: 'nomfournisseur', label: 'Nom Fournisseur', defaultVisible: true, render: (s) => <span className="font-medium">{s.nomfournisseur || '—'}</span> },
+  { key: 'nom_commercial', label: 'Nom commercial', defaultVisible: true, render: (s) => <span>{s.nom_commercial || '—'}</span> },
   { key: 'entite', label: 'Entité', defaultVisible: true, render: (s) => {
     const entites = (s.entite || '').split(',').map(e => e.trim()).filter(Boolean);
     if (!entites.length) return '—';

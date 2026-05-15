@@ -8,6 +8,7 @@ export interface SupplierEnrichment {
   id: string;
   tiers: string;
   nomfournisseur: string | null;
+  nom_commercial: string | null;
 
   categorie: string | null;
   famille_source_initiale: string | null;
