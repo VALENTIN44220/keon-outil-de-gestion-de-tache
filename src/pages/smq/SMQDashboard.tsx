@@ -5,9 +5,10 @@
  * Accessible à TOUS (Q2 user : tous peuvent déclarer + tous peuvent voir).
  */
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
+import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -29,7 +30,13 @@ import {
 
 export default function SMQDashboard() {
   const navigate = useNavigate();
+  const { effectivePermissions, isLoading: permLoading } = useEffectivePermissions();
   const [activeView, setActiveView] = useState('smq');
+
+  // Garde de permission : redirige si pas d'accès SMQ (Q2 : tous par défaut)
+  if (!permLoading && !effectivePermissions.can_access_smq) {
+    return <Navigate to="/" replace />;
+  }
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<NCStatus | 'all'>('all');
   const [societeFilter, setSocieteFilter] = useState<string>('all');

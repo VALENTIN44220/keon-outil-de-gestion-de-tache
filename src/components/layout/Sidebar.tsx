@@ -109,7 +109,7 @@ const menuGroups: MenuGroup[] = [
   {
     label: 'QUALITÉ (SMQ)',
     items: [
-      { id: 'smq', label: 'Non-conformités', icon: ShieldAlert, path: '/smq', permissionKey: 'can_access_dashboard' },
+      { id: 'smq', label: 'Non-conformités', icon: ShieldAlert, path: '/smq', permissionKey: 'can_access_smq' },
     ],
   },
   {

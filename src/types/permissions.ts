@@ -24,6 +24,7 @@ export const SCREEN_PERMISSIONS = [
   'can_access_innovation',
   'can_access_maintenance',
   'can_access_logistique',
+  'can_access_smq',
   // Transverse
   'can_access_suppliers',
   'can_access_templates',
@@ -79,6 +80,7 @@ export const SCREEN_PERMISSION_GROUPS: Array<{
       'can_access_innovation',
       'can_access_maintenance',
       'can_access_logistique',
+      'can_access_smq',
       'can_access_suppliers',
     ],
   },
@@ -117,6 +119,8 @@ export const FEATURE_PERMISSIONS = [
   'can_create_suppliers',
   'can_edit_suppliers',
   'can_delete_suppliers',
+  // SMQ
+  'can_manage_smq',
 ] as const;
 
 export type FeaturePermissionKey = typeof FEATURE_PERMISSIONS[number];
@@ -144,6 +148,7 @@ export const SCREEN_LABELS: Record<ScreenPermissionKey, string> = {
   can_access_innovation:       'Innovation',
   can_access_maintenance:      'Maintenance',
   can_access_logistique:       'Logistique',
+  can_access_smq:              'SMQ — Non-conformités',
   can_access_suppliers:        'Fournisseurs',
   can_access_templates:        'Modèles',
   can_access_team:             'Équipe',
@@ -179,6 +184,8 @@ export interface UserPermissionOverride {
   can_access_innovation: boolean | null;
   can_access_maintenance: boolean | null;
   can_access_logistique: boolean | null;
+  can_access_smq: boolean | null;
+  can_manage_smq: boolean | null;
   // Transverse
   can_access_suppliers: boolean | null;
   can_access_templates: boolean | null;
@@ -241,6 +248,8 @@ export interface EffectivePermissions {
   can_access_innovation: boolean;
   can_access_maintenance: boolean;
   can_access_logistique: boolean;
+  can_access_smq: boolean;
+  can_manage_smq: boolean;
   // Transverse
   can_access_suppliers: boolean;
   can_access_templates: boolean;

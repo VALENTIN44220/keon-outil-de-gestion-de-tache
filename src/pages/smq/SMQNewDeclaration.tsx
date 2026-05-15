@@ -6,9 +6,10 @@
  * (ou Alexandre Baffou si NC fournisseur).
  */
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -27,8 +28,13 @@ import {
 export default function SMQNewDeclaration() {
   const navigate = useNavigate();
   const createNC = useCreateNC();
+  const { effectivePermissions, isLoading: permLoading } = useEffectivePermissions();
   const [activeView, setActiveView] = useState('smq');
   const [isSaving, setIsSaving] = useState(false);
+
+  if (!permLoading && !effectivePermissions.can_access_smq) {
+    return <Navigate to="/" replace />;
+  }
 
   const [form, setForm] = useState({
     title: '',

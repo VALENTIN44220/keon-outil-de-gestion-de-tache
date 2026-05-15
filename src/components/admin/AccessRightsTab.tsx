@@ -169,6 +169,8 @@ const DEFAULT_PERMISSIONS: Record<string, boolean> = {
   can_access_innovation: true,
   can_access_maintenance: true,
   can_access_logistique: true,
+  can_access_smq: true,
+  can_manage_smq: false,
   // Transverse
   can_access_suppliers: false,
   can_access_templates: false,

@@ -8,8 +8,9 @@
  *    vers tasks (bouton "Transformer en tâche").
  */
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useMatchedRouteParam } from '@/hooks/useMatchedRouteParam';
+import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -47,9 +48,14 @@ export default function SMQDetail() {
   const { profile: authProfile } = useAuth();
   const { isSimulating, simulatedProfile } = useSimulation();
   const { isAdmin } = useUserRole();
+  const { effectivePermissions, isLoading: permLoading } = useEffectivePermissions();
   const currentProfileId = (isSimulating && simulatedProfile ? simulatedProfile : authProfile)?.id ?? null;
 
   const { nc, actions, attachments, history, isLoading, refetch } = useNCDetail(id ?? null);
+
+  if (!permLoading && !effectivePermissions.can_access_smq) {
+    return <Navigate to="/" replace />;
+  }
   const changeStatus = useChangeNCStatus();
 
   const [profilesMap, setProfilesMap] = useState<Map<string, string>>(new Map());
@@ -103,7 +109,9 @@ export default function SMQDetail() {
   const meta = NC_STATUS_META[nc.status];
   const isPilote = currentProfileId === nc.pilote_id;
   const isDeclarant = currentProfileId === nc.declarant_id;
-  const canManage = isAdmin || isPilote || isDeclarant;
+  // can_manage_smq = pilote SMQ global (Florence) ou délégué : peut piloter
+  // toutes les NC, pas seulement celles où il est désigné pilote_id
+  const canManage = isAdmin || isPilote || isDeclarant || effectivePermissions.can_manage_smq;
 
   const processusLabel = NC_PROCESSUS.find(p => p.code === nc.processus_code)?.label ?? nc.processus_code;
 
