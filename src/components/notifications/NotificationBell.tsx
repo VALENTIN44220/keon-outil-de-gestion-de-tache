@@ -163,6 +163,27 @@ export function NotificationBell({
                 </p>
               </div>
             ) : (
+              <>
+                {/* Bouton "Vider" dédié à l'onglet Échéances */}
+                {onClearDeadlines && (
+                  <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/30">
+                    <span className="text-xs text-muted-foreground">
+                      {notifications.length} échéance{notifications.length > 1 ? 's' : ''}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs text-muted-foreground hover:text-destructive"
+                      onClick={() => {
+                        if (!confirm('Vider toutes les échéances ?')) return;
+                        onClearDeadlines();
+                      }}
+                    >
+                      <Trash2 className="h-3 w-3 mr-1" />
+                      Vider
+                    </Button>
+                  </div>
+                )}
               <ScrollArea className="max-h-80">
                 <div className="divide-y divide-border">
                   {notifications.map((notification) => (
@@ -203,6 +224,7 @@ export function NotificationBell({
                   ))}
                 </div>
               </ScrollArea>
+              </>
             )}
           </TabsContent>
 
@@ -215,6 +237,27 @@ export function NotificationBell({
                 </p>
               </div>
             ) : (
+              <>
+                {/* Bouton "Vider" dédié à l'onglet Commentaires */}
+                {onClearComments && (
+                  <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/30">
+                    <span className="text-xs text-muted-foreground">
+                      {commentNotifications.length + commentInAppNotifs.length} message{(commentNotifications.length + commentInAppNotifs.length) > 1 ? 's' : ''}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs text-muted-foreground hover:text-destructive"
+                      onClick={() => {
+                        if (!confirm('Vider tous les commentaires ?')) return;
+                        onClearComments();
+                      }}
+                    >
+                      <Trash2 className="h-3 w-3 mr-1" />
+                      Vider
+                    </Button>
+                  </div>
+                )}
               <ScrollArea className="max-h-80">
                 <div className="divide-y divide-border">
                   {commentInAppNotifs.map((row) => (
@@ -284,6 +327,7 @@ export function NotificationBell({
                   ))}
                 </div>
               </ScrollArea>
+              </>
             )}
           </TabsContent>
 
@@ -294,6 +338,27 @@ export function NotificationBell({
                 <p className="text-sm text-muted-foreground">Aucune notification workflow</p>
               </div>
             ) : (
+              <>
+                {/* Bouton "Vider" dédié à l'onglet Workflow */}
+                {onClearWorkflow && (
+                  <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/30">
+                    <span className="text-xs text-muted-foreground">
+                      {otherWorkflowNotifs.length} notification{otherWorkflowNotifs.length > 1 ? 's' : ''}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs text-muted-foreground hover:text-destructive"
+                      onClick={() => {
+                        if (!confirm('Vider toutes les notifications workflow ?')) return;
+                        onClearWorkflow();
+                      }}
+                    >
+                      <Trash2 className="h-3 w-3 mr-1" />
+                      Vider
+                    </Button>
+                  </div>
+                )}
               <ScrollArea className="max-h-80">
                 <div className="divide-y divide-border">
                   {otherWorkflowNotifs.map((row) => (
@@ -324,6 +389,7 @@ export function NotificationBell({
                   ))}
                 </div>
               </ScrollArea>
+              </>
             )}
           </TabsContent>
         </Tabs>
