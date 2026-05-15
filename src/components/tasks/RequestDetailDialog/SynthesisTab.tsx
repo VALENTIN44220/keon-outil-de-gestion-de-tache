@@ -3,16 +3,17 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { 
-  Building2, 
-  Calendar, 
-  User, 
+import {
+  Building2,
+  Calendar,
+  User,
   Workflow,
   CheckCircle2,
   Clock,
   AlertCircle,
   Layers,
   Hash,
+  Link as LinkIcon,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -36,6 +37,8 @@ interface SynthesisTabProps {
   subProcessGroups: SubProcessGroup[];
   globalProgress: number;
   onSelectSubProcess: (subProcessId: string) => void;
+  /** Liens et pièces jointes fournis par le demandeur (depuis task_attachments) */
+  attachments?: Array<{ id: string; name: string; url: string; type: string | null }>;
 }
 
 export function SynthesisTab({
@@ -47,6 +50,7 @@ export function SynthesisTab({
   subProcessGroups,
   globalProgress,
   onSelectSubProcess,
+  attachments = [],
 }: SynthesisTabProps) {
 
   const getStatusIcon = (status: string) => {
@@ -75,6 +79,37 @@ export function SynthesisTab({
           <div>
             <h4 className="text-sm font-medium text-muted-foreground mb-2">Description</h4>
             <p className="text-sm whitespace-pre-wrap">{task.description}</p>
+          </div>
+        )}
+
+        {/* Liens / pièces fournis par le demandeur (task_attachments) */}
+        {attachments.length > 0 && (
+          <div className="rounded-lg border border-sky-200 bg-sky-50/40 p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <LinkIcon className="h-4 w-4 text-sky-700" />
+              <h4 className="text-sm font-semibold text-sky-800">
+                Liens fournis par le demandeur
+              </h4>
+              <span className="ml-auto text-[10px] text-sky-700/70">
+                ({attachments.length})
+              </span>
+            </div>
+            <ul className="space-y-1.5">
+              {attachments.map((att) => (
+                <li key={att.id} className="flex items-center gap-2 text-sm">
+                  <LinkIcon className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                  <a
+                    href={att.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sky-700 hover:text-sky-900 hover:underline truncate"
+                    title={att.url}
+                  >
+                    {att.name || att.url}
+                  </a>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
 

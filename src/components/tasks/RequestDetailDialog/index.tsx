@@ -90,6 +90,13 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange, onTas
   const [isReassignOpen, setIsReassignOpen] = useState(false);
   const [taskForReassign, setTaskForReassign] = useState<Task | null>(null);
   const [childTasks, setChildTasks] = useState<Task[]>([]);
+  /** Liens et pièces fournis par le demandeur sur la demande (task_attachments) */
+  const [requestAttachments, setRequestAttachments] = useState<Array<{
+    id: string;
+    name: string;
+    url: string;
+    type: string | null;
+  }>>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [profiles, setProfiles] = useState<Map<string, string>>(new Map());
   const [profilesList, setProfilesList] = useState<Profile[]>([]);
@@ -206,6 +213,14 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange, onTas
 
     setIsLoading(true);
     try {
+      // Fetch attachments (liens et fichiers fournis par le demandeur)
+      const { data: attData } = await supabase
+        .from('task_attachments')
+        .select('id, name, url, type')
+        .eq('task_id', task.id)
+        .order('created_at', { ascending: true });
+      setRequestAttachments((attData as any[]) ?? []);
+
       // Fetch child tasks
       const { data: children } = await supabase
         .from('tasks')
@@ -894,6 +909,16 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange, onTas
   // Check if this request has sub-processes
   const hasSubProcesses = subProcessGroups.length > 0;
 
+  // ID du processus Bureau d'Études — détection pour masquer l'onglet
+  // "Workflow" qui est sans objet pour le flux BE (utilise be_status à la place)
+  const BE_PROCESS_ID = 'bd75a3b0-c918-4b43-befe-739b83f7461a';
+  const isBERequest =
+    task?.source_process_template_id === BE_PROCESS_ID ||
+    task?.process_template_id === BE_PROCESS_ID ||
+    Boolean((task as any)?.be_status);
+  // Onglet Workflow visible UNIQUEMENT pour les processus non-BE qui ont un workflow lié
+  const showWorkflowTab = Boolean(task?.source_process_template_id) && !isBERequest;
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-[95vw] sm:max-w-[1200px] h-[92vh] max-h-[92vh] overflow-hidden flex flex-col">
@@ -936,7 +961,7 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange, onTas
                   <LayoutDashboard className="h-4 w-4" />
                   Synthèse
                 </TabsTrigger>
-                {task.source_process_template_id && (
+                {showWorkflowTab && (
                   <TabsTrigger value="workflow" className="gap-2">
                     <GitBranch className="h-4 w-4" />
                     Workflow
@@ -966,10 +991,11 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange, onTas
                   subProcessGroups={subProcessGroups}
                   globalProgress={globalProgress}
                   onSelectSubProcess={handleSelectSubProcess}
+                  attachments={requestAttachments}
                 />
               </TabsContent>
 
-              {task.source_process_template_id && (
+              {showWorkflowTab && (
                 <TabsContent value="workflow" className="m-0">
                   <WorkflowProgressTab task={task} />
                 </TabsContent>
