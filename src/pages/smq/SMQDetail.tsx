@@ -8,7 +8,8 @@
  *    vers tasks (bouton "Transformer en tâche").
  */
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { useMatchedRouteParam } from '@/hooks/useMatchedRouteParam';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -39,7 +40,9 @@ import {
 } from '@/types/smqNC';
 
 export default function SMQDetail() {
-  const { id } = useParams<{ id: string }>();
+  // PersistentRoutes utilise matchPath (pas <Route>), donc useParams() ne
+  // fonctionne PAS ici : on doit utiliser useMatchedRouteParam.
+  const id = useMatchedRouteParam('id', '/smq/:id');
   const navigate = useNavigate();
   const { profile: authProfile } = useAuth();
   const { isSimulating, simulatedProfile } = useSimulation();
