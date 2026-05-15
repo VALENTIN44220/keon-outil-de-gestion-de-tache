@@ -1,0 +1,18 @@
+-- Notifications SMQ : triggers DB qui alimentent la table `notifications`
+-- (in-app) sur les transitions clés des NC et de leurs actions.
+--
+-- 4 cas couverts :
+--   1. NC créée avec pilote_id → notif au pilote
+--   2. NC change de statut → notif au déclarant + au pilote (en évitant
+--      celui qui a déclenché et les doublons)
+--   2bis. Pilote changé sur NC existante → notif au nouveau pilote
+--   3. Action nc_actions créée avec assignee → notif à l'assignée
+--   4. Action terminée (status='done') → notif au créateur de l'action
+--
+-- Toutes les notifs ont :
+--   - type = 'nc_*' (cf. AppNotificationCluster pour le routing)
+--   - related_entity_type = 'nc_declaration'
+--   - related_entity_id   = nc.id (même pour les actions, pour ouvrir la
+--     fiche NC directement, plutôt qu'une fiche action isolée)
+-- Voir migration appliquée en DB pour le code complet de notify_nc_event
+-- et notify_nc_action_event.

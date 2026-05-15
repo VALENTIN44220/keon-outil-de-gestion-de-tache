@@ -153,7 +153,13 @@ export function AppNotificationCluster({ collapsed, className }: AppNotification
         }}
         onWorkflowInAppClick={(row) => {
           void markWorkflowRead(row.id);
-          if (row.related_entity_type === 'task' && row.related_entity_id) {
+          if (!row.related_entity_id) return;
+          // Routing selon le type d'entité liée
+          if (row.related_entity_type === 'nc_declaration') {
+            navigate(`/smq/${row.related_entity_id}`);
+            return;
+          }
+          if (row.related_entity_type === 'task') {
             defaultOpenTask(row.related_entity_id);
           }
         }}
