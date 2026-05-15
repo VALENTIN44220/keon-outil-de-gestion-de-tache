@@ -86,6 +86,9 @@ import ITProjectHubFiles from "./pages/it/ITProjectHubFiles";
 import ITProjectHubBudget from "./pages/it/ITProjectHubBudget";
 import ITBudgetGlobal from "./pages/it/ITBudgetGlobal";
 import ITCartographie from "./pages/it/ITCartographie";
+import SMQDashboard from "./pages/smq/SMQDashboard";
+import SMQNewDeclaration from "./pages/smq/SMQNewDeclaration";
+import SMQDetail from "./pages/smq/SMQDetail";
 
 const App = () => (
     <AuthProvider>
@@ -126,6 +129,11 @@ const App = () => (
 
                 { path: "/innovation", end: true, element: <ProtectedRoute><Innovation /></ProtectedRoute> },
                 { path: "/innovation/new", end: true, element: <ProtectedRoute><InnovationNew /></ProtectedRoute> },
+
+                // Module SMQ (Système Management Qualité) — Non-Conformités
+                { path: "/smq", end: true, element: <ProtectedRoute><SMQDashboard /></ProtectedRoute> },
+                { path: "/smq/new", end: true, element: <ProtectedRoute><SMQNewDeclaration /></ProtectedRoute> },
+                { path: "/smq/:id", end: true, element: <ProtectedRoute><SMQDetail /></ProtectedRoute> },
                 { path: "/maintenance/dispatch", end: true, element: <ProtectedRoute><MaintenanceDispatch /></ProtectedRoute> },
                 { path: "/maintenance/new", end: true, element: <ProtectedRoute><NewMaintenanceRequest /></ProtectedRoute> },
                 { path: "/logistique/dispatch", end: true, element: <ProtectedRoute><LogistiqueDispatch /></ProtectedRoute> },
@@ -195,6 +203,9 @@ const App = () => (
             <Route path="/process-tracking" element={<></>} />
             <Route path="/innovation" element={<></>} />
             <Route path="/innovation/new" element={<></>} />
+            <Route path="/smq" element={<></>} />
+            <Route path="/smq/new" element={<></>} />
+            <Route path="/smq/:id" element={<></>} />
             <Route path="/maintenance/dispatch" element={<></>} />
             <Route path="/maintenance/new" element={<></>} />
             <Route path="/logistique/dispatch" element={<></>} />
