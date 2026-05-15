@@ -111,10 +111,10 @@ serve(async (req) => {
 
     if (onConflict === "ignore") {
       // ── Mode IGNORE : ON CONFLICT DO NOTHING ──
-      const { error } = await admin.from(table).upsert(records, {
-        onConflict: conflictKey,
-        ignoreDuplicates: true,
-      });
+      const { error } = await admin.from(table).upsert(
+        (records as any[]).map((r: any) => r.id ? r : { id: crypto.randomUUID(), ...r }),
+        { onConflict: conflictKey, ignoreDuplicates: true },
+      );
       upsertError = error;
 
     } else if (onConflict === "update_nulls") {
@@ -147,8 +147,8 @@ serve(async (req) => {
       const merged = (records as any[]).map((newRec: any) => {
         const current = existingMap.get(newRec[conflictKey]);
         if (!current) {
-          // Nouveau fournisseur → insert complet
-          return newRec;
+          // Nouveau fournisseur → insert complet (id généré côté edge pour éviter null value in column "id")
+          return { id: crypto.randomUUID(), ...newRec };
         }
         const result: any = { ...newRec };
         for (const key of Object.keys(current)) {
@@ -175,10 +175,10 @@ serve(async (req) => {
 
     } else {
       // ── Mode UPSERT total (défaut) ──
-      const { error } = await admin.from(table).upsert(records, {
-        onConflict: conflictKey,
-        ignoreDuplicates: false,
-      });
+      const { error } = await admin.from(table).upsert(
+        (records as any[]).map((r: any) => r.id ? r : { id: crypto.randomUUID(), ...r }),
+        { onConflict: conflictKey, ignoreDuplicates: false },
+      );
       upsertError = error;
     }
 
