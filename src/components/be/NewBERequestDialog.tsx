@@ -399,7 +399,36 @@ export function NewBERequestDialog({
 
       if (reqError) throw reqError;
 
-      // 2. Tâches enfant (une par SOUS-ÉTAPE des prestations sélectionnées)
+      // 2. Pré-charge les paramètres « jalon » et « docs obligatoires » définis
+      //    sur les task_templates des prestations sélectionnées. Pour chaque
+      //    sub_process_template, on prend le PREMIER task_template flaggé
+      //    is_milestone=true (ordre par order_index) → il définit le jalon
+      //    qui sera créé à la complétion de la tâche.
+      const selectedSubProcessIds = allSelectedSteps.map(s => s.id);
+      const milestoneBySubProcess = new Map<string, any>();
+      const docsBySubProcess = new Map<string, { count: number; description: string | null }>();
+      if (selectedSubProcessIds.length > 0) {
+        const { data: tplRows } = await (sb as any)
+          .from('task_templates')
+          .select('sub_process_template_id, is_milestone, milestone_label, auto_milestone_delay_days, auto_milestone_label, required_docs_count, required_docs_description, order_index')
+          .in('sub_process_template_id', selectedSubProcessIds)
+          .order('order_index', { ascending: true });
+        for (const t of (tplRows ?? [])) {
+          if (t.is_milestone && !milestoneBySubProcess.has(t.sub_process_template_id)) {
+            milestoneBySubProcess.set(t.sub_process_template_id, t);
+          }
+          // Cumule les docs requis pour la prestation (somme du min de chaque étape)
+          const existing = docsBySubProcess.get(t.sub_process_template_id);
+          const addCount = t.required_docs_count ?? 0;
+          const addDesc = (t.required_docs_description || '').trim();
+          docsBySubProcess.set(t.sub_process_template_id, {
+            count: (existing?.count ?? 0) + addCount,
+            description: [existing?.description, addDesc].filter(Boolean).join(' ; ') || null,
+          });
+        }
+      }
+
+      // 3. Tâches enfant (une par SOUS-ÉTAPE des prestations sélectionnées)
       const childInserts = allSelectedSteps.map(s => {
         // Auto-assignation selon le type d'affectation du template :
         //  - 'fixed_user' (cible = personne précise, ex. Guillaume) → pré-affectation directe
@@ -412,6 +441,8 @@ export function NewBERequestDialog({
           : (s.target_assignee_id ?? s.dispatch_manager_id ?? null);
         // Statut BE initial : si déjà pré-affecté → 'affectee', sinon 'soumise' (à dispatcher).
         const initialBeStatus = initialAssignee ? 'affectee' : 'soumise';
+        const ms = milestoneBySubProcess.get(s.id);
+        const docs = docsBySubProcess.get(s.id);
         return {
           title: `${title} — ${s.name}`,
           type: 'task',
@@ -429,6 +460,13 @@ export function NewBERequestDialog({
           duration_hours: s.default_duration_hours ?? null,
           source_process_template_id: BE_PROCESS_TEMPLATE_ID,
           process_template_id: BE_PROCESS_TEMPLATE_ID,
+          // Dénormalisation : jalon timeline + docs obligatoires (depuis task_templates)
+          is_milestone: !!ms,
+          milestone_label: ms?.milestone_label ?? null,
+          auto_milestone_delay_days: ms?.auto_milestone_delay_days ?? null,
+          auto_milestone_label: ms?.auto_milestone_label ?? null,
+          required_docs_count: docs?.count ?? 0,
+          required_docs_description: docs?.description ?? null,
         };
       });
 
