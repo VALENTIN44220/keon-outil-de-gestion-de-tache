@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { CalendarClock, Loader2, Link2, MapPin, Search, CheckCircle2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format, addDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -26,24 +27,32 @@ interface Props {
   }) => Promise<void>;
 }
 
-const WINDOW_DAYS = 15;
+const WINDOW_OPTIONS: { value: string; label: string; days: number }[] = [
+  { value: '15',  label: '± 15 jours',  days: 15 },
+  { value: '30',  label: '± 30 jours',  days: 30 },
+  { value: '90',  label: '± 3 mois',    days: 90 },
+  { value: '180', label: '± 6 mois',    days: 180 },
+  { value: '365', label: '± 1 an',      days: 365 },
+];
 
 export function ITMilestoneLinkEventDialog({ open, onOpenChange, milestone, existingLinks, onLink }: Props) {
   const [search, setSearch] = useState('');
   const [linkingId, setLinkingId] = useState<string | null>(null);
+  const [windowDays, setWindowDays] = useState<string>('30');
 
-  // Fenetre temporelle : date prevue ± 15j (sinon, prochains 30j)
+  // Fenêtre temporelle autour de la date prévue (ou « à partir d'aujourd'hui » si pas de date)
   const { startDate, endDate } = useMemo(() => {
+    const days = parseInt(windowDays, 10) || 30;
     if (milestone.date_prevue) {
       const center = new Date(milestone.date_prevue);
       return {
-        startDate: addDays(center, -WINDOW_DAYS),
-        endDate: addDays(center, WINDOW_DAYS),
+        startDate: addDays(center, -days),
+        endDate: addDays(center, days),
       };
     }
     const now = new Date();
-    return { startDate: now, endDate: addDays(now, 30) };
-  }, [milestone.date_prevue]);
+    return { startDate: addDays(now, -days), endDate: addDays(now, days * 2) };
+  }, [milestone.date_prevue, windowDays]);
 
   const { events, isLoading } = useOutlookCalendar(startDate, endDate);
 
@@ -88,22 +97,32 @@ export function ITMilestoneLinkEventDialog({ open, onOpenChange, milestone, exis
           </DialogTitle>
           <DialogDescription>
             <span className="font-medium">{milestone.titre}</span>
-            {milestone.date_prevue && (
-              <> — fenêtre {format(startDate, 'dd MMM', { locale: fr })} → {format(endDate, 'dd MMM yyyy', { locale: fr })}</>
-            )}
-            {!milestone.date_prevue && <> — prochains 30 jours</>}
+            {' — '}fenêtre {format(startDate, 'dd MMM yyyy', { locale: fr })} → {format(endDate, 'dd MMM yyyy', { locale: fr })}
+            {' '}({events.length} évènement{events.length > 1 ? 's' : ''})
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Rechercher un évènement..."
-              className="pl-8"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Rechercher un évènement..."
+                className="pl-8"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <Select value={windowDays} onValueChange={setWindowDays}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {WINDOW_OPTIONS.map(opt => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <ScrollArea className="h-[360px] rounded-md border">
