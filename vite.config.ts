@@ -24,28 +24,16 @@ export default defineConfig(({ mode }) => {
   return {
     build: {
       manifest: true,
-      // Bundle unique (4.5 MB) historiquement choisi pour éviter NS_ERROR_CORRUPTED_CONTENT
-      // sur Firefox + Cloudflare. Mais ça force le navigateur à télécharger + parser
-      // l'intégralité avant d'afficher quoi que ce soit → 30-60 s sur connexion modeste.
-      //
-      // On split en chunks « vendor » stables : ces chunks restent identiques d'un déploiement
-      // à l'autre (libs ne changent pas) donc le navigateur les sert depuis son cache.
-      // Le splitting route-based reste désactivé (eager imports dans App.tsx).
-      chunkSizeWarningLimit: 800,
+      // Bundle unique : tentative de split par vendor a causé un crash
+      // « React.forwardRef undefined » (vendor-radix évalué avant vendor-react).
+      // Pour split correctement il faudrait soit forcer un ordre de chargement
+      // soit fusionner toutes les libs qui dépendent de React dans un seul chunk
+      // (perd l'intérêt). On garde le single-bundle, et on compte sur :
+      //  - <link rel="preconnect"> Supabase (index.html) pour démarrer le TLS tôt
+      //  - Brotli/gzip côté Cloudflare pour réduire le transfert (~1.1 MB compressé)
       rollupOptions: {
         output: {
-          manualChunks: (id) => {
-            if (!id.includes('node_modules')) return undefined;
-            if (id.includes('react-dom') || id.includes('/react/') || id.includes('react-router')) return 'vendor-react';
-            if (id.includes('@supabase')) return 'vendor-supabase';
-            if (id.includes('recharts') || id.includes('d3-') || id.includes('victory-')) return 'vendor-charts';
-            if (id.includes('@radix-ui')) return 'vendor-radix';
-            if (id.includes('lucide-react')) return 'vendor-icons';
-            if (id.includes('date-fns')) return 'vendor-date';
-            if (id.includes('leaflet')) return 'vendor-leaflet';
-            if (id.includes('@tanstack')) return 'vendor-query';
-            return 'vendor-misc';
-          },
+          inlineDynamicImports: true,
         },
       },
     },
