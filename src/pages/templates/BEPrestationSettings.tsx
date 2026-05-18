@@ -22,7 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   ArrowLeft, Save, Plus, Trash2, ArrowUp, ArrowDown, GripVertical,
-  Wand2, Loader2, Paperclip, Flag, ChevronDown, ChevronRight, ListChecks,
+  Wand2, Loader2, Paperclip, Flag, ChevronDown, ChevronRight, ListChecks, GitBranch,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -59,6 +59,8 @@ interface SubAction {
   is_required: boolean;
 }
 
+type StartMode = 'parallel' | 'after_previous' | 'after_specific';
+
 interface StepDraft {
   dbId: string | null;
   tempId: string;
@@ -74,8 +76,12 @@ interface StepDraft {
   milestone_label: string;
   auto_milestone_delay_days: number | null;
   auto_milestone_label: string;
+  /** Dépendance de démarrage */
+  start_mode: StartMode;
+  /** ID (dbId ou tempId) de l'étape à attendre, si start_mode = after_specific */
+  depends_on_temp_id: string | null;
   sub_actions: SubAction[];
-  expanded: boolean; // UI : étape dépliée pour montrer les options avancées
+  expanded: boolean;
 }
 
 const blankStep = (): StepDraft => ({
@@ -93,6 +99,8 @@ const blankStep = (): StepDraft => ({
   milestone_label: '',
   auto_milestone_delay_days: null,
   auto_milestone_label: '',
+  start_mode: 'parallel',
+  depends_on_temp_id: null,
   sub_actions: [],
   expanded: false,
 });
@@ -161,7 +169,7 @@ export default function BEPrestationSettings() {
 
       const { data: tasks, error: tasksErr } = await (supabase as any)
         .from('task_templates')
-        .select('id, title, default_duration_days, validation_level_1, validator_level_1_id, validation_level_2, validator_level_2_id, order_index, required_docs_count, required_docs_description, is_milestone, milestone_label, auto_milestone_delay_days, auto_milestone_label')
+        .select('id, title, default_duration_days, validation_level_1, validator_level_1_id, validation_level_2, validator_level_2_id, order_index, required_docs_count, required_docs_description, is_milestone, milestone_label, auto_milestone_delay_days, auto_milestone_label, start_mode, depends_on_task_template_id')
         .eq('sub_process_template_id', subProcessId!)
         .order('order_index', { ascending: true });
       if (tasksErr) throw tasksErr;
@@ -181,31 +189,41 @@ export default function BEPrestationSettings() {
         }
       }
 
-      setSteps(
-        (tasks || []).map((t: any) => ({
-          dbId: t.id,
+      // 1er passage : construire les drafts avec tempId
+      const drafts: StepDraft[] = (tasks || []).map((t: any) => ({
+        dbId: t.id,
+        tempId: crypto.randomUUID(),
+        title: t.title || '',
+        duration_days: t.default_duration_days ?? 5,
+        val1_type: dbToValType(t.validation_level_1, t.validator_level_1_id),
+        val1_user_id: t.validator_level_1_id || '',
+        val2_type: dbToValType(t.validation_level_2, t.validator_level_2_id),
+        val2_user_id: t.validator_level_2_id || '',
+        required_docs_count: t.required_docs_count ?? 0,
+        required_docs_description: t.required_docs_description ?? '',
+        is_milestone: t.is_milestone ?? false,
+        milestone_label: t.milestone_label ?? '',
+        auto_milestone_delay_days: t.auto_milestone_delay_days ?? null,
+        auto_milestone_label: t.auto_milestone_label ?? '',
+        start_mode: (t.start_mode as StartMode) || 'parallel',
+        depends_on_temp_id: null, // résolu juste après
+        sub_actions: (subActionsByTask.get(t.id) || []).map((sa: any) => ({
+          dbId: sa.id,
           tempId: crypto.randomUUID(),
-          title: t.title || '',
-          duration_days: t.default_duration_days ?? 5,
-          val1_type: dbToValType(t.validation_level_1, t.validator_level_1_id),
-          val1_user_id: t.validator_level_1_id || '',
-          val2_type: dbToValType(t.validation_level_2, t.validator_level_2_id),
-          val2_user_id: t.validator_level_2_id || '',
-          required_docs_count: t.required_docs_count ?? 0,
-          required_docs_description: t.required_docs_description ?? '',
-          is_milestone: t.is_milestone ?? false,
-          milestone_label: t.milestone_label ?? '',
-          auto_milestone_delay_days: t.auto_milestone_delay_days ?? null,
-          auto_milestone_label: t.auto_milestone_label ?? '',
-          sub_actions: (subActionsByTask.get(t.id) || []).map((sa: any) => ({
-            dbId: sa.id,
-            tempId: crypto.randomUUID(),
-            title: sa.title,
-            is_required: sa.is_required ?? false,
-          })),
-          expanded: false,
+          title: sa.title,
+          is_required: sa.is_required ?? false,
         })),
-      );
+        expanded: false,
+      }));
+      // 2e passage : résoudre les dépendances explicites (after_specific) → tempId
+      const byDbId = new Map(drafts.filter(d => d.dbId).map(d => [d.dbId!, d.tempId]));
+      for (let i = 0; i < drafts.length; i++) {
+        const raw = (tasks as any[])[i];
+        if (drafts[i].start_mode === 'after_specific' && raw.depends_on_task_template_id) {
+          drafts[i].depends_on_temp_id = byDbId.get(raw.depends_on_task_template_id) ?? null;
+        }
+      }
+      setSteps(drafts);
       setDeletedStepIds([]);
       setDeletedSubActionIds([]);
 
@@ -310,9 +328,19 @@ export default function BEPrestationSettings() {
       }
 
       // 3. Update/insert chaque étape (séquentiel pour récupérer l'id)
+      // Index temp_id → db_id pour résoudre les dépendances après insert
+      const tempToDbId = new Map<string, string>();
+      for (const s of steps) {
+        if (s.dbId) tempToDbId.set(s.tempId, s.dbId);
+      }
+
       for (let i = 0; i < steps.length; i++) {
         const s = steps[i];
         const orderIndex = (i + 1) * 10;
+        // Résout l'id de la dépendance explicite (si encore inconnu → 2nd passage plus bas)
+        const dependsOnDbId = s.start_mode === 'after_specific' && s.depends_on_temp_id
+          ? tempToDbId.get(s.depends_on_temp_id) ?? null
+          : null;
         const row: any = {
           title: s.title.trim(),
           default_duration_days: s.duration_days,
@@ -328,6 +356,8 @@ export default function BEPrestationSettings() {
           milestone_label: s.is_milestone ? (s.milestone_label.trim() || s.title.trim()) : null,
           auto_milestone_delay_days: s.is_milestone && s.auto_milestone_delay_days ? s.auto_milestone_delay_days : null,
           auto_milestone_label: s.is_milestone && s.auto_milestone_delay_days ? (s.auto_milestone_label.trim() || null) : null,
+          start_mode: s.start_mode,
+          depends_on_task_template_id: dependsOnDbId,
         };
 
         let taskId: string;
@@ -350,6 +380,7 @@ export default function BEPrestationSettings() {
           }).select('id').single();
           if (error) throw error;
           taskId = inserted.id;
+          tempToDbId.set(s.tempId, taskId);
         }
 
         // 4. Sub-actions de cette étape : update existantes + insert nouvelles
@@ -370,6 +401,19 @@ export default function BEPrestationSettings() {
             });
           }
         }
+      }
+
+      // 5. 2nd passage : résolution des dépendances vers étapes nouvellement créées
+      //    (lors du 1er passage, leur dbId n'existait pas encore)
+      for (const s of steps) {
+        if (s.start_mode !== 'after_specific' || !s.depends_on_temp_id) continue;
+        const myDbId = tempToDbId.get(s.tempId);
+        const targetDbId = tempToDbId.get(s.depends_on_temp_id);
+        if (!myDbId || !targetDbId) continue;
+        await (supabase as any)
+          .from('task_templates')
+          .update({ depends_on_task_template_id: targetDbId })
+          .eq('id', myDbId);
       }
 
       toast.success('Prestation mise à jour');
@@ -497,6 +541,7 @@ export default function BEPrestationSettings() {
                       total={steps.length}
                       canManage={canManage}
                       profiles={profiles}
+                      allSteps={steps}
                       onUpdate={(patch) => updateStep(s.tempId, patch)}
                       onMove={(dir) => moveStep(s.tempId, dir)}
                       onRemove={() => removeStep(s.tempId)}
@@ -530,7 +575,7 @@ export default function BEPrestationSettings() {
 // Sous-composant : éditeur d'une étape (avec section dépliable « Avancé »)
 // ════════════════════════════════════════════════════════════════════════
 function StepEditor({
-  step, index, total, canManage, profiles,
+  step, index, total, canManage, profiles, allSteps,
   onUpdate, onMove, onRemove,
   onAddSubAction, onUpdateSubAction, onRemoveSubAction,
 }: {
@@ -539,6 +584,7 @@ function StepEditor({
   total: number;
   canManage: boolean;
   profiles: Profile[];
+  allSteps: StepDraft[];
   onUpdate: (patch: Partial<StepDraft>) => void;
   onMove: (dir: -1 | 1) => void;
   onRemove: () => void;
@@ -547,9 +593,14 @@ function StepEditor({
   onRemoveSubAction: (tempId: string) => void;
 }) {
   const advancedSummary: string[] = [];
+  if (step.start_mode === 'after_previous') advancedSummary.push('Après précédente');
+  else if (step.start_mode === 'after_specific') advancedSummary.push('Dépendance');
   if (step.required_docs_count > 0) advancedSummary.push(`${step.required_docs_count} doc${step.required_docs_count > 1 ? 's' : ''}`);
   if (step.is_milestone) advancedSummary.push('Jalon');
   if (step.sub_actions.length > 0) advancedSummary.push(`${step.sub_actions.length} sous-action${step.sub_actions.length > 1 ? 's' : ''}`);
+
+  // Liste des autres étapes pour le sélecteur de dépendance
+  const otherSteps = allSteps.filter(s => s.tempId !== step.tempId);
 
   return (
     <div className="border rounded-lg p-3 space-y-3 bg-card">
@@ -609,8 +660,59 @@ function StepEditor({
 
       {step.expanded && (
         <div className="pl-8 space-y-4 pt-2 border-t">
-          {/* Pièces obligatoires */}
+          {/* ── Dépendance entre étapes ────────────────────────────── */}
           <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <GitBranch className="h-3.5 w-3.5 text-muted-foreground" />
+              <Label className="text-xs font-semibold">Quand cette étape démarre-t-elle ?</Label>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <DepModeButton
+                active={step.start_mode === 'parallel'}
+                disabled={!canManage}
+                onClick={() => onUpdate({ start_mode: 'parallel', depends_on_temp_id: null })}
+                title="En parallèle"
+                desc="Démarre en même temps que les autres étapes"
+              />
+              <DepModeButton
+                active={step.start_mode === 'after_previous'}
+                disabled={!canManage || index === 0}
+                onClick={() => onUpdate({ start_mode: 'after_previous', depends_on_temp_id: null })}
+                title="Après la précédente"
+                desc={index === 0 ? 'Indispo : pas d\'étape avant' : 'Attend la fin de l\'étape n°' + index}
+              />
+              <DepModeButton
+                active={step.start_mode === 'after_specific'}
+                disabled={!canManage || otherSteps.length === 0}
+                onClick={() => onUpdate({ start_mode: 'after_specific' })}
+                title="Après une étape précise"
+                desc="Choisis laquelle ci-dessous"
+              />
+            </div>
+            {step.start_mode === 'after_specific' && (
+              <Select
+                value={step.depends_on_temp_id ?? '__none__'}
+                onValueChange={(v) => onUpdate({ depends_on_temp_id: v === '__none__' ? null : v })}
+                disabled={!canManage || otherSteps.length === 0}
+              >
+                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Choisir l'étape déclencheur…" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— Aucune —</SelectItem>
+                  {otherSteps.map((other) => {
+                    const otherIdx = allSteps.findIndex(s => s.tempId === other.tempId);
+                    return (
+                      <SelectItem key={other.tempId} value={other.tempId} className="text-xs">
+                        n°{otherIdx + 1} — {other.title || '(sans titre)'}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+
+          {/* Pièces obligatoires */}
+          <div className="space-y-2 border-t pt-3">
             <div className="flex items-center gap-2">
               <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
               <Label className="text-xs font-semibold">Pièces obligatoires</Label>
@@ -633,13 +735,26 @@ function StepEditor({
           </div>
 
           {/* Jalon timeline */}
-          <div className="space-y-2 border-t pt-3">
-            <div className="flex items-center gap-2">
-              <Flag className="h-3.5 w-3.5 text-violet-600" />
-              <Label className="text-xs font-semibold flex-1">Jalon dans la timeline du projet</Label>
+          <div className={cn(
+            'space-y-2 border-t pt-3 -mx-1 px-1 rounded-md transition-colors',
+            step.is_milestone && 'bg-violet-50/40',
+          )}>
+            <label className={cn(
+              'flex items-center gap-2 cursor-pointer select-none rounded-md p-1.5 -m-1.5 hover:bg-violet-50 transition-colors',
+              !canManage && 'cursor-not-allowed opacity-70'
+            )}>
+              <Flag className={cn('h-3.5 w-3.5 shrink-0', step.is_milestone ? 'text-violet-600' : 'text-muted-foreground')} />
+              <div className="flex-1">
+                <span className="text-xs font-semibold">Jalon dans la timeline du projet</span>
+                <p className="text-[10px] text-muted-foreground/80 leading-tight">
+                  {step.is_milestone
+                    ? 'Activé — la complétion de cette étape crée un point sur la timeline du projet'
+                    : 'Coche pour faire apparaître cette étape comme une date-clé sur la timeline'}
+                </p>
+              </div>
               <Switch checked={step.is_milestone}
                 onCheckedChange={(v) => onUpdate({ is_milestone: v })} disabled={!canManage} />
-            </div>
+            </label>
             {step.is_milestone && (
               <div className="space-y-3 pl-1">
                 <div className="space-y-1">
@@ -761,5 +876,33 @@ function ValidationField({
         </Select>
       )}
     </div>
+  );
+}
+
+function DepModeButton({
+  active, disabled, onClick, title, desc,
+}: {
+  active: boolean;
+  disabled: boolean;
+  onClick: () => void;
+  title: string;
+  desc: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        'p-2 rounded-md border text-left transition-all',
+        active
+          ? 'border-primary bg-primary/5 ring-1 ring-primary'
+          : 'border-border hover:border-primary/40',
+        disabled && 'opacity-50 cursor-not-allowed',
+      )}
+    >
+      <p className={cn('text-xs font-medium', active && 'text-primary')}>{title}</p>
+      <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">{desc}</p>
+    </button>
   );
 }
