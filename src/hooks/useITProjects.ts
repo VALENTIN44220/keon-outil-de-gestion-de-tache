@@ -1,35 +1,48 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { ITProject, ITProjectPhase, ALL_IT_PROJECT_PHASES } from '@/types/itProject';
 import { toast } from '@/hooks/use-toast';
 
+const IT_PROJECTS_SELECT = `*, responsable_it:profiles!it_projects_responsable_it_id_fkey(id,display_name,avatar_url), chef_projet:profiles!it_projects_chef_projet_id_fkey(id,display_name,avatar_url), sponsor:profiles!it_projects_sponsor_id_fkey(id,display_name,avatar_url), company:companies!it_projects_company_id_fkey(id,name), chef_projet_metier:profiles!it_projects_chef_projet_metier_id_fkey(id,display_name,avatar_url), chef_projet_it:profiles!it_projects_chef_projet_it_id_fkey(id,display_name,avatar_url), groupe_service:departments!it_projects_groupe_service_id_fkey(id,name), directeur:profiles!it_projects_directeur_id_fkey(id,display_name,avatar_url)`;
+
+/**
+ * Liste de tous les projets IT.
+ *
+ * Implémenté via React Query : tous les composants qui appellent `useITProjects()`
+ * (même 50× dans le même render, ex. dispatch table) partagent UNE SEULE requête
+ * réseau et le même cache. Avant cette refacto le hook fetchait par instance,
+ * ce qui saturait le navigateur (`ERR_INSUFFICIENT_RESOURCES`) sur les pages
+ * où il était appelé par ligne (`ITProjectCell`, `ITExtraFilters`, etc.).
+ */
 export function useITProjects() {
-  const [projects, setProjects] = useState<ITProject[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
 
-  const fetchProjects = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      let query = supabase
+  const query = useQuery({
+    queryKey: ['it-projects', searchQuery || null],
+    queryFn: async (): Promise<ITProject[]> => {
+      let q = supabase
         .from('it_projects')
-        .select(`*, responsable_it:profiles!it_projects_responsable_it_id_fkey(id,display_name,avatar_url), chef_projet:profiles!it_projects_chef_projet_id_fkey(id,display_name,avatar_url), sponsor:profiles!it_projects_sponsor_id_fkey(id,display_name,avatar_url), company:companies!it_projects_company_id_fkey(id,name), chef_projet_metier:profiles!it_projects_chef_projet_metier_id_fkey(id,display_name,avatar_url), chef_projet_it:profiles!it_projects_chef_projet_it_id_fkey(id,display_name,avatar_url), groupe_service:departments!it_projects_groupe_service_id_fkey(id,name), directeur:profiles!it_projects_directeur_id_fkey(id,display_name,avatar_url)`)
+        .select(IT_PROJECTS_SELECT)
         .order('code_projet_digital', { ascending: true });
       if (searchQuery) {
-        query = query.or(`nom_projet.ilike.%${searchQuery}%,code_projet_digital.ilike.%${searchQuery}%`);
+        q = q.or(`nom_projet.ilike.%${searchQuery}%,code_projet_digital.ilike.%${searchQuery}%`);
       }
-      const { data, error } = await query;
-      if (error) throw error;
-      setProjects((data as ITProject[]) || []);
-    } catch (error) {
-      console.error('Error fetching IT projects:', error);
-      toast({ title: 'Erreur', description: 'Impossible de charger les projets IT', variant: 'destructive' });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [searchQuery]);
+      const { data, error } = await q;
+      if (error) {
+        console.error('Error fetching IT projects:', error);
+        toast({ title: 'Erreur', description: 'Impossible de charger les projets IT', variant: 'destructive' });
+        throw error;
+      }
+      return (data as ITProject[]) || [];
+    },
+    staleTime: 30_000, // 30s : la liste change rarement, on évite le refetch intempestif
+  });
 
-  useEffect(() => { fetchProjects(); }, [fetchProjects]);
+  const projects = query.data ?? [];
+  const isLoading = query.isLoading;
+  const fetchProjects = () => queryClient.invalidateQueries({ queryKey: ['it-projects'] });
 
   const addProject = async (project: Omit<ITProject, 'id' | 'created_at' | 'updated_at' | 'responsable_it' | 'chef_projet' | 'sponsor'>) => {
     try {
@@ -57,7 +70,7 @@ export function useITProjects() {
         await supabase.from('it_project_milestones').insert(milestones);
       }
 
-      setProjects(prev => [...prev, data as ITProject]);
+      queryClient.invalidateQueries({ queryKey: ['it-projects'] });
       toast({ title: 'Projet créé', description: `${data.nom_projet} — ${data.code_projet_digital}` });
       return data as ITProject;
     } catch (error: any) {
@@ -70,7 +83,7 @@ export function useITProjects() {
     try {
       const { data, error } = await supabase.from('it_projects').update(updates).eq('id', id).select().single();
       if (error) throw error;
-      setProjects(prev => prev.map(p => p.id === id ? (data as ITProject) : p));
+      queryClient.invalidateQueries({ queryKey: ['it-projects'] });
       toast({ title: 'Projet mis à jour' });
       return data as ITProject;
     } catch (error: any) {
@@ -83,7 +96,7 @@ export function useITProjects() {
     try {
       const { error } = await supabase.from('it_projects').delete().eq('id', id);
       if (error) throw error;
-      setProjects(prev => prev.filter(p => p.id !== id));
+      queryClient.invalidateQueries({ queryKey: ['it-projects'] });
       toast({ title: 'Projet supprimé' });
       return true;
     } catch (error: any) {
