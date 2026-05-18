@@ -24,12 +24,28 @@ export default defineConfig(({ mode }) => {
   return {
     build: {
       manifest: true,
-      // Cloudflare Pages (and some CDN/browser combos) intermittently corrupt or mis-serve
-      // lazy chunks (Firefox: NS_ERROR_CORRUPTED_CONTENT). One JS artifact per deploy avoids
-      // that class of failures at the cost of a larger initial download.
+      // Bundle unique (4.5 MB) historiquement choisi pour éviter NS_ERROR_CORRUPTED_CONTENT
+      // sur Firefox + Cloudflare. Mais ça force le navigateur à télécharger + parser
+      // l'intégralité avant d'afficher quoi que ce soit → 30-60 s sur connexion modeste.
+      //
+      // On split en chunks « vendor » stables : ces chunks restent identiques d'un déploiement
+      // à l'autre (libs ne changent pas) donc le navigateur les sert depuis son cache.
+      // Le splitting route-based reste désactivé (eager imports dans App.tsx).
+      chunkSizeWarningLimit: 800,
       rollupOptions: {
         output: {
-          inlineDynamicImports: true,
+          manualChunks: (id) => {
+            if (!id.includes('node_modules')) return undefined;
+            if (id.includes('react-dom') || id.includes('/react/') || id.includes('react-router')) return 'vendor-react';
+            if (id.includes('@supabase')) return 'vendor-supabase';
+            if (id.includes('recharts') || id.includes('d3-') || id.includes('victory-')) return 'vendor-charts';
+            if (id.includes('@radix-ui')) return 'vendor-radix';
+            if (id.includes('lucide-react')) return 'vendor-icons';
+            if (id.includes('date-fns')) return 'vendor-date';
+            if (id.includes('leaflet')) return 'vendor-leaflet';
+            if (id.includes('@tanstack')) return 'vendor-query';
+            return 'vendor-misc';
+          },
         },
       },
     },
