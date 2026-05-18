@@ -921,7 +921,7 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange, onTas
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-[95vw] sm:max-w-[1200px] h-[92vh] max-h-[92vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-[95vw] sm:max-w-[1200px] max-h-[92vh] overflow-hidden flex flex-col">
         <DialogHeader className="shrink-0">
           <div className="flex items-center gap-2">
             {task.type === 'request' && <Building2 className="h-5 w-5 text-primary" />}
@@ -941,6 +941,12 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange, onTas
             </Badge>
             {task.type === 'request' && (
               <Badge variant="secondary">Demande</Badge>
+            )}
+            {processName && (
+              <Badge variant="outline" className="gap-1 text-[10px] text-muted-foreground">
+                <Workflow className="h-2.5 w-2.5" />
+                {processName}
+              </Badge>
             )}
           </div>
           <DialogTitle className="text-xl mt-2">
@@ -1070,14 +1076,7 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange, onTas
               requesterId={task.requester_id}
             />
 
-            {processName && (
-              <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
-                <div className="flex items-center gap-2">
-                  <Workflow className="h-5 w-5 text-primary" />
-                  <span className="font-medium">Processus: {processName}</span>
-                </div>
-              </div>
-            )}
+            {/* (Le nom du processus est maintenant un badge discret dans l'en-tête) */}
 
             {/* Custom Fields */}
             <RequestCustomFieldsDisplay taskId={task.id} />
@@ -1127,8 +1126,12 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange, onTas
               Annuler la demande
             </Button>
           )}
-          {/* Complete button - marks request + children as done */}
-          {task.status !== 'done' && task.status !== 'validated' && task.status !== 'cancelled' && (
+          {/* Complete button - marqué comme complétée.
+              Masqué pour les demandes BE : la demande se clôture automatiquement
+              quand toutes ses tâches enfant ont terminé leur workflow be_status. */}
+          {task.status !== 'done' && task.status !== 'validated' && task.status !== 'cancelled'
+            && task.source_process_template_id !== 'bd75a3b0-c918-4b43-befe-739b83f7461a'
+            && !childTasks.some(c => (c as any).be_status) && (
             <Button onClick={() => setIsCompleteDialogOpen(true)}>
               <CheckCircle2 className="h-4 w-4 mr-2" />
               Marquer comme complétée

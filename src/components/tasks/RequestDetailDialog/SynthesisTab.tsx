@@ -178,15 +178,7 @@ export function SynthesisTab({
           </div>
         )}
 
-        {/* Process info */}
-        {processName && (
-          <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
-            <div className="flex items-center gap-2">
-              <Workflow className="h-5 w-5 text-primary" />
-              <span className="font-medium">Processus: {processName}</span>
-            </div>
-          </div>
-        )}
+        {/* (Le nom du processus est affiché en badge discret dans le header du dialog) */}
 
         {/* Global progress */}
         {subProcessGroups.length > 0 && (

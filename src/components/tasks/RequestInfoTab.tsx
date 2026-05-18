@@ -237,15 +237,7 @@ export function RequestInfoTab({ task, profiles, departments }: RequestInfoTabPr
           )}
         </div>
 
-        {/* Process info */}
-        {isStandardFieldVisible('process') && processName && (
-          <div className="rounded-lg border border-primary/30 bg-primary/5 p-3">
-            <div className="flex items-center gap-2">
-              <Workflow className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium">Processus: {processName}</span>
-            </div>
-          </div>
-        )}
+        {/* (Process name now shown as discreet badge in dialog header) */}
 
         {/* Custom Fields */}
         {visibleFieldValues.length > 0 && (
