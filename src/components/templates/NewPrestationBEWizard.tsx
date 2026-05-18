@@ -9,7 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { Plus, Trash2, ArrowUp, ArrowDown, ChevronRight, ChevronLeft, Check, GripVertical } from 'lucide-react';
+import { Plus, Trash2, ArrowUp, ArrowDown, ChevronRight, ChevronLeft, Check, GripVertical, Paperclip, Flag, ListChecks, ChevronDown } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 
 // BE process fixe (Bureau d'Études)
 const BE_PROCESS_ID = 'bd75a3b0-c918-4b43-befe-739b83f7461a';
@@ -19,16 +20,34 @@ interface Profile {
   display_name: string | null;
 }
 
+type ValType = 'none' | 'requester' | 'manager' | 'fixed_user';
+
+interface SubActionDraft {
+  id: string;
+  title: string;
+  is_required: boolean;
+}
+
 interface StepDraft {
   id: string; // temp id for UI
   title: string;
   duration_days: number;
-  // Validation niveau 1
-  val1_type: 'none' | 'fixed_user';
+  val1_type: ValType;
   val1_user_id: string;
-  // Validation niveau 2
-  val2_type: 'none' | 'requester' | 'fixed_user';
+  val2_type: ValType;
   val2_user_id: string;
+  // Pièces obligatoires
+  required_docs_count: number;
+  required_docs_description: string;
+  // Jalon timeline
+  is_milestone: boolean;
+  milestone_label: string;
+  auto_milestone_delay_days: number | null;
+  auto_milestone_label: string;
+  // Sous-actions
+  sub_actions: SubActionDraft[];
+  // UI : expandé pour montrer les options avancées
+  expanded: boolean;
 }
 
 interface NewPrestationBEWizardProps {
@@ -42,16 +61,15 @@ const BE_CATEGORIES = [
   { value: 'be', label: 'Bureau d\'Études' },
 ] as const;
 
-const VAL1_OPTIONS = [
-  { value: 'none', label: 'Aucune' },
+const VAL_OPTIONS: { value: ValType; label: string }[] = [
+  { value: 'none',       label: 'Aucune' },
+  { value: 'requester',  label: 'Demandeur' },
+  { value: 'manager',    label: 'Manager du demandeur' },
   { value: 'fixed_user', label: 'Utilisateur fixe' },
-] as const;
+];
 
-const VAL2_OPTIONS = [
-  { value: 'none', label: 'Aucune' },
-  { value: 'requester', label: 'Demandeur' },
-  { value: 'fixed_user', label: 'Utilisateur fixe' },
-] as const;
+const VAL1_OPTIONS = VAL_OPTIONS;
+const VAL2_OPTIONS = VAL_OPTIONS;
 
 const defaultStep = (): StepDraft => ({
   id: crypto.randomUUID(),
@@ -61,6 +79,14 @@ const defaultStep = (): StepDraft => ({
   val1_user_id: '',
   val2_type: 'none',
   val2_user_id: '',
+  required_docs_count: 0,
+  required_docs_description: '',
+  is_milestone: false,
+  milestone_label: '',
+  auto_milestone_delay_days: null,
+  auto_milestone_label: '',
+  sub_actions: [],
+  expanded: false,
 });
 
 export function NewPrestationBEWizard({ open, onClose, onSuccess }: NewPrestationBEWizardProps) {
@@ -170,29 +196,55 @@ export function NewPrestationBEWizard({ open, onClose, onSuccess }: NewPrestatio
 
       if (spErr || !sp) throw spErr ?? new Error('Sous-processus non créé');
 
-      // 3 — Créer les task_templates
-      const taskRows = steps.map((s, idx) => ({
-        sub_process_template_id: sp.id,
-        process_template_id: null,
-        title: s.title.trim(),
-        description: null,
-        priority: 'medium' as const,
-        order_index: (idx + 1) * 10,
-        default_duration_days: s.duration_days,
-        default_duration_unit: 'days' as const,
-        validation_level_1: s.val1_type === 'fixed_user' ? 'free' : 'none',
-        validator_level_1_id: s.val1_type === 'fixed_user' && s.val1_user_id ? s.val1_user_id : null,
-        validation_level_2: s.val2_type === 'none' ? 'none' : s.val2_type === 'requester' ? 'requester' : 'free',
-        validator_level_2_id: s.val2_type === 'fixed_user' && s.val2_user_id ? s.val2_user_id : null,
-        visibility_level: 'public' as const,
-        is_shared: true,
-        creator_company_id: profile?.company_id ?? null,
-        creator_department_id: profile?.department_id ?? null,
-        user_id: user.id,
-      }));
+      // 3 — Créer les task_templates (séquentiel pour récupérer chaque id
+      //     et insérer les sub-actions correspondantes)
+      const valToDb = (t: ValType): string => t === 'fixed_user' ? 'free' : t;
+      for (let idx = 0; idx < steps.length; idx++) {
+        const s = steps[idx];
+        const { data: inserted, error: tErr } = await (supabase as any)
+          .from('task_templates')
+          .insert({
+            sub_process_template_id: sp.id,
+            process_template_id: null,
+            title: s.title.trim(),
+            description: null,
+            priority: 'medium',
+            order_index: (idx + 1) * 10,
+            default_duration_days: s.duration_days,
+            default_duration_unit: 'days',
+            validation_level_1: valToDb(s.val1_type),
+            validator_level_1_id: s.val1_type === 'fixed_user' && s.val1_user_id ? s.val1_user_id : null,
+            validation_level_2: valToDb(s.val2_type),
+            validator_level_2_id: s.val2_type === 'fixed_user' && s.val2_user_id ? s.val2_user_id : null,
+            required_docs_count: s.required_docs_count,
+            required_docs_description: s.required_docs_description.trim() || null,
+            is_milestone: s.is_milestone,
+            milestone_label: s.is_milestone ? (s.milestone_label.trim() || s.title.trim()) : null,
+            auto_milestone_delay_days: s.is_milestone && s.auto_milestone_delay_days ? s.auto_milestone_delay_days : null,
+            auto_milestone_label: s.is_milestone && s.auto_milestone_delay_days ? (s.auto_milestone_label.trim() || null) : null,
+            visibility_level: 'public',
+            is_shared: true,
+            creator_company_id: profile?.company_id ?? null,
+            creator_department_id: profile?.department_id ?? null,
+            user_id: user.id,
+          })
+          .select('id')
+          .single();
+        if (tErr) throw tErr;
 
-      const { error: tasksErr } = await supabase.from('task_templates').insert(taskRows);
-      if (tasksErr) throw tasksErr;
+        const validSubActions = s.sub_actions.filter(sa => sa.title.trim());
+        if (validSubActions.length > 0) {
+          const { error: saErr } = await (supabase as any)
+            .from('task_template_sub_actions')
+            .insert(validSubActions.map((sa, j) => ({
+              task_template_id: inserted.id,
+              title: sa.title.trim(),
+              is_required: sa.is_required,
+              order_index: (j + 1) * 10,
+            })));
+          if (saErr) throw saErr;
+        }
+      }
 
       toast.success(`Prestation "${name}" créée avec ${steps.length} étape${steps.length > 1 ? 's' : ''}`);
       onSuccess();
@@ -455,6 +507,117 @@ export function NewPrestationBEWizard({ open, onClose, onSuccess }: NewPrestatio
                     )}
                   </div>
                 </div>
+
+                {/* ── Options avancées (docs obligatoires, jalon, sous-actions) ── */}
+                <button type="button" onClick={() => updateStep(s.id, { expanded: !s.expanded } as any)}
+                  className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 pl-8">
+                  {s.expanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                  Options avancées
+                  {!s.expanded && (s.required_docs_count > 0 || s.is_milestone || s.sub_actions.length > 0) && (
+                    <span className="ml-1 text-[10px] text-amber-700">
+                      · {[
+                        s.required_docs_count > 0 && `${s.required_docs_count} doc${s.required_docs_count > 1 ? 's' : ''}`,
+                        s.is_milestone && 'Jalon',
+                        s.sub_actions.length > 0 && `${s.sub_actions.length} sous-action${s.sub_actions.length > 1 ? 's' : ''}`,
+                      ].filter(Boolean).join(' · ')}
+                    </span>
+                  )}
+                </button>
+
+                {s.expanded && (
+                  <div className="pl-8 space-y-3 pt-2 border-t">
+                    {/* Pièces obligatoires */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
+                        <Label className="text-xs font-semibold">Pièces obligatoires</Label>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <Input type="number" min={0} value={s.required_docs_count}
+                          onChange={(e) => updateStep(s.id, { required_docs_count: Math.max(0, parseInt(e.target.value) || 0) } as any)}
+                          placeholder="Nb min" className="h-7 text-xs" />
+                        <Input value={s.required_docs_description}
+                          onChange={(e) => updateStep(s.id, { required_docs_description: e.target.value } as any)}
+                          placeholder="Description (ex : PV signé, plans à jour)"
+                          className="h-7 text-xs col-span-2" />
+                      </div>
+                    </div>
+
+                    {/* Jalon */}
+                    <div className="space-y-1.5 border-t pt-2">
+                      <div className="flex items-center gap-2">
+                        <Flag className="h-3.5 w-3.5 text-violet-600" />
+                        <Label className="text-xs font-semibold flex-1">Jalon dans la timeline du projet</Label>
+                        <Switch checked={s.is_milestone}
+                          onCheckedChange={(v) => updateStep(s.id, { is_milestone: v } as any)} />
+                      </div>
+                      {s.is_milestone && (
+                        <div className="space-y-2 pl-1">
+                          <Input value={s.milestone_label}
+                            onChange={(e) => updateStep(s.id, { milestone_label: e.target.value } as any)}
+                            placeholder="Libellé du jalon (ex : Dépôt PC) — vide = titre étape"
+                            className="h-7 text-xs" />
+                          <div className="grid grid-cols-3 gap-2">
+                            <Input type="number" min={1} placeholder="J+ (jours)"
+                              value={s.auto_milestone_delay_days ?? ''}
+                              onChange={(e) => {
+                                const v = parseInt(e.target.value);
+                                updateStep(s.id, { auto_milestone_delay_days: isNaN(v) || v < 1 ? null : v } as any);
+                              }}
+                              className="h-7 text-xs" />
+                            <Input value={s.auto_milestone_label}
+                              onChange={(e) => updateStep(s.id, { auto_milestone_label: e.target.value } as any)}
+                              placeholder="Libellé jalon auto (ex : Fin délai recours)"
+                              className="h-7 text-xs col-span-2"
+                              disabled={!s.auto_milestone_delay_days} />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Sous-actions */}
+                    <div className="space-y-1.5 border-t pt-2">
+                      <div className="flex items-center gap-2">
+                        <ListChecks className="h-3.5 w-3.5 text-muted-foreground" />
+                        <Label className="text-xs font-semibold flex-1">
+                          Sous-actions ({s.sub_actions.length})
+                        </Label>
+                        <Button type="button" size="sm" variant="outline" className="h-6 text-[10px] gap-1"
+                          onClick={() => updateStep(s.id, {
+                            sub_actions: [...s.sub_actions, { id: crypto.randomUUID(), title: '', is_required: false }],
+                          } as any)}>
+                          <Plus className="h-2.5 w-2.5" /> Ajouter
+                        </Button>
+                      </div>
+                      {s.sub_actions.length > 0 && (
+                        <ul className="space-y-1">
+                          {s.sub_actions.map((sa) => (
+                            <li key={sa.id} className="flex items-center gap-2">
+                              <Input value={sa.title}
+                                onChange={(e) => updateStep(s.id, {
+                                  sub_actions: s.sub_actions.map(x => x.id === sa.id ? { ...x, title: e.target.value } : x),
+                                } as any)}
+                                placeholder="Sous-action…" className="h-7 text-xs flex-1" />
+                              <label className="text-[10px] text-muted-foreground flex items-center gap-1 cursor-pointer">
+                                <Switch checked={sa.is_required}
+                                  onCheckedChange={(v) => updateStep(s.id, {
+                                    sub_actions: s.sub_actions.map(x => x.id === sa.id ? { ...x, is_required: v } : x),
+                                  } as any)} />
+                                Oblig.
+                              </label>
+                              <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive"
+                                onClick={() => updateStep(s.id, {
+                                  sub_actions: s.sub_actions.filter(x => x.id !== sa.id),
+                                } as any)}>
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
 
