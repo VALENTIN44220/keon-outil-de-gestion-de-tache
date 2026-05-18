@@ -1,17 +1,18 @@
 /**
  * Templates — page « Processus ».
  *
- * Organisation :
- *   1. Les processus sont regroupés par type de demande (BE, IT, Innovation,
- *      Maintenance, Logistique, RH, Achat, Marketing/Comm, QSE,
- *      Commercial, Compta, Autres) → une section collapsible par groupe
- *   2. Clic sur une ligne processus → expand inline pour afficher ses
- *      prestations / sous-processus (sans navigation)
- *   3. Clic sur une prestation → ouvre la page d'édition dédiée
- *      (`/templates/be-prestation/:id` pour BE, `/templates/subprocess/:id`
- *      pour les autres)
- *   4. Bouton « Configurer » sur la ligne processus → onglet complet
- *      Paramètres / Champs / Accès / Notifications
+ * Vue unifiée des « types de demande » regroupés par domaine métier.
+ *
+ * Détail d'implémentation gommé pour l'utilisateur :
+ *  - BE : 1 process_template + N sub_process_templates (les prestations)
+ *  - IT, Innovation, RH, etc. : N process_templates indépendants
+ *
+ * Dans les deux cas, on présente le résultat comme une liste de « prestations »
+ * sous chaque catégorie. Le bouton « Configurer » route vers la bonne page
+ * d'édition selon le type sous-jacent :
+ *  - sub_process_template BE → /templates/be-prestation/:id
+ *  - autre sub_process_template → /templates/subprocess/:id
+ *  - process_template standalone → /templates/process/:id
  */
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -25,9 +26,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import {
   Loader2, Layers, Plus, FolderOpen, ChevronRight, ChevronDown, MoreVertical,
-  Trash2, Eye, Lock, Building2, Briefcase, GitBranch, Workflow,
+  Trash2, Eye, Lock, Building2, Briefcase, Workflow,
   Monitor, Lightbulb, Wrench, Truck, Users as UsersIcon, ShoppingCart,
-  Megaphone, ShieldCheck, TrendingUp, Calculator, Settings2, Wand2,
+  Megaphone, ShieldCheck, TrendingUp, Calculator, Settings2, Wand2, GitBranch,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -42,7 +43,7 @@ import { cn } from '@/lib/utils';
 
 const BE_PROCESS_ID = 'bd75a3b0-c918-4b43-befe-739b83f7461a';
 
-// ─── Catégories (= types de demande) ────────────────────────────────────────
+// ─── Catégories métier ─────────────────────────────────────────────────────
 type CategoryKey =
   | 'be' | 'it' | 'innovation' | 'maintenance' | 'logistique'
   | 'rh' | 'achat' | 'comm' | 'qse' | 'commercial' | 'compta' | 'other';
@@ -52,39 +53,54 @@ interface Category {
   label: string;
   icon: any;
   iconClass: string;
-  match: (p: ProcessWithTasks) => boolean;
+  match: (name: string, id?: string) => boolean;
 }
 
-// Ordre = ordre d'affichage. Premier match l'emporte.
+// Premier match l'emporte. Ordre = ordre d'affichage.
 const CATEGORIES: Category[] = [
-  { key: 'be',          label: "Bureau d'Études",     icon: Workflow,    iconClass: 'bg-amber-100 text-amber-600',
-    match: (p) => p.id === BE_PROCESS_ID || /^BUREAU D[ '’]ETUDES/i.test(p.name) },
-  { key: 'it',          label: 'IT / Digital',         icon: Monitor,     iconClass: 'bg-blue-100 text-blue-600',
-    match: (p) => /^IT\b|^SUPPORT IT|^Intelligence/i.test(p.name) },
-  { key: 'innovation',  label: 'Innovation',           icon: Lightbulb,   iconClass: 'bg-violet-100 text-violet-600',
-    match: (p) => /^Innovation/i.test(p.name) },
-  { key: 'maintenance', label: 'Maintenance',          icon: Wrench,      iconClass: 'bg-orange-100 text-orange-600',
-    match: (p) => /^Maintenance|^SERVICE MAINTENANCE/i.test(p.name) },
-  { key: 'logistique',  label: 'Logistique / Transport', icon: Truck,    iconClass: 'bg-sky-100 text-sky-600',
-    match: (p) => /^Logistique|^TRANSPORT/i.test(p.name) },
-  { key: 'rh',          label: 'Ressources Humaines',  icon: UsersIcon,   iconClass: 'bg-pink-100 text-pink-600',
-    match: (p) => /^RH\b|^RESSOURCES HUMAINES|^ONBOARDING/i.test(p.name) },
-  { key: 'achat',       label: 'Achats / Fournisseurs', icon: ShoppingCart, iconClass: 'bg-emerald-100 text-emerald-600',
-    match: (p) => /^SERVICE ACHAT|ACHAT/i.test(p.name) },
-  { key: 'comm',        label: 'Communication / Marketing', icon: Megaphone, iconClass: 'bg-rose-100 text-rose-600',
-    match: (p) => /^Comm[ -]|^SERVICE MARKETING/i.test(p.name) },
-  { key: 'qse',         label: 'QSE / Qualité',        icon: ShieldCheck, iconClass: 'bg-green-100 text-green-600',
-    match: (p) => /QUALIT|SMQ|REGLEMENT/i.test(p.name) },
-  { key: 'commercial',  label: 'Commercial',           icon: TrendingUp,  iconClass: 'bg-cyan-100 text-cyan-600',
-    match: (p) => /^COMMERCIAL/i.test(p.name) },
-  { key: 'compta',      label: 'Comptabilité / Finance', icon: Calculator, iconClass: 'bg-slate-100 text-slate-600',
-    match: (p) => /^COMPTABILIT/i.test(p.name) },
-  { key: 'other',       label: 'Autres',               icon: Layers,      iconClass: 'bg-zinc-100 text-zinc-600',
+  { key: 'be',          label: "Bureau d'Études",          icon: Workflow,     iconClass: 'bg-amber-100 text-amber-600',
+    match: (name, id) => id === BE_PROCESS_ID || /^BUREAU D[ '’]ETUDES/i.test(name) },
+  { key: 'it',          label: 'IT / Digital',              icon: Monitor,      iconClass: 'bg-blue-100 text-blue-600',
+    match: (name) => /^IT\b|^SUPPORT IT|^Intelligence/i.test(name) },
+  { key: 'innovation',  label: 'Innovation',                icon: Lightbulb,    iconClass: 'bg-violet-100 text-violet-600',
+    match: (name) => /^Innovation/i.test(name) },
+  { key: 'maintenance', label: 'Maintenance',               icon: Wrench,       iconClass: 'bg-orange-100 text-orange-600',
+    match: (name) => /^Maintenance|^SERVICE MAINTENANCE/i.test(name) },
+  { key: 'logistique',  label: 'Logistique / Transport',    icon: Truck,        iconClass: 'bg-sky-100 text-sky-600',
+    match: (name) => /^Logistique|^TRANSPORT/i.test(name) },
+  { key: 'rh',          label: 'Ressources Humaines',       icon: UsersIcon,    iconClass: 'bg-pink-100 text-pink-600',
+    match: (name) => /^RH\b|^RESSOURCES HUMAINES|^ONBOARDING/i.test(name) },
+  { key: 'achat',       label: 'Achats / Fournisseurs',     icon: ShoppingCart, iconClass: 'bg-emerald-100 text-emerald-600',
+    match: (name) => /^SERVICE ACHAT|ACHAT/i.test(name) },
+  { key: 'comm',        label: 'Communication / Marketing', icon: Megaphone,    iconClass: 'bg-rose-100 text-rose-600',
+    match: (name) => /^Comm[ -]|^SERVICE MARKETING/i.test(name) },
+  { key: 'qse',         label: 'QSE / Qualité',             icon: ShieldCheck,  iconClass: 'bg-green-100 text-green-600',
+    match: (name) => /QUALIT|SMQ|REGLEMENT/i.test(name) },
+  { key: 'commercial',  label: 'Commercial',                icon: TrendingUp,   iconClass: 'bg-cyan-100 text-cyan-600',
+    match: (name) => /^COMMERCIAL/i.test(name) },
+  { key: 'compta',      label: 'Comptabilité / Finance',    icon: Calculator,   iconClass: 'bg-slate-100 text-slate-600',
+    match: (name) => /^COMPTABILIT/i.test(name) },
+  { key: 'other',       label: 'Autres',                    icon: Layers,       iconClass: 'bg-zinc-100 text-zinc-600',
     match: () => true },
 ];
 
-function categoryOf(p: ProcessWithTasks): Category {
-  return CATEGORIES.find(c => c.match(p))!;
+function categoryOf(name: string, id?: string): Category {
+  return CATEGORIES.find(c => c.match(name, id))!;
+}
+
+// Nettoie le préfixe redondant (« IT - Reporting Power BI » → « Reporting Power BI »
+// dans la catégorie « IT / Digital »)
+function stripCategoryPrefix(name: string, catKey: CategoryKey): string {
+  const PREFIX: Partial<Record<CategoryKey, RegExp>> = {
+    it:          /^(IT|SUPPORT IT\/DIGITAL)\s*[-–—]\s*/i,
+    innovation:  /^Innovation\s*[-–—]\s*/i,
+    maintenance: /^Maintenance\s*[-–—]\s*/i,
+    logistique:  /^Logistique\s*[-–—]\s*/i,
+    rh:          /^RH\s*[-–—]\s*/i,
+    comm:        /^Comm\s*[-–—]\s*/i,
+  };
+  const re = PREFIX[catKey];
+  return re ? name.replace(re, '').trim() || name : name;
 }
 
 const VISIBILITY_META: Record<string, { label: string; icon: any; className: string }> = {
@@ -93,6 +109,23 @@ const VISIBILITY_META: Record<string, { label: string; icon: any; className: str
   internal_department: { label: 'Services',   icon: Briefcase,  className: 'bg-indigo-100 text-indigo-700' },
   private:             { label: 'Restreint',  icon: Lock,       className: 'bg-amber-100 text-amber-700' },
 };
+
+// ─── Modèle unifié « DemandType » exposé à l'UI ────────────────────────────
+interface DemandType {
+  id: string;
+  /** 'subprocess' = prestation BE (sub_process_template),
+   *  'process'    = process_template standalone (IT, Innovation, etc.) */
+  source: 'subprocess' | 'process';
+  name: string;
+  description: string | null;
+  visibility: string;
+  createdAt: string;
+  stepCount: number;
+  isMandatory?: boolean;
+  canManage: boolean;
+  /** Source originale pour les opérations (édition / suppression) */
+  raw: any;
+}
 
 // ════════════════════════════════════════════════════════════════════════════
 export default function Templates() {
@@ -106,79 +139,79 @@ export default function Templates() {
 
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [deletingProcess, setDeletingProcess] = useState<ProcessWithTasks | null>(null);
-
-  // État UI : quels processus sont dépliés (inline prestations)
-  const [expandedProcesses, setExpandedProcesses] = useState<Set<string>>(new Set());
-  // État UI : quelles catégories sont repliées
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
 
-  const {
-    processes,
-    isLoading,
-    addProcess,
-    updateProcess,
-    deleteProcess,
-  } = useProcessTemplates();
-
+  const { processes, isLoading, addProcess, updateProcess, deleteProcess } = useProcessTemplates();
   const { subProcesses, deleteSubProcess, refetch: refetchSubProcesses } = useAllSubProcessTemplates();
 
-  // Index sub-processes par processus
-  const subsByProcess = useMemo(() => {
-    const map = new Map<string, typeof subProcesses>();
+  // ─── Construction de la liste unifiée des « types de demande » ──────────
+  const demandTypes = useMemo((): DemandType[] => {
+    const list: DemandType[] = [];
+
+    // a) Prestations BE (sub_process_templates rattachés au process BE)
     for (const sp of subProcesses) {
-      if (!sp.process_template_id) continue;
-      if (!map.has(sp.process_template_id)) map.set(sp.process_template_id, []);
-      map.get(sp.process_template_id)!.push(sp);
-    }
-    // Tri par order_index
-    for (const list of map.values()) {
-      list.sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0));
-    }
-    return map;
-  }, [subProcesses]);
-
-  // Filtrage processus
-  const filtered = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    return processes.filter((p) => {
-      if (visibilityFilter !== 'all' && p.visibility_level !== visibilityFilter) return false;
-      if (!q) return true;
-      const matchProcess = p.name.toLowerCase().includes(q) || (p.description ?? '').toLowerCase().includes(q);
-      // Élargit le filtre aux prestations : si une presta matche, on garde le processus parent
-      const presta = subsByProcess.get(p.id) ?? [];
-      const matchPresta = presta.some(sp => sp.name.toLowerCase().includes(q));
-      return matchProcess || matchPresta;
-    });
-  }, [processes, searchQuery, visibilityFilter, subsByProcess]);
-
-  // Regroupement par catégorie
-  const grouped = useMemo(() => {
-    const map = new Map<CategoryKey, ProcessWithTasks[]>();
-    for (const cat of CATEGORIES) map.set(cat.key, []);
-    for (const p of filtered) {
-      const cat = categoryOf(p);
-      map.get(cat.key)!.push(p);
-    }
-    // Tri alphabétique par catégorie (BE = id fixe en tête)
-    for (const list of map.values()) {
-      list.sort((a, b) => {
-        if (a.id === BE_PROCESS_ID) return -1;
-        if (b.id === BE_PROCESS_ID) return 1;
-        return a.name.localeCompare(b.name);
+      if (sp.process_template_id !== BE_PROCESS_ID) continue;
+      list.push({
+        id: sp.id,
+        source: 'subprocess',
+        name: sp.name,
+        description: sp.description ?? null,
+        visibility: sp.visibility_level ?? 'public',
+        createdAt: (sp as any).created_at ?? new Date().toISOString(),
+        stepCount: sp.task_templates?.length ?? 0,
+        isMandatory: (sp as any).is_mandatory ?? false,
+        canManage: true,
+        raw: sp,
       });
     }
+
+    // b) Process templates standalone (TOUS sauf BE)
+    for (const p of processes) {
+      if (p.id === BE_PROCESS_ID) continue;
+      // Compte les sous-processus liés à ce process (autre IT/Comm etc.)
+      const subs = subProcesses.filter(sp => sp.process_template_id === p.id);
+      const ownSteps = subs.reduce((acc, sp) => acc + (sp.task_templates?.length ?? 0), 0);
+      list.push({
+        id: p.id,
+        source: 'process',
+        name: p.name,
+        description: p.description ?? null,
+        visibility: p.visibility_level ?? 'public',
+        createdAt: p.created_at,
+        stepCount: subs.length || ownSteps,
+        canManage: Boolean(p.can_manage),
+        raw: p,
+      });
+    }
+    return list;
+  }, [processes, subProcesses]);
+
+  // ─── Filtrage + groupement par catégorie ────────────────────────────────
+  const grouped = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const map = new Map<CategoryKey, DemandType[]>();
+    for (const cat of CATEGORIES) map.set(cat.key, []);
+
+    for (const d of demandTypes) {
+      if (visibilityFilter !== 'all' && d.visibility !== visibilityFilter) continue;
+      if (q && !d.name.toLowerCase().includes(q) && !(d.description ?? '').toLowerCase().includes(q)) continue;
+      const cat = categoryOf(d.name, d.source === 'process' ? d.id : undefined);
+      // Pour les prestations BE, on force la catégorie 'be'
+      const catKey = d.source === 'subprocess' ? 'be' : cat.key;
+      map.get(catKey)!.push(d);
+    }
+
+    // Tri alphabétique dans chaque catégorie
+    for (const list of map.values()) {
+      list.sort((a, b) => a.name.localeCompare(b.name));
+    }
+
     return CATEGORIES
       .map(cat => ({ cat, items: map.get(cat.key) ?? [] }))
       .filter(g => g.items.length > 0);
-  }, [filtered]);
+  }, [demandTypes, searchQuery, visibilityFilter]);
 
-  const toggleProcess = (id: string) => {
-    setExpandedProcesses(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
+  const totalShown = grouped.reduce((acc, g) => acc + g.items.length, 0);
 
   const toggleCategory = (key: string) => {
     setCollapsedCategories(prev => {
@@ -186,6 +219,27 @@ export default function Templates() {
       if (next.has(key)) next.delete(key); else next.add(key);
       return next;
     });
+  };
+
+  const openConfigure = (d: DemandType) => {
+    if (d.source === 'subprocess') {
+      // Prestation BE → éditeur dédié
+      navigate(`/templates/be-prestation/${d.id}`);
+    } else {
+      // Process standalone → page de config avec onglets
+      navigate(`/templates/process/${d.id}`);
+    }
+  };
+
+  const handleDelete = async (d: DemandType) => {
+    if (d.source === 'subprocess') {
+      await deleteSubProcess(d.id);
+      refetchSubProcesses();
+      toast.success('Prestation supprimée');
+    } else {
+      // Process : passer par le dialog standard (archive / suppr)
+      setDeletingProcess(d.raw as ProcessWithTasks);
+    }
   };
 
   const handleArchive = async () => {
@@ -217,7 +271,7 @@ export default function Templates() {
         <main className="flex-1 overflow-y-auto p-4 sm:p-6">
           <div className="max-w-5xl mx-auto space-y-4">
 
-            {/* ── Filtres ──────────────────────────────────────────────── */}
+            {/* ── Barre filtres ────────────────────────────────────────── */}
             <div className="flex flex-wrap items-center gap-3 bg-card rounded-xl border p-3">
               <Select value={visibilityFilter} onValueChange={setVisibilityFilter}>
                 <SelectTrigger className="w-44 h-9 text-sm">
@@ -232,8 +286,7 @@ export default function Templates() {
               </Select>
 
               <span className="ml-auto text-sm text-muted-foreground">
-                {filtered.length} processus
-                {filtered.length !== processes.length && ` sur ${processes.length}`}
+                {totalShown} type{totalShown > 1 ? 's' : ''} de demande
                 {' · '}{grouped.length} catégorie{grouped.length > 1 ? 's' : ''}
               </span>
             </div>
@@ -248,7 +301,7 @@ export default function Templates() {
                 <FolderOpen className="h-12 w-12 text-muted-foreground/40 mb-3" />
                 <p className="text-sm text-muted-foreground mb-1">
                   {searchQuery || visibilityFilter !== 'all'
-                    ? 'Aucun processus ne correspond à la recherche'
+                    ? 'Aucun type de demande ne correspond à la recherche'
                     : 'Aucun processus pour le moment'}
                 </p>
                 {canCreate && !searchQuery && visibilityFilter === 'all' && (
@@ -269,45 +322,37 @@ export default function Templates() {
                       <button
                         type="button"
                         onClick={() => toggleCategory(cat.key)}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-muted/40 transition-colors text-left border-b"
+                        className={cn(
+                          'w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/40 transition-colors text-left',
+                          !isCollapsed && 'border-b',
+                        )}
                       >
                         {isCollapsed
                           ? <ChevronRight className="h-4 w-4 text-muted-foreground/60 shrink-0" />
                           : <ChevronDown className="h-4 w-4 text-muted-foreground/60 shrink-0" />}
-                        <div className={cn('w-7 h-7 rounded-md flex items-center justify-center shrink-0', cat.iconClass)}>
-                          <CatIcon className="h-3.5 w-3.5" />
+                        <div className={cn('w-8 h-8 rounded-md flex items-center justify-center shrink-0', cat.iconClass)}>
+                          <CatIcon className="h-4 w-4" />
                         </div>
-                        <span className="text-sm font-semibold">{cat.label}</span>
-                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0 ml-auto">
-                          {items.length}
+                        <span className="text-sm font-semibold flex-1">{cat.label}</span>
+                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                          {items.length} demande{items.length > 1 ? 's' : ''}
                         </Badge>
                       </button>
 
-                      {/* Liste des processus */}
+                      {/* Liste plate des « types de demande » */}
                       {!isCollapsed && (
-                        <div className="divide-y">
-                          {items.map((p) => (
-                            <ProcessRow
-                              key={p.id}
-                              process={p}
-                              prestations={subsByProcess.get(p.id) ?? []}
-                              expanded={expandedProcesses.has(p.id)}
-                              onToggle={() => toggleProcess(p.id)}
-                              onConfigure={() => navigate(`/templates/process/${p.id}`)}
-                              onDelete={() => setDeletingProcess(p)}
-                              onOpenPrestation={(sp) => {
-                                const route = p.id === BE_PROCESS_ID
-                                  ? `/templates/be-prestation/${sp.id}`
-                                  : `/templates/subprocess/${sp.id}`;
-                                navigate(route);
-                              }}
-                              onDeletePrestation={async (sp) => {
-                                await deleteSubProcess(sp.id);
-                                refetchSubProcesses();
-                              }}
+                        <ul className="divide-y">
+                          {items.map((d) => (
+                            <DemandTypeRow
+                              key={`${d.source}-${d.id}`}
+                              demand={d}
+                              displayName={stripCategoryPrefix(d.name, cat.key)}
+                              isBE={cat.key === 'be'}
+                              onConfigure={() => openConfigure(d)}
+                              onDelete={() => handleDelete(d)}
                             />
                           ))}
-                        </div>
+                        </ul>
                       )}
                     </section>
                   );
@@ -337,57 +382,57 @@ export default function Templates() {
 }
 
 // ════════════════════════════════════════════════════════════════════════
-// Ligne d'un processus + section prestations dépliée
+// Ligne d'un type de demande (BE prestation OU process standalone)
+// Visuellement identiques.
 // ════════════════════════════════════════════════════════════════════════
-function ProcessRow({
-  process, prestations, expanded,
-  onToggle, onConfigure, onDelete, onOpenPrestation, onDeletePrestation,
+function DemandTypeRow({
+  demand, displayName, isBE, onConfigure, onDelete,
 }: {
-  process: ProcessWithTasks;
-  prestations: any[];
-  expanded: boolean;
-  onToggle: () => void;
+  demand: DemandType;
+  displayName: string;
+  isBE: boolean;
   onConfigure: () => void;
   onDelete: () => void;
-  onOpenPrestation: (sp: any) => void;
-  onDeletePrestation: (sp: any) => void;
 }) {
-  const isBE = process.id === BE_PROCESS_ID;
-  const visMeta = VISIBILITY_META[process.visibility_level ?? 'public'] ?? VISIBILITY_META.public;
+  const visMeta = VISIBILITY_META[demand.visibility] ?? VISIBILITY_META.public;
   const VIcon = visMeta.icon;
-  const prestaLabel = isBE ? 'prestation' : 'sous-processus';
 
   return (
-    <div>
-      {/* Ligne principale processus */}
-      <button
-        type="button"
-        onClick={onToggle}
-        className="w-full flex items-center gap-3 p-3 sm:p-4 hover:bg-muted/30 transition-colors text-left"
+    <li>
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onConfigure}
+        onKeyDown={(e) => { if (e.key === 'Enter') onConfigure(); }}
+        className="w-full flex items-center gap-3 p-3 hover:bg-muted/30 transition-colors text-left cursor-pointer"
       >
-        {expanded
-          ? <ChevronDown className="h-4 w-4 text-muted-foreground/60 shrink-0" />
-          : <ChevronRight className="h-4 w-4 text-muted-foreground/60 shrink-0" />}
+        <div className="w-7 h-7 rounded-md bg-muted/60 flex items-center justify-center shrink-0">
+          {isBE
+            ? <Wand2 className="h-3.5 w-3.5 text-amber-500" />
+            : <GitBranch className="h-3.5 w-3.5 text-muted-foreground" />}
+        </div>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-medium text-sm">{process.name}</span>
+            <span className="font-medium text-sm">{displayName}</span>
             <Badge variant="outline" className={cn('text-[10px] px-1.5 py-0 gap-1 border-0', visMeta.className)}>
               <VIcon className="h-2.5 w-2.5" />
               {visMeta.label}
             </Badge>
+            {demand.isMandatory && (
+              <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Obligatoire</Badge>
+            )}
           </div>
-          {process.description && (
+          {demand.description && (
             <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
-              {process.description}
+              {demand.description}
             </p>
           )}
           <div className="flex items-center gap-3 mt-1 text-[11px] text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <GitBranch className="h-3 w-3" />
-              {prestations.length} {prestaLabel}{prestations.length > 1 ? 's' : ''}
+            <span>
+              {demand.stepCount} étape{demand.stepCount > 1 ? 's' : ''}
             </span>
-            <span>· créé le {format(parseISO(process.created_at), 'dd MMM yyyy', { locale: fr })}</span>
+            <span>· créé le {format(parseISO(demand.createdAt), 'dd MMM yyyy', { locale: fr })}</span>
           </div>
         </div>
 
@@ -397,12 +442,11 @@ function ProcessRow({
             size="sm"
             className="h-8 text-xs gap-1.5"
             onClick={onConfigure}
-            title="Paramètres / Champs / Accès / Notifications"
           >
             <Settings2 className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Configurer</span>
           </Button>
-          {process.can_manage && (
+          {demand.canManage && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
@@ -418,75 +462,13 @@ function ProcessRow({
                   onClick={onDelete}
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
-                  Supprimer / Archiver
+                  {demand.source === 'subprocess' ? 'Supprimer' : 'Supprimer / Archiver'}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           )}
         </div>
-      </button>
-
-      {/* Liste des prestations dépliée */}
-      {expanded && (
-        <div className="bg-muted/20 border-t">
-          {prestations.length === 0 ? (
-            <p className="text-xs text-muted-foreground italic px-12 py-3">
-              Aucun{isBE ? 'e' : ''} {prestaLabel} configuré{isBE ? 'e' : ''}. Utilise le bouton « Configurer » pour en ajouter.
-            </p>
-          ) : (
-            <ul className="divide-y divide-border/40">
-              {prestations.map((sp) => (
-                <li key={sp.id}>
-                  <div className="flex items-center gap-3 pl-12 pr-3 py-2 hover:bg-muted/40 transition-colors">
-                    {isBE
-                      ? <Wand2 className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                      : <GitBranch className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{sp.name}</p>
-                      <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-0.5">
-                        <span>
-                          {sp.task_templates?.length ?? 0} étape{(sp.task_templates?.length ?? 0) > 1 ? 's' : ''}
-                        </span>
-                        {sp.is_mandatory && (
-                          <Badge variant="destructive" className="text-[9px] px-1 py-0">Obligatoire</Badge>
-                        )}
-                      </div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-xs gap-1 shrink-0"
-                      onClick={() => onOpenPrestation(sp)}
-                    >
-                      <Settings2 className="h-3 w-3" />
-                      Modifier
-                    </Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button
-                          className="h-7 w-7 inline-flex items-center justify-center rounded-md hover:bg-muted text-muted-foreground"
-                          aria-label="Actions"
-                        >
-                          <MoreVertical className="h-3.5 w-3.5" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onClick={() => onDeletePrestation(sp)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5 mr-2" />
-                          Supprimer
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-    </div>
+      </div>
+    </li>
   );
 }
