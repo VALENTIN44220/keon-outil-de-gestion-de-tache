@@ -24,7 +24,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   ArrowLeft, AlertTriangle, Play, CheckCircle2, Link as LinkIcon, Plus,
   ListChecks, History, Paperclip, FileText, User as UserIcon, Loader2, ExternalLink,
+  Pencil, Sparkles,
 } from 'lucide-react';
+import { SMQEditDialog } from '@/components/smq/SMQEditDialog';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -62,6 +64,7 @@ export default function SMQDetail() {
   const [activeView, setActiveView] = useState('smq');
   const [efficacite, setEfficacite] = useState<NCEfficacite | ''>('');
   const [isAddActionOpen, setIsAddActionOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
 
   // Charge les noms des utilisateurs référencés
   useEffect(() => {
@@ -113,6 +116,16 @@ export default function SMQDetail() {
   // toutes les NC, pas seulement celles où il est désigné pilote_id
   const canManage = isAdmin || isPilote || isDeclarant || effectivePermissions.can_manage_smq;
 
+  // canEdit : qui peut MODIFIER les informations de la NC (champs métier) ?
+  //  - le rédacteur, tant que la NC n'est pas clôturée (compléter sa déclaration)
+  //  - le pilote désigné OU Florence/responsable SMQ, à tout moment
+  //  - l'admin, à tout moment
+  const canEdit =
+    isAdmin
+    || isPilote
+    || effectivePermissions.can_manage_smq
+    || (isDeclarant && nc.status !== 'cloturee');
+
   const processusLabel = NC_PROCESSUS.find(p => p.code === nc.processus_code)?.label ?? nc.processus_code;
 
   const handleAffecter = async () => {
@@ -159,6 +172,11 @@ export default function SMQDetail() {
             {nc.societe_code && <Badge variant="secondary" className="text-xs">{nc.societe_code}</Badge>}
 
             <div className="ml-auto flex items-center gap-2">
+              {canEdit && (
+                <Button size="sm" variant="outline" onClick={() => setIsEditOpen(true)} className="gap-2">
+                  <Pencil className="h-3.5 w-3.5" /> Modifier
+                </Button>
+              )}
               {canManage && nc.status === 'nouvelle' && (
                 <Button size="sm" onClick={handleAffecter} className="gap-2 bg-indigo-600 hover:bg-indigo-700">
                   <UserIcon className="h-4 w-4" /> Marquer affectée
@@ -274,7 +292,12 @@ export default function SMQDetail() {
               ))}
 
               {isAddActionOpen && (
-                <NewActionForm ncId={nc.id} onClose={() => setIsAddActionOpen(false)} onCreated={refetch} />
+                <NewActionForm
+                  nc={nc}
+                  existingActions={actions}
+                  onClose={() => setIsAddActionOpen(false)}
+                  onCreated={refetch}
+                />
               )}
             </TabsContent>
 
@@ -309,6 +332,9 @@ export default function SMQDetail() {
           </Tabs>
         </main>
       </div>
+
+      {/* Dialog d'édition complète de la NC */}
+      <SMQEditDialog nc={nc} open={isEditOpen} onClose={() => setIsEditOpen(false)} onSaved={refetch} />
     </div>
   );
 }
@@ -323,7 +349,32 @@ function KeyValue({ label, value }: { label: string; value: string | null }) {
 }
 
 // ─── Formulaire d'ajout d'une action ──────────────────────────────────────
-function NewActionForm({ ncId, onClose, onCreated }: { ncId: string; onClose: () => void; onCreated: () => void }) {
+/**
+ * Parse un texte multi-lignes (typiquement nc.actions_correctives ou
+ * nc.actions_preventives) en items individuels. Reconnaît :
+ *   - "1. ..." / "1) ..." / "1: ..." / "1/ ..." → numérotation explicite
+ *   - "- ..." / "• ..." → puces
+ *   - sinon : 1 ligne = 1 item
+ * Retire le préfixe pour ne garder que le contenu.
+ */
+function parseActionsText(text: string | null | undefined): string[] {
+  if (!text) return [];
+  return text
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean)
+    .map(line => line.replace(/^(\d+\s*[\.\)\:\/]|\-|•|\*)\s*/, '').trim())
+    .filter(line => line.length >= 3);
+}
+
+function NewActionForm({
+  nc, existingActions, onClose, onCreated,
+}: {
+  nc: NCDeclaration;
+  existingActions: NCAction[];
+  onClose: () => void;
+  onCreated: () => void;
+}) {
   const [title, setTitle] = useState('');
   const [type, setType] = useState<NCActionType>('corrective');
   const [description, setDescription] = useState('');
@@ -333,47 +384,152 @@ function NewActionForm({ ncId, onClose, onCreated }: { ncId: string; onClose: ()
   const { isSimulating, simulatedProfile } = useSimulation();
   const me = (isSimulating && simulatedProfile ? simulatedProfile : authProfile)?.id ?? null;
 
-  const handleSave = async () => {
-    if (!title.trim()) { toast.error('Titre requis'); return; }
-    setIsSaving(true);
+  // Parse les actions du plan + filtre celles déjà créées (titre identique)
+  const suggCorrectives = parseActionsText(nc.actions_correctives);
+  const suggPreventives = parseActionsText(nc.actions_preventives);
+  const existingTitles = new Set(existingActions.map(a => a.title.trim().toLowerCase()));
+  const remainingCorrectives = suggCorrectives.filter(s => !existingTitles.has(s.toLowerCase()));
+  const remainingPreventives = suggPreventives.filter(s => !existingTitles.has(s.toLowerCase()));
+
+  const createAction = async (actionType: NCActionType, actionTitle: string, actionDesc?: string, actionDueDate?: string) => {
     const { error } = await supabase.from('nc_actions').insert({
-      nc_id: ncId, type, title: title.trim(),
-      description: description.trim() || null,
-      due_date: dueDate || null, status: 'todo',
+      nc_id: nc.id, type: actionType, title: actionTitle.trim(),
+      description: actionDesc?.trim() || null,
+      due_date: actionDueDate || null, status: 'todo',
       created_by: me, assignee_id: me,
     });
+    if (error) { toast.error(`Erreur : ${error.message}`); return false; }
+    return true;
+  };
+
+  const handleSaveManual = async () => {
+    if (!title.trim()) { toast.error('Titre requis'); return; }
+    setIsSaving(true);
+    const ok = await createAction(type, title, description, dueDate);
     setIsSaving(false);
-    if (error) { toast.error(`Erreur : ${error.message}`); return; }
+    if (!ok) return;
     toast.success('Action ajoutée');
     onClose(); onCreated();
   };
 
+  const handleSuggestionClick = async (sugg: string, sType: NCActionType) => {
+    setIsSaving(true);
+    const ok = await createAction(sType, sugg);
+    setIsSaving(false);
+    if (!ok) return;
+    toast.success('Action créée depuis le plan');
+    onCreated();
+    // On ne ferme pas le formulaire — le user peut continuer à cocher d'autres suggestions
+  };
+
+  const handleImportAll = async () => {
+    setIsSaving(true);
+    let count = 0;
+    for (const s of remainingCorrectives) {
+      if (await createAction('corrective', s)) count++;
+    }
+    for (const s of remainingPreventives) {
+      if (await createAction('preventive', s)) count++;
+    }
+    setIsSaving(false);
+    if (count > 0) {
+      toast.success(`${count} action(s) créée(s) depuis le plan`);
+      onCreated();
+      onClose();
+    }
+  };
+
+  const hasSuggestions = remainingCorrectives.length + remainingPreventives.length > 0;
+
   return (
     <Card className="border-primary/40">
-      <CardHeader className="pb-2"><CardTitle className="text-sm">Nouvelle action</CardTitle></CardHeader>
-      <CardContent className="space-y-2">
-        <div className="grid grid-cols-2 gap-2">
-          <Select value={type} onValueChange={(v) => setType(v as NCActionType)}>
-            <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {(Object.entries(NC_ACTION_TYPE_LABELS) as [NCActionType, string][]).map(([k, lbl]) => (
-                <SelectItem key={k} value={k}>{lbl}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="h-9 text-sm" />
-        </div>
-        <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Titre de l'action" className="text-sm" />
-        <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description (optionnel)" rows={2} className="text-sm" />
-        <div className="flex justify-end gap-2">
-          <Button size="sm" variant="outline" onClick={onClose}>Annuler</Button>
-          <Button size="sm" onClick={handleSave} disabled={isSaving}>
-            {isSaving && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
-            Ajouter
-          </Button>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm">Nouvelle action</CardTitle>
+        {hasSuggestions && (
+          <CardDescription className="text-xs">
+            Suggestions extraites du plan d'action de la NC — clique pour créer en un coup, ou crée manuellement ci-dessous.
+          </CardDescription>
+        )}
+      </CardHeader>
+      <CardContent className="space-y-3">
+
+        {/* Suggestions depuis le plan d'action */}
+        {hasSuggestions && (
+          <div className="space-y-2 p-2 rounded-lg bg-sky-50/40 border border-sky-200">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-sky-800 flex items-center gap-1.5">
+                <Sparkles className="h-3.5 w-3.5" />
+                {remainingCorrectives.length + remainingPreventives.length} action(s) suggérée(s) du plan
+              </span>
+              <Button size="sm" variant="outline" disabled={isSaving} onClick={handleImportAll} className="h-7 text-xs gap-1">
+                {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+                Tout importer
+              </Button>
+            </div>
+            {remainingCorrectives.map((s, i) => (
+              <SuggestionRow key={`c-${i}`} text={s} type="corrective" onAdd={handleSuggestionClick} disabled={isSaving} />
+            ))}
+            {remainingPreventives.map((s, i) => (
+              <SuggestionRow key={`p-${i}`} text={s} type="preventive" onAdd={handleSuggestionClick} disabled={isSaving} />
+            ))}
+          </div>
+        )}
+
+        {/* Création manuelle */}
+        <div className="space-y-2 pt-2 border-t">
+          <p className="text-xs font-semibold text-muted-foreground">Ou crée une action manuelle :</p>
+          <div className="grid grid-cols-2 gap-2">
+            <Select value={type} onValueChange={(v) => setType(v as NCActionType)}>
+              <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {(Object.entries(NC_ACTION_TYPE_LABELS) as [NCActionType, string][]).map(([k, lbl]) => (
+                  <SelectItem key={k} value={k}>{lbl}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="h-9 text-sm" />
+          </div>
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Titre de l'action" className="text-sm" />
+          <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description (optionnel)" rows={2} className="text-sm" />
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="outline" onClick={onClose}>Fermer</Button>
+            <Button size="sm" onClick={handleSaveManual} disabled={isSaving}>
+              {isSaving && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}
+              Ajouter
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function SuggestionRow({
+  text, type, onAdd, disabled,
+}: {
+  text: string;
+  type: NCActionType;
+  onAdd: (text: string, type: NCActionType) => void;
+  disabled: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-2 p-2 rounded bg-white/80 border border-sky-100 group">
+      <Badge variant="outline" className={cn(
+        'text-[9px] shrink-0',
+        type === 'corrective' ? 'border-amber-300 text-amber-700' : 'border-sky-300 text-sky-700'
+      )}>
+        {type === 'corrective' ? 'Cor.' : 'Prév.'}
+      </Badge>
+      <span className="flex-1 text-xs text-foreground truncate" title={text}>{text}</span>
+      <Button
+        size="sm" variant="ghost"
+        disabled={disabled}
+        onClick={() => onAdd(text, type)}
+        className="h-6 px-2 text-[11px] opacity-60 group-hover:opacity-100 transition-opacity"
+      >
+        <Plus className="h-3 w-3 mr-1" /> Créer
+      </Button>
+    </div>
   );
 }
 

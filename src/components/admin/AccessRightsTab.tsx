@@ -119,6 +119,12 @@ const FEATURE_GROUPS: Array<{
       { key: "can_delete_suppliers", label: "Supprimer" },
     ],
   },
+  {
+    label: "SMQ — Qualité",
+    items: [
+      { key: "can_manage_smq", label: "Piloter toutes les NC (responsable SMQ)" },
+    ],
+  },
 ];
 
 const DEFAULT_PERMISSIONS: Record<string, boolean> = {

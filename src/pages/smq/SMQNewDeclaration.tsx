@@ -5,7 +5,7 @@
  * sections claires, validations, affectation auto au pilote du processus
  * (ou Alexandre Baffou si NC fournisseur).
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -15,9 +15,13 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowLeft, Save, Loader2, FileText, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, AlertTriangle, Link as LinkIcon, X, Plus, Paperclip } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { useSimulation } from '@/contexts/SimulationContext';
 import { useCreateNC } from '@/hooks/useNCDeclarations';
 import {
   NC_PROCESSUS, NC_METIERS, NC_SOCIETES,
@@ -53,6 +57,28 @@ export default function SMQNewDeclaration() {
     actions_preventives: '',
   });
 
+  // Override manuel du pilote (sinon auto-affectation via nc_process_pilots)
+  const [piloteOverride, setPiloteOverride] = useState<string>('');
+
+  // Liens / pièces jointes ajoutés à la création
+  const [links, setLinks] = useState<{ url: string; label: string }[]>([]);
+
+  // Liste des profils pour le sélecteur Pilote
+  const [users, setUsers] = useState<Array<{ id: string; display_name: string | null; department: string | null }>>([]);
+  useEffect(() => {
+    void supabase
+      .from('profiles')
+      .select('id, display_name, department:departments(name)')
+      .order('display_name')
+      .then(({ data }) => {
+        if (data) setUsers(data.map((u: any) => ({
+          id: u.id,
+          display_name: u.display_name,
+          department: u.department?.name ?? null,
+        })));
+      });
+  }, []);
+
   const isFournisseur = form.identification === 'nc_fournisseur';
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -72,8 +98,37 @@ export default function SMQNewDeclaration() {
         identification: form.identification as NCIdentification,
         apparition_ailleurs: form.apparition_ailleurs ? (form.apparition_ailleurs as NCApparition) : null,
         date_cloture_souhaitee: form.date_cloture_souhaitee || null,
+        pilote_id: piloteOverride || undefined,  // override manuel si renseigné
       });
-      if (created) navigate(`/smq/${created.id}`);
+      if (!created) return;
+
+      // Insère les liens en nc_attachments
+      const validLinks = links.filter(l => l.url.trim());
+      if (validLinks.length > 0) {
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', user?.id ?? '')
+          .maybeSingle();
+        const uploadedBy = profile?.id ?? null;
+        const { error: attError } = await supabase.from('nc_attachments').insert(
+          validLinks.map(l => ({
+            nc_id: created.id,
+            name: l.label.trim() || l.url.trim(),
+            url: l.url.trim(),
+            type: 'link',
+            uploaded_by: uploadedBy,
+          }))
+        );
+        if (attError) {
+          toast.error(`Liens non sauvegardés : ${attError.message}`);
+        } else {
+          toast.success(`${validLinks.length} lien(s) ajouté(s)`);
+        }
+      }
+
+      navigate(`/smq/${created.id}`);
     } finally {
       setIsSaving(false);
     }
@@ -163,25 +218,52 @@ export default function SMQNewDeclaration() {
                   </p>
                 </div>
 
-                {isFournisseur && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-3 bg-amber-50/40 border border-amber-200 rounded-lg">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label>Code projet (4 lettres) / année si audit</Label>
+                    <Input value={form.code_projet}
+                      onChange={(e) => setForm({ ...form, code_projet: e.target.value })}
+                      placeholder="ex: AOUZ ou 2026" maxLength={10} />
+                  </div>
+                  {isFournisseur && (
                     <div className="space-y-1.5">
-                      <Label>Nom du fournisseur</Label>
+                      <Label className="text-amber-700">Nom du fournisseur</Label>
                       <Input value={form.fournisseur_nom}
                         onChange={(e) => setForm({ ...form, fournisseur_nom: e.target.value })}
-                        placeholder="Raison sociale du fournisseur" />
+                        placeholder="Raison sociale du fournisseur"
+                        className="border-amber-200" />
                     </div>
-                    <div className="space-y-1.5">
-                      <Label>Code projet (4 lettres) / année audit</Label>
-                      <Input value={form.code_projet}
-                        onChange={(e) => setForm({ ...form, code_projet: e.target.value })}
-                        placeholder="ex: AOUZ ou 2026" maxLength={10} />
-                    </div>
-                    <p className="text-[11px] text-amber-700 col-span-full">
-                      NC fournisseur : la NC sera automatiquement assignée à Alexandre Baffou
-                    </p>
-                  </div>
+                  )}
+                </div>
+
+                {isFournisseur && (
+                  <p className="text-[11px] text-amber-700 bg-amber-50/60 border border-amber-200 rounded p-2">
+                    NC fournisseur : si aucun pilote n'est désigné ci-dessous,
+                    la NC sera automatiquement assignée à Alexandre Baffou.
+                  </p>
                 )}
+
+                {/* Sélecteur Pilote (override manuel — sinon auto-affecté
+                    via le mapping admin processus → pilote) */}
+                <div className="space-y-1.5">
+                  <Label>Pilote de la NC (optionnel — override manuel)</Label>
+                  <SearchableSelect
+                    value={piloteOverride}
+                    onValueChange={setPiloteOverride}
+                    placeholder="Auto-affecté selon le processus si vide"
+                    searchPlaceholder="Rechercher un utilisateur…"
+                    options={[
+                      { value: '', label: '— Auto (selon processus) —' },
+                      ...users.map(u => ({
+                        value: u.id,
+                        label: `${u.display_name ?? 'Sans nom'}${u.department ? ` · ${u.department}` : ''}`,
+                      })),
+                    ]}
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Laisse vide pour utiliser le pilote configuré par l'admin SMQ pour ce processus.
+                  </p>
+                </div>
               </CardContent>
             </Card>
 
@@ -243,6 +325,56 @@ export default function SMQNewDeclaration() {
                     onChange={(e) => setForm({ ...form, actions_preventives: e.target.value })}
                     placeholder="Numéroter les actions (1. ... 2. ...)" rows={3} />
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* ── Pièces jointes (liens) ──────────────────────────────── */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Paperclip className="h-4 w-4" /> Pièces jointes
+                </CardTitle>
+                <CardDescription>
+                  Ajoute des liens vers des documents (SharePoint, dossiers partagés, photos…).
+                  Les fichiers physiques pourront être attachés depuis la fiche après création.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {links.map((link, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <Input
+                      placeholder="https://…"
+                      value={link.url}
+                      onChange={(e) => setLinks(prev => prev.map((l, j) => j === i ? { ...l, url: e.target.value } : l))}
+                      className="flex-1"
+                    />
+                    <Input
+                      placeholder="Intitulé"
+                      value={link.label}
+                      onChange={(e) => setLinks(prev => prev.map((l, j) => j === i ? { ...l, label: e.target.value } : l))}
+                      className="w-48"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="text-muted-foreground hover:text-destructive shrink-0"
+                      onClick={() => setLinks(prev => prev.filter((_, j) => j !== i))}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setLinks(prev => [...prev, { url: '', label: '' }])}
+                  className="gap-2"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Ajouter un lien
+                </Button>
               </CardContent>
             </Card>
 
