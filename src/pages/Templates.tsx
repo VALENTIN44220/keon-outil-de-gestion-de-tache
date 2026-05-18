@@ -114,8 +114,14 @@ const VISIBILITY_META: Record<string, { label: string; icon: any; className: str
 interface DemandType {
   id: string;
   /** 'subprocess' = prestation BE (sub_process_template),
-   *  'process'    = process_template standalone (IT, Innovation, etc.) */
-  source: 'subprocess' | 'process';
+   *  'process'    = process_template standalone (IT, Innovation, etc.),
+   *  'external'   = lien vers un module dédié (ex: SMQ) */
+  source: 'subprocess' | 'process' | 'external';
+  /** Catégorie à laquelle l'entrée appartient. Optionnel : si renseigné, on
+   *  force la catégorisation (utilisé pour les entrées externes). */
+  forcedCategory?: CategoryKey;
+  /** Route à ouvrir au clic « Configurer » (uniquement pour source='external') */
+  externalRoute?: string;
   name: string;
   description: string | null;
   visibility: string;
@@ -126,6 +132,24 @@ interface DemandType {
   /** Source originale pour les opérations (édition / suppression) */
   raw: any;
 }
+
+// Entrées « externes » injectées dans la liste : modules métier dédiés
+// qui ont leur propre page de gestion (hors process_templates DB).
+const EXTERNAL_ENTRIES: DemandType[] = [
+  {
+    id: 'smq-module',
+    source: 'external',
+    forcedCategory: 'qse',
+    externalRoute: '/smq',
+    name: 'Non-Conformités (Module SMQ)',
+    description: 'Gestion des NC via le module dédié — déclaration, dispatch, actions correctives/préventives, jalons',
+    visibility: 'public',
+    createdAt: '2026-05-13',
+    stepCount: 0,
+    canManage: false,
+    raw: null,
+  },
+];
 
 // ════════════════════════════════════════════════════════════════════════════
 export default function Templates() {
@@ -165,6 +189,9 @@ export default function Templates() {
       });
     }
 
+    // 0) Entrées externes (ex : module SMQ)
+    list.push(...EXTERNAL_ENTRIES);
+
     // b) Process templates standalone (TOUS sauf BE)
     for (const p of processes) {
       if (p.id === BE_PROCESS_ID) continue;
@@ -195,9 +222,12 @@ export default function Templates() {
     for (const d of demandTypes) {
       if (visibilityFilter !== 'all' && d.visibility !== visibilityFilter) continue;
       if (q && !d.name.toLowerCase().includes(q) && !(d.description ?? '').toLowerCase().includes(q)) continue;
-      const cat = categoryOf(d.name, d.source === 'process' ? d.id : undefined);
-      // Pour les prestations BE, on force la catégorie 'be'
-      const catKey = d.source === 'subprocess' ? 'be' : cat.key;
+      // forcedCategory (entrées externes) → priorité
+      // subprocess (prestations BE) → toujours 'be'
+      // sinon → détection par nom
+      const catKey: CategoryKey =
+        d.forcedCategory ??
+        (d.source === 'subprocess' ? 'be' : categoryOf(d.name, d.source === 'process' ? d.id : undefined).key);
       map.get(catKey)!.push(d);
     }
 
@@ -222,22 +252,22 @@ export default function Templates() {
   };
 
   const openConfigure = (d: DemandType) => {
-    if (d.source === 'subprocess') {
-      // Prestation BE → éditeur dédié
+    if (d.source === 'external' && d.externalRoute) {
+      navigate(d.externalRoute);
+    } else if (d.source === 'subprocess') {
       navigate(`/templates/be-prestation/${d.id}`);
     } else {
-      // Process standalone → page de config avec onglets
       navigate(`/templates/process/${d.id}`);
     }
   };
 
   const handleDelete = async (d: DemandType) => {
+    if (d.source === 'external') return; // pas de suppression possible
     if (d.source === 'subprocess') {
       await deleteSubProcess(d.id);
       refetchSubProcesses();
       toast.success('Prestation supprimée');
     } else {
-      // Process : passer par le dialog standard (archive / suppr)
       setDeletingProcess(d.raw as ProcessWithTasks);
     }
   };
@@ -396,6 +426,7 @@ function DemandTypeRow({
 }) {
   const visMeta = VISIBILITY_META[demand.visibility] ?? VISIBILITY_META.public;
   const VIcon = visMeta.icon;
+  const isExternal = demand.source === 'external';
 
   return (
     <li>
@@ -404,12 +435,20 @@ function DemandTypeRow({
         tabIndex={0}
         onClick={onConfigure}
         onKeyDown={(e) => { if (e.key === 'Enter') onConfigure(); }}
-        className="w-full flex items-center gap-3 p-3 hover:bg-muted/30 transition-colors text-left cursor-pointer"
+        className={cn(
+          'w-full flex items-center gap-3 p-3 transition-colors text-left cursor-pointer',
+          isExternal ? 'hover:bg-violet-50/60 bg-violet-50/20' : 'hover:bg-muted/30',
+        )}
       >
-        <div className="w-7 h-7 rounded-md bg-muted/60 flex items-center justify-center shrink-0">
-          {isBE
-            ? <Wand2 className="h-3.5 w-3.5 text-amber-500" />
-            : <GitBranch className="h-3.5 w-3.5 text-muted-foreground" />}
+        <div className={cn(
+          'w-7 h-7 rounded-md flex items-center justify-center shrink-0',
+          isExternal ? 'bg-violet-100' : 'bg-muted/60',
+        )}>
+          {isExternal
+            ? <ShieldCheck className="h-3.5 w-3.5 text-violet-600" />
+            : isBE
+              ? <Wand2 className="h-3.5 w-3.5 text-amber-500" />
+              : <GitBranch className="h-3.5 w-3.5 text-muted-foreground" />}
         </div>
 
         <div className="flex-1 min-w-0">
@@ -438,13 +477,13 @@ function DemandTypeRow({
 
         <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
           <Button
-            variant="outline"
+            variant={isExternal ? 'default' : 'outline'}
             size="sm"
-            className="h-8 text-xs gap-1.5"
+            className={cn('h-8 text-xs gap-1.5', isExternal && 'bg-violet-600 hover:bg-violet-700')}
             onClick={onConfigure}
           >
             <Settings2 className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Configurer</span>
+            <span className="hidden sm:inline">{isExternal ? 'Ouvrir le module' : 'Configurer'}</span>
           </Button>
           {demand.canManage && (
             <DropdownMenu>
