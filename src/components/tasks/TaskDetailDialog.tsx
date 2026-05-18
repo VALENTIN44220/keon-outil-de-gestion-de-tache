@@ -59,7 +59,8 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { getBEStatusMeta, useBETaskStatus } from '@/hooks/useBETaskStatus';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, UserPlus } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { TaskCommentsSection } from './TaskCommentsSection';
 import { TaskChecklist } from './TaskChecklist';
 import { useTasksProgress } from '@/hooks/useChecklists';
@@ -138,6 +139,10 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
   const [profilesList, setProfilesList] = useState<{ id: string; display_name: string; manager_id: string | null }[]>([]);
   const [departments, setDepartments] = useState<Map<string, string>>(new Map());
   const [processName, setProcessName] = useState<string | null>(null);
+  const [dispatchManagerId, setDispatchManagerId] = useState<string | null>(null);
+  const [dispatchOpen, setDispatchOpen] = useState(false);
+  const [dispatchAssignee, setDispatchAssignee] = useState<string>('');
+  const [isDispatching, setIsDispatching] = useState(false);
   const [beProject, setBeProject] = useState<{ code_projet: string; nom_projet: string } | null>(null);
   const [beLabel, setBeLabel] = useState<{ code: string; name: string; color: string | null } | null>(null);
   const [beAffaire, setBeAffaire] = useState<{ code_affaire: string; libelle: string } | null>(null);
@@ -308,6 +313,19 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
 
         if (processData) {
           setProcessName(processData.name);
+        }
+      }
+
+      // Fetch sub_process_template.dispatch_manager_id pour savoir si current user
+      // peut dispatcher cette tâche (cas BE be_status='soumise')
+      if ((task as any).sub_process_template_id) {
+        const { data: spData } = await (supabase as any)
+          .from('sub_process_templates')
+          .select('dispatch_manager_id')
+          .eq('id', (task as any).sub_process_template_id)
+          .maybeSingle();
+        if (spData?.dispatch_manager_id) {
+          setDispatchManagerId(spData.dispatch_manager_id);
         }
       }
 
@@ -925,6 +943,12 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
             {task.type === 'request' && (
               <Badge variant="secondary">Demande</Badge>
             )}
+            {processName && (
+              <Badge variant="outline" className="gap-1 text-[10px] text-muted-foreground">
+                <Workflow className="h-2.5 w-2.5" />
+                {processName}
+              </Badge>
+            )}
           </div>
           <DialogTitle className="text-xl pr-8">{task.title}</DialogTitle>
           {task.status !== 'done' && task.status !== 'validated' && (
@@ -937,7 +961,44 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
                 const isAssignee = currentProfileId !== null && task.assignee_id === currentProfileId;
                 const isValidator1 = currentProfileId !== null && (task as any).validator_level_1_id === currentProfileId;
                 const isValidator2 = currentProfileId !== null && (task as any).validator_level_2_id === currentProfileId;
+                const isDispatcher = currentProfileId !== null && dispatchManagerId === currentProfileId;
+                const canDispatch = isAdmin || isDispatcher;
                 const canValidateBE = isAdmin || isValidator1 || isValidator2;
+
+                const handleDispatch = async () => {
+                  if (!dispatchAssignee) { toast.error("Sélectionne d'abord la personne à affecter"); return; }
+                  setIsDispatching(true);
+                  try {
+                    const { error } = await supabase.from('tasks')
+                      .update({ assignee_id: dispatchAssignee, be_status: 'affectee' })
+                      .eq('id', task.id);
+                    if (error) throw error;
+                    // Notification à l'assigné
+                    const assigneeAuthUser = profiles.get(dispatchAssignee);
+                    if (dispatchAssignee !== currentProfileId) {
+                      const { data: pf } = await supabase.from('profiles').select('user_id').eq('id', dispatchAssignee).maybeSingle();
+                      if (pf?.user_id) {
+                        await supabase.from('notifications').insert({
+                          user_id: pf.user_id,
+                          title: `Affecté : ${task.title}`,
+                          message: 'Une tâche BE vous a été affectée.',
+                          type: 'be_affectee',
+                          related_entity_type: 'task',
+                          related_entity_id: task.id,
+                        });
+                      }
+                    }
+                    toast.success(`Tâche affectée${assigneeAuthUser ? ` à ${assigneeAuthUser}` : ''}`);
+                    setDispatchOpen(false);
+                    setDispatchAssignee('');
+                    onTaskMutated?.();
+                    onClose();
+                  } catch (err: any) {
+                    toast.error(`Erreur : ${err.message ?? err}`);
+                  } finally {
+                    setIsDispatching(false);
+                  }
+                };
 
                 const beAction = async (newStatus: string) => {
                   await updateBEStatus({
@@ -952,8 +1013,51 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
                   onTaskMutated?.();
                 };
 
+                // Liste des collaborateurs pour le picker dispatch
+                const dispatchOptions = Array.from(profiles.entries())
+                  .map(([id, name]) => ({ value: id, label: name }))
+                  .sort((a, b) => a.label.localeCompare(b.label));
+
                 return (
                   <>
+                    {/* soumise → affectee : le dispatcher choisit un assignataire */}
+                    {beStatus === 'soumise' && canDispatch && (
+                      <Popover open={dispatchOpen} onOpenChange={setDispatchOpen}>
+                        <PopoverTrigger asChild>
+                          <Button className="gap-2 bg-amber-500 hover:bg-amber-600 text-white">
+                            <UserPlus className="h-4 w-4" />
+                            Dispatcher la tâche
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80" align="end">
+                          <div className="space-y-3">
+                            <div>
+                              <p className="text-sm font-semibold">Affecter cette tâche</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                Choisis qui prend en charge cette demande BE.
+                              </p>
+                            </div>
+                            <SearchableSelect
+                              value={dispatchAssignee}
+                              onValueChange={setDispatchAssignee}
+                              placeholder="Sélectionner un collaborateur…"
+                              searchPlaceholder="Rechercher…"
+                              options={dispatchOptions}
+                            />
+                            <div className="flex justify-end gap-2">
+                              <Button variant="outline" size="sm" onClick={() => setDispatchOpen(false)} disabled={isDispatching}>
+                                Annuler
+                              </Button>
+                              <Button size="sm" onClick={handleDispatch} disabled={isDispatching || !dispatchAssignee} className="gap-1.5 bg-amber-500 hover:bg-amber-600 text-white">
+                                {isDispatching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserPlus className="h-3.5 w-3.5" />}
+                                Affecter
+                              </Button>
+                            </div>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    )}
+
                     {/* affectee → en_cours : l'assignée démarre */}
                     {beStatus === 'affectee' && isAssignee && (
                       <Button
@@ -1037,9 +1141,13 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
                   Envoyer pour validation
                 </Button>
               )}
-              {/* Marquer terminé : seulement si pas de be_status (tâche non-BE)
-                  et pas en validation pending */}
-              {!canValidateTask && !rootOfferSend && !(task as any).be_status
+              {/* Marquer terminé : seulement si tâche standard (pas BE, pas validation pending).
+                  Une tâche BE se complète via le workflow be_status (Commencer / Soumettre /
+                  Valider / Clôturer) — jamais via « Marquer terminé ». */}
+              {!canValidateTask && !rootOfferSend
+                && !(task as any).be_status
+                && !(task as any).sub_process_template_id  // = tâche issue d'une prestation BE
+                && task.source_process_template_id !== 'bd75a3b0-c918-4b43-befe-739b83f7461a' // BE process
                 && task.status !== 'pending_validation_1' && task.status !== 'pending_validation_2' && (
                 <Button
                   onClick={() => { onStatusChange(task.id, 'done'); onClose(); }}
@@ -1312,14 +1420,7 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
             <TaskChecklist taskId={task.id} />
           </div>
 
-          {processName && (
-            <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
-              <div className="flex items-center gap-2">
-                <Workflow className="h-5 w-5 text-primary" />
-                <span className="font-medium">Processus: {processName}</span>
-              </div>
-            </div>
-          )}
+          {/* (Le nom du processus est maintenant affiché en badge discret dans le header) */}
 
           {/* Child tasks and Chat section for requests */}
           {(task.type === 'request' || childTasks.length > 0) && (
@@ -1482,7 +1583,7 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
                 )}
 
                 <TabsContent value="chat" className="mt-2">
-                  <TaskCommentsSection taskId={task.id} className="h-[48vh] max-h-[460px] min-h-[220px]" />
+                  <TaskCommentsSection taskId={task.id} className="min-h-[180px] max-h-[40vh]" />
                 </TabsContent>
               </Tabs>
             </>
@@ -1505,7 +1606,7 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
                     </TabsTrigger>
                   </TabsList>
                   <TabsContent value="details" className="mt-2">
-                    <TaskCommentsSection taskId={task.id} className="h-[36vh] max-h-[360px] min-h-[180px]" />
+                    <TaskCommentsSection taskId={task.id} className="min-h-[160px] max-h-[36vh]" />
                   </TabsContent>
                   <TabsContent value="request-info" className="mt-2">
                     <RequestInfoTab
@@ -1516,7 +1617,7 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
                   </TabsContent>
                 </Tabs>
               ) : (
-                <TaskCommentsSection taskId={task.id} className="h-[36vh] max-h-[360px] min-h-[180px]" />
+                <TaskCommentsSection taskId={task.id} className="min-h-[160px] max-h-[36vh]" />
               )}
             </>
           )}
