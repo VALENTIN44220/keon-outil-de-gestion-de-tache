@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import { useBEProjectHubCode } from '@/hooks/useBEProjectHubCode';
 import { useQueryClient } from '@tanstack/react-query';
 import { BEProjectHubLayout } from '@/components/be/BEProjectHubLayout';
+import { BEMilestoneTimeline } from '@/components/be/BEMilestoneTimeline';
+import { Flag } from 'lucide-react';
 import { 
   useBEProjectByCode, 
   useBEProjectTasks, 
@@ -221,6 +223,19 @@ export default function BEProjectHubOverview() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Jalons projet — vue visuelle */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Flag className="h-5 w-5 text-violet-600" />
+                Jalons du projet
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <BEMilestoneTimeline beProjectId={project.id} />
+            </CardContent>
+          </Card>
+
           {/* Summary Card */}
           <Card>
             <CardHeader className="pb-3">
