@@ -69,6 +69,16 @@ export default function ITProjectHubOverview() {
     return Math.round(sum / activePhases.length);
   }, [phaseProgressValues, activePhases]);
 
+  // Planning : tri des jalons par date prévue (hook avant tout early-return)
+  const sortedMilestones = useMemo(
+    () => [...milestones].sort((a, b) => {
+      if (!a.date_prevue) return 1;
+      if (!b.date_prevue) return -1;
+      return new Date(a.date_prevue).getTime() - new Date(b.date_prevue).getTime();
+    }),
+    [milestones],
+  );
+
   if (isLoading) {
     return (
       <Layout>
@@ -92,16 +102,6 @@ export default function ITProjectHubOverview() {
   const currentPhase = activePhases.find(p => p.value === project.phase_courante);
   const currentPhaseProgress = currentPhase ? phaseProgressValues[currentPhase.value] ?? 0 : 0;
   const phaseBadge = currentPhase ? IT_PHASE_BADGE_CONFIG[currentPhase.value as ITProjectPhase] : null;
-
-  // Planning : tri des jalons par date prévue
-  const sortedMilestones = useMemo(
-    () => [...milestones].sort((a, b) => {
-      if (!a.date_prevue) return 1;
-      if (!b.date_prevue) return -1;
-      return new Date(a.date_prevue).getTime() - new Date(b.date_prevue).getTime();
-    }),
-    [milestones],
-  );
 
   // Calcul du temps restant
   const today = new Date(); today.setHours(0, 0, 0, 0);
