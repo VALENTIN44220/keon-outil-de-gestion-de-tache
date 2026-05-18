@@ -380,26 +380,43 @@ export function ProcessSubProcessesTab({
 
                   {/* Actions */}
                   <div className="flex items-center gap-1 shrink-0">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 text-xs gap-1"
-                      onClick={() => setSelectedSubProcessId(sp.id)}
-                      title="Configurer dans un panneau latéral"
-                    >
-                      <Settings className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">Config.</span>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 text-xs gap-1"
-                      onClick={() => navigate(`/templates/subprocess/${sp.id}`)}
-                      title="Ouvrir la page de gestion détaillée"
-                    >
-                      <ExternalLink className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">Ouvrir</span>
-                    </Button>
+                    {isBEProcess ? (
+                      // Pour les prestations BE : un seul bouton Modifier vers la
+                      // nouvelle page dédiée alignée sur le wizard de création.
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs gap-1"
+                        onClick={() => navigate(`/templates/be-prestation/${sp.id}`)}
+                        title="Modifier cette prestation BE"
+                      >
+                        <Settings className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Modifier</span>
+                      </Button>
+                    ) : (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 text-xs gap-1"
+                          onClick={() => setSelectedSubProcessId(sp.id)}
+                          title="Configurer dans un panneau latéral"
+                        >
+                          <Settings className="h-3.5 w-3.5" />
+                          <span className="hidden sm:inline">Config.</span>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 text-xs gap-1"
+                          onClick={() => navigate(`/templates/subprocess/${sp.id}`)}
+                          title="Ouvrir la page de gestion détaillée"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                          <span className="hidden sm:inline">Ouvrir</span>
+                        </Button>
+                      </>
+                    )}
                     {canManage && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>

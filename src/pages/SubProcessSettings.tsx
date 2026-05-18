@@ -102,7 +102,9 @@ interface CollaboratorGroup {
 }
 
 export default function SubProcessSettings() {
-  const { subProcessId } = useParams<{ subProcessId: string }>();
+  // PersistentRoutes utilise matchPath → useParams() retourne undefined.
+  // En plus `useParams` n'était pas importé → ReferenceError = page blanche.
+  const subProcessId = useMatchedRouteParam('subProcessId', '/templates/subprocess/:subProcessId');
   const navigate = useNavigate();
   const { user } = useAuth();
 
