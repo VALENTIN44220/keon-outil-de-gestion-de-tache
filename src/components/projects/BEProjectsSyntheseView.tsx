@@ -283,30 +283,11 @@ function ProjectMapCard({ projects, allProjectStats = {} }: { projects: BEProjec
       mapInstanceRef.current = null;
     }
 
-    const loadClusterPlugin = (): Promise<void> => {
-      return new Promise((resolve) => {
-        if (!document.querySelector('link[href*="MarkerCluster.css"]')) {
-          const css1 = document.createElement('link');
-          css1.rel = 'stylesheet';
-          css1.href = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css';
-          document.head.appendChild(css1);
-        }
-        if (!document.querySelector('link[href*="MarkerCluster.Default.css"]')) {
-          const css2 = document.createElement('link');
-          css2.rel = 'stylesheet';
-          css2.href = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css';
-          document.head.appendChild(css2);
-        }
-        if ((L as any).markerClusterGroup) {
-          resolve();
-          return;
-        }
-        const s = document.createElement('script');
-        s.src = 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js';
-        s.onload = () => resolve();
-        s.onerror = () => resolve();
-        document.head.appendChild(s);
-      });
+    const loadClusterPlugin = async (): Promise<void> => {
+      if ((L as any).markerClusterGroup) return;
+      await import('leaflet.markercluster/dist/MarkerCluster.css');
+      await import('leaflet.markercluster/dist/MarkerCluster.Default.css');
+      await import('leaflet.markercluster');
     };
 
     const initMap = async () => {
