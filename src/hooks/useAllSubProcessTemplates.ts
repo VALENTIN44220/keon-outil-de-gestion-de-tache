@@ -23,6 +23,10 @@ export function useAllSubProcessTemplates() {
             name
           )
         `)
+        // is_shared=false sert de flag « archivé / legacy » → on les masque par défaut
+        // (cf migration BE : 111 anciens sous-processus split par étape, conservés en
+        // base mais cachés pour ne pas polluer la liste des prestations)
+        .eq('is_shared', true)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
