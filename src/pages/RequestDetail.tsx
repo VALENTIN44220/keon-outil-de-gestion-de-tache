@@ -39,6 +39,7 @@ import { Task } from '@/types/task';
 import { cn } from '@/lib/utils';
 import { TaskCommentsSection } from '@/components/tasks/TaskCommentsSection';
 import { getBEStatusMeta } from '@/hooks/useBETaskStatus';
+import { useRequestStates, macroStateColor } from '@/hooks/useRequestStates';
 import { toast } from 'sonner';
 
 // ─── Métadonnées statut ─────────────────────────────────────────────────
@@ -88,6 +89,11 @@ export default function RequestDetail() {
   const [requesterDetails, setRequesterDetails] = useState<{ company: string | null; department: string | null; job_title: string | null } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCancelling, setIsCancelling] = useState(false);
+
+  // États métier (request_states) du processus de la demande
+  const { statesByCode: reqStatesByCode, labelOf: reqStateLabelOf } = useRequestStates(
+    (task as any)?.source_process_template_id ?? null,
+  );
 
   // ─── Fetch ──────────────────────────────────────────────────────
   useEffect(() => { if (taskId) void load(); }, [taskId]); // eslint-disable-line
@@ -291,6 +297,22 @@ export default function RequestDetail() {
                       {processName}
                     </Badge>
                   )}
+                  {(task as any).current_state_code && (() => {
+                    const code = (task as any).current_state_code as string;
+                    const st = reqStatesByCode.get(code);
+                    const macro = st?.state_category ?? null;
+                    return (
+                      <Badge
+                        className={cn(
+                          'text-[10px] font-medium px-2 py-0.5 border-0',
+                          macro ? macroStateColor(macro) : 'bg-slate-100 text-slate-700',
+                        )}
+                        title={`État métier : ${st?.label ?? code}`}
+                      >
+                        {reqStateLabelOf(code)}
+                      </Badge>
+                    );
+                  })()}
                 </div>
 
                 {/* Titre */}

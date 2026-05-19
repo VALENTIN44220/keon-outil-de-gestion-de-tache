@@ -24,6 +24,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSimulation } from '@/contexts/SimulationContext';
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import {
+  MACRO_STATE_CATEGORIES,
+  BE_PROCESS_ID,
+  useRequestStates,
+  type MacroStateCategory,
+} from '@/hooks/useRequestStates';
 
 const MyRequests = () => {
   const navigate = useNavigate();
@@ -39,6 +47,11 @@ const MyRequests = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedRequest, setSelectedRequest] = useState<Task | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [macroFilter, setMacroFilter] = useState<'all' | MacroStateCategory>('all');
+
+  // Pour l'instant on ne connaît que les états BE — on prend ce mapping pour les demandes BE.
+  // Les autres processus seront alimentés au fur et à mesure (et cohabiteront sans casser).
+  const { statesByCode: beStatesByCode } = useRequestStates(BE_PROCESS_ID);
 
   const { allTasks, searchQuery, setSearchQuery, updateTaskStatus } = useTasks();
   const { refetch: refetchPending } = usePendingAssignments();
@@ -89,6 +102,28 @@ const MyRequests = () => {
     if (!profile?.id) return [];
     return requests.filter((r) => r.requester_id === profile.id);
   }, [requests, profile?.id]);
+
+  // Filtre par catégorie macro d'état (basé sur current_state_code)
+  const filteredRequests = useMemo(() => {
+    if (macroFilter === 'all') return myRequests;
+    return myRequests.filter((r) => {
+      const code = (r as any).current_state_code as string | null;
+      if (!code) return false;
+      const macro = beStatesByCode.get(code)?.state_category ?? null;
+      return macro === macroFilter;
+    });
+  }, [myRequests, macroFilter, beStatesByCode]);
+
+  // Compteurs par catégorie pour les chips
+  const macroCounts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of myRequests) {
+      const code = (r as any).current_state_code as string | null;
+      const cat = code ? (beStatesByCode.get(code)?.state_category ?? null) : null;
+      if (cat) m.set(cat, (m.get(cat) ?? 0) + 1);
+    }
+    return m;
+  }, [myRequests, beStatesByCode]);
 
   const dashboardStats = useMemo((): TaskStats => {
     const total = myRequests.length;
@@ -173,12 +208,42 @@ const MyRequests = () => {
                   Tu n'as pas encore créé de demandes. Va sur <a href="/requests" className="text-primary underline">Demandes</a> pour en créer une.
                 </div>
               ) : (
-                <ConfigurableDashboard
-                  tasks={myRequests}
-                  stats={dashboardStats}
-                  globalProgress={globalProgress}
-                  onTaskClick={(req) => { navigate(`/demande/${req.id}`); }}
-                />
+                <>
+                  {/* Filtre catégorie macro d'état */}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Button
+                      variant={macroFilter === 'all' ? 'default' : 'outline'}
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => setMacroFilter('all')}
+                    >
+                      Tous ({myRequests.length})
+                    </Button>
+                    {MACRO_STATE_CATEGORIES.map((c) => {
+                      const count = macroCounts.get(c.key) ?? 0;
+                      const active = macroFilter === c.key;
+                      return (
+                        <Button
+                          key={c.key}
+                          variant={active ? 'default' : 'outline'}
+                          size="sm"
+                          className={cn('h-7 text-xs', !active && count === 0 && 'opacity-50')}
+                          onClick={() => setMacroFilter(c.key)}
+                          disabled={count === 0 && !active}
+                        >
+                          {c.label} ({count})
+                        </Button>
+                      );
+                    })}
+                  </div>
+
+                  <ConfigurableDashboard
+                    tasks={filteredRequests}
+                    stats={dashboardStats}
+                    globalProgress={globalProgress}
+                    onTaskClick={(req) => { navigate(`/demande/${req.id}`); }}
+                  />
+                </>
               )}
             </div>
           </main>

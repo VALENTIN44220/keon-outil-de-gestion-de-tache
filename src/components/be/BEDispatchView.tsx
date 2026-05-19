@@ -91,6 +91,12 @@ import { NewBERequestDialog } from '@/components/be/NewBERequestDialog';
 import { useBETaskStatus } from '@/hooks/useBETaskStatus';
 import { useUserWeekLoad, type UserWeekLoad } from '@/hooks/useUserWeekLoad';
 import { clearBETaskSlots, resyncBESlots } from '@/lib/be/distributeBESlots';
+import {
+  useRequestStates,
+  MACRO_STATE_CATEGORIES,
+  macroStateColor,
+  type MacroStateCategory,
+} from '@/hooks/useRequestStates';
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
 
@@ -976,7 +982,11 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
   const [projectFilter, setProjectFilter] = useState<string>('all');
   const [assigneeFilter, setAssigneeFilter] = useState<string>('all');
   const [statusBEFilter, setStatusBEFilter] = useState<string>('all');
+  const [macroStateFilter, setMacroStateFilter] = useState<'all' | MacroStateCategory>('all');
   const [overdueOnly, setOverdueOnly] = useState(false);
+
+  // ── États métier BE (request_states) ──────────────────────────────────────
+  const { statesByCode: beStatesByCode, labelOf: beStateLabelOf } = useRequestStates(BE_PROCESS_TEMPLATE_ID);
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedRequests, setExpandedRequests] = useState<Set<string>>(new Set());
   const [showNewRequest, setShowNewRequest] = useState(false);
@@ -1022,7 +1032,7 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
         .from('tasks')
         .select(`
           id, title, description, be_urgency, created_at, requester_id,
-          be_project_id, be_affaire_id, request_number,
+          be_project_id, be_affaire_id, request_number, current_state_code,
           requester:profiles!tasks_requester_id_fkey(display_name),
           be_project:be_projects!tasks_be_project_id_fkey(code_projet, nom_projet)
         `)
@@ -1145,6 +1155,12 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
       // La demande est gardée si AU MOINS une de ses tâches matche les filtres
       // (l'urgence est aussi évaluée au niveau demande pour cohérence avec l'ancien comportement).
       if (urgencyFilter !== 'all' && req.be_urgency !== urgencyFilter) return false;
+      // Filtre catégorie macro d'état (basé sur current_state_code de la demande)
+      if (macroStateFilter !== 'all') {
+        const code = (req as any).current_state_code as string | null;
+        const macro = code ? (beStatesByCode.get(code)?.state_category ?? null) : null;
+        if (macro !== macroStateFilter) return false;
+      }
       // Si recherche par n° de demande, on matche aussi sur req.request_number / req.title
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -1155,7 +1171,7 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
       }
       return children.some(matchesTaskFilters);
     });
-  }, [requests, tasksByRequest, urgencyFilter, searchQuery, matchesTaskFilters]);
+  }, [requests, tasksByRequest, urgencyFilter, searchQuery, matchesTaskFilters, macroStateFilter, beStatesByCode]);
 
   const standaloneFiltered = useMemo(() => {
     const st = tasksByRequest.get('__standalone__') ?? [];
@@ -1207,6 +1223,7 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
     (urgencyFilter !== 'all' ? 1 : 0) +
     (assignFilter !== 'all' ? 1 : 0) +
     (statusBEFilter !== 'all' ? 1 : 0) +
+    (macroStateFilter !== 'all' ? 1 : 0) +
     (assigneeFilter !== 'all' ? 1 : 0) +
     (projectFilter !== 'all' ? 1 : 0) +
     (overdueOnly ? 1 : 0) +
@@ -1216,6 +1233,7 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
     setUrgencyFilter('all');
     setAssignFilter('all');
     setStatusBEFilter('all');
+    setMacroStateFilter('all');
     setAssigneeFilter('all');
     setProjectFilter('all');
     setOverdueOnly(false);
@@ -1386,6 +1404,18 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
                 </SelectContent>
               </Select>
 
+              <Select value={macroStateFilter} onValueChange={(v) => setMacroStateFilter(v as any)}>
+                <SelectTrigger className="w-[180px] h-8 text-xs">
+                  <SelectValue placeholder="État demande" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous états</SelectItem>
+                  {MACRO_STATE_CATEGORIES.map((c) => (
+                    <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
               <Select value={projectFilter} onValueChange={setProjectFilter}>
                 <SelectTrigger className="w-[170px] h-8 text-xs">
                   <SelectValue placeholder="Projet" />
@@ -1498,6 +1528,21 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
                           )}
                           <span className="text-sm font-medium truncate">{req.title}</span>
                           <UrgencyBadge urgency={req.be_urgency} />
+                          {(req as any).current_state_code && (() => {
+                            const st = beStatesByCode.get((req as any).current_state_code);
+                            const macro = st?.state_category ?? null;
+                            return (
+                              <Badge
+                                className={cn(
+                                  'text-[10px] px-1.5 py-0 border-0',
+                                  macro ? macroStateColor(macro) : 'bg-slate-100 text-slate-700',
+                                )}
+                                title={st?.label ?? (req as any).current_state_code}
+                              >
+                                {beStateLabelOf((req as any).current_state_code)}
+                              </Badge>
+                            );
+                          })()}
                           {unassignedCount > 0 && (
                             <Badge
                               variant="outline"

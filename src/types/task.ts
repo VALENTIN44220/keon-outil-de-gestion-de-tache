@@ -61,6 +61,10 @@ export interface Task {
   /** Statut du workflow Bureau d'Études (en_cours, a_relire, a_valider, a_deposer, en_instruction, complement_demande, cloturee) */
   be_status: string | null;
   be_urgency: string | null;
+  /** État métier courant de la demande (code dans request_states, ex: pc_depose, dossier_redige). Auto-MAJ par trigger à la complétion d'une étape. */
+  current_state_code: string | null;
+  /** État métier qu'une tâche enfant appliquera à sa demande parente quand elle sera complétée (copié de task_template). */
+  output_state_code: string | null;
   // IT Project fields
   it_project_id: string | null;
   it_project_phase: string | null;
