@@ -33,6 +33,7 @@ import Admin from "./pages/Admin";
 import Workload from "./pages/Workload";
 import Requests from "./pages/Requests";
 import MyRequests from "./pages/MyRequests";
+import RequestDetail from "./pages/RequestDetail";
 import CalendarPage from "./pages/Calendar";
 import Chat from "./pages/Chat";
 import DesignSystem from "./pages/DesignSystem";
@@ -124,6 +125,7 @@ const App = () => (
                 { path: "/workload", end: true, element: <ProtectedRoute><Workload /></ProtectedRoute> },
                 { path: "/requests", end: false, element: <ProtectedRoute><Requests /></ProtectedRoute> },
                 { path: "/mes-demandes", end: true, element: <ProtectedRoute><MyRequests /></ProtectedRoute> },
+                { path: "/demande/:taskId", end: true, element: <ProtectedRoute><RequestDetail /></ProtectedRoute> },
                 { path: "/calendar", end: true, element: <ProtectedRoute><CalendarPage /></ProtectedRoute> },
                 { path: "/chat", end: true, element: <ProtectedRoute><Chat /></ProtectedRoute> },
                 { path: "/suppliers", end: true, element: <ProtectedRoute><SupplierReference /></ProtectedRoute> },
@@ -200,6 +202,7 @@ const App = () => (
             <Route path="/workload" element={<></>} />
             <Route path="/requests/*" element={<></>} />
             <Route path="/mes-demandes" element={<></>} />
+            <Route path="/demande/:taskId" element={<></>} />
             <Route path="/calendar" element={<></>} />
             <Route path="/chat" element={<></>} />
             <Route path="/suppliers" element={<></>} />

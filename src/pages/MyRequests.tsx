@@ -9,7 +9,7 @@
  * demande directement depuis la cloche notif sidebar.
  */
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { DeadlineTasksOverrideProvider } from '@/contexts/DeadlineTasksOverrideContext';
@@ -26,6 +26,7 @@ import { useSimulation } from '@/contexts/SimulationContext';
 import { toast } from 'sonner';
 
 const MyRequests = () => {
+  const navigate = useNavigate();
   const { profile: authProfile, user } = useAuth();
   const { isSimulating, simulatedProfile } = useSimulation();
   // En mode simulation, on raisonne avec le profil simulé pour que la page
@@ -176,7 +177,7 @@ const MyRequests = () => {
                   tasks={myRequests}
                   stats={dashboardStats}
                   globalProgress={globalProgress}
-                  onTaskClick={(req) => { setSelectedRequest(req); setIsDetailOpen(true); }}
+                  onTaskClick={(req) => { navigate(`/demande/${req.id}`); }}
                 />
               )}
             </div>
