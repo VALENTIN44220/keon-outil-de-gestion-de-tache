@@ -1,39 +1,36 @@
 /**
- * RequestDetail — Page plein écran du détail d'une demande.
+ * RequestDetail — Page plein écran « Détail demande ».
  *
- * Remplace le dialog modal pour les vues riches.
+ * Designed comme un portail de suivi (style commande client) :
+ *  - Hero card avec numéro + statut visuel + progression
+ *  - Stepper visuel des étapes en timeline verticale
+ *  - Cartes propres avec hiérarchie typographique forte
+ *  - Pensé responsive pour devenir un portail public si besoin
  *
- * Structure :
- *  Header : breadcrumb + numéro + titre + badges + actions
- *  Onglet 1 « Étapes »          : liste des tâches enfant avec statut,
- *                                 assigné, dates de validation, progress global
- *  Onglet 2 « Synthèse & Discussion » : récap demande + chat
- *
- * Conventions typographiques (uniformes) :
- *   - Titre h1     : text-2xl font-bold tracking-tight
- *   - Section h2   : text-base font-semibold
- *   - Labels       : text-xs font-medium uppercase tracking-wide text-muted-foreground
- *   - Body         : text-sm
- *   - Meta inline  : text-xs text-muted-foreground
+ * Typographie unifiée :
+ *   h1 hero      : text-3xl sm:text-4xl font-bold tracking-tight
+ *   Card title   : text-base font-semibold
+ *   Labels       : text-[11px] font-medium uppercase tracking-wider text-muted-foreground
+ *   Body         : text-sm leading-relaxed
+ *   Meta         : text-xs text-muted-foreground
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMatchedRouteParam } from '@/hooks/useMatchedRouteParam';
 import { Sidebar } from '@/components/layout/Sidebar';
-import { PageHeader } from '@/components/layout/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Separator } from '@/components/ui/separator';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
-  ArrowLeft, Building2, Calendar, CheckCircle2, ChevronRight, Clock,
+  ArrowLeft, Calendar, CheckCircle2, ChevronRight, Clock,
   Flag, ListChecks, MessageSquare, User, Workflow, AlertTriangle,
-  ShieldCheck, FileText, Loader2, Ban, UserPlus,
+  ShieldCheck, FileText, Loader2, Ban, UserPlus, Hourglass, Sparkles,
 } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, differenceInDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -44,23 +41,24 @@ import { TaskCommentsSection } from '@/components/tasks/TaskCommentsSection';
 import { getBEStatusMeta } from '@/hooks/useBETaskStatus';
 import { toast } from 'sonner';
 
-const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
-  to_assign:            { label: 'À affecter',        color: 'text-slate-700',   bg: 'bg-slate-100' },
-  todo:                 { label: 'À faire',           color: 'text-blue-700',    bg: 'bg-blue-100' },
-  'in-progress':        { label: 'En cours',          color: 'text-amber-700',   bg: 'bg-amber-100' },
-  pending_validation_1: { label: 'En validation N1',  color: 'text-violet-700',  bg: 'bg-violet-100' },
-  pending_validation_2: { label: 'En validation N2',  color: 'text-violet-700',  bg: 'bg-violet-100' },
-  done:                 { label: 'Terminé',           color: 'text-emerald-700', bg: 'bg-emerald-100' },
-  validated:            { label: 'Validé',            color: 'text-emerald-700', bg: 'bg-emerald-100' },
-  cancelled:            { label: 'Annulé',            color: 'text-red-700',     bg: 'bg-red-100' },
-  refused:              { label: 'Refusé',            color: 'text-red-700',     bg: 'bg-red-100' },
+// ─── Métadonnées statut ─────────────────────────────────────────────────
+const STATUS_META: Record<string, { label: string; chip: string; dot: string }> = {
+  to_assign:            { label: 'À affecter',       chip: 'bg-slate-100 text-slate-700',    dot: 'bg-slate-400' },
+  todo:                 { label: 'À faire',          chip: 'bg-blue-100 text-blue-700',      dot: 'bg-blue-500' },
+  'in-progress':        { label: 'En cours',         chip: 'bg-amber-100 text-amber-700',    dot: 'bg-amber-500' },
+  pending_validation_1: { label: 'Validation N1',    chip: 'bg-violet-100 text-violet-700',  dot: 'bg-violet-500' },
+  pending_validation_2: { label: 'Validation N2',    chip: 'bg-violet-100 text-violet-700',  dot: 'bg-violet-500' },
+  done:                 { label: 'Terminé',          chip: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500' },
+  validated:            { label: 'Validé',           chip: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500' },
+  cancelled:            { label: 'Annulé',           chip: 'bg-red-100 text-red-700',        dot: 'bg-red-500' },
+  refused:              { label: 'Refusé',           chip: 'bg-red-100 text-red-700',        dot: 'bg-red-500' },
 };
 
-const PRIORITY_LABEL: Record<string, { label: string; color: string }> = {
-  low:    { label: 'Faible',    color: 'bg-slate-100 text-slate-700' },
-  medium: { label: 'Moyenne',   color: 'bg-blue-100 text-blue-700' },
-  high:   { label: 'Élevée',    color: 'bg-amber-100 text-amber-700' },
-  urgent: { label: 'Urgente',   color: 'bg-red-100 text-red-700' },
+const PRIORITY_META: Record<string, { label: string; chip: string }> = {
+  low:    { label: 'Faible',  chip: 'bg-slate-100 text-slate-700 border-slate-200' },
+  medium: { label: 'Normale', chip: 'bg-blue-100 text-blue-700 border-blue-200' },
+  high:   { label: 'Élevée',  chip: 'bg-amber-100 text-amber-700 border-amber-200' },
+  urgent: { label: 'Urgente', chip: 'bg-red-100 text-red-700 border-red-200' },
 };
 
 interface SubProcessGroup {
@@ -72,6 +70,7 @@ interface SubProcessGroup {
   total: number;
 }
 
+// ════════════════════════════════════════════════════════════════════════
 export default function RequestDetail() {
   const taskId = useMatchedRouteParam('taskId', '/demande/:taskId');
   const navigate = useNavigate();
@@ -90,12 +89,8 @@ export default function RequestDetail() {
   const [isLoading, setIsLoading] = useState(true);
   const [isCancelling, setIsCancelling] = useState(false);
 
-  // ─── Fetch ─────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!taskId) return;
-    void load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [taskId]);
+  // ─── Fetch ──────────────────────────────────────────────────────
+  useEffect(() => { if (taskId) void load(); }, [taskId]); // eslint-disable-line
 
   const load = async () => {
     if (!taskId) return;
@@ -107,12 +102,10 @@ export default function RequestDetail() {
       if (!t) { navigate(-1); return; }
       setTask(t as Task);
 
-      // Children
       const { data: kids } = await supabase
         .from('tasks').select('*').eq('parent_request_id', taskId).order('created_at');
       setChildTasks((kids || []) as Task[]);
 
-      // Process name
       if ((t as any).source_process_template_id) {
         const { data: pData } = await supabase
           .from('process_templates').select('name')
@@ -120,7 +113,6 @@ export default function RequestDetail() {
         if (pData) setProcessName(pData.name);
       }
 
-      // Sub-process names (unique ids)
       const spIds = Array.from(new Set(
         (kids || [])
           .map((c: any) => c.sub_process_template_id || c.source_sub_process_template_id)
@@ -134,7 +126,6 @@ export default function RequestDetail() {
         setSubProcessNames(map);
       }
 
-      // Profiles (requester + assignees + validators)
       const allProfileIds = new Set<string>();
       if ((t as any).requester_id) allProfileIds.add((t as any).requester_id);
       if ((t as any).assignee_id) allProfileIds.add((t as any).assignee_id);
@@ -148,11 +139,8 @@ export default function RequestDetail() {
           .from('profiles').select('id, display_name, company:companies(name), department:departments(name), job_title')
           .in('id', Array.from(allProfileIds));
         const map = new Map<string, string>();
-        for (const p of (profs || []) as any[]) {
-          map.set(p.id, p.display_name || 'Sans nom');
-        }
+        for (const p of (profs || []) as any[]) map.set(p.id, p.display_name || 'Sans nom');
         setProfiles(map);
-        // Détails du demandeur
         if ((t as any).requester_id) {
           const req = (profs || []).find((p: any) => p.id === (t as any).requester_id) as any;
           if (req) setRequesterDetails({
@@ -164,28 +152,28 @@ export default function RequestDetail() {
       }
     } catch (err) {
       console.error(err);
-      toast.error('Erreur de chargement de la demande');
+      toast.error('Erreur de chargement');
       navigate(-1);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // ─── Groupes par sous-processus ────────────────────────────────
+  // ─── Calculs ───────────────────────────────────────────────────
   const subProcessGroups = useMemo<SubProcessGroup[]>(() => {
     const groups = new Map<string, Task[]>();
     for (const c of childTasks) {
-      const id =
-        (c as any).sub_process_template_id ||
-        (c as any).source_sub_process_template_id ||
-        '__direct__';
+      const id = (c as any).sub_process_template_id || (c as any).source_sub_process_template_id || '__direct__';
       if (!groups.has(id)) groups.set(id, []);
       groups.get(id)!.push(c);
     }
     return Array.from(groups.entries())
       .filter(([id]) => id !== '__direct__')
       .map(([id, tasks]) => {
-        const done = tasks.filter(t => ['done', 'validated', 'cloturee'].includes(t.status as string) || ['cloturee'].includes((t as any).be_status)).length;
+        const done = tasks.filter(t =>
+          ['done', 'validated'].includes(t.status as string) ||
+          (t as any).be_status === 'cloturee'
+        ).length;
         return {
           subProcessId: id,
           subProcessName: subProcessNames.get(id) ?? 'Sous-processus',
@@ -206,9 +194,7 @@ export default function RequestDetail() {
     return Math.round((done / childTasks.length) * 100);
   }, [childTasks]);
 
-  // ─── Actions ───────────────────────────────────────────────────
-  const isBERequest = (task as any)?.source_process_template_id === 'bd75a3b0-c918-4b43-befe-739b83f7461a';
-
+  // ─── Actions ──────────────────────────────────────────────────
   const handleCancel = async () => {
     if (!task) return;
     if (!window.confirm('Annuler définitivement cette demande ?')) return;
@@ -220,16 +206,15 @@ export default function RequestDetail() {
     navigate(-1);
   };
 
-  // ─── Render ────────────────────────────────────────────────────
+  // ─── Loading ──────────────────────────────────────────────────
   if (isLoading || !task) {
     return (
       <div className="flex h-screen bg-background">
         <Sidebar activeView={activeView} onViewChange={setActiveView} />
         <div className="flex-1 flex flex-col overflow-hidden">
-          <PageHeader title="Chargement…" />
-          <main className="flex-1 overflow-y-auto p-6 space-y-4">
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-64 w-full" />
+          <main className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-4">
+            <Skeleton className="h-32 w-full max-w-5xl mx-auto" />
+            <Skeleton className="h-96 w-full max-w-5xl mx-auto" />
           </main>
         </div>
       </div>
@@ -237,247 +222,317 @@ export default function RequestDetail() {
   }
 
   const statusMeta = STATUS_META[task.status as string] ?? STATUS_META.todo;
-  const prioMeta = PRIORITY_LABEL[task.priority as string] ?? PRIORITY_LABEL.medium;
+  const prioMeta = PRIORITY_META[task.priority as string] ?? PRIORITY_META.medium;
   const dueDate = (task as any).due_date as string | null | undefined;
-  const dueDateOverdue = dueDate ? new Date(dueDate) < new Date() && !['done', 'validated', 'cancelled'].includes(task.status as string) : false;
-
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const dueOverdue = dueDate ? new Date(dueDate) < today && !['done', 'validated', 'cancelled'].includes(task.status as string) : false;
+  const dueIn = dueDate ? differenceInDays(new Date(dueDate), today) : null;
   const canCancel = !['done', 'validated', 'cancelled'].includes(task.status as string)
     && (isAdmin || task.requester_id === profile?.id);
 
+  // Total tâches terminées
+  const totalDone = childTasks.filter(t =>
+    ['done', 'validated'].includes(t.status as string) || (t as any).be_status === 'cloturee'
+  ).length;
+
+  // Détermine l'étape "courante" pour afficher dans le hero
+  const currentStep = childTasks.find(t =>
+    !['done', 'validated', 'cancelled'].includes(t.status as string) && (t as any).be_status !== 'cloturee'
+  );
+
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
       <Sidebar activeView={activeView} onViewChange={setActiveView} />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <PageHeader
-          title={
-            <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-              <Building2 className="h-5 w-5 text-primary" />
-              <span className="text-base font-semibold">Demande</span>
-            </div>
-          }
-        />
-
         <main className="flex-1 overflow-y-auto">
-          <div className="max-w-5xl mx-auto p-6 space-y-6">
+          <div className="max-w-5xl mx-auto p-4 sm:p-8 space-y-6 pb-12">
 
-            {/* ── Bandeau identité ───────────────────────────── */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 flex-wrap text-xs">
-                {task.request_number && (
-                  <Badge variant="outline" className="font-mono text-[11px] px-2 py-0.5">
-                    {task.request_number}
+            {/* ── Breadcrumb ──────────────────────────────────── */}
+            <button
+              onClick={() => navigate(-1)}
+              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Retour
+            </button>
+
+            {/* ─────────────────────────────────────────────────── */}
+            {/* HERO CARD                                          */}
+            {/* ─────────────────────────────────────────────────── */}
+            <div className="relative overflow-hidden rounded-2xl border bg-card shadow-sm">
+              {/* Bandeau dégradé selon priorité */}
+              <div className={cn(
+                'absolute inset-x-0 top-0 h-1',
+                task.priority === 'urgent' && 'bg-red-500',
+                task.priority === 'high' && 'bg-amber-500',
+                task.priority === 'medium' && 'bg-blue-500',
+                task.priority === 'low' && 'bg-slate-300',
+              )} />
+
+              <div className="p-6 sm:p-8 space-y-5">
+                {/* Numéro + chips */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {task.request_number && (
+                    <span className="font-mono text-xs font-semibold text-muted-foreground bg-muted px-2 py-1 rounded">
+                      {task.request_number}
+                    </span>
+                  )}
+                  <Badge className={cn('text-[10px] font-medium px-2 py-0.5 border', prioMeta.chip)}>
+                    <Flag className="h-2.5 w-2.5 mr-1" />
+                    {prioMeta.label}
                   </Badge>
-                )}
-                <Badge className={cn('text-[10px] px-2 py-0.5 border-0', prioMeta.color)}>
-                  <Flag className="h-2.5 w-2.5 mr-1" />
-                  {prioMeta.label}
-                </Badge>
-                <Badge className={cn('text-[10px] px-2 py-0.5 border-0', statusMeta.bg, statusMeta.color)}>
-                  {statusMeta.label}
-                </Badge>
-                {processName && (
-                  <Badge variant="outline" className="gap-1 text-[10px] text-muted-foreground border-dashed">
-                    <Workflow className="h-2.5 w-2.5" />
-                    {processName}
+                  <Badge className={cn('text-[10px] font-medium px-2 py-0.5 border-0 gap-1.5', statusMeta.chip)}>
+                    <span className={cn('inline-block w-1.5 h-1.5 rounded-full', statusMeta.dot)} />
+                    {statusMeta.label}
                   </Badge>
-                )}
-              </div>
-              <h1 className="text-2xl font-bold tracking-tight">
-                {(task.title ?? '').replace(/^([TD]-[A-Z][A-Z0-9-]*\d+\s*—\s*)+/, '')}
-              </h1>
-              <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1.5">
-                  <Calendar className="h-3.5 w-3.5" />
-                  Créée le {format(parseISO((task as any).created_at), 'dd MMM yyyy', { locale: fr })}
-                </span>
-                {dueDate && (
-                  <span className={cn('flex items-center gap-1.5', dueDateOverdue && 'text-red-600 font-medium')}>
-                    <Clock className="h-3.5 w-3.5" />
-                    Échéance {format(parseISO(dueDate), 'dd MMM yyyy', { locale: fr })}
-                    {dueDateOverdue && ' · en retard'}
+                  {processName && (
+                    <Badge variant="outline" className="text-[10px] font-medium px-2 py-0.5 gap-1 text-muted-foreground border-dashed">
+                      <Workflow className="h-2.5 w-2.5" />
+                      {processName}
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Titre */}
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight leading-tight">
+                  {(task.title ?? '').replace(/^([TD]-[A-Z][A-Z0-9-]*\d+\s*—\s*)+/, '')}
+                </h1>
+
+                {/* Méta créée + échéance */}
+                <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
+                  <span className="flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5" />
+                    Créée le {format(parseISO((task as any).created_at), 'd MMMM yyyy', { locale: fr })}
                   </span>
-                )}
+                  {dueDate && (
+                    <span className={cn(
+                      'flex items-center gap-1.5',
+                      dueOverdue ? 'text-red-600 font-semibold' : dueIn !== null && dueIn <= 7 ? 'text-amber-700 font-medium' : ''
+                    )}>
+                      <Clock className="h-3.5 w-3.5" />
+                      {dueOverdue
+                        ? `En retard de ${Math.abs(dueIn ?? 0)} j`
+                        : dueIn === 0 ? 'Échéance aujourd\'hui'
+                        : dueIn !== null && dueIn > 0 ? `J–${dueIn}` : ''}
+                      <span className="text-muted-foreground font-normal ml-1">
+                        ({format(parseISO(dueDate), 'd MMM yyyy', { locale: fr })})
+                      </span>
+                    </span>
+                  )}
+                </div>
+
+                {/* Progress bar gros visuel */}
+                <div className="pt-2">
+                  <div className="flex items-baseline justify-between mb-2">
+                    <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                      Avancement
+                    </span>
+                    <span className="text-3xl font-bold tracking-tight tabular-nums bg-gradient-to-r from-violet-600 to-blue-600 bg-clip-text text-transparent">
+                      {globalProgress}%
+                    </span>
+                  </div>
+                  <div className="h-2.5 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-violet-500 to-blue-500 transition-all duration-500"
+                      style={{ width: `${globalProgress}%` }}
+                    />
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">
+                      <span className="font-semibold text-foreground">{totalDone}</span>
+                      {' / '}{childTasks.length} étape{childTasks.length > 1 ? 's' : ''} terminée{totalDone > 1 ? 's' : ''}
+                    </span>
+                    {currentStep && (
+                      <span className="text-muted-foreground flex items-center gap-1">
+                        <Hourglass className="h-3 w-3" />
+                        Étape en cours : <span className="font-medium text-foreground">{stripPrefix(currentStep.title)}</span>
+                      </span>
+                    )}
+                    {!currentStep && globalProgress === 100 && (
+                      <span className="text-emerald-700 flex items-center gap-1 font-medium">
+                        <Sparkles className="h-3 w-3" />
+                        Demande complète
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* ── Onglets ────────────────────────────────────── */}
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'steps' | 'synthesis')}>
-              <TabsList className="bg-muted/40">
-                <TabsTrigger value="steps" className="gap-2 text-sm">
+            {/* ─────────────────────────────────────────────────── */}
+            {/* TABS                                                */}
+            {/* ─────────────────────────────────────────────────── */}
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+              <TabsList className="bg-muted/40 border h-10 p-1">
+                <TabsTrigger value="steps" className="gap-2 text-sm px-4 h-8 data-[state=active]:shadow-sm">
                   <ListChecks className="h-4 w-4" />
-                  Étapes
+                  <span>Étapes</span>
                   {childTasks.length > 0 && (
-                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                      {globalProgress}%
+                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-mono">
+                      {totalDone}/{childTasks.length}
                     </Badge>
                   )}
                 </TabsTrigger>
-                <TabsTrigger value="synthesis" className="gap-2 text-sm">
+                <TabsTrigger value="synthesis" className="gap-2 text-sm px-4 h-8 data-[state=active]:shadow-sm">
                   <MessageSquare className="h-4 w-4" />
-                  Synthèse & Discussion
+                  <span>Synthèse & Discussion</span>
                 </TabsTrigger>
               </TabsList>
 
-              {/* ════ Onglet Étapes ════ */}
-              <TabsContent value="steps" className="mt-4 space-y-4">
-                {/* Avancement global */}
-                <Card>
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-base font-semibold">Avancement global</CardTitle>
-                      <span className="text-lg font-bold text-violet-600 tabular-nums">{globalProgress}%</span>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <Progress value={globalProgress} className="h-3" />
-                    <p className="text-xs text-muted-foreground mt-2">
-                      {childTasks.filter(t => ['done', 'validated'].includes(t.status as string) || (t as any).be_status === 'cloturee').length} étape{childTasks.length > 1 ? 's' : ''} terminée{childTasks.length > 1 ? 's' : ''} sur {childTasks.length}
-                    </p>
-                  </CardContent>
-                </Card>
-
-                {/* Étapes groupées par sous-processus (ou liste plate si une seule presta) */}
+              {/* ═════ ÉTAPES ═════ */}
+              <TabsContent value="steps" className="mt-5 space-y-5">
                 {childTasks.length === 0 ? (
                   <Card>
-                    <CardContent className="p-12 text-center text-sm text-muted-foreground">
+                    <CardContent className="p-16 text-center text-sm text-muted-foreground">
                       <FileText className="h-10 w-10 mx-auto opacity-30 mb-3" />
                       Aucune étape pour cette demande.
                     </CardContent>
                   </Card>
                 ) : subProcessGroups.length === 0 ? (
-                  // Pas de groupement par sous-processus → liste plate
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-base font-semibold">Tâches ({childTasks.length})</CardTitle>
+                  <Card className="overflow-hidden">
+                    <CardHeader className="pb-3 border-b bg-muted/20">
+                      <CardTitle className="text-base font-semibold">
+                        Tâches ({childTasks.length})
+                      </CardTitle>
                     </CardHeader>
-                    <CardContent>
-                      <StepList tasks={childTasks} profiles={profiles} />
+                    <CardContent className="p-0">
+                      <StepTimeline tasks={childTasks} profiles={profiles} />
                     </CardContent>
                   </Card>
                 ) : (
                   subProcessGroups.map((group) => (
-                    <Card key={group.subProcessId}>
-                      <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <CardTitle className="text-base font-semibold">{group.subProcessName}</CardTitle>
+                    <Card key={group.subProcessId} className="overflow-hidden">
+                      <CardHeader className="pb-3 border-b bg-muted/20">
+                        <div className="flex items-center justify-between gap-4 flex-wrap">
+                          <div className="min-w-0">
+                            <CardTitle className="text-base font-semibold truncate capitalize">
+                              {group.subProcessName}
+                            </CardTitle>
                             <p className="text-xs text-muted-foreground mt-0.5">
-                              {group.done}/{group.total} étape{group.total > 1 ? 's' : ''} terminée{group.done > 1 ? 's' : ''}
+                              {group.done} sur {group.total} étape{group.total > 1 ? 's' : ''} terminée{group.done > 1 ? 's' : ''}
                             </p>
                           </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <Progress value={group.progressPercent} className="w-24 h-2" />
-                            <span className="text-sm font-semibold tabular-nums w-10 text-right">{group.progressPercent}%</span>
+                          <div className="flex items-center gap-3 shrink-0">
+                            <Progress value={group.progressPercent} className="w-28 h-2" />
+                            <span className="text-sm font-semibold tabular-nums w-11 text-right">{group.progressPercent}%</span>
                           </div>
                         </div>
                       </CardHeader>
-                      <CardContent>
-                        <StepList tasks={group.tasks} profiles={profiles} />
+                      <CardContent className="p-0">
+                        <StepTimeline tasks={group.tasks} profiles={profiles} />
                       </CardContent>
                     </Card>
                   ))
                 )}
               </TabsContent>
 
-              {/* ════ Onglet Synthèse + Discussion ════ */}
-              <TabsContent value="synthesis" className="mt-4 space-y-4">
-                {/* Récap */}
+              {/* ═════ SYNTHÈSE & DISCUSSION ═════ */}
+              <TabsContent value="synthesis" className="mt-5 space-y-5">
                 <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base font-semibold">Synthèse</CardTitle>
+                  <CardHeader className="pb-3 border-b bg-muted/20">
+                    <CardTitle className="text-base font-semibold">Récapitulatif</CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4 text-sm">
+                  <CardContent className="p-6 space-y-5">
                     {task.description && (
                       <div>
-                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5">Description</p>
-                        <p className="text-sm whitespace-pre-wrap leading-relaxed">{task.description}</p>
+                        <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1.5">
+                          Description
+                        </p>
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                          {task.description}
+                        </p>
                       </div>
                     )}
 
-                    <Separator />
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
                       <InfoBlock label="Demandeur" icon={User}>
-                        <div className="text-sm font-medium">{profiles.get((task as any).requester_id ?? '') ?? '—'}</div>
-                        {requesterDetails && (
-                          <div className="text-xs text-muted-foreground space-y-0.5 mt-1">
-                            {requesterDetails.company && <div>{requesterDetails.company}</div>}
-                            {requesterDetails.department && <div>{requesterDetails.department}</div>}
-                            {requesterDetails.job_title && <div className="italic">{requesterDetails.job_title}</div>}
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-9 w-9">
+                            <AvatarFallback className="text-xs bg-violet-100 text-violet-700">
+                              {initials(profiles.get((task as any).requester_id ?? '') ?? '?')}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">
+                              {profiles.get((task as any).requester_id ?? '') ?? '—'}
+                            </p>
+                            {requesterDetails && (
+                              <p className="text-xs text-muted-foreground truncate">
+                                {[requesterDetails.job_title, requesterDetails.department, requesterDetails.company]
+                                  .filter(Boolean).join(' · ')}
+                              </p>
+                            )}
                           </div>
-                        )}
+                        </div>
                       </InfoBlock>
 
                       <InfoBlock label="Échéance" icon={Calendar}>
                         {dueDate ? (
-                          <div className={cn('text-sm font-medium', dueDateOverdue && 'text-red-600')}>
-                            {format(parseISO(dueDate), 'EEEE dd MMMM yyyy', { locale: fr })}
-                            {dueDateOverdue && (
-                              <span className="ml-2 text-xs font-normal">
-                                <AlertTriangle className="h-3 w-3 inline mr-0.5" /> en retard
-                              </span>
+                          <div className="text-sm">
+                            <span className={cn('font-medium', dueOverdue && 'text-red-600')}>
+                              {format(parseISO(dueDate), 'EEEE d MMMM yyyy', { locale: fr })}
+                            </span>
+                            {dueOverdue && (
+                              <div className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                                <AlertTriangle className="h-3 w-3" />
+                                En retard de {Math.abs(dueIn ?? 0)} j
+                              </div>
                             )}
                           </div>
                         ) : (
-                          <span className="text-sm text-muted-foreground">Pas d'échéance</span>
+                          <span className="text-sm text-muted-foreground">Pas d'échéance définie</span>
                         )}
                       </InfoBlock>
 
                       <InfoBlock label="Avancement" icon={CheckCircle2}>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-3">
                           <Progress value={globalProgress} className="flex-1 h-2" />
                           <span className="text-sm font-semibold tabular-nums">{globalProgress}%</span>
                         </div>
+                        <p className="text-xs text-muted-foreground mt-1.5">
+                          {totalDone} sur {childTasks.length} étape{childTasks.length > 1 ? 's' : ''} terminée{totalDone > 1 ? 's' : ''}
+                        </p>
                       </InfoBlock>
 
-                      <InfoBlock label="Étapes" icon={ListChecks}>
+                      <InfoBlock label="Structure" icon={ListChecks}>
                         <div className="text-sm">
                           <span className="font-semibold">{childTasks.length}</span> étape{childTasks.length > 1 ? 's' : ''}
-                          <span className="text-muted-foreground">
-                            {' '}— {subProcessGroups.length || 1} sous-processus
-                          </span>
+                          {' réparties sur '}
+                          <span className="font-semibold">{subProcessGroups.length || 1}</span> sous-processus
                         </div>
                       </InfoBlock>
                     </div>
                   </CardContent>
                 </Card>
 
-                {/* Discussion */}
                 <Card>
-                  <CardHeader className="pb-3">
+                  <CardHeader className="pb-3 border-b bg-muted/20">
                     <CardTitle className="text-base font-semibold flex items-center gap-2">
                       <MessageSquare className="h-4 w-4 text-muted-foreground" />
                       Discussion
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <TaskCommentsSection taskId={task.id} className="min-h-[280px] max-h-[60vh]" />
+                  <CardContent className="p-4">
+                    <TaskCommentsSection taskId={task.id} className="min-h-[320px] max-h-[60vh]" />
                   </CardContent>
                 </Card>
               </TabsContent>
             </Tabs>
 
-            {/* ── Actions globales ──────────────────────────── */}
-            <div className="flex items-center justify-end gap-2 pt-2 border-t">
-              {canCancel && (
+            {/* ── Actions ─────────────────────────────────────── */}
+            {canCancel && (
+              <div className="flex items-center justify-end gap-2 pt-2">
                 <Button
                   variant="outline"
                   onClick={handleCancel}
                   disabled={isCancelling}
-                  className="gap-2 text-red-600 border-red-200 hover:bg-red-50"
+                  className="gap-2 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
                 >
                   {isCancelling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ban className="h-4 w-4" />}
                   Annuler la demande
                 </Button>
-              )}
-              <Button variant="outline" onClick={() => navigate(-1)} className="gap-2">
-                <ArrowLeft className="h-4 w-4" />
-                Retour
-              </Button>
-            </div>
+              </div>
+            )}
           </div>
         </main>
       </div>
@@ -486,112 +541,151 @@ export default function RequestDetail() {
 }
 
 // ════════════════════════════════════════════════════════════════════════
-// Liste compacte d'étapes
+// Timeline verticale des étapes — style portail de suivi
 // ════════════════════════════════════════════════════════════════════════
-function StepList({ tasks, profiles }: { tasks: Task[]; profiles: Map<string, string> }) {
+function StepTimeline({ tasks, profiles }: { tasks: Task[]; profiles: Map<string, string> }) {
   const navigate = useNavigate();
-
   if (tasks.length === 0) {
-    return <p className="text-xs text-muted-foreground italic">Aucune étape.</p>;
+    return <p className="text-xs text-muted-foreground italic p-6">Aucune étape.</p>;
   }
 
   return (
-    <ul className="divide-y -mx-3">
-      {tasks.map((t) => {
+    <ol className="divide-y">
+      {tasks.map((t, idx) => {
         const beStatus = (t as any).be_status as string | null | undefined;
         const stat = STATUS_META[t.status as string] ?? STATUS_META.todo;
         const beMeta = beStatus ? getBEStatusMeta(beStatus) : null;
         const isDone = ['done', 'validated'].includes(t.status as string) || beStatus === 'cloturee';
+        const isActive = (t.status as string) === 'in-progress'
+          || ['en_cours', 'a_relire', 'a_valider', 'a_deposer'].includes(beStatus ?? '');
         const validatedAt = (t as any).validated_at as string | null | undefined;
         const completedAt = (t as any).completed_at as string | null | undefined;
         const finishedAt = validatedAt || completedAt;
+        const assigneeName = (t as any).assignee_id ? profiles.get((t as any).assignee_id) : null;
+        const validatorName = (t as any).validator_level_1_id ? profiles.get((t as any).validator_level_1_id) : null;
 
         return (
           <li key={t.id}>
             <button
               type="button"
               onClick={() => navigate(`/demande/${t.id}`)}
-              className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-muted/40 transition-colors text-left"
+              className="group w-full flex items-start gap-4 p-4 sm:p-5 hover:bg-muted/30 transition-colors text-left"
             >
-              {/* Icône statut */}
-              <div className={cn(
-                'w-8 h-8 rounded-full flex items-center justify-center shrink-0',
-                isDone ? 'bg-emerald-100 text-emerald-700' :
-                (t.status === 'in-progress' || beStatus === 'en_cours') ? 'bg-amber-100 text-amber-700' :
-                'bg-slate-100 text-slate-500',
-              )}>
-                {isDone ? <CheckCircle2 className="h-4 w-4" /> :
-                 beStatus === 'a_relire' || beStatus === 'a_valider' ? <ShieldCheck className="h-4 w-4" /> :
-                 (t.status === 'in-progress' || beStatus === 'en_cours') ? <Clock className="h-4 w-4" /> :
-                 <Flag className="h-4 w-4" />}
+              {/* Cercle numéro/statut + ligne verticale */}
+              <div className="relative flex flex-col items-center shrink-0 pt-0.5">
+                <div className={cn(
+                  'w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 ring-4 ring-background z-10 transition-colors',
+                  isDone     && 'bg-emerald-500 text-white',
+                  !isDone && isActive && 'bg-amber-500 text-white',
+                  !isDone && !isActive && 'bg-slate-200 text-slate-600',
+                )}>
+                  {isDone
+                    ? <CheckCircle2 className="h-4 w-4" />
+                    : isActive
+                      ? <Clock className="h-4 w-4" />
+                      : (idx + 1)}
+                </div>
               </div>
 
-              {/* Titre + meta */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className={cn('text-sm font-medium truncate', isDone && 'line-through text-muted-foreground')}>
-                    {t.title}
-                  </p>
-                  {beMeta ? (
-                    <Badge className={cn('text-[10px] px-1.5 py-0 border-0', beMeta.bgClass, beMeta.textClass)}>
-                      {beMeta.icon} {beMeta.label}
-                    </Badge>
-                  ) : (
-                    <Badge className={cn('text-[10px] px-1.5 py-0 border-0', stat.bg, stat.color)}>
-                      {stat.label}
-                    </Badge>
-                  )}
+              {/* Contenu */}
+              <div className="flex-1 min-w-0 space-y-2">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className={cn(
+                        'text-sm font-medium leading-snug',
+                        isDone && 'line-through text-muted-foreground'
+                      )}>
+                        {stripPrefix(t.title)}
+                      </h4>
+                      {beMeta ? (
+                        <Badge className={cn('text-[10px] px-1.5 py-0 border-0 shrink-0', beMeta.bgClass, beMeta.textClass)}>
+                          {beMeta.icon} {beMeta.label}
+                        </Badge>
+                      ) : (
+                        <Badge className={cn('text-[10px] px-1.5 py-0 border-0 shrink-0', stat.chip)}>
+                          {stat.label}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground/40 group-hover:text-muted-foreground shrink-0 mt-0.5" />
                 </div>
-                <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                  {(t as any).assignee_id ? (
-                    <span className="flex items-center gap-1">
-                      <User className="h-3 w-3" />
-                      {profiles.get((t as any).assignee_id) ?? 'Inconnu'}
+
+                {/* Méta : assigné / validateur / dates */}
+                <div className="flex items-center gap-x-4 gap-y-1.5 flex-wrap text-xs">
+                  {assigneeName ? (
+                    <span className="flex items-center gap-1.5">
+                      <Avatar className="h-5 w-5">
+                        <AvatarFallback className="text-[9px] bg-blue-100 text-blue-700">{initials(assigneeName)}</AvatarFallback>
+                      </Avatar>
+                      <span className="text-muted-foreground">{assigneeName}</span>
                     </span>
                   ) : (
-                    <span className="flex items-center gap-1 text-amber-600">
+                    <span className="flex items-center gap-1 text-amber-700 font-medium">
                       <UserPlus className="h-3 w-3" />
                       À affecter
                     </span>
                   )}
-                  {(t as any).validator_level_1_id && (
-                    <span className="flex items-center gap-1">
+                  {validatorName && (
+                    <span className="flex items-center gap-1 text-muted-foreground">
                       <ShieldCheck className="h-3 w-3" />
-                      Valideur : {profiles.get((t as any).validator_level_1_id)}
+                      Valid. : {validatorName}
                     </span>
                   )}
-                  {finishedAt && (
-                    <span className="flex items-center gap-1 text-emerald-700">
+                  {finishedAt ? (
+                    <span className="flex items-center gap-1 text-emerald-700 font-medium">
                       <CheckCircle2 className="h-3 w-3" />
-                      Validée le {format(parseISO(finishedAt), 'dd MMM yyyy', { locale: fr })}
+                      Validée le {format(parseISO(finishedAt), 'd MMM yyyy', { locale: fr })}
+                    </span>
+                  ) : (t as any).due_date && (
+                    <span className="flex items-center gap-1 text-muted-foreground">
+                      <Calendar className="h-3 w-3" />
+                      Échéance {format(parseISO((t as any).due_date), 'd MMM', { locale: fr })}
                     </span>
                   )}
-                  {!finishedAt && (t as any).due_date && (
-                    <span className="flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />
-                      Échéance {format(parseISO((t as any).due_date), 'dd MMM', { locale: fr })}
-                    </span>
+                  {(t as any).is_milestone && (
+                    <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-violet-200 bg-violet-50 text-violet-700">
+                      <Flag className="h-2.5 w-2.5 mr-0.5" />
+                      Jalon
+                    </Badge>
                   )}
                 </div>
               </div>
-
-              <ChevronRight className="h-4 w-4 text-muted-foreground/50 shrink-0" />
             </button>
           </li>
         );
       })}
-    </ul>
+    </ol>
   );
 }
 
+// ════════════════════════════════════════════════════════════════════════
 function InfoBlock({ label, icon: Icon, children }: { label: string; icon: any; children: React.ReactNode }) {
   return (
-    <div>
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1 flex items-center gap-1.5">
+    <div className="space-y-2">
+      <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
         <Icon className="h-3 w-3" />
         {label}
       </p>
-      {children}
+      <div>{children}</div>
     </div>
   );
+}
+
+// Strip prefix « D-XXX-0001 — » ou « T-XXX-0001 — » + nom prestation pour
+// afficher juste l'étape dans la timeline (déjà groupée par sous-processus)
+function stripPrefix(title: string | null | undefined): string {
+  if (!title) return '';
+  return title.replace(/^([TD]-[A-Z][A-Z0-9-]*\d+\s*—\s*)+/, '')
+              .replace(/^[^—]+—[^—]+—\s*/, ''); // retire « demande — presta — » s'il y a 3 niveaux
+}
+
+function initials(name: string): string {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(s => s[0]?.toUpperCase() ?? '')
+    .join('') || '?';
 }
