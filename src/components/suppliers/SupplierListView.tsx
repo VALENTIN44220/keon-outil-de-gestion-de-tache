@@ -218,7 +218,9 @@ export interface SupplierColumnDef {
 
 const ALL_COLUMNS: SupplierColumnDef[] = [
   { key: 'tiers', label: 'TIERS', defaultVisible: true, className: 'w-[120px]', render: (s) => <span className="font-mono font-medium">{s.tiers}</span> },
-  { key: 'nomfournisseur', label: 'Nom Fournisseur', defaultVisible: true, render: (s) => <span className="font-medium">{s.nomfournisseur || '—'}</span> },
+  // Fallback : si la sync Divalto n'a écrit que dans nom_commercial (cas observé
+  // pour les tiers récemment créés), on l'affiche pour ne pas montrer de vide.
+  { key: 'nomfournisseur', label: 'Nom Fournisseur', defaultVisible: true, render: (s) => <span className="font-medium">{s.nomfournisseur || s.nom_commercial || '—'}</span> },
   { key: 'nom_commercial', label: 'Nom commercial', defaultVisible: true, render: (s) => <span>{s.nom_commercial || '—'}</span> },
   { key: 'entite', label: 'Entité', defaultVisible: true, render: (s) => {
     const entites = (s.entite || '').split(',').map(e => e.trim()).filter(Boolean);
@@ -1192,7 +1194,7 @@ export function SupplierListView({
                         </div>
                       )}
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium text-sm truncate">{supplier.nomfournisseur || '—'}</p>
+                        <p className="font-medium text-sm truncate">{supplier.nomfournisseur || supplier.nom_commercial || '—'}</p>
                         <p className="font-mono text-xs text-muted-foreground">{supplier.tiers}</p>
                       </div>
                     </div>
