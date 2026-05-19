@@ -407,7 +407,7 @@ export function NewBERequestDialog({
       if (selectedSubProcessIds.length > 0) {
         const { data: tplRows, error: tplErr } = await (sb as any)
           .from('task_templates')
-          .select('id, sub_process_template_id, title, default_duration_days, default_duration_hours, order_index, validation_level_1, validator_level_1_id, validation_level_2, validator_level_2_id, is_milestone, milestone_label, auto_milestone_delay_days, auto_milestone_label, required_docs_count, required_docs_description, start_mode, depends_on_task_template_id')
+          .select('id, sub_process_template_id, title, default_duration_days, default_duration_hours, order_index, validation_level_1, validator_level_1_id, validation_level_2, validator_level_2_id, is_milestone, milestone_label, auto_milestone_delay_days, auto_milestone_label, required_docs_count, required_docs_description, start_mode, depends_on_task_template_id, delay_after_previous_days')
           .in('sub_process_template_id', selectedSubProcessIds)
           .order('order_index', { ascending: true });
         if (tplErr) throw tplErr;
@@ -453,6 +453,7 @@ export function NewBERequestDialog({
           required_docs_count: tpl.required_docs_count ?? 0,
           required_docs_description: tpl.required_docs_description,
           start_mode: tpl.start_mode ?? 'parallel',
+          delay_after_previous_days: tpl.delay_after_previous_days ?? 0,
         };
       });
 

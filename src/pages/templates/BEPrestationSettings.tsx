@@ -80,6 +80,8 @@ interface StepDraft {
   start_mode: StartMode;
   /** ID (dbId ou tempId) de l'étape à attendre, si start_mode = after_specific */
   depends_on_temp_id: string | null;
+  /** Délai (jours) à ajouter après la fin du prédécesseur. 0 = enchaîné immédiatement. */
+  delay_after_previous_days: number;
   sub_actions: SubAction[];
   expanded: boolean;
 }
@@ -101,6 +103,7 @@ const blankStep = (): StepDraft => ({
   auto_milestone_label: '',
   start_mode: 'parallel',
   depends_on_temp_id: null,
+  delay_after_previous_days: 0,
   sub_actions: [],
   expanded: false,
 });
@@ -169,7 +172,7 @@ export default function BEPrestationSettings() {
 
       const { data: tasks, error: tasksErr } = await (supabase as any)
         .from('task_templates')
-        .select('id, title, default_duration_days, validation_level_1, validator_level_1_id, validation_level_2, validator_level_2_id, order_index, required_docs_count, required_docs_description, is_milestone, milestone_label, auto_milestone_delay_days, auto_milestone_label, start_mode, depends_on_task_template_id')
+        .select('id, title, default_duration_days, validation_level_1, validator_level_1_id, validation_level_2, validator_level_2_id, order_index, required_docs_count, required_docs_description, is_milestone, milestone_label, auto_milestone_delay_days, auto_milestone_label, start_mode, depends_on_task_template_id, delay_after_previous_days')
         .eq('sub_process_template_id', subProcessId!)
         .order('order_index', { ascending: true });
       if (tasksErr) throw tasksErr;
@@ -207,6 +210,7 @@ export default function BEPrestationSettings() {
         auto_milestone_label: t.auto_milestone_label ?? '',
         start_mode: (t.start_mode as StartMode) || 'parallel',
         depends_on_temp_id: null, // résolu juste après
+        delay_after_previous_days: t.delay_after_previous_days ?? 0,
         sub_actions: (subActionsByTask.get(t.id) || []).map((sa: any) => ({
           dbId: sa.id,
           tempId: crypto.randomUUID(),
@@ -358,6 +362,7 @@ export default function BEPrestationSettings() {
           auto_milestone_label: s.is_milestone && s.auto_milestone_delay_days ? (s.auto_milestone_label.trim() || null) : null,
           start_mode: s.start_mode,
           depends_on_task_template_id: dependsOnDbId,
+          delay_after_previous_days: s.delay_after_previous_days || 0,
         };
 
         let taskId: string;
@@ -708,6 +713,31 @@ function StepEditor({
                   })}
                 </SelectContent>
               </Select>
+            )}
+
+            {/* Délai après la précédente — affiché pour after_previous OU after_specific */}
+            {(step.start_mode === 'after_previous' || step.start_mode === 'after_specific') && (
+              <div className="space-y-1 pt-1">
+                <Label className="text-[10px] text-muted-foreground">
+                  Délai (jours) à attendre après la fin de l'étape précédente
+                </Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={step.delay_after_previous_days}
+                  onChange={(e) => onUpdate({
+                    delay_after_previous_days: Math.max(0, parseInt(e.target.value) || 0),
+                  })}
+                  placeholder="0 = enchaîné immédiatement"
+                  className="h-8 text-xs w-40"
+                  disabled={!canManage}
+                />
+                {step.delay_after_previous_days > 0 && (
+                  <p className="text-[10px] text-muted-foreground italic">
+                    Cette étape démarrera <strong>{step.delay_after_previous_days} jour{step.delay_after_previous_days > 1 ? 's' : ''}</strong> après la fin de la précédente.
+                  </p>
+                )}
+              </div>
             )}
           </div>
 
