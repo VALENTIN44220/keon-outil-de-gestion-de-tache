@@ -6,6 +6,7 @@ import { Layout } from '@/components/layout/Layout';
 import { ITProjectHubHeader } from '@/components/it/ITProjectHubHeader';
 import { useITProject, useITProjectTasks, useITProjectStats } from '@/hooks/useITProjectHub';
 import { useITProjectBudget } from '@/hooks/useITProjectBudget';
+import { useQueryClient } from '@tanstack/react-query';
 import { useITBudgetOptions, PRESET_CATEGORIES } from '@/hooks/useITBudgetOptions';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { extractErrorMessage } from '@/lib/extractErrorMessage';
@@ -63,7 +64,13 @@ import {
   Plus,
   BarChart3,
   Wallet,
+  Link2,
+  ChevronDown,
+  Search as SearchIcon,
+  Loader2,
 } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import {
@@ -157,6 +164,7 @@ export default function ITProjectHubBudget() {
   const codeFromHub = useITProjectHubCode();
   const code = codeFromParams?.trim() || codeFromHub;
 
+  const queryClient = useQueryClient();
   const { data: project, isLoading, refetch } = useITProject(code);
   const { data: tasks = [] } = useITProjectTasks(project?.id);
   const stats = useITProjectStats(tasks, project);
@@ -295,6 +303,50 @@ export default function ITProjectHubBudget() {
     setEditingLine(null);
     resetLineForm();
     setLineDialogOpen(true);
+  };
+
+  // ── Dialog « Relier des lignes budgétaires existantes » ──
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [linkSearch, setLinkSearch] = useState('');
+  const [linkSelection, setLinkSelection] = useState<Set<string>>(new Set());
+  const [linkCandidates, setLinkCandidates] = useState<any[]>([]);
+  const [linkLoading, setLinkLoading] = useState(false);
+  const [linkSaving, setLinkSaving] = useState(false);
+
+  const openLinkExistingDialog = async () => {
+    setLinkSelection(new Set());
+    setLinkSearch('');
+    setLinkDialogOpen(true);
+    setLinkLoading(true);
+    // Charge les lignes orphelines (sans projet) ou rattachées à un autre projet
+    const { data, error } = await (supabase as any)
+      .from('it_budget_lines')
+      .select('id, categorie, sous_categorie, fournisseur_prevu, type_depense, budget_type, montant_budget, montant_budget_revise, statut, exercice, it_project_id')
+      .or(`it_project_id.is.null,it_project_id.neq.${project?.id ?? '__none__'}`)
+      .order('exercice', { ascending: false })
+      .order('categorie', { ascending: true })
+      .limit(500);
+    setLinkLoading(false);
+    if (error) { toast({ title: 'Erreur', description: error.message, variant: 'destructive' }); return; }
+    setLinkCandidates(data || []);
+  };
+
+  const handleLinkExisting = async () => {
+    if (!project?.id || linkSelection.size === 0) return;
+    setLinkSaving(true);
+    const ids = Array.from(linkSelection);
+    const { error } = await (supabase as any)
+      .from('it_budget_lines')
+      .update({ it_project_id: project.id })
+      .in('id', ids);
+    setLinkSaving(false);
+    if (error) { toast({ title: 'Erreur', description: error.message, variant: 'destructive' }); return; }
+    toast({ title: 'Lignes liées', description: `${ids.length} ligne${ids.length > 1 ? 's' : ''} rattachée${ids.length > 1 ? 's' : ''} au projet.` });
+    setLinkDialogOpen(false);
+    setLinkSelection(new Set());
+    // Refresh la table : invalide la query react-query du budget
+    queryClient.invalidateQueries({ queryKey: ['it-budget-lines', project.id] });
+    if (typeof refetch === 'function') refetch();
   };
 
   const openEditLine = (line: ITBudgetLine) => {
@@ -792,10 +844,31 @@ export default function ITProjectHubBudget() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button onClick={openAddLine} className="gap-2 ml-auto">
-                    <Plus className="h-4 w-4" />
-                    + Ajouter une ligne
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button className="gap-2 ml-auto">
+                        <Plus className="h-4 w-4" />
+                        Ajouter
+                        <ChevronDown className="h-3.5 w-3.5 opacity-70" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-64">
+                      <DropdownMenuItem onClick={openLinkExistingDialog} className="gap-2 py-2.5">
+                        <Link2 className="h-4 w-4 text-violet-600" />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">Relier des lignes existantes</p>
+                          <p className="text-[11px] text-muted-foreground">Rattacher des lignes orphelines à ce projet</p>
+                        </div>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={openAddLine} className="gap-2 py-2.5">
+                        <Plus className="h-4 w-4" />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">Créer une nouvelle ligne</p>
+                          <p className="text-[11px] text-muted-foreground">Saisir manuellement une ligne budgétaire</p>
+                        </div>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
 
                 {filteredLines.length === 0 ? (
@@ -1069,6 +1142,140 @@ export default function ITProjectHubBudget() {
         onClose={() => setShowEditDialog(false)}
         onSaved={refetch}
       />
+
+      {/* ── Dialog : relier des lignes budgétaires existantes au projet ── */}
+      <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Link2 className="h-5 w-5 text-violet-600" />
+              Relier des lignes budgétaires existantes
+            </DialogTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              Sélectionne les lignes (saisies sans projet ou rattachées ailleurs) à rattacher à <strong>{project?.code_projet_digital}</strong>.
+            </p>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="relative">
+              <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={linkSearch}
+                onChange={(e) => setLinkSearch(e.target.value)}
+                placeholder="Rechercher par catégorie, fournisseur, description…"
+                className="pl-8 h-9 text-sm"
+                autoFocus
+              />
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>
+                {linkCandidates.filter(l => {
+                  const q = linkSearch.trim().toLowerCase();
+                  if (!q) return true;
+                  return [l.categorie, l.sous_categorie, l.fournisseur_prevu, l.type_depense].some(v => (v || '').toLowerCase().includes(q));
+                }).length} disponible(s)
+                {linkSelection.size > 0 && ` · ${linkSelection.size} sélectionnée(s)`}
+              </span>
+              {linkCandidates.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const visible = linkCandidates.filter(l => {
+                      const q = linkSearch.trim().toLowerCase();
+                      if (!q) return true;
+                      return [l.categorie, l.sous_categorie, l.fournisseur_prevu, l.type_depense].some(v => (v || '').toLowerCase().includes(q));
+                    });
+                    if (linkSelection.size === visible.length) setLinkSelection(new Set());
+                    else setLinkSelection(new Set(visible.map(l => l.id)));
+                  }}
+                  className="text-primary hover:underline"
+                >
+                  {linkSelection.size === linkCandidates.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+                </button>
+              )}
+            </div>
+
+            <ScrollArea className="h-[360px] rounded-md border">
+              {linkLoading ? (
+                <div className="flex items-center justify-center h-full text-xs text-muted-foreground gap-2 py-12">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Chargement…
+                </div>
+              ) : linkCandidates.length === 0 ? (
+                <div className="p-8 text-center text-xs text-muted-foreground">
+                  Aucune ligne disponible. Toutes les lignes existantes sont déjà rattachées à ce projet.
+                </div>
+              ) : (
+                <table className="w-full text-xs">
+                  <thead className="bg-muted/40 sticky top-0">
+                    <tr className="text-left">
+                      <th className="p-2 w-8"></th>
+                      <th className="p-2">Catégorie</th>
+                      <th className="p-2">Sous-cat.</th>
+                      <th className="p-2">Fournisseur</th>
+                      <th className="p-2">Type</th>
+                      <th className="p-2 text-right">Budget</th>
+                      <th className="p-2">Année</th>
+                      <th className="p-2">Statut</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {linkCandidates
+                      .filter(l => {
+                        const q = linkSearch.trim().toLowerCase();
+                        if (!q) return true;
+                        return [l.categorie, l.sous_categorie, l.fournisseur_prevu, l.type_depense].some(v => (v || '').toLowerCase().includes(q));
+                      })
+                      .map(l => {
+                        const checked = linkSelection.has(l.id);
+                        const total = l.montant_budget_revise || l.montant_budget || 0;
+                        return (
+                          <tr key={l.id} className={cn('hover:bg-muted/30 cursor-pointer', checked && 'bg-violet-50/50')}
+                            onClick={() => {
+                              setLinkSelection(prev => {
+                                const next = new Set(prev);
+                                if (next.has(l.id)) next.delete(l.id); else next.add(l.id);
+                                return next;
+                              });
+                            }}>
+                            <td className="p-2"><Checkbox checked={checked} /></td>
+                            <td className="p-2">{l.categorie || '—'}</td>
+                            <td className="p-2">{l.sous_categorie || '—'}</td>
+                            <td className="p-2 font-mono">{l.fournisseur_prevu || '—'}</td>
+                            <td className="p-2">{l.type_depense || '—'}</td>
+                            <td className="p-2 text-right tabular-nums">
+                              {Number(total).toLocaleString('fr-FR', { minimumFractionDigits: 0 })} €
+                            </td>
+                            <td className="p-2">{l.exercice || l.annee || '—'}</td>
+                            <td className="p-2">
+                              {l.it_project_id && l.it_project_id !== project?.id ? (
+                                <Badge variant="outline" className="text-[9px] px-1 py-0">Autre projet</Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-[9px] px-1 py-0">Orpheline</Badge>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              )}
+            </ScrollArea>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLinkDialogOpen(false)} disabled={linkSaving}>Annuler</Button>
+            <Button
+              onClick={handleLinkExisting}
+              disabled={linkSaving || linkSelection.size === 0}
+              className="gap-2 bg-violet-600 hover:bg-violet-700"
+            >
+              {linkSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
+              Relier ({linkSelection.size})
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={lineDialogOpen} onOpenChange={(o) => { if (!o) { setLineDialogOpen(false); setEditingLine(null); } }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">

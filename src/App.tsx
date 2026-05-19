@@ -80,6 +80,7 @@ function SpvBudgetRedirect() {
 import ITProjects from "./pages/it/ITProjects";
 import ITProjectImportFDR from "./pages/it/ITProjectImportFDR";
 import ITProjectHubOverview from "./pages/it/ITProjectHubOverview";
+import ITProjectHubGovernance from "./pages/it/ITProjectHubGovernance";
 import ITProjectHubTasks from "./pages/it/ITProjectHubTasks";
 import ITProjectHubTimeline from "./pages/it/ITProjectHubTimeline";
 import ITProjectHubSync from "./pages/it/ITProjectHubSync";
@@ -177,6 +178,7 @@ const App = () => (
                 { path: "/it/budget", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITBudgetGlobal /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/cartographie", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITCartographie /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/projects/:code/overview", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubOverview /></ITProjectsAccessGate></ProtectedRoute> },
+                { path: "/it/projects/:code/governance", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubGovernance /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/projects/:code/tasks", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubTasks /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/projects/:code/timeline", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubTimeline /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/projects/:code/sync", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubSync /></ITProjectsAccessGate></ProtectedRoute> },
@@ -246,6 +248,7 @@ const App = () => (
             <Route path="/it/budget" element={<></>} />
             <Route path="/it/cartographie" element={<></>} />
             <Route path="/it/projects/:code/overview" element={<></>} />
+            <Route path="/it/projects/:code/governance" element={<></>} />
             <Route path="/it/projects/:code/tasks" element={<></>} />
             <Route path="/it/projects/:code/timeline" element={<></>} />
             <Route path="/it/projects/:code/sync" element={<></>} />

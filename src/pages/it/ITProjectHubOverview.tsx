@@ -247,44 +247,11 @@ export default function ITProjectHubOverview() {
                 </CardContent>
               </Card>
 
-              {/* 2. Phase en cours */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                    <Target className="h-4 w-4 text-violet-600" />
-                    Phase en cours
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {currentPhase ? (
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-3 flex-wrap">
-                        {phaseBadge && (
-                          <Badge className={cn(phaseBadge.className, 'border text-sm px-2.5 py-1')}>
-                            {currentPhase.label}
-                          </Badge>
-                        )}
-                        <span className="text-xs text-muted-foreground">
-                          Phase {currentPhase.order} / {activePhases.length}
-                        </span>
-                      </div>
-                      <div>
-                        <div className="flex justify-between mb-1.5">
-                          <span className="text-xs text-muted-foreground">Avancement de la phase</span>
-                          <span className="text-sm font-semibold text-violet-600 tabular-nums">{currentPhaseProgress}%</span>
-                        </div>
-                        <Progress value={currentPhaseProgress} className="h-2" />
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground italic">
-                      Aucune phase courante définie.
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
+              {/* Phase en cours + Gouvernance FDR → déplacés dans l'onglet
+                  « Gouvernance & Phasage » pour avoir le détail du phasage
+                  cliquable + le stepper FDR ensemble. */}
 
-              {/* 3. Planning */}
+              {/* 2. Planning */}
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -345,100 +312,7 @@ export default function ITProjectHubOverview() {
                 </CardContent>
               </Card>
 
-              {/* 4. Phase 0 — Gouvernance FDR */}
-              <Card className="border-violet-200/50 bg-violet-50/30 dark:bg-violet-950/10">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                    <Shield className="h-4 w-4 text-violet-600" />
-                    Phase 0 — Gouvernance FDR
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {statutFdr === 'fdr_2027' && (
-                    <div className="rounded-lg bg-emerald-100 border border-emerald-300 text-emerald-800 px-4 py-2 text-sm font-medium">
-                      ✅ Projet validé et intégré à la Feuille de Route 2027
-                    </div>
-                  )}
-                  {statutFdr === 'fdr_2030' && (
-                    <div className="rounded-lg bg-emerald-100 border border-emerald-300 text-emerald-800 px-4 py-2 text-sm font-medium">
-                      ✅ Projet validé et intégré à la Feuille de Route 2030
-                    </div>
-                  )}
-                  {statutFdr === 'abandonne' && (
-                    <div className="rounded-lg bg-red-100 border border-red-300 text-red-800 px-4 py-2 text-sm font-medium">
-                      ❌ Projet abandonné
-                    </div>
-                  )}
-                  {statutFdr === 'stand_by' && (
-                    <div className="rounded-lg bg-amber-100 border border-amber-300 text-amber-800 px-4 py-2 text-sm font-medium">
-                      ⏸️ Projet mis en stand-by
-                    </div>
-                  )}
-
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <span className="text-xs font-medium text-muted-foreground">Statut FDR :</span>
-                    <Select value={statutFdr || 'non_soumis'} onValueChange={handleFdrStatutChange} disabled={savingFdrStatut}>
-                      <SelectTrigger className="h-8 text-xs w-[260px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(Object.entries(STATUT_FDR_CONFIG) as [StatutFDR, typeof STATUT_FDR_CONFIG['non_soumis']][]).map(([key, cfg]) => (
-                          <SelectItem key={key} value={key}>
-                            <span className="flex items-center gap-2">
-                              <span>{cfg.icon}</span>
-                              <span>{cfg.label}</span>
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {fdrConfig && (
-                      <Badge className={cn(fdrConfig.className, 'border text-[10px]')}>
-                        {fdrConfig.icon} {fdrConfig.label}
-                      </Badge>
-                    )}
-                  </div>
-
-                  {etapes.length > 0 ? (
-                    <div className="flex items-start justify-between gap-2">
-                      {etapes.map((etape, idx) => {
-                        const fdrEtape = FDR_ETAPES.find(e => e.numero === etape.etape);
-                        return (
-                          <div key={etape.id} className="flex-1 flex flex-col items-center">
-                            <button
-                              onClick={() => openEtapeDialog(etape)}
-                              className={cn(
-                                'w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all hover:scale-110 cursor-pointer',
-                                ETAPE_COLORS[etape.statut]
-                              )}
-                            >
-                              {etape.statut === 'valide' ? '✓' : etape.statut === 'rejete' ? '✗' : etape.etape}
-                            </button>
-                            {idx < etapes.length - 1 && (
-                              <div className={cn('h-0.5 w-full mt-5 -mb-5', etape.statut === 'valide' ? 'bg-emerald-400' : 'bg-border')} />
-                            )}
-                            <p className="text-[10px] font-medium text-center mt-2 leading-tight max-w-[90px]">
-                              {fdrEtape?.icon} {fdrEtape?.label || etape.etape_label}
-                            </p>
-                            {etape.date_validation && (
-                              <p className="text-[9px] text-muted-foreground mt-0.5">
-                                {format(new Date(etape.date_validation), 'dd/MM/yy')}
-                              </p>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="text-center py-4">
-                      <p className="text-xs text-muted-foreground mb-2">Aucune étape de validation FDR initialisée</p>
-                      <Button size="sm" variant="outline" onClick={initFDRValidation} className="gap-2">
-                        <Shield className="h-3.5 w-3.5" /> Initialiser les 4 étapes
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+              {/* Gouvernance FDR déplacée dans l'onglet « Gouvernance & Phasage » */}
             </div>
 
             {/* ───────── Sidebar (1/3) ───────── */}

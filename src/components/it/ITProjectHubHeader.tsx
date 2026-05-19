@@ -3,7 +3,7 @@ import { ITProject, IT_PROJECT_STATUS_CONFIG, IT_PROJECT_PRIORITY_CONFIG, IT_PRO
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { ArrowLeft, LayoutDashboard, ListTodo, Calendar, MessageSquare, Paperclip, RefreshCw, Pencil, ChevronRight, Monitor, AlertTriangle, TrendingUp, CheckCircle2, Clock, MessageSquareText, Link2, ExternalLink, Euro } from 'lucide-react';
+import { ArrowLeft, LayoutDashboard, ListTodo, Calendar, MessageSquare, Paperclip, RefreshCw, Pencil, ChevronRight, Monitor, AlertTriangle, TrendingUp, CheckCircle2, Clock, MessageSquareText, Link2, ExternalLink, Euro, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useITProjectSync } from '@/hooks/useITProjectSync';
 
@@ -14,13 +14,14 @@ interface ITProjectHubHeaderProps {
 }
 
 const navItems = [
-  { value: 'overview',    label: 'Synthèse',          icon: LayoutDashboard },
-  { value: 'tasks',       label: 'Tâches & Demandes',  icon: ListTodo },
-  { value: 'timeline',    label: 'Planning',           icon: Calendar },
-  { value: 'sync',        label: 'Teams / Loop',       icon: RefreshCw },
-  { value: 'discussions', label: 'Discussions',        icon: MessageSquare },
-  { value: 'files',       label: 'Fichiers',           icon: Paperclip },
-  { value: 'budget',      label: 'Budget',             icon: Euro },
+  { value: 'overview',    label: 'Synthèse',                 icon: LayoutDashboard },
+  { value: 'governance',  label: 'Gouvernance & Phasage',    icon: Shield },
+  { value: 'tasks',       label: 'Tâches & Demandes',        icon: ListTodo },
+  { value: 'timeline',    label: 'Planning',                 icon: Calendar },
+  { value: 'sync',        label: 'Teams / Loop',             icon: RefreshCw },
+  { value: 'discussions', label: 'Discussions',              icon: MessageSquare },
+  { value: 'files',       label: 'Fichiers',                 icon: Paperclip },
+  { value: 'budget',      label: 'Budget',                   icon: Euro },
 ];
 
 export function ITProjectHubHeader({ project, stats, onEditProject }: ITProjectHubHeaderProps) {
@@ -108,36 +109,8 @@ export function ITProjectHubHeader({ project, stats, onEditProject }: ITProjectH
                 </Button>
               )}
 
-              <div className="ml-auto flex items-center gap-6">
-                {[
-                  { icon: Clock, value: stats.openTasks, label: 'Ouvertes', color: 'text-blue-500', bg: '' },
-                  { icon: CheckCircle2, value: stats.doneTasks, label: 'Terminées', color: 'text-emerald-600', bg: '' },
-                ].map(k => (
-                  <div key={k.label} className="text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      <k.icon className={cn('h-4 w-4', k.color)} />
-                      <span className="text-2xl font-bold">{k.value}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">{k.label}</p>
-                  </div>
-                ))}
-                {stats.overdueTasks > 0 && (
-                  <div className="text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      <AlertTriangle className="h-4 w-4 text-red-500" />
-                      <span className="text-2xl font-bold text-red-500">{stats.overdueTasks}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">Retard</p>
-                  </div>
-                )}
-
-                <div className="flex flex-col items-center justify-center">
-                  <div className="relative h-16 w-16 rounded-full border-4 border-muted flex items-center justify-center">
-                    <span className="text-sm font-bold">{stats.progress}%</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">Avancement</p>
-                </div>
-              </div>
+              {/* KPI tâches retirés — l'avancement global est affiché dans la carte
+                  « Synthèse d'avancement » de l'onglet Synthèse pour éviter le doublon. */}
             </div>
           </div>
         </div>
