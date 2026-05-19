@@ -44,6 +44,8 @@ const DEFAULT_PERMISSIONS: EffectivePermissions = {
   can_access_logistique: true,
   can_access_smq: true,        // Q2 : tous peuvent voir/déclarer
   can_manage_smq: false,       // Pilote / admin uniquement
+  can_manage_logistique: false, // Dispatch logistique / admin uniquement
+  can_manage_maintenance: false, // Dispatch maintenance / admin uniquement
   // Transverse
   can_access_suppliers: false,
   can_access_templates: false,

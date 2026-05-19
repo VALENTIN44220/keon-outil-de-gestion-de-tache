@@ -18,7 +18,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Plus, Trash2, Pencil, Shield, RotateCcw } from "lucide-react";
+import { Loader2, Plus, Trash2, Pencil, Shield, RotateCcw, UserPlus, Search, X } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import type { PermissionProfile, UserProfile } from "@/types/admin";
 import type { UserPermissionOverride, AllPermissionKeys } from "@/types/permissions";
 import { SCREEN_PERMISSIONS, SCREEN_LABELS, SCREEN_PERMISSION_GROUPS } from "@/types/permissions";
@@ -125,6 +126,18 @@ const FEATURE_GROUPS: Array<{
       { key: "can_manage_smq", label: "Piloter toutes les NC (responsable SMQ)" },
     ],
   },
+  {
+    label: "Logistique",
+    items: [
+      { key: "can_manage_logistique", label: "Dispatcher et modifier les demandes logistique" },
+    ],
+  },
+  {
+    label: "Maintenance",
+    items: [
+      { key: "can_manage_maintenance", label: "Dispatcher et modifier les demandes maintenance" },
+    ],
+  },
 ];
 
 const DEFAULT_PERMISSIONS: Record<string, boolean> = {
@@ -177,6 +190,8 @@ const DEFAULT_PERMISSIONS: Record<string, boolean> = {
   can_access_logistique: true,
   can_access_smq: true,
   can_manage_smq: false,
+  can_manage_logistique: false,
+  can_manage_maintenance: false,
   // Transverse
   can_access_suppliers: false,
   can_access_templates: false,
@@ -349,6 +364,12 @@ export function AccessRightsTab({
   const [isLoadingOverrides, setIsLoadingOverrides] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [isAssigningProfile, setIsAssigningProfile] = useState(false);
+
+  // Dialog raccourci « Ajouter des utilisateurs au profil »
+  const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
+  const [bulkAssignSearch, setBulkAssignSearch] = useState('');
+  const [bulkAssignSelection, setBulkAssignSelection] = useState<Set<string>>(new Set());
+  const [isBulkAssigning, setIsBulkAssigning] = useState(false);
 
   // Process data
   const [processTemplates, setProcessTemplates] = useState<ProcessTemplate[]>([]);
@@ -564,6 +585,30 @@ export function AccessRightsTab({
       toast.error((e as Error).message || "Erreur lors de l'affectation");
     } finally {
       setIsAssigningProfile(false);
+    }
+  };
+
+  // ── Affectation rapide en lot : ajoute N users d'un coup au profil sélectionné ──
+  const handleBulkAssign = async () => {
+    if (!selectedProfileId || bulkAssignSelection.size === 0) return;
+    setIsBulkAssigning(true);
+    try {
+      const ids = Array.from(bulkAssignSelection);
+      const { error } = await supabase
+        .from('profiles')
+        .update({ permission_profile_id: selectedProfileId })
+        .in('id', ids);
+      if (error) throw error;
+      const profName = permissionProfiles.find(p => p.id === selectedProfileId)?.name ?? 'ce profil';
+      toast.success(`${ids.length} utilisateur${ids.length > 1 ? 's' : ''} ajouté${ids.length > 1 ? 's' : ''} à « ${profName} »`);
+      setBulkAssignOpen(false);
+      setBulkAssignSelection(new Set());
+      setBulkAssignSearch('');
+      onRefresh();
+    } catch (e: any) {
+      toast.error(e?.message || "Erreur lors de l'affectation");
+    } finally {
+      setIsBulkAssigning(false);
     }
   };
 
@@ -814,7 +859,18 @@ export function AccessRightsTab({
 
               {/* Users assigned to this profile */}
               <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-                <SectionHead icon="👥" label="Utilisateurs avec ce profil" />
+                <div className="flex items-center justify-between mb-3">
+                  <SectionHead icon="👥" label="Utilisateurs avec ce profil" />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => { setBulkAssignSelection(new Set()); setBulkAssignSearch(''); setBulkAssignOpen(true); }}
+                    className="gap-1.5 h-8"
+                  >
+                    <UserPlus className="h-3.5 w-3.5" />
+                    Ajouter des utilisateurs
+                  </Button>
+                </div>
                 {(() => {
                   const profileUsers = users.filter((u) => u.permission_profile_id === selectedProfile.id);
                   if (profileUsers.length === 0) {
@@ -1187,6 +1243,139 @@ export function AccessRightsTab({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ─── Dialog : ajouter des users en lot au profil sélectionné ─── */}
+      <Dialog open={bulkAssignOpen} onOpenChange={setBulkAssignOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5 text-primary" />
+              Ajouter des utilisateurs au profil
+            </DialogTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              Profil : <span className="font-medium text-foreground">{permissionProfiles.find(p => p.id === selectedProfileId)?.name ?? '—'}</span>
+              {' '}— sélectionne les utilisateurs à affecter
+            </p>
+          </DialogHeader>
+
+          {(() => {
+            // Liste des users PAS encore sur ce profil
+            const candidates = users.filter(u => u.permission_profile_id !== selectedProfileId);
+            const q = bulkAssignSearch.trim().toLowerCase();
+            const filtered = q
+              ? candidates.filter(u =>
+                  (u.display_name ?? '').toLowerCase().includes(q) ||
+                  (u.email ?? '').toLowerCase().includes(q) ||
+                  (u.department?.name ?? '').toLowerCase().includes(q),
+                )
+              : candidates;
+
+            const toggleAll = () => {
+              if (bulkAssignSelection.size === filtered.length) {
+                setBulkAssignSelection(new Set());
+              } else {
+                setBulkAssignSelection(new Set(filtered.map(u => u.id)));
+              }
+            };
+
+            return (
+              <div className="space-y-3">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    value={bulkAssignSearch}
+                    onChange={(e) => setBulkAssignSearch(e.target.value)}
+                    placeholder="Rechercher par nom, email, service…"
+                    className="pl-8 h-9 text-sm"
+                    autoFocus
+                  />
+                  {bulkAssignSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setBulkAssignSearch('')}
+                      className="absolute right-2 top-2 h-5 w-5 inline-flex items-center justify-center rounded hover:bg-muted"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>
+                    {filtered.length} disponible{filtered.length > 1 ? 's' : ''}
+                    {bulkAssignSelection.size > 0 && ` · ${bulkAssignSelection.size} sélectionné${bulkAssignSelection.size > 1 ? 's' : ''}`}
+                  </span>
+                  {filtered.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={toggleAll}
+                      className="text-primary hover:underline"
+                    >
+                      {bulkAssignSelection.size === filtered.length ? 'Tout désélectionner' : 'Tout sélectionner'}
+                    </button>
+                  )}
+                </div>
+
+                <ScrollArea className="h-[300px] rounded-md border">
+                  {filtered.length === 0 ? (
+                    <div className="p-8 text-center text-xs text-muted-foreground">
+                      {candidates.length === 0
+                        ? 'Tous les utilisateurs sont déjà sur ce profil.'
+                        : `Aucun utilisateur ne correspond à « ${bulkAssignSearch} ».`}
+                    </div>
+                  ) : (
+                    <ul className="divide-y">
+                      {filtered.map((u) => {
+                        const checked = bulkAssignSelection.has(u.id);
+                        const currentProfile = permissionProfiles.find(p => p.id === u.permission_profile_id);
+                        return (
+                          <li key={u.id}>
+                            <Label
+                              className="flex items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-muted/40 transition-colors"
+                            >
+                              <Checkbox
+                                checked={checked}
+                                onCheckedChange={(v) => {
+                                  setBulkAssignSelection(prev => {
+                                    const next = new Set(prev);
+                                    if (v) next.add(u.id); else next.delete(u.id);
+                                    return next;
+                                  });
+                                }}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{u.display_name ?? 'Sans nom'}</p>
+                                <p className="text-[11px] text-muted-foreground truncate">
+                                  {[u.department?.name, currentProfile?.name && `Actuellement : ${currentProfile.name}`]
+                                    .filter(Boolean).join(' · ') || u.email}
+                                </p>
+                              </div>
+                            </Label>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </ScrollArea>
+              </div>
+            );
+          })()}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkAssignOpen(false)} disabled={isBulkAssigning}>
+              Annuler
+            </Button>
+            <Button
+              onClick={handleBulkAssign}
+              disabled={isBulkAssigning || bulkAssignSelection.size === 0}
+              className="gap-2"
+            >
+              {isBulkAssigning ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+              Affecter ({bulkAssignSelection.size})
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -121,6 +121,9 @@ export const FEATURE_PERMISSIONS = [
   'can_delete_suppliers',
   // SMQ
   'can_manage_smq',
+  // Modules avec gestion (dispatch / modification)
+  'can_manage_logistique',
+  'can_manage_maintenance',
 ] as const;
 
 export type FeaturePermissionKey = typeof FEATURE_PERMISSIONS[number];
@@ -186,6 +189,8 @@ export interface UserPermissionOverride {
   can_access_logistique: boolean | null;
   can_access_smq: boolean | null;
   can_manage_smq: boolean | null;
+  can_manage_logistique: boolean | null;
+  can_manage_maintenance: boolean | null;
   // Transverse
   can_access_suppliers: boolean | null;
   can_access_templates: boolean | null;
@@ -250,6 +255,8 @@ export interface EffectivePermissions {
   can_access_logistique: boolean;
   can_access_smq: boolean;
   can_manage_smq: boolean;
+  can_manage_logistique: boolean;
+  can_manage_maintenance: boolean;
   // Transverse
   can_access_suppliers: boolean;
   can_access_templates: boolean;
