@@ -185,7 +185,6 @@ export function NewPrestationBEWizard({ open, onClose, onSuccess }: NewPrestatio
           order_index: (count ?? 0) * 10 + 10,
           is_shared: true,
           is_mandatory: false,
-          show_quick_launch: false,
           visibility_level: 'public',
           creator_company_id: profile?.company_id ?? null,
           creator_department_id: profile?.department_id ?? null,

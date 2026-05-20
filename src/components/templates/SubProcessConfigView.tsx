@@ -144,8 +144,6 @@ export function SubProcessConfigView({
     target_manager_id: null as string | null,
     target_department_id: null as string | null,
     target_group_id: null as string | null,
-    modifiable_at_request: false,
-    show_quick_launch: false,
     // Champs BE
     be_category: '' as string,
     dispatch_manager_id: null as string | null,
@@ -202,8 +200,6 @@ export function SubProcessConfigView({
           target_manager_id: spData.target_manager_id,
           target_department_id: spData.target_department_id,
           target_group_id: spData.target_group_id,
-          modifiable_at_request: false,
-          show_quick_launch: (spData as any).show_quick_launch ?? false,
           be_category: ((spData as any).be_category as string) || '',
           dispatch_manager_id: ((spData as any).dispatch_manager_id as string | null) || null,
         });
@@ -330,7 +326,6 @@ export function SubProcessConfigView({
           name: formData.name,
           description: formData.description || null,
           is_mandatory: formData.is_mandatory,
-          show_quick_launch: formData.show_quick_launch,
           form_schema: updatedSchema,
           ...beFields,
         } as any)
@@ -652,19 +647,6 @@ export function SubProcessConfigView({
                       <Switch
                         checked={formData.apply_request_validation}
                         onCheckedChange={(checked) => setFormData({ ...formData, apply_request_validation: checked })}
-                        disabled={!canManage}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                      <div>
-                        <Label>Afficher en lancement rapide</Label>
-                        <p className="text-xs text-muted-foreground">
-                          Ajoute un bouton raccourci sur la carte du processus dans la page Demandes
-                        </p>
-                      </div>
-                      <Switch
-                        checked={formData.show_quick_launch}
-                        onCheckedChange={(checked) => setFormData({ ...formData, show_quick_launch: checked })}
                         disabled={!canManage}
                       />
                     </div>
@@ -994,14 +976,6 @@ export function SubProcessConfigView({
                         </div>
                       )}
 
-                      {formData.assignment_type === 'user' && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">Modifiable à la demande</span>
-                          <Badge variant={formData.modifiable_at_request ? 'default' : 'secondary'}>
-                            {formData.modifiable_at_request ? 'Oui' : 'Non'}
-                          </Badge>
-                        </div>
-                      )}
                     </div>
 
                     <div className="flex items-center gap-2 p-3 rounded-lg border border-primary/20 bg-primary/5">

@@ -152,8 +152,6 @@ export default function SubProcessSettings() {
     target_department_id: null as string | null,
     target_group_id: null as string | null,
     target_job_title_id: null as string | null,
-    modifiable_at_request: false,
-    show_quick_launch: false,
     // Fallback
     fallback_assignment_type: null as AssignmentType | null,
     fallback_target_assignee_id: null as string | null,
@@ -216,8 +214,6 @@ export default function SubProcessSettings() {
         target_department_id: spData.target_department_id,
         target_group_id: spData.target_group_id,
         target_job_title_id: spData.target_job_title_id,
-        modifiable_at_request: false,
-        show_quick_launch: (spData as any).show_quick_launch ?? false,
         fallback_assignment_type: (spData as any).fallback_assignment_type || null,
         fallback_target_assignee_id: (spData as any).fallback_target_assignee_id || null,
         fallback_target_group_id: (spData as any).fallback_target_group_id || null,
@@ -298,7 +294,6 @@ export default function SubProcessSettings() {
           name: formData.name,
           description: formData.description || null,
           is_mandatory: formData.is_mandatory,
-          show_quick_launch: formData.show_quick_launch,
           ...beFields,
         } as any)
         .eq('id', subProcessId);
@@ -676,19 +671,6 @@ export default function SubProcessSettings() {
                           disabled={!canManage}
                         />
                       </div>
-                      <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                        <div>
-                          <Label>Afficher en lancement rapide</Label>
-                          <p className="text-xs text-muted-foreground">
-                            Ajoute un bouton raccourci sur la carte du processus dans la page Demandes
-                          </p>
-                        </div>
-                        <Switch
-                          checked={formData.show_quick_launch}
-                          onCheckedChange={(checked) => setFormData({ ...formData, show_quick_launch: checked })}
-                          disabled={!canManage}
-                        />
-                      </div>
                       {canManage && (
                         <Button onClick={handleSaveGeneral} disabled={isSaving}>
                           {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
@@ -903,19 +885,6 @@ export default function SubProcessSettings() {
                                 ))}
                               </SelectContent>
                             </Select>
-                          </div>
-                          <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                            <div>
-                              <Label>Modifiable à la demande</Label>
-                              <p className="text-xs text-muted-foreground">
-                                Le demandeur peut changer l'affectataire
-                              </p>
-                            </div>
-                            <Switch
-                              checked={formData.modifiable_at_request}
-                              onCheckedChange={(checked) => setFormData({ ...formData, modifiable_at_request: checked })}
-                              disabled={!canManage}
-                            />
                           </div>
                         </div>
                       )}

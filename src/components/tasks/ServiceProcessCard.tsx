@@ -14,7 +14,6 @@ interface SubProcess {
   id: string;
   name: string;
   description: string | null;
-  show_quick_launch?: boolean;
 }
 
 interface ServiceProcessCardProps {
