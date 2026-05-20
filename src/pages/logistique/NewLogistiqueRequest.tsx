@@ -22,6 +22,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSimulation } from '@/contexts/SimulationContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { RequestCustomFieldsSection, insertRequestFieldValues } from '@/components/requests/RequestCustomFieldsSection';
 
 const LOGISTIQUE_PROCESS_ID = '11111111-1111-4111-8111-111111111201';
 
@@ -57,6 +58,7 @@ export default function NewLogistiqueRequest() {
   const [typeColis, setTypeColis] = useState('colis');
   const [dateSouhaitee, setDateSouhaitee] = useState('');
   const [description, setDescription] = useState('');
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
 
   const canSubmit =
     !isSubmitting &&
@@ -102,6 +104,15 @@ export default function NewLogistiqueRequest() {
       }).select('id').single();
 
       if (error || !data) throw error;
+
+      // Champs personnalisés (CONFIGURATION:MODELE > Champs)
+      if (Object.keys(customFieldValues).length > 0) {
+        const { error: cfErr } = await insertRequestFieldValues(data.id, customFieldValues);
+        if (cfErr) {
+          console.warn('[NewLogistiqueRequest] custom fields insert error:', cfErr);
+          toast.error(`Demande créée — champs personnalisés non sauvegardés : ${cfErr.message}`);
+        }
+      }
 
       toast.success(urgence ? 'Demande URGENTE soumise' : 'Demande de transport soumise');
       navigate('/logistique/dispatch');
@@ -256,6 +267,16 @@ export default function NewLogistiqueRequest() {
                   <Label>Commentaire / précisions</Label>
                   <Textarea rows={2} value={description} onChange={e => setDescription(e.target.value)} disabled={isSubmitting} placeholder="Indications particulières (fragile, manutention...)" />
                 </div>
+
+                {/* Champs personnalisés configurés via CONFIGURATION:MODELE > Champs */}
+                <RequestCustomFieldsSection
+                  processTemplateId={LOGISTIQUE_PROCESS_ID}
+                  values={customFieldValues}
+                  onChange={(fieldId, value) =>
+                    setCustomFieldValues((prev) => ({ ...prev, [fieldId]: value }))
+                  }
+                  disabled={isSubmitting}
+                />
 
                 <div className="flex items-center justify-end gap-2 pt-4 border-t">
                   <Button variant="outline" onClick={() => navigate('/logistique/dispatch')} disabled={isSubmitting}>

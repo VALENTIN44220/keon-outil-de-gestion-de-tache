@@ -25,6 +25,7 @@ import { toast } from 'sonner';
 import { IT_PRESTATIONS, IT_PRESTATIONS_REQUIRING_CDC, IT_CDC_TEMPLATE_URL } from '@/hooks/useITRequests';
 import { useITProjects } from '@/hooks/useITProjects';
 import { useEffect } from 'react';
+import { RequestCustomFieldsSection, insertRequestFieldValues } from '@/components/requests/RequestCustomFieldsSection';
 
 export default function NewITRequest() {
   const navigate = useNavigate();
@@ -58,6 +59,8 @@ export default function NewITRequest() {
   const [links, setLinks] = useState<string[]>([]);
   const [newLink, setNewLink] = useState('');
   const [uploadingFile, setUploadingFile] = useState(false);
+  // Valeurs des champs personnalisés (template_custom_fields configurés via CONFIGURATION:MODELE)
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
 
   const { projects: itProjects, isLoading: isLoadingProjects } = useITProjects();
 
@@ -112,7 +115,7 @@ export default function NewITRequest() {
       if (attachments.length) moduleData.attachments = attachments;
       if (links.length) moduleData.links = links;
 
-      const { error } = await supabase.from('tasks').insert({
+      const { data: inserted, error } = await supabase.from('tasks').insert({
         type: 'request',
         status: 'todo',
         title,
@@ -125,9 +128,19 @@ export default function NewITRequest() {
         priority: priority as any,
         due_date: echeanceSouhaitee || null,
         module_data: moduleData,
-      });
+      }).select('id').single();
 
       if (error) throw error;
+
+      // Persiste les valeurs des champs personnalisés (CONFIGURATION:MODELE > Champs)
+      if (inserted?.id && Object.keys(customFieldValues).length > 0) {
+        const { error: cfErr } = await insertRequestFieldValues(inserted.id, customFieldValues);
+        if (cfErr) {
+          console.warn('[NewITRequest] custom fields insert error:', cfErr);
+          toast.error(`Demande créée — champs personnalisés non sauvegardés : ${cfErr.message}`);
+        }
+      }
+
       toast.success('Demande IT soumise — auto-affectée à la cible');
       navigate('/it/dispatch');
     } catch (e: any) {
@@ -330,6 +343,18 @@ export default function NewITRequest() {
                       </div>
                     )}
                   </>
+                )}
+
+                {/* Champs personnalisés configurés via CONFIGURATION:MODELE > Champs */}
+                {prestationId && (
+                  <RequestCustomFieldsSection
+                    processTemplateId={prestationId}
+                    values={customFieldValues}
+                    onChange={(fieldId, value) =>
+                      setCustomFieldValues((prev) => ({ ...prev, [fieldId]: value }))
+                    }
+                    disabled={isSubmitting}
+                  />
                 )}
 
                 {/* Pieces jointes + liens */}

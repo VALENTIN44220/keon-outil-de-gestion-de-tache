@@ -29,6 +29,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSimulation } from '@/contexts/SimulationContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { RequestCustomFieldsSection, insertRequestFieldValues } from '@/components/requests/RequestCustomFieldsSection';
 
 const MAINTENANCE_PROCESS_ID = '11111111-1111-4111-8111-111111111101';
 
@@ -43,6 +44,7 @@ export default function NewMaintenanceRequest() {
   const [dateBesoin, setDateBesoin] = useState('');
   const [lines, setLines] = useState<MaterialLine[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
 
   const canSubmit =
     !isSubmitting &&
@@ -98,6 +100,15 @@ export default function NewMaintenanceRequest() {
       const { error: linesErr } = await supabase.from('demande_materiel').insert(lignes);
       if (linesErr) throw linesErr;
 
+      // 3. Champs personnalisés (CONFIGURATION:MODELE > Champs)
+      if (Object.keys(customFieldValues).length > 0) {
+        const { error: cfErr } = await insertRequestFieldValues(task.id, customFieldValues);
+        if (cfErr) {
+          console.warn('[NewMaintenanceRequest] custom fields insert error:', cfErr);
+          toast.error(`Demande créée — champs personnalisés non sauvegardés : ${cfErr.message}`);
+        }
+      }
+
       toast.success(`Demande créée — ${lines.length} article(s) en attente de validation`);
       navigate('/maintenance/dispatch');
     } catch (e: any) {
@@ -149,6 +160,16 @@ export default function NewMaintenanceRequest() {
                     disabled={isSubmitting}
                   />
                 </div>
+
+                {/* Champs personnalisés configurés via CONFIGURATION:MODELE > Champs */}
+                <RequestCustomFieldsSection
+                  processTemplateId={MAINTENANCE_PROCESS_ID}
+                  values={customFieldValues}
+                  onChange={(fieldId, value) =>
+                    setCustomFieldValues((prev) => ({ ...prev, [fieldId]: value }))
+                  }
+                  disabled={isSubmitting}
+                />
 
                 <div className="pt-2 border-t">
                   <MaterialRequestLines
