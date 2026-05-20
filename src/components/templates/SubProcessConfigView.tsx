@@ -672,6 +672,12 @@ export function SubProcessConfigView({
                     <Separator />
 
                     {/* Built-in components - multi-table selection */}
+                    {/*
+                      Masqué par défaut pour les flux simples (Onboarding, Innovation, etc.)
+                      qui n'utilisent ni « lignes de matériel » ni table filtrée. Affiché
+                      pour BE et Maintenance, ou si déjà configuré.
+                    */}
+                    {(isBEPrestation || hasMaterialLines || enabledComponents.length > 0 || enabledFilterTables.length > 0) && (
                     <Card className="border-warning/30 bg-warning/5">
                       <CardHeader className="pb-2">
                         <CardTitle className="text-sm flex items-center gap-2">
@@ -732,10 +738,12 @@ export function SubProcessConfigView({
                         })}
                       </CardContent>
                     </Card>
+                    )}
 
                     <Separator />
 
                     {/* Table filters - multi-table selection */}
+                    {(isBEPrestation || enabledFilterTables.length > 0) && (
                     <Card className="border-primary/30 bg-primary/5">
                       <CardHeader className="pb-2">
                         <CardTitle className="text-sm flex items-center gap-2">
@@ -804,6 +812,7 @@ export function SubProcessConfigView({
                         </div>
                       </CardContent>
                     </Card>
+                    )}
                     {canManage && (
                       <Button onClick={handleSaveGeneral} disabled={isSaving}>
                         {isSaving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}

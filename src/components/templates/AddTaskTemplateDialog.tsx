@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TaskTemplate, TemplateVisibility, ValidationLevelType } from '@/types/template';
 import { TaskTemplateValidationSection } from './TaskTemplateValidationSection';
+import { TaskTemplateFlowSection, type TaskTemplateFlowValues } from './TaskTemplateFlowSection';
 import { CategorySelect } from './CategorySelect';
 import { VisibilitySelect } from './VisibilitySelect';
 import { VariableInputField } from './VariableInputField';
@@ -54,6 +55,15 @@ export function AddTaskTemplateDialog({
   const [validatorLevel1Id, setValidatorLevel1Id] = useState<string | null>(null);
   const [validatorLevel2Id, setValidatorLevel2Id] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+
+  // Excel-aligned flow fields
+  const [flow, setFlow] = useState<TaskTemplateFlowValues>({
+    startMode: 'parallel',
+    dependsOnTaskTemplateId: null,
+    delayAfterPreviousDays: 0,
+    targetGroupId: null,
+    outputStateCode: null,
+  });
 
   const { categories, addCategory, addSubcategory } = useCategories();
   // Get custom fields including common, process-level, and sub-process-level
@@ -104,7 +114,13 @@ export function AddTaskTemplateDialog({
       validation_level_2: validationLevel2,
       validator_level_1_id: validationLevel1 === 'free' ? validatorLevel1Id : null,
       validator_level_2_id: validationLevel2 === 'free' ? validatorLevel2Id : null,
-    });
+      // Excel-aligned flow fields
+      start_mode: flow.startMode,
+      depends_on_task_template_id: flow.startMode === 'after_previous' ? flow.dependsOnTaskTemplateId : null,
+      delay_after_previous_days: flow.startMode === 'after_previous' ? flow.delayAfterPreviousDays : 0,
+      target_group_id: flow.targetGroupId,
+      output_state_code: flow.outputStateCode,
+    } as any);
 
     resetForm();
     onClose();
@@ -123,6 +139,13 @@ export function AddTaskTemplateDialog({
     setValidationLevel2('none');
     setValidatorLevel1Id(null);
     setValidatorLevel2Id(null);
+    setFlow({
+      startMode: 'parallel',
+      dependsOnTaskTemplateId: null,
+      delayAfterPreviousDays: 0,
+      targetGroupId: null,
+      outputStateCode: null,
+    });
   };
 
   const handleAddCategory = async (name: string) => {
@@ -231,6 +254,14 @@ export function AddTaskTemplateDialog({
           <VisibilitySelect
             value={visibilityLevel}
             onChange={setVisibilityLevel}
+          />
+
+          <TaskTemplateFlowSection
+            {...flow}
+            subProcessTemplateId={subProcessTemplateId ?? null}
+            processTemplateId={processTemplateId ?? null}
+            currentTaskTemplateId={null}
+            onChange={(patch) => setFlow(prev => ({ ...prev, ...patch }))}
           />
 
           <TaskTemplateValidationSection

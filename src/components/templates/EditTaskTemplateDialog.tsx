@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TaskTemplate, TemplateVisibility, ValidationLevelType } from '@/types/template';
 import { TaskTemplateValidationSection } from './TaskTemplateValidationSection';
+import { TaskTemplateFlowSection, type TaskTemplateFlowValues } from './TaskTemplateFlowSection';
 import { CategorySelect } from './CategorySelect';
 import { VisibilitySelect } from './VisibilitySelect';
 import { VariableInputField } from './VariableInputField';
@@ -43,6 +44,15 @@ export function EditTaskTemplateDialog({ task, open, onClose, onSave }: EditTask
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Excel-aligned flow fields (Démarrage / Dépendance / Délai / Override / État sortie)
+  const [flow, setFlow] = useState<TaskTemplateFlowValues>({
+    startMode: 'parallel',
+    dependsOnTaskTemplateId: null,
+    delayAfterPreviousDays: 0,
+    targetGroupId: null,
+    outputStateCode: null,
+  });
+
   const { categories, addCategory, addSubcategory } = useCategories();
   
   // Get custom fields - include common + parent process + sub-process fields
@@ -67,6 +77,13 @@ export function EditTaskTemplateDialog({ task, open, onClose, onSave }: EditTask
       setValidationLevel2(task.validation_level_2);
       setValidatorLevel1Id(task.validator_level_1_id);
       setValidatorLevel2Id(task.validator_level_2_id);
+      setFlow({
+        startMode: ((task as any).start_mode === 'after_previous' ? 'after_previous' : 'parallel'),
+        dependsOnTaskTemplateId: (task as any).depends_on_task_template_id ?? null,
+        delayAfterPreviousDays: (task as any).delay_after_previous_days ?? 0,
+        targetGroupId: (task as any).target_group_id ?? null,
+        outputStateCode: (task as any).output_state_code ?? null,
+      });
       fetchProfiles();
     }
   }, [open, task]);
@@ -103,6 +120,12 @@ export function EditTaskTemplateDialog({ task, open, onClose, onSave }: EditTask
         validation_level_2: validationLevel2,
         validator_level_1_id: validationLevel1 === 'free' ? validatorLevel1Id : null,
         validator_level_2_id: validationLevel2 === 'free' ? validatorLevel2Id : null,
+        // Excel-aligned flow fields
+        start_mode: flow.startMode,
+        depends_on_task_template_id: flow.startMode === 'after_previous' ? flow.dependsOnTaskTemplateId : null,
+        delay_after_previous_days: flow.startMode === 'after_previous' ? flow.delayAfterPreviousDays : 0,
+        target_group_id: flow.targetGroupId,
+        output_state_code: flow.outputStateCode,
       };
 
       const { error } = await supabase
@@ -229,6 +252,14 @@ export function EditTaskTemplateDialog({ task, open, onClose, onSave }: EditTask
           <VisibilitySelect
             value={visibilityLevel}
             onChange={setVisibilityLevel}
+          />
+
+          <TaskTemplateFlowSection
+            {...flow}
+            subProcessTemplateId={task?.sub_process_template_id ?? null}
+            processTemplateId={task?.process_template_id ?? null}
+            currentTaskTemplateId={task?.id ?? null}
+            onChange={(patch) => setFlow(prev => ({ ...prev, ...patch }))}
           />
 
           <TaskTemplateValidationSection
