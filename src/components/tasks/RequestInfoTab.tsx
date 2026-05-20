@@ -38,14 +38,20 @@ export function RequestInfoTab({ task, profiles, departments }: RequestInfoTabPr
   const [processName, setProcessName] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Si la tâche est elle-même une demande (type='request'), on lit ses propres
+  // valeurs. Sinon (c'est une tâche enfant), on remonte au parent_request_id.
+  const targetRequestId = task.type === 'request' ? task.id : targetRequestId;
+
   useEffect(() => {
-    if (task.parent_request_id) {
+    if (targetRequestId) {
       fetchRequestDetails();
+    } else {
+      setIsLoading(false);
     }
-  }, [task.parent_request_id, task.source_sub_process_template_id]);
+  }, [targetRequestId, task.source_sub_process_template_id]);
 
   const fetchRequestDetails = async () => {
-    if (!task.parent_request_id) return;
+    if (!targetRequestId) return;
     setIsLoading(true);
 
     try {
@@ -55,13 +61,13 @@ export function RequestInfoTab({ task, profiles, departments }: RequestInfoTabPr
         supabase
           .from('tasks')
           .select('*')
-          .eq('id', task.parent_request_id)
+          .eq('id', targetRequestId)
           .single(),
         // Custom field values with field metadata
         supabase
           .from('request_field_values')
           .select('id, field_id, value, file_url, template_custom_fields!inner(label, field_type, name)')
-          .eq('task_id', task.parent_request_id),
+          .eq('task_id', targetRequestId),
         // Sub-process config for hidden fields
         task.source_sub_process_template_id
           ? supabase

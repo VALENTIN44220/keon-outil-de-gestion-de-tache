@@ -28,6 +28,10 @@ import {
   NC_IDENTIFICATION_LABELS, NC_APPARITION_LABELS,
   type NCIdentification, type NCApparition,
 } from '@/types/smqNC';
+import { RequestCustomFieldsSection, insertRequestFieldValues } from '@/components/requests/RequestCustomFieldsSection';
+
+// Process QUALITÉ SECURITE ENVIRONNEMENT
+const QSE_PROCESS_ID = '697fdfee-7a64-4193-af2f-bece2da44d8e';
 
 export default function SMQNewDeclaration() {
   const navigate = useNavigate();
@@ -62,6 +66,9 @@ export default function SMQNewDeclaration() {
 
   // Liens / pièces jointes ajoutés à la création
   const [links, setLinks] = useState<{ url: string; label: string }[]>([]);
+
+  // Champs personnalisés configurés via CONFIGURATION:MODELE > Champs
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
 
   // Liste des profils pour le sélecteur Pilote
   const [users, setUsers] = useState<Array<{ id: string; display_name: string | null; department: string | null }>>([]);
@@ -125,6 +132,39 @@ export default function SMQNewDeclaration() {
           toast.error(`Liens non sauvegardés : ${attError.message}`);
         } else {
           toast.success(`${validLinks.length} lien(s) ajouté(s)`);
+        }
+      }
+
+      // Crée une tâche-demande associée (process QSE) → permet l'attache des
+      // champs personnalisés. Pas d'auto-spawn de tâches enfant ici car le
+      // process QSE n'a pas de task_templates (workflow géré via nc_actions).
+      if (Object.keys(customFieldValues).length > 0) {
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', authUser?.id ?? '')
+          .maybeSingle();
+        const { data: taskRow, error: taskErr } = await supabase.from('tasks').insert({
+          type: 'request',
+          status: 'todo',
+          title: `NC — ${form.title}`,
+          description: form.description_problem || null,
+          requester_id: prof?.id ?? null,
+          user_id: authUser?.id ?? null,
+          module_code: 'smq',
+          source_process_template_id: QSE_PROCESS_ID,
+          priority: 'medium',
+          module_data: { nc_declaration_id: created.id },
+        } as any).select('id').single();
+        if (taskErr) {
+          console.warn('[SMQNewDeclaration] tasks insert error:', taskErr);
+        } else if (taskRow?.id) {
+          const { error: cfErr } = await insertRequestFieldValues(taskRow.id, customFieldValues);
+          if (cfErr) {
+            console.warn('[SMQNewDeclaration] custom fields insert error:', cfErr);
+            toast.error(`NC créée — champs personnalisés non sauvegardés : ${cfErr.message}`);
+          }
         }
       }
 
@@ -377,6 +417,16 @@ export default function SMQNewDeclaration() {
                 </Button>
               </CardContent>
             </Card>
+
+            {/* Champs personnalisés configurés via CONFIGURATION:MODELE > Champs */}
+            <RequestCustomFieldsSection
+              processTemplateId={QSE_PROCESS_ID}
+              values={customFieldValues}
+              onChange={(fieldId, value) =>
+                setCustomFieldValues((prev) => ({ ...prev, [fieldId]: value }))
+              }
+              disabled={isSaving}
+            />
 
             {/* ── Submit ──────────────────────────────────────────────── */}
             <div className="flex justify-end gap-2 sticky bottom-0 bg-background py-3 border-t">

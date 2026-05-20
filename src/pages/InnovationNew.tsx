@@ -18,6 +18,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { ENTITES, THEMES, SOUS_THEMES } from '@/components/innovation/constants';
+import { RequestCustomFieldsSection, insertRequestFieldValues } from '@/components/requests/RequestCustomFieldsSection';
+
+// Process_template Innovation (a 3 task_templates → auto-spawn via trigger DB)
+const INNOVATION_PROCESS_ID = 'a1b2c3d4-0000-4000-a000-000000000001';
 
 const schema = z.object({
   nom_projet: z.string().min(1, 'Requis').max(200),
@@ -46,11 +50,12 @@ type FormValues = z.infer<typeof schema>;
 
 export default function InnovationNew() {
   const navigate = useNavigate();
-  const { profile } = useAuth();
+  const { profile, user } = useAuth() as any;
   const [submitting, setSubmitting] = useState(false);
   const { data: codeOptions } = useInnoCodeProjetOptions();
   const { data: usageOptions } = useInnoUsageOptions();
   const { data: etiquetteSuggestions } = useInnoEtiquetteSuggestions();
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -88,7 +93,7 @@ export default function InnovationNew() {
     }
     setSubmitting(true);
     try {
-      const { error } = await supabase.from('inno_demandes').insert({
+      const { data: innoData, error } = await supabase.from('inno_demandes').insert({
         nom_projet: values.nom_projet,
         code_projet: values.code_projet,
         theme: values.theme,
@@ -111,8 +116,44 @@ export default function InnovationNew() {
         sponsor: values.sponsor || null,
         commentaire_projet: values.commentaire_projet || null,
         audit_log: [{ action: 'Demande soumise', by: profile.display_name, at: new Date().toISOString() }],
-      } as any);
+      } as any).select('id').single();
       if (error) throw error;
+
+      // Crée une tâche-demande associée → déclenche l'auto-spawn des étapes
+      // (Instruire la demande / Présenter au CODIR / Mettre en oeuvre) configurées
+      // dans le process Innovation, et permet l'attache des champs personnalisés.
+      const taskTitle = `Innovation — ${values.nom_projet}`;
+      const { data: taskRow, error: taskErr } = await supabase.from('tasks').insert({
+        type: 'request',
+        status: 'todo',
+        title: taskTitle,
+        description: values.descriptif,
+        requester_id: profile.id,
+        user_id: user?.id ?? null,
+        module_code: 'innovation',
+        source_process_template_id: INNOVATION_PROCESS_ID,
+        priority: 'medium',
+        module_data: {
+          inno_demande_id: innoData?.id ?? null,
+          code_projet: values.code_projet,
+          theme: values.theme,
+          sous_theme: values.sous_theme,
+          entite_concernee: values.entite_concernee,
+        },
+      } as any).select('id').single();
+      if (taskErr) {
+        console.warn('[InnovationNew] tasks insert error (non bloquant):', taskErr);
+      }
+
+      // Persiste les champs personnalisés sur la demande
+      if (taskRow?.id && Object.keys(customFieldValues).length > 0) {
+        const { error: cfErr } = await insertRequestFieldValues(taskRow.id, customFieldValues);
+        if (cfErr) {
+          console.warn('[InnovationNew] custom fields insert error:', cfErr);
+          toast.error(`Demande créée — champs personnalisés non sauvegardés : ${cfErr.message}`);
+        }
+      }
+
       toast.success('Demande Innovation soumise avec succès !');
       navigate('/innovation');
     } catch (err: any) {
@@ -382,6 +423,16 @@ export default function InnovationNew() {
                     )} />
                   </div>
                 </div>
+
+                {/* Champs personnalisés configurés via CONFIGURATION:MODELE > Champs */}
+                <RequestCustomFieldsSection
+                  processTemplateId={INNOVATION_PROCESS_ID}
+                  values={customFieldValues}
+                  onChange={(fieldId, value) =>
+                    setCustomFieldValues((prev) => ({ ...prev, [fieldId]: value }))
+                  }
+                  disabled={submitting}
+                />
 
                 <div className="flex justify-end gap-3 pt-4">
                   <Button type="button" variant="outline" onClick={() => navigate('/innovation')}>
