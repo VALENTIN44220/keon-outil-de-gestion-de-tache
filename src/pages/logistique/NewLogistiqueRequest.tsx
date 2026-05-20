@@ -4,7 +4,7 @@
  * Cree 1 task type=request, module_code='logistique', les champs
  * specifiques etant stockes dans module_data jsonb.
  */
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
@@ -54,25 +54,32 @@ export default function NewLogistiqueRequest() {
   const [destAdresse, setDestAdresse] = useState('');
   const [destNom, setDestNom] = useState('');
   const [destTel, setDestTel] = useState('');
-  const [nbColis, setNbColis] = useState<number>(1);
-  const [typeColis, setTypeColis] = useState('colis');
+  // Plusieurs lots possibles (ex: 2 palettes + 3 colis sur la même demande)
+  const [colisLines, setColisLines] = useState<Array<{ nb: number; type: string }>>([{ nb: 1, type: 'colis' }]);
+  // Valeur totale (assurance / déclaration de valeur transporteur)
+  const [valeurTotale, setValeurTotale] = useState<string>('');
   const [dateSouhaitee, setDateSouhaitee] = useState('');
   const [description, setDescription] = useState('');
+  const [modeQuotation, setModeQuotation] = useState(false);
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, any>>({});
+
+  const totalColis = useMemo(() => colisLines.reduce((s, l) => s + (l.nb || 0), 0), [colisLines]);
 
   const canSubmit =
     !isSubmitting &&
     filiale && codeProjet.trim() && natureMarchandise.trim() &&
     destAdresse.trim() && destNom.trim() && destTel.trim() &&
-    nbColis > 0 &&
+    totalColis > 0 && colisLines.every((l) => l.nb > 0 && l.type) &&
     (departBgn || (expedAdresse.trim() && expedNom.trim() && expedTel.trim()));
 
   const handleSubmit = async () => {
     if (!profile?.id || !user || !canSubmit) return;
     setIsSubmitting(true);
     try {
-      const title = (urgence ? '⚡ URGENT — ' : '') +
-        `Transport ${filiale} — ${natureMarchandise.slice(0, 40)}`;
+      const prefix = modeQuotation ? '💬 DEVIS — ' : (urgence ? '⚡ URGENT — ' : '');
+      const title = `${prefix}Transport ${filiale} — ${natureMarchandise.slice(0, 40)}`;
+
+      const valeurTotaleNum = valeurTotale ? Number(valeurTotale.replace(',', '.')) : null;
 
       const { data, error } = await supabase.from('tasks').insert({
         type: 'request',
@@ -86,6 +93,7 @@ export default function NewLogistiqueRequest() {
         due_date: dateSouhaitee || null,
         priority: urgence ? 'high' : 'medium',
         module_data: {
+          mode: modeQuotation ? 'quotation' : 'transport',
           filiale,
           code_projet: codeProjet,
           urgence,
@@ -97,8 +105,9 @@ export default function NewLogistiqueRequest() {
           destinataire_adresse: destAdresse,
           destinataire_nom: destNom,
           destinataire_tel: destTel,
-          nb_colis: nbColis,
-          type_colis: typeColis,
+          colis_lines: colisLines,           // [{nb, type}, …] — peut contenir plusieurs lots
+          nb_colis_total: totalColis,        // somme — pour compat tri/affichage
+          valeur_totale_eur: valeurTotaleNum,
           date_souhaitee_enlevement: dateSouhaitee || null,
         },
       }).select('id').single();
@@ -114,7 +123,13 @@ export default function NewLogistiqueRequest() {
         }
       }
 
-      toast.success(urgence ? 'Demande URGENTE soumise' : 'Demande de transport soumise');
+      toast.success(
+        modeQuotation
+          ? 'Demande de devis soumise — chiffrage en attente'
+          : urgence
+            ? 'Demande URGENTE soumise'
+            : 'Demande de transport soumise',
+      );
       navigate('/logistique/dispatch');
     } catch (e: any) {
       console.error('NewLogistiqueRequest:', e);
@@ -169,19 +184,37 @@ export default function NewLogistiqueRequest() {
                   </div>
                 </div>
 
-                {/* Urgence */}
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-50 border border-amber-200">
+                {/* Mode de la demande : devis ou exécution directe */}
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-sky-50 border border-sky-200">
                   <Checkbox
-                    id="urgence"
-                    checked={urgence}
-                    onCheckedChange={v => setUrgence(!!v)}
+                    id="mode-quotation"
+                    checked={modeQuotation}
+                    onCheckedChange={v => setModeQuotation(!!v)}
                     disabled={isSubmitting}
                   />
-                  <Label htmlFor="urgence" className="cursor-pointer flex-1">
-                    <span className="font-medium text-amber-900">URGENCE</span>
-                    <span className="text-xs text-amber-700 block">Cocher si traitement prioritaire (24h max)</span>
+                  <Label htmlFor="mode-quotation" className="cursor-pointer flex-1">
+                    <span className="font-medium text-sky-900">DEMANDE DE DEVIS</span>
+                    <span className="text-xs text-sky-700 block">
+                      Le logisticien chiffre — tu valides ensuite la conversion en transport si le prix te convient.
+                    </span>
                   </Label>
                 </div>
+
+                {/* Urgence — désactivé si mode devis (le devis n'est pas urgent par défaut) */}
+                {!modeQuotation && (
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-50 border border-amber-200">
+                    <Checkbox
+                      id="urgence"
+                      checked={urgence}
+                      onCheckedChange={v => setUrgence(!!v)}
+                      disabled={isSubmitting}
+                    />
+                    <Label htmlFor="urgence" className="cursor-pointer flex-1">
+                      <span className="font-medium text-amber-900">URGENCE</span>
+                      <span className="text-xs text-amber-700 block">Cocher si traitement prioritaire (24h max)</span>
+                    </Label>
+                  </div>
+                )}
 
                 {/* Nature */}
                 <div>
@@ -241,24 +274,72 @@ export default function NewLogistiqueRequest() {
                   </div>
                 </div>
 
-                {/* Colis */}
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <Label>Nombre de colis *</Label>
-                    <Input type="number" min={1} value={nbColis} onChange={e => setNbColis(Math.max(1, Number(e.target.value)))} disabled={isSubmitting} />
+                {/* Colis — plusieurs lots possibles (ex: 2 palettes + 3 colis) */}
+                <div className="space-y-2">
+                  <Label>Colis transportés *</Label>
+                  <div className="space-y-2">
+                    {colisLines.map((line, i) => (
+                      <div key={i} className="grid grid-cols-[1fr_2fr_auto] gap-2 items-end">
+                        <div>
+                          {i === 0 && <Label className="text-xs text-muted-foreground">Nombre</Label>}
+                          <Input
+                            type="number" min={1} value={line.nb}
+                            onChange={(e) => setColisLines((arr) => arr.map((l, j) => j === i ? { ...l, nb: Math.max(1, Number(e.target.value)) } : l))}
+                            disabled={isSubmitting}
+                          />
+                        </div>
+                        <div>
+                          {i === 0 && <Label className="text-xs text-muted-foreground">Type</Label>}
+                          <Select
+                            value={line.type}
+                            onValueChange={(v) => setColisLines((arr) => arr.map((l, j) => j === i ? { ...l, type: v } : l))}
+                            disabled={isSubmitting}
+                          >
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {TYPES_COLIS.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <Button
+                          type="button" variant="ghost" size="icon"
+                          className="h-9 w-9 text-muted-foreground hover:text-destructive"
+                          onClick={() => setColisLines((arr) => arr.length > 1 ? arr.filter((_, j) => j !== i) : arr)}
+                          disabled={isSubmitting || colisLines.length === 1}
+                          title="Supprimer cette ligne"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      type="button" variant="outline" size="sm"
+                      onClick={() => setColisLines((arr) => [...arr, { nb: 1, type: 'colis' }])}
+                      disabled={isSubmitting}
+                      className="gap-1.5"
+                    >
+                      + Ajouter un type de colis
+                    </Button>
                   </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Total : <strong>{totalColis}</strong> colis. Mélange autorisé (ex: 2 palettes + 3 colis).
+                  </p>
+                </div>
+
+                {/* Valeur totale + date */}
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label>Type de colis</Label>
-                    <Select value={typeColis} onValueChange={setTypeColis} disabled={isSubmitting}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {TYPES_COLIS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <Label>Valeur totale (€) <span className="text-muted-foreground text-xs">— pour assurance / déclaration</span></Label>
+                    <Input
+                      type="number" min={0} step="0.01" value={valeurTotale}
+                      onChange={(e) => setValeurTotale(e.target.value)}
+                      disabled={isSubmitting}
+                      placeholder="Ex: 2500.00"
+                    />
                   </div>
                   <div>
                     <Label>Date d'enlèvement souhaitée</Label>
-                    <Input type="date" value={dateSouhaitee} onChange={e => setDateSouhaitee(e.target.value)} disabled={isSubmitting} />
+                    <Input type="date" value={dateSouhaitee} onChange={(e) => setDateSouhaitee(e.target.value)} disabled={isSubmitting} />
                   </div>
                 </div>
 
