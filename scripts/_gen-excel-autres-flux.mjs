@@ -46,9 +46,11 @@ const ASSIGNMENT_TYPES = [
 
 // ─── Étapes existantes SERVICE ACHAT ───────────────────────────────────────
 const achat = [
-  { 'ID_étape': 'd1111111-1111-1111-1111-111111111111', 'ID_sous_processus': 'c1111111-1111-1111-1111-111111111111', 'Sous-processus': 'DEMANDE DE NOUVEAU FOURNISSEUR', 'N°': 1, 'Étape': 'Vérification fournisseur', 'Durée (j)': 1, 'Démarrage': 'parallele',         'Dépend de (étape n°)': '', 'Délai après précédente (j)': 0, 'Affectation type': 'fixed_role', 'Affectation cible (UUID)': '', 'Affectation cible (nom)': '', 'Validation N1': 'aucune', 'Valideur N1': '', 'Validation N2': 'aucune', 'Valideur N2': '', 'État en sortie': '' },
-  { 'ID_étape': 'd2222222-2222-2222-2222-222222222222', 'ID_sous_processus': 'c1111111-1111-1111-1111-111111111111', 'Sous-processus': 'DEMANDE DE NOUVEAU FOURNISSEUR', 'N°': 2, 'Étape': 'Création fournisseur',    'Durée (j)': 1, 'Démarrage': 'apres_precedente', 'Dépend de (étape n°)': '', 'Délai après précédente (j)': 0, 'Affectation type': '',           'Affectation cible (UUID)': '', 'Affectation cible (nom)': '', 'Validation N1': 'aucune', 'Valideur N1': '', 'Validation N2': 'aucune', 'Valideur N2': '', 'État en sortie': '' },
-  { 'ID_étape': '35a65b15-63ae-4d31-94dc-f0f18d39339c', 'ID_sous_processus': '951d6c3c-82ca-4468-97ca-ca51275da573', 'Sous-processus': 'DEMANDE DIVERSES SERVICE ACHAT (HORS NOUVEAU FOURNISSEUR)', 'N°': 1, 'Étape': 'REPONDRE AU TICKET', 'Durée (j)': 1, 'Démarrage': 'parallele', 'Dépend de (étape n°)': '', 'Délai après précédente (j)': 0, 'Affectation type': 'fixed_user', 'Affectation cible (UUID)': '', 'Affectation cible (nom)': '', 'Validation N1': 'aucune', 'Valideur N1': '', 'Validation N2': 'aucune', 'Valideur N2': '', 'État en sortie': '' },
+  // Sous-processus 1 : flux state-machine (2 affectataires différents) — déjà en place via wf_workflows
+  { 'ID_étape': 'd1111111-1111-1111-1111-111111111111', 'ID_sous_processus': 'c1111111-1111-1111-1111-111111111111', 'Sous-processus': 'DEMANDE DE NOUVEAU FOURNISSEUR', 'N°': 1, 'Étape': 'Vérification fournisseur', 'Durée (j)': 1, 'Démarrage': 'parallele',         'Dépend de (étape n°)': '',  'Délai après précédente (j)': 0, 'Affectation type': 'group', 'Affectation cible (UUID)': 'a1111111-1111-1111-1111-111111111111', 'Affectation cible (nom)': 'Service Achat', 'Validation N1': 'aucune', 'Valideur N1': '', 'Validation N2': 'aucune', 'Valideur N2': '', 'État en sortie': 'en_cours' },
+  { 'ID_étape': 'd2222222-2222-2222-2222-222222222222', 'ID_sous_processus': 'c1111111-1111-1111-1111-111111111111', 'Sous-processus': 'DEMANDE DE NOUVEAU FOURNISSEUR', 'N°': 2, 'Étape': 'Création fournisseur',    'Durée (j)': 1, 'Démarrage': 'apres_precedente', 'Dépend de (étape n°)': '1', 'Délai après précédente (j)': 0, 'Affectation type': 'group', 'Affectation cible (UUID)': 'a2222222-2222-2222-2222-222222222222', 'Affectation cible (nom)': 'Comptabilité', 'Validation N1': 'aucune', 'Valideur N1': '', 'Validation N2': 'aucune', 'Valideur N2': '', 'État en sortie': 'terminee' },
+  // Sous-processus 2 : 1 seule étape, affectation simple
+  { 'ID_étape': '35a65b15-63ae-4d31-94dc-f0f18d39339c', 'ID_sous_processus': '951d6c3c-82ca-4468-97ca-ca51275da573', 'Sous-processus': 'DEMANDE DIVERSES SERVICE ACHAT (HORS NOUVEAU FOURNISSEUR)', 'N°': 1, 'Étape': 'REPONDRE AU TICKET', 'Durée (j)': 1, 'Démarrage': 'parallele', 'Dépend de (étape n°)': '', 'Délai après précédente (j)': 0, 'Affectation type': 'group', 'Affectation cible (UUID)': 'a1111111-1111-1111-1111-111111111111', 'Affectation cible (nom)': 'Service Achat', 'Validation N1': 'aucune', 'Valideur N1': '', 'Validation N2': 'aucune', 'Valideur N2': '', 'État en sortie': 'terminee' },
 ];
 
 // ─── Templates vides pour les autres process IT/RH/Comm/etc. ──────────────
@@ -209,14 +211,22 @@ const wsHelp = XLSX.utils.aoa_to_sheet([
   ['  7. ASSIGNMENT_TYPES     — cheat-sheet des 7 modes d\'affectation supportés'],
   ['  8. ETATS_PAR_FLUX       — liste des états par processus + colonne Catégorie macro'],
   [],
-  ['⚠ AFFECTATION (nouveauté) :'],
-  ['  L\'affectation est définie au niveau du SOUS-PROCESSUS, pas de chaque étape.'],
-  ['  → Remplis les colonnes « Affectation type » + « Affectation cible (UUID) » + « Affectation cible (nom) »'],
-  ['     UNIQUEMENT sur la 1ʳᵉ ligne (N°=1) de chaque ID_sous_processus.'],
-  ['  → Pour les types « requester » et « manager_requester », laisse UUID vide.'],
-  ['  → Pour « fixed_user » / « manager_dispatch » : colle l\'UUID depuis PROFILES_REFERENCE.'],
-  ['  → Pour « department » : colle l\'UUID depuis DEPARTMENTS_REFERENCE.'],
-  ['  → Pour « group » : colle l\'UUID depuis GROUPS_REFERENCE.'],
+  ['⚠ AFFECTATION — 2 cas à distinguer :'],
+  [''],
+  ['  CAS A — toutes les étapes d\'un sous-processus → MÊME affectataire :'],
+  ['     Remplis Affectation type/cible UNIQUEMENT sur la ligne N°=1.'],
+  ['     → Je génère un sub_process_templates classique (affectation au niveau sous-processus).'],
+  [''],
+  ['  CAS B — chaque étape a un affectataire DIFFÉRENT (ex: Achat puis Comptabilité) :'],
+  ['     Remplis Affectation type/cible sur CHAQUE ligne (N°=1, 2, 3…).'],
+  ['     → Je génère un workflow state-machine (wf_workflows/wf_steps), comme le flux'],
+  ['       « Demande de nouveau fournisseur » qui passe : Vérification (groupe Achat) →'],
+  ['       Création (groupe Comptabilité) → Terminé.'],
+  [''],
+  ['  Pour les types « requester » et « manager_requester », laisse UUID vide.'],
+  ['  Pour « fixed_user » / « manager_dispatch » : colle l\'UUID depuis PROFILES_REFERENCE.'],
+  ['  Pour « department » : colle l\'UUID depuis DEPARTMENTS_REFERENCE.'],
+  ['  Pour « group » : colle l\'UUID depuis GROUPS_REFERENCE.'],
   [],
   ['POUR SAISIR DES ÉTAPES SUR UN FLUX SANS ÉTAPES (ex: IT - Demande d\'intervention IT) :'],
   ['  1. Va sur PROCESS_REFERENCE → copie l\'ID_processus du flux concerné'],
