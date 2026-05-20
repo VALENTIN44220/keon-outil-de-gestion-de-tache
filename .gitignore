@@ -37,3 +37,6 @@ dist-ssr
 schema.sql
 users_export.csv*
 syncro-fabric-taskflow.md~$*
+
+# Excel lock files (Windows ouvre ~$<filename>.xlsx pendant l'édition)
+~$*.xlsx
