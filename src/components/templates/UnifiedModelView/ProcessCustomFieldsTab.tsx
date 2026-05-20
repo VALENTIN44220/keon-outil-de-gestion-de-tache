@@ -14,6 +14,7 @@ import { FormInput, Workflow, GitBranch } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { TabHeader, ReadOnlyBanner } from './_TabShell';
+import { NativeFieldsBanner } from '../NativeFieldsBanner';
 
 interface ProcessCustomFieldsTabProps {
   processId: string;
@@ -49,6 +50,11 @@ export function ProcessCustomFieldsTab({ processId, canManage }: ProcessCustomFi
       />
 
       <ReadOnlyBanner show={!canManage} />
+
+      {/* Pour les processus dont le formulaire est hardcodé (IT/Maintenance/
+          Logistique/Innovation/SMQ), on affiche la liste des champs natifs
+          afin d'éviter la confusion : « champs additionnels » ≠ formulaire réel. */}
+      <NativeFieldsBanner processId={processId} />
 
       {subProcesses.length > 0 && (
         <div className="flex flex-wrap gap-2 p-3 rounded-lg bg-muted/40 border">
