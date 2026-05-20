@@ -16,6 +16,7 @@ export function useITProjectHubCode(): string | undefined {
 
     const patterns = [
       /^\/it\/projects\/([^/]+)\/overview/,
+      /^\/it\/projects\/([^/]+)\/governance/,
       /^\/it\/projects\/([^/]+)\/tasks/,
       /^\/it\/projects\/([^/]+)\/timeline/,
       /^\/it\/projects\/([^/]+)\/budget/,
