@@ -3,9 +3,10 @@
  */
 import { useMemo, useState } from 'react';
 import { LogistiquePlanificationDialog } from '@/components/logistique/LogistiquePlanificationDialog';
+import { LogistiqueQuotationDialog } from '@/components/logistique/LogistiqueQuotationDialog';
 import {
   Truck, AlertTriangle, Clock, CheckCircle2, ListChecks, Trash2,
-  User, Calendar, Package, MapPin, Send, FileText,
+  User, Calendar, Package, MapPin, Send, FileText, Tag, Check, X as XIcon,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -288,13 +289,23 @@ interface LogistiqueDetailDialogProps {
 
 function LogistiqueDetailDialog({ request, open, onClose, refetch, isAdmin, myProfileId, profilesMap }: LogistiqueDetailDialogProps) {
     const [showPlanif, setShowPlanif] = useState(false);
+    const [showQuote, setShowQuote] = useState(false);
     const data = request.module_data ?? {};
+    const isQuotation = data.mode === 'quotation';
+    const hasProposal = isQuotation && data.quotation_price != null;
+    // Le demandeur connecté (ou un admin) peut décider d'une proposition
+    const canDecideQuote = hasProposal && (request.requester_id === myProfileId || isAdmin);
     const fmtDay = (iso: string | null | undefined) =>
       iso ? format(parseISO(iso), 'dd/MM/yyyy', { locale: fr }) : '—';
 
     const extraBadges = (
       <>
-        {!!data.urgence && <Badge variant="destructive" className="text-xs">⚡ URGENT</Badge>}
+        {isQuotation && (
+          <Badge className="text-xs bg-sky-100 text-sky-800 border-sky-300 gap-1">
+            <Tag className="h-3 w-3" /> {hasProposal ? 'Devis proposé' : 'Devis demandé'}
+          </Badge>
+        )}
+        {!!data.urgence && !isQuotation && <Badge variant="destructive" className="text-xs">⚡ URGENT</Badge>}
         {data.filiale && <Badge variant="secondary" className="text-xs">{data.filiale}</Badge>}
         {data.code_projet && <Badge variant="outline" className="text-xs font-mono">{data.code_projet}</Badge>}
       </>
@@ -327,13 +338,42 @@ function LogistiqueDetailDialog({ request, open, onClose, refetch, isAdmin, myPr
         : []),
     ];
 
+    // Format conditionnement : nouveau format (colis_lines[]) ou fallback ancien (nb_colis/type_colis)
+    const conditionnementText = (() => {
+      if (Array.isArray(data.colis_lines) && data.colis_lines.length > 0) {
+        return data.colis_lines
+          .map((l: any) => `${l.nb} ${l.type}`)
+          .join(' + ');
+      }
+      return `${data.nb_colis ?? '?'} ${data.type_colis ?? ''}`.trim();
+    })();
+
     const sections: DetailSection[] = [
+      // Section devis si applicable
+      ...(isQuotation ? [{
+        title: 'Demande de devis',
+        icon: <Tag className="h-3 w-3" />,
+        fields: hasProposal
+          ? [
+              { label: 'Prix proposé', value: `${data.quotation_price} €` },
+              ...(data.quotation_valid_until ? [{ label: 'Valide jusqu\'au', value: fmtDay(data.quotation_valid_until) }] : []),
+              ...(data.quotation_proposed_at ? [{ label: 'Proposé le', value: fmtDay(data.quotation_proposed_at) }] : []),
+              ...(data.quotation_comment ? [{ label: 'Commentaire', value: data.quotation_comment as string }] : []),
+              ...(data.quotation_accepted_at ? [{ label: '✓ Accepté le', value: fmtDay(data.quotation_accepted_at) }] : []),
+              ...(data.quotation_refused_at ? [{ label: '✗ Refusé le', value: fmtDay(data.quotation_refused_at) }] : []),
+            ]
+          : [
+              { label: 'État', value: 'En attente de chiffrage par le logisticien' },
+            ],
+      }] : []),
       {
         title: 'Marchandise',
         icon: <Package className="h-3 w-3" />,
         fields: [
           { label: 'Nature', value: data.nature_marchandise ?? '—' },
-          { label: 'Conditionnement', value: `${data.nb_colis ?? '?'} ${data.type_colis ?? ''}`.trim() },
+          { label: 'Conditionnement', value: conditionnementText },
+          ...(data.nb_colis_total ? [{ label: 'Total colis', value: String(data.nb_colis_total) }] : []),
+          ...(data.valeur_totale_eur ? [{ label: 'Valeur totale', value: `${data.valeur_totale_eur} €` }] : []),
           ...(data.poids_total_kg ? [{ label: 'Poids total', value: `${data.poids_total_kg} kg` }] : []),
           ...(data.dimensions ? [{ label: 'Dimensions', value: data.dimensions as string }] : []),
           ...(data.dangereux ? [{ label: 'Marchandise dangereuse', value: 'OUI' as any }] : []),
@@ -373,20 +413,52 @@ function LogistiqueDetailDialog({ request, open, onClose, refetch, isAdmin, myPr
     // Workflow boutons
     const todayISO = () => new Date().toISOString().slice(0, 10);
     const statusActions: DetailStatusAction[] = [];
-    switch (request.status) {
-      case 'todo':
+
+    // ─── Workflow QUOTATION (devis) ─────────────────────────────────────
+    if (isQuotation && !TERMINAL_STATUSES.includes(request.status)) {
+      if (!hasProposal) {
+        // Le logisticien doit chiffrer
         statusActions.push({
-          key: 'pec',
-          label: 'Prendre en charge',
-          onClick: () => updateStatus(request.id, 'affectee', undefined, refetch, { assigneeId: myProfileId }),
+          key: 'quote', label: 'Chiffrer le devis',
+          onClick: () => setShowQuote(true),
         });
-        break;
-      case 'affectee':
+      } else if (canDecideQuote) {
+        // Le demandeur valide ou refuse
         statusActions.push({
-          key: 'plan', label: 'Planifier',
-          onClick: () => setShowPlanif(true),
+          key: 'accept_quote',
+          label: '✓ Valider le devis & lancer le transport',
+          onClick: () => updateStatus(
+            request.id, 'affectee', {
+              mode: 'transport',
+              quotation_accepted_at: new Date().toISOString(),
+            }, refetch,
+          ),
         });
-        break;
+        statusActions.push({
+          key: 'refuse_quote', label: 'Refuser le devis', variant: 'outline',
+          onClick: () => updateStatus(
+            request.id, 'abandonnee', { quotation_refused_at: new Date().toISOString() }, refetch,
+          ),
+        });
+      }
+    }
+
+    // ─── Workflow TRANSPORT (existant) ──────────────────────────────────
+    if (!isQuotation || (isQuotation && data.quotation_accepted_at && data.mode === 'transport')) {
+      switch (request.status) {
+        case 'todo':
+          statusActions.push({
+            key: 'pec',
+            label: 'Prendre en charge',
+            onClick: () => updateStatus(request.id, 'affectee', undefined, refetch, { assigneeId: myProfileId }),
+          });
+          break;
+        case 'affectee':
+          statusActions.push({
+            key: 'plan', label: 'Planifier',
+            onClick: () => setShowPlanif(true),
+          });
+          break;
       case 'planifiee':
         statusActions.push({ key: 'enl', label: 'Enlèvement', variant: 'outline', targetStatus: 'en_enlevement' });
         statusActions.push({ key: 'liv', label: 'En livraison', targetStatus: 'en_livraison' });
@@ -403,6 +475,7 @@ function LogistiqueDetailDialog({ request, open, onClose, refetch, isAdmin, myPr
       case 'livree':
         statusActions.push({ key: 'clo', label: 'Clôturer', variant: 'outline', targetStatus: 'cloturee' });
         break;
+      }
     }
     if (!TERMINAL_STATUSES.includes(request.status) && request.status !== 'abandonnee') {
       statusActions.push({ key: 'abd', label: 'Annuler', variant: 'ghost', targetStatus: 'abandonnee' });
@@ -445,6 +518,12 @@ function LogistiqueDetailDialog({ request, open, onClose, refetch, isAdmin, myPr
           open={showPlanif}
           onClose={() => setShowPlanif(false)}
           onPlanned={refetch}
+        />
+        <LogistiqueQuotationDialog
+          taskId={request.id}
+          open={showQuote}
+          onClose={() => setShowQuote(false)}
+          onProposed={refetch}
         />
       </>
     );
