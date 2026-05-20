@@ -26,6 +26,10 @@ const profiles = snap.profiles || [];
 const departments = snap.departments || [];
 const groups = snap.groups || [];
 
+const flowsSnap = JSON.parse(readFileSync(join(__dirname, '_flows-snapshot.json'), 'utf8'));
+const flows = flowsSnap.flows || [];
+const tableEffects = flowsSnap.table_effects || [];
+
 // ─── Types d'affectation supportés (voir sub_process_templates.assignment_type) ──
 //   • fixed_user        : utilisateur fixé (renseigne la colonne UUID avec un id de profile)
 //   • fixed_role        : un rôle / job_title (renseigne UUID = job_title_id)
@@ -125,6 +129,44 @@ function styleHeader(ws) {
   }
 }
 
+// 0) EXISTANT — dump complet de tous les flux configurés en DB (hors BE)
+const wsExisting = XLSX.utils.json_to_sheet(flows.map(f => ({
+  'Processus': f.process_name,
+  'Sous-processus': f.sp_name,
+  'N° sp': f.sp_order,
+  'Affectation type (sp)': f.assignment_type,
+  'Affectation cible (sp)': f.cible_nom,
+  'UUID cible (sp)': f.cible_uuid,
+  'Type cible': f.cible_kind,
+  'N° étape': f.tt_order,
+  'Étape': f.tt_title,
+  'Durée (j)': f.default_duration_days,
+  'Démarrage': f.start_mode,
+  'Override groupe (étape)': f.tt_target_group_name || '',
+  'UUID override (étape)': f.tt_target_group_id || '',
+  'Validation': f.validation,
+  'ID processus': f.process_id,
+  'ID sous-processus': f.sp_id,
+  'ID étape': f.tt_id,
+})));
+wsExisting['!cols'] = [{wch:32},{wch:42},{wch:6},{wch:18},{wch:32},{wch:38},{wch:14},{wch:6},{wch:48},{wch:8},{wch:12},{wch:22},{wch:38},{wch:12},{wch:38},{wch:38},{wch:38}];
+styleHeader(wsExisting);
+XLSX.utils.book_append_sheet(wb, wsExisting, 'EXISTANT');
+
+// 0bis) TABLE_EFFECTS — documentation des effets de bord sur tables métier
+const wsEffects = XLSX.utils.json_to_sheet(tableEffects.map(e => ({
+  'Processus': e.process_name,
+  'Sous-processus': e.sp_name,
+  'Étape concernée': e.step,
+  'Table impactée': e.table,
+  'Action': e.action,
+  'Champs copiés': e.fields_copied,
+  'Notes': e.notes,
+})));
+wsEffects['!cols'] = [{wch:32},{wch:48},{wch:42},{wch:34},{wch:36},{wch:60},{wch:80}];
+styleHeader(wsEffects);
+XLSX.utils.book_append_sheet(wb, wsEffects, 'TABLE_EFFECTS');
+
 // 1) SERVICE_ACHAT (existant)
 const wsAchat = XLSX.utils.json_to_sheet(achat);
 wsAchat['!cols'] = [{wch:38},{wch:38},{wch:48},{wch:5},{wch:36},{wch:11},{wch:18},{wch:20},{wch:24},{wch:20},{wch:38},{wch:30},{wch:18},{wch:18},{wch:22},{wch:18},{wch:22}];
@@ -202,6 +244,13 @@ const wsHelp = XLSX.utils.aoa_to_sheet([
   ['🛠  Paramétrage en masse — Autres flux'],
   [],
   ['ONGLETS :'],
+  ['  0. EXISTANT             — DUMP READ-ONLY de tous les flux configurés actuellement en DB (hors BE)'],
+  ['                            32 lignes : COMPTABILITÉ, GESTION REGLEMENTAIRE, Innovation, ONBOARDING,'],
+  ['                            QUALITÉ SECURITE ENVIRONNEMENT, SERVICE ACHAT, SERVICE MAINTENANCE,'],
+  ['                            SERVICE MARKETING, SUPPORT IT/DIGITAL (avec ses 6 sous-processus)'],
+  ['  0bis. TABLE_EFFECTS     — effets de bord sur tables métier (supplier_waiting_approval,'],
+  ['                            suppliers, nc_declarations, nc_actions, inno_demandes, demande_materiel)'],
+  ['                            → permet de voir quelles étapes déclenchent une INSERT/UPDATE sur quelle table'],
   ['  1. SERVICE_ACHAT        — étapes existantes du flux Achat (à compléter)'],
   ['  2. NOUVELLES_ETAPES     — saisie des étapes IT / RH / Comm / Maintenance / Logistique / Innovation'],
   ['  3. PROCESS_REFERENCE    — UUID des process à utiliser dans la colonne ID_processus'],
