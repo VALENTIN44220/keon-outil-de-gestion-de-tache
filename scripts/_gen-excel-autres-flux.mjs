@@ -1,35 +1,71 @@
 #!/usr/bin/env node
 /**
  * Fichier Excel « Autres flux » :
- *   - SERVICE_ACHAT : 3 étapes existantes
- *   - Onglet IT_PROPOSE, RH_PROPOSE, COMM_PROPOSE, etc. — squelettes vides
- *     pour que le métier remplisse les étapes
- *   - Un onglet ÉTATS par flux
+ *   - SERVICE_ACHAT : 3 étapes existantes (avec colonnes Affectation pour compléter)
+ *   - NOUVELLES_ETAPES : squelette vide pour saisir des étapes sur IT / RH / Comm / etc.
+ *   - PROCESS_REFERENCE : UUID des process_templates qui n'ont pas encore d'étapes
+ *   - PROFILES_REFERENCE : UUID des utilisateurs actifs (pour recopier dans Affectation cible)
+ *   - DEPARTMENTS_REFERENCE : UUID des départements
+ *   - ETATS_PAR_FLUX : 7 états par défaut (à dupliquer par flux)
+ *
+ * Note : l'AFFECTATION est attachée au **sous-processus** (sub_process_templates),
+ * pas à chaque étape. Donc on remplit les colonnes Affectation UNIQUEMENT sur la
+ * 1ʳᵉ ligne (N°=1) de chaque ID_sous_processus.
  */
 import XLSX from 'xlsx';
+import { readFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// ─── Snapshot statique des profils + départements ──────────────────────────
+// Source : scripts/_refs-snapshot.json (régénéré ponctuellement via MCP Supabase).
+const snap = JSON.parse(readFileSync(join(__dirname, '_refs-snapshot.json'), 'utf8'));
+const profiles = snap.profiles || [];
+const departments = snap.departments || [];
+
+// ─── Types d'affectation supportés (voir sub_process_templates.assignment_type) ──
+//   • fixed_user        : utilisateur fixé (renseigne la colonne UUID avec un id de profile)
+//   • fixed_role        : un rôle / job_title (renseigne UUID = job_title_id)
+//   • manager_dispatch  : un manager « dispatch » qui ré-affecte ensuite (UUID = profile_id)
+//   • manager_requester : le manager du demandeur (laisse UUID vide)
+//   • requester         : le demandeur lui-même (laisse UUID vide)
+//   • group             : un groupe d'utilisateurs (UUID = group_id)
+//   • department        : un département cible (UUID = department_id)
+const ASSIGNMENT_TYPES = [
+  'fixed_user',
+  'fixed_role',
+  'manager_dispatch',
+  'manager_requester',
+  'requester',
+  'group',
+  'department',
+];
+
 // ─── Étapes existantes SERVICE ACHAT ───────────────────────────────────────
 const achat = [
-  { 'ID_étape': 'd1111111-1111-1111-1111-111111111111', 'ID_sous_processus': 'c1111111-1111-1111-1111-111111111111', 'Sous-processus': 'DEMANDE DE NOUVEAU FOURNISSEUR',                'N°': 1, 'Étape': 'Vérification fournisseur',  'Durée (j)': 1, 'Démarrage': 'parallele',         'Dépend de (étape n°)': '', 'Délai après précédente (j)': 0, 'Validation N1': 'aucune', 'Valideur N1': '', 'Validation N2': 'aucune', 'Valideur N2': '', 'État en sortie': '' },
-  { 'ID_étape': 'd2222222-2222-2222-2222-222222222222', 'ID_sous_processus': 'c1111111-1111-1111-1111-111111111111', 'Sous-processus': 'DEMANDE DE NOUVEAU FOURNISSEUR',                'N°': 2, 'Étape': 'Création fournisseur',     'Durée (j)': 1, 'Démarrage': 'apres_precedente', 'Dépend de (étape n°)': '', 'Délai après précédente (j)': 0, 'Validation N1': 'aucune', 'Valideur N1': '', 'Validation N2': 'aucune', 'Valideur N2': '', 'État en sortie': '' },
-  { 'ID_étape': '35a65b15-63ae-4d31-94dc-f0f18d39339c', 'ID_sous_processus': '951d6c3c-82ca-4468-97ca-ca51275da573', 'Sous-processus': 'DEMANDE DIVERSES SERVICE ACHAT (HORS NOUVEAU FOURNISSEUR)', 'N°': 1, 'Étape': 'REPONDRE AU TICKET',     'Durée (j)': 1, 'Démarrage': 'parallele',         'Dépend de (étape n°)': '', 'Délai après précédente (j)': 0, 'Validation N1': 'aucune', 'Valideur N1': '', 'Validation N2': 'aucune', 'Valideur N2': '', 'État en sortie': '' },
+  { 'ID_étape': 'd1111111-1111-1111-1111-111111111111', 'ID_sous_processus': 'c1111111-1111-1111-1111-111111111111', 'Sous-processus': 'DEMANDE DE NOUVEAU FOURNISSEUR', 'N°': 1, 'Étape': 'Vérification fournisseur', 'Durée (j)': 1, 'Démarrage': 'parallele',         'Dépend de (étape n°)': '', 'Délai après précédente (j)': 0, 'Affectation type': 'fixed_role', 'Affectation cible (UUID)': '', 'Affectation cible (nom)': '', 'Validation N1': 'aucune', 'Valideur N1': '', 'Validation N2': 'aucune', 'Valideur N2': '', 'État en sortie': '' },
+  { 'ID_étape': 'd2222222-2222-2222-2222-222222222222', 'ID_sous_processus': 'c1111111-1111-1111-1111-111111111111', 'Sous-processus': 'DEMANDE DE NOUVEAU FOURNISSEUR', 'N°': 2, 'Étape': 'Création fournisseur',    'Durée (j)': 1, 'Démarrage': 'apres_precedente', 'Dépend de (étape n°)': '', 'Délai après précédente (j)': 0, 'Affectation type': '',           'Affectation cible (UUID)': '', 'Affectation cible (nom)': '', 'Validation N1': 'aucune', 'Valideur N1': '', 'Validation N2': 'aucune', 'Valideur N2': '', 'État en sortie': '' },
+  { 'ID_étape': '35a65b15-63ae-4d31-94dc-f0f18d39339c', 'ID_sous_processus': '951d6c3c-82ca-4468-97ca-ca51275da573', 'Sous-processus': 'DEMANDE DIVERSES SERVICE ACHAT (HORS NOUVEAU FOURNISSEUR)', 'N°': 1, 'Étape': 'REPONDRE AU TICKET', 'Durée (j)': 1, 'Démarrage': 'parallele', 'Dépend de (étape n°)': '', 'Délai après précédente (j)': 0, 'Affectation type': 'fixed_user', 'Affectation cible (UUID)': '', 'Affectation cible (nom)': '', 'Validation N1': 'aucune', 'Valideur N1': '', 'Validation N2': 'aucune', 'Valideur N2': '', 'État en sortie': '' },
 ];
 
 // ─── Templates vides pour les autres process IT/RH/Comm/etc. ──────────────
-// L'utilisateur ajoute des lignes : ID_processus + nom + N° + étape + durée etc.
 const ROW_TEMPLATE = {
-  'ID_processus': '',          // ← à recopier depuis l'onglet PROCESS_REFERENCE
+  'ID_processus': '',
   'Processus':    '',
+  'ID_sous_processus': '',
+  'Sous-processus':    '',
   'N°':           1,
   'Étape':        '',
   'Durée (j)':    1,
   'Démarrage':    'parallele',
   'Dépend de (étape n°)': '',
   'Délai après précédente (j)': 0,
+  // ⬇ Affectation : à remplir SEULEMENT sur la ligne N°=1 de chaque sous-processus
+  'Affectation type':         '',
+  'Affectation cible (UUID)': '',
+  'Affectation cible (nom)':  '',
   'Validation N1':'aucune',
   'Valideur N1':  '',
   'Validation N2':'aucune',
@@ -37,8 +73,7 @@ const ROW_TEMPLATE = {
   'État en sortie': '',
 };
 
-// 3 lignes vides pour amorcer la saisie (le user peut en ajouter)
-const blankRows = Array.from({ length: 5 }, () => ({ ...ROW_TEMPLATE }));
+const blankRows = Array.from({ length: 8 }, () => ({ ...ROW_TEMPLATE }));
 
 // ─── Référence des process_templates qui n'ont pas encore d'étapes ───────
 const processRef = [
@@ -64,85 +99,132 @@ const processRef = [
   { 'ID_processus': '11111111-1111-4111-8111-111111111604', 'Processus': 'RH - Promotion' },
 ];
 
-// ─── États « par défaut » suggérés (à dupliquer pour chaque process) ───────
+// ─── États « par défaut » suggérés ─────────────────────────────────────────
 const etatsParDefaut = [
-  { 'ID_processus': '', 'Processus': '', Code: 'soumise',     Libellé: 'Soumise',     Couleur: 'bg-slate-100 text-slate-700',     Ordre: 10,  'État initial': 'oui', 'État final': 'non' },
-  { 'ID_processus': '', 'Processus': '', Code: 'en_cours',    Libellé: 'En cours',    Couleur: 'bg-amber-100 text-amber-700',     Ordre: 20,  'État initial': 'non', 'État final': 'non' },
-  { 'ID_processus': '', 'Processus': '', Code: 'a_valider',   Libellé: 'À valider',   Couleur: 'bg-violet-100 text-violet-700',   Ordre: 30,  'État initial': 'non', 'État final': 'non' },
-  { 'ID_processus': '', 'Processus': '', Code: 'validee',     Libellé: 'Validée',     Couleur: 'bg-emerald-100 text-emerald-700', Ordre: 40,  'État initial': 'non', 'État final': 'non' },
-  { 'ID_processus': '', 'Processus': '', Code: 'terminee',    Libellé: 'Terminée',    Couleur: 'bg-emerald-200 text-emerald-800', Ordre: 50,  'État initial': 'non', 'État final': 'oui' },
-  { 'ID_processus': '', 'Processus': '', Code: 'refusee',     Libellé: 'Refusée',     Couleur: 'bg-red-100 text-red-700',         Ordre: 60,  'État initial': 'non', 'État final': 'oui' },
-  { 'ID_processus': '', 'Processus': '', Code: 'annulee',     Libellé: 'Annulée',     Couleur: 'bg-red-100 text-red-700',         Ordre: 70,  'État initial': 'non', 'État final': 'oui' },
+  { 'ID_processus': '', 'Processus': '', Code: 'soumise',  Libellé: 'Soumise',  Couleur: 'bg-slate-100 text-slate-700',     Ordre: 10, 'État initial': 'oui', 'État final': 'non', 'Catégorie': 'SOUMIS' },
+  { 'ID_processus': '', 'Processus': '', Code: 'en_cours', Libellé: 'En cours', Couleur: 'bg-amber-100 text-amber-700',     Ordre: 20, 'État initial': 'non', 'État final': 'non', 'Catégorie': 'EN_COURS' },
+  { 'ID_processus': '', 'Processus': '', Code: 'a_valider',Libellé: 'À valider',Couleur: 'bg-violet-100 text-violet-700',   Ordre: 30, 'État initial': 'non', 'État final': 'non', 'Catégorie': 'EN_ATTENTE_VALIDATION' },
+  { 'ID_processus': '', 'Processus': '', Code: 'validee',  Libellé: 'Validée',  Couleur: 'bg-emerald-100 text-emerald-700', Ordre: 40, 'État initial': 'non', 'État final': 'non', 'Catégorie': 'EN_COURS' },
+  { 'ID_processus': '', 'Processus': '', Code: 'terminee', Libellé: 'Terminée', Couleur: 'bg-emerald-200 text-emerald-800', Ordre: 50, 'État initial': 'non', 'État final': 'oui', 'Catégorie': 'TERMINE' },
+  { 'ID_processus': '', 'Processus': '', Code: 'refusee',  Libellé: 'Refusée',  Couleur: 'bg-red-100 text-red-700',         Ordre: 60, 'État initial': 'non', 'État final': 'oui', 'Catégorie': 'TERMINE' },
+  { 'ID_processus': '', 'Processus': '', Code: 'annulee',  Libellé: 'Annulée',  Couleur: 'bg-red-100 text-red-700',         Ordre: 70, 'État initial': 'non', 'État final': 'oui', 'Catégorie': 'TERMINE' },
 ];
 
+// ─── Construction du classeur ──────────────────────────────────────────────
 const wb = XLSX.utils.book_new();
+const headerStyle = { font: { bold: true }, fill: { fgColor: { rgb: 'FFF3E8' } } };
+function styleHeader(ws) {
+  if (!ws['!ref']) return;
+  const r = XLSX.utils.decode_range(ws['!ref']);
+  for (let C = r.s.c; C <= r.e.c; C++) {
+    const c = ws[XLSX.utils.encode_cell({ r: 0, c: C })];
+    if (c) c.s = headerStyle;
+  }
+}
 
 // 1) SERVICE_ACHAT (existant)
 const wsAchat = XLSX.utils.json_to_sheet(achat);
-wsAchat['!cols'] = [{wch:38},{wch:38},{wch:48},{wch:5},{wch:36},{wch:11},{wch:20},{wch:30},{wch:18},{wch:18},{wch:22},{wch:18},{wch:22},{wch:24}];
-const r1 = XLSX.utils.decode_range(wsAchat['!ref']);
-for (let C = r1.s.c; C <= r1.e.c; C++) {
-  const c = wsAchat[XLSX.utils.encode_cell({ r: 0, c: C })];
-  if (c) c.s = { font: { bold: true }, fill: { fgColor: { rgb: 'FFF3E8' } } };
-}
+wsAchat['!cols'] = [{wch:38},{wch:38},{wch:48},{wch:5},{wch:36},{wch:11},{wch:18},{wch:20},{wch:24},{wch:20},{wch:38},{wch:30},{wch:18},{wch:18},{wch:22},{wch:18},{wch:22}];
+styleHeader(wsAchat);
 XLSX.utils.book_append_sheet(wb, wsAchat, 'SERVICE_ACHAT');
 
-// 2) IT / RH / COMM / MAINT / LOGI / INNO — onglet vide pour saisie
+// 2) NOUVELLES_ETAPES (vide pour saisie)
 const wsNew = XLSX.utils.json_to_sheet(blankRows);
-wsNew['!cols'] = [{wch:38},{wch:42},{wch:5},{wch:36},{wch:11},{wch:20},{wch:30},{wch:18},{wch:18},{wch:22},{wch:18},{wch:22},{wch:24}];
-const r2 = XLSX.utils.decode_range(wsNew['!ref']);
-for (let C = r2.s.c; C <= r2.e.c; C++) {
-  const c = wsNew[XLSX.utils.encode_cell({ r: 0, c: C })];
-  if (c) c.s = { font: { bold: true }, fill: { fgColor: { rgb: 'FFF3E8' } } };
-}
+wsNew['!cols'] = [{wch:38},{wch:42},{wch:38},{wch:42},{wch:5},{wch:36},{wch:11},{wch:18},{wch:20},{wch:24},{wch:20},{wch:38},{wch:30},{wch:18},{wch:18},{wch:22},{wch:18},{wch:22}];
+styleHeader(wsNew);
 XLSX.utils.book_append_sheet(wb, wsNew, 'NOUVELLES_ETAPES');
 
 // 3) PROCESS_REFERENCE
 const wsRef = XLSX.utils.json_to_sheet(processRef);
 wsRef['!cols'] = [{ wch: 40 }, { wch: 50 }];
+styleHeader(wsRef);
 XLSX.utils.book_append_sheet(wb, wsRef, 'PROCESS_REFERENCE');
 
-// 4) ÉTATS_PAR_FLUX — pré-rempli avec une suggestion neutre, le user duplique par process
+// 4) PROFILES_REFERENCE — pour récupérer les UUIDs des utilisateurs
+const wsProf = XLSX.utils.json_to_sheet(
+  profiles.map(p => ({
+    'UUID': p.id,
+    'Nom': p.display_name,
+    'Fonction': p.job_title || '',
+    'Département': p.dept || '',
+  })),
+);
+wsProf['!cols'] = [{ wch: 40 }, { wch: 32 }, { wch: 48 }, { wch: 28 }];
+styleHeader(wsProf);
+XLSX.utils.book_append_sheet(wb, wsProf, 'PROFILES_REFERENCE');
+
+// 5) DEPARTMENTS_REFERENCE
+const wsDept = XLSX.utils.json_to_sheet(
+  departments.map(d => ({ 'UUID': d.id, 'Département': d.name })),
+);
+wsDept['!cols'] = [{ wch: 40 }, { wch: 40 }];
+styleHeader(wsDept);
+XLSX.utils.book_append_sheet(wb, wsDept, 'DEPARTMENTS_REFERENCE');
+
+// 6) ASSIGNMENT_TYPES — petite cheat-sheet
+const wsAt = XLSX.utils.json_to_sheet([
+  { 'Affectation type': 'fixed_user',        'Description': 'Personne fixée — colle son UUID dans « Affectation cible (UUID) »' },
+  { 'Affectation type': 'fixed_role',        'Description': 'Rôle / job_title — colle l\'UUID du job_title' },
+  { 'Affectation type': 'manager_dispatch',  'Description': 'Un manager qui ré-affecte ensuite (cas BE) — UUID du manager' },
+  { 'Affectation type': 'manager_requester', 'Description': 'Manager du demandeur (auto à la création) — UUID vide' },
+  { 'Affectation type': 'requester',         'Description': 'Le demandeur lui-même — UUID vide' },
+  { 'Affectation type': 'group',             'Description': 'Groupe d\'utilisateurs — UUID du groupe' },
+  { 'Affectation type': 'department',        'Description': 'Département cible — UUID du département' },
+]);
+wsAt['!cols'] = [{ wch: 22 }, { wch: 90 }];
+styleHeader(wsAt);
+XLSX.utils.book_append_sheet(wb, wsAt, 'ASSIGNMENT_TYPES');
+
+// 7) ETATS_PAR_FLUX
 const wsEtats = XLSX.utils.json_to_sheet(etatsParDefaut);
-wsEtats['!cols'] = [{wch:40},{wch:42},{wch:18},{wch:24},{wch:34},{wch:8},{wch:14},{wch:12}];
-const r3 = XLSX.utils.decode_range(wsEtats['!ref']);
-for (let C = r3.s.c; C <= r3.e.c; C++) {
-  const c = wsEtats[XLSX.utils.encode_cell({ r: 0, c: C })];
-  if (c) c.s = { font: { bold: true }, fill: { fgColor: { rgb: 'E0E7FF' } } };
-}
+wsEtats['!cols'] = [{wch:40},{wch:42},{wch:18},{wch:24},{wch:34},{wch:8},{wch:14},{wch:12},{wch:24}];
+styleHeader(wsEtats);
 XLSX.utils.book_append_sheet(wb, wsEtats, 'ETATS_PAR_FLUX');
 
-// 5) LISEZ-MOI
+// 8) LISEZ-MOI
 const wsHelp = XLSX.utils.aoa_to_sheet([
   ['🛠  Paramétrage en masse — Autres flux'],
   [],
-  ['CE FICHIER contient 4 onglets :'],
-  ['  1. SERVICE_ACHAT      : les 3 étapes existantes du flux Achat (à compléter avec États en sortie)'],
-  ['  2. NOUVELLES_ETAPES   : squelette pour saisir des étapes sur les flux IT/RH/Comm/Maintenance/Logistique/Innovation'],
-  ['  3. PROCESS_REFERENCE  : liste des ID des process pour recopier l\'ID_processus dans NOUVELLES_ETAPES'],
-  ['  4. ETATS_PAR_FLUX     : liste des états par processus (duplique le bloc des 7 états par défaut pour chaque flux)'],
+  ['ONGLETS :'],
+  ['  1. SERVICE_ACHAT        — étapes existantes du flux Achat (à compléter)'],
+  ['  2. NOUVELLES_ETAPES     — saisie des étapes IT / RH / Comm / Maintenance / Logistique / Innovation'],
+  ['  3. PROCESS_REFERENCE    — UUID des process à utiliser dans la colonne ID_processus'],
+  ['  4. PROFILES_REFERENCE   — UUID des utilisateurs (pour Affectation cible (UUID) quand type=fixed_user/manager_dispatch)'],
+  ['  5. DEPARTMENTS_REFERENCE— UUID des départements (pour Affectation cible (UUID) quand type=department)'],
+  ['  6. ASSIGNMENT_TYPES     — cheat-sheet des 7 modes d\'affectation supportés'],
+  ['  7. ETATS_PAR_FLUX       — liste des états par processus + colonne Catégorie macro'],
   [],
-  ['POUR SAISIR DES ÉTAPES SUR UN FLUX SANS ÉTAPES ACTUELLES (ex: IT - Demande d\'intervention IT) :'],
+  ['⚠ AFFECTATION (nouveauté) :'],
+  ['  L\'affectation est définie au niveau du SOUS-PROCESSUS, pas de chaque étape.'],
+  ['  → Remplis les colonnes « Affectation type » + « Affectation cible (UUID) » + « Affectation cible (nom) »'],
+  ['     UNIQUEMENT sur la 1ʳᵉ ligne (N°=1) de chaque ID_sous_processus.'],
+  ['  → Pour les types « requester » et « manager_requester », laisse UUID vide.'],
+  ['  → Pour « fixed_user » / « manager_dispatch » : colle l\'UUID depuis PROFILES_REFERENCE.'],
+  ['  → Pour « department » : colle l\'UUID depuis DEPARTMENTS_REFERENCE.'],
+  [],
+  ['POUR SAISIR DES ÉTAPES SUR UN FLUX SANS ÉTAPES (ex: IT - Demande d\'intervention IT) :'],
   ['  1. Va sur PROCESS_REFERENCE → copie l\'ID_processus du flux concerné'],
-  ['  2. Va sur NOUVELLES_ETAPES → colle l\'ID dans ID_processus, remplis Processus, N°, Étape, Durée…'],
-  ['  3. Ajoute autant de lignes que d\'étapes (la même ID_processus se répète)'],
+  ['  2. Va sur NOUVELLES_ETAPES → colle l\'ID dans ID_processus + nom dans Processus'],
+  ['  3. Définis ID_sous_processus (UUID que tu inventes, format xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx) +'],
+  ['     Sous-processus (nom). Tu peux créer plusieurs sous-processus par flux.'],
+  ['  4. Pour chaque sous-processus, ajoute autant de lignes que d\'étapes (N° 1, 2, 3…)'],
+  ['  5. Sur la ligne N°=1 du sous-processus, renseigne les colonnes Affectation'],
   [],
   ['POUR DÉFINIR LES ÉTATS D\'UN FLUX :'],
-  ['  1. Va sur ETATS_PAR_FLUX'],
-  ['  2. Pour chaque flux que tu veux configurer, recopie le bloc des 7 lignes (Code/Libellé/Couleur…) en renseignant'],
-  ['     ID_processus + Processus correspondants. Modifie/ajoute/supprime selon besoin métier.'],
+  ['  → ETATS_PAR_FLUX : recopie le bloc des 7 lignes par flux, ajuste si besoin.'],
+  ['  → Catégorie : SOUMIS | EN_COURS | EN_ATTENTE_VALIDATION | EN_ATTENTE_RETOUR_ADMIN | EN_ATTENTE_TRAVAUX | TERMINE'],
   [],
   ['QUAND C\'EST PRÊT :'],
-  ['  Renvoie ce fichier à Claude — il va :'],
-  ['     • Mettre à jour les états en sortie pour SERVICE_ACHAT'],
-  ['     • Créer les sub_process_templates + task_templates pour NOUVELLES_ETAPES (les flux qui n\'avaient pas d\'étapes)'],
-  ['     • Insérer les états dans request_states pour ETATS_PAR_FLUX'],
+  ['  Renvoie ce fichier à Claude — il génèrera :'],
+  ['     • UPSERT sub_process_templates (assignment_type + target_*)'],
+  ['     • INSERT task_templates (étapes + output_state_code)'],
+  ['     • INSERT request_states (avec catégorie macro)'],
   ['  Backup automatique avant écriture, comme pour le BE.'],
 ]);
-wsHelp['!cols'] = [{ wch: 110 }];
+wsHelp['!cols'] = [{ wch: 115 }];
 XLSX.utils.book_append_sheet(wb, wsHelp, 'LISEZ-MOI');
 
 const out = join(__dirname, '..', 'AUTRES_FLUX_parametrage.xlsx');
 XLSX.writeFile(wb, out);
 console.log(`✅ Fichier autres flux : ${out}`);
-console.log(`   Onglets : SERVICE_ACHAT (${achat.length} étapes) + NOUVELLES_ETAPES (vide) + PROCESS_REFERENCE (${processRef.length}) + ETATS_PAR_FLUX (${etatsParDefaut.length})`);
+console.log(`   Onglets : SERVICE_ACHAT (${achat.length}) + NOUVELLES_ETAPES (vide) + PROCESS_REFERENCE (${processRef.length}) + PROFILES_REFERENCE (${profiles.length}) + DEPARTMENTS_REFERENCE (${departments.length}) + ETATS_PAR_FLUX (${etatsParDefaut.length})`);
