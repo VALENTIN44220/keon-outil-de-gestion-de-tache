@@ -1011,6 +1011,7 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
         .eq('type', 'task')
         .not('be_status', 'is', null)
         .not('be_status', 'eq', 'cloturee')
+        .not('status', 'eq', 'cancelled')
         .order('be_urgency', { ascending: false })
         .order('created_at', { ascending: true });
 
@@ -1037,6 +1038,7 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
           be_project:be_projects!tasks_be_project_id_fkey(code_projet, nom_projet)
         `)
         .eq('type', 'request')
+        .not('status', 'eq', 'cancelled')
         .order('created_at', { ascending: false });
 
       if (projectId) {
