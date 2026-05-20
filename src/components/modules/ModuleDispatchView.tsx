@@ -201,6 +201,17 @@ export function ModuleDispatchView<
       });
   }, [requests, config]);
 
+  // Re-sync detailRequest avec la dernière version de la liste après refetch
+  // (sinon le dialog ouvert affiche un état périmé après une action statut).
+  useEffect(() => {
+    if (!detailRequest) return;
+    const id = config.getId(detailRequest);
+    const fresh = requests.find((r) => config.getId(r) === id);
+    if (fresh && fresh !== detailRequest) {
+      setDetailRequest(fresh);
+    }
+  }, [requests, detailRequest, config]);
+
   // Deep-link ?openTask=<id> : ouvre le detail au chargement
   useEffect(() => {
     const openId = searchParams.get('openTask');

@@ -25,6 +25,8 @@ import type { ModuleDispatchConfig, ModuleKpi, ModuleRowCtx } from '@/components
 
 const STATUS_COLORS: Record<string, string> = {
   todo: 'bg-amber-100 text-amber-800 border-amber-300',
+  devis_a_chiffrer: 'bg-sky-100 text-sky-800 border-sky-300',
+  devis_a_valider: 'bg-sky-200 text-sky-900 border-sky-400',
   affectee: 'bg-blue-100 text-blue-800 border-blue-300',
   planifiee: 'bg-violet-100 text-violet-800 border-violet-300',
   en_enlevement: 'bg-orange-100 text-orange-800 border-orange-300',
@@ -37,6 +39,8 @@ const STATUS_COLORS: Record<string, string> = {
 
 const STATUS_LABELS: Record<string, string> = {
   todo: 'Soumise',
+  devis_a_chiffrer: 'Devis à chiffrer',
+  devis_a_valider: 'Devis à valider',
   affectee: 'Affectée',
   planifiee: 'Planifiée',
   en_enlevement: 'En enlèvement',
@@ -415,14 +419,14 @@ function LogistiqueDetailDialog({ request, open, onClose, refetch, isAdmin, myPr
     const statusActions: DetailStatusAction[] = [];
 
     // ─── Workflow QUOTATION (devis) ─────────────────────────────────────
-    if (isQuotation && !TERMINAL_STATUSES.includes(request.status)) {
-      if (!hasProposal) {
+    if (isQuotation && !TERMINAL_STATUSES.includes(request.status) && request.status !== 'abandonnee') {
+      if (request.status === 'devis_a_chiffrer' || (!hasProposal && request.status === 'todo')) {
         // Le logisticien doit chiffrer
         statusActions.push({
           key: 'quote', label: 'Chiffrer le devis',
           onClick: () => setShowQuote(true),
         });
-      } else if (canDecideQuote) {
+      } else if (request.status === 'devis_a_valider' && canDecideQuote) {
         // Le demandeur valide ou refuse
         statusActions.push({
           key: 'accept_quote',
@@ -440,11 +444,15 @@ function LogistiqueDetailDialog({ request, open, onClose, refetch, isAdmin, myPr
             request.id, 'abandonnee', { quotation_refused_at: new Date().toISOString() }, refetch,
           ),
         });
+      } else if (request.status === 'devis_a_valider' && !canDecideQuote) {
+        // Logisticien après chiffrage : info read-only
+        // (pas de bouton — le demandeur doit décider)
       }
     }
 
     // ─── Workflow TRANSPORT (existant) ──────────────────────────────────
-    if (!isQuotation || (isQuotation && data.quotation_accepted_at && data.mode === 'transport')) {
+    // Actif si pas un devis OU si le devis a été accepté (mode passé à transport)
+    if (!isQuotation || data.mode === 'transport') {
       switch (request.status) {
         case 'todo':
           statusActions.push({

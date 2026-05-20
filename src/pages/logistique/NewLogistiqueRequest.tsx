@@ -83,7 +83,7 @@ export default function NewLogistiqueRequest() {
 
       const { data, error } = await supabase.from('tasks').insert({
         type: 'request',
-        status: 'todo',
+        status: modeQuotation ? 'devis_a_chiffrer' : 'todo',
         title,
         description,
         requester_id: profile.id,

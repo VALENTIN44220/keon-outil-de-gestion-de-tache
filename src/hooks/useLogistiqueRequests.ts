@@ -21,6 +21,8 @@ export interface LogistiqueRequest {
 
 export const LOG_STATUSES = [
   'soumise',
+  'devis_a_chiffrer',          // demande de devis créée, en attente de chiffrage
+  'devis_a_valider',           // chiffré, en attente de décision du demandeur
   'affectee',
   'planifiee',
   'en_enlevement',

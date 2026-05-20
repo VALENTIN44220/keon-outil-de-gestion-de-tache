@@ -61,7 +61,7 @@ export function LogistiqueQuotationDialog({ taskId, open, onClose, onProposed }:
       };
       const { error } = await supabase
         .from('tasks')
-        .update({ status: 'affectee', module_data: merged })
+        .update({ status: 'devis_a_valider', module_data: merged })
         .eq('id', taskId);
       if (error) throw error;
       toast.success('Devis proposé — le demandeur va recevoir une notification');
