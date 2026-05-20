@@ -203,12 +203,34 @@ export default function RequestDetail() {
   // ─── Actions ──────────────────────────────────────────────────
   const handleCancel = async () => {
     if (!task) return;
-    if (!window.confirm('Annuler définitivement cette demande ?')) return;
+    if (!window.confirm('Annuler définitivement cette demande ? Toutes les tâches enfant seront également annulées.')) return;
     setIsCancelling(true);
-    const { error } = await supabase.from('tasks').update({ status: 'cancelled' }).eq('id', task.id);
+    const now = new Date().toISOString();
+    // 1) Annule toutes les tâches enfant non terminées (pour qu'elles sortent du dispatch BE / des plans de charge)
+    const activeChildIds = childTasks
+      .filter((c) => c.status !== 'cancelled' && c.status !== 'done' && c.status !== 'validated')
+      .map((c) => c.id);
+    if (activeChildIds.length > 0) {
+      const { error: childErr } = await supabase
+        .from('tasks')
+        .update({ status: 'cancelled', updated_at: now })
+        .in('id', activeChildIds);
+      if (childErr) {
+        setIsCancelling(false);
+        toast.error(`Erreur annulation tâches : ${childErr.message}`);
+        return;
+      }
+    }
+    // 2) Annule la demande elle-même
+    const { error } = await supabase
+      .from('tasks')
+      .update({ status: 'cancelled', updated_at: now })
+      .eq('id', task.id);
     setIsCancelling(false);
     if (error) { toast.error(`Erreur : ${error.message}`); return; }
-    toast.success('Demande annulée');
+    toast.success(activeChildIds.length > 0
+      ? `Demande annulée (${activeChildIds.length} tâche${activeChildIds.length > 1 ? 's' : ''} enfant également annulée${activeChildIds.length > 1 ? 's' : ''})`
+      : 'Demande annulée');
     navigate(-1);
   };
 
