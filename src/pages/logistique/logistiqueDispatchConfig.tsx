@@ -1,7 +1,7 @@
 /**
  * logistiqueDispatchConfig — config du module Logistique pour ModuleDispatchView.
  */
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { LogistiquePlanificationDialog } from '@/components/logistique/LogistiquePlanificationDialog';
 import { LogistiqueQuotationDialog } from '@/components/logistique/LogistiqueQuotationDialog';
 import {
@@ -291,9 +291,23 @@ interface LogistiqueDetailDialogProps {
   profilesMap: Map<string, string>;
 }
 
-function LogistiqueDetailDialog({ request, open, onClose, refetch, isAdmin, myProfileId, profilesMap }: LogistiqueDetailDialogProps) {
+function LogistiqueDetailDialog({ request: initialRequest, open, onClose, refetch, isAdmin, myProfileId, profilesMap }: LogistiqueDetailDialogProps) {
     const [showPlanif, setShowPlanif] = useState(false);
     const [showQuote, setShowQuote] = useState(false);
+    // State local mis à jour aussi bien par les props que par re-fetch direct
+    // après chaque action — évite le « écran ne change pas » dû à la latence
+    // de la realtime subscription / re-render parent.
+    const [request, setRequest] = useState<LogistiqueRequest>(initialRequest);
+
+    useEffect(() => { setRequest(initialRequest); }, [initialRequest]);
+
+    const refreshThisRequest = async () => {
+      const { data: row } = await supabase.from('tasks').select('*').eq('id', initialRequest.id).maybeSingle();
+      if (row) setRequest(row as LogistiqueRequest);
+      // Et on signale au parent pour MAJ la liste
+      refetch();
+    };
+
     const data = request.module_data ?? {};
     const isQuotation = data.mode === 'quotation';
     const hasProposal = isQuotation && data.quotation_price != null;
@@ -435,13 +449,13 @@ function LogistiqueDetailDialog({ request, open, onClose, refetch, isAdmin, myPr
             request.id, 'affectee', {
               mode: 'transport',
               quotation_accepted_at: new Date().toISOString(),
-            }, refetch,
+            }, refreshThisRequest,
           ),
         });
         statusActions.push({
           key: 'refuse_quote', label: 'Refuser le devis', variant: 'outline',
           onClick: () => updateStatus(
-            request.id, 'abandonnee', { quotation_refused_at: new Date().toISOString() }, refetch,
+            request.id, 'abandonnee', { quotation_refused_at: new Date().toISOString() }, refreshThisRequest,
           ),
         });
       } else if (request.status === 'devis_a_valider' && !canDecideQuote) {
@@ -458,7 +472,7 @@ function LogistiqueDetailDialog({ request, open, onClose, refetch, isAdmin, myPr
           statusActions.push({
             key: 'pec',
             label: 'Prendre en charge',
-            onClick: () => updateStatus(request.id, 'affectee', undefined, refetch, { assigneeId: myProfileId }),
+            onClick: () => updateStatus(request.id, 'affectee', undefined, refreshThisRequest, { assigneeId: myProfileId }),
           });
           break;
         case 'affectee':
@@ -509,7 +523,7 @@ function LogistiqueDetailDialog({ request, open, onClose, refetch, isAdmin, myPr
           allowAttachmentMutation={true}
           attachmentPathPrefix={`logistique-requests/${request.id}`}
           statusActions={statusActions}
-          refetch={refetch}
+          refetch={refreshThisRequest}
           isAdmin={isAdmin}
           allowDelete={true}
           onDeleteConfirm="Supprimer définitivement cette demande de transport ?"
@@ -525,13 +539,13 @@ function LogistiqueDetailDialog({ request, open, onClose, refetch, isAdmin, myPr
           taskId={request.id}
           open={showPlanif}
           onClose={() => setShowPlanif(false)}
-          onPlanned={refetch}
+          onPlanned={refreshThisRequest}
         />
         <LogistiqueQuotationDialog
           taskId={request.id}
           open={showQuote}
           onClose={() => setShowQuote(false)}
-          onProposed={refetch}
+          onProposed={refreshThisRequest}
         />
       </>
     );
