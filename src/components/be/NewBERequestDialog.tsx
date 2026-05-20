@@ -44,6 +44,8 @@ import {
   Plus,
   X,
   Link as LinkIcon,
+  Paperclip,
+  FileText as FileIcon,
   Info,
   Calendar as CalendarIcon,
 } from 'lucide-react';
@@ -204,6 +206,8 @@ export function NewBERequestDialog({
 
   // ── Liens externes ────────────────────────────────────────────────────────
   const [links, setLinks] = useState<{ url: string; label: string }[]>([]);
+  const [files, setFiles] = useState<{ name: string; url: string; path: string; size: number }[]>([]);
+  const [uploadingFile, setUploadingFile] = useState(false);
 
   // ── Configuration admin "Champs du formulaire de demande" ────────────────
   // Lue depuis process_templates.settings.common_fields_config du processus BE.
@@ -250,6 +254,7 @@ export function NewBERequestDialog({
       setExpectedDate('');
       setDescription('');
       setLinks([]);
+      setFiles([]);
       setProjectSearch('');
     }
   }, [open, defaultProjectId, defaultAffaireId, hasDefaultProject]);
@@ -407,7 +412,7 @@ export function NewBERequestDialog({
       if (selectedSubProcessIds.length > 0) {
         const { data: tplRows, error: tplErr } = await (sb as any)
           .from('task_templates')
-          .select('id, sub_process_template_id, title, default_duration_days, default_duration_hours, order_index, validation_level_1, validator_level_1_id, validation_level_2, validator_level_2_id, is_milestone, milestone_label, auto_milestone_delay_days, auto_milestone_label, required_docs_count, required_docs_description, start_mode, depends_on_task_template_id, delay_after_previous_days')
+          .select('id, sub_process_template_id, title, default_duration_days, order_index, validation_level_1, validator_level_1_id, validation_level_2, validator_level_2_id, is_milestone, milestone_label, auto_milestone_delay_days, auto_milestone_label, required_docs_count, required_docs_description, start_mode, depends_on_task_template_id, delay_after_previous_days')
           .in('sub_process_template_id', selectedSubProcessIds)
           .order('order_index', { ascending: true });
         if (tplErr) throw tplErr;
@@ -595,12 +600,34 @@ export function NewBERequestDialog({
         }
       }
 
-      // Toast succès enrichi : indique le nb de liens inséré pour ne plus
-      // laisser place au doute sur la sauvegarde des liens
+      // 3bis. Fichiers uploadés en tant que task_attachments type='file'
+      let insertedFiles = 0;
+      if (files.length > 0) {
+        const { data: insertedFileRows, error: filesError } = await sb.from('task_attachments').insert(
+          files.map(f => ({
+            task_id: request.id,
+            name: f.name,
+            url: f.url,
+            type: 'file',
+            uploaded_by: user.id,
+          }))
+        ).select('id');
+        if (filesError) {
+          console.warn('[NewBERequestDialog] files insert error:', filesError);
+          toast.error(`Pièces jointes non sauvegardées (${files.length}) : ${filesError.message}`);
+        } else {
+          insertedFiles = (insertedFileRows ?? []).length;
+        }
+      }
+
+      // Toast succès enrichi : indique le nb de liens + fichiers insérés
       toast.success(
         `Demande créée : ${selectedGroups.length} prestation(s), ${allSelectedSteps.length} tâche(s)` +
           (validLinks.length > 0
-            ? ` · ${insertedLinks}/${validLinks.length} lien${insertedLinks > 1 ? 's' : ''} sauvegardé${insertedLinks > 1 ? 's' : ''}`
+            ? ` · ${insertedLinks}/${validLinks.length} lien${insertedLinks > 1 ? 's' : ''}`
+            : '') +
+          (files.length > 0
+            ? ` · ${insertedFiles}/${files.length} fichier${insertedFiles > 1 ? 's' : ''}`
             : ''),
       );
       onCreated?.(request.id);
@@ -970,6 +997,73 @@ export function NewBERequestDialog({
                       <Plus className="h-3.5 w-3.5" />
                       Ajouter un lien
                     </Button>
+                  </div>
+                </div>
+                )}
+
+                {/* Fichiers (pièces jointes) — masquables via attachments.visible */}
+                {fieldsConfig.attachments.visible && (
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2 font-medium">
+                    <Paperclip className="h-4 w-4" />
+                    Pièces jointes{' '}
+                    <span className="font-normal text-muted-foreground text-xs">(optionnel — PDF, plans, photos, etc.)</span>
+                  </Label>
+                  <div className="space-y-2">
+                    {files.map((f, i) => (
+                      <div key={i} className="flex items-center gap-2 px-2 py-1.5 rounded border bg-muted/30 text-sm">
+                        <FileIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <a href={f.url} target="_blank" rel="noopener noreferrer" className="flex-1 truncate hover:underline" title={f.name}>
+                          {f.name}
+                        </a>
+                        <span className="text-xs text-muted-foreground shrink-0">{(f.size / 1024).toFixed(0)} Ko</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive shrink-0"
+                          onClick={() => setFiles(prev => prev.filter((_, j) => j !== i))}
+                          disabled={!fieldsConfig.attachments.editable || isSubmitting}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                    <label>
+                      <input
+                        type="file"
+                        className="hidden"
+                        disabled={!fieldsConfig.attachments.editable || isSubmitting || uploadingFile}
+                        onChange={async (e) => {
+                          const f = e.target.files?.[0];
+                          if (!f) return;
+                          // Reset input so the same file can be re-selected if removed
+                          e.target.value = '';
+                          setUploadingFile(true);
+                          try {
+                            const safeName = f.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+                            const path = `be-requests/draft/${Date.now()}-${safeName}`;
+                            const { error: upErr } = await sb.storage
+                              .from('attachments')
+                              .upload(path, f, { upsert: false });
+                            if (upErr) throw upErr;
+                            const { data: pub } = sb.storage.from('attachments').getPublicUrl(path);
+                            setFiles(prev => [...prev, { name: f.name, url: pub.publicUrl, path, size: f.size }]);
+                            toast.success(`Fichier ajouté : ${f.name}`);
+                          } catch (err: any) {
+                            toast.error(`Upload : ${err.message || 'échec'}`);
+                          } finally {
+                            setUploadingFile(false);
+                          }
+                        }}
+                      />
+                      <Button type="button" variant="outline" size="sm" className="gap-1.5 text-xs"
+                        disabled={!fieldsConfig.attachments.editable || isSubmitting || uploadingFile} asChild>
+                        <span>
+                          <Paperclip className="h-3.5 w-3.5" />
+                          {uploadingFile ? 'Upload en cours…' : 'Ajouter un fichier'}
+                        </span>
+                      </Button>
+                    </label>
                   </div>
                 </div>
                 )}
