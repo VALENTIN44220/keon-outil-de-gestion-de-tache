@@ -24,6 +24,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const snap = JSON.parse(readFileSync(join(__dirname, '_refs-snapshot.json'), 'utf8'));
 const profiles = snap.profiles || [];
 const departments = snap.departments || [];
+const groups = snap.groups || [];
 
 // ─── Types d'affectation supportés (voir sub_process_templates.assignment_type) ──
 //   • fixed_user        : utilisateur fixé (renseigne la colonne UUID avec un id de profile)
@@ -161,6 +162,19 @@ wsDept['!cols'] = [{ wch: 40 }, { wch: 40 }];
 styleHeader(wsDept);
 XLSX.utils.book_append_sheet(wb, wsDept, 'DEPARTMENTS_REFERENCE');
 
+// 5bis) GROUPS_REFERENCE — UUID des groupes (collaborator_groups)
+const wsGroups = XLSX.utils.json_to_sheet(
+  groups.map(g => ({
+    'UUID': g.id,
+    'Groupe': g.name,
+    'Description': g.description || '',
+    'Membres': g.members ?? '',
+  })),
+);
+wsGroups['!cols'] = [{ wch: 40 }, { wch: 28 }, { wch: 50 }, { wch: 10 }];
+styleHeader(wsGroups);
+XLSX.utils.book_append_sheet(wb, wsGroups, 'GROUPS_REFERENCE');
+
 // 6) ASSIGNMENT_TYPES — petite cheat-sheet
 const wsAt = XLSX.utils.json_to_sheet([
   { 'Affectation type': 'fixed_user',        'Description': 'Personne fixée — colle son UUID dans « Affectation cible (UUID) »' },
@@ -191,8 +205,9 @@ const wsHelp = XLSX.utils.aoa_to_sheet([
   ['  3. PROCESS_REFERENCE    — UUID des process à utiliser dans la colonne ID_processus'],
   ['  4. PROFILES_REFERENCE   — UUID des utilisateurs (pour Affectation cible (UUID) quand type=fixed_user/manager_dispatch)'],
   ['  5. DEPARTMENTS_REFERENCE— UUID des départements (pour Affectation cible (UUID) quand type=department)'],
-  ['  6. ASSIGNMENT_TYPES     — cheat-sheet des 7 modes d\'affectation supportés'],
-  ['  7. ETATS_PAR_FLUX       — liste des états par processus + colonne Catégorie macro'],
+  ['  6. GROUPS_REFERENCE     — UUID des groupes collaborateurs (pour Affectation cible (UUID) quand type=group)'],
+  ['  7. ASSIGNMENT_TYPES     — cheat-sheet des 7 modes d\'affectation supportés'],
+  ['  8. ETATS_PAR_FLUX       — liste des états par processus + colonne Catégorie macro'],
   [],
   ['⚠ AFFECTATION (nouveauté) :'],
   ['  L\'affectation est définie au niveau du SOUS-PROCESSUS, pas de chaque étape.'],
@@ -201,6 +216,7 @@ const wsHelp = XLSX.utils.aoa_to_sheet([
   ['  → Pour les types « requester » et « manager_requester », laisse UUID vide.'],
   ['  → Pour « fixed_user » / « manager_dispatch » : colle l\'UUID depuis PROFILES_REFERENCE.'],
   ['  → Pour « department » : colle l\'UUID depuis DEPARTMENTS_REFERENCE.'],
+  ['  → Pour « group » : colle l\'UUID depuis GROUPS_REFERENCE.'],
   [],
   ['POUR SAISIR DES ÉTAPES SUR UN FLUX SANS ÉTAPES (ex: IT - Demande d\'intervention IT) :'],
   ['  1. Va sur PROCESS_REFERENCE → copie l\'ID_processus du flux concerné'],
@@ -227,4 +243,4 @@ XLSX.utils.book_append_sheet(wb, wsHelp, 'LISEZ-MOI');
 const out = join(__dirname, '..', 'AUTRES_FLUX_parametrage.xlsx');
 XLSX.writeFile(wb, out);
 console.log(`✅ Fichier autres flux : ${out}`);
-console.log(`   Onglets : SERVICE_ACHAT (${achat.length}) + NOUVELLES_ETAPES (vide) + PROCESS_REFERENCE (${processRef.length}) + PROFILES_REFERENCE (${profiles.length}) + DEPARTMENTS_REFERENCE (${departments.length}) + ETATS_PAR_FLUX (${etatsParDefaut.length})`);
+console.log(`   Onglets : SERVICE_ACHAT (${achat.length}) + NOUVELLES_ETAPES (vide) + PROCESS_REFERENCE (${processRef.length}) + PROFILES_REFERENCE (${profiles.length}) + DEPARTMENTS_REFERENCE (${departments.length}) + GROUPS_REFERENCE (${groups.length}) + ETATS_PAR_FLUX (${etatsParDefaut.length})`);

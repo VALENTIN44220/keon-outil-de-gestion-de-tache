@@ -1,5 +1,12 @@
 {
   "_comment": "Snapshot statique des profils + départements pour alimenter les onglets PROFILES_REFERENCE et DEPARTMENTS_REFERENCE du fichier AUTRES_FLUX_parametrage.xlsx. À régénérer ponctuellement si turnover important.",
+  "groups": [
+    {"id":"a2222222-2222-2222-2222-222222222222","name":"Comptabilité","description":"Groupe création fournisseur Divalto","members":7},
+    {"id":"ed12ff20-0c81-48bb-adc4-402f4f5664c0","name":"IT/DIGITAL","description":"","members":4},
+    {"id":"0f64dd74-463d-4ee0-8ada-53b840dbe886","name":"RH","description":"","members":2},
+    {"id":"a1111111-1111-1111-1111-111111111111","name":"Service Achat","description":"Groupe vérifications fournisseurs","members":3},
+    {"id":"43f37092-1366-4758-abbc-5b85fbcf355c","name":"SERVICES GENERAUX","description":"","members":2}
+  ],
   "departments": [
     {"id":"50883e64-70f6-48e6-aa5e-0667eb533b4f","name":"Achats Keon"},
     {"id":"ab7d407b-18ff-4c82-b18b-915304577349","name":"Achats Naskeo"},
