@@ -108,8 +108,13 @@ export function ConfigurableDashboard({
   crossFiltersDefaultCollapsed = false,
 }: ConfigurableDashboardProps) {
   const { user } = useAuth();
-  const isProcessMode = !!processId;
-  const storageKey = isProcessMode ? `process-dashboard-widgets-${processId}` : STORAGE_KEY;
+  // Un vrai « process mode » ne s'active que si processId est un UUID — sinon
+  // (ex: 'it-module', 'maintenance-module'), on retombe sur le mode global qui
+  // utilise user_dashboard_filters (process_dashboard_configs.process_template_id
+  // étant FK/UUID, on ne peut pas y upsert un identifiant module synthétique).
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const isProcessMode = !!processId && UUID_RE.test(processId);
+  const storageKey = isProcessMode ? `process-dashboard-widgets-${processId}` : (processId ? `module-dashboard-widgets-${processId}` : STORAGE_KEY);
 
   const [widgets, setWidgets] = useState<WidgetConfig[]>(() => {
     if (isProcessMode) return DEFAULT_WIDGETS; // will be loaded from DB
@@ -155,7 +160,11 @@ export function ConfigurableDashboard({
       .insert({ user_id: user.id, name: presetName.trim(), widgets_config: widgets })
       .select('id, name, widgets_config')
       .single();
-    if (error) { toast.error('Erreur'); return; }
+    if (error) {
+      console.error('[ConfigurableDashboard] handleSavePreset error:', error);
+      toast.error(`Erreur sauvegarde preset${error.message ? ` : ${error.message}` : ''}`);
+      return;
+    }
     setLayoutPresets(prev => [data, ...prev]);
     setSavePresetDialogOpen(false);
     setPresetName('');
@@ -255,6 +264,7 @@ export function ConfigurableDashboard({
             user_id: user.id,
             widgets_config: widgets,
             filters_config: serializedFilters,
+            columns_config: [],
             updated_at: new Date().toISOString(),
           }, { onConflict: 'process_template_id,user_id' });
         if (error) throw error;
@@ -268,7 +278,8 @@ export function ConfigurableDashboard({
       setFiltersDirty(false);
       toast.success('Configuration enregistrée');
     } catch (err: any) {
-      toast.error('Erreur lors de la sauvegarde');
+      console.error('[ConfigurableDashboard] handleSaveFilters error:', err);
+      toast.error(`Erreur lors de la sauvegarde${err?.message ? ` : ${err.message}` : ''}`);
     } finally {
       setIsSaving(false);
     }

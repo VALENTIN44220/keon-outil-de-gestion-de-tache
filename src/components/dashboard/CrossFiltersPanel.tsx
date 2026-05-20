@@ -377,7 +377,8 @@ export function CrossFiltersPanel({
         .update({ filters: serialized, visible_columns: colsPayload })
         .eq('id', overwritePresetId);
       if (error) {
-        toast.error('Erreur lors de la sauvegarde');
+        console.error('[CrossFiltersPanel] update preset error:', error);
+        toast.error(`Erreur lors de la sauvegarde${error.message ? ` : ${error.message}` : ''}`);
         return;
       }
       setPresets(prev => prev.map(p => p.id === overwritePresetId ? { ...p, filters: serialized, visible_columns: visibleColumns } : p));
@@ -394,12 +395,15 @@ export function CrossFiltersPanel({
           name: presetName.trim(),
           filters: serialized,
           visible_columns: colsPayload,
-          process_template_id: processId ?? null,
+          // Pour les modules synthétiques (ex: 'it-module'), pas de UUID de process
+          // template → on stocke null (le preset reste rattaché à l'utilisateur).
+          process_template_id: (processId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(processId)) ? processId : null,
         })
         .select('id, name, filters, visible_columns')
         .single();
       if (error) {
-        toast.error('Erreur lors de la sauvegarde');
+        console.error('[CrossFiltersPanel] insert preset error:', error);
+        toast.error(`Erreur lors de la sauvegarde${error.message ? ` : ${error.message}` : ''}`);
         return;
       }
       setPresets(prev => [data, ...prev]);
