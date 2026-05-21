@@ -57,6 +57,8 @@ interface CrossFiltersPanelProps {
    * ne correspondent pas au preset global "Affaires non terminees".
    */
   disableAutoApplyDefault?: boolean;
+  /** Si true : rendu sans la carte, sans le toggle collapse — pour affichage dans un Sheet. */
+  inDrawer?: boolean;
 }
 
 const PERIODS = [
@@ -227,6 +229,7 @@ export function CrossFiltersPanel({
   isAdmin,
   defaultCollapsed = false,
   disableAutoApplyDefault = false,
+  inDrawer = false,
 }: CrossFiltersPanelProps) {
   const { user } = useAuth();
   const [collapsed, setCollapsed] = useState(() => defaultCollapsed);
@@ -514,9 +517,12 @@ export function CrossFiltersPanel({
   const statusItems = STATUSES.map(s => ({ id: s.value, name: s.label, color: s.color }));
   const priorityItems = PRIORITIES.map(p => ({ id: p.value, name: p.label, color: p.color }));
 
+  const effectiveCollapsed = inDrawer ? false : collapsed;
+
   return (
-    <div className="bg-gradient-to-r from-white to-keon-50 border-2 border-keon-200 rounded-xl p-4 mb-4 shadow-keon">
-       {/* Header row */}
+    <div className={inDrawer ? undefined : "bg-gradient-to-r from-white to-keon-50 border-2 border-keon-200 rounded-xl p-4 mb-4 shadow-keon"}>
+       {/* Header row — masqué en mode drawer */}
+       {!inDrawer && (
        <div className="flex flex-wrap items-center justify-between gap-2">
         <button
           onClick={() => setCollapsed(!collapsed)}
@@ -654,10 +660,11 @@ export function CrossFiltersPanel({
           )}
         </div>
       </div>
+      )} {/* fin !inDrawer */}
 
-       {/* Filters grid - collapsible */}
-       {!collapsed && (
-       <div className="flex flex-wrap gap-3 items-end mt-3">
+       {/* Filtres — toujours visibles en drawer */}
+       {!effectiveCollapsed && (
+       <div className={inDrawer ? "flex flex-col gap-4" : "flex flex-wrap gap-3 items-end mt-3"}>
          {/* Search */}
          <div className="space-y-1.5 flex-1 min-w-[200px]">
           <Label className="text-xs text-keon-600 flex items-center gap-1">

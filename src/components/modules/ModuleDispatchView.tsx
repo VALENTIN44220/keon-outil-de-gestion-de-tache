@@ -34,7 +34,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { ConfigurableDashboard } from '@/components/dashboard/ConfigurableDashboard';
-import { CrossFiltersPanel } from '@/components/dashboard/CrossFiltersPanel';
+import { FilterDrawerButton } from '@/components/dashboard/FilterDrawerButton';
 import { CrossFilters, DEFAULT_CROSS_FILTERS } from '@/components/dashboard/types';
 import { ModuleQuickFilters, ModuleViewMode } from '@/components/modules/ModuleQuickFilters';
 import { KanbanBoard } from '@/components/tasks/KanbanBoard';
@@ -363,11 +363,10 @@ export function ModuleDispatchView<
                   onOnlyMineChange={setOnlyMine}
                 />
 
-                <CrossFiltersPanel
+                <FilterDrawerButton
                   filters={crossFilters}
                   onFiltersChange={setCrossFilters}
                   contextId={config.contextId}
-                  defaultCollapsed={true}
                   isAdmin={isAdmin}
                   disableAutoApplyDefault={true}
                 />

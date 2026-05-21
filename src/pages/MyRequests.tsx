@@ -1,45 +1,27 @@
-/**
- * MyRequests — page « Mes demandes ».
- *
- * Suivi des demandes faites par l'utilisateur courant. Extrait de l'ancienne
- * page /requests (refonte chantier 2 : la page Demandes ne sert plus qu'à la
- * création, le suivi a sa page dédiée).
- *
- * Compat : la page conserve le deep-link `?openTask=<uuid>` pour ouvrir une
- * demande directement depuis la cloche notif sidebar.
- */
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { DeadlineTasksOverrideProvider } from '@/contexts/DeadlineTasksOverrideContext';
 import { UnifiedTaskDetailDialog } from '@/components/tasks/UnifiedTaskDetailDialog';
-import { ConfigurableDashboard } from '@/components/dashboard/ConfigurableDashboard';
+import { DataTableWidget } from '@/components/dashboard/widgets/DataTableWidget';
+import { FilterDrawerButton } from '@/components/dashboard/FilterDrawerButton';
+import { CrossFilters, DEFAULT_CROSS_FILTERS } from '@/components/dashboard/types';
 import { useTasks } from '@/hooks/useTasks';
 import { usePendingAssignments } from '@/hooks/usePendingAssignments';
-import { Task, TaskStats } from '@/types/task';
+import { Task } from '@/types/task';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Eye } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSimulation } from '@/contexts/SimulationContext';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
-import {
-  MACRO_STATE_CATEGORIES,
-  BE_PROCESS_ID,
-  useRequestStates,
-  type MacroStateCategory,
-} from '@/hooks/useRequestStates';
+import { isWithinInterval, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 
 const MyRequests = () => {
   const navigate = useNavigate();
   const { profile: authProfile, user } = useAuth();
   const { isSimulating, simulatedProfile } = useSimulation();
-  // En mode simulation, on raisonne avec le profil simulé pour que la page
-  // « Mes demandes » reflète bien la perspective de l'utilisateur incarné
-  // (sinon on continuerait d'afficher les demandes de l'admin réel).
   const profile = isSimulating && simulatedProfile ? simulatedProfile : authProfile;
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeView, setActiveView] = useState('my-requests');
@@ -47,11 +29,7 @@ const MyRequests = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedRequest, setSelectedRequest] = useState<Task | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [macroFilter, setMacroFilter] = useState<'all' | MacroStateCategory>('all');
-
-  // Pour l'instant on ne connaît que les états BE — on prend ce mapping pour les demandes BE.
-  // Les autres processus seront alimentés au fur et à mesure (et cohabiteront sans casser).
-  const { statesByCode: beStatesByCode } = useRequestStates(BE_PROCESS_ID);
+  const [crossFilters, setCrossFilters] = useState<CrossFilters>(DEFAULT_CROSS_FILTERS);
 
   const { allTasks, searchQuery, setSearchQuery, updateTaskStatus } = useTasks();
   const { refetch: refetchPending } = usePendingAssignments();
@@ -79,7 +57,6 @@ const MyRequests = () => {
     fetchRequests();
   }, [fetchRequests]);
 
-  // Realtime
   useEffect(() => {
     if (!user?.id) return;
     const channel = supabase
@@ -103,47 +80,45 @@ const MyRequests = () => {
     return requests.filter((r) => r.requester_id === profile.id);
   }, [requests, profile?.id]);
 
-  // Filtre par catégorie macro d'état (basé sur current_state_code)
   const filteredRequests = useMemo(() => {
-    if (macroFilter === 'all') return myRequests;
-    return myRequests.filter((r) => {
-      const code = (r as any).current_state_code as string | null;
-      if (!code) return false;
-      const macro = beStatesByCode.get(code)?.state_category ?? null;
-      return macro === macroFilter;
+    return myRequests.filter((task) => {
+      const f = crossFilters;
+
+      if (f.searchQuery && !task.title?.toLowerCase().includes(f.searchQuery.toLowerCase())) return false;
+
+      if (f.statuses.length > 0 && !f.statuses.includes(task.status)) return false;
+
+      if (f.priorities.length > 0 && task.priority && !f.priorities.includes(task.priority)) return false;
+
+      if (f.categoryIds.length > 0 && !f.categoryIds.includes(task.category_id || '')) return false;
+
+      if (f.assigneeIds.length > 0 && !f.assigneeIds.includes(task.assignee_id || '')) return false;
+
+      if (f.dateRange.start || f.dateRange.end || f.period) {
+        const taskDate = task.due_date ? new Date(task.due_date) : null;
+        if (!taskDate) return false;
+        if (f.period && f.period !== 'all') {
+          const now = new Date();
+          if (f.period === 'today') {
+            if (!isWithinInterval(taskDate, { start: subDays(now, 1), end: now })) return false;
+          } else if (f.period === 'week') {
+            if (!isWithinInterval(taskDate, { start: startOfWeek(now, { weekStartsOn: 1 }), end: endOfWeek(now, { weekStartsOn: 1 }) })) return false;
+          } else if (f.period === 'month') {
+            if (!isWithinInterval(taskDate, { start: startOfMonth(now), end: endOfMonth(now) })) return false;
+          } else if (f.period === '30days') {
+            if (!isWithinInterval(taskDate, { start: subDays(now, 30), end: now })) return false;
+          } else if (f.period === '90days') {
+            if (!isWithinInterval(taskDate, { start: subDays(now, 90), end: now })) return false;
+          }
+        }
+        if (f.dateRange.start && taskDate < new Date(f.dateRange.start)) return false;
+        if (f.dateRange.end && taskDate > new Date(f.dateRange.end)) return false;
+      }
+
+      return true;
     });
-  }, [myRequests, macroFilter, beStatesByCode]);
+  }, [myRequests, crossFilters]);
 
-  // Compteurs par catégorie pour les chips
-  const macroCounts = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const r of myRequests) {
-      const code = (r as any).current_state_code as string | null;
-      const cat = code ? (beStatesByCode.get(code)?.state_category ?? null) : null;
-      if (cat) m.set(cat, (m.get(cat) ?? 0) + 1);
-    }
-    return m;
-  }, [myRequests, beStatesByCode]);
-
-  const dashboardStats = useMemo((): TaskStats => {
-    const total = myRequests.length;
-    const todo = myRequests.filter((t) => t.status === 'todo').length;
-    const inProgress = myRequests.filter((t) => t.status === 'in-progress').length;
-    const done = myRequests.filter((t) => t.status === 'done').length;
-    const pendingValidation = myRequests.filter(
-      (t) => t.status === 'pending_validation_1' || t.status === 'pending_validation_2',
-    ).length;
-    const validated = myRequests.filter((t) => t.status === 'validated').length;
-    const refused = myRequests.filter((t) => t.status === 'refused').length;
-    return {
-      total, todo, inProgress, done, pendingValidation, validated, refused,
-      completionRate: total > 0 ? Math.round(((done + validated) / total) * 100) : 0,
-    };
-  }, [myRequests]);
-
-  const globalProgress = dashboardStats.completionRate;
-
-  // Deep-link openTask
   const openNotificationTarget = useCallback(
     async (taskId: string) => {
       let task = requests.find((r) => r.id === taskId) || allTasks.find((t) => t.id === taskId);
@@ -185,6 +160,8 @@ const MyRequests = () => {
     [updateTaskStatus],
   );
 
+  const activeFilterCount = filteredRequests.length !== myRequests.length;
+
   return (
     <DeadlineTasksOverrideProvider value={allTasks}>
       <div className="flex h-screen bg-background">
@@ -196,7 +173,18 @@ const MyRequests = () => {
               <div className="flex items-center gap-3">
                 <Eye className="h-5 w-5 text-primary" />
                 <h2 className="text-lg font-bold tracking-tight">Suivi de mes demandes</h2>
-                {myRequests.length > 0 && <Badge variant="secondary">{myRequests.length}</Badge>}
+                {myRequests.length > 0 && (
+                  <Badge variant="secondary">
+                    {activeFilterCount ? `${filteredRequests.length} / ${myRequests.length}` : myRequests.length}
+                  </Badge>
+                )}
+                <div className="ml-auto">
+                  <FilterDrawerButton
+                    filters={crossFilters}
+                    onFiltersChange={setCrossFilters}
+                    contextId="my-requests"
+                  />
+                </div>
               </div>
 
               {isLoading ? (
@@ -208,42 +196,13 @@ const MyRequests = () => {
                   Tu n'as pas encore créé de demandes. Va sur <a href="/requests" className="text-primary underline">Demandes</a> pour en créer une.
                 </div>
               ) : (
-                <>
-                  {/* Filtre catégorie macro d'état */}
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <Button
-                      variant={macroFilter === 'all' ? 'default' : 'outline'}
-                      size="sm"
-                      className="h-7 text-xs"
-                      onClick={() => setMacroFilter('all')}
-                    >
-                      Tous ({myRequests.length})
-                    </Button>
-                    {MACRO_STATE_CATEGORIES.map((c) => {
-                      const count = macroCounts.get(c.key) ?? 0;
-                      const active = macroFilter === c.key;
-                      return (
-                        <Button
-                          key={c.key}
-                          variant={active ? 'default' : 'outline'}
-                          size="sm"
-                          className={cn('h-7 text-xs', !active && count === 0 && 'opacity-50')}
-                          onClick={() => setMacroFilter(c.key)}
-                          disabled={count === 0 && !active}
-                        >
-                          {c.label} ({count})
-                        </Button>
-                      );
-                    })}
-                  </div>
-
-                  <ConfigurableDashboard
+                <div className="rounded-xl border bg-white overflow-hidden">
+                  <DataTableWidget
                     tasks={filteredRequests}
-                    stats={dashboardStats}
-                    globalProgress={globalProgress}
                     onTaskClick={(req) => { navigate(`/demande/${req.id}`); }}
+                    processId="my-requests"
                   />
-                </>
+                </div>
               )}
             </div>
           </main>

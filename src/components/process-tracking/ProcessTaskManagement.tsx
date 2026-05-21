@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Task, TaskStats, TaskStatus } from '@/types/task';
 import { DashboardToolbar, KanbanGroupMode } from '@/components/dashboard/DashboardToolbar';
-import { CrossFiltersPanel } from '@/components/dashboard/CrossFiltersPanel';
+import { FilterDrawerButton } from '@/components/dashboard/FilterDrawerButton';
 import { CrossFilters, DEFAULT_CROSS_FILTERS } from '@/components/dashboard/types';
 import { DashboardStats } from '@/components/dashboard/DashboardStats';
 import { TaskList } from '@/components/tasks/TaskList';
@@ -282,7 +282,7 @@ export function ProcessTaskManagement({ processId, departmentId, processIds, can
         onKanbanGroupModeChange={setKanbanGroupMode}
       />
 
-      <CrossFiltersPanel
+      <FilterDrawerButton
         filters={crossFilters}
         onFiltersChange={setCrossFilters}
         processId={effectiveId}

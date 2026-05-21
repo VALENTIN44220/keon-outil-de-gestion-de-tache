@@ -6,7 +6,7 @@ import { DeadlineTasksOverrideProvider } from '@/contexts/DeadlineTasksOverrideC
 import { DashboardToolbar, KanbanGroupMode } from '@/components/dashboard/DashboardToolbar';
 import { DashboardStats } from '@/components/dashboard/DashboardStats';
 import { ConfigurableDashboard } from '@/components/dashboard/ConfigurableDashboard';
-import { CrossFiltersPanel } from '@/components/dashboard/CrossFiltersPanel';
+import { FilterDrawerButton } from '@/components/dashboard/FilterDrawerButton';
 import { CrossFilters, DEFAULT_CROSS_FILTERS } from '@/components/dashboard/types';
 import { TaskList } from '@/components/tasks/TaskList';
 import { AdvancedFilters, AdvancedFiltersState } from '@/components/tasks/AdvancedFilters';
@@ -466,11 +466,11 @@ const Index = () => {
             Aucune tâche ici pour l’instant : les tâches que vous avez réaffectées avec suivi apparaissent dans « Tâches de l’équipe » (même si le nouvel assigné n’est plus dans votre filtre équipe), pour suivre l’avancement et les échanges.
           </p>
         )}
-        <CrossFiltersPanel
+        <FilterDrawerButton
           filters={crossFilters}
           onFiltersChange={setCrossFilters}
           contextId="tasks"
-          defaultCollapsed={true}
+          className="mb-2"
         />
         <div className="mb-4">
           <button

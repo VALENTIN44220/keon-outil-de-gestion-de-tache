@@ -9,7 +9,7 @@ import {
   ChartDataPoint,
   TimelineDataPoint,
 } from './types';
-import { CrossFiltersPanel } from './CrossFiltersPanel';
+import { FilterDrawerButton } from './FilterDrawerButton';
 import { WidgetWrapper } from './widgets/WidgetWrapper';
 import { StatsSummaryWidget } from './widgets/StatsSummaryWidget';
 import { BarChartWidget } from './widgets/BarChartWidget';
@@ -42,8 +42,6 @@ interface ConfigurableDashboardProps {
   processId?: string;
   /** Whether the user can edit (customize) the dashboard layout */
   canEdit?: boolean;
-  /** Whether "Filtres croisés" starts collapsed. */
-  crossFiltersDefaultCollapsed?: boolean;
 }
 
 const STORAGE_KEY = 'dashboard-widgets-config';
@@ -105,7 +103,6 @@ export function ConfigurableDashboard({
   onTaskClick,
   processId,
   canEdit = true,
-  crossFiltersDefaultCollapsed = false,
 }: ConfigurableDashboardProps) {
   const { user } = useAuth();
   // Un vrai « process mode » ne s'active que si processId est un UUID — sinon
@@ -686,9 +683,14 @@ export function ConfigurableDashboard({
 
   return (
     <div className="space-y-4">
-      {/* Toolbar - above filters */}
+      {/* Toolbar */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
+          <FilterDrawerButton
+            filters={pendingFilters}
+            onFiltersChange={handlePendingFiltersChange}
+            contextId="analytics"
+          />
           {filtersDirty && (
             <Button
               size="sm"
@@ -701,7 +703,7 @@ export function ConfigurableDashboard({
               ) : (
                 <Save className="h-4 w-4" />
               )}
-              Valider et enregistrer
+              Enregistrer
             </Button>
           )}
         </div>
@@ -772,14 +774,6 @@ export function ConfigurableDashboard({
           </div>
         )}
       </div>
-
-      {/* Cross Filters Panel - always visible */}
-      <CrossFiltersPanel
-        filters={pendingFilters}
-        onFiltersChange={handlePendingFiltersChange}
-        contextId="analytics"
-        defaultCollapsed={crossFiltersDefaultCollapsed}
-      />
 
       {/* Widget Grid - Smart 2-column bin-packing layout */}
       <div
