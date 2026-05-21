@@ -108,19 +108,44 @@ export default function Workload() {
   useEffect(() => {
     const fetchTasks = async () => {
       if (!profile?.id) return;
-      
-      const { data } = await supabase
+
+      // 1. Tâches déjà affectées à des membres de l'équipe
+      const teamIds = teamMembers.map(m => m.id);
+      const { data: assignedData } = await supabase
         .from('tasks')
         .select('*')
-        .in('assignee_id', teamMembers.map(m => m.id));
-      
-      setTasks((data || []) as Task[]);
+        .in('assignee_id', teamIds);
+
+      // 2. Tâches NON affectées qui ciblent le département du manager connecté
+      //    → permet au manager (ex : Florence pour le BE) de les voir dans le
+      //    backlog et de les planifier en les déposant sur une date.
+      //    Le drop sur un collaborateur déclenchera l'auto-affectation.
+      let unassignedData: any[] = [];
+      const deptId = (profile as any)?.department_id;
+      if (deptId) {
+        const { data } = await supabase
+          .from('tasks')
+          .select('*')
+          .is('assignee_id', null)
+          .eq('target_department_id', deptId);
+        unassignedData = data ?? [];
+      }
+
+      // Merge + déduplication par id (au cas où une tâche serait dans les 2)
+      const seen = new Set<string>();
+      const merged = [...(assignedData ?? []), ...unassignedData].filter((t: any) => {
+        if (seen.has(t.id)) return false;
+        seen.add(t.id);
+        return true;
+      });
+
+      setTasks(merged as Task[]);
     };
-    
+
     if (teamMembers.length > 0) {
       fetchTasks();
     }
-  }, [profile?.id, teamMembers]);
+  }, [profile?.id, (profile as any)?.department_id, teamMembers]);
 
   const handleDateRangeChange = (start: Date, end: Date, mode?: 'week' | 'month' | 'quarter') => {
     setStartDate(start);
