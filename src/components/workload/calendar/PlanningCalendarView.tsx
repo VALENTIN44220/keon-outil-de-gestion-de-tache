@@ -269,35 +269,35 @@ export function PlanningCalendarView({
  
    return (
      <TooltipProvider>
-       <div className="flex flex-col h-full gap-4">
-         {/* Header row with KPIs and controls */}
-         <div className="flex items-center justify-between gap-4 flex-wrap">
+       <div className="flex flex-col h-full gap-0">
+         {/* KPIs + controls bar — sober, single line, separator below */}
+         <div className="flex items-center justify-between gap-4 px-4 h-11 bg-white border rounded-lg mb-4">
            <PlanningKPIs
              workloadData={workloadData}
              tasks={tasks}
              plannedTaskIds={plannedTaskIds}
              conflictCount={conflictCount}
            />
-           
-           <div className="flex items-center gap-3">
+
+           <div className="flex items-center gap-2">
              {/* Search */}
              {onSearchChange && (
                <div className="relative">
-                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                  <Input
                    placeholder="Rechercher..."
                    value={searchQuery}
                    onChange={(e) => onSearchChange(e.target.value)}
-                   className="pl-9 h-9 w-48"
+                   className="pl-8 h-7 w-44 text-xs"
                  />
                </div>
              )}
-             
+
              {/* Display options */}
              <DropdownMenu>
                <DropdownMenuTrigger asChild>
-                 <Button variant="outline" size="sm" className="h-9 gap-2">
-                   <Settings2 className="h-4 w-4" />
+                 <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs text-muted-foreground hover:text-foreground">
+                   <Settings2 className="h-3.5 w-3.5" />
                    <span className="hidden sm:inline">Affichage</span>
                  </Button>
                </DropdownMenuTrigger>

@@ -365,24 +365,12 @@
                          </div>
                        </div>
                        
-                       <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                         {duration && (
-                           <span className="inline-flex items-center gap-1 bg-muted px-1.5 py-0.5 rounded">
-                             <Clock className="h-3 w-3" />
-                             {duration / 2}j
-                           </span>
-                         )}
-                         {task.due_date && (
-                           <span className={cn(
-                             "inline-flex items-center gap-1",
-                             overdue && "text-red-600 font-medium"
-                           )}>
-                             {overdue && <AlertTriangle className="h-3 w-3" />}
-                             <Calendar className="h-3 w-3" />
-                             {format(parseISO(task.due_date), 'dd/MM', { locale: fr })}
-                           </span>
-                         )}
-                       </div>
+                       {overdue && task.due_date && (
+                        <div className="mt-1 inline-flex items-center gap-1 text-[11px] text-red-600 font-medium">
+                          <AlertTriangle className="h-3 w-3" />
+                          En retard depuis le {format(parseISO(task.due_date), 'dd/MM', { locale: fr })}
+                        </div>
+                      )}
                        
                        {progress && progress.total > 0 && (
                          <div className="mt-2 flex items-center gap-2">

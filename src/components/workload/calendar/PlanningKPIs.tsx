@@ -92,27 +92,15 @@
    ];
    
    return (
-     <div className="flex items-center gap-3 flex-wrap">
+     <div className="flex items-center divide-x divide-border">
        {kpis.map((kpi, idx) => {
          const Icon = kpi.icon;
          return (
-           <div
-             key={idx}
-             className="flex items-center gap-2 px-3 py-2 rounded-xl border bg-card shadow-sm"
-           >
-             <div className={cn(
-               "w-8 h-8 rounded-lg flex items-center justify-center",
-               kpi.bgColor
-             )}>
-               <Icon className={cn("h-4 w-4", kpi.color)} />
-             </div>
-             <div className="flex flex-col">
-               <span className="font-semibold text-sm">
-                 {kpi.value}
-               </span>
-               <span className="text-[10px] text-muted-foreground">
-                 {kpi.label}
-               </span>
+           <div key={idx} className="flex items-center gap-2 px-3 first:pl-0">
+             <Icon className={cn("h-3.5 w-3.5 shrink-0", kpi.color)} />
+             <div className="flex items-baseline gap-1.5 leading-none">
+               <span className="font-semibold text-sm tabular-nums">{kpi.value}</span>
+               <span className="text-[11px] text-muted-foreground whitespace-nowrap">{kpi.label}</span>
              </div>
            </div>
          );
