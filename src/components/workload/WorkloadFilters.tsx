@@ -1,33 +1,32 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { 
-  CalendarIcon, 
-  ChevronLeft, 
-  ChevronRight, 
-  Search, 
-  Users, 
-  Layers, 
+import { Badge } from '@/components/ui/badge';
+import {
+  CalendarIcon,
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  Users,
+  Layers,
   CheckCircle2,
   Palmtree,
   ListFilter,
   X,
-  Flag,
-  AlertTriangle
+  AlertTriangle,
+  SlidersHorizontal,
 } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addMonths, addWeeks, subWeeks, subMonths, startOfQuarter, endOfQuarter, addDays, startOfYear, endOfYear, addYears } from 'date-fns';
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, addMonths, addWeeks, subWeeks, subMonths, startOfQuarter, endOfQuarter, startOfYear, endOfYear, addYears } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
-import { Badge } from '@/components/ui/badge';
 
 export type ItemTypeFilter = 'all' | 'tasks' | 'leaves';
 
@@ -43,7 +42,6 @@ interface WorkloadFiltersProps {
   onCompanyIdChange: (id: string | null) => void;
   teamMembers: any[];
   viewMode?: 'week' | 'month' | 'quarter' | 'year';
-  // Search and filter props
   searchQuery?: string;
   onSearchChange?: (query: string) => void;
   selectedStatuses?: string[];
@@ -52,12 +50,10 @@ interface WorkloadFiltersProps {
   onPrioritiesChange?: (priorities: string[]) => void;
   itemTypeFilter?: ItemTypeFilter;
   onItemTypeChange?: (type: ItemTypeFilter) => void;
-  // Quick filters
   showOnlyOverloaded?: boolean;
   onShowOnlyOverloadedChange?: (show: boolean) => void;
 }
 
-// Use centralized status options with colors
 const STATUS_OPTIONS = [
   { value: 'to_assign', label: 'À affecter', color: 'bg-amber-500' },
   { value: 'todo', label: 'À faire', color: 'bg-slate-500' },
@@ -65,13 +61,6 @@ const STATUS_OPTIONS = [
   { value: 'pending_validation', label: 'En attente de validation', color: 'bg-violet-500' },
   { value: 'validated', label: 'Validé / Terminé', color: 'bg-emerald-500' },
   { value: 'done', label: 'Terminé', color: 'bg-green-500' },
-];
-
-const PRIORITY_OPTIONS = [
-  { value: 'urgent', label: 'Urgente', color: 'bg-red-500' },
-  { value: 'high', label: 'Haute', color: 'bg-orange-500' },
-  { value: 'medium', label: 'Moyenne', color: 'bg-blue-500' },
-  { value: 'low', label: 'Basse', color: 'bg-emerald-500' },
 ];
 
 export function WorkloadFilters({
@@ -98,23 +87,20 @@ export function WorkloadFilters({
   onShowOnlyOverloadedChange,
 }: WorkloadFiltersProps) {
   const [processes, setProcesses] = useState<any[]>([]);
-  const [companies, setCompanies] = useState<any[]>([]);
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({ from: startDate, to: endDate });
   const [localSearch, setLocalSearch] = useState(searchQuery);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   useEffect(() => {
     const fetchFilters = async () => {
-      const [processRes, companyRes] = await Promise.all([
+      const [processRes] = await Promise.all([
         supabase.from('process_templates').select('id, name').order('name'),
-        supabase.from('companies').select('id, name').order('name'),
       ]);
       setProcesses(processRes.data || []);
-      setCompanies(companyRes.data || []);
     };
     fetchFilters();
   }, []);
 
-  // Debounced search
   useEffect(() => {
     const timer = setTimeout(() => {
       onSearchChange?.(localSearch);
@@ -125,7 +111,6 @@ export function WorkloadFilters({
   const handlePresetPeriod = (preset: 'week' | 'month' | 'quarter' | 'year') => {
     const now = new Date();
     let start: Date, end: Date;
-    
     switch (preset) {
       case 'week':
         start = startOfWeek(now, { locale: fr });
@@ -144,15 +129,13 @@ export function WorkloadFilters({
         end = endOfYear(now);
         break;
     }
-    
     setDateRange({ from: start, to: end });
     onDateRangeChange(start, end, preset);
   };
 
   const navigatePeriod = (direction: 'prev' | 'next') => {
-    let newStart: Date, newEnd: Date;
     const offset = direction === 'prev' ? -1 : 1;
-    
+    let newStart: Date, newEnd: Date;
     switch (viewMode) {
       case 'week':
         newStart = direction === 'prev' ? subWeeks(startDate, 1) : addWeeks(startDate, 1);
@@ -172,14 +155,11 @@ export function WorkloadFilters({
         newEnd = endOfMonth(newStart);
         break;
     }
-    
     setDateRange({ from: newStart, to: newEnd });
     onDateRangeChange(newStart, newEnd, viewMode);
   };
 
-  const goToToday = () => {
-    handlePresetPeriod(viewMode);
-  };
+  const goToToday = () => handlePresetPeriod(viewMode);
 
   const handleUserToggle = (userId: string) => {
     if (selectedUserIds.includes(userId)) {
@@ -198,16 +178,7 @@ export function WorkloadFilters({
     }
   };
 
-  const handlePriorityToggle = (priority: string) => {
-    if (!onPrioritiesChange) return;
-    if (selectedPriorities.includes(priority)) {
-      onPrioritiesChange(selectedPriorities.filter(p => p !== priority));
-    } else {
-      onPrioritiesChange([...selectedPriorities, priority]);
-    }
-  };
-
-  const clearFilters = () => {
+  const clearAllFilters = () => {
     onUserIdsChange([]);
     onProcessIdChange(null);
     onCompanyIdChange(null);
@@ -218,7 +189,6 @@ export function WorkloadFilters({
     setLocalSearch('');
   };
 
-  const hasActiveFilters = selectedUserIds.length > 0 || selectedProcessId || selectedCompanyId || selectedStatuses.length > 0 || selectedPriorities.length > 0 || itemTypeFilter !== 'all' || localSearch || showOnlyOverloaded;
   const activeFiltersCount = [
     selectedUserIds.length > 0,
     !!selectedProcessId,
@@ -226,92 +196,45 @@ export function WorkloadFilters({
     selectedStatuses.length > 0,
     selectedPriorities.length > 0,
     itemTypeFilter !== 'all',
+    !!localSearch,
     showOnlyOverloaded,
   ].filter(Boolean).length;
 
-  const getInitials = (name: string) => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  const getInitials = (name: string) =>
+    name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+
+  const PERIOD_LABELS: Record<string, string> = {
+    week: 'Semaine', month: 'Mois', quarter: 'Trim.', year: 'Année',
   };
 
   return (
-    <div className="space-y-3">
-      {/* Main filter bar - premium design */}
-      <div className="workload-filter-bar">
-        {/* Search */}
-        <div className="relative flex-1 min-w-[200px] max-w-[300px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Rechercher une tâche..."
-            value={localSearch}
-            onChange={(e) => setLocalSearch(e.target.value)}
-            className="pl-9 h-9 bg-keon-50 border-keon-200 focus-visible:ring-1 focus-visible:ring-primary"
-          />
-          {localSearch && (
-            <button
-              onClick={() => setLocalSearch('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
+    <>
+      {/* ── Control bar ── */}
+      <div className="flex items-center gap-2 px-4 h-11 bg-white border-b shrink-0">
 
-        <Separator orientation="vertical" className="h-6 bg-keon-200" />
-
-        {/* Period presets - segmented control */}
-        <div className="workload-segmented-control">
-          {(['week', 'month', 'quarter', 'year'] as const).map((preset) => (
-            <Button 
-              key={preset}
-              variant="ghost"
-              size="sm" 
-              onClick={() => handlePresetPeriod(preset)}
-              className={cn(
-                "workload-segmented-btn h-8 px-3",
-                viewMode === preset && "workload-segmented-btn-active"
-              )}
-            >
-              {preset === 'week' ? 'Semaine' : preset === 'month' ? 'Mois' : preset === 'quarter' ? 'Trimestre' : 'Année'}
-            </Button>
-          ))}
-        </div>
-
-        {/* Navigation - more compact */}
-        <div className="flex items-center gap-0.5 bg-keon-100 rounded-lg p-0.5">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 hover:bg-card rounded-md"
-            onClick={() => navigatePeriod('prev')}
-          >
-            <ChevronLeft className="h-4 w-4" />
+        {/* Navigation */}
+        <div className="flex items-center gap-0 bg-muted rounded-md p-0.5">
+          <Button variant="ghost" size="icon" className="h-7 w-7 rounded-sm hover:bg-background"
+            onClick={() => navigatePeriod('prev')}>
+            <ChevronLeft className="h-3.5 w-3.5" />
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={goToToday}
-            className="h-8 px-3 text-xs font-semibold hover:bg-card rounded-md"
-          >
+          <Button variant="ghost" size="sm" className="h-7 px-2.5 text-xs font-medium rounded-sm hover:bg-background"
+            onClick={goToToday}>
             Aujourd'hui
           </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8 hover:bg-card rounded-md"
-            onClick={() => navigatePeriod('next')}
-          >
-            <ChevronRight className="h-4 w-4" />
+          <Button variant="ghost" size="icon" className="h-7 w-7 rounded-sm hover:bg-background"
+            onClick={() => navigatePeriod('next')}>
+            <ChevronRight className="h-3.5 w-3.5" />
           </Button>
         </div>
 
-        {/* Date range display - premium button */}
+        {/* Date picker */}
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8 gap-2 font-semibold border-keon-200 hover:bg-keon-50">
-              <CalendarIcon className="h-3.5 w-3.5 text-primary" />
-              <span className="text-xs">
-                {format(startDate, 'd MMM', { locale: fr })} – {format(endDate, 'd MMM yyyy', { locale: fr })}
-              </span>
+            <Button variant="ghost" size="sm"
+              className="h-7 gap-1.5 px-2.5 text-xs font-semibold text-foreground hover:bg-muted">
+              <CalendarIcon className="h-3 w-3 text-muted-foreground" />
+              {format(startDate, 'd MMM', { locale: fr })} – {format(endDate, 'd MMM yyyy', { locale: fr })}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
@@ -330,281 +253,245 @@ export function WorkloadFilters({
           </PopoverContent>
         </Popover>
 
-        <Separator orientation="vertical" className="h-6 bg-keon-200" />
+        <Separator orientation="vertical" className="h-4 bg-border mx-0.5" />
 
-        {/* Collaborators filter */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button 
-              variant={selectedUserIds.length > 0 ? "default" : "outline"} 
-              size="sm" 
+        {/* Period presets */}
+        <div className="flex items-center gap-0 bg-muted rounded-md p-0.5">
+          {(['week', 'month', 'quarter', 'year'] as const).map((preset) => (
+            <Button
+              key={preset}
+              variant="ghost"
+              size="sm"
+              onClick={() => handlePresetPeriod(preset)}
               className={cn(
-                "h-8 gap-2",
-                selectedUserIds.length > 0 && "bg-primary/90"
+                'h-7 px-2.5 text-xs rounded-sm transition-all',
+                viewMode === preset
+                  ? 'bg-background shadow-sm font-semibold text-foreground'
+                  : 'text-muted-foreground hover:bg-background/60 font-normal'
               )}
             >
-              <Users className="h-3.5 w-3.5" />
-              <span className="text-xs">Collaborateurs</span>
-              {selectedUserIds.length > 0 && (
-                <Badge variant="secondary" className="h-5 px-1.5 text-[10px] bg-white/20 text-white">
-                  {selectedUserIds.length}
+              {PERIOD_LABELS[preset]}
+            </Button>
+          ))}
+        </div>
+
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Filters button */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 gap-1.5 text-xs border-border"
+          onClick={() => setSheetOpen(true)}
+        >
+          <SlidersHorizontal className="h-3.5 w-3.5" />
+          Filtres
+          {activeFiltersCount > 0 && (
+            <Badge className="h-[16px] min-w-[16px] px-1 text-[10px] rounded-full bg-primary text-primary-foreground">
+              {activeFiltersCount}
+            </Badge>
+          )}
+        </Button>
+      </div>
+
+      {/* ── Filter sheet ── */}
+      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        <SheetContent side="right" className="w-[380px] flex flex-col p-0 gap-0">
+          <SheetHeader className="px-5 py-4 border-b shrink-0">
+            <SheetTitle className="flex items-center gap-2 text-base">
+              <SlidersHorizontal className="h-4 w-4 text-primary" />
+              Filtres
+              {activeFiltersCount > 0 && (
+                <Badge className="bg-primary text-primary-foreground text-xs ml-1">
+                  {activeFiltersCount} actif{activeFiltersCount > 1 ? 's' : ''}
                 </Badge>
               )}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-72 p-0" align="start">
-            <div className="p-3 border-b">
-              <h4 className="text-sm font-semibold">Filtrer par collaborateur</h4>
-              <p className="text-xs text-muted-foreground">Sélectionnez les personnes à afficher</p>
-            </div>
-            <ScrollArea className="h-[280px]">
-              <div className="p-2 space-y-1">
-                {teamMembers.map(member => (
-                  <label 
-                    key={member.id} 
-                    className={cn(
-                      "flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors",
-                      selectedUserIds.includes(member.id) 
-                        ? "bg-primary/10" 
-                        : "hover:bg-muted"
-                    )}
-                  >
-                    <Checkbox
-                      checked={selectedUserIds.includes(member.id)}
-                      onCheckedChange={() => handleUserToggle(member.id)}
-                    />
-                    <Avatar className="h-7 w-7">
-                      <AvatarImage src={member.avatar_url} />
-                      <AvatarFallback className="text-xs bg-muted">
-                        {getInitials(member.display_name || 'U')}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{member.display_name}</p>
-                      {member.job_title && (
-                        <p className="text-xs text-muted-foreground truncate">{member.job_title}</p>
-                      )}
-                    </div>
-                  </label>
-                ))}
+            </SheetTitle>
+          </SheetHeader>
+
+          <div className="flex-1 overflow-y-auto p-4 space-y-5">
+
+            {/* Search */}
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Recherche</p>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Rechercher une tâche..."
+                  value={localSearch}
+                  onChange={(e) => setLocalSearch(e.target.value)}
+                  className="pl-9 h-9 text-sm"
+                />
+                {localSearch && (
+                  <button onClick={() => setLocalSearch('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </div>
-            </ScrollArea>
-            {selectedUserIds.length > 0 && (
-              <div className="p-2 border-t">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => onUserIdsChange([])}
-                  className="w-full text-xs"
-                >
-                  Effacer la sélection
-                </Button>
+            </div>
+
+            {/* Type */}
+            {onItemTypeChange && (
+              <div className="space-y-1.5">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Type d'élément</p>
+                <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5">
+                  {([
+                    { value: 'all', label: 'Tout', icon: ListFilter },
+                    { value: 'tasks', label: 'Tâches', icon: CheckCircle2 },
+                    { value: 'leaves', label: 'Congés', icon: Palmtree },
+                  ] as const).map(({ value, label, icon: Icon }) => (
+                    <Button key={value} variant="ghost" size="sm"
+                      onClick={() => onItemTypeChange(value)}
+                      className={cn('flex-1 h-8 text-xs gap-1.5',
+                        itemTypeFilter === value ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground'
+                      )}>
+                      <Icon className="h-3 w-3" />
+                      {label}
+                    </Button>
+                  ))}
+                </div>
               </div>
             )}
-          </PopoverContent>
-        </Popover>
 
-        {/* Process filter */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button 
-              variant={selectedProcessId ? "default" : "outline"} 
-              size="sm" 
-              className={cn(
-                "h-8 gap-2",
-                selectedProcessId && "bg-primary/90"
-              )}
-            >
-              <Layers className="h-3.5 w-3.5" />
-              <span className="text-xs">
-                {selectedProcessId 
-                  ? processes.find(p => p.id === selectedProcessId)?.name || 'Processus'
-                  : 'Processus'
-                }
-              </span>
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-64 p-0" align="start">
-            <div className="p-3 border-b">
-              <h4 className="text-sm font-semibold">Filtrer par processus</h4>
-            </div>
-            <ScrollArea className="h-[220px]">
-              <div className="p-2 space-y-1">
-                <button
-                  onClick={() => onProcessIdChange(null)}
-                  className={cn(
-                    "w-full text-left px-3 py-2 rounded-lg text-sm transition-colors",
-                    !selectedProcessId ? "bg-primary/10 font-medium" : "hover:bg-muted"
-                  )}
-                >
-                  Tous les processus
-                </button>
-                {processes.map(p => (
-                  <button
-                    key={p.id}
-                    onClick={() => onProcessIdChange(p.id)}
-                    className={cn(
-                      "w-full text-left px-3 py-2 rounded-lg text-sm transition-colors",
-                      selectedProcessId === p.id ? "bg-primary/10 font-medium" : "hover:bg-muted"
-                    )}
-                  >
-                    {p.name}
+            {/* Collaborateurs */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                  <Users className="h-3.5 w-3.5" /> Collaborateurs
+                </p>
+                {selectedUserIds.length > 0 && (
+                  <button onClick={() => onUserIdsChange([])}
+                    className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5">
+                    <X className="h-3 w-3" /> Effacer
                   </button>
-                ))}
-              </div>
-            </ScrollArea>
-          </PopoverContent>
-        </Popover>
-
-        {/* Status filter */}
-        {onStatusesChange && (
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button 
-                variant={selectedStatuses.length > 0 ? "default" : "outline"} 
-                size="sm" 
-                className={cn(
-                  "h-8 gap-2",
-                  selectedStatuses.length > 0 && "bg-primary/90"
                 )}
-              >
-                <CheckCircle2 className="h-3.5 w-3.5" />
-                <span className="text-xs">Statut</span>
-                {selectedStatuses.length > 0 && (
-                  <Badge variant="secondary" className="h-5 px-1.5 text-[10px] bg-white/20 text-white">
-                    {selectedStatuses.length}
-                  </Badge>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-56 p-0" align="start">
-              <div className="p-3 border-b">
-                <h4 className="text-sm font-semibold">Filtrer par statut</h4>
               </div>
-              <div className="p-2 space-y-1">
-                {STATUS_OPTIONS.map(status => (
-                  <label 
-                    key={status.value} 
-                    className={cn(
-                      "flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors",
-                      selectedStatuses.includes(status.value) 
-                        ? "bg-primary/10" 
-                        : "hover:bg-muted"
-                    )}
-                  >
-                    <Checkbox
-                      checked={selectedStatuses.includes(status.value)}
-                      onCheckedChange={() => handleStatusToggle(status.value)}
-                    />
-                    <div className={cn("w-2.5 h-2.5 rounded-full", status.color)} />
-                    <span className="text-sm">{status.label}</span>
-                  </label>
-                ))}
-              </div>
-              {selectedStatuses.length > 0 && (
-                <div className="p-2 border-t">
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => onStatusesChange([])}
-                    className="w-full text-xs"
-                  >
-                    Effacer
-                  </Button>
+              <ScrollArea className="h-[160px] rounded-lg border">
+                <div className="p-2 space-y-0.5">
+                  {teamMembers.map(member => (
+                    <label key={member.id}
+                      className={cn('flex items-center gap-2.5 p-2 rounded-md cursor-pointer transition-colors',
+                        selectedUserIds.includes(member.id) ? 'bg-primary/10' : 'hover:bg-muted'
+                      )}>
+                      <Checkbox
+                        checked={selectedUserIds.includes(member.id)}
+                        onCheckedChange={() => handleUserToggle(member.id)}
+                      />
+                      <Avatar className="h-6 w-6">
+                        <AvatarImage src={member.avatar_url} />
+                        <AvatarFallback className="text-[10px] bg-muted">
+                          {getInitials(member.display_name || 'U')}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm leading-none truncate">{member.display_name}</p>
+                        {member.job_title && (
+                          <p className="text-xs text-muted-foreground truncate mt-0.5">{member.job_title}</p>
+                        )}
+                      </div>
+                    </label>
+                  ))}
                 </div>
-              )}
-            </PopoverContent>
-          </Popover>
-        )}
+              </ScrollArea>
+            </div>
 
-        {/* Type filter: Tasks / Leaves / Both */}
-        {onItemTypeChange && (
-          <div className="flex items-center rounded-lg bg-muted p-0.5">
-            <Button 
-              variant="ghost"
-              size="sm" 
-              onClick={() => onItemTypeChange('all')}
-              className={cn(
-                "h-7 px-2.5 text-xs gap-1.5",
-                itemTypeFilter === 'all' 
-                  ? "bg-background text-foreground shadow-sm" 
-                  : "text-muted-foreground hover:text-foreground hover:bg-transparent"
-              )}
-            >
-              <ListFilter className="h-3 w-3" />
-              Tout
-            </Button>
-            <Button 
-              variant="ghost"
-              size="sm" 
-              onClick={() => onItemTypeChange('tasks')}
-              className={cn(
-                "h-7 px-2.5 text-xs gap-1.5",
-                itemTypeFilter === 'tasks' 
-                  ? "bg-background text-foreground shadow-sm" 
-                  : "text-muted-foreground hover:text-foreground hover:bg-transparent"
-              )}
-            >
-              <CheckCircle2 className="h-3 w-3" />
-              Tâches
-            </Button>
-            <Button 
-              variant="ghost"
-              size="sm" 
-              onClick={() => onItemTypeChange('leaves')}
-              className={cn(
-                "h-7 px-2.5 text-xs gap-1.5",
-                itemTypeFilter === 'leaves' 
-                  ? "bg-background text-foreground shadow-sm" 
-                  : "text-muted-foreground hover:text-foreground hover:bg-transparent"
-              )}
-            >
-              <Palmtree className="h-3 w-3" />
-              Congés
-            </Button>
-          </div>
-        )}
+            {/* Processus */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                  <Layers className="h-3.5 w-3.5" /> Processus
+                </p>
+                {selectedProcessId && (
+                  <button onClick={() => onProcessIdChange(null)}
+                    className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5">
+                    <X className="h-3 w-3" /> Effacer
+                  </button>
+                )}
+              </div>
+              <ScrollArea className="h-[140px] rounded-lg border">
+                <div className="p-2 space-y-0.5">
+                  <button onClick={() => onProcessIdChange(null)}
+                    className={cn('w-full text-left px-3 py-2 rounded-md text-sm transition-colors',
+                      !selectedProcessId ? 'bg-primary/10 font-medium' : 'hover:bg-muted text-muted-foreground'
+                    )}>
+                    Tous les processus
+                  </button>
+                  {processes.map(p => (
+                    <button key={p.id} onClick={() => onProcessIdChange(p.id)}
+                      className={cn('w-full text-left px-3 py-2 rounded-md text-sm transition-colors',
+                        selectedProcessId === p.id ? 'bg-primary/10 font-medium' : 'hover:bg-muted text-muted-foreground'
+                      )}>
+                      {p.name}
+                    </button>
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
 
-        {/* Quick filter: Overloaded */}
-        {onShowOnlyOverloadedChange && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant={showOnlyOverloaded ? "default" : "outline"}
-                  size="sm"
-                  className={cn(
-                    "h-8 w-8 p-0",
-                    showOnlyOverloaded && "bg-red-600 hover:bg-red-700"
+            {/* Statut */}
+            {onStatusesChange && (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                    <CheckCircle2 className="h-3.5 w-3.5" /> Statut
+                  </p>
+                  {selectedStatuses.length > 0 && (
+                    <button onClick={() => onStatusesChange([])}
+                      className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5">
+                      <X className="h-3 w-3" /> Effacer
+                    </button>
                   )}
-                  onClick={() => onShowOnlyOverloadedChange(!showOnlyOverloaded)}
-                >
-                  <AlertTriangle className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Afficher uniquement les surchargés</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
+                </div>
+                <div className="rounded-lg border p-2 space-y-0.5">
+                  {STATUS_OPTIONS.map(status => (
+                    <label key={status.value}
+                      className={cn('flex items-center gap-2.5 p-2 rounded-md cursor-pointer transition-colors',
+                        selectedStatuses.includes(status.value) ? 'bg-primary/10' : 'hover:bg-muted'
+                      )}>
+                      <Checkbox
+                        checked={selectedStatuses.includes(status.value)}
+                        onCheckedChange={() => handleStatusToggle(status.value)}
+                      />
+                      <div className={cn('w-2 h-2 rounded-full shrink-0', status.color)} />
+                      <span className="text-sm">{status.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
 
-        {/* Clear all filters */}
-        {hasActiveFilters && (
-          <>
-            <Separator orientation="vertical" className="h-6" />
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={clearFilters} 
-              className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-            >
-              <X className="h-3.5 w-3.5" />
-              Effacer ({activeFiltersCount})
-            </Button>
-          </>
-        )}
-      </div>
-    </div>
+            {/* Surcharge */}
+            {onShowOnlyOverloadedChange && (
+              <div className="space-y-1.5">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Alertes</p>
+                <label className={cn(
+                  'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
+                  showOnlyOverloaded ? 'border-red-300 bg-red-50' : 'hover:bg-muted'
+                )}>
+                  <Checkbox
+                    checked={showOnlyOverloaded}
+                    onCheckedChange={(v) => onShowOnlyOverloadedChange(!!v)}
+                  />
+                  <AlertTriangle className={cn('h-4 w-4', showOnlyOverloaded ? 'text-red-500' : 'text-muted-foreground')} />
+                  <span className="text-sm">Afficher uniquement les surchargés</span>
+                </label>
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          {activeFiltersCount > 0 && (
+            <div className="p-4 border-t shrink-0">
+              <Button variant="ghost" size="sm" className="w-full text-xs gap-1.5" onClick={clearAllFilters}>
+                <X className="h-3.5 w-3.5" />
+                Réinitialiser tous les filtres ({activeFiltersCount})
+              </Button>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+    </>
   );
 }

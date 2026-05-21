@@ -300,219 +300,200 @@ export default function Workload() {
           onSearchChange={() => {}}
         />
         
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-keon-50">
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            {/* Premium header row */}
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
-              {/* Tabs with premium underline style */}
-              <TabsList className="h-auto p-1 bg-card border border-keon-200 rounded-xl shadow-premium">
-                <TabsTrigger 
-                  value="calendar" 
-                  className="gap-2 px-4 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-white rounded-lg transition-all"
-                >
-                  <CalendarDays className="h-4 w-4" />
-                   <span className="hidden sm:inline font-medium">Planning</span>
+        <main className="flex-1 flex flex-col overflow-hidden bg-keon-50">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 overflow-hidden">
+
+            {/* ── Tab bar ── */}
+            <div className="flex items-center justify-between px-4 h-12 bg-white border-b shrink-0">
+              <TabsList className="h-8 p-0.5 bg-muted rounded-lg gap-0">
+                <TabsTrigger value="calendar"
+                  className="gap-1.5 px-3 h-7 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md font-medium">
+                  <CalendarDays className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Planning</span>
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="summary" 
-                  className="gap-2 px-4 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-white rounded-lg transition-all"
-                >
-                  <BarChart3 className="h-4 w-4" />
-                  <span className="hidden sm:inline font-medium">Bilan</span>
+                <TabsTrigger value="summary"
+                  className="gap-1.5 px-3 h-7 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md font-medium">
+                  <BarChart3 className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Bilan</span>
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="team" 
-                  className="gap-2 px-4 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-white rounded-lg transition-all"
-                >
-                  <Users className="h-4 w-4" />
-                  <span className="hidden sm:inline font-medium">Équipe</span>
+                <TabsTrigger value="team"
+                  className="gap-1.5 px-3 h-7 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md font-medium">
+                  <Users className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Équipe</span>
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="leaves" 
-                  className="gap-2 px-4 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-white rounded-lg transition-all"
-                >
-                  <Palmtree className="h-4 w-4" />
-                  <span className="hidden sm:inline font-medium">Congés</span>
+                <TabsTrigger value="leaves"
+                  className="gap-1.5 px-3 h-7 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md font-medium">
+                  <Palmtree className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Congés</span>
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="holidays" 
-                  className="gap-2 px-4 py-2.5 data-[state=active]:bg-primary data-[state=active]:text-white rounded-lg transition-all"
-                >
-                  <CalendarCheck className="h-4 w-4" />
-                  <span className="hidden sm:inline font-medium">Fériés</span>
+                <TabsTrigger value="holidays"
+                  className="gap-1.5 px-3 h-7 text-sm data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md font-medium">
+                  <CalendarCheck className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Fériés</span>
                 </TabsTrigger>
               </TabsList>
 
-              {/* Action buttons row */}
-              <div className="flex items-center gap-2">
-                {/* Export / Sync buttons */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="gap-2 h-9 border-keon-200 hover:bg-keon-50">
-                      <Download className="h-4 w-4" />
-                      <span className="hidden sm:inline font-medium">Exporter</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuItem onClick={handleExportCSV}>
-                      <FileSpreadsheet className="h-4 w-4 mr-2" />
-                      Export CSV
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleExportJSON}>
-                      <FileJson className="h-4 w-4 mr-2" />
-                      Export JSON
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleExportReport}>
-                      <FileText className="h-4 w-4 mr-2" />
-                      Rapport de synthèse
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleExportICS}>
-                      <CalendarDays className="h-4 w-4 mr-2" />
-                      Export ICS (Calendrier)
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleOutlookSync}>
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                      Synchroniser Outlook
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs text-muted-foreground hover:text-foreground">
+                    <Download className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Exporter</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={handleExportCSV}>
+                    <FileSpreadsheet className="h-4 w-4 mr-2" /> Export CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportJSON}>
+                    <FileJson className="h-4 w-4 mr-2" /> Export JSON
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportReport}>
+                    <FileText className="h-4 w-4 mr-2" /> Rapport de synthèse
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleExportICS}>
+                    <CalendarDays className="h-4 w-4 mr-2" /> Export ICS
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleOutlookSync}>
+                    <RefreshCw className="h-4 w-4 mr-2" /> Synchroniser Outlook
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
 
-             {/* Filters for planning views - now just calendar and summary */}
-             {(activeTab === 'calendar' || activeTab === 'summary') && (
-              <>
-                {/* Date range navigation */}
-                <WorkloadFilters
-                  startDate={startDate}
-                  endDate={endDate}
-                  onDateRangeChange={handleDateRangeChange}
-                  selectedUserIds={filters.selectedUserIds}
-                  onUserIdsChange={setSelectedUserIds}
-                  selectedProcessId={filters.selectedProcessId}
-                  onProcessIdChange={setSelectedProcessId}
-                  selectedCompanyId={filters.selectedCompanyId}
-                  onCompanyIdChange={setSelectedCompanyId}
-                  teamMembers={teamMembers}
-                  viewMode={viewMode}
-                  searchQuery={filters.searchQuery}
-                  onSearchChange={setSearchQuery}
-                  selectedStatuses={filters.selectedStatuses}
-                  onStatusesChange={setSelectedStatuses}
-                  itemTypeFilter={filters.itemType}
-                  onItemTypeChange={setItemType}
-                />
-              </>
+            {/* ── Control bar (Planning & Bilan only) ── */}
+            {(activeTab === 'calendar' || activeTab === 'summary') && (
+              <WorkloadFilters
+                startDate={startDate}
+                endDate={endDate}
+                onDateRangeChange={handleDateRangeChange}
+                selectedUserIds={filters.selectedUserIds}
+                onUserIdsChange={setSelectedUserIds}
+                selectedProcessId={filters.selectedProcessId}
+                onProcessIdChange={setSelectedProcessId}
+                selectedCompanyId={filters.selectedCompanyId}
+                onCompanyIdChange={setSelectedCompanyId}
+                teamMembers={teamMembers}
+                viewMode={viewMode}
+                searchQuery={filters.searchQuery}
+                onSearchChange={setSearchQuery}
+                selectedStatuses={filters.selectedStatuses}
+                onStatusesChange={setSelectedStatuses}
+                itemTypeFilter={filters.itemType}
+                onItemTypeChange={setItemType}
+              />
             )}
 
-             {isLoading && (activeTab === 'calendar' || activeTab === 'summary') ? (
-              <Card>
-                <CardContent className="flex items-center justify-center h-64">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </CardContent>
-              </Card>
-            ) : (
-              <>
-                 <TabsContent value="calendar" className="mt-4 flex-1 min-h-0">
-                   <PlanningCalendarView
-                    workloadData={workloadData}
-                     startDate={startDate}
-                     endDate={endDate}
-                     tasks={tasks}
-                    holidays={holidays}
-                    leaves={leaves}
-                     outlookEvents={outlookEvents}
-                    viewMode={viewMode}
-                     onNavigate={(direction: 'prev' | 'next') => {
-                      const offset = direction === 'prev' ? -1 : 1;
-                      let newStart: Date, newEnd: Date;
-                      if (viewMode === 'week') {
-                        newStart = addWeeks(startDate, offset);
-                        newEnd = endOfWeek(newStart, { locale: fr });
-                      } else if (viewMode === 'quarter') {
-                         newStart = offset === 1 ? startOfQuarter(addMonths(startDate, 3)) : startOfQuarter(addMonths(startDate, -3));
-                         newEnd = endOfQuarter(newStart);
-                      } else if (viewMode === 'year') {
-                        newStart = addYears(startDate, offset);
-                        newEnd = endOfYear(newStart);
-                      } else {
-                        newStart = addMonths(startDate, offset);
-                        newEnd = endOfMonth(newStart);
-                      }
-                      setStartDate(newStart);
-                      setEndDate(newEnd);
-                    }}
-                    onToday={() => {
-                      if (viewMode === 'week') {
-                        setStartDate(startOfWeek(new Date(), { locale: fr }));
-                        setEndDate(endOfWeek(new Date(), { locale: fr }));
-                      } else if (viewMode === 'quarter') {
-                         setStartDate(startOfQuarter(new Date()));
-                         setEndDate(endOfQuarter(new Date()));
-                      } else if (viewMode === 'year') {
-                        setStartDate(startOfYear(new Date()));
-                        setEndDate(endOfYear(new Date()));
-                      } else {
-                        setStartDate(startOfMonth(new Date()));
-                        setEndDate(endOfMonth(new Date()));
-                      }
-                    }}
-                     onSlotAdd={handleAddSlot}
-                     onMultiSlotAdd={handleAddMultipleSlots}
-                     onSlotMove={moveSlotsWithOffset}
-                     onReassignTask={reassignTaskSlots}
-                     isHalfDayAvailable={isHalfDayAvailable}
-                     checkSlotLeaveConflict={checkSlotLeaveConflict}
-                     getTaskDuration={getTaskDuration}
-                     getTaskProgress={getTaskProgress}
-                     plannedTaskIds={plannedTaskIds}
-                     onTaskUpdated={refetch}
-                     searchQuery={filters.searchQuery}
-                     onSearchChange={setSearchQuery}
-                     onViewModeChange={(mode, anchorDate) => {
-                       setViewMode(mode);
-                       if (anchorDate) {
-                         if (mode === 'week') {
-                           setStartDate(startOfWeek(anchorDate, { locale: fr }));
-                           setEndDate(endOfWeek(anchorDate, { locale: fr }));
-                         } else if (mode === 'month') {
-                           setStartDate(startOfMonth(anchorDate));
-                           setEndDate(endOfMonth(anchorDate));
-                         } else if (mode === 'quarter') {
-                           setStartDate(startOfQuarter(anchorDate));
-                           setEndDate(endOfQuarter(anchorDate));
-                         } else if (mode === 'year') {
-                           setStartDate(startOfYear(anchorDate));
-                           setEndDate(endOfYear(anchorDate));
-                         }
-                       }
-                     }}
-                  />
-                </TabsContent>
+            {/* ── Content ── */}
+            <div className="flex-1 overflow-y-auto p-4 md:p-6">
+              {isLoading && (activeTab === 'calendar' || activeTab === 'summary') ? (
+                <Card>
+                  <CardContent className="flex items-center justify-center h-64">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  </CardContent>
+                </Card>
+              ) : (
+                <>
+                  <TabsContent value="calendar" className="mt-0 flex-1 min-h-0">
+                    <PlanningCalendarView
+                      workloadData={workloadData}
+                      startDate={startDate}
+                      endDate={endDate}
+                      tasks={tasks}
+                      holidays={holidays}
+                      leaves={leaves}
+                      outlookEvents={outlookEvents}
+                      viewMode={viewMode}
+                      onNavigate={(direction: 'prev' | 'next') => {
+                        const offset = direction === 'prev' ? -1 : 1;
+                        let newStart: Date, newEnd: Date;
+                        if (viewMode === 'week') {
+                          newStart = addWeeks(startDate, offset);
+                          newEnd = endOfWeek(newStart, { locale: fr });
+                        } else if (viewMode === 'quarter') {
+                          newStart = offset === 1 ? startOfQuarter(addMonths(startDate, 3)) : startOfQuarter(addMonths(startDate, -3));
+                          newEnd = endOfQuarter(newStart);
+                        } else if (viewMode === 'year') {
+                          newStart = addYears(startDate, offset);
+                          newEnd = endOfYear(newStart);
+                        } else {
+                          newStart = addMonths(startDate, offset);
+                          newEnd = endOfMonth(newStart);
+                        }
+                        setStartDate(newStart);
+                        setEndDate(newEnd);
+                      }}
+                      onToday={() => {
+                        if (viewMode === 'week') {
+                          setStartDate(startOfWeek(new Date(), { locale: fr }));
+                          setEndDate(endOfWeek(new Date(), { locale: fr }));
+                        } else if (viewMode === 'quarter') {
+                          setStartDate(startOfQuarter(new Date()));
+                          setEndDate(endOfQuarter(new Date()));
+                        } else if (viewMode === 'year') {
+                          setStartDate(startOfYear(new Date()));
+                          setEndDate(endOfYear(new Date()));
+                        } else {
+                          setStartDate(startOfMonth(new Date()));
+                          setEndDate(endOfMonth(new Date()));
+                        }
+                      }}
+                      onSlotAdd={handleAddSlot}
+                      onMultiSlotAdd={handleAddMultipleSlots}
+                      onSlotMove={moveSlotsWithOffset}
+                      onReassignTask={reassignTaskSlots}
+                      isHalfDayAvailable={isHalfDayAvailable}
+                      checkSlotLeaveConflict={checkSlotLeaveConflict}
+                      getTaskDuration={getTaskDuration}
+                      getTaskProgress={getTaskProgress}
+                      plannedTaskIds={plannedTaskIds}
+                      onTaskUpdated={refetch}
+                      searchQuery={filters.searchQuery}
+                      onSearchChange={setSearchQuery}
+                      onViewModeChange={(mode, anchorDate) => {
+                        setViewMode(mode);
+                        if (anchorDate) {
+                          if (mode === 'week') {
+                            setStartDate(startOfWeek(anchorDate, { locale: fr }));
+                            setEndDate(endOfWeek(anchorDate, { locale: fr }));
+                          } else if (mode === 'month') {
+                            setStartDate(startOfMonth(anchorDate));
+                            setEndDate(endOfMonth(anchorDate));
+                          } else if (mode === 'quarter') {
+                            setStartDate(startOfQuarter(anchorDate));
+                            setEndDate(endOfQuarter(anchorDate));
+                          } else if (mode === 'year') {
+                            setStartDate(startOfYear(anchorDate));
+                            setEndDate(endOfYear(anchorDate));
+                          }
+                        }
+                      }}
+                    />
+                  </TabsContent>
 
-                <TabsContent value="summary" className="mt-4">
-                  <WorkloadSummaryView
-                    workloadData={workloadData}
-                    startDate={startDate}
-                    endDate={endDate}
-                  />
-                </TabsContent>
+                  <TabsContent value="summary" className="mt-0">
+                    <WorkloadSummaryView
+                      workloadData={workloadData}
+                      startDate={startDate}
+                      endDate={endDate}
+                    />
+                  </TabsContent>
 
-                <TabsContent value="team" className="mt-4">
-                  <TeamWorkloadView />
-                </TabsContent>
-              </>
-            )}
+                  <TabsContent value="team" className="mt-0">
+                    <TeamWorkloadView />
+                  </TabsContent>
+                </>
+              )}
 
-            <TabsContent value="leaves" className="mt-4">
-              <LeaveManagement />
-            </TabsContent>
+              <TabsContent value="leaves" className="mt-0">
+                <LeaveManagement />
+              </TabsContent>
 
-            <TabsContent value="holidays" className="mt-4">
-              <HolidayManagement />
-            </TabsContent>
+              <TabsContent value="holidays" className="mt-0">
+                <HolidayManagement />
+              </TabsContent>
+            </div>
           </Tabs>
         </main>
       </div>
