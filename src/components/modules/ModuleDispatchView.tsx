@@ -303,98 +303,102 @@ export function ModuleDispatchView<
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header title={config.title} searchQuery="" onSearchChange={() => {}} />
         <main className="flex-1 overflow-y-auto p-3 sm:p-6">
-          <div className="max-w-7xl mx-auto space-y-6">
-            {/* Titre + actions */}
+          <div className="max-w-7xl mx-auto space-y-4">
+            {/* ── Titre compact + actions ── */}
             <div className="flex items-center justify-between flex-wrap gap-2">
-              <div className="flex items-center gap-3">
-                <div className={cn('p-2 rounded-xl', config.iconBgClass)}>
-                  <Icon className={cn('h-6 w-6', config.iconColorClass)} />
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className={cn('p-1.5 rounded-lg shrink-0', config.iconBgClass)}>
+                  <Icon className={cn('h-4 w-4', config.iconColorClass)} />
                 </div>
-                <div>
-                  <h1 className="text-2xl font-display font-bold">{config.title}</h1>
-                  <p className="text-sm text-muted-foreground">{config.subtitle}</p>
-                </div>
+                <h1 className="text-xl font-display font-bold leading-none whitespace-nowrap">{config.title}</h1>
+                <span className="text-xs text-muted-foreground truncate">{config.subtitle}</span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 {config.HeaderExtras && <config.HeaderExtras isAdmin={isAdmin} refetch={refetch} />}
-                <Button variant="outline" size="sm" onClick={refetch}>
-                  <RefreshCw className="h-4 w-4 mr-2" />Actualiser
+                <Button variant="ghost" size="sm" onClick={refetch} className="h-8 gap-1.5 text-xs">
+                  <RefreshCw className="h-3.5 w-3.5" />Actualiser
                 </Button>
-                <Button onClick={() => navigate(config.newRoute)}>
-                  <Plus className="h-4 w-4 mr-2" />{config.newButtonLabel ?? 'Nouvelle demande'}
+                <Button size="sm" onClick={() => navigate(config.newRoute)} className="h-8 gap-1.5">
+                  <Plus className="h-3.5 w-3.5" />{config.newButtonLabel ?? 'Nouvelle demande'}
                 </Button>
               </div>
             </div>
 
             <Tabs defaultValue="demandes" className="w-full">
-              <TabsList>
-                <TabsTrigger value="demandes" className="gap-2">
-                  <Layers className="h-4 w-4" /> Demandes
-                </TabsTrigger>
-                <TabsTrigger value="analyse" className="gap-2">
-                  <BarChart3 className="h-4 w-4" /> Analyse
-                </TabsTrigger>
-              </TabsList>
+              {/* ── Tabs + KPI strip ── */}
+              <div className="flex items-center justify-between gap-4 border-b flex-wrap">
+                <TabsList className="h-9 p-0.5 bg-muted rounded-lg">
+                  <TabsTrigger value="demandes" className="h-7 px-3 gap-1.5 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md">
+                    <Layers className="h-3.5 w-3.5" /> Demandes
+                  </TabsTrigger>
+                  <TabsTrigger value="analyse" className="h-7 px-3 gap-1.5 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md">
+                    <BarChart3 className="h-3.5 w-3.5" /> Analyse
+                  </TabsTrigger>
+                </TabsList>
 
-              <TabsContent value="demandes" className="space-y-6 mt-4">
-                {/* KPIs */}
-                <div className={cn('grid grid-cols-2 gap-3', kpiCols)}>
+                {/* KPI strip inline */}
+                <div className="flex items-center divide-x divide-border py-1.5">
                   {kpis.map((k, i) => (
-                    <Card key={i}>
-                      <CardContent className="p-4 flex items-center gap-3">
-                        <div className={cn('p-2 rounded-lg shrink-0', k.color)}>
-                          <k.icon className="h-5 w-5" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs text-muted-foreground truncate">{k.label}</p>
-                          <p className="text-2xl font-bold tabular-nums">{k.value}</p>
-                        </div>
-                      </CardContent>
-                    </Card>
+                    <div key={i} className="flex items-center gap-2 px-3 first:pl-0">
+                      <div className={cn('w-6 h-6 rounded-md flex items-center justify-center shrink-0', k.color)}>
+                        <k.icon className="h-3.5 w-3.5" />
+                      </div>
+                      <div className="flex items-baseline gap-1.5 leading-none">
+                        <span className="font-semibold text-sm tabular-nums">{k.value}</span>
+                        <span className="text-[11px] text-muted-foreground whitespace-nowrap">{k.label}</span>
+                      </div>
+                    </div>
                   ))}
                 </div>
+              </div>
 
-                <ModuleQuickFilters
-                  viewMode={viewMode}
-                  onViewModeChange={setViewMode}
-                  hideTerminated={hideTerminated}
-                  onHideTerminatedChange={setHideTerminated}
-                  onlyMine={onlyMine}
-                  onOnlyMineChange={setOnlyMine}
-                />
+              <TabsContent value="demandes" className="space-y-3 mt-3">
+                {/* ── Barre de contrôles unifiée ── */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <ModuleQuickFilters
+                    viewMode={viewMode}
+                    onViewModeChange={setViewMode}
+                    hideTerminated={hideTerminated}
+                    onHideTerminatedChange={setHideTerminated}
+                    onlyMine={onlyMine}
+                    onOnlyMineChange={setOnlyMine}
+                  />
 
-                <FilterDrawerButton
-                  filters={crossFilters}
-                  onFiltersChange={setCrossFilters}
-                  contextId={config.contextId}
-                  isAdmin={isAdmin}
-                  disableAutoApplyDefault={true}
-                />
+                  <div className="flex-1" />
 
-                <Card>
-                  <CardContent className="pt-4 pb-4">
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <div className="relative flex-1 min-w-[220px]">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input placeholder="Rechercher..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10" />
-                      </div>
-                      <Select value={filterStatus} onValueChange={setFilterStatus}>
-                        <SelectTrigger className="w-[180px]"><SelectValue placeholder="Statut" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Tous statuts</SelectItem>
-                          {statusOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                      {config.ExtraFilters && (
-                        <config.ExtraFilters
-                          value={extraFilter}
-                          onChange={setExtraFilter}
-                          requests={requests as any[]}
-                        />
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                    <Input
+                      placeholder="Rechercher..."
+                      value={search}
+                      onChange={e => setSearch(e.target.value)}
+                      className="pl-8 h-8 w-48 text-xs"
+                    />
+                  </div>
+                  <Select value={filterStatus} onValueChange={setFilterStatus}>
+                    <SelectTrigger className="h-8 w-36 text-xs">
+                      <SelectValue placeholder="Statut" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tous statuts</SelectItem>
+                      {statusOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  {config.ExtraFilters && (
+                    <config.ExtraFilters
+                      value={extraFilter}
+                      onChange={setExtraFilter}
+                      requests={requests as any[]}
+                    />
+                  )}
+                  <FilterDrawerButton
+                    filters={crossFilters}
+                    onFiltersChange={setCrossFilters}
+                    contextId={config.contextId}
+                    isAdmin={isAdmin}
+                    disableAutoApplyDefault={true}
+                  />
+                </div>
 
                 <Card>
                   <CardContent className={cn(viewMode === 'table' ? 'p-0' : 'p-4')}>
