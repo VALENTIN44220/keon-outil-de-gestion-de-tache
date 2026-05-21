@@ -27,6 +27,15 @@ import { WorkloadSlot, TeamMemberWorkload } from '@/types/workload';
 import { toast } from 'sonner';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
+import { BE_PROCESS_ID } from '@/hooks/useRequestStates';
+
+// Postes / job_titles qui donnent visibilité sur l'ensemble des tâches BE
+// dans le Plan de charge équipe (responsables capables d'arbitrer/affecter).
+const BE_MANAGER_JOB_TITLE_PATTERNS = [
+  'responsable be',
+  'responsable réglementaire',
+  'responsable reglementaire',
+];
 export default function Workload() {
   const { profile: authProfile } = useAuth();
   const { getActiveProfile } = useSimulation();
@@ -109,31 +118,48 @@ export default function Workload() {
     const fetchTasks = async () => {
       if (!profile?.id) return;
 
-      // 1. Tâches déjà affectées à des membres de l'équipe
+      // 1. Tâches déjà affectées à des membres de l'équipe (visibilité standard)
       const teamIds = teamMembers.map(m => m.id);
       const { data: assignedData } = await supabase
         .from('tasks')
         .select('*')
         .in('assignee_id', teamIds);
 
-      // 2. Tâches NON affectées qui ciblent le département du manager connecté
-      //    → permet au manager (ex : Florence pour le BE) de les voir dans le
-      //    backlog et de les planifier en les déposant sur une date.
-      //    Le drop sur un collaborateur déclenchera l'auto-affectation.
-      let unassignedData: any[] = [];
-      const deptId = (profile as any)?.department_id;
-      if (deptId) {
-        const { data } = await supabase
+      // 2. Visibilité élargie pour les responsables BE :
+      //    si le profil connecté a un job_title type "Responsable BE" /
+      //    "Responsable Réglementaire", on lui montre TOUTES les sous-tâches
+      //    rattachées à une demande BE — y compris non affectées — afin qu'il
+      //    puisse les planifier par drag-drop. Le drop déclenche déjà
+      //    l'auto-affectation au collaborateur cible.
+      const jobTitle = String((profile as any)?.job_title ?? '').toLowerCase();
+      const isBEManager = BE_MANAGER_JOB_TITLE_PATTERNS.some(p =>
+        jobTitle.includes(p),
+      );
+
+      let beScopedData: any[] = [];
+      if (isBEManager) {
+        // a) IDs des demandes BE (parent_request)
+        const { data: beDemands } = await supabase
           .from('tasks')
-          .select('*')
-          .is('assignee_id', null)
-          .eq('target_department_id', deptId);
-        unassignedData = data ?? [];
+          .select('id')
+          .eq('process_template_id', BE_PROCESS_ID)
+          .eq('type', 'request');
+
+        const beDemandIds = (beDemands ?? []).map((d: any) => d.id);
+
+        // b) Toutes les sous-tâches rattachées à ces demandes
+        if (beDemandIds.length > 0) {
+          const { data } = await supabase
+            .from('tasks')
+            .select('*')
+            .in('parent_request_id', beDemandIds);
+          beScopedData = data ?? [];
+        }
       }
 
-      // Merge + déduplication par id (au cas où une tâche serait dans les 2)
+      // Merge + déduplication par id
       const seen = new Set<string>();
-      const merged = [...(assignedData ?? []), ...unassignedData].filter((t: any) => {
+      const merged = [...(assignedData ?? []), ...beScopedData].filter((t: any) => {
         if (seen.has(t.id)) return false;
         seen.add(t.id);
         return true;
@@ -145,7 +171,7 @@ export default function Workload() {
     if (teamMembers.length > 0) {
       fetchTasks();
     }
-  }, [profile?.id, (profile as any)?.department_id, teamMembers]);
+  }, [profile?.id, (profile as any)?.job_title, teamMembers]);
 
   const handleDateRangeChange = (start: Date, end: Date, mode?: 'week' | 'month' | 'quarter') => {
     setStartDate(start);
