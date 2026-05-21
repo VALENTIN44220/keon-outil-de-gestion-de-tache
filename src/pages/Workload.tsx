@@ -5,6 +5,7 @@ import { useWorkloadPlanning } from '@/hooks/useWorkloadPlanning';
 import { useWorkloadPreferences } from '@/hooks/useWorkloadPreferences';
 import { useWorkloadFilters } from '@/hooks/useWorkloadFilters';
 import { WorkloadFilters } from '@/components/workload/WorkloadFilters';
+import { PlanningKPIs } from '@/components/workload/calendar/PlanningKPIs';
  import { PlanningCalendarView } from '@/components/workload/calendar';
  import { useOutlookCalendar } from '@/hooks/useOutlookCalendar';
 import { WorkloadSummaryView } from '@/components/workload/WorkloadSummaryView';
@@ -382,6 +383,13 @@ export default function Workload() {
                 onStatusesChange={setSelectedStatuses}
                 itemTypeFilter={filters.itemType}
                 onItemTypeChange={setItemType}
+                extras={activeTab === 'calendar' ? (
+                  <PlanningKPIs
+                    workloadData={workloadData}
+                    tasks={tasks}
+                    plannedTaskIds={plannedTaskIds}
+                  />
+                ) : undefined}
               />
             )}
 

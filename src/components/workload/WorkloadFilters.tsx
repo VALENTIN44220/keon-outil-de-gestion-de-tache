@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -52,6 +52,8 @@ interface WorkloadFiltersProps {
   onItemTypeChange?: (type: ItemTypeFilter) => void;
   showOnlyOverloaded?: boolean;
   onShowOnlyOverloadedChange?: (show: boolean) => void;
+  /** Contenu optionnel rendu dans la barre, juste avant le bouton Filtres (KPIs, etc.) */
+  extras?: ReactNode;
 }
 
 const STATUS_OPTIONS = [
@@ -85,6 +87,7 @@ export function WorkloadFilters({
   onItemTypeChange,
   showOnlyOverloaded = false,
   onShowOnlyOverloadedChange,
+  extras,
 }: WorkloadFiltersProps) {
   const [processes, setProcesses] = useState<any[]>([]);
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({ from: startDate, to: endDate });
@@ -277,6 +280,14 @@ export function WorkloadFilters({
 
         {/* Spacer */}
         <div className="flex-1" />
+
+        {/* Optional extras (KPIs, etc.) */}
+        {extras && (
+          <>
+            {extras}
+            <Separator orientation="vertical" className="h-4 bg-border mx-1" />
+          </>
+        )}
 
         {/* Filters button */}
         <Button
