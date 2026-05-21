@@ -102,6 +102,10 @@ import {
 
 const BE_PROCESS_TEMPLATE_ID = 'bd75a3b0-c918-4b43-befe-739b83f7461a';
 const BE_WORKER_POSTES = ['ingenieur_etudes', 'projeteur'];
+// Groupe de collaborateurs « SERVICE BUREAUX D'ETUDES » — source de vérité de
+// l'appartenance au BE. Toute personne hors de ce groupe ne doit pas apparaître
+// dans les dropdowns d'affectation, même si son champ be_poste est renseigné.
+const BE_COLLAB_GROUP_ID = '301ffee1-718f-42af-aec0-545cf4765ffa';
 
 const sb = supabase as any;
 
@@ -1052,18 +1056,40 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
   });
 
   // ── Chargement profils BE (exécutants + managers dispatch) ─────────────────
+  // Source de vérité = appartenance au groupe « SERVICE BUREAUX D'ETUDES ».
+  // Seules les personnes membres de ce groupe sont éligibles à l'affectation.
   const { data: profiles = [] } = useQuery({
-    queryKey: ['be-team-profiles'],
+    queryKey: ['be-team-profiles', BE_COLLAB_GROUP_ID],
     queryFn: async (): Promise<Profile[]> => {
-      // 1. Exécutants : ingenieur_etudes + projeteur
+      // 0. Récupère les user_id membres du groupe BE
+      const { data: groupMembers } = await sb
+        .from('collaborator_group_members')
+        .select('user_id')
+        .eq('group_id', BE_COLLAB_GROUP_ID);
+
+      const beMemberIds = new Set<string>(
+        (groupMembers ?? []).map((m: any) => m.user_id).filter(Boolean),
+      );
+
+      if (beMemberIds.size === 0) {
+        // Groupe vide ou inaccessible — on n'affiche personne plutôt que de
+        // tomber dans l'ancien comportement (qui exposait des non-BE).
+        return [];
+      }
+
+      const memberIdsArr = Array.from(beMemberIds);
+
+      // 1. Exécutants : ingenieur_etudes + projeteur ET membres du groupe BE
       const { data: workers } = await supabase
         .from('profiles')
         .select('id, display_name')
+        .in('id', memberIdsArr)
         .in('be_poste', BE_WORKER_POSTES)
         .in('status', ['active', 'external'])
         .order('display_name');
 
       // 2. Managers dispatch définis dans les sous-étapes BE
+      //    On les conserve UNIQUEMENT s'ils sont membres du groupe BE.
       const { data: tplRows } = await sb
         .from('sub_process_templates')
         .select('dispatch_manager_id')
@@ -1071,7 +1097,9 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
         .not('dispatch_manager_id', 'is', null);
 
       const managerIds = [...new Set<string>(
-        (tplRows ?? []).map((r: any) => r.dispatch_manager_id).filter(Boolean),
+        (tplRows ?? [])
+          .map((r: any) => r.dispatch_manager_id)
+          .filter((id: string) => id && beMemberIds.has(id)),
       )];
       const existingIds = new Set((workers ?? []).map((p: any) => p.id));
       const missingIds = managerIds.filter(id => !existingIds.has(id));
