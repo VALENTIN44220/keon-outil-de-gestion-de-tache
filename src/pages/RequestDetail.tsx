@@ -269,10 +269,10 @@ export default function RequestDetail() {
   );
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
+    <div className="flex h-screen">
       <Sidebar activeView={activeView} onViewChange={setActiveView} />
       <div className="flex-1 flex overflow-hidden">
-        <main className="flex-1 overflow-y-auto min-w-0">
+        <main className="flex-1 overflow-y-auto min-w-0 bg-gradient-to-br from-slate-100/70 via-blue-50/40 to-slate-50/60">
           <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-4 pb-12">
 
             {/* ── Breadcrumb ──────────────────────────────────── */}
@@ -407,7 +407,7 @@ export default function RequestDetail() {
             {/* TABS                                                */}
             {/* ─────────────────────────────────────────────────── */}
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-              <TabsList className="bg-muted/40 border h-10 p-1">
+              <TabsList className="bg-white/70 border border-blue-200/50 h-10 p-1 shadow-sm">
                 <TabsTrigger value="steps" className="gap-2 text-sm px-4 h-8 data-[state=active]:shadow-sm">
                   <ListChecks className="h-4 w-4" />
                   <span>Étapes</span>
@@ -426,15 +426,15 @@ export default function RequestDetail() {
               {/* ═════ ÉTAPES ═════ */}
               <TabsContent value="steps" className="mt-5 space-y-5">
                 {childTasks.length === 0 ? (
-                  <Card>
+                  <Card className="border-dashed border-2 border-blue-200/70 bg-blue-50/30">
                     <CardContent className="p-16 text-center text-sm text-muted-foreground">
-                      <FileText className="h-10 w-10 mx-auto opacity-30 mb-3" />
+                      <FileText className="h-10 w-10 mx-auto opacity-40 mb-3 text-blue-400" />
                       Aucune étape pour cette demande.
                     </CardContent>
                   </Card>
                 ) : subProcessGroups.length === 0 ? (
-                  <Card className="overflow-hidden">
-                    <CardHeader className="pb-3 border-b bg-muted/20">
+                  <Card className="overflow-hidden shadow-sm">
+                    <CardHeader className="pb-3 border-b bg-gradient-to-r from-blue-50/60 to-violet-50/40">
                       <CardTitle className="text-base font-semibold">
                         Tâches ({childTasks.length})
                       </CardTitle>
@@ -445,8 +445,8 @@ export default function RequestDetail() {
                   </Card>
                 ) : (
                   subProcessGroups.map((group) => (
-                    <Card key={group.subProcessId} className="overflow-hidden">
-                      <CardHeader className="pb-3 border-b bg-muted/20">
+                    <Card key={group.subProcessId} className="overflow-hidden shadow-sm">
+                      <CardHeader className="pb-3 border-b bg-gradient-to-r from-blue-50/60 to-violet-50/40">
                         <div className="flex items-center justify-between gap-4 flex-wrap">
                           <div className="min-w-0">
                             <CardTitle className="text-base font-semibold truncate capitalize">
@@ -470,10 +470,10 @@ export default function RequestDetail() {
                 )}
               </TabsContent>
 
-              {/* ═════ SYNTHÈSE & DISCUSSION ═════ */}
+              {/* ═════ SYNTHÈSE ═════ */}
               <TabsContent value="synthesis" className="mt-5 space-y-5">
-                <Card>
-                  <CardHeader className="pb-3 border-b bg-muted/20">
+                <Card className="overflow-hidden shadow-sm">
+                  <CardHeader className="pb-3 border-b bg-gradient-to-r from-blue-50/60 to-violet-50/40">
                     <CardTitle className="text-base font-semibold">Récapitulatif</CardTitle>
                   </CardHeader>
                   <CardContent className="p-6 space-y-5">
@@ -572,10 +572,10 @@ export default function RequestDetail() {
         {/* ─────────────────────────────────────────────────── */}
         {/* PANNEAU CONVERSATION (DROITE) — toujours visible    */}
         {/* ─────────────────────────────────────────────────── */}
-        <aside className="hidden lg:flex flex-col w-[380px] xl:w-[420px] border-l bg-white shrink-0">
-          <div className="px-4 h-12 flex items-center gap-2 border-b shrink-0 bg-gradient-to-r from-violet-50 to-blue-50">
+        <aside className="hidden lg:flex flex-col w-[380px] xl:w-[420px] border-l border-violet-200/60 bg-violet-50/30 shrink-0">
+          <div className="px-4 h-12 flex items-center gap-2 border-b border-violet-200/60 shrink-0 bg-gradient-to-r from-violet-100/80 to-blue-100/60">
             <MessageSquare className="h-4 w-4 text-violet-600" />
-            <h2 className="text-sm font-semibold">Conversation de la demande</h2>
+            <h2 className="text-sm font-semibold text-violet-900">Conversation de la demande</h2>
           </div>
           <div className="flex-1 overflow-hidden p-3 min-h-0">
             <TaskCommentsSection taskId={task.id} className="h-full" />
