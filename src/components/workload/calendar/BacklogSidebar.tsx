@@ -30,6 +30,7 @@
    CheckSquare,
  } from 'lucide-react';
  import { TaskDetailDialog } from '@/components/tasks/TaskDetailDialog';
+ import { parseTaskTitle } from '@/lib/parseTaskTitle';
  
  interface BacklogSidebarProps {
    tasks: Task[];
@@ -356,12 +357,29 @@
                                  {String((task as any).be_status).replace(/_/g, ' ')}
                                </Badge>
                              )}
+                             {(() => {
+                               const parsed = parseTaskTitle(task.title, (task as any).task_number);
+                               return parsed.prestation ? (
+                                 <Badge
+                                   variant="outline"
+                                   className="h-4 px-1 text-[9px] font-semibold shrink-0 border-violet-300 text-violet-700 bg-violet-50"
+                                   title={`Prestation : ${parsed.prestation}`}
+                                 >
+                                   {parsed.prestation}
+                                 </Badge>
+                               ) : null;
+                             })()}
                            </div>
-                           <span
-                             className="text-sm font-medium cursor-pointer hover:underline line-clamp-2 break-words leading-tight"
-                             onClick={(e) => { e.stopPropagation(); setDetailTask(task); }}
-                             title={task.title}
-                           >{task.title}</span>
+                           {(() => {
+                             const parsed = parseTaskTitle(task.title, (task as any).task_number);
+                             return (
+                               <span
+                                 className="text-sm font-medium cursor-pointer hover:underline line-clamp-2 break-words leading-tight"
+                                 onClick={(e) => { e.stopPropagation(); setDetailTask(task); }}
+                                 title={task.title}
+                               >{parsed.name || task.title}</span>
+                             );
+                           })()}
                          </div>
                        </div>
                        

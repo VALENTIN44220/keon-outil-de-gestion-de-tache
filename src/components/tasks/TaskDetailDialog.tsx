@@ -74,6 +74,7 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { useSimulation } from '@/contexts/SimulationContext';
 import { canInitiateTaskReassignment } from '@/lib/taskReassignmentPermissions';
 import { canOfferSendForValidationInsteadOfMarkDone, normalizeValidationLevel } from '@/lib/taskValidationUi';
+import { parseTaskTitle } from '@/lib/parseTaskTitle';
 import { TaskValidationChainPanel } from '@/components/tasks/TaskValidationChainPanel';
 import {
   sendTaskForValidationFromExecutorState,
@@ -949,8 +950,25 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
                 {processName}
               </Badge>
             )}
+            {(() => {
+              const parsed = parseTaskTitle(task.title, (task as any).task_number);
+              return parsed.prestation ? (
+                <Badge
+                  variant="outline"
+                  className="gap-1 text-[10px] font-semibold border-violet-300 text-violet-700 bg-violet-50"
+                  title={`Prestation : ${parsed.prestation}`}
+                >
+                  {parsed.prestation}
+                </Badge>
+              ) : null;
+            })()}
           </div>
-          <DialogTitle className="text-xl pr-8">{task.title}</DialogTitle>
+          <DialogTitle className="text-xl pr-8">
+            {(() => {
+              const parsed = parseTaskTitle(task.title, (task as any).task_number);
+              return parsed.name || task.title;
+            })()}
+          </DialogTitle>
           {task.status !== 'done' && task.status !== 'validated' && (
             <div className="mt-3 flex justify-end gap-2 flex-wrap">
               {/* ── Boutons workflow BE — si la tâche a un be_status (= tâche
