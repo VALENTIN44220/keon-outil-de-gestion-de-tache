@@ -23,15 +23,24 @@
    Clock,
    ChevronRight,
    ChevronLeft,
+   ChevronDown,
    Filter,
    SortAsc,
    AlertTriangle,
    User,
    CheckSquare,
+   FolderOpen,
  } from 'lucide-react';
  import { TaskDetailDialog } from '@/components/tasks/TaskDetailDialog';
  import { parseTaskTitle } from '@/lib/parseTaskTitle';
  
+ export interface ParentDemandSummary {
+   id: string;
+   title: string;
+   task_number?: string | null;
+   priority?: string | null;
+ }
+
  interface BacklogSidebarProps {
    tasks: Task[];
    plannedTaskIds: string[];
@@ -45,6 +54,8 @@
    onSelectAll: () => void;
    onClearSelection: () => void;
    onBulkAssign?: (taskIds: string[], userId: string) => void;
+   /** Si fourni, les tâches sont regroupées par demande parente avec un header repliable. */
+   parentDemandsMap?: Map<string, ParentDemandSummary>;
  }
  
  type SortOption = 'priority' | 'due_date' | 'charge' | 'title';
@@ -69,11 +80,22 @@
    onTaskSelect,
    onSelectAll,
    onClearSelection,
+   parentDemandsMap,
  }: BacklogSidebarProps) {
    const [searchQuery, setSearchQuery] = useState('');
    const [sortBy, setSortBy] = useState<SortOption>('priority');
    const [filterBy, setFilterBy] = useState<FilterOption>('all');
    const [detailTask, setDetailTask] = useState<Task | null>(null);
+   const [collapsedDemands, setCollapsedDemands] = useState<Set<string>>(new Set());
+
+   const toggleDemandCollapse = useCallback((demandId: string) => {
+     setCollapsedDemands(prev => {
+       const next = new Set(prev);
+       if (next.has(demandId)) next.delete(demandId);
+       else next.add(demandId);
+       return next;
+     });
+   }, []);
  
    const availableTasks = useMemo(() => {
     return (tasks || []).filter(t =>
@@ -278,16 +300,17 @@
        <CardContent className="pt-0 flex-1 overflow-hidden">
          <ScrollArea className="h-full pr-3">
            <div className="space-y-2 pb-4">
-             {filteredTasks.map(task => {
-               const duration = getTaskDuration?.(task.id);
-               const progress = getTaskProgress?.(task.id);
-               const progressPercent = progress && progress.total > 0 
-                 ? Math.round((progress.completed / progress.total) * 100) 
-                 : 0;
-               const overdue = isOverdue(task.due_date);
-               const isSelected = selectedTasks.has(task.id);
-               
-               return (
+             {(() => {
+               // Helper de rendu d'une carte de tâche, partagé entre vue plate et vue groupée
+               const renderTaskCard = (task: Task) => {
+                 const duration = getTaskDuration?.(task.id);
+                 const progress = getTaskProgress?.(task.id);
+                 const progressPercent = progress && progress.total > 0
+                   ? Math.round((progress.completed / progress.total) * 100)
+                   : 0;
+                 const overdue = isOverdue(task.due_date);
+                 const isSelected = selectedTasks.has(task.id);
+                 return (
                  <div
                    key={task.id}
                    draggable
@@ -407,16 +430,105 @@
                      </div>
                    </div>
                  </div>
+                 );
+               };
+
+               // Si parentDemandsMap est fourni → vue groupée par demande parente
+               if (parentDemandsMap && parentDemandsMap.size > 0) {
+                 // Regroupe les tâches filtrées par parent_request_id
+                 const grouped = new Map<string | null, Task[]>();
+                 for (const t of filteredTasks) {
+                   const parentId = (t as any).parent_request_id ?? null;
+                   if (!grouped.has(parentId)) grouped.set(parentId, []);
+                   grouped.get(parentId)!.push(t);
+                 }
+
+                 // Ordre des groupes : demandes parentes connues d'abord, "Sans demande" à la fin
+                 const groupEntries = Array.from(grouped.entries()).sort((a, b) => {
+                   if (a[0] === null) return 1;
+                   if (b[0] === null) return -1;
+                   const da = parentDemandsMap.get(a[0]);
+                   const db = parentDemandsMap.get(b[0]);
+                   const na = da?.task_number ?? '';
+                   const nb = db?.task_number ?? '';
+                   return na.localeCompare(nb);
+                 });
+
+                 return (
+                   <>
+                     {groupEntries.map(([parentId, groupTasks]) => {
+                       const demand = parentId ? parentDemandsMap.get(parentId) : null;
+                       const isCollapsed = parentId ? collapsedDemands.has(parentId) : false;
+                       const demandTitle = demand ? parseTaskTitle(demand.title, demand.task_number).name || demand.title : 'Tâches sans demande parente';
+                       const demandCode = demand?.task_number ?? '—';
+
+                       return (
+                         <div key={parentId ?? '__orphan__'} className="mb-1">
+                           {/* Header de demande — cliquable pour replier */}
+                           <button
+                             onClick={() => parentId && toggleDemandCollapse(parentId)}
+                             className={cn(
+                               'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left',
+                               'bg-gradient-to-r from-violet-50 to-blue-50 hover:from-violet-100 hover:to-blue-100',
+                               'border border-violet-200/60 transition-colors',
+                               !parentId && 'from-slate-50 to-slate-50 border-slate-200',
+                             )}
+                             type="button"
+                           >
+                             {parentId && (
+                               isCollapsed
+                                 ? <ChevronRight className="h-3.5 w-3.5 text-violet-600 shrink-0" />
+                                 : <ChevronDown className="h-3.5 w-3.5 text-violet-600 shrink-0" />
+                             )}
+                             <FolderOpen className="h-3.5 w-3.5 text-violet-600 shrink-0" />
+                             {demand && (
+                               <Badge variant="outline" className="h-4 px-1 text-[9px] font-mono shrink-0 bg-white">
+                                 {demandCode}
+                               </Badge>
+                             )}
+                             <span className="text-xs font-semibold truncate flex-1" title={demand?.title ?? ''}>
+                               {demandTitle}
+                             </span>
+                             <Badge variant="secondary" className="h-4 px-1.5 text-[9px] shrink-0">
+                               {groupTasks.length}
+                             </Badge>
+                           </button>
+
+                           {/* Tâches du groupe (masquables) */}
+                           {!isCollapsed && (
+                             <div className="space-y-2 mt-1.5 pl-3 border-l-2 border-violet-200/50">
+                               {groupTasks.map(t => renderTaskCard(t))}
+                             </div>
+                           )}
+                         </div>
+                       );
+                     })}
+
+                     {filteredTasks.length === 0 && (
+                       <div className="text-center py-12">
+                         <div className="text-muted-foreground text-sm">
+                           {searchQuery ? 'Aucun résultat' : 'Toutes les tâches sont planifiées'}
+                         </div>
+                       </div>
+                     )}
+                   </>
+                 );
+               }
+
+               // Vue plate (par défaut)
+               return (
+                 <>
+                   {filteredTasks.map(t => renderTaskCard(t))}
+                   {filteredTasks.length === 0 && (
+                     <div className="text-center py-12">
+                       <div className="text-muted-foreground text-sm">
+                         {searchQuery ? 'Aucun résultat' : 'Toutes les tâches sont planifiées'}
+                       </div>
+                     </div>
+                   )}
+                 </>
                );
-             })}
-             
-             {filteredTasks.length === 0 && (
-               <div className="text-center py-12">
-                 <div className="text-muted-foreground text-sm">
-                   {searchQuery ? 'Aucun résultat' : 'Toutes les tâches sont planifiées'}
-                 </div>
-               </div>
-             )}
+             })()}
            </div>
          </ScrollArea>
        </CardContent>

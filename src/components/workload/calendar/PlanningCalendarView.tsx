@@ -21,7 +21,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Search, Calendar, Settings2, Maximize2, Minimize2, Eye, EyeOff, CheckSquare } from 'lucide-react';
 import { PlanningKPIs } from './PlanningKPIs';
-import { BacklogSidebar } from './BacklogSidebar';
+import { BacklogSidebar, ParentDemandSummary } from './BacklogSidebar';
 import { PlanningCalendarGrid } from './PlanningCalendarGrid';
 import { UnifiedTaskDrawer, DrawerItem } from '../UnifiedTaskDrawer';
 import { TaskDetailDialog } from '@/components/tasks/TaskDetailDialog';
@@ -53,6 +53,8 @@ import { toast } from 'sonner';
    searchQuery?: string;
    onSearchChange?: (query: string) => void;
   onViewModeChange?: (mode: 'week' | 'month' | 'quarter' | 'year', anchorDate?: Date) => void;
+  /** Map des demandes parentes — déclenche le regroupement dans le BacklogSidebar */
+  parentDemandsMap?: Map<string, ParentDemandSummary>;
  }
  
 export function PlanningCalendarView({
@@ -79,6 +81,7 @@ export function PlanningCalendarView({
   searchQuery = '',
   onSearchChange,
   onViewModeChange,
+  parentDemandsMap,
 }: PlanningCalendarViewProps) {
   const navigate = useNavigate();
   
@@ -329,6 +332,7 @@ export function PlanningCalendarView({
              onTaskSelect={handleTaskSelect}
              onSelectAll={handleSelectAll}
              onClearSelection={handleClearSelection}
+             parentDemandsMap={parentDemandsMap}
            />
  
            {/* Calendar Grid */}

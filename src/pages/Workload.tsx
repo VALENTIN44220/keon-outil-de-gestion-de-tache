@@ -6,6 +6,7 @@ import { useWorkloadPreferences } from '@/hooks/useWorkloadPreferences';
 import { useWorkloadFilters } from '@/hooks/useWorkloadFilters';
 import { WorkloadFilters } from '@/components/workload/WorkloadFilters';
 import { PlanningKPIs } from '@/components/workload/calendar/PlanningKPIs';
+import type { ParentDemandSummary } from '@/components/workload/calendar/BacklogSidebar';
  import { PlanningCalendarView } from '@/components/workload/calendar';
  import { useOutlookCalendar } from '@/hooks/useOutlookCalendar';
 import { WorkloadSummaryView } from '@/components/workload/WorkloadSummaryView';
@@ -47,6 +48,7 @@ export default function Workload() {
   const [endDate, setEndDate] = useState(() => endOfMonth(new Date()));
   const [selectedCalendarUserId, setSelectedCalendarUserId] = useState<string | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [parentDemandsMap, setParentDemandsMap] = useState<Map<string, ParentDemandSummary>>(new Map());
   const [useAdvancedFilters, setUseAdvancedFilters] = useState(false);
  
    // Fetch Outlook calendar events for team members
@@ -134,11 +136,23 @@ export default function Workload() {
         //    une vue mixte.
         const { data: beDemands } = await supabase
           .from('tasks')
-          .select('id')
+          .select('id, title, task_number, priority')
           .eq('process_template_id', BE_PROCESS_ID)
           .eq('type', 'request');
 
-        const beDemandIds = (beDemands ?? []).map((d: any) => d.id);
+        const beDemandIds = ((beDemands ?? []) as any[]).map((d) => d.id);
+
+        // Construit la map des demandes parentes pour le regroupement du backlog
+        const demandsMap = new Map<string, ParentDemandSummary>();
+        for (const d of (beDemands ?? []) as any[]) {
+          demandsMap.set(d.id, {
+            id: d.id,
+            title: d.title ?? '',
+            task_number: d.task_number ?? null,
+            priority: d.priority ?? null,
+          });
+        }
+        setParentDemandsMap(demandsMap);
 
         let beTasks: any[] = [];
         if (beDemandIds.length > 0) {
@@ -154,6 +168,7 @@ export default function Workload() {
       }
 
       // ── Vue manager standard : tâches affectées aux membres de l'équipe ──
+      setParentDemandsMap(new Map());
       const teamIds = teamMembers.map(m => m.id);
       const { data: assignedData } = await supabase
         .from('tasks')
@@ -455,6 +470,7 @@ export default function Workload() {
                       startDate={startDate}
                       endDate={endDate}
                       tasks={tasks}
+                      parentDemandsMap={parentDemandsMap}
                       holidays={holidays}
                       leaves={leaves}
                       outlookEvents={outlookEvents}
