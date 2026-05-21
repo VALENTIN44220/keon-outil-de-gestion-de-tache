@@ -6,9 +6,9 @@ import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Building2, 
-  Calendar, 
+import {
+  Building2,
+  Calendar,
   User,
   ChevronRight,
   CheckCircle2,
@@ -18,7 +18,9 @@ import {
   ListTodo,
   UserCheck,
   Loader2,
-  History
+  History,
+  Lock,
+  Play,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -135,78 +137,123 @@ export function SubProcessTab({
                 <ListTodo className="h-8 w-8 mx-auto mb-2 opacity-50" />
                 <p>Aucune tâche dans ce sous-processus</p>
               </div>
-            ) : (
-              <div className="space-y-2 pr-4">
-                {group.tasks.map((task) => {
-                  const StatusIcon = getStatusIcon(task.status);
-                  const isCompleted = task.status === 'done' || task.status === 'validated';
-                  const taskProgress = checklistProgress[task.id];
-                  
-                  return (
-                    <div
-                      key={task.id}
-                      onClick={() => onOpenTask(task)}
-                      className={cn(
-                        "flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors hover:bg-accent/50",
-                        isCompleted
-                          ? 'bg-success/5 border-success/30'
-                          : 'bg-card border-border'
-                      )}
-                    >
-                      <div className="flex items-center gap-3 flex-1">
-                        <StatusIcon className={cn('h-5 w-5', statusConfig[task.status]?.color)} />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className={cn(
-                              "font-medium text-sm truncate",
-                              isCompleted && 'line-through text-muted-foreground'
-                            )}>
-                              {task.title}
-                            </p>
-                            {taskProgress && taskProgress.total > 0 && (
-                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
-                                {taskProgress.completed}/{taskProgress.total}
+            ) : (() => {
+              // Détermine la première étape active = première tâche non terminée.
+              // Les tâches suivantes sont verrouillées (séquence implicite par l'ordre).
+              const firstActiveIdx = group.tasks.findIndex(
+                t => t.status !== 'done' && t.status !== 'validated'
+              );
+
+              return (
+                <div className="relative pl-3 pr-4 space-y-0">
+                  {/* Ligne verticale de connection entre étapes */}
+                  <div className="absolute left-[22px] top-2 bottom-2 w-0.5 bg-gradient-to-b from-emerald-300 via-violet-300 to-slate-200" />
+
+                  {group.tasks.map((task, idx) => {
+                    const isCompleted = task.status === 'done' || task.status === 'validated';
+                    const isActive = idx === firstActiveIdx;
+                    const isLocked = !isCompleted && !isActive;
+                    const taskProgress = checklistProgress[task.id];
+                    const stepNum = idx + 1;
+
+                    return (
+                      <div key={task.id} className="relative py-1.5">
+                        {/* Numéro d'étape + icône d'état */}
+                        <div className={cn(
+                          "absolute left-0 top-3.5 z-10 w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold border-2 shrink-0",
+                          isCompleted && "bg-emerald-500 border-emerald-600 text-white",
+                          isActive && "bg-violet-500 border-violet-600 text-white ring-4 ring-violet-200 animate-pulse",
+                          isLocked && "bg-slate-100 border-slate-300 text-slate-400"
+                        )}>
+                          {isCompleted ? <CheckCircle2 className="h-4 w-4" />
+                            : isLocked ? <Lock className="h-3.5 w-3.5" />
+                            : stepNum}
+                        </div>
+
+                        {/* Carte de la tâche */}
+                        <div
+                          onClick={() => isLocked ? undefined : onOpenTask(task)}
+                          className={cn(
+                            "ml-12 flex items-center justify-between p-3 rounded-lg border-2 transition-all",
+                            isLocked ? "cursor-not-allowed opacity-60 bg-slate-50 border-slate-200"
+                              : "cursor-pointer hover:shadow-md",
+                            isCompleted && "bg-emerald-50 border-emerald-200",
+                            isActive && "bg-violet-50 border-violet-300 shadow-md"
+                          )}
+                        >
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                {isActive && (
+                                  <Badge className="bg-violet-600 text-white text-[10px] px-1.5 py-0 shrink-0 gap-1">
+                                    <Play className="h-2.5 w-2.5" />
+                                    À faire maintenant
+                                  </Badge>
+                                )}
+                                {isLocked && (
+                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0 gap-1 text-slate-500 border-slate-300">
+                                    <Lock className="h-2.5 w-2.5" />
+                                    En attente
+                                  </Badge>
+                                )}
+                                <p className={cn(
+                                  "font-medium text-sm truncate",
+                                  isCompleted && 'line-through text-muted-foreground',
+                                  isLocked && 'text-slate-500'
+                                )}>
+                                  {task.title}
+                                </p>
+                                {taskProgress && taskProgress.total > 0 && (
+                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 shrink-0">
+                                    {taskProgress.completed}/{taskProgress.total}
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                                {task.assignee_id ? (
+                                  <span className="flex items-center gap-1">
+                                    <User className="h-3 w-3" />
+                                    {profiles.get(task.assignee_id)}
+                                  </span>
+                                ) : (
+                                  <span className={cn(
+                                    "flex items-center gap-1",
+                                    isActive ? "text-warning font-medium" : "text-muted-foreground"
+                                  )}>
+                                    <User className="h-3 w-3" />
+                                    {isLocked ? 'Sera assigné en temps voulu' : 'Non assigné'}
+                                  </span>
+                                )}
+                                {task.due_date && !isLocked && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="flex items-center gap-1">
+                                      <Calendar className="h-3 w-3" />
+                                      {format(new Date(task.due_date), 'dd MMM', { locale: fr })}
+                                    </span>
+                                  </>
+                                )}
+                              </div>
+                              {taskProgress && taskProgress.total > 0 && (
+                                <Progress value={taskProgress.progress} className="h-1 mt-1.5" />
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {!isLocked && (
+                              <Badge variant="outline" className={cn("text-xs", statusConfig[task.status]?.color)}>
+                                {statusConfig[task.status]?.label}
                               </Badge>
                             )}
+                            {!isLocked && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
                           </div>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            {task.assignee_id ? (
-                              <span className="flex items-center gap-1">
-                                <User className="h-3 w-3" />
-                                {profiles.get(task.assignee_id)}
-                              </span>
-                            ) : (
-                              <span className="text-warning flex items-center gap-1">
-                                <User className="h-3 w-3" />
-                                Non assigné
-                              </span>
-                            )}
-                            {task.due_date && (
-                              <>
-                                <span>•</span>
-                                <span className="flex items-center gap-1">
-                                  <Calendar className="h-3 w-3" />
-                                  {format(new Date(task.due_date), 'dd MMM', { locale: fr })}
-                                </span>
-                              </>
-                            )}
-                          </div>
-                          {taskProgress && taskProgress.total > 0 && (
-                            <Progress value={taskProgress.progress} className="h-1 mt-1.5" />
-                          )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className={cn("text-xs", statusConfig[task.status]?.color)}>
-                          {statusConfig[task.status]?.label}
-                        </Badge>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </ScrollArea>
         </TabsContent>
 
