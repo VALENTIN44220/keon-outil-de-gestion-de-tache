@@ -118,27 +118,20 @@ export default function Workload() {
     const fetchTasks = async () => {
       if (!profile?.id) return;
 
-      // 1. Tâches déjà affectées à des membres de l'équipe (visibilité standard)
-      const teamIds = teamMembers.map(m => m.id);
-      const { data: assignedData } = await supabase
-        .from('tasks')
-        .select('*')
-        .in('assignee_id', teamIds);
-
-      // 2. Visibilité élargie pour les responsables BE :
-      //    si le profil connecté a un job_title type "Responsable BE" /
-      //    "Responsable Réglementaire", on lui montre TOUTES les sous-tâches
-      //    rattachées à une demande BE — y compris non affectées — afin qu'il
-      //    puisse les planifier par drag-drop. Le drop déclenche déjà
-      //    l'auto-affectation au collaborateur cible.
+      // Détection responsable BE par job_title (case-insensitive)
       const jobTitle = String((profile as any)?.job_title ?? '').toLowerCase();
       const isBEManager = BE_MANAGER_JOB_TITLE_PATTERNS.some(p =>
         jobTitle.includes(p),
       );
 
-      let beScopedData: any[] = [];
       if (isBEManager) {
-        // a) IDs des demandes BE (parent_request)
+        // ── Vue Responsable BE : SCOPE EXCLUSIVEMENT BE ──
+        //    On affiche uniquement les sous-tâches rattachées à une demande
+        //    dont process_template_id = BE_PROCESS_ID, indépendamment de
+        //    l'assignation. Les tâches personnelles non-BE du responsable
+        //    (IT, DIVALTO, PERSO, etc.) sont volontairement EXCLUES — la
+        //    page Plan de charge équipe est un outil de pilotage BE, pas
+        //    une vue mixte.
         const { data: beDemands } = await supabase
           .from('tasks')
           .select('id')
@@ -147,25 +140,27 @@ export default function Workload() {
 
         const beDemandIds = (beDemands ?? []).map((d: any) => d.id);
 
-        // b) Toutes les sous-tâches rattachées à ces demandes
+        let beTasks: any[] = [];
         if (beDemandIds.length > 0) {
           const { data } = await supabase
             .from('tasks')
             .select('*')
             .in('parent_request_id', beDemandIds);
-          beScopedData = data ?? [];
+          beTasks = data ?? [];
         }
+
+        setTasks(beTasks as Task[]);
+        return;
       }
 
-      // Merge + déduplication par id
-      const seen = new Set<string>();
-      const merged = [...(assignedData ?? []), ...beScopedData].filter((t: any) => {
-        if (seen.has(t.id)) return false;
-        seen.add(t.id);
-        return true;
-      });
+      // ── Vue manager standard : tâches affectées aux membres de l'équipe ──
+      const teamIds = teamMembers.map(m => m.id);
+      const { data: assignedData } = await supabase
+        .from('tasks')
+        .select('*')
+        .in('assignee_id', teamIds);
 
-      setTasks(merged as Task[]);
+      setTasks((assignedData ?? []) as Task[]);
     };
 
     if (teamMembers.length > 0) {
