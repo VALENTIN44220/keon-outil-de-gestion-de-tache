@@ -3,8 +3,7 @@ import { useBEProjectHubCode } from '@/hooks/useBEProjectHubCode';
 import { useQueryClient } from '@tanstack/react-query';
 import { BEProjectHubLayout } from '@/components/be/BEProjectHubLayout';
 import { BEMilestoneTimeline } from '@/components/be/BEMilestoneTimeline';
-import { Flag } from 'lucide-react';
-import { 
+import {
   useBEProjectByCode, 
   useBEProjectTasks, 
   useBEProjectStats,
