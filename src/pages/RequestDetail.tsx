@@ -271,9 +271,9 @@ export default function RequestDetail() {
   return (
     <div className="flex h-screen bg-gradient-to-br from-slate-50 via-white to-slate-50">
       <Sidebar activeView={activeView} onViewChange={setActiveView} />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <main className="flex-1 overflow-y-auto">
-          <div className="max-w-5xl mx-auto p-4 sm:p-8 space-y-6 pb-12">
+      <div className="flex-1 flex overflow-hidden">
+        <main className="flex-1 overflow-y-auto min-w-0">
+          <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-4 pb-12">
 
             {/* ── Breadcrumb ──────────────────────────────────── */}
             <button
@@ -297,7 +297,7 @@ export default function RequestDetail() {
                 task.priority === 'low' && 'bg-slate-300',
               )} />
 
-              <div className="p-6 sm:p-8 space-y-5">
+              <div className="p-4 sm:p-5 space-y-3">
                 {/* Numéro + chips */}
                 <div className="flex items-center gap-2 flex-wrap">
                   {task.request_number && (
@@ -338,7 +338,7 @@ export default function RequestDetail() {
                 </div>
 
                 {/* Titre */}
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight leading-tight">
+                <h1 className="text-lg sm:text-xl font-bold tracking-tight leading-tight">
                   {(task.title ?? '').replace(/^([TD]-[A-Z][A-Z0-9-]*\d+\s*—\s*)+/, '')}
                 </h1>
 
@@ -365,31 +365,31 @@ export default function RequestDetail() {
                   )}
                 </div>
 
-                {/* Progress bar gros visuel */}
-                <div className="pt-2">
-                  <div className="flex items-baseline justify-between mb-2">
-                    <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                {/* Progress bar compacte */}
+                <div className="pt-1">
+                  <div className="flex items-baseline justify-between mb-1.5">
+                    <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                       Avancement
                     </span>
-                    <span className="text-3xl font-bold tracking-tight tabular-nums bg-gradient-to-r from-violet-600 to-blue-600 bg-clip-text text-transparent">
+                    <span className="text-xl font-bold tracking-tight tabular-nums bg-gradient-to-r from-violet-600 to-blue-600 bg-clip-text text-transparent">
                       {globalProgress}%
                     </span>
                   </div>
-                  <div className="h-2.5 bg-muted rounded-full overflow-hidden">
+                  <div className="h-2 bg-muted rounded-full overflow-hidden">
                     <div
                       className="h-full bg-gradient-to-r from-violet-500 to-blue-500 transition-all duration-500"
                       style={{ width: `${globalProgress}%` }}
                     />
                   </div>
-                  <div className="mt-2 flex items-center justify-between text-xs">
+                  <div className="mt-1.5 flex items-center justify-between text-[11px]">
                     <span className="text-muted-foreground">
                       <span className="font-semibold text-foreground">{totalDone}</span>
                       {' / '}{childTasks.length} étape{childTasks.length > 1 ? 's' : ''} terminée{totalDone > 1 ? 's' : ''}
                     </span>
                     {currentStep && (
-                      <span className="text-muted-foreground flex items-center gap-1">
-                        <Hourglass className="h-3 w-3" />
-                        Étape en cours : <span className="font-medium text-foreground">{stripPrefix(currentStep.title)}</span>
+                      <span className="text-muted-foreground flex items-center gap-1 truncate ml-2">
+                        <Hourglass className="h-3 w-3 shrink-0" />
+                        En cours : <span className="font-medium text-foreground truncate">{stripPrefix(currentStep.title)}</span>
                       </span>
                     )}
                     {!currentStep && globalProgress === 100 && (
@@ -418,8 +418,8 @@ export default function RequestDetail() {
                   )}
                 </TabsTrigger>
                 <TabsTrigger value="synthesis" className="gap-2 text-sm px-4 h-8 data-[state=active]:shadow-sm">
-                  <MessageSquare className="h-4 w-4" />
-                  <span>Synthèse & Discussion</span>
+                  <FileText className="h-4 w-4" />
+                  <span>Synthèse</span>
                 </TabsTrigger>
               </TabsList>
 
@@ -549,17 +549,6 @@ export default function RequestDetail() {
                   </CardContent>
                 </Card>
 
-                <Card>
-                  <CardHeader className="pb-3 border-b bg-muted/20">
-                    <CardTitle className="text-base font-semibold flex items-center gap-2">
-                      <MessageSquare className="h-4 w-4 text-muted-foreground" />
-                      Discussion
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-4">
-                    <TaskCommentsSection taskId={task.id} className="min-h-[320px] max-h-[60vh]" />
-                  </CardContent>
-                </Card>
               </TabsContent>
             </Tabs>
 
@@ -579,6 +568,19 @@ export default function RequestDetail() {
             )}
           </div>
         </main>
+
+        {/* ─────────────────────────────────────────────────── */}
+        {/* PANNEAU CONVERSATION (DROITE) — toujours visible    */}
+        {/* ─────────────────────────────────────────────────── */}
+        <aside className="hidden lg:flex flex-col w-[380px] xl:w-[420px] border-l bg-white shrink-0">
+          <div className="px-4 h-12 flex items-center gap-2 border-b shrink-0 bg-gradient-to-r from-violet-50 to-blue-50">
+            <MessageSquare className="h-4 w-4 text-violet-600" />
+            <h2 className="text-sm font-semibold">Conversation de la demande</h2>
+          </div>
+          <div className="flex-1 overflow-hidden p-3 min-h-0">
+            <TaskCommentsSection taskId={task.id} className="h-full" />
+          </div>
+        </aside>
       </div>
     </div>
   );
