@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/table';
 import {
   Plus, Search, RefreshCw, Loader2, BarChart3, Layers, ChevronRight, ChevronDown,
+  TableProperties, Columns, Calendar as CalendarIcon,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -303,15 +304,14 @@ export function ModuleDispatchView<
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header title={config.title} searchQuery="" onSearchChange={() => {}} />
         <main className="flex-1 overflow-y-auto p-3 sm:p-6">
-          <div className="max-w-7xl mx-auto space-y-4">
-            {/* ── Titre compact + actions ── */}
+          <div className="max-w-7xl mx-auto space-y-3">
+            {/* ── Row 0 : Titre + actions ── */}
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className={cn('p-1.5 rounded-lg shrink-0', config.iconBgClass)}>
                   <Icon className={cn('h-4 w-4', config.iconColorClass)} />
                 </div>
                 <h1 className="text-xl font-display font-bold leading-none whitespace-nowrap">{config.title}</h1>
-                <span className="text-xs text-muted-foreground truncate">{config.subtitle}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 {config.HeaderExtras && <config.HeaderExtras isAdmin={isAdmin} refetch={refetch} />}
@@ -325,72 +325,59 @@ export function ModuleDispatchView<
             </div>
 
             <Tabs defaultValue="demandes" className="w-full">
-              {/* ── Tabs + KPI strip ── */}
-              <div className="flex items-center justify-between gap-4 border-b flex-wrap">
-                <TabsList className="h-9 p-0.5 bg-muted rounded-lg">
-                  <TabsTrigger value="demandes" className="h-7 px-3 gap-1.5 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md">
-                    <Layers className="h-3.5 w-3.5" /> Demandes
-                  </TabsTrigger>
-                  <TabsTrigger value="analyse" className="h-7 px-3 gap-1.5 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md">
-                    <BarChart3 className="h-3.5 w-3.5" /> Analyse
-                  </TabsTrigger>
-                </TabsList>
-
-                {/* KPI strip inline */}
-                <div className="flex items-center divide-x divide-border py-1.5">
-                  {kpis.map((k, i) => (
-                    <div key={i} className="flex items-center gap-2 px-3 first:pl-0">
-                      <div className={cn('w-6 h-6 rounded-md flex items-center justify-center shrink-0', k.color)}>
-                        <k.icon className="h-3.5 w-3.5" />
-                      </div>
-                      <div className="flex items-baseline gap-1.5 leading-none">
-                        <span className="font-semibold text-sm tabular-nums">{k.value}</span>
-                        <span className="text-[11px] text-muted-foreground whitespace-nowrap">{k.label}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              {/* ── Row 1 : Tabs ── */}
+              <TabsList className="h-9 p-0.5 bg-muted rounded-lg">
+                <TabsTrigger value="demandes" className="h-7 px-3 gap-1.5 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md">
+                  <Layers className="h-3.5 w-3.5" /> Demandes
+                </TabsTrigger>
+                <TabsTrigger value="analyse" className="h-7 px-3 gap-1.5 text-xs data-[state=active]:bg-background data-[state=active]:shadow-sm rounded-md">
+                  <BarChart3 className="h-3.5 w-3.5" /> Analyse
+                </TabsTrigger>
+              </TabsList>
 
               <TabsContent value="demandes" className="space-y-3 mt-3">
-                {/* ── Barre de contrôles unifiée ── */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <ModuleQuickFilters
-                    viewMode={viewMode}
-                    onViewModeChange={setViewMode}
-                    hideTerminated={hideTerminated}
-                    onHideTerminatedChange={setHideTerminated}
-                    onlyMine={onlyMine}
-                    onOnlyMineChange={setOnlyMine}
-                  />
-
-                  <div className="flex-1" />
-
-                  <div className="relative">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                    <Input
-                      placeholder="Rechercher..."
-                      value={search}
-                      onChange={e => setSearch(e.target.value)}
-                      className="pl-8 h-8 w-48 text-xs"
-                    />
+                {/* ── Row 2 : Vue + Filtres ── */}
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setViewMode('table')}
+                      className={cn(
+                        'h-7 px-2.5 gap-1.5 text-xs rounded-md',
+                        viewMode === 'table' ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground'
+                      )}
+                    >
+                      <TableProperties className="h-3.5 w-3.5" /> Tableau
+                    </Button>
+                    {enableKanban && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setViewMode('kanban')}
+                        className={cn(
+                          'h-7 px-2.5 gap-1.5 text-xs rounded-md',
+                          viewMode === 'kanban' ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground'
+                        )}
+                      >
+                        <Columns className="h-3.5 w-3.5" /> Kanban
+                      </Button>
+                    )}
+                    {enableCalendar && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setViewMode('calendar')}
+                        className={cn(
+                          'h-7 px-2.5 gap-1.5 text-xs rounded-md',
+                          viewMode === 'calendar' ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground'
+                        )}
+                      >
+                        <CalendarIcon className="h-3.5 w-3.5" /> Calendrier
+                      </Button>
+                    )}
                   </div>
-                  <Select value={filterStatus} onValueChange={setFilterStatus}>
-                    <SelectTrigger className="h-8 w-36 text-xs">
-                      <SelectValue placeholder="Statut" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Tous statuts</SelectItem>
-                      {statusOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  {config.ExtraFilters && (
-                    <config.ExtraFilters
-                      value={extraFilter}
-                      onChange={setExtraFilter}
-                      requests={requests as any[]}
-                    />
-                  )}
+
                   <FilterDrawerButton
                     filters={crossFilters}
                     onFiltersChange={setCrossFilters}
