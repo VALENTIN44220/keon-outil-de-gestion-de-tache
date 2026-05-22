@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   format,
   startOfMonth,
@@ -35,18 +35,36 @@ import { useUserLeaves } from '@/hooks/useUserLeaves';
 import { TaskDetailDialog } from '@/components/tasks/TaskDetailDialog';
 import { Task } from '@/types/task';
 import { getStatusFilterOptions, matchesStatusFilter, getStatusCalendarColor, getStatusShortLabel } from '@/services/taskStatusService';
+import { useAuth } from '@/contexts/AuthContext';
+import { useSimulation } from '@/contexts/SimulationContext';
+import { supabase } from '@/integrations/supabase/client';
+import { parseTaskTitle } from '@/lib/parseTaskTitle';
 
 interface CalendarEvent {
   id: string;
   title: string;
   start: Date;
   end: Date;
-  type: 'outlook' | 'task' | 'leave';
+  type: 'outlook' | 'task' | 'leave' | 'planned';
   color: string;
   location?: string;
   isAllDay?: boolean;
   source?: string;
   taskData?: Task;
+}
+
+interface PlannedSlot {
+  id: string;
+  task_id: string;
+  date: string;
+  half_day: 'morning' | 'afternoon';
+  task?: {
+    id: string;
+    title: string;
+    status: string;
+    type: string;
+    task_number?: string | null;
+  } | null;
 }
 
 type ViewMode = 'week' | 'month';
@@ -80,6 +98,31 @@ export function UnifiedCalendarView() {
   const { connection, isSyncing, syncCalendar } = useMicrosoftConnection();
   const { allTasks, isLoading: isLoadingTasks, updateTaskStatus, deleteTask, refetch: refetchTasks } = useTasks();
   const { leaves, isLoading: isLoadingLeaves } = useUserLeaves();
+
+  // Profil ACTIF (respecte la simulation) — pour ne montrer QUE le planning du
+  // user incarné, pas celui de l'admin réel.
+  const { profile: authProfile } = useAuth();
+  const { isSimulating, simulatedProfile } = useSimulation();
+  const activeProfile = isSimulating && simulatedProfile ? simulatedProfile : authProfile;
+  const activeProfileId = activeProfile?.id;
+
+  // Créneaux planifiés (workload_slots) de l'utilisateur actif
+  const [plannedSlots, setPlannedSlots] = useState<PlannedSlot[]>([]);
+  useEffect(() => {
+    if (!activeProfileId) { setPlannedSlots([]); return; }
+    let cancelled = false;
+    const fetchSlots = async () => {
+      const { data } = await supabase
+        .from('workload_slots')
+        .select('id, task_id, date, half_day, task:tasks(id, title, status, type, task_number)')
+        .eq('user_id', activeProfileId)
+        .gte('date', format(startDate, 'yyyy-MM-dd'))
+        .lte('date', format(endDate, 'yyyy-MM-dd'));
+      if (!cancelled) setPlannedSlots((data ?? []) as any as PlannedSlot[]);
+    };
+    fetchSlots();
+    return () => { cancelled = true; };
+  }, [activeProfileId, startDate, endDate]);
 
   // Filter tasks by status
   const filteredTasks = useMemo(() => {
@@ -126,9 +169,53 @@ export function UnifiedCalendarView() {
     return events;
   }, [leaves]);
 
+  // Événements de planification (workload_slots) : une entrée par tâche+jour.
+  // En simulation on n'affiche QUE le planning du user incarné (déjà filtré
+  // par activeProfileId au fetch).
+  const plannedEvents = useMemo<CalendarEvent[]>(() => {
+    const taskById = new Map(allTasks.map(t => [t.id, t]));
+    const seen = new Set<string>(); // dédup task+jour (matin+aprem → 1 event)
+    const events: CalendarEvent[] = [];
+
+    for (const slot of plannedSlots) {
+      const key = `${slot.task_id}-${slot.date}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const fullTask = taskById.get(slot.task_id);
+      const embedded = slot.task;
+      const rawTitle = fullTask?.title ?? embedded?.title ?? 'Tâche planifiée';
+      const status = fullTask?.status ?? embedded?.status ?? 'todo';
+      const parsed = parseTaskTitle(rawTitle, fullTask ? (fullTask as any).task_number : embedded?.task_number);
+
+      // Filtre statut cohérent avec le reste du calendrier
+      if (statusFilter !== 'all' && !matchesStatusFilter(status, statusFilter)) continue;
+
+      let day: Date;
+      try { day = parseISO(slot.date); } catch { continue; }
+
+      events.push({
+        id: `planned-${slot.task_id}-${slot.date}`,
+        title: parsed.name || rawTitle,
+        start: day,
+        end: day,
+        type: 'planned',
+        color: 'bg-teal-500',
+        isAllDay: true,
+        source: 'Planifié',
+        taskData: fullTask,
+      });
+    }
+    return events;
+  }, [plannedSlots, allTasks, statusFilter]);
+
+  // En simulation, on masque l'Outlook (celui-ci provient de la session réelle
+  // de l'admin — afficher son calendrier sous l'identité incarnée serait faux).
+  const effectiveOutlookEvents = isSimulating ? [] : outlookEvents;
+
   // Memoize calendar events to prevent flickering
   const calendarEvents = useMemo<CalendarEvent[]>(() => [
-    ...outlookEvents.map(event => ({
+    ...effectiveOutlookEvents.map(event => ({
       id: `outlook-${event.id}`,
       title: event.subject,
       start: new Date(event.start_time),
@@ -151,8 +238,9 @@ export function UnifiedCalendarView() {
         source: getStatusShortLabel(task.status),
         taskData: task,
       })),
+    ...plannedEvents,
     ...leaveEvents,
-  ], [outlookEvents, filteredTasks, leaveEvents]);
+  ], [effectiveOutlookEvents, filteredTasks, plannedEvents, leaveEvents]);
 
   const getEventsForDate = useCallback((date: Date): CalendarEvent[] => {
     return calendarEvents.filter(event => isSameDay(event.start, date));
@@ -482,6 +570,10 @@ export function UnifiedCalendarView() {
                 <div className="flex items-center gap-1">
                   <div className="w-3 h-3 rounded bg-purple-500" />
                   <span>À corriger</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded bg-teal-500" />
+                  <span>Planifié</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <div className="w-3 h-3 rounded bg-amber-500" />
