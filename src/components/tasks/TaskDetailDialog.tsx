@@ -1076,8 +1076,11 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
                       </Popover>
                     )}
 
-                    {/* affectee → en_cours : l'assignée démarre */}
-                    {beStatus === 'affectee' && isAssignee && (
+                    {/* affectee → en_cours : l'assignée démarre.
+                        Tolérance : une tâche restée "soumise" mais déjà assignée
+                        (affectation via plan de charge sur ancien code, etc.)
+                        doit aussi permettre à l'assigné de démarrer. */}
+                    {((beStatus === 'affectee') || (beStatus === 'soumise' && !!task.assignee_id)) && isAssignee && (
                       <Button
                         onClick={() => void beAction('en_cours')}
                         disabled={isBeUpdating}

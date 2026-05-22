@@ -38,12 +38,12 @@ export function useWorkloadPlanning({
         await Promise.all([
           supabase
             .from('profiles')
-            .select('department_id')
+            .select('department_id, display_name')
             .eq('id', assigneeProfileId)
             .maybeSingle(),
           supabase
             .from('tasks')
-            .select('id, status, target_department_id, assignee_id, reassignment_stakeholder_id')
+            .select('id, title, status, be_status, target_department_id, assignee_id, requester_id, parent_request_id, reassignment_stakeholder_id')
             .eq('id', taskId)
             .maybeSingle(),
         ]);
@@ -52,6 +52,7 @@ export function useWorkloadPlanning({
       if (taskError) throw taskError;
       if (!taskRow) throw new Error('Tâche introuvable');
 
+      const previousAssigneeId = (taskRow as any).assignee_id ?? null;
       const update: Record<string, any> = {
         assignee_id: assigneeProfileId,
       };
@@ -64,6 +65,15 @@ export function useWorkloadPlanning({
       // If it was “À affecter”, move it to “À faire” once assigned
       if (taskRow.status === 'to_assign') {
         update.status = 'todo';
+      }
+
+      // Workflow BE : une tâche "soumise" devient "affectée" dès qu'un
+      // exécutant lui est attribué — comme dans /be/dispatch. Sans ça, la
+      // tâche reste bloquée et l'assigné ne voit aucune action workflow.
+      const beStatus = (taskRow as any).be_status as string | null | undefined;
+      const becomesAffectee = beStatus === 'soumise';
+      if (becomesAffectee) {
+        update.be_status = 'affectee';
       }
 
       Object.assign(
@@ -82,6 +92,47 @@ export function useWorkloadPlanning({
         .eq('id', taskId);
 
       if (updateError) throw updateError;
+
+      // ── Notifications (mêmes règles que /be/dispatch) ──
+      // Uniquement si l'affectation change réellement d'exécutant.
+      if (assigneeProfileId !== previousAssigneeId) {
+        const taskTitle = (taskRow as any).title ?? 'Tâche';
+        const requesterId = (taskRow as any).requester_id ?? null;
+        const assigneeName = (assigneeProfile as any)?.display_name ?? '';
+        const notifications: any[] = [];
+
+        // Notifier l'assigné (si ce n'est pas soi-même)
+        if (assigneeProfileId !== profile?.id) {
+          notifications.push({
+            user_id: assigneeProfileId,
+            title: `Affecté : ${taskTitle}`,
+            message: 'Vous avez été affecté(e) à une tâche depuis le plan de charge.',
+            type: 'be_affectee',
+            related_entity_type: 'task',
+            related_entity_id: taskId,
+          });
+        }
+
+        // Notifier le demandeur (si différent de l'opérateur et de l'assigné)
+        if (becomesAffectee && requesterId && requesterId !== profile?.id && requesterId !== assigneeProfileId) {
+          notifications.push({
+            user_id: requesterId,
+            title: 'Demande prise en charge',
+            message: `Votre demande a été affectée${assigneeName ? ` à ${assigneeName}` : ''}.`,
+            type: 'be_affectee_requester',
+            related_entity_type: 'task',
+            related_entity_id: taskId,
+          });
+        }
+
+        if (notifications.length > 0) {
+          try {
+            await supabase.from('notifications').insert(notifications);
+          } catch (e) {
+            console.warn('[assignTaskToUserFromPlanning] notification insert failed', e);
+          }
+        }
+      }
     },
     [profile?.id]
   );
