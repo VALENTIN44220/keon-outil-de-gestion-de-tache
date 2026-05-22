@@ -4,7 +4,7 @@ import {
   Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText,
   ArrowLeftRight, Calendar, MessageCircle, Building2, ClipboardList,
   Lightbulb, Monitor, Leaf, Euro, Map as MapIcon, Users, Wallet,
-  Package, Truck, Plus, Minus, ChevronsDownUp, ChevronsUpDown, ShieldAlert, Clock,
+  Package, Truck, Plus, Minus, ChevronsDownUp, ChevronsUpDown, ShieldAlert,
 } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
@@ -71,7 +71,7 @@ const menuGroups: MenuGroup[] = [
     label: 'SPV',
     items: [
       { id: 'spv', label: 'Projets SPV', icon: Leaf, path: '/spv', permissionKey: 'can_access_spv' },
-      { id: 'spv-budget', label: 'Suivi des temps', icon: Clock, path: '/spv/budget', permissionKey: 'can_access_spv' },
+      { id: 'spv-budget', label: 'Budget & temps', icon: Wallet, path: '/spv/budget', permissionKey: 'can_access_spv' },
     ],
   },
   {
