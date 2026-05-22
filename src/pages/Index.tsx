@@ -478,12 +478,31 @@ const Index = () => {
             Aucune tâche ici pour l’instant : les tâches que vous avez réaffectées avec suivi apparaissent dans « Tâches de l’équipe » (même si le nouvel assigné n’est plus dans votre filtre équipe), pour suivre l’avancement et les échanges.
           </p>
         )}
-        <FilterDrawerButton
-          filters={crossFilters}
-          onFiltersChange={setCrossFilters}
-          contextId="tasks"
-          className="mb-2"
-        />
+        <div className="flex items-center gap-2 mb-2 flex-wrap">
+          <FilterDrawerButton
+            filters={crossFilters}
+            onFiltersChange={setCrossFilters}
+            contextId="tasks"
+          />
+          {/* Regrouper par (visible directement, pas enfoui dans un panneau) */}
+          <Select
+            value={advancedFilters.groupBy}
+            onValueChange={(v) => setAdvancedFilters(prev => ({ ...prev, groupBy: v }))}
+          >
+            <SelectTrigger className="h-9 w-auto gap-2 text-sm">
+              <Layers className="h-3.5 w-3.5 text-keon-700" />
+              <SelectValue placeholder="Regrouper" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Aucun regroupement</SelectItem>
+              <SelectItem value="request">Par demande</SelectItem>
+              <SelectItem value="assignee">Par collaborateur</SelectItem>
+              <SelectItem value="requester">Par demandeur</SelectItem>
+              <SelectItem value="category">Par catégorie</SelectItem>
+              <SelectItem value="subcategory">Par sous-catégorie</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         <div className="mb-4">
           <button
             onClick={() => setShowFullStats(!showFullStats)}
