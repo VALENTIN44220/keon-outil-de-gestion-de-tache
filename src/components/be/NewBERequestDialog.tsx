@@ -188,7 +188,7 @@ export function NewBERequestDialog({
   /** Projet sélectionné — chargé séparément quand defaultProjectId est fourni */
   const [defaultProject, setDefaultProject] = useState<Pick<BEProject, 'id' | 'code_projet' | 'nom_projet'> | null>(null);
 
-  const [affaires, setAffaires] = useState<Pick<BEAffaire, 'id' | 'code_affaire' | 'libelle' | 'status'>[]>([]);
+  const [affaires, setAffaires] = useState<(Pick<BEAffaire, 'id' | 'code_affaire' | 'libelle' | 'status'> & { commandes?: string[] })[]>([]);
   const [selectedAffaireId, setSelectedAffaireId] = useState<string | null>(defaultAffaireId ?? null);
   const [description, setDescription] = useState('');
 
@@ -287,15 +287,47 @@ export function NewBERequestDialog({
     });
   }, [open, projectSearch]);
 
-  // ── Chargement affaires ───────────────────────────────────────────────────
+  // ── Chargement affaires (+ n° commande/devis client CCN/DCN) ──────────────
   useEffect(() => {
     if (!selectedProjectId) { setAffaires([]); return; }
-    sb.from('be_affaires')
-      .select('id,code_affaire,libelle,status')
-      .eq('be_project_id', selectedProjectId)
-      .in('status', ['ouverte', 'en_cours'])
-      .order('code_affaire')
-      .then(({ data }: any) => setAffaires(data ?? []));
+    let cancelled = false;
+    (async () => {
+      const { data: rows } = await sb
+        .from('be_affaires')
+        .select('id,code_affaire,libelle,status')
+        .eq('be_project_id', selectedProjectId)
+        .in('status', ['ouverte', 'en_cours'])
+        .order('code_affaire');
+
+      const baseAffaires = (rows ?? []) as any[];
+      if (cancelled) return;
+
+      // Enrichissement : numéros de commande (CCN) / devis (DCN) client
+      // depuis les mouvements Divalto, regroupés par code_affaire.
+      const codes = baseAffaires.map(a => a.code_affaire).filter(Boolean);
+      const cmdMap = new Map<string, Set<string>>();
+      if (codes.length > 0) {
+        const { data: mvts } = await sb
+          .from('be_divalto_mouvements')
+          .select('code_affaire,numero_piece')
+          .in('code_affaire', codes)
+          .or('numero_piece.ilike.CCN%,numero_piece.ilike.DCN%');
+        for (const m of (mvts ?? []) as any[]) {
+          if (!m.code_affaire || !m.numero_piece) continue;
+          if (!cmdMap.has(m.code_affaire)) cmdMap.set(m.code_affaire, new Set());
+          cmdMap.get(m.code_affaire)!.add(String(m.numero_piece).trim());
+        }
+      }
+
+      if (cancelled) return;
+      setAffaires(
+        baseAffaires.map(a => ({
+          ...a,
+          commandes: Array.from(cmdMap.get(a.code_affaire) ?? []).sort(),
+        })),
+      );
+    })();
+    return () => { cancelled = true; };
   }, [selectedProjectId]);
 
   // ── Chargement sous-étapes (à l'entrée sur l'étape 1 ou si projet par défaut) ──
@@ -780,21 +812,57 @@ export function NewBERequestDialog({
                         >
                           Sans affaire
                         </button>
-                        {affaires.map(a => (
+                        {affaires.map(a => {
+                          const isSel = selectedAffaireId === a.id;
+                          return (
                           <button
                             key={a.id}
                             onClick={() => setSelectedAffaireId(a.id)}
                             className={cn(
-                              'w-full text-left px-3 py-2.5 flex items-center gap-3 hover:bg-muted/50 transition-colors',
-                              selectedAffaireId === a.id && 'bg-primary/10',
+                              'w-full text-left px-3 py-2.5 flex items-center gap-3 transition-colors',
+                              isSel
+                                ? 'bg-primary/10 ring-1 ring-inset ring-primary/40'
+                                : 'hover:bg-muted/50',
                             )}
                           >
-                            <Badge variant="outline" className="font-mono text-xs">
+                            <div
+                              className={cn(
+                                'w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center',
+                                isSel ? 'border-primary bg-primary' : 'border-muted-foreground/40',
+                              )}
+                            >
+                              {isSel && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
+                            </div>
+                            <Badge variant="outline" className="font-mono text-xs shrink-0">
                               {a.code_affaire}
                             </Badge>
-                            <span className="text-sm truncate">{a.libelle ?? a.code_affaire}</span>
+                            <div className="flex-1 min-w-0">
+                              <span className={cn('text-sm truncate block', isSel && 'font-medium')}>
+                                {a.libelle ?? a.code_affaire}
+                              </span>
+                              {a.commandes && a.commandes.length > 0 && (
+                                <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                                  {a.commandes.slice(0, 3).map(cmd => (
+                                    <Badge
+                                      key={cmd}
+                                      variant="secondary"
+                                      className="font-mono text-[10px] px-1 py-0 bg-blue-50 text-blue-700 border border-blue-200"
+                                      title="N° commande / devis client (Divalto)"
+                                    >
+                                      {cmd}
+                                    </Badge>
+                                  ))}
+                                  {a.commandes.length > 3 && (
+                                    <span className="text-[10px] text-muted-foreground">
+                                      +{a.commandes.length - 3}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </button>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -914,21 +982,57 @@ export function NewBERequestDialog({
                         >
                           Sans affaire
                         </button>
-                        {affaires.map(a => (
+                        {affaires.map(a => {
+                          const isSel = selectedAffaireId === a.id;
+                          return (
                           <button
                             key={a.id}
                             onClick={() => setSelectedAffaireId(a.id)}
                             className={cn(
-                              'w-full text-left px-3 py-2.5 flex items-center gap-3 hover:bg-muted/50 transition-colors',
-                              selectedAffaireId === a.id && 'bg-primary/10',
+                              'w-full text-left px-3 py-2.5 flex items-center gap-3 transition-colors',
+                              isSel
+                                ? 'bg-primary/10 ring-1 ring-inset ring-primary/40'
+                                : 'hover:bg-muted/50',
                             )}
                           >
-                            <Badge variant="outline" className="font-mono text-xs">
+                            <div
+                              className={cn(
+                                'w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center',
+                                isSel ? 'border-primary bg-primary' : 'border-muted-foreground/40',
+                              )}
+                            >
+                              {isSel && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
+                            </div>
+                            <Badge variant="outline" className="font-mono text-xs shrink-0">
                               {a.code_affaire}
                             </Badge>
-                            <span className="text-sm truncate">{a.libelle ?? a.code_affaire}</span>
+                            <div className="flex-1 min-w-0">
+                              <span className={cn('text-sm truncate block', isSel && 'font-medium')}>
+                                {a.libelle ?? a.code_affaire}
+                              </span>
+                              {a.commandes && a.commandes.length > 0 && (
+                                <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                                  {a.commandes.slice(0, 3).map(cmd => (
+                                    <Badge
+                                      key={cmd}
+                                      variant="secondary"
+                                      className="font-mono text-[10px] px-1 py-0 bg-blue-50 text-blue-700 border border-blue-200"
+                                      title="N° commande / devis client (Divalto)"
+                                    >
+                                      {cmd}
+                                    </Badge>
+                                  ))}
+                                  {a.commandes.length > 3 && (
+                                    <span className="text-[10px] text-muted-foreground">
+                                      +{a.commandes.length - 3}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </button>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
