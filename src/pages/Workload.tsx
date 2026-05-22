@@ -50,6 +50,10 @@ export default function Workload() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [parentDemandsMap, setParentDemandsMap] = useState<Map<string, ParentDemandSummary>>(new Map());
   const [useAdvancedFilters, setUseAdvancedFilters] = useState(false);
+  // Vrai dès le 1er chargement terminé. Évite de démonter le calendrier
+  // (et donc de perdre l'état de repli du backlog) à chaque refetch
+  // déclenché par un drag-drop.
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
  
    // Fetch Outlook calendar events for team members
    const { events: outlookEvents, isLoading: isLoadingOutlook } = useOutlookCalendar(
@@ -182,6 +186,11 @@ export default function Workload() {
       fetchTasks();
     }
   }, [profile?.id, (profile as any)?.job_title, teamMembers]);
+
+  // Marque le premier chargement terminé (garde le calendrier monté ensuite)
+  useEffect(() => {
+    if (!isLoading) setHasLoadedOnce(true);
+  }, [isLoading]);
 
   const handleDateRangeChange = (start: Date, end: Date, mode?: 'week' | 'month' | 'quarter') => {
     setStartDate(start);
@@ -456,7 +465,7 @@ export default function Workload() {
 
             {/* ── Content ── */}
             <div className="flex-1 overflow-y-auto p-4 md:p-6">
-              {isLoading && (activeTab === 'calendar' || activeTab === 'summary') ? (
+              {isLoading && !hasLoadedOnce && (activeTab === 'calendar' || activeTab === 'summary') ? (
                 <Card>
                   <CardContent className="flex items-center justify-center h-64">
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

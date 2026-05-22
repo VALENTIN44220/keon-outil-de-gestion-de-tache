@@ -86,10 +86,14 @@
    const [sortBy, setSortBy] = useState<SortOption>('priority');
    const [filterBy, setFilterBy] = useState<FilterOption>('all');
    const [detailTask, setDetailTask] = useState<Task | null>(null);
-   const [collapsedDemands, setCollapsedDemands] = useState<Set<string>>(new Set());
+   // Demandes dépliées (par défaut TOUTES repliées → set vide). On suit
+   // l'état "déplié" plutôt que "replié" pour que l'ouverture par défaut
+   // soit l'état compact demandé.
+   const [expandedDemands, setExpandedDemands] = useState<Set<string>>(new Set());
+   const [demandFilter, setDemandFilter] = useState<string>('all');
 
-   const toggleDemandCollapse = useCallback((demandId: string) => {
-     setCollapsedDemands(prev => {
+   const toggleDemandExpand = useCallback((demandId: string) => {
+     setExpandedDemands(prev => {
        const next = new Set(prev);
        if (next.has(demandId)) next.delete(demandId);
        else next.add(demandId);
@@ -113,9 +117,14 @@
      // Apply search
      if (searchQuery) {
        const query = searchQuery.toLowerCase();
-       filtered = filtered.filter(t => 
+       filtered = filtered.filter(t =>
          t.title.toLowerCase().includes(query)
        );
+     }
+
+     // Apply demand filter (vue groupée)
+     if (demandFilter !== 'all') {
+       filtered = filtered.filter(t => (t as any).parent_request_id === demandFilter);
      }
  
      // Apply filter
@@ -158,7 +167,20 @@
      });
  
      return filtered;
-   }, [availableTasks, searchQuery, sortBy, filterBy, getTaskDuration]);
+   }, [availableTasks, searchQuery, sortBy, filterBy, demandFilter, getTaskDuration]);
+
+   // Liste des demandes présentes dans le backlog (pour le filtre par demande)
+   const demandFilterOptions = useMemo(() => {
+     if (!parentDemandsMap || parentDemandsMap.size === 0) return [];
+     const presentIds = new Set<string>();
+     for (const t of availableTasks) {
+       const pid = (t as any).parent_request_id;
+       if (pid && parentDemandsMap.has(pid)) presentIds.add(pid);
+     }
+     return Array.from(presentIds)
+       .map(id => parentDemandsMap.get(id)!)
+       .sort((a, b) => (a.task_number ?? '').localeCompare(b.task_number ?? ''));
+   }, [availableTasks, parentDemandsMap]);
  
    const getPriorityColor = (priority: string) => {
      switch (priority) {
@@ -279,6 +301,43 @@
              </DropdownMenuContent>
            </DropdownMenu>
          </div>
+
+         {/* Filtre par demande (uniquement en vue groupée) */}
+         {demandFilterOptions.length > 0 && (
+           <div className="mt-2">
+             <DropdownMenu>
+               <DropdownMenuTrigger asChild>
+                 <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs w-full justify-start">
+                   <FolderOpen className="h-3.5 w-3.5 text-violet-600 shrink-0" />
+                   <span className="truncate">
+                     {demandFilter === 'all'
+                       ? 'Toutes les demandes'
+                       : (() => {
+                           const d = parentDemandsMap?.get(demandFilter);
+                           return d ? `${d.task_number ?? ''} — ${parseTaskTitle(d.title, d.task_number).name || d.title}` : 'Demande';
+                         })()}
+                   </span>
+                 </Button>
+               </DropdownMenuTrigger>
+               <DropdownMenuContent className="max-h-[300px] overflow-y-auto w-[280px]">
+                 <DropdownMenuItem onClick={() => setDemandFilter('all')}>
+                   Toutes les demandes
+                 </DropdownMenuItem>
+                 <DropdownMenuSeparator />
+                 {demandFilterOptions.map(d => (
+                   <DropdownMenuItem key={d.id} onClick={() => setDemandFilter(d.id)} className="gap-1.5">
+                     <Badge variant="outline" className="h-4 px-1 text-[9px] font-mono shrink-0">
+                       {d.task_number ?? '—'}
+                     </Badge>
+                     <span className="truncate text-xs">
+                       {parseTaskTitle(d.title, d.task_number).name || d.title}
+                     </span>
+                   </DropdownMenuItem>
+                 ))}
+               </DropdownMenuContent>
+             </DropdownMenu>
+           </div>
+         )}
  
          {/* Selection actions */}
          {selectedTasks.size > 0 && (
@@ -458,15 +517,18 @@
                    <>
                      {groupEntries.map(([parentId, groupTasks]) => {
                        const demand = parentId ? parentDemandsMap.get(parentId) : null;
-                       const isCollapsed = parentId ? collapsedDemands.has(parentId) : false;
+                       // Replié par défaut : un groupe est ouvert seulement s'il
+                       // est explicitement dans expandedDemands. Le groupe orphelin
+                       // (sans demande) reste toujours ouvert.
+                       const isCollapsed = parentId ? !expandedDemands.has(parentId) : false;
                        const demandTitle = demand ? parseTaskTitle(demand.title, demand.task_number).name || demand.title : 'Tâches sans demande parente';
                        const demandCode = demand?.task_number ?? '—';
 
                        return (
                          <div key={parentId ?? '__orphan__'} className="mb-1">
-                           {/* Header de demande — cliquable pour replier */}
+                           {/* Header de demande — cliquable pour déplier/replier */}
                            <button
-                             onClick={() => parentId && toggleDemandCollapse(parentId)}
+                             onClick={() => parentId && toggleDemandExpand(parentId)}
                              className={cn(
                                'w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left',
                                'bg-gradient-to-r from-violet-50 to-blue-50 hover:from-violet-100 hover:to-blue-100',
