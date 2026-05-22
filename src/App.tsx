@@ -65,6 +65,7 @@ import BEAdminTJM from "./pages/BEAdminTJM";
 import BEAdminDivaltoImport from "./pages/BEAdminDivaltoImport";
 import BEDispatchGlobal from "./pages/be/BEDispatchGlobal";
 import BEBudgetGlobal from "./pages/be/BEBudgetGlobal";
+import SpvBudget from "./pages/spv/SpvBudget";
 
 // Budget tab is BE-only. If someone lands on /spv/.../budget, send them to overview.
 // NOTE: PersistentRoutes uses matchPath (not <Route>), so useParams() doesn't work here.
@@ -164,6 +165,7 @@ const App = () => (
                 { path: "/be/projects/:code/discussions", end: true, element: <ProtectedRoute><BEProjectHubDiscussions /></ProtectedRoute> },
                 { path: "/be/projects/:code/files", end: true, element: <ProtectedRoute><BEProjectHubFiles /></ProtectedRoute> },
 
+                { path: "/spv/budget", end: true, element: <ProtectedRoute><SpvBudget /></ProtectedRoute> },
                 { path: "/spv/projects/:code/overview", end: true, element: <ProtectedRoute><BEProjectHubOverview /></ProtectedRoute> },
                 { path: "/spv/projects/:code/questionnaire", end: true, element: <ProtectedRoute><BEProjectHubQuestionnaire /></ProtectedRoute> },
                 { path: "/spv/projects/:code/keon-synthese", end: true, element: <ProtectedRoute><BEProjectHubKeonSynthese /></ProtectedRoute> },
