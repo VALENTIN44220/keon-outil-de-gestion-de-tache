@@ -1,7 +1,8 @@
 import { forwardRef, useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Task, TaskStatus } from '@/types/task';
 import { TaskCard } from './TaskCard';
-import { ClipboardList, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { ClipboardList, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FolderOpen, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface TaskListProps {
@@ -21,6 +22,7 @@ export const TaskList = forwardRef<HTMLDivElement, TaskListProps>(
     { tasks, onStatusChange, onDelete, groupBy, groupLabels, progressMap, onTaskUpdated },
     ref
   ) {
+    const navigate = useNavigate();
     const [page, setPage] = useState(1);
 
     useEffect(() => { setPage(1); }, [tasks.length]);
@@ -69,6 +71,9 @@ export const TaskList = forwardRef<HTMLDivElement, TaskListProps>(
           case 'subcategory':
             key = task.subcategory_id || 'Sans sous-catégorie';
             break;
+          case 'request':
+            key = (task as any).parent_request_id || 'Sans demande';
+            break;
           default:
             key = 'Autre';
         }
@@ -81,14 +86,35 @@ export const TaskList = forwardRef<HTMLDivElement, TaskListProps>(
 
       return (
         <div ref={ref} className="space-y-8">
-          {Array.from(groups.entries()).map(([groupKey, groupTasks]) => (
+          {Array.from(groups.entries()).map(([groupKey, groupTasks]) => {
+            // Quand on regroupe par demande, l'en-tête est cliquable et ouvre
+            // la fiche de la demande parente (/demande/:id).
+            const isRequestGroup = groupBy === 'request' && groupKey !== 'Sans demande';
+            return (
             <div key={groupKey}>
-              <h3 className="text-lg font-semibold mb-4 text-foreground border-b border-border pb-2">
-                {groupLabels?.get(groupKey) || groupKey}
-                <span className="ml-2 text-sm font-normal text-muted-foreground">
-                  ({groupTasks.length})
-                </span>
-              </h3>
+              {isRequestGroup ? (
+                <button
+                  onClick={() => navigate(`/demande/${groupKey}`)}
+                  className="group w-full flex items-center gap-2 mb-4 pb-2 border-b border-violet-200 text-left hover:text-violet-700 transition-colors"
+                  title="Ouvrir la demande"
+                >
+                  <FolderOpen className="h-4 w-4 text-violet-600 shrink-0" />
+                  <span className="text-lg font-semibold text-foreground group-hover:text-violet-700">
+                    {groupLabels?.get(groupKey) || 'Demande'}
+                  </span>
+                  <span className="text-sm font-normal text-muted-foreground">
+                    ({groupTasks.length})
+                  </span>
+                  <ExternalLink className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity ml-1" />
+                </button>
+              ) : (
+                <h3 className="text-lg font-semibold mb-4 text-foreground border-b border-border pb-2">
+                  {groupLabels?.get(groupKey) || groupKey}
+                  <span className="ml-2 text-sm font-normal text-muted-foreground">
+                    ({groupTasks.length})
+                  </span>
+                </h3>
+              )}
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {groupTasks.map((task) => (
                   <TaskCard
@@ -102,7 +128,8 @@ export const TaskList = forwardRef<HTMLDivElement, TaskListProps>(
                 ))}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       );
     }

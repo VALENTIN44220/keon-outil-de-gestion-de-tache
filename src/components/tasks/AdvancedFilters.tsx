@@ -50,6 +50,7 @@ interface AdvancedFiltersProps {
 
 const groupByOptions = [
   { value: 'none', label: 'Aucun', color: 'bg-muted' },
+  { value: 'request', label: 'Demande', color: 'bg-violet-500' },
   { value: 'assignee', label: 'Collaborateur', color: 'bg-blue-500' },
   { value: 'requester', label: 'Demandeur', color: 'bg-green-500' },
   { value: 'reporter', label: 'Manager', color: 'bg-purple-500' },

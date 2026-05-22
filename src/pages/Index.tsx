@@ -298,14 +298,24 @@ const Index = () => {
       cat.subcategories.forEach(sub => labels.set(sub.id, sub.name));
     });
     
+    // Add demand labels (regroupement par demande) : parent_request_id → n° demande
+    tasks.forEach((t: any) => {
+      const pid = t.parent_request_id;
+      const reqNum = t.request_number;
+      if (pid && reqNum && !labels.has(pid)) {
+        labels.set(pid, reqNum);
+      }
+    });
+
     // Add defaults
     labels.set('Non assigné', 'Non assigné');
     labels.set('Non défini', 'Non défini');
     labels.set('Sans catégorie', 'Sans catégorie');
     labels.set('Sans sous-catégorie', 'Sans sous-catégorie');
-    
+    labels.set('Sans demande', 'Sans demande');
+
     return labels;
-  }, [profilesMap, categories]);
+  }, [profilesMap, categories, tasks]);
 
   // Category map for kanban
   const categoryMap = useMemo(() => {
