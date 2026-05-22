@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, Fragment } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Task, TaskStatus, TaskPriority } from '@/types/task';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -8,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
-import { Columns3, ClipboardList, Search, Monitor } from 'lucide-react';
+import { Columns3, ClipboardList, Search, Monitor, FolderOpen, ExternalLink } from 'lucide-react';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { useTableSort, SortDirection } from '@/hooks/useTableSort';
 import { format } from 'date-fns';
@@ -25,6 +26,8 @@ interface DenseTableViewProps {
   onDelete: (taskId: string) => void;
   progressMap?: Record<string, { completed: number; total: number; progress: number }>;
   onTaskUpdated?: () => void;
+  groupBy?: string;
+  groupLabels?: Map<string, string>;
 }
 
 interface ColumnDef {
@@ -98,7 +101,8 @@ const PRIORITY_COLORS: Record<string, string> = {
   'urgent': 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
 };
 
-export function DenseTableView({ tasks, onStatusChange, onDelete, progressMap, onTaskUpdated }: DenseTableViewProps) {
+export function DenseTableView({ tasks, onStatusChange, onDelete, progressMap, onTaskUpdated, groupBy, groupLabels }: DenseTableViewProps) {
+  const navigate = useNavigate();
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) return JSON.parse(stored);
@@ -175,8 +179,23 @@ export function DenseTableView({ tasks, onStatusChange, onDelete, progressMap, o
 
   const renderCellContent = (task: Task, colKey: string) => {
     switch (colKey) {
-      case 'request_number':
-        return <span className="font-mono text-xs text-muted-foreground">{task.request_number || task.task_number || '—'}</span>;
+      case 'request_number': {
+        const parentId = (task as any).parent_request_id;
+        const num = task.request_number || task.task_number || '—';
+        if (parentId) {
+          return (
+            <button
+              onClick={(e) => { e.stopPropagation(); navigate(`/demande/${parentId}`); }}
+              className="font-mono text-xs text-violet-600 hover:underline inline-flex items-center gap-1"
+              title="Ouvrir la demande"
+            >
+              {num}
+              <ExternalLink className="h-2.5 w-2.5" />
+            </button>
+          );
+        }
+        return <span className="font-mono text-xs text-muted-foreground">{num}</span>;
+      }
       case 'title': {
         // Le N° (T-XXXX-XXXX / D-XXXX-XXXX) est deja affiche dans la colonne 'request_number'.
         // On retire le prefixe redondant du titre pour gagner en lisibilite.
@@ -378,19 +397,66 @@ export function DenseTableView({ tasks, onStatusChange, onDelete, progressMap, o
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sortedTasks.map(task => (
-              <TableRow
-                key={task.id}
-                className="cursor-pointer hover:bg-keon-50/50 h-8"
-                onClick={() => setSelectedTask(task)}
-              >
-                {ALL_COLUMNS.filter(c => visibleColumns.includes(c.key)).map(col => (
-                  <TableCell key={col.key} className="py-1 px-2 text-xs">
-                    {renderCellContent(task, col.key)}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))}
+            {(() => {
+              const visibleCols = ALL_COLUMNS.filter(c => visibleColumns.includes(c.key));
+              const colCount = visibleCols.length;
+
+              const renderTaskRow = (task: Task) => (
+                <TableRow
+                  key={task.id}
+                  className="cursor-pointer hover:bg-keon-50/50 h-8"
+                  onClick={() => setSelectedTask(task)}
+                >
+                  {visibleCols.map(col => (
+                    <TableCell key={col.key} className="py-1 px-2 text-xs">
+                      {renderCellContent(task, col.key)}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              );
+
+              // Vue groupée par demande
+              if (groupBy === 'request') {
+                const groups = new Map<string, Task[]>();
+                for (const t of sortedTasks) {
+                  const key = (t as any).parent_request_id || 'Sans demande';
+                  if (!groups.has(key)) groups.set(key, []);
+                  groups.get(key)!.push(t);
+                }
+                return Array.from(groups.entries()).map(([groupKey, groupTasks]) => {
+                  const isRequest = groupKey !== 'Sans demande';
+                  const label = groupLabels?.get(groupKey)
+                    || (groupTasks[0] as any).request_number
+                    || 'Demande';
+                  return (
+                    <Fragment key={`grp-${groupKey}`}>
+                      <TableRow
+                        className={cn(
+                          'border-b-2 border-violet-200',
+                          isRequest && 'cursor-pointer hover:bg-violet-50',
+                        )}
+                        onClick={isRequest ? () => navigate(`/demande/${groupKey}`) : undefined}
+                      >
+                        <TableCell colSpan={colCount} className="py-1.5 px-2 bg-violet-50/60">
+                          <div className="flex items-center gap-2 group">
+                            <FolderOpen className="h-3.5 w-3.5 text-violet-600 shrink-0" />
+                            <span className="text-xs font-semibold text-violet-900">{label}</span>
+                            <span className="text-[11px] text-muted-foreground">({groupTasks.length})</span>
+                            {isRequest && (
+                              <ExternalLink className="h-3 w-3 text-violet-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                      {groupTasks.map(renderTaskRow)}
+                    </Fragment>
+                  );
+                });
+              }
+
+              // Vue plate
+              return sortedTasks.map(renderTaskRow);
+            })()}
           </TableBody>
         </Table>
       </div>

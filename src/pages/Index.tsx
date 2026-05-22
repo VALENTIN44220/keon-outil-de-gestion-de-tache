@@ -432,6 +432,8 @@ const Index = () => {
             onDelete={deleteTask}
             progressMap={progressMap}
             onTaskUpdated={refetch}
+            groupBy={advancedFilters.groupBy}
+            groupLabels={groupLabels}
           />
         );
       default:
