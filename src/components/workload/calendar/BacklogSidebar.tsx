@@ -1,4 +1,4 @@
- import { useMemo, useState, useCallback } from 'react';
+ import { useMemo, useState, useCallback, useEffect } from 'react';
  import { format, parseISO } from 'date-fns';
  import { fr } from 'date-fns/locale';
  import { Task } from '@/types/task';
@@ -56,6 +56,8 @@
    onBulkAssign?: (taskIds: string[], userId: string) => void;
    /** Si fourni, les tâches sont regroupées par demande parente avec un header repliable. */
    parentDemandsMap?: Map<string, ParentDemandSummary>;
+   /** Demande à pré-sélectionner dans le filtre (deep-link depuis /be/dispatch). */
+   initialDemandFilter?: string | null;
  }
  
  type SortOption = 'priority' | 'due_date' | 'charge' | 'title';
@@ -81,6 +83,7 @@
    onSelectAll,
    onClearSelection,
    parentDemandsMap,
+   initialDemandFilter,
  }: BacklogSidebarProps) {
    const [searchQuery, setSearchQuery] = useState('');
    const [sortBy, setSortBy] = useState<SortOption>('priority');
@@ -90,7 +93,15 @@
    // l'état "déplié" plutôt que "replié" pour que l'ouverture par défaut
    // soit l'état compact demandé.
    const [expandedDemands, setExpandedDemands] = useState<Set<string>>(new Set());
-   const [demandFilter, setDemandFilter] = useState<string>('all');
+   const [demandFilter, setDemandFilter] = useState<string>(initialDemandFilter ?? 'all');
+
+   // Deep-link : applique le filtre demande + déplie automatiquement le groupe
+   useEffect(() => {
+     if (initialDemandFilter) {
+       setDemandFilter(initialDemandFilter);
+       setExpandedDemands(prev => new Set(prev).add(initialDemandFilter));
+     }
+   }, [initialDemandFilter]);
 
    const toggleDemandExpand = useCallback((demandId: string) => {
      setExpandedDemands(prev => {

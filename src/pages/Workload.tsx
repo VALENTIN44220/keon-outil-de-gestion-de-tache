@@ -1,4 +1,5 @@
  import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
  import { startOfWeek, endOfWeek, startOfMonth, endOfMonth, format, addWeeks, addMonths, startOfYear, endOfYear, addYears, startOfQuarter, endOfQuarter } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useWorkloadPlanning } from '@/hooks/useWorkloadPlanning';
@@ -54,6 +55,9 @@ export default function Workload() {
   // (et donc de perdre l'état de repli du backlog) à chaque refetch
   // déclenché par un drag-drop.
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  // Filtre demande initial (deep-link depuis /be/dispatch ?demandId=…&userId=…)
+  const [searchParams] = useSearchParams();
+  const [initialDemandFilter, setInitialDemandFilter] = useState<string | null>(null);
  
    // Fetch Outlook calendar events for team members
    const { events: outlookEvents, isLoading: isLoadingOutlook } = useOutlookCalendar(
@@ -118,7 +122,21 @@ export default function Workload() {
     companyId: filters.selectedCompanyId || undefined,
   });
 
-  // Fetch tasks for planning grid - include ALL tasks (even done/validated) 
+  // Deep-link depuis /be/dispatch : applique les filtres demande + salarié
+  // une seule fois au montage si les query params sont présents.
+  useEffect(() => {
+    const demandId = searchParams.get('demandId');
+    const userId = searchParams.get('userId');
+    if (userId) {
+      setSelectedUserIds([userId]);
+    }
+    if (demandId) {
+      setInitialDemandFilter(demandId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Fetch tasks for planning grid - include ALL tasks (even done/validated)
   // so they remain visible in the calendar. Only the backlog sidebar filters them.
   useEffect(() => {
     const fetchTasks = async () => {
@@ -480,6 +498,7 @@ export default function Workload() {
                       endDate={endDate}
                       tasks={tasks}
                       parentDemandsMap={parentDemandsMap}
+                      initialDemandFilter={initialDemandFilter}
                       holidays={holidays}
                       leaves={leaves}
                       outlookEvents={outlookEvents}

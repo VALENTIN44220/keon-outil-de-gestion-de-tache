@@ -507,6 +507,7 @@ function DurationHoursField({
 
 function AssigneeSelector({
   taskId,
+  parentRequestId,
   currentAssigneeId,
   currentBeStatus,
   requesterId,
@@ -520,6 +521,7 @@ function AssigneeSelector({
   onAssigned,
 }: {
   taskId: string;
+  parentRequestId?: string | null;
   currentAssigneeId: string | null;
   currentBeStatus: string | null;
   requesterId?: string | null;
@@ -536,6 +538,7 @@ function AssigneeSelector({
 }) {
   const qc = useQueryClient();
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const mutation = useMutation({
     mutationFn: async (assigneeId: string | null) => {
@@ -608,12 +611,24 @@ function AssigneeSelector({
         }
       }
     },
-    onSuccess: () => {
-      toast.success('Tâche assignée');
+    onSuccess: (_data, assigneeId) => {
       qc.invalidateQueries({ queryKey: ['be-dispatch-tasks'] });
       // Rafraîchit la charge hebdo affichée sous chaque profil
       qc.invalidateQueries({ queryKey: ['user-week-load'] });
       onAssigned();
+
+      if (assigneeId) {
+        // Affecté à un collaborateur → on bascule sur le Plan de charge,
+        // pré-filtré sur la demande + le salarié, pour placer la tâche sur
+        // une date par drag-drop.
+        toast.success('Tâche assignée — ouverture du plan de charge');
+        const params = new URLSearchParams();
+        if (parentRequestId) params.set('demandId', parentRequestId);
+        params.set('userId', assigneeId);
+        navigate(`/workload?${params.toString()}`);
+      } else {
+        toast.success('Affectation retirée');
+      }
     },
     onError: (err: any) => {
       toast.error(err.message || "Erreur lors de l'assignation");
@@ -880,6 +895,7 @@ function TaskRow({
 
       <AssigneeSelector
         taskId={task.id}
+        parentRequestId={task.parent_request_id}
         currentAssigneeId={task.assignee_id}
         currentBeStatus={task.be_status}
         requesterId={requesterId}

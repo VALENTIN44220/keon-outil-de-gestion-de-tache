@@ -55,6 +55,8 @@ import { toast } from 'sonner';
   onViewModeChange?: (mode: 'week' | 'month' | 'quarter' | 'year', anchorDate?: Date) => void;
   /** Map des demandes parentes — déclenche le regroupement dans le BacklogSidebar */
   parentDemandsMap?: Map<string, ParentDemandSummary>;
+  /** Filtre demande initial (deep-link) transmis au BacklogSidebar */
+  initialDemandFilter?: string | null;
  }
  
 export function PlanningCalendarView({
@@ -82,6 +84,7 @@ export function PlanningCalendarView({
   onSearchChange,
   onViewModeChange,
   parentDemandsMap,
+  initialDemandFilter,
 }: PlanningCalendarViewProps) {
   const navigate = useNavigate();
   
@@ -333,6 +336,7 @@ export function PlanningCalendarView({
              onSelectAll={handleSelectAll}
              onClearSelection={handleClearSelection}
              parentDemandsMap={parentDemandsMap}
+             initialDemandFilter={initialDemandFilter}
            />
  
            {/* Calendar Grid */}
