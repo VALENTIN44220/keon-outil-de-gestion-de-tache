@@ -294,11 +294,11 @@ export default function SpvBudget() {
             </Card>
 
             <p className="text-[11px] text-muted-foreground">
-              <strong>COGS</strong> (achats) issus des tables it_divalto_commandes (engagé) / it_divalto_factures (constaté),
-              qui contiennent les pièces TerGreen « M », rapprochées par projet (axe_0001).
+              <strong>CA / COGS</strong> issus de la table unifiée <code>divalto_mouvements_all</code> (tout Divalto, sans filtre),
+              rapprochés par projet (axe_0001) : CA = pièces client (CC/FC), COGS = pièces fournisseur (CF/FF).
+              <strong> Marge brute</strong> = CA constaté − COGS constaté ; <strong>marge directe</strong> = marge brute − coût RH.
               <strong> Coût RH</strong> valorisé via le référentiel TJM par fonction (tous salariés, temps Lucca).
-              <strong> CA client</strong> : aucune pièce de vente « M » n'est présente dans les sources Divalto disponibles
-              (tables orientées achats) → CA à 0 ; il se renseignera dès qu'une source de ventes TerGreen sera branchée.
+              Les pièces sans préfixe identifiable (avoirs / écritures comptables) sont exclues du calcul.
             </p>
           </div>
         </main>
