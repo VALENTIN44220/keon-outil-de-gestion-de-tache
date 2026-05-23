@@ -295,10 +295,10 @@ export default function SpvBudget() {
 
             <p className="text-[11px] text-muted-foreground">
               <strong>CA / COGS</strong> issus de la table unifiée <code>divalto_mouvements_all</code> (tout Divalto, sans filtre),
-              rapprochés par projet (axe_0001) : CA = pièces client (CC/FC), COGS = pièces fournisseur (CF/FF).
+              rapprochés par projet (axe_0001). Classification par <strong>code tiers</strong> : <code>C…</code> = client (CA),
+              <code>F…</code> = fournisseur (COGS) ; engagé = commandes, constaté = factures (avoirs inclus).
               <strong> Marge brute</strong> = CA constaté − COGS constaté ; <strong>marge directe</strong> = marge brute − coût RH.
               <strong> Coût RH</strong> valorisé via le référentiel TJM par fonction (tous salariés, temps Lucca).
-              Les pièces sans préfixe identifiable (avoirs / écritures comptables) sont exclues du calcul.
             </p>
           </div>
         </main>
