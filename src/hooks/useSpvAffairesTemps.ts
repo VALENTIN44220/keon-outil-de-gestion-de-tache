@@ -154,3 +154,56 @@ export function useSpvBudgetLines(spvAffaireId: string | null) {
 
   return { ...query, upsertLine, deleteLine };
 }
+
+// ── Détail des pièces Divalto d'une affaire (devis/commandes/factures) ──────
+
+export interface SpvAffairePiece {
+  doc_type: string;            // 'commande' | 'facture'
+  numero_piece: string | null;
+  prefix: string | null;
+  tiers_code: string | null;
+  nom_tiers: string | null;
+  montant_ht: number;          // signé brut (client négatif, fournisseur positif)
+  date_piece: string | null;
+  libelle: string | null;
+}
+
+/** Toutes les pièces Divalto rattachées à une affaire SPV (par projet axe_0001). */
+export function useSpvAffairePieces(codeAffaire: string | null) {
+  return useQuery({
+    queryKey: ['spv-affaire-pieces', codeAffaire],
+    enabled: !!codeAffaire,
+    queryFn: async (): Promise<SpvAffairePiece[]> => {
+      const { data, error } = await sb
+        .from('divalto_mouvements_all')
+        .select('doc_type, numero_piece, prefix, tiers_code, nom_tiers, montant_ht, date_piece, libelle')
+        .eq('axe_0001', codeAffaire)
+        .order('date_piece', { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as SpvAffairePiece[];
+    },
+  });
+}
+
+export type SpvPieceCategorie = 'ca_vendu' | 'ca_constate' | 'cogs_engage' | 'cogs_constate' | 'autre';
+
+export const SPV_PIECE_CAT_LABEL: Record<SpvPieceCategorie, string> = {
+  ca_vendu:      'Commande client (CA vendu)',
+  ca_constate:   'Facture client (CA constaté)',
+  cogs_engage:   'Commande fournisseur (COGS engagé)',
+  cogs_constate: 'Facture fournisseur (COGS constaté)',
+  autre:         'Autre',
+};
+
+/** Catégorise une pièce + renvoie le montant "présentable" (positif). */
+export function classifySpvPiece(p: SpvAffairePiece): { categorie: SpvPieceCategorie; montant: number; isCA: boolean } {
+  const isClient = (p.tiers_code ?? '').toUpperCase().startsWith('C');
+  const isFournisseur = (p.tiers_code ?? '').toUpperCase().startsWith('F');
+  const isFacture = p.doc_type === 'facture';
+  // client = négatif en base → on inverse pour présenter du positif
+  const montant = isClient ? -Number(p.montant_ht || 0) : Number(p.montant_ht || 0);
+  let categorie: SpvPieceCategorie = 'autre';
+  if (isClient) categorie = isFacture ? 'ca_constate' : 'ca_vendu';
+  else if (isFournisseur) categorie = isFacture ? 'cogs_constate' : 'cogs_engage';
+  return { categorie, montant, isCA: isClient };
+}

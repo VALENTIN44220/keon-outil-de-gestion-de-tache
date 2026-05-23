@@ -27,12 +27,14 @@ import {
 import {
   ListChecks, Coins, Users, ChevronRight, ChevronDown, Search, Leaf,
   Receipt, ReceiptText, TrendingUp, TrendingDown, Plus, Trash2, Wallet, Clock,
+  FileText, CalendarDays,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import {
   useSpvAffairesBudgetKpi, useSpvAffaireTempsByUser, useSpvBudgetLines,
-  type SpvAffaireBudgetKpi,
+  useSpvAffairePieces, classifySpvPiece, SPV_PIECE_CAT_LABEL,
+  type SpvAffaireBudgetKpi, type SpvPieceCategorie,
 } from '@/hooks/useSpvAffairesTemps';
 
 const eur = (n: number) =>
@@ -156,11 +158,125 @@ function BudgetLines({ spvAffaireId }: { spvAffaireId: string }) {
   );
 }
 
+// ── Détail des pièces Divalto + ventilation mensuelle ───────────────────────
+const CAT_ORDER: SpvPieceCategorie[] = ['ca_vendu', 'ca_constate', 'cogs_engage', 'cogs_constate'];
+const CAT_COLOR: Record<SpvPieceCategorie, string> = {
+  ca_vendu:      'text-blue-700',
+  ca_constate:   'text-blue-900',
+  cogs_engage:   'text-orange-600',
+  cogs_constate: 'text-orange-800',
+  autre:         'text-muted-foreground',
+};
+
+function PiecesBreakdown({ codeAffaire }: { codeAffaire: string }) {
+  const { data: pieces = [], isLoading } = useSpvAffairePieces(codeAffaire);
+
+  const { totals, byMonth, rows } = useMemo(() => {
+    const totals: Record<SpvPieceCategorie, number> = { ca_vendu: 0, ca_constate: 0, cogs_engage: 0, cogs_constate: 0, autre: 0 };
+    const monthMap = new Map<string, Record<SpvPieceCategorie, number>>();
+    const rows = pieces.map((p) => {
+      const { categorie, montant } = classifySpvPiece(p);
+      totals[categorie] += montant;
+      const mois = (p.date_piece ?? '').slice(0, 7) || '—';
+      if (!monthMap.has(mois)) monthMap.set(mois, { ca_vendu: 0, ca_constate: 0, cogs_engage: 0, cogs_constate: 0, autre: 0 });
+      monthMap.get(mois)![categorie] += montant;
+      return { ...p, categorie, montant };
+    });
+    const byMonth = Array.from(monthMap.entries()).sort((a, b) => b[0].localeCompare(a[0]));
+    return { totals, byMonth, rows };
+  }, [pieces]);
+
+  if (isLoading) return <Skeleton className="h-24 w-full" />;
+  if (pieces.length === 0) return <p className="text-xs text-muted-foreground">Aucune pièce Divalto pour cette affaire.</p>;
+
+  return (
+    <div className="space-y-4">
+      {/* Résumé par catégorie */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+        {CAT_ORDER.map((c) => (
+          <div key={c} className="rounded-lg border bg-white px-3 py-2">
+            <p className="text-[10px] text-muted-foreground">{SPV_PIECE_CAT_LABEL[c]}</p>
+            <p className={cn('text-sm font-bold tabular-nums', CAT_COLOR[c])}>{eur(totals[c])}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Ventilation mensuelle */}
+      <div>
+        <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1 flex items-center gap-1.5">
+          <CalendarDays className="h-3.5 w-3.5" /> Ventilation mensuelle
+        </p>
+        <div className="rounded-lg border overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="h-7 text-[11px]">Mois</TableHead>
+                <TableHead className="h-7 text-[11px] text-right">CA vendu</TableHead>
+                <TableHead className="h-7 text-[11px] text-right">CA constaté</TableHead>
+                <TableHead className="h-7 text-[11px] text-right">COGS engagé</TableHead>
+                <TableHead className="h-7 text-[11px] text-right">COGS constaté</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {byMonth.map(([mois, v]) => (
+                <TableRow key={mois} className="hover:bg-muted/40">
+                  <TableCell className="py-1 text-xs font-medium tabular-nums">{mois}</TableCell>
+                  <TableCell className="py-1 text-xs text-right tabular-nums">{v.ca_vendu ? eur(v.ca_vendu) : '—'}</TableCell>
+                  <TableCell className="py-1 text-xs text-right tabular-nums">{v.ca_constate ? eur(v.ca_constate) : '—'}</TableCell>
+                  <TableCell className="py-1 text-xs text-right tabular-nums">{v.cogs_engage ? eur(v.cogs_engage) : '—'}</TableCell>
+                  <TableCell className="py-1 text-xs text-right tabular-nums">{v.cogs_constate ? eur(v.cogs_constate) : '—'}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+
+      {/* Détail des pièces */}
+      <div>
+        <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1 flex items-center gap-1.5">
+          <FileText className="h-3.5 w-3.5" /> Pièces ({rows.length})
+        </p>
+        <div className="rounded-lg border overflow-hidden max-h-[320px] overflow-y-auto">
+          <Table>
+            <TableHeader className="sticky top-0 bg-background">
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="h-7 text-[11px]">Date</TableHead>
+                <TableHead className="h-7 text-[11px]">Type</TableHead>
+                <TableHead className="h-7 text-[11px]">N° / Tiers</TableHead>
+                <TableHead className="h-7 text-[11px]">Libellé</TableHead>
+                <TableHead className="h-7 text-[11px] text-right">Montant</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((r, i) => (
+                <TableRow key={i} className="hover:bg-muted/40">
+                  <TableCell className="py-1 text-xs tabular-nums">{r.date_piece ?? '—'}</TableCell>
+                  <TableCell className="py-1 text-xs">
+                    <span className={cn('font-medium', CAT_COLOR[r.categorie])}>{SPV_PIECE_CAT_LABEL[r.categorie]}</span>
+                  </TableCell>
+                  <TableCell className="py-1 text-[11px] text-muted-foreground">
+                    {r.numero_piece && r.numero_piece !== '0' ? r.numero_piece : (r.tiers_code ?? '—')}
+                  </TableCell>
+                  <TableCell className="py-1 text-[11px] text-muted-foreground max-w-[260px] truncate" title={r.libelle ?? ''}>
+                    {r.libelle ?? '—'}
+                  </TableCell>
+                  <TableCell className="py-1 text-xs text-right tabular-nums">{eur(r.montant)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SpvBudget() {
   const [activeView, setActiveView] = useState('spv-budget');
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [tab, setTab] = useState<Record<string, 'temps' | 'budget'>>({});
+  const [tab, setTab] = useState<Record<string, 'temps' | 'budget' | 'pieces'>>({});
   const { data: affaires = [], isLoading } = useSpvAffairesBudgetKpi();
 
   const filtered = useMemo(() => {
@@ -273,6 +389,11 @@ export default function SpvBudget() {
                                       <Clock className="h-3.5 w-3.5" /> Temps ({a.nb_factures >= 0 ? '' : ''}{num(a.jours_declares)}j)
                                     </Button>
                                     <Button variant="ghost" size="sm"
+                                      onClick={() => setTab(prev => ({ ...prev, [a.spv_affaire_id]: 'pieces' }))}
+                                      className={cn('h-7 px-3 gap-1.5 text-xs rounded-md', t === 'pieces' ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground')}>
+                                      <FileText className="h-3.5 w-3.5" /> Pièces & mensuel
+                                    </Button>
+                                    <Button variant="ghost" size="sm"
                                       onClick={() => setTab(prev => ({ ...prev, [a.spv_affaire_id]: 'budget' }))}
                                       className={cn('h-7 px-3 gap-1.5 text-xs rounded-md', t === 'budget' ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground')}>
                                       <Wallet className="h-3.5 w-3.5" /> Budget ({eur(a.budget_total)})
@@ -280,6 +401,8 @@ export default function SpvBudget() {
                                   </div>
                                   {t === 'temps'
                                     ? <TempsBreakdown codeAffaire={a.code_affaire} />
+                                    : t === 'pieces'
+                                    ? <PiecesBreakdown codeAffaire={a.code_affaire} />
                                     : <BudgetLines spvAffaireId={a.spv_affaire_id} />}
                                 </div>
                               </TableCell>
