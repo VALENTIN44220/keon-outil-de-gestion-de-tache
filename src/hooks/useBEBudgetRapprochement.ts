@@ -17,17 +17,42 @@ interface BudgetLineLien {
   created_at: string;
 }
 
+/**
+ * Types considérés comme commandes (prefix Divalto) = client engagé.
+ * CCN = commande client NASKEO, CFK = commande-cadre client NASKEO.
+ */
+const COMMANDES_PREFIXES: string[] = ['CCN', 'CFK'];
+/**
+ * Types considérés comme factures (prefix Divalto) = client constaté.
+ * FCN = facture client NASKEO, FFK = facture-cadre client NASKEO.
+ */
+const FACTURES_PREFIXES: string[] = ['FCN', 'FFK'];
+
+/** Équivalence prefix → BEDivaltoTypeMouv pour usage d'options.typeMouv externe. */
 const COMMANDES_TYPES: BEDivaltoTypeMouv[] = ['CCN', 'CFK'];
-const FACTURES_TYPES: BEDivaltoTypeMouv[] = ['FCN', 'FFK'];
+const FACTURES_TYPES:  BEDivaltoTypeMouv[] = ['FCN', 'FFK'];
 
 /**
- * Rapprochement d'une ligne budget BE avec les pieces Divalto :
- *   - commandes : CCN / CFK
- *   - factures  : FCN / FFK
+ * Convertit une ligne brute de divalto_mouvements_all en forme BEDivaltoMouvement.
+ * Normalise les montants : client (C*) stocké négatif → positif pour l'affichage.
+ */
+function mapRow(r: any): BEDivaltoMouvement {
+  const isClient = (r.tiers_code as string | null)?.startsWith('C') ?? false;
+  return {
+    ...r,
+    type_mouv:   (r.prefix ?? '') as BEDivaltoTypeMouv,
+    prefpino:     r.prefix ?? '',
+    montant_tva:  null,
+    montant_ht:   isClient ? -(r.montant_ht ?? 0) : (r.montant_ht ?? 0),
+  } as BEDivaltoMouvement;
+}
+
+/**
+ * Rapprochement d'une ligne budget BE avec les pièces Divalto :
+ *   - commandes : CCN / CFK (client engagé)
+ *   - factures  : FCN / FFK (client constaté)
  * Filtrage des candidats restreint au code_affaire de l'affaire parente.
- *
- * Adapte de useITBudgetRapprochement (les tables BE n'utilisent qu'une seule
- * table miroir `be_divalto_mouvements` discriminee par `type_mouv`).
+ * Source : divalto_mouvements_all (classification par prefix + code_affaire).
  */
 export function useBEBudgetRapprochement(
   budgetLineId: string | null,
@@ -50,21 +75,21 @@ export function useBEBudgetRapprochement(
     enabled: !!budgetLineId,
   });
 
-  // ── Donnees Divalto pour les commandes liees (resolution batch) ──────────
+  // ── Données Divalto pour les commandes liées (résolution batch) ──────────
   const commandesLiensCount = commandesLiensQuery.data?.length ?? 0;
   const commandesQuery = useQuery({
     queryKey: ['be-budget-commandes-data', budgetLineId, commandesLiensCount],
     queryFn: async (): Promise<BEDivaltoMouvementGrouped[]> => {
       const liens = commandesLiensQuery.data ?? [];
-      const refs = Array.from(new Set(liens.map(l => l.numero_piece).filter(Boolean)));
+      const refs  = Array.from(new Set(liens.map(l => l.numero_piece).filter(Boolean)));
       if (refs.length === 0) return [];
       const { data, error } = await sb
-        .from('be_divalto_mouvements')
+        .from('divalto_mouvements_all')
         .select('*')
         .in('numero_piece', refs)
-        .in('type_mouv', COMMANDES_TYPES);
+        .in('prefix', COMMANDES_PREFIXES);
       if (error) throw error;
-      return groupBEMouvementsByPiece((data ?? []) as BEDivaltoMouvement[]);
+      return groupBEMouvementsByPiece((data ?? []).map(mapRow) as BEDivaltoMouvement[]);
     },
     enabled: !!budgetLineId && commandesLiensCount > 0,
   });
@@ -89,15 +114,15 @@ export function useBEBudgetRapprochement(
     queryKey: ['be-budget-factures-data', budgetLineId, facturesLiensCount],
     queryFn: async (): Promise<BEDivaltoMouvementGrouped[]> => {
       const liens = facturesLiensQuery.data ?? [];
-      const refs = Array.from(new Set(liens.map(l => l.numero_piece).filter(Boolean)));
+      const refs  = Array.from(new Set(liens.map(l => l.numero_piece).filter(Boolean)));
       if (refs.length === 0) return [];
       const { data, error } = await sb
-        .from('be_divalto_mouvements')
+        .from('divalto_mouvements_all')
         .select('*')
         .in('numero_piece', refs)
-        .in('type_mouv', FACTURES_TYPES);
+        .in('prefix', FACTURES_PREFIXES);
       if (error) throw error;
-      return groupBEMouvementsByPiece((data ?? []) as BEDivaltoMouvement[]);
+      return groupBEMouvementsByPiece((data ?? []).map(mapRow) as BEDivaltoMouvement[]);
     },
     enabled: !!budgetLineId && facturesLiensCount > 0,
   });
@@ -109,10 +134,10 @@ export function useBEBudgetRapprochement(
   ): Promise<BEDivaltoMouvementGrouped[]> => {
     if (!codeAffaire) return [];
     let q = sb
-      .from('be_divalto_mouvements')
+      .from('divalto_mouvements_all')
       .select('*')
       .eq('code_affaire', codeAffaire)
-      .in('type_mouv', typesMouv)
+      .in('prefix', typesMouv)  // prefix = type_mouv pour NASKEO
       .order('date_piece', { ascending: false })
       .limit(200);
     if (query.trim()) {
@@ -123,11 +148,11 @@ export function useBEBudgetRapprochement(
     }
     const { data, error } = await q;
     if (error) throw error;
-    return groupBEMouvementsByPiece((data ?? []) as BEDivaltoMouvement[]).slice(0, 50);
+    return groupBEMouvementsByPiece((data ?? []).map(mapRow) as BEDivaltoMouvement[]).slice(0, 50);
   };
 
   const searchCommandes = (query: string) => searchPieces(COMMANDES_TYPES, query);
-  const searchFactures = (query: string) => searchPieces(FACTURES_TYPES, query);
+  const searchFactures  = (query: string) => searchPieces(FACTURES_TYPES,  query);
 
   // ── Mutations link/unlink ────────────────────────────────────────────────
   const lierCommande = useMutation({
@@ -184,9 +209,9 @@ export function useBEBudgetRapprochement(
     },
   });
 
-  // ── Aggregats locaux ─────────────────────────────────────────────────────
+  // ── Agrégats locaux ─────────────────────────────────────────────────────
   const commandes = commandesQuery.data ?? [];
-  const factures = facturesQuery.data ?? [];
+  const factures  = facturesQuery.data  ?? [];
 
   const commandeLienByPiece = useMemo(() => {
     const m = new Map<string, BudgetLineLien>();
@@ -200,18 +225,18 @@ export function useBEBudgetRapprochement(
     return m;
   }, [facturesLiensQuery.data]);
 
-  const engage = commandes.reduce((s, p) => s + (p.montant_ht ?? 0), 0);
+  const engage  = commandes.reduce((s, p) => s + (p.montant_ht ?? 0), 0);
   const constate = factures.reduce((s, p) => s + (p.montant_ht ?? 0), 0);
 
   return {
     commandesLiees: commandes,
-    facturesLiees: factures,
+    facturesLiees:  factures,
     commandeLienByPiece,
     factureLienByPiece,
     isLoading:
       commandesLiensQuery.isLoading ||
-      facturesLiensQuery.isLoading ||
-      commandesQuery.isLoading ||
+      facturesLiensQuery.isLoading  ||
+      commandesQuery.isLoading      ||
       facturesQuery.isLoading,
     searchCommandes,
     searchFactures,

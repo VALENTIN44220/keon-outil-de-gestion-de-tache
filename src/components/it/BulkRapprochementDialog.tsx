@@ -132,15 +132,34 @@ export function BulkRapprochementDialog({
   const searchCommandes = useCallback(async (q: string) => {
     setSearching(true);
     try {
-      let req = supabase
-        .from('it_divalto_commandes')
-        .select('fullcdno, tiers, nomfournisseur, montant_ht, date_commande')
-        .order('date_commande', { ascending: false })
-        .limit(50);
-      if (q.trim()) req = req.ilike('fullcdno', `%${q.trim()}%`);
+      // Source unifiée : divalto_mouvements_all (remplace it_divalto_commandes)
+      let req = (supabase as any)
+        .from('divalto_mouvements_all')
+        .select('numero_piece, tiers_code, nom_tiers, montant_ht, date_piece')
+        .eq('doc_type', 'commande')
+        .order('date_piece', { ascending: false })
+        .limit(100);   // 2× pour absorber doublons éventuels
+      if (q.trim()) req = req.ilike('numero_piece', `%${q.trim()}%`);
       const { data, error } = await req;
       if (error) throw error;
-      setCommandes((data ?? []) as DivaltoCommande[]);
+
+      // Déduplique par numero_piece et mappe vers DivaltoCommande
+      const seen = new Map<string, DivaltoCommande>();
+      for (const d of data ?? []) {
+        const existing = seen.get(d.numero_piece);
+        if (!existing) {
+          seen.set(d.numero_piece, {
+            fullcdno:      d.numero_piece,
+            tiers:         d.tiers_code,
+            nomfournisseur: d.nom_tiers,
+            montant_ht:    d.montant_ht,
+            date_commande: d.date_piece,
+          });
+        } else {
+          existing.montant_ht = (existing.montant_ht ?? 0) + (d.montant_ht ?? 0);
+        }
+      }
+      setCommandes(Array.from(seen.values()).slice(0, 50));
     } catch (e) {
       toast({ title: 'Erreur', description: extractErrorMessage(e), variant: 'destructive' });
     } finally {
@@ -151,15 +170,28 @@ export function BulkRapprochementDialog({
   const searchFactures = useCallback(async (q: string) => {
     setSearching(true);
     try {
-      let req = supabase
-        .from('it_divalto_factures')
-        .select('reference, source, tiers, nomfournisseur, libelle, montant_ht, date_facture')
-        .order('date_facture', { ascending: false })
+      // Source unifiée : divalto_mouvements_all (remplace it_divalto_factures)
+      let req = (supabase as any)
+        .from('divalto_mouvements_all')
+        .select('numero_piece, source, tiers_code, nom_tiers, libelle, montant_ht, date_piece')
+        .eq('doc_type', 'facture')
+        .order('date_piece', { ascending: false })
         .limit(200);
-      if (q.trim()) req = req.ilike('reference', `%${q.trim()}%`);
+      if (q.trim()) req = req.ilike('numero_piece', `%${q.trim()}%`);
       const { data, error } = await req;
       if (error) throw error;
-      const grouped = groupFacturesByReference((data ?? []) as DivaltoFactureRaw[]);
+
+      // Mappe au format DivaltoFactureRaw attendu par groupFacturesByReference
+      const rawRows: DivaltoFactureRaw[] = (data ?? []).map((d: any) => ({
+        reference:     d.numero_piece,
+        source:        d.source,
+        tiers:         d.tiers_code,
+        nomfournisseur: d.nom_tiers,
+        libelle:       d.libelle,
+        montant_ht:    d.montant_ht,
+        date_facture:  d.date_piece,
+      }));
+      const grouped = groupFacturesByReference(rawRows);
       setFactures(grouped.slice(0, 50));
     } catch (e) {
       toast({ title: 'Erreur', description: extractErrorMessage(e), variant: 'destructive' });

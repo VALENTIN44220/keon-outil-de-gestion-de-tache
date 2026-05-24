@@ -308,10 +308,11 @@ export function NewBERequestDialog({
       const cmdMap = new Map<string, Set<string>>();
       if (codes.length > 0) {
         const { data: mvts } = await sb
-          .from('be_divalto_mouvements')
+          .from('divalto_mouvements_all')
           .select('code_affaire,numero_piece')
           .in('code_affaire', codes)
-          .or('numero_piece.ilike.CCN%,numero_piece.ilike.DCN%');
+          // prefix CCN = commande client NASKEO, DCN = devis client NASKEO
+          .in('prefix', ['CCN', 'DCN', 'CCK', 'DCK']);
         for (const m of (mvts ?? []) as any[]) {
           if (!m.code_affaire || !m.numero_piece) continue;
           if (!cmdMap.has(m.code_affaire)) cmdMap.set(m.code_affaire, new Set());

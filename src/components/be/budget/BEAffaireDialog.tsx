@@ -95,10 +95,11 @@ export function BEAffaireDialog({
     (async () => {
       const sb = supabase as any;
       const { data, error } = await sb
-        .from('be_divalto_mouvements')
+        .from('divalto_mouvements_all')
         .select('date_piece')
         .eq('code_affaire', code)
-        .eq('type_mouv', 'CCN')
+        .eq('doc_type', 'commande')
+        .ilike('tiers_code', 'C%')   // client (CA) = CCN équivalent
         .not('date_piece', 'is', null)
         .order('date_piece', { ascending: true })
         .limit(1);

@@ -20,8 +20,13 @@ export interface BEAffaireMonthRow {
   cout_rh: number;
 }
 
+/**
+ * Ligne brute lue depuis divalto_mouvements_all.
+ * Convention : C* = client (CA, stocké négatif) ; F* = fournisseur (COGS, positif).
+ */
 interface MouvRow {
-  type_mouv: 'CCN' | 'CFN' | 'FCN' | 'FFN';
+  doc_type: 'commande' | 'facture';
+  tiers_code: string | null;
   date_piece: string | null;
   montant_ht: number | null;
 }
@@ -43,8 +48,9 @@ interface TjmRow {
 }
 
 /**
- * Aggregation MENSUELLE pour une affaire :
+ * Agrégation MENSUELLE pour une affaire :
  *   CA / COGS / NDF / RH par mois sur la plage [dateFrom, dateTo].
+ * Source : divalto_mouvements_all (classification par code tiers C*/F*).
  * Si dateFrom/dateTo NULL : tout l'historique.
  */
 export function useBEAffaireMonthly(
@@ -57,35 +63,35 @@ export function useBEAffaireMonthly(
     queryFn: async (): Promise<BEAffaireMonthRow[]> => {
       if (!codeAffaire) return [];
 
-      // 1. Mouvements
+      // 1. Mouvements Divalto (source unifiée)
       let mvQuery = sb
-        .from('be_divalto_mouvements')
-        .select('type_mouv,date_piece,montant_ht')
+        .from('divalto_mouvements_all')
+        .select('doc_type,tiers_code,date_piece,montant_ht')
         .eq('code_affaire', codeAffaire)
         .not('date_piece', 'is', null);
       if (dateFrom) mvQuery = mvQuery.gte('date_piece', dateFrom);
-      if (dateTo) mvQuery = mvQuery.lte('date_piece', dateTo);
+      if (dateTo)   mvQuery = mvQuery.lte('date_piece', dateTo);
       const { data: mvData, error: mvErr } = await mvQuery;
       if (mvErr) throw mvErr;
 
-      // 2. Saisies temps + profile poste pour cout RH
+      // 2. Saisies temps + profil poste pour coût RH
       let stQuery = sb
         .from('lucca_saisie_temps')
         .select('date_saisie,duree_heures,profiles(be_poste)')
         .eq('code_site', codeAffaire);
       if (dateFrom) stQuery = stQuery.gte('date_saisie', dateFrom);
-      if (dateTo) stQuery = stQuery.lte('date_saisie', dateTo);
+      if (dateTo)   stQuery = stQuery.lte('date_saisie', dateTo);
       const { data: stData, error: stErr } = await stQuery;
       if (stErr) throw stErr;
 
-      // 3. NDF Lucca filtrees par axe_1 = prefixe 5 chars du code_affaire
+      // 3. NDF Lucca filtrées par axe_1 = préfixe 5 chars du code_affaire
       const code5 = codeAffaire.length >= 5 ? codeAffaire.substring(0, 5) : codeAffaire;
       let ndfQuery = sb
         .from('lucca_notes_frais')
         .select('date_depense,montant_ht')
         .eq('axe_1', code5);
       if (dateFrom) ndfQuery = ndfQuery.gte('date_depense', dateFrom);
-      if (dateTo) ndfQuery = ndfQuery.lte('date_depense', dateTo);
+      if (dateTo)   ndfQuery = ndfQuery.lte('date_depense', dateTo);
       const { data: ndfData } = await ndfQuery;
 
       // 4. TJM
@@ -95,7 +101,7 @@ export function useBEAffaireMonthly(
         tjmByPoste.set(t.poste, Number(t.tjm) || 0);
       }
 
-      // Aggregation par mois
+      // Agrégation par mois
       const months = new Map<string, BEAffaireMonthRow>();
       const ensure = (mois: string): BEAffaireMonthRow => {
         let row = months.get(mois);
@@ -114,17 +120,21 @@ export function useBEAffaireMonthly(
         return row;
       };
 
-      // Mouvements
+      // Mouvements Divalto
+      // Convention : C* → montant_ht stocké négatif → negate pour CA positif
       for (const m of (mvData ?? []) as MouvRow[]) {
         if (!m.date_piece) continue;
         const mois = m.date_piece.slice(0, 7);
-        const row = ensure(mois);
-        const ht = m.montant_ht ?? 0;
-        switch (m.type_mouv) {
-          case 'CCN': row.ca_engage += ht; break;
-          case 'FCN': row.ca_constate += ht; break;
-          case 'CFN': row.cogs_engage += ht; break;
-          case 'FFN': row.cogs_constate += ht; break;
+        const row  = ensure(mois);
+        const ht   = m.montant_ht ?? 0;
+        const isClient = m.tiers_code?.startsWith('C') ?? false;
+        const isFourni = m.tiers_code?.startsWith('F') ?? false;
+        if (m.doc_type === 'commande') {
+          if (isClient) row.ca_engage    -= ht;  // negate
+          if (isFourni) row.cogs_engage  += ht;
+        } else if (m.doc_type === 'facture') {
+          if (isClient) row.ca_constate  -= ht;
+          if (isFourni) row.cogs_constate += ht;
         }
       }
 
@@ -132,7 +142,7 @@ export function useBEAffaireMonthly(
       for (const n of (ndfData ?? []) as NdfRow[]) {
         if (!n.date_depense) continue;
         const mois = n.date_depense.slice(0, 7);
-        const row = ensure(mois);
+        const row  = ensure(mois);
         row.ndf += Number(n.montant_ht) || 0;
       }
 
@@ -140,19 +150,19 @@ export function useBEAffaireMonthly(
       for (const s of (stData ?? []) as SaisieRow[]) {
         if (!s.date_saisie) continue;
         const mois = s.date_saisie.slice(0, 7);
-        const row = ensure(mois);
-        const h = Number(s.duree_heures) || 0;
+        const row  = ensure(mois);
+        const h    = Number(s.duree_heures) || 0;
         row.heures += h;
-        row.jours += h / 8;
+        row.jours  += h / 8;
         const poste = s.profiles?.be_poste ?? null;
-        const tjm = poste ? (tjmByPoste.get(poste) ?? 0) : 0;
+        const tjm   = poste ? (tjmByPoste.get(poste) ?? 0) : 0;
         row.cout_rh += (h / 8) * tjm;
       }
 
       // Calcul des marges (avec NDF)
       for (const row of months.values()) {
-        row.marge_brute = row.ca_constate - row.cogs_constate - row.ndf;
-        row.marge_directe = row.marge_brute - row.cout_rh;
+        row.marge_brute    = row.ca_constate - row.cogs_constate - row.ndf;
+        row.marge_directe  = row.marge_brute - row.cout_rh;
       }
 
       return Array.from(months.values()).sort((a, b) => a.mois.localeCompare(b.mois));

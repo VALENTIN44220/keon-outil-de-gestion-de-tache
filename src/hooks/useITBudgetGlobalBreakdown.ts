@@ -9,12 +9,10 @@ import { lineAnnualBudgetRevise } from '@/lib/itBudgetTotals';
  * budgétaire IT. Croise les lignes budgétaires en scope avec les commandes
  * et factures Divalto liées.
  *
- * Principes :
- * - Budget mensuel : déduit de `budget_type` (mensuel = 12× le montant ;
- *   annuel = montant unique sur `mois_budget`).
- * - Commandé : HT des commandes Divalto ventilé sur `date_commande`.
- * - Facturé : HT consolidé (gescom, fallback TTC/1.20 sur compta seul)
- *   des factures Divalto ventilé sur `date_facture`.
+ * Source : divalto_mouvements_all (en remplacement des anciennes tables
+ * it_divalto_commandes / it_divalto_factures).
+ * La résolution se fait en 2 étapes : (1) liens via it_budget_line_commandes/_factures,
+ * (2) lookup des montants dans divalto_mouvements_all par numero_piece.
  */
 
 const TVA_RATE = 0.20;
@@ -32,7 +30,7 @@ export interface SupplierRow {
   budget: number;
   commande: number;
   facture: number;
-  ecart: number;   // budget - facture (positif = économie, négatif = dépassement)
+  ecart: number;
 }
 
 /** Références Divalto rattachées à une ligne budgétaire. */
@@ -50,6 +48,19 @@ interface LineMin {
   montant_budget_revise: number | null;
 }
 
+/** Lien table it_budget_line_commandes */
+interface CommandeLink {
+  budget_line_id: string;
+  fullcdno: string;
+}
+
+/** Lien table it_budget_line_factures */
+interface FactureLink {
+  budget_line_id: string;
+  fullcdno_fac: string;
+}
+
+/** Données Divalto résolues pour une commande (forme interne compatible avec CommandeRaw). */
 interface CommandeRaw {
   budget_line_id: string;
   fullcdno: string;
@@ -59,11 +70,6 @@ interface CommandeRaw {
     montant_ht: number | null;
     date_commande: string | null;
   } | null;
-}
-
-interface FactureRaw {
-  budget_line_id: string;
-  fullcdno_fac: string;
 }
 
 interface DivaltoFactureRaw {
@@ -113,47 +119,96 @@ export function useITBudgetGlobalBreakdown(lines: ITBudgetLine[]) {
   const lineIds = useMemo(() => lines.map((l) => l.id), [lines]);
   const lineIdsKey = lineIds.join(',');
 
+  // ── Commandes : 2 étapes ─────────────────────────────────────────────────
+  // Étape 1 : liens it_budget_line_commandes → fullcdno
+  // Étape 2 : lookup dans divalto_mouvements_all par numero_piece
   const commandesQuery = useQuery({
     queryKey: ['it-budget-global-commandes', lineIdsKey],
     queryFn: async () => {
       if (lineIds.length === 0) return [] as CommandeRaw[];
-      const { data, error } = await supabase
+
+      // Étape 1 : liens
+      const { data: links, error: e1 } = await supabase
         .from('it_budget_line_commandes')
-        .select('budget_line_id, fullcdno, it_divalto_commandes(tiers, nomfournisseur, montant_ht, date_commande)')
+        .select('budget_line_id, fullcdno')
         .in('budget_line_id', lineIds);
-      if (error) throw error;
-      return (data ?? []) as unknown as CommandeRaw[];
+      if (e1) throw e1;
+      const linksArr = (links ?? []) as CommandeLink[];
+      const refs = Array.from(new Set(linksArr.map(l => l.fullcdno).filter(Boolean)));
+      if (refs.length === 0) {
+        return linksArr.map(l => ({ budget_line_id: l.budget_line_id, fullcdno: l.fullcdno, it_divalto_commandes: null })) as CommandeRaw[];
+      }
+
+      // Étape 2 : données Divalto
+      const { data: divaltoData, error: e2 } = await (supabase as any)
+        .from('divalto_mouvements_all')
+        .select('numero_piece, tiers_code, nom_tiers, montant_ht, date_piece')
+        .in('numero_piece', refs)
+        .eq('doc_type', 'commande');
+      if (e2) throw e2;
+
+      // Agrégat par pièce (somme multi-lignes éventuelles)
+      const dMap = new Map<string, { tiers: string|null; nomfournisseur: string|null; montant_ht: number|null; date_commande: string|null }>();
+      for (const d of divaltoData ?? []) {
+        const existing = dMap.get(d.numero_piece);
+        if (!existing) {
+          dMap.set(d.numero_piece, { tiers: d.tiers_code, nomfournisseur: d.nom_tiers, montant_ht: d.montant_ht, date_commande: d.date_piece });
+        } else {
+          existing.montant_ht = (existing.montant_ht ?? 0) + (d.montant_ht ?? 0);
+        }
+      }
+
+      return linksArr.map(l => ({
+        budget_line_id: l.budget_line_id,
+        fullcdno: l.fullcdno,
+        it_divalto_commandes: dMap.get(l.fullcdno) ?? null,
+      })) as CommandeRaw[];
     },
     enabled: lineIds.length > 0,
   });
 
+  // ── Factures : 2 étapes ──────────────────────────────────────────────────
   const facturesQuery = useQuery({
     queryKey: ['it-budget-global-factures', lineIdsKey],
     queryFn: async () => {
-      if (lineIds.length === 0) return { links: [] as FactureRaw[], consolide: new Map() };
-      const { data: links, error: e1 } = await supabase
+      if (lineIds.length === 0) return { links: [] as FactureLink[], consolide: new Map() };
+
+      // Étape 1 : liens
+      const { data: linksData, error: e1 } = await supabase
         .from('it_budget_line_factures')
         .select('budget_line_id, fullcdno_fac')
         .in('budget_line_id', lineIds);
       if (e1) throw e1;
-      const refs = Array.from(new Set((links ?? []).map((l: { fullcdno_fac: string | null }) => l.fullcdno_fac).filter((v): v is string => !!v)));
+      const linksArr = (linksData ?? []) as FactureLink[];
+      const refs = Array.from(new Set(linksArr.map(l => l.fullcdno_fac).filter(Boolean)));
       if (refs.length === 0) {
-        return { links: (links ?? []) as unknown as FactureRaw[], consolide: new Map() };
+        return { links: linksArr, consolide: new Map() };
       }
-      const { data: rows, error: e2 } = await supabase
-        .from('it_divalto_factures')
-        .select('reference, source, tiers, nomfournisseur, montant_ht, date_facture')
-        .in('reference', refs);
+
+      // Étape 2 : données Divalto
+      const { data: divaltoData, error: e2 } = await (supabase as any)
+        .from('divalto_mouvements_all')
+        .select('numero_piece, source, tiers_code, nom_tiers, montant_ht, date_piece')
+        .in('numero_piece', refs)
+        .eq('doc_type', 'facture');
       if (e2) throw e2;
-      return {
-        links: (links ?? []) as unknown as FactureRaw[],
-        consolide: consolideFactures((rows ?? []) as DivaltoFactureRaw[]),
-      };
+
+      // Mappe au format DivaltoFactureRaw pour consolideFactures
+      const rawRows: DivaltoFactureRaw[] = (divaltoData ?? []).map((d: any) => ({
+        reference:    d.numero_piece,
+        source:       d.source,
+        tiers:        d.tiers_code,
+        nomfournisseur: d.nom_tiers,
+        montant_ht:   d.montant_ht,
+        date_facture: d.date_piece,
+      }));
+
+      return { links: linksArr, consolide: consolideFactures(rawRows) };
     },
     enabled: lineIds.length > 0,
   });
 
-  /** Map budget_line_id → fournisseur_prevu (pour retomber sur un tiers quand la commande n'a pas le tiers renseigné). */
+  /** Map budget_line_id → fournisseur_prevu */
   const lineById = useMemo(() => {
     const m = new Map<string, LineMin>();
     for (const l of lines) {
@@ -169,7 +224,7 @@ export function useITBudgetGlobalBreakdown(lines: ITBudgetLine[]) {
     return m;
   }, [lines]);
 
-  // ── Ventilation mensuelle ─────────────────────────────────────────────
+  // ── Ventilation mensuelle ─────────────────────────────────────────────────
   const monthlyRows: MonthlyRow[] = useMemo(() => {
     const init: MonthlyRow[] = Array.from({ length: 12 }, (_, i) => ({
       mois: i + 1, budget: 0, commande: 0, facture: 0,
@@ -204,13 +259,11 @@ export function useITBudgetGlobalBreakdown(lines: ITBudgetLine[]) {
     return init;
   }, [lines, commandesQuery.data, facturesQuery.data]);
 
-  // ── Vue par fournisseur ───────────────────────────────────────────────
+  // ── Vue par fournisseur ───────────────────────────────────────────────────
   const supplierRows: SupplierRow[] = useMemo(() => {
     const map = new Map<string, SupplierRow>();
-    const keyOf = (tiers: string | null, nom: string | null) => {
-      const k = (tiers ?? '').trim() || (nom ?? '').trim() || '—';
-      return k;
-    };
+    const keyOf = (tiers: string | null, nom: string | null) =>
+      (tiers ?? '').trim() || (nom ?? '').trim() || '—';
     const getOrInit = (tiers: string | null, nom: string | null): SupplierRow => {
       const key = keyOf(tiers, nom);
       let s = map.get(key);
@@ -221,7 +274,6 @@ export function useITBudgetGlobalBreakdown(lines: ITBudgetLine[]) {
       return s;
     };
 
-    // Budget : on utilise le fournisseur_prevu de la ligne
     for (const l of lines) {
       const tiers = l.fournisseur_prevu ?? null;
       if (!tiers) continue;
@@ -229,20 +281,18 @@ export function useITBudgetGlobalBreakdown(lines: ITBudgetLine[]) {
       s.budget += lineAnnualBudgetRevise(l);
     }
 
-    // Commandes : prend le tiers de la commande (fallback ligne si vide)
     for (const c of commandesQuery.data ?? []) {
       const div = c.it_divalto_commandes;
       if (!div) continue;
       const line = lineById.get(c.budget_line_id);
       const tiers = div.tiers ?? line?.fournisseur_prevu ?? null;
-      const nom = div.nomfournisseur;
+      const nom   = div.nomfournisseur;
       if (!tiers && !nom) continue;
       const s = getOrInit(tiers, nom);
       if (!s.nomfournisseur && nom) s.nomfournisseur = nom;
       s.commande += div.montant_ht ?? 0;
     }
 
-    // Factures : même logique via consolide
     if (facturesQuery.data) {
       const { links, consolide } = facturesQuery.data;
       for (const link of links) {
@@ -264,7 +314,7 @@ export function useITBudgetGlobalBreakdown(lines: ITBudgetLine[]) {
     return Array.from(map.values()).sort((a, b) => b.budget - a.budget);
   }, [lines, commandesQuery.data, facturesQuery.data, lineById]);
 
-  // ── Mapping ligne → références Divalto liées (pour le regroupement UI) ─
+  // ── Mapping ligne → références Divalto liées ─────────────────────────────
   const linkedRefs: Map<string, LineLinkedRefs> = useMemo(() => {
     const map = new Map<string, LineLinkedRefs>();
     const getOrInit = (id: string): LineLinkedRefs => {

@@ -47,7 +47,8 @@ interface AffaireRow {
 
 interface MouvRow {
   code_affaire: string | null;
-  type_mouv: 'CCN' | 'CFN' | 'FCN' | 'FFN';
+  /** Préfixe Divalto (ex: CCN, FCN, CFN, FFN) — identique à l'ancien type_mouv pour NASKEO. */
+  prefix: string;
   numero_piece: string;
   date_piece: string | null;
   montant_ht: number | null;
@@ -81,12 +82,12 @@ export function useBEProjectTimelineEvents(projectId: string | undefined) {
 
       const codes = affaires.map((a) => a.code_affaire);
 
-      // 2. Mouvements Divalto (CCN/CFN/FCN/FFN) avec date renseignee
+      // 2. Mouvements Divalto (source unifiée) avec date renseignée
       const { data: mvData, error: mvErr } = await sb
-        .from('be_divalto_mouvements')
-        .select('code_affaire,type_mouv,numero_piece,date_piece,montant_ht,nom_tiers')
+        .from('divalto_mouvements_all')
+        .select('code_affaire,prefix,numero_piece,date_piece,montant_ht,nom_tiers')
         .in('code_affaire', codes)
-        .in('type_mouv', ['CCN', 'CFN', 'FCN', 'FFN'])
+        .in('prefix', ['CCN', 'CFN', 'FCN', 'FFN'])
         .not('date_piece', 'is', null);
       if (mvErr) throw mvErr;
       const mouvs = (mvData ?? []) as MouvRow[];
@@ -114,17 +115,18 @@ export function useBEProjectTimelineEvents(projectId: string | undefined) {
           });
         }
 
-        // Mouvements Divalto
+        // Mouvements Divalto (source unifiée)
+        // Convention : FCN = facture client (CA) → montant_ht négatif → negate
         let totalCa = 0;
         for (const m of mouvs.filter((x) => x.code_affaire === a.code_affaire)) {
           if (!m.date_piece) continue;
-          if (m.type_mouv === 'FCN') totalCa += m.montant_ht ?? 0;
+          if (m.prefix === 'FCN') totalCa -= m.montant_ht ?? 0;  // negate : stocké négatif
           events.push({
-            id: `${m.type_mouv}-${m.numero_piece}`,
+            id: `${m.prefix}-${m.numero_piece}`,
             affaire_id: a.id,
-            type: m.type_mouv,
+            type: m.prefix as BETimelineEventType,
             date: m.date_piece.slice(0, 10),
-            label: `${m.type_mouv} ${m.numero_piece}`,
+            label: `${m.prefix} ${m.numero_piece}`,
             numero_piece: m.numero_piece,
             montant_ht: m.montant_ht,
             tiers: m.nom_tiers,
