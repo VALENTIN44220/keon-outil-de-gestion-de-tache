@@ -53,7 +53,7 @@ interface TjmRow {
 
 /**
  * Hook unifié KPI affaire avec filtre période.
- * Source : divalto_mouvements_all (classification par code tiers C*/F*).
+ * Source : divalto_mouvements_all (classification par code tiers C% client, F% fournisseur).
  * Si dateFrom/dateTo NULL : pas de filtre (tout l'historique).
  */
 export function useBEAffaireKpiByPeriod(

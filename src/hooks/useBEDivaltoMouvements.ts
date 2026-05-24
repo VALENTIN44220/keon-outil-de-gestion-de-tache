@@ -115,7 +115,7 @@ export interface UseBEDivaltoOptions {
 /**
  * Mouvements Divalto rattachés à une affaire (via code_affaire),
  * consolidés gescom/compta par pièce. Limite à 500 lignes brutes.
- * Source : divalto_mouvements_all (classification par code tiers C*/F*).
+ * Source : divalto_mouvements_all (classification par code tiers C% client, F% fournisseur).
  */
 export function useBEDivaltoMouvements(
   codeAffaire: string | null | undefined,

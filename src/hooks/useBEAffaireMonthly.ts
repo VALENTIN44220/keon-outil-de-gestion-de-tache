@@ -50,7 +50,7 @@ interface TjmRow {
 /**
  * Agrégation MENSUELLE pour une affaire :
  *   CA / COGS / NDF / RH par mois sur la plage [dateFrom, dateTo].
- * Source : divalto_mouvements_all (classification par code tiers C*/F*).
+ * Source : divalto_mouvements_all (classification par code tiers C% client, F% fournisseur).
  * Si dateFrom/dateTo NULL : tout l'historique.
  */
 export function useBEAffaireMonthly(
