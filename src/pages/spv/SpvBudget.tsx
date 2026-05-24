@@ -182,6 +182,7 @@ interface PieceGroup {
   date_piece: string | null;
   tiers_code: string | null;
   nom_tiers: string | null;
+  libelle_entete: string | null; // titre de la pièce (ent_gold)
   categorie: SpvPieceCategorie;
   montantTotal: number;
   lines: PieceLine[];
@@ -223,10 +224,11 @@ function PiecesBreakdown({ codeAffaire }: { codeAffaire: string }) {
       if (!groupMap.has(key)) {
         groupMap.set(key, {
           key,
-          numero_piece: hasPiece ? p.numero_piece : null,
-          date_piece:   p.date_piece,
-          tiers_code:   p.tiers_code,
-          nom_tiers:    p.nom_tiers,
+          numero_piece:   hasPiece ? p.numero_piece : null,
+          date_piece:     p.date_piece,
+          tiers_code:     p.tiers_code,
+          nom_tiers:      p.nom_tiers,
+          libelle_entete: p.libelle_entete ?? null,
           categorie,
           montantTotal: 0,
           lines: [],
@@ -310,6 +312,7 @@ function PiecesBreakdown({ codeAffaire }: { codeAffaire: string }) {
                 <TableHead className="h-7 text-[11px]">Date</TableHead>
                 <TableHead className="h-7 text-[11px]">Type</TableHead>
                 <TableHead className="h-7 text-[11px]">N° pièce</TableHead>
+                <TableHead className="h-7 text-[11px]">Objet (entête)</TableHead>
                 <TableHead className="h-7 text-[11px]">Tiers</TableHead>
                 <TableHead className="h-7 text-[11px] text-right">Total</TableHead>
               </TableRow>
@@ -346,7 +349,7 @@ function PiecesBreakdown({ codeAffaire }: { codeAffaire: string }) {
                           {SPV_PIECE_CAT_LABEL[g.categorie]}
                         </span>
                       </TableCell>
-                      <TableCell className="py-1 text-xs font-mono font-medium">
+                      <TableCell className="py-1 text-xs font-mono font-medium whitespace-nowrap">
                         {g.numero_piece ?? <span className="text-muted-foreground italic">—</span>}
                         {multiLine && (
                           <span className="ml-1.5 text-[10px] text-muted-foreground font-sans font-normal">
@@ -354,7 +357,10 @@ function PiecesBreakdown({ codeAffaire }: { codeAffaire: string }) {
                           </span>
                         )}
                       </TableCell>
-                      <TableCell className="py-1 text-[11px] text-muted-foreground">
+                      <TableCell className="py-1 text-[11px] text-muted-foreground max-w-[220px] truncate" title={g.libelle_entete ?? ''}>
+                        {g.libelle_entete ?? <span className="italic opacity-40">—</span>}
+                      </TableCell>
+                      <TableCell className="py-1 text-[11px] text-muted-foreground whitespace-nowrap">
                         {g.nom_tiers ?? g.tiers_code ?? '—'}
                       </TableCell>
                       <TableCell className="py-1 text-xs text-right tabular-nums font-semibold">

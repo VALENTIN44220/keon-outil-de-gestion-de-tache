@@ -168,7 +168,8 @@ export interface SpvAffairePiece {
   nom_tiers: string | null;
   montant_ht: number;          // signé brut (client négatif, fournisseur positif)
   date_piece: string | null;
-  libelle: string | null;
+  libelle: string | null;       // libellé de la ligne analytique (mouv_gold.des)
+  libelle_entete: string | null; // libellé entête pièce (ent_gold.des) — même valeur pour toutes les lignes d'une pièce
 }
 
 /** Toutes les pièces Divalto rattachées à une affaire SPV (par projet axe_0001). */
@@ -179,7 +180,7 @@ export function useSpvAffairePieces(codeAffaire: string | null) {
     queryFn: async (): Promise<SpvAffairePiece[]> => {
       const { data, error } = await sb
         .from('divalto_mouvements_all')
-        .select('doc_type, numero_piece, prefix, tiers_code, nom_tiers, montant_ht, date_piece, libelle')
+        .select('doc_type, numero_piece, prefix, tiers_code, nom_tiers, montant_ht, date_piece, libelle, libelle_entete')
         .eq('axe_0001', codeAffaire)
         .order('date_piece', { ascending: false });
       if (error) throw error;
