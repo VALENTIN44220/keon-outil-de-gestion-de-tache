@@ -71,10 +71,13 @@ export interface SpvAffaireBudgetKpi {
   ca_constate_brut: number;
   cogs_engage_brut: number;
   cogs_constate_brut: number;
+  devis_client_brut: number;
+  devis_fournisseur_brut: number;
   marge_brute: number;
   marge_directe: number;
   nb_commandes: number;
   nb_factures: number;
+  nb_devis: number;
   jours_declares: number;
   cout_rh_declare: number;
   budget_total: number;
@@ -158,7 +161,7 @@ export function useSpvBudgetLines(spvAffaireId: string | null) {
 // ── Détail des pièces Divalto d'une affaire (devis/commandes/factures) ──────
 
 export interface SpvAffairePiece {
-  doc_type: string;            // 'commande' | 'facture'
+  doc_type: string;            // 'commande' | 'facture' | 'devis'
   numero_piece: string | null;
   prefix: string | null;
   tiers_code: string | null;
@@ -185,25 +188,40 @@ export function useSpvAffairePieces(codeAffaire: string | null) {
   });
 }
 
-export type SpvPieceCategorie = 'ca_vendu' | 'ca_constate' | 'cogs_engage' | 'cogs_constate' | 'autre';
+export type SpvPieceCategorie =
+  | 'ca_vendu'
+  | 'ca_constate'
+  | 'cogs_engage'
+  | 'cogs_constate'
+  | 'devis_client'
+  | 'devis_fournisseur'
+  | 'autre';
 
 export const SPV_PIECE_CAT_LABEL: Record<SpvPieceCategorie, string> = {
-  ca_vendu:      'Commande client (CA vendu)',
-  ca_constate:   'Facture client (CA constaté)',
-  cogs_engage:   'Commande fournisseur (COGS engagé)',
-  cogs_constate: 'Facture fournisseur (COGS constaté)',
-  autre:         'Autre',
+  ca_vendu:          'Commande client (CA vendu)',
+  ca_constate:       'Facture client (CA constaté)',
+  cogs_engage:       'Commande fournisseur (COGS engagé)',
+  cogs_constate:     'Facture fournisseur (COGS constaté)',
+  devis_client:      'Devis client',
+  devis_fournisseur: 'Devis fournisseur',
+  autre:             'Autre',
 };
 
 /** Catégorise une pièce + renvoie le montant "présentable" (positif). */
 export function classifySpvPiece(p: SpvAffairePiece): { categorie: SpvPieceCategorie; montant: number; isCA: boolean } {
-  const isClient = (p.tiers_code ?? '').toUpperCase().startsWith('C');
+  const isClient     = (p.tiers_code ?? '').toUpperCase().startsWith('C');
   const isFournisseur = (p.tiers_code ?? '').toUpperCase().startsWith('F');
-  const isFacture = p.doc_type === 'facture';
+  const isFacture    = p.doc_type === 'facture';
+  const isDevis      = p.doc_type === 'devis';
   // client = négatif en base → on inverse pour présenter du positif
   const montant = isClient ? -Number(p.montant_ht || 0) : Number(p.montant_ht || 0);
   let categorie: SpvPieceCategorie = 'autre';
-  if (isClient) categorie = isFacture ? 'ca_constate' : 'ca_vendu';
-  else if (isFournisseur) categorie = isFacture ? 'cogs_constate' : 'cogs_engage';
+  if (isDevis) {
+    categorie = isClient ? 'devis_client' : isFournisseur ? 'devis_fournisseur' : 'autre';
+  } else if (isClient) {
+    categorie = isFacture ? 'ca_constate' : 'ca_vendu';
+  } else if (isFournisseur) {
+    categorie = isFacture ? 'cogs_constate' : 'cogs_engage';
+  }
   return { categorie, montant, isCA: isClient };
 }
