@@ -13,7 +13,7 @@
  * table spv_affaire_budget_lines.
  */
 
-import { Fragment, useMemo, useRef, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { Card, CardContent } from '@/components/ui/card';
@@ -188,23 +188,17 @@ interface PieceGroup {
   lines: PieceLine[];
 }
 
-function PiecesBreakdown({ codeAffaire }: { codeAffaire: string }) {
+// ── Hook partagé : calcul groupes + mois (React Query cache = 1 seul fetch) ──
+const ZERO_CATS: Record<SpvPieceCategorie, number> = {
+  ca_vendu: 0, ca_constate: 0, cogs_engage: 0, cogs_constate: 0,
+  devis_client: 0, devis_fournisseur: 0, autre: 0,
+};
+
+function useSpvPiecesData(codeAffaire: string) {
   const { data: pieces = [], isLoading } = useSpvAffairePieces(codeAffaire);
-  const [expandedPieces, setExpandedPieces] = useState<Set<string>>(new Set());
 
-  const togglePiece = (key: string) =>
-    setExpandedPieces(prev => {
-      const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
-      return next;
-    });
-
-  const { totals, byMonth, groups } = useMemo(() => {
-    const ZERO: Record<SpvPieceCategorie, number> = {
-      ca_vendu: 0, ca_constate: 0, cogs_engage: 0, cogs_constate: 0,
-      devis_client: 0, devis_fournisseur: 0, autre: 0,
-    };
-    const totals: Record<SpvPieceCategorie, number> = { ...ZERO };
+  const computed = useMemo(() => {
+    const totals: Record<SpvPieceCategorie, number> = { ...ZERO_CATS };
     const monthMap = new Map<string, Record<SpvPieceCategorie, number>>();
     const groupMap = new Map<string, PieceGroup>();
     let noKeyIdx = 0;
@@ -214,10 +208,9 @@ function PiecesBreakdown({ codeAffaire }: { codeAffaire: string }) {
       totals[categorie] += montant;
 
       const mois = (p.date_piece ?? '').slice(0, 7) || '—';
-      if (!monthMap.has(mois)) monthMap.set(mois, { ...ZERO });
+      if (!monthMap.has(mois)) monthMap.set(mois, { ...ZERO_CATS });
       monthMap.get(mois)![categorie] += montant;
 
-      // Clé de groupe = numero_piece si valide, sinon fallback unique
       const hasPiece = p.numero_piece && p.numero_piece !== '0';
       const key = hasPiece ? p.numero_piece! : `__${noKeyIdx++}`;
 
@@ -230,8 +223,8 @@ function PiecesBreakdown({ codeAffaire }: { codeAffaire: string }) {
           nom_tiers:      p.nom_tiers,
           libelle_entete: p.libelle_entete ?? null,
           categorie,
-          montantTotal: 0,
-          lines: [],
+          montantTotal:   0,
+          lines:          [],
         });
       }
       const g = groupMap.get(key)!;
@@ -243,18 +236,21 @@ function PiecesBreakdown({ codeAffaire }: { codeAffaire: string }) {
       const d = (b.date_piece ?? '').localeCompare(a.date_piece ?? '');
       return d !== 0 ? d : (a.numero_piece ?? '').localeCompare(b.numero_piece ?? '');
     });
-
     const byMonth = Array.from(monthMap.entries()).sort((a, b) => b[0].localeCompare(a[0]));
     return { totals, byMonth, groups };
   }, [pieces]);
 
+  return { ...computed, isLoading, isEmpty: pieces.length === 0 };
+}
+
+// ── Onglet Ventilation mensuelle ─────────────────────────────────────────────
+function MensuelBreakdown({ codeAffaire }: { codeAffaire: string }) {
+  const { totals, byMonth, isLoading, isEmpty } = useSpvPiecesData(codeAffaire);
   if (isLoading) return <Skeleton className="h-24 w-full" />;
-  if (pieces.length === 0) return <p className="text-xs text-muted-foreground">Aucune pièce Divalto pour cette affaire.</p>;
-
+  if (isEmpty) return <p className="text-xs text-muted-foreground">Aucune pièce Divalto pour cette affaire.</p>;
   const hasDevis = totals.devis_client > 0 || totals.devis_fournisseur > 0;
-
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Résumé par catégorie */}
       <div className={cn('grid gap-2', hasDevis ? 'grid-cols-2 lg:grid-cols-5' : 'grid-cols-2 lg:grid-cols-4')}>
         {CAT_ORDER.filter(c => c !== 'devis_client' || hasDevis).map((c) => (
@@ -264,132 +260,128 @@ function PiecesBreakdown({ codeAffaire }: { codeAffaire: string }) {
           </div>
         ))}
       </div>
-
-      {/* Ventilation mensuelle */}
-      <div>
-        <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1 flex items-center gap-1.5">
-          <CalendarDays className="h-3.5 w-3.5" /> Ventilation mensuelle
-        </p>
-        <div className="rounded-lg border overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="h-7 text-[11px]">Mois</TableHead>
-                <TableHead className="h-7 text-[11px] text-right">CA vendu</TableHead>
-                <TableHead className="h-7 text-[11px] text-right">CA constaté</TableHead>
-                <TableHead className="h-7 text-[11px] text-right">COGS engagé</TableHead>
-                <TableHead className="h-7 text-[11px] text-right">COGS constaté</TableHead>
-                {hasDevis && <TableHead className="h-7 text-[11px] text-right">Devis client</TableHead>}
+      {/* Table mensuelle */}
+      <div className="rounded-lg border overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="h-7 text-[11px]">Mois</TableHead>
+              <TableHead className="h-7 text-[11px] text-right">CA vendu</TableHead>
+              <TableHead className="h-7 text-[11px] text-right">CA constaté</TableHead>
+              <TableHead className="h-7 text-[11px] text-right">COGS engagé</TableHead>
+              <TableHead className="h-7 text-[11px] text-right">COGS constaté</TableHead>
+              {hasDevis && <TableHead className="h-7 text-[11px] text-right">Devis client</TableHead>}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {byMonth.map(([mois, v]) => (
+              <TableRow key={mois} className="hover:bg-muted/40">
+                <TableCell className="py-1 text-xs font-medium tabular-nums">{mois}</TableCell>
+                <TableCell className="py-1 text-xs text-right tabular-nums">{v.ca_vendu    ? eur(v.ca_vendu)    : '—'}</TableCell>
+                <TableCell className="py-1 text-xs text-right tabular-nums">{v.ca_constate ? eur(v.ca_constate) : '—'}</TableCell>
+                <TableCell className="py-1 text-xs text-right tabular-nums">{v.cogs_engage   ? eur(v.cogs_engage)   : '—'}</TableCell>
+                <TableCell className="py-1 text-xs text-right tabular-nums">{v.cogs_constate ? eur(v.cogs_constate) : '—'}</TableCell>
+                {hasDevis && <TableCell className="py-1 text-xs text-right tabular-nums">{v.devis_client ? eur(v.devis_client) : '—'}</TableCell>}
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {byMonth.map(([mois, v]) => (
-                <TableRow key={mois} className="hover:bg-muted/40">
-                  <TableCell className="py-1 text-xs font-medium tabular-nums">{mois}</TableCell>
-                  <TableCell className="py-1 text-xs text-right tabular-nums">{v.ca_vendu    ? eur(v.ca_vendu)    : '—'}</TableCell>
-                  <TableCell className="py-1 text-xs text-right tabular-nums">{v.ca_constate ? eur(v.ca_constate) : '—'}</TableCell>
-                  <TableCell className="py-1 text-xs text-right tabular-nums">{v.cogs_engage   ? eur(v.cogs_engage)   : '—'}</TableCell>
-                  <TableCell className="py-1 text-xs text-right tabular-nums">{v.cogs_constate ? eur(v.cogs_constate) : '—'}</TableCell>
-                  {hasDevis && <TableCell className="py-1 text-xs text-right tabular-nums">{v.devis_client ? eur(v.devis_client) : '—'}</TableCell>}
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}
+
+// ── Onglet Pièces (groupé par N° pièce, expand/collapse) ────────────────────
+function PiecesDetail({ codeAffaire }: { codeAffaire: string }) {
+  const { groups, isLoading, isEmpty } = useSpvPiecesData(codeAffaire);
+  const [expandedPieces, setExpandedPieces] = useState<Set<string>>(new Set());
+
+  const togglePiece = (key: string) =>
+    setExpandedPieces(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+
+  if (isLoading) return <Skeleton className="h-24 w-full" />;
+  if (isEmpty) return <p className="text-xs text-muted-foreground">Aucune pièce Divalto pour cette affaire.</p>;
+
+  return (
+    <div className="rounded-lg border overflow-hidden max-h-[480px] overflow-y-auto">
+      <Table>
+        <TableHeader className="sticky top-0 bg-background z-10">
+          <TableRow className="hover:bg-transparent">
+            <TableHead className="h-7 w-6 text-[11px]" />
+            <TableHead className="h-7 text-[11px]">Date</TableHead>
+            <TableHead className="h-7 text-[11px]">Type</TableHead>
+            <TableHead className="h-7 text-[11px]">N° pièce</TableHead>
+            <TableHead className="h-7 text-[11px]">Objet (entête)</TableHead>
+            <TableHead className="h-7 text-[11px]">Tiers</TableHead>
+            <TableHead className="h-7 text-[11px] text-right">Total</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {groups.map((g) => {
+            const isExpanded = expandedPieces.has(g.key);
+            const multiLine = g.lines.length > 1;
+            return (
+              <Fragment key={g.key}>
+                <TableRow
+                  className={cn(
+                    'hover:bg-muted/40',
+                    multiLine ? 'cursor-pointer' : '',
+                    isExpanded ? 'bg-muted/20' : '',
+                  )}
+                  onClick={() => multiLine && togglePiece(g.key)}
+                >
+                  <TableCell className="py-1 pl-2">
+                    {multiLine
+                      ? isExpanded
+                        ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                        : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                      : <span className="w-3.5 inline-block" />}
+                  </TableCell>
+                  <TableCell className="py-1 text-xs tabular-nums">{g.date_piece ?? '—'}</TableCell>
+                  <TableCell className="py-1 text-xs">
+                    <span className={cn('font-medium', CAT_COLOR[g.categorie])}>
+                      {(g.categorie === 'devis_client' || g.categorie === 'devis_fournisseur') &&
+                        <FilePen className="h-3 w-3 inline mr-1 -mt-0.5" />}
+                      {SPV_PIECE_CAT_LABEL[g.categorie]}
+                    </span>
+                  </TableCell>
+                  <TableCell className="py-1 text-xs font-mono font-medium whitespace-nowrap">
+                    {g.numero_piece ?? <span className="text-muted-foreground italic">—</span>}
+                    {multiLine && (
+                      <span className="ml-1.5 text-[10px] text-muted-foreground font-sans font-normal">
+                        ({g.lines.length} lignes)
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell className="py-1 text-[11px] text-muted-foreground max-w-[220px] truncate" title={g.libelle_entete ?? ''}>
+                    {g.libelle_entete ?? <span className="italic opacity-40">—</span>}
+                  </TableCell>
+                  <TableCell className="py-1 text-[11px] text-muted-foreground whitespace-nowrap">
+                    {g.nom_tiers ?? g.tiers_code ?? '—'}
+                  </TableCell>
+                  <TableCell className="py-1 text-xs text-right tabular-nums font-semibold">
+                    {eur(g.montantTotal)}
+                  </TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
-
-      {/* Détail des pièces — groupé par numéro de pièce */}
-      <div>
-        <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide mb-1 flex items-center gap-1.5">
-          <FileText className="h-3.5 w-3.5" /> Pièces ({groups.length})
-          <span className="font-normal text-[10px]">· cliquer sur une ligne pour voir le détail</span>
-        </p>
-        <div className="rounded-lg border overflow-hidden max-h-[400px] overflow-y-auto">
-          <Table>
-            <TableHeader className="sticky top-0 bg-background z-10">
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="h-7 w-6 text-[11px]" />
-                <TableHead className="h-7 text-[11px]">Date</TableHead>
-                <TableHead className="h-7 text-[11px]">Type</TableHead>
-                <TableHead className="h-7 text-[11px]">N° pièce</TableHead>
-                <TableHead className="h-7 text-[11px]">Objet (entête)</TableHead>
-                <TableHead className="h-7 text-[11px]">Tiers</TableHead>
-                <TableHead className="h-7 text-[11px] text-right">Total</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {groups.map((g) => {
-                const isExpanded = expandedPieces.has(g.key);
-                const multiLine = g.lines.length > 1;
-                return (
-                  <Fragment key={g.key}>
-                    {/* Ligne groupe */}
-                    <TableRow
-                      className={cn(
-                        'hover:bg-muted/40',
-                        multiLine ? 'cursor-pointer' : '',
-                        isExpanded ? 'bg-muted/20' : '',
-                      )}
-                      onClick={() => multiLine && togglePiece(g.key)}
-                    >
-                      <TableCell className="py-1 pl-2">
-                        {multiLine
-                          ? isExpanded
-                            ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-                            : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                          : <span className="w-3.5 inline-block" />
-                        }
-                      </TableCell>
-                      <TableCell className="py-1 text-xs tabular-nums">{g.date_piece ?? '—'}</TableCell>
-                      <TableCell className="py-1 text-xs">
-                        <span className={cn('font-medium', CAT_COLOR[g.categorie])}>
-                          {g.categorie === 'devis_client' || g.categorie === 'devis_fournisseur'
-                            ? <FilePen className="h-3 w-3 inline mr-1 -mt-0.5" />
-                            : null}
-                          {SPV_PIECE_CAT_LABEL[g.categorie]}
-                        </span>
-                      </TableCell>
-                      <TableCell className="py-1 text-xs font-mono font-medium whitespace-nowrap">
-                        {g.numero_piece ?? <span className="text-muted-foreground italic">—</span>}
-                        {multiLine && (
-                          <span className="ml-1.5 text-[10px] text-muted-foreground font-sans font-normal">
-                            ({g.lines.length} lignes)
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="py-1 text-[11px] text-muted-foreground max-w-[220px] truncate" title={g.libelle_entete ?? ''}>
-                        {g.libelle_entete ?? <span className="italic opacity-40">—</span>}
-                      </TableCell>
-                      <TableCell className="py-1 text-[11px] text-muted-foreground whitespace-nowrap">
-                        {g.nom_tiers ?? g.tiers_code ?? '—'}
-                      </TableCell>
-                      <TableCell className="py-1 text-xs text-right tabular-nums font-semibold">
-                        {eur(g.montantTotal)}
-                      </TableCell>
-                    </TableRow>
-
-                    {/* Sous-lignes (détail) */}
-                    {isExpanded && g.lines.map((l, li) => (
-                      <TableRow key={li} className="bg-muted/10 hover:bg-muted/20">
-                        <TableCell className="py-0.5 pl-2" />
-                        <TableCell className="py-0.5 text-[11px] text-muted-foreground tabular-nums pl-6">
-                          {l.date_piece ?? ''}
-                        </TableCell>
-                        <TableCell colSpan={3} className="py-0.5 text-[11px] text-muted-foreground pl-4 max-w-[320px] truncate" title={l.libelle ?? ''}>
-                          {l.libelle ?? '—'}
-                        </TableCell>
-                        <TableCell className="py-0.5 text-[11px] text-right tabular-nums text-muted-foreground">
-                          {eur(l.montant)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </Fragment>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
+                {isExpanded && g.lines.map((l, li) => (
+                  <TableRow key={li} className="bg-muted/10 hover:bg-muted/20">
+                    <TableCell className="py-0.5 pl-2" />
+                    <TableCell className="py-0.5 text-[11px] text-muted-foreground tabular-nums pl-6">{l.date_piece ?? ''}</TableCell>
+                    <TableCell colSpan={4} className="py-0.5 text-[11px] text-muted-foreground pl-4 max-w-[360px] truncate" title={l.libelle ?? ''}>
+                      {l.libelle ?? '—'}
+                    </TableCell>
+                    <TableCell className="py-0.5 text-[11px] text-right tabular-nums text-muted-foreground">{eur(l.montant)}</TableCell>
+                  </TableRow>
+                ))}
+              </Fragment>
+            );
+          })}
+        </TableBody>
+      </Table>
     </div>
   );
 }
@@ -398,7 +390,7 @@ export default function SpvBudget() {
   const [activeView, setActiveView] = useState('spv-budget');
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [tab, setTab] = useState<Record<string, 'temps' | 'budget' | 'pieces'>>({});
+  const [tab, setTab] = useState<Record<string, 'temps' | 'mensuel' | 'pieces' | 'budget'>>({});
   const { data: affaires = [], isLoading } = useSpvAffairesBudgetKpi();
 
   const filtered = useMemo(() => {
@@ -504,27 +496,37 @@ export default function SpvBudget() {
                               <TableCell colSpan={8} className="p-0">
                                 <div className="bg-muted/30 p-3 space-y-3">
                                   {/* sous-onglets */}
-                                  <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5 w-fit">
+                                  <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5 w-fit flex-wrap">
                                     <Button variant="ghost" size="sm"
-                                      onClick={() => setTab(prev => ({ ...prev, [a.spv_affaire_id]: 'temps' }))}
+                                      onClick={e => { e.stopPropagation(); setTab(prev => ({ ...prev, [a.spv_affaire_id]: 'temps' })); }}
                                       className={cn('h-7 px-3 gap-1.5 text-xs rounded-md', t === 'temps' ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground')}>
-                                      <Clock className="h-3.5 w-3.5" /> Temps ({a.nb_factures >= 0 ? '' : ''}{num(a.jours_declares)}j)
+                                      <Clock className="h-3.5 w-3.5" /> Temps ({num(a.jours_declares)}j)
                                     </Button>
                                     <Button variant="ghost" size="sm"
-                                      onClick={() => setTab(prev => ({ ...prev, [a.spv_affaire_id]: 'pieces' }))}
+                                      onClick={e => { e.stopPropagation(); setTab(prev => ({ ...prev, [a.spv_affaire_id]: 'mensuel' })); }}
+                                      className={cn('h-7 px-3 gap-1.5 text-xs rounded-md', t === 'mensuel' ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground')}>
+                                      <CalendarDays className="h-3.5 w-3.5" /> Mensuel
+                                    </Button>
+                                    <Button variant="ghost" size="sm"
+                                      onClick={e => { e.stopPropagation(); setTab(prev => ({ ...prev, [a.spv_affaire_id]: 'pieces' })); }}
                                       className={cn('h-7 px-3 gap-1.5 text-xs rounded-md', t === 'pieces' ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground')}>
-                                      <FileText className="h-3.5 w-3.5" /> Pièces & mensuel
+                                      <FileText className="h-3.5 w-3.5" /> Pièces
+                                      {(a.nb_commandes + a.nb_factures + a.nb_devis) > 0 && (
+                                        <span className="ml-1 text-[10px] opacity-70">({a.nb_commandes + a.nb_factures + a.nb_devis})</span>
+                                      )}
                                     </Button>
                                     <Button variant="ghost" size="sm"
-                                      onClick={() => setTab(prev => ({ ...prev, [a.spv_affaire_id]: 'budget' }))}
+                                      onClick={e => { e.stopPropagation(); setTab(prev => ({ ...prev, [a.spv_affaire_id]: 'budget' })); }}
                                       className={cn('h-7 px-3 gap-1.5 text-xs rounded-md', t === 'budget' ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground')}>
                                       <Wallet className="h-3.5 w-3.5" /> Budget ({eur(a.budget_total)})
                                     </Button>
                                   </div>
                                   {t === 'temps'
                                     ? <TempsBreakdown codeAffaire={a.code_affaire} />
+                                    : t === 'mensuel'
+                                    ? <MensuelBreakdown codeAffaire={a.code_affaire} />
                                     : t === 'pieces'
-                                    ? <PiecesBreakdown codeAffaire={a.code_affaire} />
+                                    ? <PiecesDetail codeAffaire={a.code_affaire} />
                                     : <BudgetLines spvAffaireId={a.spv_affaire_id} />}
                                 </div>
                               </TableCell>
