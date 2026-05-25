@@ -7,8 +7,8 @@ const corsHeaders = {
 
 const MICROSOFT_GRAPH_URL = 'https://graph.microsoft.com/v1.0';
 
-// Scopes including Planner
-const OAUTH_SCOPES = 'openid profile email offline_access User.Read Calendars.Read Calendars.ReadWrite Mail.Send Tasks.Read Tasks.ReadWrite Group.Read.All';
+// Scopes including Planner + SharePoint
+const OAUTH_SCOPES = 'openid profile email offline_access User.Read Calendars.Read Calendars.ReadWrite Mail.Send Tasks.Read Tasks.ReadWrite Group.Read.All Sites.Read.All Files.Read.All';
 
 interface TokenResponse {
   access_token: string;
@@ -672,6 +672,79 @@ async function persistPlannerSyncLog(
   } catch (e) {
     console.error('persistPlannerSyncLog:', e);
   }
+}
+
+// ── SharePoint : liste les fichiers d'une bibliothèque ──────────────────────
+async function listSharepointFiles(accessToken: string, sharepointUrl: string): Promise<any[]> {
+  // Parse URL → hostname + site path + optional folder path
+  let parsedUrl: URL;
+  try { parsedUrl = new URL(sharepointUrl); } catch {
+    throw new Error('URL SharePoint invalide');
+  }
+  const hostname = parsedUrl.hostname;
+  const rawParts = parsedUrl.pathname.split('/').filter(Boolean);
+
+  let sitePath = '';
+  let folderPath = '';
+  for (let i = 0; i < rawParts.length; i++) {
+    const seg = rawParts[i].toLowerCase();
+    if ((seg === 'sites' || seg === 'teams') && rawParts[i + 1]) {
+      sitePath = `/${rawParts[i]}/${rawParts[i + 1]}`;
+      const rest = rawParts.slice(i + 2)
+        .map(decodeURIComponent)
+        .filter(p => !p.toLowerCase().includes('.aspx') && p.toLowerCase() !== 'forms');
+      if (rest.length > 0) folderPath = '/' + rest.join('/');
+      break;
+    }
+  }
+
+  if (!sitePath) {
+    throw new Error('URL SharePoint invalide — le chemin doit contenir /sites/... ou /teams/...');
+  }
+
+  // Resolve site ID
+  const siteResp = await fetch(`${MICROSOFT_GRAPH_URL}/sites/${hostname}:${sitePath}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (siteResp.status === 401 || siteResp.status === 403) {
+    const errBody = await siteResp.json().catch(() => ({}));
+    const code = errBody?.error?.code || '';
+    if (siteResp.status === 403 || code === 'Authorization_RequestDenied') {
+      throw Object.assign(new Error('Permissions insuffisantes pour accéder à SharePoint. Reconnectez votre compte Microsoft.'), { code: 'SCOPE_MISSING' });
+    }
+    throw Object.assign(new Error('Non connecté à Microsoft. Connectez votre compte dans les paramètres.'), { code: 'NOT_CONNECTED' });
+  }
+  if (!siteResp.ok) throw new Error(`Site SharePoint introuvable (${siteResp.status}). Vérifiez l'URL.`);
+  const site = await siteResp.json();
+  const siteId = site.id;
+
+  // List files from root or specific folder
+  const baseEndpoint = folderPath
+    ? `${MICROSOFT_GRAPH_URL}/sites/${siteId}/drive/root:${encodeURIComponent(folderPath)}:/children`
+    : `${MICROSOFT_GRAPH_URL}/sites/${siteId}/drive/root/children`;
+
+  const fields = 'id,name,size,createdDateTime,lastModifiedDateTime,file,folder,webUrl,parentReference';
+  const filesResp = await fetch(`${baseEndpoint}?$select=${fields}&$top=200&$orderby=name`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (filesResp.status === 401 || filesResp.status === 403) {
+    throw Object.assign(new Error('Permissions insuffisantes pour lire les fichiers. Reconnectez votre compte Microsoft.'), { code: 'SCOPE_MISSING' });
+  }
+  if (!filesResp.ok) throw new Error(`Impossible de lister les fichiers SharePoint (${filesResp.status}).`);
+
+  const data = await filesResp.json();
+  return (data.value || []).map((item: any) => ({
+    id: item.id,
+    name: item.name,
+    size: item.size || 0,
+    createdDateTime: item.createdDateTime,
+    lastModifiedDateTime: item.lastModifiedDateTime,
+    webUrl: item.webUrl,
+    mimeType: item.file?.mimeType || null,
+    isFolder: !!item.folder,
+    childCount: item.folder?.childCount || 0,
+  }));
 }
 
 Deno.serve(async (req) => {
@@ -1878,6 +1951,38 @@ Deno.serve(async (req) => {
           tasksUpdated,
           errors: errors.length,
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+    }
+
+    // ── SharePoint : liste les fichiers d'une bibliothèque liée ────────────
+    if (action === 'sharepoint-list-files') {
+      if (!userId) {
+        return new Response(JSON.stringify({ success: false, error: 'NOT_CONNECTED', message: 'Utilisateur non authentifié' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const accessToken = await getValidAccessToken(supabase, userId);
+      if (!accessToken) {
+        return new Response(JSON.stringify({ success: false, error: 'NOT_CONNECTED', message: 'Aucune connexion Microsoft active. Connectez votre compte dans Paramètres → Microsoft.' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const { sharepointUrl } = params as { sharepointUrl?: string };
+      if (!sharepointUrl) {
+        return new Response(JSON.stringify({ success: false, error: 'MISSING_URL', message: 'URL SharePoint manquante' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      try {
+        const files = await listSharepointFiles(accessToken, sharepointUrl);
+        return new Response(JSON.stringify({ success: true, files }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      } catch (err: any) {
+        const code = err.code || 'ERROR';
+        return new Response(JSON.stringify({ success: false, error: code, message: err.message }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
     }
 
