@@ -674,67 +674,9 @@ async function persistPlannerSyncLog(
   }
 }
 
-// ── SharePoint : liste les fichiers d'une bibliothèque ──────────────────────
-async function listSharepointFiles(accessToken: string, sharepointUrl: string): Promise<any[]> {
-  // Parse URL → hostname + site path + optional folder path
-  let parsedUrl: URL;
-  try { parsedUrl = new URL(sharepointUrl); } catch {
-    throw new Error('URL SharePoint invalide');
-  }
-  const hostname = parsedUrl.hostname;
-  const rawParts = parsedUrl.pathname.split('/').filter(Boolean);
-
-  let sitePath = '';
-  let folderPath = '';
-  for (let i = 0; i < rawParts.length; i++) {
-    const seg = rawParts[i].toLowerCase();
-    if ((seg === 'sites' || seg === 'teams') && rawParts[i + 1]) {
-      sitePath = `/${rawParts[i]}/${rawParts[i + 1]}`;
-      const rest = rawParts.slice(i + 2)
-        .map(decodeURIComponent)
-        .filter(p => !p.toLowerCase().includes('.aspx') && p.toLowerCase() !== 'forms');
-      if (rest.length > 0) folderPath = '/' + rest.join('/');
-      break;
-    }
-  }
-
-  if (!sitePath) {
-    throw new Error('URL SharePoint invalide — le chemin doit contenir /sites/... ou /teams/...');
-  }
-
-  // Resolve site ID
-  const siteResp = await fetch(`${MICROSOFT_GRAPH_URL}/sites/${hostname}:${sitePath}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (siteResp.status === 401 || siteResp.status === 403) {
-    const errBody = await siteResp.json().catch(() => ({}));
-    const code = errBody?.error?.code || '';
-    if (siteResp.status === 403 || code === 'Authorization_RequestDenied') {
-      throw Object.assign(new Error('Permissions insuffisantes pour accéder à SharePoint. Reconnectez votre compte Microsoft.'), { code: 'SCOPE_MISSING' });
-    }
-    throw Object.assign(new Error('Non connecté à Microsoft. Connectez votre compte dans les paramètres.'), { code: 'NOT_CONNECTED' });
-  }
-  if (!siteResp.ok) throw new Error(`Site SharePoint introuvable (${siteResp.status}). Vérifiez l'URL.`);
-  const site = await siteResp.json();
-  const siteId = site.id;
-
-  // List files from root or specific folder
-  const baseEndpoint = folderPath
-    ? `${MICROSOFT_GRAPH_URL}/sites/${siteId}/drive/root:${encodeURIComponent(folderPath)}:/children`
-    : `${MICROSOFT_GRAPH_URL}/sites/${siteId}/drive/root/children`;
-
-  const fields = 'id,name,size,createdDateTime,lastModifiedDateTime,file,folder,webUrl,parentReference';
-  const filesResp = await fetch(`${baseEndpoint}?$select=${fields}&$top=200&$orderby=name`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-
-  if (filesResp.status === 401 || filesResp.status === 403) {
-    throw Object.assign(new Error('Permissions insuffisantes pour lire les fichiers. Reconnectez votre compte Microsoft.'), { code: 'SCOPE_MISSING' });
-  }
-  if (!filesResp.ok) throw new Error(`Impossible de lister les fichiers SharePoint (${filesResp.status}).`);
-
-  const data = await filesResp.json();
-  return (data.value || []).map((item: any) => ({
+// ── SharePoint : helpers ────────────────────────────────────────────────────
+function mapDriveItems(items: any[]): any[] {
+  return (items || []).map((item: any) => ({
     id: item.id,
     name: item.name,
     size: item.size || 0,
@@ -745,6 +687,95 @@ async function listSharepointFiles(accessToken: string, sharepointUrl: string): 
     isFolder: !!item.folder,
     childCount: item.folder?.childCount || 0,
   }));
+}
+
+async function graphGet(accessToken: string, url: string): Promise<{ ok: boolean; status: number; data: any }> {
+  const resp = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+  const data = resp.ok ? await resp.json().catch(() => ({})) : null;
+  return { ok: resp.ok, status: resp.status, data };
+}
+
+function throwIfAuthError(status: number): void {
+  if (status === 401) throw Object.assign(new Error('Token Microsoft expiré ou invalide. Reconnectez votre compte Microsoft dans Paramètres → Synchronisation.'), { code: 'NOT_CONNECTED' });
+  if (status === 403) throw Object.assign(new Error('Permissions insuffisantes pour accéder à SharePoint. Déconnectez puis reconnectez votre compte Microsoft pour autoriser l\'accès aux sites.'), { code: 'SCOPE_MISSING' });
+}
+
+const DRIVE_FIELDS = 'id,name,size,createdDateTime,lastModifiedDateTime,file,folder,webUrl,parentReference';
+
+// ── SharePoint : liste les fichiers d'une bibliothèque ──────────────────────
+async function listSharepointFiles(accessToken: string, sharepointUrl: string): Promise<any[]> {
+  // 1) Parse URL → hostname + sitePath + optional libraryOrFolder name
+  let parsedUrl: URL;
+  try { parsedUrl = new URL(sharepointUrl); } catch {
+    throw new Error('URL SharePoint invalide');
+  }
+  const hostname = parsedUrl.hostname;
+  const rawParts = parsedUrl.pathname.split('/').filter(Boolean);
+
+  let sitePath = '';
+  let extraSegments: string[] = [];
+  for (let i = 0; i < rawParts.length; i++) {
+    const seg = rawParts[i].toLowerCase();
+    if ((seg === 'sites' || seg === 'teams') && rawParts[i + 1]) {
+      sitePath = `/${rawParts[i]}/${rawParts[i + 1]}`;
+      extraSegments = rawParts.slice(i + 2)
+        .map(decodeURIComponent)
+        .filter(p => !p.toLowerCase().includes('.aspx') && p.toLowerCase() !== 'forms' && p !== '_layouts');
+      break;
+    }
+  }
+  if (!sitePath) throw new Error('URL SharePoint invalide — le chemin doit contenir /sites/... ou /teams/...');
+
+  // 2) Resolve site ID
+  const siteRes = await graphGet(accessToken, `${MICROSOFT_GRAPH_URL}/sites/${hostname}:${sitePath}`);
+  throwIfAuthError(siteRes.status);
+  if (!siteRes.ok) throw new Error(`Site SharePoint introuvable (${siteRes.status}). Vérifiez l'URL et vos permissions.`);
+  const siteId = siteRes.data.id;
+
+  // 3) If there are extra path segments, the first one is likely a document library name.
+  //    Strategy: check all drives of the site first (handles named libraries).
+  //    Then fallback to folder navigation in the default drive.
+  if (extraSegments.length > 0) {
+    const libraryName = extraSegments[0];
+    const subPath = extraSegments.slice(1).join('/'); // sub-folder within the library
+
+    // 3a) List drives to find a matching document library by name
+    const drivesRes = await graphGet(accessToken, `${MICROSOFT_GRAPH_URL}/sites/${siteId}/drives?$select=id,name`);
+    if (drivesRes.ok) {
+      const drives: any[] = drivesRes.data.value || [];
+      const matchingDrive = drives.find((d: any) =>
+        (d.name ?? '').toLowerCase().trim() === libraryName.toLowerCase().trim()
+      );
+      if (matchingDrive) {
+        // Found the document library — list its root (or subfolder)
+        const endpoint = subPath
+          ? `${MICROSOFT_GRAPH_URL}/drives/${matchingDrive.id}/root:/${encodeURIComponent(subPath)}:/children`
+          : `${MICROSOFT_GRAPH_URL}/drives/${matchingDrive.id}/root/children`;
+        const filesRes = await graphGet(accessToken, `${endpoint}?$select=${DRIVE_FIELDS}&$top=200&$orderby=name`);
+        throwIfAuthError(filesRes.status);
+        if (filesRes.ok) return mapDriveItems(filesRes.data.value);
+      }
+    }
+
+    // 3b) Fallback: try as a folder path in the default drive
+    const folderPath = extraSegments.join('/');
+    const folderRes = await graphGet(
+      accessToken,
+      `${MICROSOFT_GRAPH_URL}/sites/${siteId}/drive/root:/${encodeURIComponent(folderPath)}:/children?$select=${DRIVE_FIELDS}&$top=200&$orderby=name`,
+    );
+    throwIfAuthError(folderRes.status);
+    if (folderRes.ok) return mapDriveItems(folderRes.data.value);
+    // If still not found, fall through to default drive root
+  }
+
+  // 4) Fallback: root of the default document library
+  const rootRes = await graphGet(
+    accessToken,
+    `${MICROSOFT_GRAPH_URL}/sites/${siteId}/drive/root/children?$select=${DRIVE_FIELDS}&$top=200&$orderby=name`,
+  );
+  throwIfAuthError(rootRes.status);
+  if (!rootRes.ok) throw new Error(`Impossible de lister les fichiers SharePoint (${rootRes.status}).`);
+  return mapDriveItems(rootRes.data.value);
 }
 
 Deno.serve(async (req) => {

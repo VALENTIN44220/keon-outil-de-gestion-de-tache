@@ -72,25 +72,34 @@ function SharepointSection({ sharepointUrl }: { sharepointUrl: string }) {
   }
 
   if (spError) {
-    const isAuthError = spError.code === 'NOT_CONNECTED' || spError.code === 'SCOPE_MISSING';
+    const isScopeMissing = spError.code === 'SCOPE_MISSING';
+    const isNotConnected = spError.code === 'NOT_CONNECTED';
+    const isAuthError = isScopeMissing || isNotConnected;
     return (
-      <div className="flex flex-col items-center justify-center gap-3 py-10 px-4 text-center">
+      <div className="flex flex-col items-center justify-center gap-3 py-8 px-6 text-center">
         <div className={cn('p-3 rounded-full', isAuthError ? 'bg-amber-50' : 'bg-red-50')}>
           <AlertCircle className={cn('h-6 w-6', isAuthError ? 'text-amber-500' : 'text-red-500')} />
         </div>
-        <div>
-          <p className="font-medium text-sm">{spError.message}</p>
-          {spError.code === 'SCOPE_MISSING' && (
-            <p className="text-xs text-muted-foreground mt-1">
-              Déconnectez puis reconnectez votre compte Microsoft pour autoriser l'accès SharePoint.
-            </p>
-          )}
-          {spError.code === 'NOT_CONNECTED' && (
-            <p className="text-xs text-muted-foreground mt-1">
-              Allez dans <strong>Paramètres → Microsoft</strong> pour connecter votre compte.
-            </p>
-          )}
+        <div className="space-y-1 max-w-sm">
+          <p className="font-semibold text-sm">{isScopeMissing ? 'Autorisation SharePoint requise' : isNotConnected ? 'Compte Microsoft non connecté' : 'Erreur d\'accès SharePoint'}</p>
+          <p className="text-xs text-muted-foreground">{spError.message}</p>
         </div>
+        {isScopeMissing && (
+          <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800 text-left max-w-sm space-y-1">
+            <p className="font-semibold">Comment autoriser l'accès :</p>
+            <ol className="list-decimal ml-4 space-y-0.5">
+              <li>Allez dans <strong>Mon profil → Synchronisation</strong></li>
+              <li>Cliquez sur <strong>Déconnecter Microsoft</strong></li>
+              <li>Reconnectez-vous avec le bouton <strong>Se connecter avec Microsoft</strong></li>
+              <li>Acceptez les nouvelles permissions (Sites SharePoint)</li>
+            </ol>
+          </div>
+        )}
+        {isNotConnected && (
+          <p className="text-xs text-muted-foreground">
+            Allez dans <strong>Mon profil → Synchronisation</strong> pour connecter votre compte Microsoft.
+          </p>
+        )}
         <Button variant="outline" size="sm" className="gap-2" onClick={() => refetch()} disabled={isFetching}>
           <RefreshCw className={cn('h-3.5 w-3.5', isFetching && 'animate-spin')} /> Réessayer
         </Button>
