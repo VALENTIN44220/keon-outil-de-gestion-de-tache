@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Link2, ExternalLink, Info, Save, RefreshCw, CheckCircle2, MessageSquareText } from 'lucide-react';
+import { Link2, ExternalLink, Info, Save, RefreshCw, CheckCircle2, MessageSquareText, FolderOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function ITProjectHubSync() {
@@ -18,17 +18,19 @@ export default function ITProjectHubSync() {
   const { data: project, isLoading, refetch } = useITProject(code);
   const { data: tasks = [] } = useITProjectTasks(project?.id);
   const stats = useITProjectStats(tasks, project);
-  const { openLoop, openTeams, hasLoop, hasTeams } = useITProjectSync(project);
+  const { openLoop, openTeams, openSharepoint, hasLoop, hasTeams, hasSharepoint } = useITProjectSync(project);
   const { updateProject } = useITProjects();
 
-  const [teamsChannelUrl, setTeamsChannelUrl] = useState('');
-  const [loopWorkspaceUrl, setLoopWorkspaceUrl] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
+  const [teamsChannelUrl, setTeamsChannelUrl]       = useState('');
+  const [loopWorkspaceUrl, setLoopWorkspaceUrl]     = useState('');
+  const [sharepointUrl, setSharepointUrl]           = useState('');
+  const [isSaving, setIsSaving]                     = useState(false);
 
   useEffect(() => {
     if (project) {
       setTeamsChannelUrl(project.teams_channel_url || '');
       setLoopWorkspaceUrl(project.loop_workspace_url || '');
+      setSharepointUrl(project.sharepoint_library_url || '');
     }
   }, [project]);
 
@@ -36,8 +38,9 @@ export default function ITProjectHubSync() {
     if (!project?.id) return;
     setIsSaving(true);
     await updateProject(project.id, {
-      teams_channel_url: teamsChannelUrl.trim() || null,
-      loop_workspace_url: loopWorkspaceUrl.trim() || null,
+      teams_channel_url:       teamsChannelUrl.trim()  || null,
+      loop_workspace_url:      loopWorkspaceUrl.trim() || null,
+      sharepoint_library_url:  sharepointUrl.trim()    || null,
     });
     await refetch();
     setIsSaving(false);
@@ -65,7 +68,8 @@ export default function ITProjectHubSync() {
               <div>
                 <p className="font-semibold">Intégration Microsoft 365</p>
                 <p className="text-xs mt-1 opacity-80">
-                  Associez un workspace Loop et un canal Teams à ce projet. Les liens apparaîtront dans le header et la synthèse pour un accès direct depuis KEON.
+                  Associez un workspace Loop, un canal Teams et une bibliothèque SharePoint à ce projet.
+                  Les liens apparaîtront dans le header et la synthèse pour un accès direct depuis KEON.
                 </p>
               </div>
             </div>
@@ -150,6 +154,46 @@ export default function ITProjectHubSync() {
               </CardContent>
             </Card>
 
+            {/* SharePoint */}
+            <Card className={cn('border-2 transition-colors', hasSharepoint ? 'border-emerald-200' : 'border-border')}>
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-3">
+                  <div className={cn('p-2.5 rounded-xl', hasSharepoint ? 'bg-emerald-100' : 'bg-muted')}>
+                    <FolderOpen className={cn('h-5 w-5', hasSharepoint ? 'text-emerald-600' : 'text-muted-foreground')} />
+                  </div>
+                  <div className="flex-1">
+                    <CardTitle className="text-base">SharePoint</CardTitle>
+                    <CardDescription>Bibliothèque de documents du projet</CardDescription>
+                  </div>
+                  {hasSharepoint && (
+                    <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200">
+                      <CheckCircle2 className="h-3 w-3 mr-1" /> Configuré
+                    </Badge>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="sharepoint-url">URL de la bibliothèque SharePoint</Label>
+                  <Input
+                    id="sharepoint-url"
+                    placeholder="https://keon.sharepoint.com/sites/..."
+                    value={sharepointUrl}
+                    onChange={e => setSharepointUrl(e.target.value)}
+                    className="font-mono text-xs"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    SharePoint → ouvrez la bibliothèque → copiez l'URL depuis la barre d'adresse du navigateur
+                  </p>
+                </div>
+                {sharepointUrl && (
+                  <Button variant="outline" size="sm" className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50" onClick={openSharepoint}>
+                    <ExternalLink className="h-3.5 w-3.5" /> Tester l'ouverture
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Save */}
             <Button
               className="w-full gap-2 h-11 text-base bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 shadow-lg shadow-violet-500/20"
@@ -161,7 +205,7 @@ export default function ITProjectHubSync() {
             </Button>
 
             {/* Liens actifs */}
-            {(hasLoop || hasTeams) && (
+            {(hasLoop || hasTeams || hasSharepoint) && (
               <div className="rounded-xl border bg-muted/30 p-4">
                 <p className="text-xs font-semibold text-muted-foreground mb-3">Liens actifs sur ce projet</p>
                 <div className="space-y-2">
@@ -183,6 +227,16 @@ export default function ITProjectHubSync() {
                         <p className="text-[10px] text-blue-500 truncate">{teamsChannelUrl}</p>
                       </div>
                       <ExternalLink className="h-3.5 w-3.5 text-blue-400 flex-shrink-0" />
+                    </div>
+                  )}
+                  {hasSharepoint && (
+                    <div className="flex items-center gap-3 p-2.5 rounded-lg bg-emerald-50 border border-emerald-100 cursor-pointer hover:bg-emerald-100 transition-colors" onClick={openSharepoint}>
+                      <FolderOpen className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-emerald-700">SharePoint</p>
+                        <p className="text-[10px] text-emerald-500 truncate">{sharepointUrl}</p>
+                      </div>
+                      <ExternalLink className="h-3.5 w-3.5 text-emerald-400 flex-shrink-0" />
                     </div>
                   )}
                 </div>

@@ -116,6 +116,7 @@ export interface ITProject {
   teams_channel_url?: string | null;
   loop_workspace_id?: string | null;
   loop_workspace_url?: string | null;
+  sharepoint_library_url?: string | null;
 
   // Metadata
   created_at: string;

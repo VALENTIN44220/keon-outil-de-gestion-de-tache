@@ -2,7 +2,7 @@ import { ITProject } from '@/types/itProject';
 import { toast } from '@/hooks/use-toast';
 
 // ================================================
-// Hook useITProjectSync — Intégration Microsoft Loop (lien direct)
+// Hook useITProjectSync — Intégration Microsoft 365 (Loop, Teams, SharePoint)
 // ================================================
 export function useITProjectSync(project: ITProject | null | undefined) {
 
@@ -32,8 +32,22 @@ export function useITProjectSync(project: ITProject | null | undefined) {
     }
   };
 
-  const hasLoop = !!project?.loop_workspace_url;
-  const hasTeams = !!project?.teams_channel_url;
+  // Ouvrir la bibliothèque SharePoint si configurée
+  const openSharepoint = () => {
+    if (project?.sharepoint_library_url) {
+      window.open(project.sharepoint_library_url, '_blank', 'noopener,noreferrer');
+    } else {
+      toast({
+        title: 'SharePoint non configuré',
+        description: "Aucune bibliothèque SharePoint n'est associée à ce projet.",
+        variant: 'destructive',
+      });
+    }
+  };
 
-  return { openLoop, openTeams, hasLoop, hasTeams, isSyncing: false };
+  const hasLoop       = !!project?.loop_workspace_url;
+  const hasTeams      = !!project?.teams_channel_url;
+  const hasSharepoint = !!project?.sharepoint_library_url;
+
+  return { openLoop, openTeams, openSharepoint, hasLoop, hasTeams, hasSharepoint, isSyncing: false };
 }
