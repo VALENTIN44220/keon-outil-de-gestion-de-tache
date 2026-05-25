@@ -30,6 +30,8 @@ export interface BEAffaireBudgetKPIs {
   depassement: number;
   forecast_fin_annee: number;
   ecart_budget: number;
+  devis_client: number;   // CA Potentiel (devis sans commande)
+  devis_fournisseur: number;
 }
 
 export interface AddBEBudgetLineInput {
@@ -165,6 +167,8 @@ export function useBEAffaireBudget(affaireId: string | undefined) {
     depassement: Math.max(constate - budget_revise, 0),
     forecast_fin_annee,
     ecart_budget,
+    devis_client: raw?.devis_client_brut ?? 0,
+    devis_fournisseur: raw?.devis_fournisseur_brut ?? 0,
   };
 
   return {

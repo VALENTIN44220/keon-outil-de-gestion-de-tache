@@ -118,32 +118,35 @@ export interface BEAffaireBudgetKPI {
   code_affaire: string;
   affaire_libelle: string | null;
   affaire_status: BEAffaireStatus;
-  /** CA client engage (commandes CCN). */
+  /** CA client engage = commandes client signées (CC). */
   ca_engage_brut: number;
-  /** CA client constate (factures FCN). */
+  /** CA client constate = factures client (FC). */
   ca_constate_brut: number;
-  /** COGS fournisseur engage (commandes CFN). */
+  /** COGS fournisseur engage = commandes fournisseur (CF). */
   cogs_engage_brut: number;
-  /** COGS fournisseur constate (factures FFN). */
+  /** COGS fournisseur constate = factures fournisseur (FF). */
   cogs_constate_brut: number;
-  /** Notes de frais Lucca rattachees au prefixe 5 chars du code_affaire. */
+  /** Notes de frais. */
   ndf_brut: number;
-  /** Marge constatee (compat retro) = CA - COGS Divalto seul. */
+  /** MB = CA constate - COGS constate (sans RH). */
   marge_constatee_brut: number;
-  /** Marge brute = CA constate - COGS Divalto - NDF. */
   marge_brute_brut: number;
-  /** Marge sur couts directs = Marge brute - Cout RH declare (Lucca x TJM). */
+  /** MSCD = MB - RH declare (Lucca x TJM). */
   marge_directe_brut: number;
-  /** Cout RH declare (jours Lucca x TJM du poste). */
   cout_rh_declare: number;
-  /** Jours declares Lucca. */
   jours_declares: number;
-  /** Compat retro : somme commandes (CCN+CFN). */
+  heures_declarees: number;
+  nb_collaborateurs: number;
   engage_montant_brut: number;
-  /** Compat retro : somme factures (FCN+FFN). */
   constate_montant_brut: number;
   nb_commandes: number;
   nb_factures: number;
+  /** Devis client SANS commande liée = CA Potentiel. */
+  devis_client_brut: number;
+  /** Devis client déjà convertis en commande (info). */
+  devis_client_converti_brut: number;
+  devis_fournisseur_brut: number;
+  nb_devis: number;
 }
 
 /** Vue v_be_project_budget_kpi (agregat par projet, somme des affaires). */
@@ -212,4 +215,84 @@ export function extractProjectCodeFromAffaire(
 ): string | null {
   if (!codeAffaire || codeAffaire.length < 5) return null;
   return codeAffaire.substring(1, 5);
+}
+
+// ================================================
+// Types pour le détail des pièces Divalto
+// ================================================
+
+export type BEPieceCategorie =
+  | 'ca_potentiel'      // Devis client sans commande = CA prévisionnel
+  | 'ca_vendu'          // Commande client signée (CC)
+  | 'ca_constate'       // Facture client (FC)
+  | 'cogs_prevu'        // Commande fournisseur (CF)
+  | 'cogs_constate'     // Facture fournisseur (FF)
+  | 'devis_fournisseur' // Devis fournisseur
+  | 'autre';
+
+export const BE_PIECE_CAT_LABEL: Record<BEPieceCategorie, string> = {
+  ca_potentiel:      'Devis client (CA potentiel)',
+  ca_vendu:          'Commande client (CA vendu)',
+  ca_constate:       'Facture client (CA constaté)',
+  cogs_prevu:        'Commande fournisseur (COGS prévu)',
+  cogs_constate:     'Facture fournisseur (COGS constaté)',
+  devis_fournisseur: 'Devis fournisseur',
+  autre:             'Autre',
+};
+
+export const BE_PIECE_CAT_COLOR: Record<BEPieceCategorie, string> = {
+  ca_potentiel:      'text-violet-600',
+  ca_vendu:          'text-blue-600',
+  ca_constate:       'text-blue-900',
+  cogs_prevu:        'text-orange-500',
+  cogs_constate:     'text-orange-800',
+  devis_fournisseur: 'text-violet-400',
+  autre:             'text-muted-foreground',
+};
+
+export const BE_PIECE_CAT_BG: Record<BEPieceCategorie, string> = {
+  ca_potentiel:      'bg-violet-50 border-violet-200',
+  ca_vendu:          'bg-blue-50 border-blue-200',
+  ca_constate:       'bg-blue-100 border-blue-300',
+  cogs_prevu:        'bg-orange-50 border-orange-200',
+  cogs_constate:     'bg-orange-100 border-orange-300',
+  devis_fournisseur: 'bg-violet-50 border-violet-100',
+  autre:             'bg-muted border-border',
+};
+
+export interface BEAffairePiece {
+  doc_type: string;
+  numero_piece: string | null;
+  prefix: string | null;
+  tiers_code: string | null;
+  nom_tiers: string | null;
+  montant_ht: number;
+  date_piece: string | null;
+  libelle: string | null;
+  libelle_entete: string | null;
+  fullcdno_lie: string | null; // lien devis → commande
+}
+
+/** Catégorise une pièce BE + renvoie montant positif présentable. */
+export function classifyBEPiece(p: BEAffairePiece): { categorie: BEPieceCategorie; montant: number } {
+  const isClient      = (p.tiers_code ?? '').toUpperCase().startsWith('C');
+  const isFournisseur = (p.tiers_code ?? '').toUpperCase().startsWith('F');
+  const isFacture     = p.doc_type === 'facture';
+  const isDevis       = p.doc_type === 'devis';
+  const isCommande    = p.doc_type === 'commande';
+  const hasLien       = p.fullcdno_lie && p.fullcdno_lie !== '';
+  const montant = isClient ? -Number(p.montant_ht || 0) : Number(p.montant_ht || 0);
+
+  let categorie: BEPieceCategorie = 'autre';
+  if (isDevis) {
+    if (isClient && !hasLien)   categorie = 'ca_potentiel';      // DC sans commande
+    else if (isFournisseur)     categorie = 'devis_fournisseur';
+    // devis client avec lien = déjà converti, on classe comme ca_vendu
+    else if (isClient && hasLien) categorie = 'ca_vendu';
+  } else if (isCommande) {
+    categorie = isClient ? 'ca_vendu' : 'cogs_prevu';
+  } else if (isFacture) {
+    categorie = isClient ? 'ca_constate' : 'cogs_constate';
+  }
+  return { categorie, montant };
 }

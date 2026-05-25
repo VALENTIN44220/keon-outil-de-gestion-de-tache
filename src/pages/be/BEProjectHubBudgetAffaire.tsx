@@ -67,6 +67,8 @@ import {
   type BEPeriodValue,
 } from '@/components/be/budget/BEPeriodSelector';
 import { BEAffaireMonthlyBreakdown } from '@/components/be/budget/BEAffaireMonthlyBreakdown';
+import { BEPiecesDetail, BEMensuelBreakdown } from '@/components/be/budget/BEPiecesDetail';
+import { FileText, Target } from 'lucide-react';
 import { BE_POSTE_ICON, BE_POSTE_LABEL } from '@/types/beTemps';
 
 const eur = (n: number | null | undefined) =>
@@ -111,6 +113,7 @@ export default function BEProjectHubBudgetAffaire() {
   const [expandedLineId, setExpandedLineId] = useState<string | null>(null);
   const [deletingLineId, setDeletingLineId] = useState<string | null>(null);
   const [tempsDialogOpen, setTempsDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'budget' | 'pieces' | 'mensuel'>('budget');
 
   const [period, setPeriod] = useState<BEPeriodValue>(() => {
     const range = computePeriodRange('all');
@@ -125,24 +128,24 @@ export default function BEProjectHubBudgetAffaire() {
   const isFiltered = period.mode !== 'all';
 
   const displayKpis = {
-    ca_engage: isFiltered ? kpiPeriod?.ca_engage ?? 0 : kpisAll.ca_engage,
-    ca_constate: isFiltered ? kpiPeriod?.ca_constate ?? 0 : kpisAll.ca_constate,
-    cogs_engage: isFiltered ? kpiPeriod?.cogs_engage ?? 0 : kpisAll.cogs_engage,
-    cogs_constate: isFiltered ? kpiPeriod?.cogs_constate ?? 0 : kpisAll.cogs_constate,
-    marge_brute: isFiltered ? kpiPeriod?.marge_brute ?? 0 : kpisAll.marge_constatee,
-    marge_directe: isFiltered
+    ca_engage:      isFiltered ? kpiPeriod?.ca_engage ?? 0      : kpisAll.ca_engage,
+    ca_constate:    isFiltered ? kpiPeriod?.ca_constate ?? 0    : kpisAll.ca_constate,
+    cogs_engage:    isFiltered ? kpiPeriod?.cogs_engage ?? 0    : kpisAll.cogs_engage,
+    cogs_constate:  isFiltered ? kpiPeriod?.cogs_constate ?? 0  : kpisAll.cogs_constate,
+    marge_brute:    isFiltered ? kpiPeriod?.marge_brute ?? 0    : kpisAll.marge_constatee,
+    marge_directe:  isFiltered
       ? kpiPeriod?.marge_directe ?? 0
       : kpisAll.marge_constatee - (tempsKpi?.cout_rh_declare ?? 0),
-    cout_rh: isFiltered
+    cout_rh:        isFiltered
       ? kpiPeriod?.cout_rh_declare ?? 0
       : tempsKpi?.cout_rh_declare ?? 0,
-    jours_declares: isFiltered
-      ? kpiPeriod?.jours_declares ?? 0
-      : tempsKpi?.jours_declares ?? 0,
-    heures_declarees: isFiltered
-      ? kpiPeriod?.heures_declarees ?? 0
-      : tempsKpi?.heures_declarees ?? 0,
+    jours_declares: isFiltered ? kpiPeriod?.jours_declares ?? 0   : tempsKpi?.jours_declares ?? 0,
+    heures_declarees: isFiltered ? kpiPeriod?.heures_declarees ?? 0 : tempsKpi?.heures_declarees ?? 0,
     nb_collaborateurs: isFiltered ? kpiPeriod?.nb_collaborateurs ?? 0 : 0,
+    // Nouveaux
+    devis_potentiel: kpisAll.devis_client ?? 0,
+    mb: kpisAll.marge_constatee,                                   // CA constaté - COGS constaté
+    mscd: kpisAll.marge_constatee - (tempsKpi?.cout_rh_declare ?? 0), // MB - RH
   };
 
   const handleEdit = (line: BEAffaireBudgetLine) => {
@@ -394,16 +397,69 @@ export default function BEProjectHubBudgetAffaire() {
           {affaireId && <BETempsBreakdown affaireId={affaireId} />}
         </div>
 
-        {codeAffaire && (
-          <div className="pt-2">
-            <BEAffaireMonthlyBreakdown
-              codeAffaire={codeAffaire}
-              dateFrom={period.from}
-              dateTo={period.to}
+        {/* ── KPI enrichis : CA Potentiel + MB + MSCD ── */}
+        {(displayKpis.devis_potentiel > 0 || displayKpis.mb !== 0) && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
+            {displayKpis.devis_potentiel > 0 && (
+              <KpiMini
+                label="CA Potentiel (devis)"
+                value={eur(displayKpis.devis_potentiel)}
+                icon={Target}
+                accent="text-violet-600"
+                hint="Devis sans commande liée"
+              />
+            )}
+            <KpiMini
+              label="MB = CA − COGS"
+              value={eur(displayKpis.mb)}
+              icon={displayKpis.mb >= 0 ? TrendingUp : TrendingDown}
+              accent={displayKpis.mb >= 0 ? 'text-emerald-600' : 'text-red-600'}
+              hint={
+                displayKpis.ca_constate > 0
+                  ? `${Math.round((displayKpis.mb / displayKpis.ca_constate) * 100)}% du CA`
+                  : undefined
+              }
+            />
+            <KpiMini
+              label="MSCD = MB − RH"
+              value={eur(displayKpis.mscd)}
+              icon={Coins}
+              accent={displayKpis.mscd >= 0 ? 'text-emerald-700' : 'text-red-600'}
+              hint={displayKpis.cout_rh > 0 ? `RH : ${eur(displayKpis.cout_rh)}` : undefined}
             />
           </div>
         )}
 
+        {/* ── Onglets Pièces / Mensuel / Budget ── */}
+        {codeAffaire && (
+          <div className="space-y-3 pt-2">
+            <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5 w-fit">
+              <Button variant="ghost" size="sm"
+                className={cn('h-7 px-3 gap-1.5 text-xs rounded-md',
+                  activeTab === 'budget' ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground')}
+                onClick={() => setActiveTab('budget')}>
+                <Wallet className="h-3.5 w-3.5" /> Lignes budget
+              </Button>
+              <Button variant="ghost" size="sm"
+                className={cn('h-7 px-3 gap-1.5 text-xs rounded-md',
+                  activeTab === 'pieces' ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground')}
+                onClick={() => setActiveTab('pieces')}>
+                <FileText className="h-3.5 w-3.5" /> Pièces Divalto
+              </Button>
+              <Button variant="ghost" size="sm"
+                className={cn('h-7 px-3 gap-1.5 text-xs rounded-md',
+                  activeTab === 'mensuel' ? 'bg-background shadow-sm font-medium' : 'text-muted-foreground')}
+                onClick={() => setActiveTab('mensuel')}>
+                <CalendarDays className="h-3.5 w-3.5" /> Mensuel
+              </Button>
+            </div>
+
+            {activeTab === 'mensuel' && <BEMensuelBreakdown codeAffaire={codeAffaire} />}
+            {activeTab === 'pieces'  && <BEPiecesDetail codeAffaire={codeAffaire} />}
+          </div>
+        )}
+
+        {activeTab === 'budget' && (
         <div className="space-y-3 pt-2">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold">
@@ -536,6 +592,7 @@ export default function BEProjectHubBudgetAffaire() {
             </div>
           )}
         </div>
+        )}
       </div>
 
       {project && (
