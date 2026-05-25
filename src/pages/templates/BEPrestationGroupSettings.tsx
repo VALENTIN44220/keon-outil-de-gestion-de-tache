@@ -147,13 +147,14 @@ export default function BEPrestationGroupSettings() {
           stepLabel: sp.name.includes(' — ') ? sp.name.split(' — ').slice(1).join(' — ') : sp.name,
           orderIndex: sp.order_index ?? 0,
           parallelGroup: sp.parallel_group ?? null,
-          durationDays: sp.duration_days ?? 1,
+          // default_duration_hours en base — on affiche en heures
+          durationDays: sp.default_duration_hours ?? 0,
           dispatchManagerId: sp.dispatch_manager_id ?? '',
-          val1Type: dbToValType(sp.validation_level_1, sp.validator_user_id_1),
-          val1UserId: sp.validator_user_id_1 ?? '',
-          val2Type: dbToValType(sp.validation_level_2, sp.validator_user_id_2),
-          val2UserId: sp.validator_user_id_2 ?? '',
-          fixedUserId: sp.fixed_user_id ?? '',
+          val1Type: dbToValType(sp.validation_level_1_type, sp.validation_level_1_user_id),
+          val1UserId: sp.validation_level_1_user_id ?? '',
+          val2Type: dbToValType(sp.validation_level_2_type, sp.validation_level_2_user_id),
+          val2UserId: sp.validation_level_2_user_id ?? '',
+          fixedUserId: sp.target_assignee_id ?? '',
           expanded: false,
           isNew: false,
           markedForDelete: false,
@@ -247,13 +248,13 @@ export default function BEPrestationGroupSettings() {
           process_template_id: BE_PROCESS_ID,
           order_index: s.orderIndex,
           parallel_group: s.parallelGroup,
-          duration_days: s.durationDays || null,
+          default_duration_hours: s.durationDays || null,   // stocké en heures
           dispatch_manager_id: s.dispatchManagerId || null,
-          validation_level_1: valTypeToDb(s.val1Type),
-          validator_user_id_1: s.val1Type === 'fixed_user' ? s.val1UserId || null : null,
-          validation_level_2: valTypeToDb(s.val2Type),
-          validator_user_id_2: s.val2Type === 'fixed_user' ? s.val2UserId || null : null,
-          fixed_user_id: s.fixedUserId || null,
+          validation_level_1_type: valTypeToDb(s.val1Type),
+          validation_level_1_user_id: s.val1Type === 'fixed_user' ? s.val1UserId || null : null,
+          validation_level_2_type: valTypeToDb(s.val2Type),
+          validation_level_2_user_id: s.val2Type === 'fixed_user' ? s.val2UserId || null : null,
+          target_assignee_id: s.fixedUserId || null,
           is_shared: true,
         };
         if (s.dbId) {
@@ -376,7 +377,7 @@ export default function BEPrestationGroupSettings() {
 
                       {/* Durée */}
                       {step.durationDays > 0 && (
-                        <span className="text-xs text-slate-400 flex-shrink-0">{step.durationDays}j</span>
+                        <span className="text-xs text-slate-400 flex-shrink-0">{step.durationDays}h</span>
                       )}
 
                       {/* Contrôles */}
@@ -429,7 +430,7 @@ export default function BEPrestationGroupSettings() {
                   <div className="space-y-4">
                     {/* Durée */}
                     <div>
-                      <Label className="text-xs">Durée (jours)</Label>
+                      <Label className="text-xs">Durée (heures)</Label>
                       <Input
                         type="number"
                         min={0}
