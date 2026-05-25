@@ -10,7 +10,8 @@
  *  - Sauvegarder toutes les modifications en batch
  */
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { useMatchedRouteParam } from '@/hooks/useMatchedRouteParam';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -102,7 +103,10 @@ function computeLogicalOrder(steps: StepDraft[]): Map<string, number> {
 }
 
 export default function BEPrestationGroupSettings() {
-  const { prestationName: encodedName } = useParams<{ prestationName: string }>();
+  const encodedName = useMatchedRouteParam(
+    'prestationName',
+    '/templates/be-prestation-group/:prestationName',
+  );
   const prestationName = encodedName ? decodeURIComponent(encodedName) : '';
   const navigate = useNavigate();
 
