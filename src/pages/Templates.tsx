@@ -172,20 +172,28 @@ export default function Templates() {
   const demandTypes = useMemo((): DemandType[] => {
     const list: DemandType[] = [];
 
-    // a) Prestations BE (sub_process_templates rattachés au process BE)
+    // a) Prestations BE — groupées par nom (prefix avant ' — ')
+    const beGroups = new Map<string, typeof subProcesses>();
     for (const sp of subProcesses) {
       if (sp.process_template_id !== BE_PROCESS_ID) continue;
+      const prestName = sp.name.includes(' — ') ? sp.name.split(' — ')[0] : sp.name;
+      if (!beGroups.has(prestName)) beGroups.set(prestName, []);
+      beGroups.get(prestName)!.push(sp);
+    }
+    for (const [prestName, steps] of beGroups) {
+      const sorted = [...steps].sort((a, b) => ((a as any).order_index ?? 0) - ((b as any).order_index ?? 0));
+      const firstStep = sorted[0];
       list.push({
-        id: sp.id,
-        source: 'subprocess',
-        name: sp.name,
-        description: sp.description ?? null,
-        visibility: sp.visibility_level ?? 'public',
-        createdAt: (sp as any).created_at ?? new Date().toISOString(),
-        stepCount: sp.task_templates?.length ?? 0,
-        isMandatory: (sp as any).is_mandatory ?? false,
+        id: `be-group::${prestName}`,  // marker prefix
+        source: 'subprocess' as const,
+        name: prestName,
+        description: null,
+        visibility: 'public',
+        createdAt: (firstStep as any).created_at ?? new Date().toISOString(),
+        stepCount: steps.length,
+        isMandatory: false,
         canManage: true,
-        raw: sp,
+        raw: steps,
       });
     }
 
@@ -255,7 +263,11 @@ export default function Templates() {
     if (d.source === 'external' && d.externalRoute) {
       navigate(d.externalRoute);
     } else if (d.source === 'subprocess') {
-      navigate(`/templates/be-prestation/${d.id}`);
+      if (d.id.startsWith('be-group::')) {
+        navigate(`/templates/be-prestation-group/${encodeURIComponent(d.name)}`);
+      } else {
+        navigate(`/templates/be-prestation/${d.id}`);
+      }
     } else {
       navigate(`/templates/process/${d.id}`);
     }
@@ -264,6 +276,10 @@ export default function Templates() {
   const handleDelete = async (d: DemandType) => {
     if (d.source === 'external') return; // pas de suppression possible
     if (d.source === 'subprocess') {
+      if (d.id.startsWith('be-group::')) {
+        toast.error('Pour supprimer une prestation BE, ouvrez-la et supprimez chaque étape individuellement');
+        return;
+      }
       await deleteSubProcess(d.id);
       refetchSubProcesses();
       toast.success('Prestation supprimée');
