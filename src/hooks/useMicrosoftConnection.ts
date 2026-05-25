@@ -138,10 +138,17 @@ export function useMicrosoftConnection() {
       });
 
       if (error) throw error;
-      
-      toast.success(`${data.syncedEvents} événements synchronisés`);
+
+      // La Edge Function peut retourner success:false sans lever d'erreur HTTP
+      // (ex: token Microsoft expiré) → on le traite comme une erreur explicite
+      if (!data?.success) {
+        throw new Error(data?.error || 'Synchronisation Microsoft échouée');
+      }
+
+      const count: number = data.syncedEvents ?? 0;
+      toast.success(`${count} événement${count !== 1 ? 's' : ''} synchronisé${count !== 1 ? 's' : ''}`);
       await checkConnection();
-      return data.syncedEvents;
+      return count;
     } catch (error: any) {
       console.error('Error syncing calendar:', error);
       toast.error(`Erreur de synchronisation: ${error.message}`);
@@ -180,6 +187,15 @@ export function useMicrosoftConnection() {
 
   const updateSyncWindow = async (pastDays: number, futureDays: number): Promise<boolean> => {
     if (!user) return false;
+
+    // Mise à jour optimiste : le Select reflète immédiatement le choix
+    // sans attendre le round-trip DB + Edge Function.
+    setConnection(prev => ({
+      ...prev,
+      calendar_sync_past_days: pastDays,
+      calendar_sync_future_days: futureDays,
+    }));
+
     try {
       const { error } = await supabase
         .from('user_microsoft_connections')
@@ -190,9 +206,10 @@ export function useMicrosoftConnection() {
         .eq('user_id', user.id);
       if (error) throw error;
       toast.success('Fenêtre de synchronisation mise à jour');
-      await checkConnection();
       return true;
     } catch (e: any) {
+      // En cas d'erreur, on recharge depuis la DB pour revenir à l'état réel
+      await checkConnection();
       toast.error(`Erreur : ${e.message}`);
       return false;
     }
