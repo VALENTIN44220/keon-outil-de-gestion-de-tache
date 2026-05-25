@@ -69,15 +69,17 @@ const VAL_OPTIONS: { value: ValType; label: string }[] = [
 ];
 
 function dbToValType(dbValue: string | null, validatorId: string | null): ValType {
-  if (!dbValue || dbValue === 'none') return 'none';
+  if (!dbValue) return 'none';
   if (dbValue === 'requester') return 'requester';
   if (dbValue === 'manager') return 'manager';
-  if (validatorId) return 'fixed_user';
+  if (dbValue === 'fixed_user' || validatorId) return 'fixed_user';
   return 'none';
 }
 
-function valTypeToDb(t: ValType): string {
-  return t === 'fixed_user' ? 'free' : t;
+// Contrainte DB : ('manager' | 'fixed_user' | 'requester') ou NULL — 'none' = NULL
+function valTypeToDb(t: ValType): string | null {
+  if (t === 'none') return null;
+  return t; // 'manager' | 'fixed_user' | 'requester'
 }
 
 function getParallelColor(group: number | null) {
