@@ -118,12 +118,11 @@ export default function BEPrestationGroupSettings() {
     async function load() {
       setIsLoading(true);
       try {
-        const [{ data: spData, error: spErr }, { data: profData }] = await Promise.all([
+        const [{ data: allData, error: spErr }, { data: profData }] = await Promise.all([
           supabase
             .from('sub_process_templates')
             .select('*')
             .eq('process_template_id', BE_PROCESS_ID)
-            .or(`name.eq.${prestationName},name.like.${prestationName} — %`)
             .order('order_index', { ascending: true }),
           supabase.from('profiles').select('id, display_name').order('display_name'),
         ]);
@@ -131,7 +130,11 @@ export default function BEPrestationGroupSettings() {
         if (spErr) throw spErr;
         setProfiles((profData ?? []) as Profile[]);
 
-        const rows = (spData ?? []) as any[];
+        // Filtrage côté client pour éviter les problèmes d'encodage PostgREST
+        const prefix = `${prestationName} — `;
+        const rows = ((allData ?? []) as any[]).filter(
+          sp => sp.name === prestationName || sp.name.startsWith(prefix)
+        );
         if (rows.length > 0) setBeCategory(rows[0].be_category ?? 'be');
 
         setSteps(rows.map((sp): StepDraft => ({
