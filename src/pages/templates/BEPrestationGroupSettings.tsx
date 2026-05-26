@@ -21,9 +21,11 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   ArrowLeft, Save, Plus, Trash2, ArrowUp, ArrowDown, GitBranch,
-  Loader2, ChevronDown, ChevronRight, Link, Unlink,
+  Loader2, ChevronDown, ChevronRight, Link, Unlink, Flag, FileText, Milestone,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -40,8 +42,10 @@ const PARALLEL_COLORS = [
 ];
 
 type ValType = 'none' | 'requester' | 'manager' | 'fixed_user';
+type StartMode = 'parallel' | 'after_previous' | 'after_specific';
 
 interface Profile { id: string; display_name: string | null; }
+interface RequestState { code: string; label: string; state_category: string | null; }
 
 interface StepDraft {
   dbId: string | null;         // null = nouvelle étape
@@ -56,6 +60,20 @@ interface StepDraft {
   val2Type: ValType;
   val2UserId: string;
   fixedUserId: string;
+  // ── Enchaînement ──
+  startMode: StartMode;
+  dependsOnTempId: string;      // tempId de l'étape dont celle-ci dépend (après_specifique)
+  delayAfterPreviousDays: number;
+  // ── Jalon timeline ──
+  isMilestone: boolean;
+  milestoneLabel: string;
+  autoMilestoneDelayDays: number | null;
+  autoMilestoneLabel: string;
+  // ── Documents obligatoires ──
+  requiredDocsCount: number;
+  requiredDocsDescription: string;
+  // ── État de sortie ──
+  outputStateCode: string;
   expanded: boolean;
   isNew: boolean;
   markedForDelete: boolean;
@@ -67,6 +85,21 @@ const VAL_OPTIONS: { value: ValType; label: string }[] = [
   { value: 'manager',    label: 'Manager du demandeur' },
   { value: 'fixed_user', label: 'Utilisateur fixe' },
 ];
+
+const START_MODE_OPTIONS: { value: StartMode; label: string }[] = [
+  { value: 'parallel',       label: 'En parallèle (dès le départ)' },
+  { value: 'after_previous', label: 'Après l\'étape précédente' },
+  { value: 'after_specific', label: 'Après une étape précise' },
+];
+
+// Couleurs des catégories d'état (cohérent avec le reste de l'app BE)
+const STATE_CATEGORY_LABELS: Record<string, string> = {
+  SOUMIS: 'Soumis',
+  EN_COURS: 'En cours',
+  EN_ATTENTE_VALIDATION: 'En attente de validation',
+  EN_ATTENTE_RETOUR_ADMIN: 'En attente retour administration',
+  TERMINE: 'Terminé',
+};
 
 function dbToValType(dbValue: string | null, validatorId: string | null): ValType {
   if (!dbValue) return 'none';
@@ -116,25 +149,38 @@ export default function BEPrestationGroupSettings() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [requestStates, setRequestStates] = useState<RequestState[]>([]);
   const [beCategory, setBeCategory] = useState<'be' | 'be_reglementaire'>('be');
   const [steps, setSteps] = useState<StepDraft[]>([]);
+
+  // Catégorie d'état dérivée d'un code d'état de sortie
+  const categoryOfState = useCallback(
+    (code: string): string | null => requestStates.find(s => s.code === code)?.state_category ?? null,
+    [requestStates],
+  );
 
   // ── Chargement ───────────────────────────────────────────────────────────
   useEffect(() => {
     async function load() {
       setIsLoading(true);
       try {
-        const [{ data: allData, error: spErr }, { data: profData }] = await Promise.all([
+        const [{ data: allData, error: spErr }, { data: profData }, { data: stateData }] = await Promise.all([
           supabase
             .from('sub_process_templates')
             .select('*')
             .eq('process_template_id', BE_PROCESS_ID)
             .order('order_index', { ascending: true }),
           supabase.from('profiles').select('id, display_name').order('display_name'),
+          (supabase as any)
+            .from('request_states')
+            .select('code, label, state_category')
+            .eq('process_template_id', BE_PROCESS_ID)
+            .order('order_index', { ascending: true }),
         ]);
 
         if (spErr) throw spErr;
         setProfiles((profData ?? []) as Profile[]);
+        setRequestStates((stateData ?? []) as RequestState[]);
 
         // Filtrage côté client pour éviter les problèmes d'encodage PostgREST
         const prefix = `${prestationName} — `;
@@ -157,6 +203,20 @@ export default function BEPrestationGroupSettings() {
           val2Type: dbToValType(sp.validation_level_2_type, sp.validation_level_2_user_id),
           val2UserId: sp.validation_level_2_user_id ?? '',
           fixedUserId: sp.target_assignee_id ?? '',
+          // Enchaînement
+          startMode: (sp.start_mode as StartMode) ?? 'parallel',
+          dependsOnTempId: sp.depends_on_sub_process_template_id ?? '',
+          delayAfterPreviousDays: sp.delay_after_previous_days ?? 0,
+          // Jalon
+          isMilestone: sp.is_milestone ?? false,
+          milestoneLabel: sp.milestone_label ?? '',
+          autoMilestoneDelayDays: sp.auto_milestone_delay_days ?? null,
+          autoMilestoneLabel: sp.auto_milestone_label ?? '',
+          // Docs obligatoires
+          requiredDocsCount: sp.required_docs_count ?? 0,
+          requiredDocsDescription: sp.required_docs_description ?? '',
+          // État de sortie
+          outputStateCode: sp.output_state_code ?? '',
           expanded: false,
           isNew: false,
           markedForDelete: false,
@@ -212,6 +272,16 @@ export default function BEPrestationGroupSettings() {
       val2Type: 'none',
       val2UserId: '',
       fixedUserId: '',
+      startMode: 'parallel',
+      dependsOnTempId: '',
+      delayAfterPreviousDays: 0,
+      isMilestone: false,
+      milestoneLabel: '',
+      autoMilestoneDelayDays: null,
+      autoMilestoneLabel: '',
+      requiredDocsCount: 0,
+      requiredDocsDescription: '',
+      outputStateCode: '',
       expanded: true,
       isNew: true,
       markedForDelete: false,
@@ -242,7 +312,9 @@ export default function BEPrestationGroupSettings() {
         if (error) throw error;
       }
 
-      // Upsert (insert ou update)
+      // Upsert (insert ou update) — on capture tempId → dbId pour résoudre
+      // ensuite les dépendances entre étapes (after_specific).
+      const tempIdToDbId = new Map<string, string>();
       for (const s of reordered) {
         const payload: any = {
           name: `${prestationName} — ${s.stepLabel}`,
@@ -257,6 +329,19 @@ export default function BEPrestationGroupSettings() {
           validation_level_2_type: valTypeToDb(s.val2Type),
           validation_level_2_user_id: s.val2Type === 'fixed_user' ? s.val2UserId || null : null,
           target_assignee_id: s.fixedUserId || null,
+          // ── Enchaînement (depends_on résolu en 2e passe) ──
+          start_mode: s.startMode,
+          delay_after_previous_days: s.delayAfterPreviousDays || 0,
+          // ── Jalon timeline ──
+          is_milestone: s.isMilestone,
+          milestone_label: s.isMilestone ? (s.milestoneLabel || null) : null,
+          auto_milestone_delay_days: s.autoMilestoneDelayDays,
+          auto_milestone_label: s.autoMilestoneLabel || null,
+          // ── Documents obligatoires ──
+          required_docs_count: s.requiredDocsCount || 0,
+          required_docs_description: s.requiredDocsDescription || null,
+          // ── État de sortie ──
+          output_state_code: s.outputStateCode || null,
           is_shared: true,
         };
         if (s.dbId) {
@@ -265,17 +350,39 @@ export default function BEPrestationGroupSettings() {
             .update(payload)
             .eq('id', s.dbId);
           if (error) throw error;
+          tempIdToDbId.set(s.tempId, s.dbId);
         } else {
-          const { error } = await supabase
+          const { data: inserted, error } = await supabase
             .from('sub_process_templates')
-            .insert(payload);
+            .insert(payload)
+            .select('id')
+            .single();
           if (error) throw error;
+          if (inserted?.id) tempIdToDbId.set(s.tempId, inserted.id);
         }
       }
 
+      // 2e passe : résolution des dépendances explicites (after_specific)
+      for (const s of reordered) {
+        const myDbId = tempIdToDbId.get(s.tempId);
+        if (!myDbId) continue;
+        const dependsDbId =
+          s.startMode === 'after_specific' && s.dependsOnTempId
+            ? tempIdToDbId.get(s.dependsOnTempId) ?? null
+            : null;
+        const { error } = await supabase
+          .from('sub_process_templates')
+          .update({ depends_on_sub_process_template_id: dependsDbId } as any)
+          .eq('id', myDbId);
+        if (error) throw error;
+      }
+
       toast.success('Prestation sauvegardée');
+      // Recharge proprement (ids des nouvelles étapes + dépendances résolues)
       setSteps(prev => prev.filter(s => !s.markedForDelete).map((s, i) => ({
         ...s,
+        dbId: tempIdToDbId.get(s.tempId) ?? s.dbId,
+        tempId: tempIdToDbId.get(s.tempId) ?? s.tempId,
         orderIndex: (i + 1) * 10,
         isNew: false,
       })));
@@ -375,6 +482,18 @@ export default function BEPrestationGroupSettings() {
                         <Badge variant="outline" className={cn('text-[10px] px-1.5 py-0', color?.badge)}>
                           ‖ Groupe {step.parallelGroup}
                         </Badge>
+                      )}
+
+                      {/* Jalon */}
+                      {step.isMilestone && (
+                        <Flag className="w-3.5 h-3.5 text-violet-500 flex-shrink-0" />
+                      )}
+
+                      {/* Docs obligatoires */}
+                      {step.requiredDocsCount > 0 && (
+                        <span className="text-[10px] text-slate-400 flex-shrink-0 flex items-center gap-0.5">
+                          <FileText className="w-3 h-3" />{step.requiredDocsCount}
+                        </span>
                       )}
 
                       {/* Durée */}
@@ -591,6 +710,176 @@ export default function BEPrestationGroupSettings() {
                           </SelectContent>
                         </Select>
                       )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* ════ Enchaînement ════ */}
+                <div className="mt-5 pt-4 border-t">
+                  <h4 className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                    <GitBranch className="w-3.5 h-3.5" /> Enchaînement
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-xs">Démarrage de l'étape</Label>
+                      <Select
+                        value={step.startMode}
+                        onValueChange={v => updateStep(step.tempId, { startMode: v as StartMode })}
+                      >
+                        <SelectTrigger className="h-8 text-sm mt-1"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {START_MODE_OPTIONS.map(o => (
+                            <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Délai après la précédente (jours)</Label>
+                      <Input
+                        type="number" min={0}
+                        value={step.delayAfterPreviousDays}
+                        onChange={e => updateStep(step.tempId, { delayAfterPreviousDays: parseInt(e.target.value) || 0 })}
+                        className="h-8 text-sm mt-1"
+                      />
+                    </div>
+                    {step.startMode === 'after_specific' && (
+                      <div className="col-span-2">
+                        <Label className="text-xs">Dépend de l'étape</Label>
+                        <Select
+                          value={step.dependsOnTempId || 'none'}
+                          onValueChange={v => updateStep(step.tempId, { dependsOnTempId: v === 'none' ? '' : v })}
+                        >
+                          <SelectTrigger className="h-8 text-sm mt-1">
+                            <SelectValue placeholder="Choisir l'étape prérequise" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">—</SelectItem>
+                            {visibleSteps
+                              .filter(o => o.tempId !== step.tempId)
+                              .map(o => (
+                                <SelectItem key={o.tempId} value={o.tempId}>
+                                  {logicalOrder.get(o.tempId) ?? '?'}. {o.stepLabel}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* ════ Jalon timeline ════ */}
+                <div className="mt-4 pt-4 border-t">
+                  <h4 className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                    <Flag className="w-3.5 h-3.5" /> Jalon timeline
+                  </h4>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <Checkbox
+                      checked={step.isMilestone}
+                      onCheckedChange={c => updateStep(step.tempId, { isMilestone: !!c })}
+                    />
+                    <span className="text-sm text-slate-700">Marquer comme jalon sur la timeline du projet</span>
+                  </label>
+                  {step.isMilestone && (
+                    <div className="grid grid-cols-2 gap-4 mt-3">
+                      <div className="col-span-2">
+                        <Label className="text-xs">Libellé du jalon (optionnel)</Label>
+                        <Input
+                          value={step.milestoneLabel}
+                          onChange={e => updateStep(step.tempId, { milestoneLabel: e.target.value })}
+                          placeholder="Ex: Dépôt du dossier"
+                          className="h-8 text-sm mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs flex items-center gap-1">
+                          <Milestone className="w-3 h-3" /> Jalon différé J+ (jours)
+                        </Label>
+                        <Input
+                          type="number" min={0}
+                          value={step.autoMilestoneDelayDays ?? ''}
+                          onChange={e => updateStep(step.tempId, {
+                            autoMilestoneDelayDays: e.target.value ? parseInt(e.target.value) : null,
+                          })}
+                          placeholder="Aucun"
+                          className="h-8 text-sm mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Libellé jalon différé</Label>
+                        <Input
+                          value={step.autoMilestoneLabel}
+                          onChange={e => updateStep(step.tempId, { autoMilestoneLabel: e.target.value })}
+                          placeholder="Optionnel"
+                          className="h-8 text-sm mt-1"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* ════ Documents obligatoires ════ */}
+                <div className="mt-4 pt-4 border-t">
+                  <h4 className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5" /> Documents obligatoires
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-xs">Nombre de documents requis</Label>
+                      <Input
+                        type="number" min={0}
+                        value={step.requiredDocsCount}
+                        onChange={e => updateStep(step.tempId, { requiredDocsCount: parseInt(e.target.value) || 0 })}
+                        className="h-8 text-sm mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Description des documents</Label>
+                      <Input
+                        value={step.requiredDocsDescription}
+                        onChange={e => updateStep(step.tempId, { requiredDocsDescription: e.target.value })}
+                        placeholder="Ex: Dossier, Plans…"
+                        className="h-8 text-sm mt-1"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* ════ État de sortie ════ */}
+                <div className="mt-4 pt-4 border-t">
+                  <h4 className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3">
+                    État de la demande à la complétion de cette étape
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-xs">État en sortie</Label>
+                      <Select
+                        value={step.outputStateCode || 'none'}
+                        onValueChange={v => updateStep(step.tempId, { outputStateCode: v === 'none' ? '' : v })}
+                      >
+                        <SelectTrigger className="h-8 text-sm mt-1">
+                          <SelectValue placeholder="Aucun changement" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Aucun changement</SelectItem>
+                          {requestStates.map(st => (
+                            <SelectItem key={st.code} value={st.code}>{st.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Catégorie d'état (auto)</Label>
+                      <div className="h-8 mt-1 flex items-center">
+                        {step.outputStateCode && categoryOfState(step.outputStateCode) ? (
+                          <Badge variant="outline" className="text-xs">
+                            {STATE_CATEGORY_LABELS[categoryOfState(step.outputStateCode)!] ?? categoryOfState(step.outputStateCode)}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-slate-400 italic">—</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>

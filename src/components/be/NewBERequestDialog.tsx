@@ -102,6 +102,17 @@ interface SubStep {
   /** Niveau de validation 2 : 'manager' | 'fixed_user' | 'requester' | null */
   validation_level_2_type: string | null;
   validation_level_2_user_id: string | null;
+  // ── Config de flux (depuis le template) ──
+  start_mode: string | null;
+  depends_on_sub_process_template_id: string | null;
+  delay_after_previous_days: number | null;
+  is_milestone: boolean | null;
+  milestone_label: string | null;
+  auto_milestone_delay_days: number | null;
+  auto_milestone_label: string | null;
+  required_docs_count: number | null;
+  required_docs_description: string | null;
+  output_state_code: string | null;
 }
 
 /**
@@ -344,7 +355,7 @@ export function NewBERequestDialog({
     if (step !== 1 && !(hasDefaultProject && step === 1)) return;
     setStepsLoading(true);
     sb.from('sub_process_templates')
-      .select('id,name,description,be_category,order_index,parallel_group,dispatch_manager_id,user_id,assignment_type,target_assignee_id,default_duration_hours,validation_level_1_type,validation_level_1_user_id,validation_level_2_type,validation_level_2_user_id')
+      .select('id,name,description,be_category,order_index,parallel_group,dispatch_manager_id,user_id,assignment_type,target_assignee_id,default_duration_hours,validation_level_1_type,validation_level_1_user_id,validation_level_2_type,validation_level_2_user_id,start_mode,depends_on_sub_process_template_id,delay_after_previous_days,is_milestone,milestone_label,auto_milestone_delay_days,auto_milestone_label,required_docs_count,required_docs_description,output_state_code')
       .eq('process_template_id', BE_PROCESS_TEMPLATE_ID)
       .eq('is_shared', true)
       .order('be_category')
@@ -490,6 +501,16 @@ export function NewBERequestDialog({
           process_template_id: BE_PROCESS_TEMPLATE_ID,
           validator_level_1_id: val1Id,
           validator_level_2_id: val2Id,
+          // ── Config de flux héritée du template ──
+          start_mode: sub.start_mode ?? 'parallel',
+          delay_after_previous_days: sub.delay_after_previous_days ?? 0,
+          is_milestone: sub.is_milestone ?? false,
+          milestone_label: sub.milestone_label ?? null,
+          auto_milestone_delay_days: sub.auto_milestone_delay_days ?? null,
+          auto_milestone_label: sub.auto_milestone_label ?? null,
+          required_docs_count: sub.required_docs_count ?? 0,
+          required_docs_description: sub.required_docs_description ?? null,
+          output_state_code: sub.output_state_code ?? null,
         };
       });
 
@@ -498,6 +519,22 @@ export function NewBERequestDialog({
         .insert(childInserts)
         .select('id, title, assignee_id, be_status, sub_process_template_id');
       if (childError) throw childError;
+
+      // 2bis. Résolution des dépendances explicites (start_mode='after_specific').
+      // On mappe sub_process_template_id → id de la tâche créée, puis on pose
+      // depends_on_task_id sur les tâches qui dépendent d'une étape précise.
+      const taskBySubProcess = new Map<string, string>();
+      for (const c of (createdChildren ?? [])) {
+        if (c.sub_process_template_id) taskBySubProcess.set(c.sub_process_template_id, c.id);
+      }
+      for (const sub of allSelectedSteps) {
+        if (sub.start_mode !== 'after_specific' || !sub.depends_on_sub_process_template_id) continue;
+        const myTaskId = taskBySubProcess.get(sub.id);
+        const targetTaskId = taskBySubProcess.get(sub.depends_on_sub_process_template_id);
+        if (myTaskId && targetTaskId) {
+          await sb.from('tasks').update({ depends_on_task_id: targetTaskId } as any).eq('id', myTaskId);
+        }
+      }
 
       // 3. Notifications inbox — informe les managers/dispatchers et les
       // assignés que de nouvelles tâches BE leur arrivent. On résout
