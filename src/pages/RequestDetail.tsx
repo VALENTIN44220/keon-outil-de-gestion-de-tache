@@ -22,6 +22,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -29,7 +30,7 @@ import {
   ArrowLeft, Calendar, CheckCircle2, ChevronRight, Clock,
   Flag, ListChecks, MessageSquare, User, Workflow, AlertTriangle,
   ShieldCheck, FileText, Loader2, Ban, UserPlus, Hourglass, Sparkles,
-  Paperclip, Link as LinkIcon, ExternalLink, Download,
+  Paperclip, Link as LinkIcon, ExternalLink, Download, Plus, X, Trash2,
 } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -89,8 +90,15 @@ export default function RequestDetail() {
   const [subProcessNames, setSubProcessNames] = useState<Map<string, string>>(new Map());
   const [processName, setProcessName] = useState<string | null>(null);
   const [requesterDetails, setRequesterDetails] = useState<{ company: string | null; department: string | null; job_title: string | null } | null>(null);
+  const [parentRequest, setParentRequest] = useState<{ id: string; title: string; request_number: string | null } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCancelling, setIsCancelling] = useState(false);
+
+  // Ajout de pièces jointes / liens
+  const [newLinkUrl, setNewLinkUrl] = useState('');
+  const [newLinkLabel, setNewLinkLabel] = useState('');
+  const [addingLink, setAddingLink] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState(false);
 
   // États métier (request_states) du processus de la demande
   const { statesByCode: reqStatesByCode, labelOf: reqStateLabelOf } = useRequestStates(
@@ -129,10 +137,23 @@ export default function RequestDetail() {
         if (pData) setProcessName(pData.name);
       }
 
+      // Si on consulte une ÉTAPE (type='task'), on charge la demande parente
+      // pour proposer un fil d'Ariane « ← retour à la demande ».
+      if ((t as any).type !== 'request' && (t as any).parent_request_id) {
+        const { data: p } = await supabase
+          .from('tasks').select('id, title, request_number')
+          .eq('id', (t as any).parent_request_id).maybeSingle();
+        setParentRequest((p as any) ?? null);
+      } else {
+        setParentRequest(null);
+      }
+
       const spIds = Array.from(new Set(
-        (kids || [])
-          .map((c: any) => c.sub_process_template_id || c.source_sub_process_template_id)
-          .filter(Boolean),
+        [
+          // le sous-processus de la tâche courante (utile quand on consulte une étape)
+          (t as any).sub_process_template_id || (t as any).source_sub_process_template_id,
+          ...(kids || []).map((c: any) => c.sub_process_template_id || c.source_sub_process_template_id),
+        ].filter(Boolean),
       ));
       if (spIds.length > 0) {
         const { data: spData } = await supabase
@@ -145,6 +166,8 @@ export default function RequestDetail() {
       const allProfileIds = new Set<string>();
       if ((t as any).requester_id) allProfileIds.add((t as any).requester_id);
       if ((t as any).assignee_id) allProfileIds.add((t as any).assignee_id);
+      if ((t as any).validator_level_1_id) allProfileIds.add((t as any).validator_level_1_id);
+      if ((t as any).validator_level_2_id) allProfileIds.add((t as any).validator_level_2_id);
       for (const c of (kids || [])) {
         if ((c as any).assignee_id) allProfileIds.add((c as any).assignee_id);
         if ((c as any).validator_level_1_id) allProfileIds.add((c as any).validator_level_1_id);
@@ -244,6 +267,77 @@ export default function RequestDetail() {
     navigate(-1);
   };
 
+  // ─── Pièces jointes & liens : ajout / suppression ──────────────
+  const refreshAttachments = async () => {
+    if (!taskId) return;
+    const { data } = await supabase
+      .from('task_attachments')
+      .select('id, name, url, type')
+      .eq('task_id', taskId)
+      .order('created_at');
+    setAttachments((data || []) as any[]);
+  };
+
+  const handleAddLink = async () => {
+    if (!task || !newLinkUrl.trim()) return;
+    setAddingLink(true);
+    try {
+      const { error } = await supabase.from('task_attachments').insert({
+        task_id: task.id,
+        name: newLinkLabel.trim() || newLinkUrl.trim(),
+        url: newLinkUrl.trim(),
+        type: 'link',
+        // uploaded_by = profile.id pour matcher la policy DELETE (uploaded_by = current_profile_id())
+        uploaded_by: profile?.id ?? null,
+      } as any);
+      if (error) throw error;
+      setNewLinkUrl('');
+      setNewLinkLabel('');
+      toast.success('Lien ajouté');
+      await refreshAttachments();
+    } catch (e: any) {
+      toast.error(e.message || "Erreur lors de l'ajout du lien");
+    } finally {
+      setAddingLink(false);
+    }
+  };
+
+  const handleUploadFile = async (file: File) => {
+    if (!task) return;
+    setUploadingFile(true);
+    try {
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = `be-requests/${task.id}/${Date.now()}-${safeName}`;
+      const { error: upErr } = await supabase.storage
+        .from('task-attachments')
+        .upload(path, file, { upsert: false });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from('task-attachments').getPublicUrl(path);
+      const { error } = await supabase.from('task_attachments').insert({
+        task_id: task.id,
+        name: file.name,
+        url: pub.publicUrl,
+        type: 'file',
+        // uploaded_by = profile.id pour matcher la policy DELETE (uploaded_by = current_profile_id())
+        uploaded_by: profile?.id ?? null,
+      } as any);
+      if (error) throw error;
+      toast.success(`Fichier ajouté : ${file.name}`);
+      await refreshAttachments();
+    } catch (e: any) {
+      toast.error(e.message || 'Upload échoué');
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  const handleDeleteAttachment = async (id: string) => {
+    const { error } = await supabase.from('task_attachments').delete().eq('id', id);
+    if (error) { toast.error(error.message || 'Erreur de suppression'); return; }
+    toast.success('Pièce jointe supprimée');
+    await refreshAttachments();
+  };
+
   // ─── Loading ──────────────────────────────────────────────────
   if (isLoading || !task) {
     return (
@@ -268,6 +362,16 @@ export default function RequestDetail() {
   const canCancel = !['done', 'validated', 'cancelled'].includes(task.status as string)
     && (isAdmin || task.requester_id === profile?.id);
 
+  // Consulte-t-on une ÉTAPE (tâche enfant) plutôt qu'une demande ?
+  const isStep = (task as any).type !== 'request';
+
+  // Qui peut ajouter/supprimer des pièces jointes : admin, demandeur, ou
+  // l'assigné (pour une étape). Pas sur une demande annulée.
+  const canEditAttachments = task.status !== 'cancelled'
+    && (isAdmin
+      || task.requester_id === profile?.id
+      || (task as any).assignee_id === profile?.id);
+
   // Total tâches terminées
   const totalDone = childTasks.filter(t =>
     ['done', 'validated'].includes(t.status as string) || (t as any).be_status === 'cloturee'
@@ -278,6 +382,132 @@ export default function RequestDetail() {
     !['done', 'validated', 'cancelled'].includes(t.status as string) && (t as any).be_status !== 'cloturee'
   );
 
+  // Métadonnées de l'étape consultée (be_status)
+  const stepBeStatus = (task as any).be_status as string | null | undefined;
+  const stepBeMeta = stepBeStatus ? getBEStatusMeta(stepBeStatus) : null;
+  const stepAssigneeName = (task as any).assignee_id ? profiles.get((task as any).assignee_id) : null;
+  const stepValidatorName = (task as any).validator_level_1_id ? profiles.get((task as any).validator_level_1_id) : null;
+  const stepDurationHours = (task as any).duration_hours as number | null | undefined;
+  const stepSubProcessName = subProcessNames.get(
+    (task as any).sub_process_template_id || (task as any).source_sub_process_template_id || '',
+  );
+
+  // ─── Carte « Pièces jointes & liens » (partagée demande/étape) ──
+  const attachmentsCard = (
+    <Card className="overflow-hidden shadow-sm">
+      <CardHeader className="pb-3 border-b bg-gradient-to-r from-blue-50/60 to-violet-50/40">
+        <CardTitle className="text-base font-semibold flex items-center gap-2">
+          <Paperclip className="h-4 w-4" />
+          Pièces jointes & liens
+          {attachments.length > 0 && (
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-mono">
+              {attachments.length}
+            </Badge>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-4 space-y-4">
+        {attachments.length === 0 ? (
+          <p className="text-sm text-muted-foreground italic py-1">
+            Aucune pièce jointe ni lien associé.
+          </p>
+        ) : (
+          <ul className="divide-y">
+            {attachments.map((att) => {
+              const isLink = att.type === 'link';
+              return (
+                <li key={att.id} className="flex items-center gap-2">
+                  <a
+                    href={att.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 py-2.5 px-1 hover:bg-muted/40 rounded-md transition-colors group flex-1 min-w-0"
+                  >
+                    <div className={cn(
+                      'h-8 w-8 rounded-lg flex items-center justify-center shrink-0',
+                      isLink ? 'bg-blue-100 text-blue-600' : 'bg-violet-100 text-violet-600',
+                    )}>
+                      {isLink ? <LinkIcon className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{att.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {isLink ? att.url.replace(/^https?:\/\//, '') : 'Fichier'}
+                      </p>
+                    </div>
+                    {isLink
+                      ? <ExternalLink className="h-4 w-4 text-muted-foreground/50 group-hover:text-muted-foreground shrink-0" />
+                      : <Download className="h-4 w-4 text-muted-foreground/50 group-hover:text-muted-foreground shrink-0" />}
+                  </a>
+                  {canEditAttachments && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive shrink-0"
+                      onClick={() => handleDeleteAttachment(att.id)}
+                      title="Supprimer"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        {/* Zone d'ajout */}
+        {canEditAttachments && (
+          <div className="border-t pt-3 space-y-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Input
+                placeholder="https://… (lien à ajouter)"
+                value={newLinkUrl}
+                onChange={(e) => setNewLinkUrl(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') void handleAddLink(); }}
+                className="flex-1 min-w-[180px] h-9 text-sm"
+              />
+              <Input
+                placeholder="Intitulé (optionnel)"
+                value={newLinkLabel}
+                onChange={(e) => setNewLinkLabel(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') void handleAddLink(); }}
+                className="w-40 h-9 text-sm"
+              />
+              <Button
+                size="sm"
+                className="h-9 gap-1.5"
+                onClick={() => void handleAddLink()}
+                disabled={addingLink || !newLinkUrl.trim()}
+              >
+                {addingLink ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                Lien
+              </Button>
+            </div>
+            <label>
+              <input
+                type="file"
+                className="hidden"
+                disabled={uploadingFile}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = '';
+                  if (f) void handleUploadFile(f);
+                }}
+              />
+              <Button type="button" variant="outline" size="sm" className="h-9 gap-1.5" disabled={uploadingFile} asChild>
+                <span>
+                  <Paperclip className="h-3.5 w-3.5" />
+                  {uploadingFile ? 'Upload en cours…' : 'Ajouter un fichier'}
+                </span>
+              </Button>
+            </label>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+
   return (
     <div className="flex h-screen">
       <Sidebar activeView={activeView} onViewChange={setActiveView} />
@@ -286,13 +516,25 @@ export default function RequestDetail() {
           <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-4 pb-12">
 
             {/* ── Breadcrumb ──────────────────────────────────── */}
-            <button
-              onClick={() => navigate(-1)}
-              className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              Retour
-            </button>
+            <div className="flex items-center gap-3 flex-wrap">
+              <button
+                onClick={() => navigate(-1)}
+                className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                Retour
+              </button>
+              {isStep && parentRequest && (
+                <button
+                  onClick={() => navigate(`/demande/${parentRequest.id}`)}
+                  className="text-xs text-primary hover:underline flex items-center gap-1.5"
+                  title={parentRequest.title}
+                >
+                  <ListChecks className="h-3.5 w-3.5" />
+                  Voir la demande{parentRequest.request_number ? ` ${parentRequest.request_number}` : ''}
+                </button>
+              )}
+            </div>
 
             {/* ─────────────────────────────────────────────────── */}
             {/* HERO CARD                                          */}
@@ -319,10 +561,16 @@ export default function RequestDetail() {
                     <Flag className="h-2.5 w-2.5 mr-1" />
                     {prioMeta.label}
                   </Badge>
-                  <Badge className={cn('text-[10px] font-medium px-2 py-0.5 border-0 gap-1.5', statusMeta.chip)}>
-                    <span className={cn('inline-block w-1.5 h-1.5 rounded-full', statusMeta.dot)} />
-                    {statusMeta.label}
-                  </Badge>
+                  {isStep && stepBeMeta ? (
+                    <Badge className={cn('text-[10px] font-medium px-2 py-0.5 border-0', stepBeMeta.bgClass, stepBeMeta.textClass)}>
+                      {stepBeMeta.icon} {stepBeMeta.label}
+                    </Badge>
+                  ) : (
+                    <Badge className={cn('text-[10px] font-medium px-2 py-0.5 border-0 gap-1.5', statusMeta.chip)}>
+                      <span className={cn('inline-block w-1.5 h-1.5 rounded-full', statusMeta.dot)} />
+                      {statusMeta.label}
+                    </Badge>
+                  )}
                   {processName && (
                     <Badge variant="outline" className="text-[10px] font-medium px-2 py-0.5 gap-1 text-muted-foreground border-dashed">
                       <Workflow className="h-2.5 w-2.5" />
@@ -375,7 +623,8 @@ export default function RequestDetail() {
                   )}
                 </div>
 
-                {/* Progress bar compacte */}
+                {/* Progress bar compacte — uniquement pour une DEMANDE (pas une étape) */}
+                {!isStep && (
                 <div className="pt-1">
                   <div className="flex items-baseline justify-between mb-1.5">
                     <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
@@ -410,12 +659,85 @@ export default function RequestDetail() {
                     )}
                   </div>
                 </div>
+                )}
               </div>
             </div>
 
-            {/* ─────────────────────────────────────────────────── */}
-            {/* TABS                                                */}
-            {/* ─────────────────────────────────────────────────── */}
+            {/* ═══════════════════════════════════════════════════ */}
+            {/* CORPS : vue ÉTAPE (détail seul) ou vue DEMANDE (tabs) */}
+            {/* ═══════════════════════════════════════════════════ */}
+            {isStep ? (
+              <div className="space-y-5">
+                <Card className="overflow-hidden shadow-sm">
+                  <CardHeader className="pb-3 border-b bg-gradient-to-r from-blue-50/60 to-violet-50/40">
+                    <CardTitle className="text-base font-semibold flex items-center gap-2">
+                      <ListChecks className="h-4 w-4" />
+                      Détail de l'étape
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6 space-y-5">
+                    {stepSubProcessName && (
+                      <div>
+                        <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1.5">Prestation</p>
+                        <p className="text-sm font-medium">{stepSubProcessName}</p>
+                      </div>
+                    )}
+                    {task.description && (
+                      <div>
+                        <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-1.5">Description</p>
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap">{task.description}</p>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">
+                      <InfoBlock label="Assigné" icon={User}>
+                        {stepAssigneeName ? (
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-9 w-9">
+                              <AvatarFallback className="text-xs bg-blue-100 text-blue-700">{initials(stepAssigneeName)}</AvatarFallback>
+                            </Avatar>
+                            <p className="text-sm font-medium truncate">{stepAssigneeName}</p>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-amber-700 flex items-center gap-1.5">
+                            <UserPlus className="h-3.5 w-3.5" /> À affecter
+                          </span>
+                        )}
+                      </InfoBlock>
+                      <InfoBlock label="Statut" icon={CheckCircle2}>
+                        {stepBeMeta ? (
+                          <Badge className={cn('text-xs px-2 py-0.5 border-0', stepBeMeta.bgClass, stepBeMeta.textClass)}>
+                            {stepBeMeta.icon} {stepBeMeta.label}
+                          </Badge>
+                        ) : (
+                          <Badge className={cn('text-xs px-2 py-0.5 border-0', statusMeta.chip)}>{statusMeta.label}</Badge>
+                        )}
+                      </InfoBlock>
+                      {stepValidatorName && (
+                        <InfoBlock label="Validateur" icon={ShieldCheck}>
+                          <span className="text-sm">{stepValidatorName}</span>
+                        </InfoBlock>
+                      )}
+                      {stepDurationHours != null && (
+                        <InfoBlock label="Temps prévu" icon={Clock}>
+                          <span className="text-sm">{stepDurationHours} h</span>
+                        </InfoBlock>
+                      )}
+                      <InfoBlock label="Échéance" icon={Calendar}>
+                        {dueDate ? (
+                          <span className={cn('text-sm font-medium', dueOverdue && 'text-red-600')}>
+                            {format(parseISO(dueDate), 'EEEE d MMMM yyyy', { locale: fr })}
+                          </span>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">Pas d'échéance définie</span>
+                        )}
+                      </InfoBlock>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {attachmentsCard}
+              </div>
+            ) : (
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
               <TabsList className="bg-white border-2 border-blue-200 h-10 p-1 shadow-sm">
                 <TabsTrigger value="steps" className="gap-2 text-sm px-4 h-8 data-[state=active]:shadow-sm">
@@ -560,70 +882,18 @@ export default function RequestDetail() {
                 </Card>
 
                 {/* ── Pièces jointes & liens ─────────────────────── */}
-                <Card className="overflow-hidden shadow-sm">
-                  <CardHeader className="pb-3 border-b bg-gradient-to-r from-blue-50/60 to-violet-50/40">
-                    <CardTitle className="text-base font-semibold flex items-center gap-2">
-                      <Paperclip className="h-4 w-4" />
-                      Pièces jointes & liens
-                      {attachments.length > 0 && (
-                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-mono">
-                          {attachments.length}
-                        </Badge>
-                      )}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-4">
-                    {attachments.length === 0 ? (
-                      <p className="text-sm text-muted-foreground italic py-2">
-                        Aucune pièce jointe ni lien associé à cette demande.
-                      </p>
-                    ) : (
-                      <ul className="divide-y">
-                        {attachments.map((att) => {
-                          const isLink = att.type === 'link';
-                          return (
-                            <li key={att.id}>
-                              <a
-                                href={att.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-3 py-2.5 px-1 hover:bg-muted/40 rounded-md transition-colors group"
-                              >
-                                <div className={cn(
-                                  'h-8 w-8 rounded-lg flex items-center justify-center shrink-0',
-                                  isLink ? 'bg-blue-100 text-blue-600' : 'bg-violet-100 text-violet-600',
-                                )}>
-                                  {isLink ? <LinkIcon className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium truncate">{att.name}</p>
-                                  <p className="text-xs text-muted-foreground truncate">
-                                    {isLink ? att.url.replace(/^https?:\/\//, '') : 'Fichier'}
-                                  </p>
-                                </div>
-                                {isLink ? (
-                                  <ExternalLink className="h-4 w-4 text-muted-foreground/50 group-hover:text-muted-foreground shrink-0" />
-                                ) : (
-                                  <Download className="h-4 w-4 text-muted-foreground/50 group-hover:text-muted-foreground shrink-0" />
-                                )}
-                              </a>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </CardContent>
-                </Card>
+                {attachmentsCard}
 
               </TabsContent>
             </Tabs>
+            )}
 
             {/* ── Conversation (écrans < lg, où le panneau latéral est masqué) ── */}
             <Card className="lg:hidden overflow-hidden shadow-sm">
               <CardHeader className="pb-3 border-b-2 border-violet-200 bg-gradient-to-r from-violet-100 to-blue-100">
                 <CardTitle className="text-base font-semibold flex items-center gap-2 text-violet-900">
                   <MessageSquare className="h-4 w-4 text-violet-700" />
-                  Conversation de la demande
+                  {isStep ? "Conversation de l'étape" : 'Conversation de la demande'}
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-3">
@@ -632,7 +902,8 @@ export default function RequestDetail() {
             </Card>
 
             {/* ── Actions ─────────────────────────────────────── */}
-            {canCancel && (
+            {/* L'annulation se fait au niveau de la demande, pas d'une étape isolée */}
+            {canCancel && !isStep && (
               <div className="flex items-center justify-end gap-2 pt-2">
                 <Button
                   variant="outline"
@@ -654,7 +925,7 @@ export default function RequestDetail() {
         <aside className="hidden lg:flex flex-col w-[380px] xl:w-[420px] border-l-2 border-violet-300 bg-violet-100/60 shrink-0">
           <div className="px-4 h-12 flex items-center gap-2 border-b-2 border-violet-300 shrink-0 bg-gradient-to-r from-violet-200 to-blue-200">
             <MessageSquare className="h-4 w-4 text-violet-700" />
-            <h2 className="text-sm font-semibold text-violet-900">Conversation de la demande</h2>
+            <h2 className="text-sm font-semibold text-violet-900">{isStep ? "Conversation de l'étape" : 'Conversation de la demande'}</h2>
           </div>
           <div className="flex-1 overflow-hidden p-3 min-h-0">
             <TaskCommentsSection taskId={task.id} className="h-full" />
