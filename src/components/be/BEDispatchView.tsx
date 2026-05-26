@@ -15,6 +15,7 @@
 
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSimulation } from '@/contexts/SimulationContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -993,6 +994,7 @@ interface BEDispatchViewProps {
 export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const isGlobal = !projectId;
 
   // ── Filtres ────────────────────────────────────────────────────────────────
@@ -1004,6 +1006,31 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
   const [statusBEFilter, setStatusBEFilter] = useState<string>('all');
   const [macroStateFilter, setMacroStateFilter] = useState<'all' | MacroStateCategory>('all');
   const [overdueOnly, setOverdueOnly] = useState(false);
+
+  // ── Auto-ouverture depuis URL (?requestId=...) ───────────────────────────
+  // Quand l'utilisateur clique sur une notification "Nouvelle demande BE",
+  // on arrive ici avec ?requestId=<uuid>. On reset les filtres bloquants,
+  // on expand la demande et on nettoie le paramètre URL.
+  useEffect(() => {
+    const rid = searchParams.get('requestId');
+    if (!rid) return;
+    // Reset des filtres qui pourraient masquer la demande
+    setOverdueOnly(false);
+    setAssignFilter('all');
+    setMacroStateFilter('all');
+    // Auto-expand la demande ciblée
+    setExpandedRequests(prev => {
+      const next = new Set(prev);
+      next.add(rid);
+      return next;
+    });
+    // Nettoie le paramètre URL sans recharger la page
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      next.delete('requestId');
+      return next;
+    }, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   // ── États métier BE (request_states) ──────────────────────────────────────
   const { statesByCode: beStatesByCode, labelOf: beStateLabelOf } = useRequestStates(BE_PROCESS_TEMPLATE_ID);

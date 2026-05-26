@@ -160,6 +160,12 @@ export function AppNotificationCluster({ collapsed, className }: AppNotification
             return;
           }
           if (row.related_entity_type === 'task') {
+            // Notifs BE "nouvelle demande à dispatcher" → ouvre directement
+            // l'écran Dispatch BE avec la demande pré-sélectionnée + filtres réinitialisés.
+            if (row.type === 'be_request_created') {
+              navigate(`/be/dispatch?requestId=${encodeURIComponent(row.related_entity_id)}`);
+              return;
+            }
             defaultOpenTask(row.related_entity_id);
           }
         }}
