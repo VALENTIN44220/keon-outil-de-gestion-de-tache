@@ -479,6 +479,11 @@ export default function BEBudgetGlobal() {
                                   )}
                                 >
                                   {margeDirecte !== 0 ? eur(margeDirecte) : '—'}
+                                  {k.ca_constate_brut > 0 && margeDirecte !== 0 && (
+                                    <span className="block text-[10px] font-normal text-muted-foreground">
+                                      {Math.round((margeDirecte / k.ca_constate_brut) * 100)}% du CA
+                                    </span>
+                                  )}
                                 </TableCell>
                                 <TableCell className="text-right tabular-nums">
                                   {k.jours_declares > 0 ? `${num(k.jours_declares)} j` : '—'}

@@ -425,7 +425,14 @@ export default function BEProjectHubBudgetAffaire() {
               value={eur(displayKpis.mscd)}
               icon={Coins}
               accent={displayKpis.mscd >= 0 ? 'text-emerald-700' : 'text-red-600'}
-              hint={displayKpis.cout_rh > 0 ? `RH : ${eur(displayKpis.cout_rh)}` : undefined}
+              hint={
+                displayKpis.ca_constate > 0
+                  ? `${Math.round((displayKpis.mscd / displayKpis.ca_constate) * 100)}% du CA` +
+                    (displayKpis.cout_rh > 0 ? ` · RH ${eur(displayKpis.cout_rh)}` : '')
+                  : displayKpis.cout_rh > 0
+                    ? `RH : ${eur(displayKpis.cout_rh)}`
+                    : undefined
+              }
             />
           </div>
         )}
