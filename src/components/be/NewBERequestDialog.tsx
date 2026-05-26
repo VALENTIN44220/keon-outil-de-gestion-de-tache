@@ -481,7 +481,6 @@ export function NewBERequestDialog({
           sub_process_template_id: sub.id,
           assignee_id: initialAssignee,
           duration_hours: sub.default_duration_hours ?? 8,
-          order_index: sub.order_index ?? 0,
           parallel_group: sub.parallel_group ?? null,
           source_process_template_id: BE_PROCESS_TEMPLATE_ID,
           process_template_id: BE_PROCESS_TEMPLATE_ID,
