@@ -72,6 +72,8 @@ interface StepDraft {
   // ── Documents obligatoires ──
   requiredDocsCount: number;
   requiredDocsDescription: string;
+  /** Titres / références des documents requis (texte libre, 1 par ligne) */
+  requiredDocsReferences: string;
   // ── État de sortie ──
   outputStateCode: string;
   expanded: boolean;
@@ -215,6 +217,7 @@ export default function BEPrestationGroupSettings() {
           // Docs obligatoires
           requiredDocsCount: sp.required_docs_count ?? 0,
           requiredDocsDescription: sp.required_docs_description ?? '',
+          requiredDocsReferences: sp.required_docs_references ?? '',
           // État de sortie
           outputStateCode: sp.output_state_code ?? '',
           expanded: false,
@@ -281,6 +284,7 @@ export default function BEPrestationGroupSettings() {
       autoMilestoneLabel: '',
       requiredDocsCount: 0,
       requiredDocsDescription: '',
+      requiredDocsReferences: '',
       outputStateCode: '',
       expanded: true,
       isNew: true,
@@ -340,6 +344,7 @@ export default function BEPrestationGroupSettings() {
           // ── Documents obligatoires ──
           required_docs_count: s.requiredDocsCount || 0,
           required_docs_description: s.requiredDocsDescription || null,
+          required_docs_references: s.requiredDocsReferences || null,
           // ── État de sortie ──
           output_state_code: s.outputStateCode || null,
           is_shared: true,
@@ -841,6 +846,16 @@ export default function BEPrestationGroupSettings() {
                         onChange={e => updateStep(step.tempId, { requiredDocsDescription: e.target.value })}
                         placeholder="Ex: Dossier, Plans…"
                         className="h-8 text-sm mt-1"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <Label className="text-xs">Références / titres des documents requis</Label>
+                      <Textarea
+                        value={step.requiredDocsReferences}
+                        onChange={e => updateStep(step.tempId, { requiredDocsReferences: e.target.value })}
+                        placeholder="Un titre de document par ligne (ex : Plan de masse, Étude d'impact, Récépissé de dépôt…)"
+                        rows={3}
+                        className="text-sm mt-1"
                       />
                     </div>
                   </div>
