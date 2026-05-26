@@ -29,6 +29,7 @@ import {
   ArrowLeft, Calendar, CheckCircle2, ChevronRight, Clock,
   Flag, ListChecks, MessageSquare, User, Workflow, AlertTriangle,
   ShieldCheck, FileText, Loader2, Ban, UserPlus, Hourglass, Sparkles,
+  Paperclip, Link as LinkIcon, ExternalLink, Download,
 } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -83,6 +84,7 @@ export default function RequestDetail() {
 
   const [task, setTask] = useState<Task | null>(null);
   const [childTasks, setChildTasks] = useState<Task[]>([]);
+  const [attachments, setAttachments] = useState<Array<{ id: string; name: string; url: string; type: string }>>([]);
   const [profiles, setProfiles] = useState<Map<string, string>>(new Map());
   const [subProcessNames, setSubProcessNames] = useState<Map<string, string>>(new Map());
   const [processName, setProcessName] = useState<string | null>(null);
@@ -111,6 +113,14 @@ export default function RequestDetail() {
       const { data: kids } = await supabase
         .from('tasks').select('*').eq('parent_request_id', taskId).order('created_at');
       setChildTasks((kids || []) as Task[]);
+
+      // Pièces jointes & liens de la demande (task_attachments sur la demande parente)
+      const { data: atts } = await supabase
+        .from('task_attachments')
+        .select('id, name, url, type')
+        .eq('task_id', taskId)
+        .order('created_at');
+      setAttachments((atts || []) as any[]);
 
       if ((t as any).source_process_template_id) {
         const { data: pData } = await supabase
@@ -546,6 +556,62 @@ export default function RequestDetail() {
                         </div>
                       </InfoBlock>
                     </div>
+                  </CardContent>
+                </Card>
+
+                {/* ── Pièces jointes & liens ─────────────────────── */}
+                <Card className="overflow-hidden shadow-sm">
+                  <CardHeader className="pb-3 border-b bg-gradient-to-r from-blue-50/60 to-violet-50/40">
+                    <CardTitle className="text-base font-semibold flex items-center gap-2">
+                      <Paperclip className="h-4 w-4" />
+                      Pièces jointes & liens
+                      {attachments.length > 0 && (
+                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-mono">
+                          {attachments.length}
+                        </Badge>
+                      )}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4">
+                    {attachments.length === 0 ? (
+                      <p className="text-sm text-muted-foreground italic py-2">
+                        Aucune pièce jointe ni lien associé à cette demande.
+                      </p>
+                    ) : (
+                      <ul className="divide-y">
+                        {attachments.map((att) => {
+                          const isLink = att.type === 'link';
+                          return (
+                            <li key={att.id}>
+                              <a
+                                href={att.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-3 py-2.5 px-1 hover:bg-muted/40 rounded-md transition-colors group"
+                              >
+                                <div className={cn(
+                                  'h-8 w-8 rounded-lg flex items-center justify-center shrink-0',
+                                  isLink ? 'bg-blue-100 text-blue-600' : 'bg-violet-100 text-violet-600',
+                                )}>
+                                  {isLink ? <LinkIcon className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium truncate">{att.name}</p>
+                                  <p className="text-xs text-muted-foreground truncate">
+                                    {isLink ? att.url.replace(/^https?:\/\//, '') : 'Fichier'}
+                                  </p>
+                                </div>
+                                {isLink ? (
+                                  <ExternalLink className="h-4 w-4 text-muted-foreground/50 group-hover:text-muted-foreground shrink-0" />
+                                ) : (
+                                  <Download className="h-4 w-4 text-muted-foreground/50 group-hover:text-muted-foreground shrink-0" />
+                                )}
+                              </a>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
                   </CardContent>
                 </Card>
 
