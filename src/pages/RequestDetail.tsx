@@ -34,7 +34,7 @@ import {
   ArrowLeft, Calendar, CheckCircle2, ChevronRight, Clock,
   Flag, ListChecks, MessageSquare, User, Workflow, AlertTriangle,
   ShieldCheck, FileText, Loader2, Ban, UserPlus, Hourglass, Sparkles,
-  Paperclip, Link as LinkIcon, ExternalLink, Download, Plus, X, Trash2,
+  Paperclip, Link as LinkIcon, ExternalLink, Download, Plus, X, Trash2, Copy,
 } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -443,30 +443,55 @@ export default function RequestDetail() {
           <ul className="divide-y">
             {attachments.map((att) => {
               const isLink = att.type === 'link';
+              // Un lien http(s) (ou un fichier) est ouvrable dans le navigateur.
+              // Un lien interne (\\serveur\..., S:\..., référence texte) ne l'est
+              // pas (les navigateurs bloquent file://) → on le rend copiable.
+              const openable = !isLink || /^https?:\/\//i.test(att.url);
+              const innerContent = (
+                <>
+                  <div className={cn(
+                    'h-8 w-8 rounded-lg flex items-center justify-center shrink-0',
+                    isLink ? 'bg-blue-100 text-blue-600' : 'bg-violet-100 text-violet-600',
+                  )}>
+                    {isLink ? <LinkIcon className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{att.name}</p>
+                    <p className="text-xs text-muted-foreground truncate" title={att.url}>
+                      {isLink ? att.url.replace(/^https?:\/\//, '') : 'Fichier'}
+                    </p>
+                  </div>
+                  {openable
+                    ? (isLink
+                        ? <ExternalLink className="h-4 w-4 text-muted-foreground/50 group-hover:text-muted-foreground shrink-0" />
+                        : <Download className="h-4 w-4 text-muted-foreground/50 group-hover:text-muted-foreground shrink-0" />)
+                    : <Copy className="h-4 w-4 text-muted-foreground/50 group-hover:text-muted-foreground shrink-0" />}
+                </>
+              );
               return (
                 <li key={att.id} className="flex items-center gap-2">
-                  <a
-                    href={att.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-3 py-2.5 px-1 hover:bg-muted/40 rounded-md transition-colors group flex-1 min-w-0"
-                  >
-                    <div className={cn(
-                      'h-8 w-8 rounded-lg flex items-center justify-center shrink-0',
-                      isLink ? 'bg-blue-100 text-blue-600' : 'bg-violet-100 text-violet-600',
-                    )}>
-                      {isLink ? <LinkIcon className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{att.name}</p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {isLink ? att.url.replace(/^https?:\/\//, '') : 'Fichier'}
-                      </p>
-                    </div>
-                    {isLink
-                      ? <ExternalLink className="h-4 w-4 text-muted-foreground/50 group-hover:text-muted-foreground shrink-0" />
-                      : <Download className="h-4 w-4 text-muted-foreground/50 group-hover:text-muted-foreground shrink-0" />}
-                  </a>
+                  {openable ? (
+                    <a
+                      href={att.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 py-2.5 px-1 hover:bg-muted/40 rounded-md transition-colors group flex-1 min-w-0"
+                    >
+                      {innerContent}
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void navigator.clipboard?.writeText(att.url);
+                        toast.success('Lien interne copié dans le presse-papier');
+                      }}
+                      title="Lien interne — cliquer pour copier le chemin"
+                      className="flex items-center gap-3 py-2.5 px-1 hover:bg-muted/40 rounded-md transition-colors group flex-1 min-w-0 text-left"
+                    >
+                      {innerContent}
+                    </button>
+                  )}
                   {canEditAttachments && (
                     <Button
                       variant="ghost"
@@ -489,7 +514,7 @@ export default function RequestDetail() {
           <div className="border-t pt-3 space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
               <Input
-                placeholder="https://… (lien à ajouter)"
+                placeholder="https://… ou chemin interne (\\serveur\…, S:\…)"
                 value={newLinkUrl}
                 onChange={(e) => setNewLinkUrl(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') void handleAddLink(); }}
