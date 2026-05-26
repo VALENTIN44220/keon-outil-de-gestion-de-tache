@@ -14,18 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      _planner_real_ids: {
-        Row: {
-          pid: string
-        }
-        Insert: {
-          pid: string
-        }
-        Update: {
-          pid?: string
-        }
-        Relationships: []
-      }
       admin_table_lookup_configs: {
         Row: {
           created_at: string
@@ -506,74 +494,41 @@ export type Database = {
           },
         ]
       }
-      be_divalto_mouvements: {
+      be_piece_periode: {
         Row: {
-          axe_0001: string | null
-          axe_0002: string | null
-          code_affaire: string | null
-          compte_general: string | null
+          code_affaire: string
           created_at: string
-          date_piece: string | null
-          devise: string | null
-          exercice: number | null
-          fabric_synced_at: string
+          created_by: string | null
+          date_prevue: string | null
+          date_prevue_fin: string | null
+          doc_type: string
           id: string
-          libelle: string | null
-          montant_ht: number | null
-          montant_tva: number | null
-          nom_tiers: string | null
+          note: string | null
           numero_piece: string
-          prefpino: string
-          raw: Json | null
-          source: string
-          tiers_code: string | null
-          type_mouv: string
           updated_at: string
         }
         Insert: {
-          axe_0001?: string | null
-          axe_0002?: string | null
-          code_affaire?: string | null
-          compte_general?: string | null
+          code_affaire: string
           created_at?: string
-          date_piece?: string | null
-          devise?: string | null
-          exercice?: number | null
-          fabric_synced_at?: string
+          created_by?: string | null
+          date_prevue?: string | null
+          date_prevue_fin?: string | null
+          doc_type: string
           id?: string
-          libelle?: string | null
-          montant_ht?: number | null
-          montant_tva?: number | null
-          nom_tiers?: string | null
+          note?: string | null
           numero_piece: string
-          prefpino: string
-          raw?: Json | null
-          source: string
-          tiers_code?: string | null
-          type_mouv: string
           updated_at?: string
         }
         Update: {
-          axe_0001?: string | null
-          axe_0002?: string | null
-          code_affaire?: string | null
-          compte_general?: string | null
+          code_affaire?: string
           created_at?: string
-          date_piece?: string | null
-          devise?: string | null
-          exercice?: number | null
-          fabric_synced_at?: string
+          created_by?: string | null
+          date_prevue?: string | null
+          date_prevue_fin?: string | null
+          doc_type?: string
           id?: string
-          libelle?: string | null
-          montant_ht?: number | null
-          montant_tva?: number | null
-          nom_tiers?: string | null
+          note?: string | null
           numero_piece?: string
-          prefpino?: string
-          raw?: Json | null
-          source?: string
-          tiers_code?: string | null
-          type_mouv?: string
           updated_at?: string
         }
         Relationships: []
@@ -630,6 +585,94 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      be_project_milestones: {
+        Row: {
+          be_project_id: string
+          created_at: string
+          date_prevue: string | null
+          date_reelle: string | null
+          description: string | null
+          id: string
+          is_auto_delayed: boolean
+          ordre: number | null
+          source_task_id: string | null
+          statut: string
+          titre: string
+          updated_at: string
+        }
+        Insert: {
+          be_project_id: string
+          created_at?: string
+          date_prevue?: string | null
+          date_reelle?: string | null
+          description?: string | null
+          id?: string
+          is_auto_delayed?: boolean
+          ordre?: number | null
+          source_task_id?: string | null
+          statut?: string
+          titre: string
+          updated_at?: string
+        }
+        Update: {
+          be_project_id?: string
+          created_at?: string
+          date_prevue?: string | null
+          date_reelle?: string | null
+          description?: string | null
+          id?: string
+          is_auto_delayed?: boolean
+          ordre?: number | null
+          source_task_id?: string | null
+          statut?: string
+          titre?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "be_project_milestones_be_project_id_fkey"
+            columns: ["be_project_id"]
+            isOneToOne: false
+            referencedRelation: "be_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "be_project_milestones_be_project_id_fkey"
+            columns: ["be_project_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_project_budget_kpi"
+            referencedColumns: ["be_project_id"]
+          },
+          {
+            foreignKeyName: "be_project_milestones_be_project_id_fkey"
+            columns: ["be_project_id"]
+            isOneToOne: false
+            referencedRelation: "v_be_project_synthese_kpi"
+            referencedColumns: ["be_project_id"]
+          },
+          {
+            foreignKeyName: "be_project_milestones_source_task_id_fkey"
+            columns: ["source_task_id"]
+            isOneToOne: false
+            referencedRelation: "maintenance_requests_overview"
+            referencedColumns: ["task_id"]
+          },
+          {
+            foreignKeyName: "be_project_milestones_source_task_id_fkey"
+            columns: ["source_task_id"]
+            isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["request_id"]
+          },
+          {
+            foreignKeyName: "be_project_milestones_source_task_id_fkey"
+            columns: ["source_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
             referencedColumns: ["id"]
           },
         ]
@@ -1494,6 +1537,87 @@ export type Database = {
           },
         ]
       }
+      divalto_mouvements_all: {
+        Row: {
+          axe_0001: string | null
+          axe_0002: string | null
+          code_affaire: string | null
+          created_at: string
+          date_piece: string | null
+          devise: string | null
+          doc_type: string | null
+          dos: string | null
+          exercice: number | null
+          fullcdno_lie: string | null
+          id: string
+          libelle: string | null
+          libelle_entete: string | null
+          line_uid: string
+          montant_ht: number | null
+          nom_tiers: string | null
+          numero_piece: string | null
+          prefix: string | null
+          projet: string | null
+          sens: number | null
+          source: string | null
+          source_system: string | null
+          synced_at: string | null
+          tiers_code: string | null
+        }
+        Insert: {
+          axe_0001?: string | null
+          axe_0002?: string | null
+          code_affaire?: string | null
+          created_at?: string
+          date_piece?: string | null
+          devise?: string | null
+          doc_type?: string | null
+          dos?: string | null
+          exercice?: number | null
+          fullcdno_lie?: string | null
+          id?: string
+          libelle?: string | null
+          libelle_entete?: string | null
+          line_uid: string
+          montant_ht?: number | null
+          nom_tiers?: string | null
+          numero_piece?: string | null
+          prefix?: string | null
+          projet?: string | null
+          sens?: number | null
+          source?: string | null
+          source_system?: string | null
+          synced_at?: string | null
+          tiers_code?: string | null
+        }
+        Update: {
+          axe_0001?: string | null
+          axe_0002?: string | null
+          code_affaire?: string | null
+          created_at?: string
+          date_piece?: string | null
+          devise?: string | null
+          doc_type?: string | null
+          dos?: string | null
+          exercice?: number | null
+          fullcdno_lie?: string | null
+          id?: string
+          libelle?: string | null
+          libelle_entete?: string | null
+          line_uid?: string
+          montant_ht?: number | null
+          nom_tiers?: string | null
+          numero_piece?: string | null
+          prefix?: string | null
+          projet?: string | null
+          sens?: number | null
+          source?: string | null
+          source_system?: string | null
+          synced_at?: string | null
+          tiers_code?: string | null
+        }
+        Relationships: []
+      }
       form_sections: {
         Row: {
           condition_field_id: string | null
@@ -1597,7 +1721,7 @@ export type Database = {
           dos: string
           ecart_cmd_fac: number | null
           fou_key: string
-          id: number
+          id: string
           mois: number | null
           mois_cmd: string | null
           mois_fac: string | null
@@ -1615,7 +1739,7 @@ export type Database = {
           dos: string
           ecart_cmd_fac?: number | null
           fou_key: string
-          id?: number
+          id?: string
           mois?: number | null
           mois_cmd?: string | null
           mois_fac?: string | null
@@ -1633,7 +1757,7 @@ export type Database = {
           dos?: string
           ecart_cmd_fac?: number | null
           fou_key?: string
-          id?: number
+          id?: string
           mois?: number | null
           mois_cmd?: string | null
           mois_fac?: string | null
@@ -1944,13 +2068,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_it_budget_engage_constate"
             referencedColumns: ["budget_line_id"]
-          },
-          {
-            foreignKeyName: "it_budget_line_commandes_fullcdno_fkey"
-            columns: ["fullcdno"]
-            isOneToOne: false
-            referencedRelation: "it_divalto_commandes"
-            referencedColumns: ["fullcdno"]
           },
         ]
       }
@@ -2346,111 +2463,6 @@ export type Database = {
         }
         Relationships: []
       }
-      it_divalto_commandes: {
-        Row: {
-          axe_0001: string | null
-          axe_0002: string | null
-          date_commande: string | null
-          date_facture: string | null
-          description: string | null
-          dos: string | null
-          fullcdno: string
-          fullfano: string | null
-          id: string
-          montant_ht: number | null
-          nomfournisseur: string | null
-          projet: string | null
-          source_system: string | null
-          synced_at: string | null
-          tiers: string | null
-        }
-        Insert: {
-          axe_0001?: string | null
-          axe_0002?: string | null
-          date_commande?: string | null
-          date_facture?: string | null
-          description?: string | null
-          dos?: string | null
-          fullcdno: string
-          fullfano?: string | null
-          id?: string
-          montant_ht?: number | null
-          nomfournisseur?: string | null
-          projet?: string | null
-          source_system?: string | null
-          synced_at?: string | null
-          tiers?: string | null
-        }
-        Update: {
-          axe_0001?: string | null
-          axe_0002?: string | null
-          date_commande?: string | null
-          date_facture?: string | null
-          description?: string | null
-          dos?: string | null
-          fullcdno?: string
-          fullfano?: string | null
-          id?: string
-          montant_ht?: number | null
-          nomfournisseur?: string | null
-          projet?: string | null
-          source_system?: string | null
-          synced_at?: string | null
-          tiers?: string | null
-        }
-        Relationships: []
-      }
-      it_divalto_factures: {
-        Row: {
-          axe_0001: string | null
-          date_facture: string | null
-          dos: string | null
-          fullcdno_lie: string | null
-          id: string
-          libelle: string | null
-          montant_ht: number | null
-          nomfournisseur: string | null
-          projet: string | null
-          reference: string
-          source: string
-          source_system: string | null
-          synced_at: string | null
-          tiers: string | null
-        }
-        Insert: {
-          axe_0001?: string | null
-          date_facture?: string | null
-          dos?: string | null
-          fullcdno_lie?: string | null
-          id?: string
-          libelle?: string | null
-          montant_ht?: number | null
-          nomfournisseur?: string | null
-          projet?: string | null
-          reference: string
-          source: string
-          source_system?: string | null
-          synced_at?: string | null
-          tiers?: string | null
-        }
-        Update: {
-          axe_0001?: string | null
-          date_facture?: string | null
-          dos?: string | null
-          fullcdno_lie?: string | null
-          id?: string
-          libelle?: string | null
-          montant_ht?: number | null
-          nomfournisseur?: string | null
-          projet?: string | null
-          reference?: string
-          source?: string
-          source_system?: string | null
-          synced_at?: string | null
-          tiers?: string | null
-        }
-        Relationships: []
-      }
       it_manual_expenses: {
         Row: {
           annee: number
@@ -2766,6 +2778,7 @@ export type Database = {
           priorite: string | null
           progress: number | null
           responsable_it_id: string | null
+          sharepoint_library_url: string | null
           sponsor_id: string | null
           statut: string
           statut_fdr: string | null
@@ -2806,6 +2819,7 @@ export type Database = {
           priorite?: string | null
           progress?: number | null
           responsable_it_id?: string | null
+          sharepoint_library_url?: string | null
           sponsor_id?: string | null
           statut?: string
           statut_fdr?: string | null
@@ -2846,6 +2860,7 @@ export type Database = {
           priorite?: string | null
           progress?: number | null
           responsable_it_id?: string | null
+          sharepoint_library_url?: string | null
           sponsor_id?: string | null
           statut?: string
           statut_fdr?: string | null
@@ -4104,6 +4119,7 @@ export type Database = {
           can_access_projects: boolean
           can_access_requests: boolean
           can_access_settings: boolean
+          can_access_smq: boolean
           can_access_spv: boolean
           can_access_suppliers: boolean
           can_access_tasks: boolean
@@ -4122,7 +4138,10 @@ export type Database = {
           can_edit_it_projects: boolean
           can_edit_suppliers: boolean
           can_manage_all_tasks: boolean
+          can_manage_logistique: boolean
+          can_manage_maintenance: boolean
           can_manage_own_tasks: boolean
+          can_manage_smq: boolean
           can_manage_subordinates_tasks: boolean
           can_manage_templates: boolean
           can_manage_users: boolean
@@ -4169,6 +4188,7 @@ export type Database = {
           can_access_projects?: boolean
           can_access_requests?: boolean
           can_access_settings?: boolean
+          can_access_smq?: boolean
           can_access_spv?: boolean
           can_access_suppliers?: boolean
           can_access_tasks?: boolean
@@ -4187,7 +4207,10 @@ export type Database = {
           can_edit_it_projects?: boolean
           can_edit_suppliers?: boolean
           can_manage_all_tasks?: boolean
+          can_manage_logistique?: boolean
+          can_manage_maintenance?: boolean
           can_manage_own_tasks?: boolean
+          can_manage_smq?: boolean
           can_manage_subordinates_tasks?: boolean
           can_manage_templates?: boolean
           can_manage_users?: boolean
@@ -4234,6 +4257,7 @@ export type Database = {
           can_access_projects?: boolean
           can_access_requests?: boolean
           can_access_settings?: boolean
+          can_access_smq?: boolean
           can_access_spv?: boolean
           can_access_suppliers?: boolean
           can_access_tasks?: boolean
@@ -4252,7 +4276,10 @@ export type Database = {
           can_edit_it_projects?: boolean
           can_edit_suppliers?: boolean
           can_manage_all_tasks?: boolean
+          can_manage_logistique?: boolean
+          can_manage_maintenance?: boolean
           can_manage_own_tasks?: boolean
+          can_manage_smq?: boolean
           can_manage_subordinates_tasks?: boolean
           can_manage_templates?: boolean
           can_manage_users?: boolean
@@ -5506,6 +5533,56 @@ export type Database = {
           },
         ]
       }
+      request_states: {
+        Row: {
+          code: string
+          color: string | null
+          created_at: string
+          id: string
+          is_final: boolean
+          is_initial: boolean
+          label: string
+          order_index: number
+          process_template_id: string
+          state_category: string | null
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          color?: string | null
+          created_at?: string
+          id?: string
+          is_final?: boolean
+          is_initial?: boolean
+          label: string
+          order_index?: number
+          process_template_id: string
+          state_category?: string | null
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          color?: string | null
+          created_at?: string
+          id?: string
+          is_final?: boolean
+          is_initial?: boolean
+          label?: string
+          order_index?: number
+          process_template_id?: string
+          state_category?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "request_states_process_template_id_fkey"
+            columns: ["process_template_id"]
+            isOneToOne: false
+            referencedRelation: "process_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       request_sub_processes: {
         Row: {
           completed_at: string | null
@@ -5825,6 +5902,102 @@ export type Database = {
           },
         ]
       }
+      spv_affaire_budget_lines: {
+        Row: {
+          commentaire: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          exercice: number | null
+          fournisseur_prevu: string | null
+          id: string
+          montant_budget: number
+          montant_budget_revise: number | null
+          poste: string
+          spv_affaire_id: string
+          statut: string
+          type_depense: string | null
+          updated_at: string
+        }
+        Insert: {
+          commentaire?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          exercice?: number | null
+          fournisseur_prevu?: string | null
+          id?: string
+          montant_budget: number
+          montant_budget_revise?: number | null
+          poste: string
+          spv_affaire_id: string
+          statut?: string
+          type_depense?: string | null
+          updated_at?: string
+        }
+        Update: {
+          commentaire?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          exercice?: number | null
+          fournisseur_prevu?: string | null
+          id?: string
+          montant_budget?: number
+          montant_budget_revise?: number | null
+          poste?: string
+          spv_affaire_id?: string
+          statut?: string
+          type_depense?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spv_affaire_budget_lines_spv_affaire_id_fkey"
+            columns: ["spv_affaire_id"]
+            isOneToOne: false
+            referencedRelation: "spv_affaires"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spv_affaire_budget_lines_spv_affaire_id_fkey"
+            columns: ["spv_affaire_id"]
+            isOneToOne: false
+            referencedRelation: "v_spv_affaire_budget_kpi"
+            referencedColumns: ["spv_affaire_id"]
+          },
+        ]
+      }
+      spv_affaires: {
+        Row: {
+          code_affaire: string
+          created_at: string
+          created_by: string | null
+          id: string
+          libelle: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          code_affaire: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          libelle?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          code_affaire?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          libelle?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       sub_process_step_fields: {
         Row: {
           alert_delay_days: number | null
@@ -6063,11 +6236,15 @@ export type Database = {
       sub_process_templates: {
         Row: {
           assignment_type: string
+          auto_milestone_delay_days: number | null
+          auto_milestone_label: string | null
           be_category: string | null
           created_at: string
           creator_company_id: string | null
           creator_department_id: string | null
           default_duration_hours: number | null
+          delay_after_previous_days: number
+          depends_on_sub_process_template_id: string | null
           description: string | null
           dispatch_manager_id: string | null
           fallback_assignment_type: string | null
@@ -6078,9 +6255,12 @@ export type Database = {
           form_schema: Json | null
           id: string
           is_mandatory: boolean
+          is_milestone: boolean
           is_shared: boolean
+          milestone_label: string | null
           name: string
           order_index: number
+          output_state_code: string | null
           parallel_group: number | null
           process_template_id: string
           recurrence_delay_days: number | null
@@ -6089,7 +6269,10 @@ export type Database = {
           recurrence_next_run_at: string | null
           recurrence_start_date: string | null
           recurrence_unit: string | null
+          required_docs_count: number
+          required_docs_description: string | null
           show_quick_launch: boolean
+          start_mode: string
           target_assignee_id: string | null
           target_department_id: string | null
           target_group_id: string | null
@@ -6107,11 +6290,15 @@ export type Database = {
         }
         Insert: {
           assignment_type?: string
+          auto_milestone_delay_days?: number | null
+          auto_milestone_label?: string | null
           be_category?: string | null
           created_at?: string
           creator_company_id?: string | null
           creator_department_id?: string | null
           default_duration_hours?: number | null
+          delay_after_previous_days?: number
+          depends_on_sub_process_template_id?: string | null
           description?: string | null
           dispatch_manager_id?: string | null
           fallback_assignment_type?: string | null
@@ -6122,9 +6309,12 @@ export type Database = {
           form_schema?: Json | null
           id?: string
           is_mandatory?: boolean
+          is_milestone?: boolean
           is_shared?: boolean
+          milestone_label?: string | null
           name: string
           order_index?: number
+          output_state_code?: string | null
           parallel_group?: number | null
           process_template_id: string
           recurrence_delay_days?: number | null
@@ -6133,7 +6323,10 @@ export type Database = {
           recurrence_next_run_at?: string | null
           recurrence_start_date?: string | null
           recurrence_unit?: string | null
+          required_docs_count?: number
+          required_docs_description?: string | null
           show_quick_launch?: boolean
+          start_mode?: string
           target_assignee_id?: string | null
           target_department_id?: string | null
           target_group_id?: string | null
@@ -6151,11 +6344,15 @@ export type Database = {
         }
         Update: {
           assignment_type?: string
+          auto_milestone_delay_days?: number | null
+          auto_milestone_label?: string | null
           be_category?: string | null
           created_at?: string
           creator_company_id?: string | null
           creator_department_id?: string | null
           default_duration_hours?: number | null
+          delay_after_previous_days?: number
+          depends_on_sub_process_template_id?: string | null
           description?: string | null
           dispatch_manager_id?: string | null
           fallback_assignment_type?: string | null
@@ -6166,9 +6363,12 @@ export type Database = {
           form_schema?: Json | null
           id?: string
           is_mandatory?: boolean
+          is_milestone?: boolean
           is_shared?: boolean
+          milestone_label?: string | null
           name?: string
           order_index?: number
+          output_state_code?: string | null
           parallel_group?: number | null
           process_template_id?: string
           recurrence_delay_days?: number | null
@@ -6177,7 +6377,10 @@ export type Database = {
           recurrence_next_run_at?: string | null
           recurrence_start_date?: string | null
           recurrence_unit?: string | null
+          required_docs_count?: number
+          required_docs_description?: string | null
           show_quick_launch?: boolean
+          start_mode?: string
           target_assignee_id?: string | null
           target_department_id?: string | null
           target_group_id?: string | null
@@ -6206,6 +6409,20 @@ export type Database = {
             columns: ["creator_department_id"]
             isOneToOne: false
             referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sub_process_templates_depends_on_sub_process_template_id_fkey"
+            columns: ["depends_on_sub_process_template_id"]
+            isOneToOne: false
+            referencedRelation: "request_progress_view"
+            referencedColumns: ["sub_process_template_id"]
+          },
+          {
+            foreignKeyName: "sub_process_templates_depends_on_sub_process_template_id_fkey"
+            columns: ["depends_on_sub_process_template_id"]
+            isOneToOne: false
+            referencedRelation: "sub_process_templates"
             referencedColumns: ["id"]
           },
           {
@@ -6381,13 +6598,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "supplier_purchase_enrichment"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "supplier_attachments_supplier_id_fkey"
-            columns: ["supplier_id"]
-            isOneToOne: false
-            referencedRelation: "v_supplier_ca_realise"
-            referencedColumns: ["supplier_id"]
           },
         ]
       }
@@ -7248,6 +7458,41 @@ export type Database = {
           },
         ]
       }
+      task_template_sub_actions: {
+        Row: {
+          created_at: string
+          id: string
+          is_required: boolean
+          order_index: number
+          task_template_id: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_required?: boolean
+          order_index?: number
+          task_template_id: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_required?: boolean
+          order_index?: number
+          task_template_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_template_sub_actions_task_template_id_fkey"
+            columns: ["task_template_id"]
+            isOneToOne: false
+            referencedRelation: "task_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_template_visible_companies: {
         Row: {
           company_id: string
@@ -7394,6 +7639,8 @@ export type Database = {
       }
       task_templates: {
         Row: {
+          auto_milestone_delay_days: number | null
+          auto_milestone_label: string | null
           category: string | null
           category_id: string | null
           created_at: string
@@ -7401,15 +7648,22 @@ export type Database = {
           creator_department_id: string | null
           default_duration_days: number | null
           default_duration_unit: string
+          delay_after_previous_days: number
           depends_on_task_template_id: string | null
           description: string | null
           id: string
           initial_status: string | null
+          is_milestone: boolean
           is_shared: boolean
+          milestone_label: string | null
           order_index: number | null
+          output_state_code: string | null
           priority: string
           process_template_id: string | null
+          required_docs_count: number
+          required_docs_description: string | null
           requires_validation: boolean | null
+          start_mode: string
           sub_process_template_id: string | null
           subcategory_id: string | null
           target_group_id: string | null
@@ -7423,6 +7677,8 @@ export type Database = {
           visibility_level: Database["public"]["Enums"]["template_visibility"]
         }
         Insert: {
+          auto_milestone_delay_days?: number | null
+          auto_milestone_label?: string | null
           category?: string | null
           category_id?: string | null
           created_at?: string
@@ -7430,15 +7686,22 @@ export type Database = {
           creator_department_id?: string | null
           default_duration_days?: number | null
           default_duration_unit?: string
+          delay_after_previous_days?: number
           depends_on_task_template_id?: string | null
           description?: string | null
           id?: string
           initial_status?: string | null
+          is_milestone?: boolean
           is_shared?: boolean
+          milestone_label?: string | null
           order_index?: number | null
+          output_state_code?: string | null
           priority?: string
           process_template_id?: string | null
+          required_docs_count?: number
+          required_docs_description?: string | null
           requires_validation?: boolean | null
+          start_mode?: string
           sub_process_template_id?: string | null
           subcategory_id?: string | null
           target_group_id?: string | null
@@ -7452,6 +7715,8 @@ export type Database = {
           visibility_level?: Database["public"]["Enums"]["template_visibility"]
         }
         Update: {
+          auto_milestone_delay_days?: number | null
+          auto_milestone_label?: string | null
           category?: string | null
           category_id?: string | null
           created_at?: string
@@ -7459,15 +7724,22 @@ export type Database = {
           creator_department_id?: string | null
           default_duration_days?: number | null
           default_duration_unit?: string
+          delay_after_previous_days?: number
           depends_on_task_template_id?: string | null
           description?: string | null
           id?: string
           initial_status?: string | null
+          is_milestone?: boolean
           is_shared?: boolean
+          milestone_label?: string | null
           order_index?: number | null
+          output_state_code?: string | null
           priority?: string
           process_template_id?: string | null
+          required_docs_count?: number
+          required_docs_description?: string | null
           requires_validation?: boolean | null
+          start_mode?: string
           sub_process_template_id?: string | null
           subcategory_id?: string | null
           target_group_id?: string | null
@@ -7636,6 +7908,8 @@ export type Database = {
         Row: {
           allows_reassignment: boolean
           assignee_id: string | null
+          auto_milestone_delay_days: number | null
+          auto_milestone_label: string | null
           be_affaire_id: string | null
           be_label_id: string | null
           be_project_id: string | null
@@ -7645,10 +7919,12 @@ export type Database = {
           category: string | null
           category_id: string | null
           created_at: string
+          current_state_code: string | null
           current_validation_level: number | null
           date_demande: string | null
           date_fermeture: string | null
           date_lancement: string | null
+          delay_after_previous_days: number
           depends_on_task_id: string | null
           description: string | null
           document_url: string | null
@@ -7659,11 +7935,14 @@ export type Database = {
           is_assignment_task: boolean
           is_dependency_locked: boolean | null
           is_locked_for_validation: boolean | null
+          is_milestone: boolean
           it_project_id: string | null
           it_project_phase: string | null
+          milestone_label: string | null
           module_code: Database["public"]["Enums"]["module_code"] | null
           module_data: Json | null
           original_assignee_id: string | null
+          output_state_code: string | null
           parent_complement_id: string | null
           parent_request_id: string | null
           parent_sub_process_run_id: string | null
@@ -7694,10 +7973,14 @@ export type Database = {
           requester_validated_at: string | null
           requester_validation_comment: string | null
           requester_validation_status: string | null
+          required_docs_count: number
+          required_docs_description: string | null
           requires_validation: boolean | null
           source_process_template_id: string | null
           source_sub_process_template_id: string | null
+          source_task_template_id: string | null
           start_date: string | null
+          start_mode: string
           status: string
           status_dates: Json | null
           sub_process_template_id: string | null
@@ -7729,6 +8012,8 @@ export type Database = {
         Insert: {
           allows_reassignment?: boolean
           assignee_id?: string | null
+          auto_milestone_delay_days?: number | null
+          auto_milestone_label?: string | null
           be_affaire_id?: string | null
           be_label_id?: string | null
           be_project_id?: string | null
@@ -7738,10 +8023,12 @@ export type Database = {
           category?: string | null
           category_id?: string | null
           created_at?: string
+          current_state_code?: string | null
           current_validation_level?: number | null
           date_demande?: string | null
           date_fermeture?: string | null
           date_lancement?: string | null
+          delay_after_previous_days?: number
           depends_on_task_id?: string | null
           description?: string | null
           document_url?: string | null
@@ -7752,11 +8039,14 @@ export type Database = {
           is_assignment_task?: boolean
           is_dependency_locked?: boolean | null
           is_locked_for_validation?: boolean | null
+          is_milestone?: boolean
           it_project_id?: string | null
           it_project_phase?: string | null
+          milestone_label?: string | null
           module_code?: Database["public"]["Enums"]["module_code"] | null
           module_data?: Json | null
           original_assignee_id?: string | null
+          output_state_code?: string | null
           parent_complement_id?: string | null
           parent_request_id?: string | null
           parent_sub_process_run_id?: string | null
@@ -7787,10 +8077,14 @@ export type Database = {
           requester_validated_at?: string | null
           requester_validation_comment?: string | null
           requester_validation_status?: string | null
+          required_docs_count?: number
+          required_docs_description?: string | null
           requires_validation?: boolean | null
           source_process_template_id?: string | null
           source_sub_process_template_id?: string | null
+          source_task_template_id?: string | null
           start_date?: string | null
+          start_mode?: string
           status?: string
           status_dates?: Json | null
           sub_process_template_id?: string | null
@@ -7822,6 +8116,8 @@ export type Database = {
         Update: {
           allows_reassignment?: boolean
           assignee_id?: string | null
+          auto_milestone_delay_days?: number | null
+          auto_milestone_label?: string | null
           be_affaire_id?: string | null
           be_label_id?: string | null
           be_project_id?: string | null
@@ -7831,10 +8127,12 @@ export type Database = {
           category?: string | null
           category_id?: string | null
           created_at?: string
+          current_state_code?: string | null
           current_validation_level?: number | null
           date_demande?: string | null
           date_fermeture?: string | null
           date_lancement?: string | null
+          delay_after_previous_days?: number
           depends_on_task_id?: string | null
           description?: string | null
           document_url?: string | null
@@ -7845,11 +8143,14 @@ export type Database = {
           is_assignment_task?: boolean
           is_dependency_locked?: boolean | null
           is_locked_for_validation?: boolean | null
+          is_milestone?: boolean
           it_project_id?: string | null
           it_project_phase?: string | null
+          milestone_label?: string | null
           module_code?: Database["public"]["Enums"]["module_code"] | null
           module_data?: Json | null
           original_assignee_id?: string | null
+          output_state_code?: string | null
           parent_complement_id?: string | null
           parent_request_id?: string | null
           parent_sub_process_run_id?: string | null
@@ -7880,10 +8181,14 @@ export type Database = {
           requester_validated_at?: string | null
           requester_validation_comment?: string | null
           requester_validation_status?: string | null
+          required_docs_count?: number
+          required_docs_description?: string | null
           requires_validation?: boolean | null
           source_process_template_id?: string | null
           source_sub_process_template_id?: string | null
+          source_task_template_id?: string | null
           start_date?: string | null
+          start_mode?: string
           status?: string
           status_dates?: Json | null
           sub_process_template_id?: string | null
@@ -8093,6 +8398,13 @@ export type Database = {
             columns: ["source_sub_process_template_id"]
             isOneToOne: false
             referencedRelation: "sub_process_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_source_task_template_id_fkey"
+            columns: ["source_task_template_id"]
+            isOneToOne: false
+            referencedRelation: "task_templates"
             referencedColumns: ["id"]
           },
           {
@@ -8563,6 +8875,7 @@ export type Database = {
           can_access_projects: boolean | null
           can_access_requests: boolean | null
           can_access_settings: boolean | null
+          can_access_smq: boolean | null
           can_access_spv: boolean | null
           can_access_suppliers: boolean | null
           can_access_tasks: boolean | null
@@ -8578,7 +8891,10 @@ export type Database = {
           can_edit_be_projects: boolean | null
           can_edit_suppliers: boolean | null
           can_manage_all_tasks: boolean | null
+          can_manage_logistique: boolean | null
+          can_manage_maintenance: boolean | null
           can_manage_own_tasks: boolean | null
+          can_manage_smq: boolean | null
           can_manage_subordinates_tasks: boolean | null
           can_manage_templates: boolean | null
           can_manage_users: boolean | null
@@ -8611,6 +8927,7 @@ export type Database = {
           can_access_projects?: boolean | null
           can_access_requests?: boolean | null
           can_access_settings?: boolean | null
+          can_access_smq?: boolean | null
           can_access_spv?: boolean | null
           can_access_suppliers?: boolean | null
           can_access_tasks?: boolean | null
@@ -8626,7 +8943,10 @@ export type Database = {
           can_edit_be_projects?: boolean | null
           can_edit_suppliers?: boolean | null
           can_manage_all_tasks?: boolean | null
+          can_manage_logistique?: boolean | null
+          can_manage_maintenance?: boolean | null
           can_manage_own_tasks?: boolean | null
+          can_manage_smq?: boolean | null
           can_manage_subordinates_tasks?: boolean | null
           can_manage_templates?: boolean | null
           can_manage_users?: boolean | null
@@ -8659,6 +8979,7 @@ export type Database = {
           can_access_projects?: boolean | null
           can_access_requests?: boolean | null
           can_access_settings?: boolean | null
+          can_access_smq?: boolean | null
           can_access_spv?: boolean | null
           can_access_suppliers?: boolean | null
           can_access_tasks?: boolean | null
@@ -8674,7 +8995,10 @@ export type Database = {
           can_edit_be_projects?: boolean | null
           can_edit_suppliers?: boolean | null
           can_manage_all_tasks?: boolean | null
+          can_manage_logistique?: boolean | null
+          can_manage_maintenance?: boolean | null
           can_manage_own_tasks?: boolean | null
+          can_manage_smq?: boolean | null
           can_manage_subordinates_tasks?: boolean | null
           can_manage_templates?: boolean | null
           can_manage_users?: boolean | null
@@ -8995,13 +9319,19 @@ export type Database = {
           cogs_engage_brut: number | null
           constate_montant_brut: number | null
           cout_rh_declare: number | null
+          devis_client_brut: number | null
+          devis_client_converti_brut: number | null
+          devis_fournisseur_brut: number | null
           engage_montant_brut: number | null
+          heures_declarees: number | null
           jours_declares: number | null
           marge_brute_brut: number | null
           marge_constatee_brut: number | null
           marge_directe_brut: number | null
           nb_commandes: number | null
+          nb_devis: number | null
           nb_factures: number | null
+          ndf_brut: number | null
         }
         Relationships: [
           {
@@ -9147,6 +9477,7 @@ export type Database = {
           nb_collaborateurs: number | null
           nb_commandes: number | null
           nb_factures: number | null
+          ndf_brut: number | null
         }
         Relationships: [
           {
@@ -9338,19 +9669,61 @@ export type Database = {
           },
         ]
       }
-      v_supplier_ca_realise: {
+      v_spv_affaire_budget_kpi: {
         Row: {
-          ca_realise_annee_courante: number | null
-          ca_realise_annee_precedente: number | null
-          ca_realise_total: number | null
-          derniere_facture_at: string | null
-          nb_factures_annee_courante: number | null
-          nb_factures_total: number | null
-          nomfournisseur: string | null
-          supplier_id: string | null
-          tiers: string | null
+          affaire_libelle: string | null
+          affaire_status: string | null
+          budget_total: number | null
+          ca_constate_brut: number | null
+          ca_engage_brut: number | null
+          code_affaire: string | null
+          cogs_constate_brut: number | null
+          cogs_engage_brut: number | null
+          cout_rh_declare: number | null
+          devis_client_brut: number | null
+          devis_fournisseur_brut: number | null
+          jours_declares: number | null
+          marge_brute: number | null
+          marge_directe: number | null
+          nb_commandes: number | null
+          nb_devis: number | null
+          nb_factures: number | null
+          spv_affaire_id: string | null
         }
         Relationships: []
+      }
+      v_spv_affaire_temps_kpi: {
+        Row: {
+          code_affaire: string | null
+          cout_rh_declare: number | null
+          derniere_saisie: string | null
+          heures_declarees: number | null
+          jours_declares: number | null
+          nb_collaborateurs: number | null
+          premiere_saisie: string | null
+        }
+        Relationships: []
+      }
+      v_spv_affaire_temps_par_user: {
+        Row: {
+          code_affaire: string | null
+          cout_rh: number | null
+          display_name: string | null
+          heures: number | null
+          job_title: string | null
+          jours: number | null
+          taux_horaire: number | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lucca_saisie_temps_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {
@@ -9433,6 +9806,10 @@ export type Database = {
       find_or_create_request_chat: {
         Args: { _request_id: string; _user_id: string }
         Returns: string
+      }
+      fn_be_recompute_dependent_dates: {
+        Args: { p_task_id: string }
+        Returns: undefined
       }
       generate_default_form_schema: {
         Args: { p_process_id: string }
@@ -9935,5 +10312,3 @@ export const Constants = {
     },
   },
 } as const
-A new version of Supabase CLI is available: v2.98.2 (currently installed v2.95.4)
-We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli

@@ -74,7 +74,6 @@ import { EditTaskTemplateDialog } from './EditTaskTemplateDialog';
 import { SubProcessNotificationsPanel } from './SubProcessNotificationsPanel';
 import { TableOutputMappingPanel } from './TableOutputMappingPanel';
 import { addTaskToWorkflow, removeTaskFromWorkflow } from '@/hooks/useAutoWorkflowGeneration';
-import { WorkflowConfigTab } from '@/components/workflow-config/WorkflowConfigTab';
 import { cn } from '@/lib/utils';
 
 interface SubProcessConfigViewProps {
@@ -456,7 +455,6 @@ export function SubProcessConfigView({
         { id: 'output',        label: 'Sortie table',    icon: Database },
         { id: 'visibility',    label: 'Visibilité',      icon: Eye },
         { id: 'notifications', label: 'Notifications',   icon: Bell },
-        { id: 'workflow',      label: 'Workflow',        icon: Workflow },
       ];
 
   return (
@@ -978,21 +976,6 @@ export function SubProcessConfigView({
 
                     </div>
 
-                    <div className="flex items-center gap-2 p-3 rounded-lg border border-primary/20 bg-primary/5">
-                      <Workflow className="h-4 w-4 text-primary shrink-0" />
-                      <p className="text-sm text-primary flex-1">
-                        Pour modifier l'affectation, utilisez la configuration du workflow.
-                      </p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setActiveTab('workflow')}
-                        className="shrink-0"
-                      >
-                        <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-                        Aller au Workflow
-                      </Button>
-                    </div>
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -1147,16 +1130,7 @@ export function SubProcessConfigView({
                 />
               </TabsContent>
 
-              {/* Workflow Tab — masqué sur BE (étapes linéaires) */}
-              {!isBEPrestation && (
-                <TabsContent value="workflow" className="mt-0 space-y-4">
-                  <WorkflowConfigTab
-                    subProcessId={subProcessId}
-                    subProcessName={subProcess.name}
-                    canManage={canManage}
-                  />
-                </TabsContent>
-              )}
+              {/* Onglet Workflow retiré (moteur workflow wf_* supprimé) */}
 
             </div>
           </ScrollArea>

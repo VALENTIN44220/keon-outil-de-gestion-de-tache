@@ -71,7 +71,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { AddTaskTemplateDialog } from '@/components/templates/AddTaskTemplateDialog';
 import { EditTaskTemplateDialog } from '@/components/templates/EditTaskTemplateDialog';
 import { addTaskToWorkflow, removeTaskFromWorkflow } from '@/hooks/useAutoWorkflowGeneration';
-import { WorkflowConfigTab } from '@/components/workflow-config/WorkflowConfigTab';
 import { SubProcessCustomFieldsEditor } from '@/components/templates/SubProcessCustomFieldsEditor';
 import { RecurrenceConfig, RecurrenceData } from '@/components/templates/RecurrenceConfig';
 
@@ -459,7 +458,6 @@ export default function SubProcessSettings() {
         { id: 'general',       label: 'Général',     icon: Settings },
         { id: 'tasks',         label: 'Tâches',      icon: ListTodo },
         { id: 'assignment',    label: 'Affectation', icon: Users },
-        { id: 'workflow',      label: 'Workflow',    icon: GitBranch },
         { id: 'custom-fields', label: 'Champs',      icon: FileText },
       ];
 
@@ -1320,18 +1318,7 @@ export default function SubProcessSettings() {
                 </TabsContent>
                 )}
 
-                {/* Validations Tab removed — managed via workflow steps */}
-
-                {/* Workflow Tab — masqué sur BE (étapes linéaires sans branchements) */}
-                {!isBEPrestation && (
-                  <TabsContent value="workflow" className="mt-0 space-y-4">
-                    <WorkflowConfigTab
-                      subProcessId={subProcessId!}
-                      subProcessName={subProcess.name}
-                      canManage={canManage}
-                    />
-                  </TabsContent>
-                )}
+                {/* Onglet Workflow retiré (moteur workflow wf_* supprimé) */}
 
                 {/* Custom Fields Tab */}
                 <TabsContent value="custom-fields" className="mt-0 space-y-4">

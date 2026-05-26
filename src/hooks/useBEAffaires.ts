@@ -193,9 +193,9 @@ export function useBEDivaltoAvailableAffaires(
       if (!usable) return [];
 
       // On filtre Divalto : code_affaire dont chars 2-5 = projectCode (case-insensitive)
-      // On limite a 100 codes distincts max - amplement suffisant.
+      // Source : divalto_mouvements_all (table unifiée ; be_divalto_mouvements supprimée).
       const { data, error } = await sb
-        .from('be_divalto_mouvements')
+        .from('divalto_mouvements_all')
         .select('code_affaire, montant_ht')
         .ilike('code_affaire', `_${projectCodeUpper}%`)
         .not('code_affaire', 'is', null);
