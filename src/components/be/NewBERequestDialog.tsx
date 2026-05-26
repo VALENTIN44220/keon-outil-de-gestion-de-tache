@@ -455,8 +455,13 @@ export function NewBERequestDialog({
         const sepIdx = sub.name.indexOf(' — ');
         const stepLabel = sepIdx !== -1 ? sub.name.slice(sepIdx + 3).trim() : sub.name;
 
-        // Assigné initial : personne fixe si définie, sinon le dispatcher
-        const initialAssignee = sub.target_assignee_id ?? sub.dispatch_manager_id ?? null;
+        // Assigné initial : UNIQUEMENT si une cible fixe est définie
+        // (assignment_type='fixed_user' + target_assignee_id). Sinon la tâche
+        // reste 'soumise' et apparaît dans la file de dispatch du manager —
+        // le dispatch_manager RÉPARTIT les tâches, il ne les exécute pas, donc
+        // on ne le met JAMAIS comme assigné automatiquement.
+        const initialAssignee =
+          sub.assignment_type === 'fixed_user' ? (sub.target_assignee_id ?? null) : null;
         const initialBeStatus = initialAssignee ? 'affectee' : 'soumise';
 
         // Validateur niveau 1 : uniquement si type = 'fixed_user'
