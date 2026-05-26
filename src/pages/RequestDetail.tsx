@@ -27,6 +27,10 @@ import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   ArrowLeft, Calendar, CheckCircle2, ChevronRight, Clock,
   Flag, ListChecks, MessageSquare, User, Workflow, AlertTriangle,
   ShieldCheck, FileText, Loader2, Ban, UserPlus, Hourglass, Sparkles,
@@ -93,6 +97,7 @@ export default function RequestDetail() {
   const [parentRequest, setParentRequest] = useState<{ id: string; title: string; request_number: string | null } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
 
   // Ajout de pièces jointes / liens
   const [newLinkUrl, setNewLinkUrl] = useState('');
@@ -236,7 +241,6 @@ export default function RequestDetail() {
   // ─── Actions ──────────────────────────────────────────────────
   const handleCancel = async () => {
     if (!task) return;
-    if (!window.confirm('Annuler définitivement cette demande ? Toutes les tâches enfant seront également annulées.')) return;
     setIsCancelling(true);
     const now = new Date().toISOString();
     // 1) Annule toutes les tâches enfant non terminées (pour qu'elles sortent du dispatch BE / des plans de charge)
@@ -250,6 +254,7 @@ export default function RequestDetail() {
         .in('id', activeChildIds);
       if (childErr) {
         setIsCancelling(false);
+        setCancelOpen(false);
         toast.error(`Erreur annulation tâches : ${childErr.message}`);
         return;
       }
@@ -260,6 +265,7 @@ export default function RequestDetail() {
       .update({ status: 'cancelled', updated_at: now })
       .eq('id', task.id);
     setIsCancelling(false);
+    setCancelOpen(false);
     if (error) { toast.error(`Erreur : ${error.message}`); return; }
     toast.success(activeChildIds.length > 0
       ? `Demande annulée (${activeChildIds.length} tâche${activeChildIds.length > 1 ? 's' : ''} enfant également annulée${activeChildIds.length > 1 ? 's' : ''})`
@@ -912,7 +918,7 @@ export default function RequestDetail() {
               <div className="flex items-center justify-end gap-2 pt-2">
                 <Button
                   variant="outline"
-                  onClick={handleCancel}
+                  onClick={() => setCancelOpen(true)}
                   disabled={isCancelling}
                   className="gap-2 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
                 >
@@ -921,6 +927,29 @@ export default function RequestDetail() {
                 </Button>
               </div>
             )}
+
+            {/* Confirmation d'annulation (AlertDialog in-app — remplace window.confirm) */}
+            <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Annuler définitivement cette demande ?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Toutes les tâches enfant non terminées seront également annulées. Cette action est irréversible.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={isCancelling}>Retour</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={(e) => { e.preventDefault(); void handleCancel(); }}
+                    disabled={isCancelling}
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    {isCancelling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Ban className="h-4 w-4 mr-2" />}
+                    Annuler la demande
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </main>
 
