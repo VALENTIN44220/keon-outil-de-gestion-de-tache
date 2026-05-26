@@ -134,7 +134,7 @@ export function BETempsBudgetDialog({
                   onChange={(e) =>
                     setValues((prev) => ({ ...prev, [poste]: e.target.value }))
                   }
-                  className="h-8 text-right"
+                  className="h-8 text-right pr-7"
                 />
                 <p className="text-xs tabular-nums text-right text-muted-foreground">
                   {cout > 0 ? eur(cout) : '—'}
