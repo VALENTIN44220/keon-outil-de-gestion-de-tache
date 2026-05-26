@@ -618,6 +618,19 @@ export default function RequestDetail() {
               </TabsContent>
             </Tabs>
 
+            {/* ── Conversation (écrans < lg, où le panneau latéral est masqué) ── */}
+            <Card className="lg:hidden overflow-hidden shadow-sm">
+              <CardHeader className="pb-3 border-b-2 border-violet-200 bg-gradient-to-r from-violet-100 to-blue-100">
+                <CardTitle className="text-base font-semibold flex items-center gap-2 text-violet-900">
+                  <MessageSquare className="h-4 w-4 text-violet-700" />
+                  Conversation de la demande
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3">
+                <TaskCommentsSection taskId={task.id} className="max-h-[480px]" />
+              </CardContent>
+            </Card>
+
             {/* ── Actions ─────────────────────────────────────── */}
             {canCancel && (
               <div className="flex items-center justify-end gap-2 pt-2">
