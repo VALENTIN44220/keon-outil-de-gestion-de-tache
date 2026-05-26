@@ -92,6 +92,7 @@ export default function RequestDetail() {
   const [attachments, setAttachments] = useState<Array<{ id: string; name: string; url: string; type: string }>>([]);
   const [profiles, setProfiles] = useState<Map<string, string>>(new Map());
   const [subProcessNames, setSubProcessNames] = useState<Map<string, string>>(new Map());
+  const [subProcessOrder, setSubProcessOrder] = useState<Map<string, number>>(new Map());
   const [processName, setProcessName] = useState<string | null>(null);
   const [requesterDetails, setRequesterDetails] = useState<{ company: string | null; department: string | null; job_title: string | null } | null>(null);
   const [parentRequest, setParentRequest] = useState<{ id: string; title: string; request_number: string | null } | null>(null);
@@ -162,10 +163,15 @@ export default function RequestDetail() {
       ));
       if (spIds.length > 0) {
         const { data: spData } = await supabase
-          .from('sub_process_templates').select('id, name').in('id', spIds);
+          .from('sub_process_templates').select('id, name, order_index').in('id', spIds);
         const map = new Map<string, string>();
-        for (const sp of (spData || [])) map.set(sp.id, sp.name);
+        const orderMap = new Map<string, number>();
+        for (const sp of (spData || [])) {
+          map.set(sp.id, sp.name);
+          orderMap.set(sp.id, (sp as any).order_index ?? 9999);
+        }
         setSubProcessNames(map);
+        setSubProcessOrder(orderMap);
       }
 
       const allProfileIds = new Set<string>();
@@ -221,13 +227,24 @@ export default function RequestDetail() {
         return {
           subProcessId: id,
           subProcessName: subProcessNames.get(id) ?? 'Sous-processus',
-          tasks,
+          // Étapes triées par order_index du template (ordre logique du flux)
+          tasks: [...tasks].sort(
+            (a, b) =>
+              (subProcessOrder.get((a as any).sub_process_template_id) ?? 9999) -
+              (subProcessOrder.get((b as any).sub_process_template_id) ?? 9999),
+          ),
           done,
           total: tasks.length,
           progressPercent: tasks.length === 0 ? 0 : Math.round((done / tasks.length) * 100),
         };
-      });
-  }, [childTasks, subProcessNames]);
+      })
+      // Groupes triés par order_index minimal de leurs étapes
+      .sort(
+        (ga, gb) =>
+          (subProcessOrder.get(ga.subProcessId) ?? 9999) -
+          (subProcessOrder.get(gb.subProcessId) ?? 9999),
+      );
+  }, [childTasks, subProcessNames, subProcessOrder]);
 
   const globalProgress = useMemo(() => {
     if (childTasks.length === 0) return 0;

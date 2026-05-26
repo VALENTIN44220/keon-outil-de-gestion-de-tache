@@ -56,7 +56,8 @@ export const DEFAULT_COMMON_FIELDS_CONFIG: CommonFieldsConfig = {
   // BE
   be_project: { visible: false, editable: true },
   be_affaire: { visible: false, editable: true },
-  be_urgency: { visible: false, editable: true, default_value: 'normal' },
+  // Urgence choisie par le demandeur (visible + éditable) — défaut 'normal'
+  be_urgency: { visible: true, editable: true, default_value: 'normal' },
 
   // IT
   it_project: { visible: false, editable: true },
