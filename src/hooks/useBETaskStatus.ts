@@ -234,48 +234,52 @@ export function useBETaskStatus() {
       if (error) throw error;
 
       // ── Notification in-app ──────────────────────────────────────────────
+      // IMPORTANT : notifications.user_id = auth.users.id (PAS profile.id).
+      // Les destinataires (dispatchManagerId/assigneeId/requesterId) sont des
+      // profile.id → on les résout en user_id auth via la table profiles, sinon
+      // la notif est créée avec un mauvais user_id et n'est jamais reçue.
       if (notify) {
         const projectSuffix = notify.projectCode ? ` — ${notify.projectCode}` : '';
-        const notifications: any[] = [];
 
-        // → a_relire : prévenir le manager que le travail est soumis
-        if (status === 'a_relire' && notify.dispatchManagerId && notify.dispatchManagerId !== user?.id) {
-          notifications.push({
-            user_id: notify.dispatchManagerId,
-            title: `À relire : ${notify.taskLabel}`,
-            message: `Une tâche est prête pour votre relecture${projectSuffix}.`,
-            type: 'be_a_relire',
-            related_entity_type: 'task',
-            related_entity_id: taskId,
-          });
+        // Destinataire (profile.id) + contenu selon la transition
+        let recipientProfileId: string | null = null;
+        let notifTitle = '';
+        let notifMsg = '';
+        let notifType = '';
+        if (status === 'a_relire' && notify.dispatchManagerId) {
+          recipientProfileId = notify.dispatchManagerId;
+          notifTitle = `À relire : ${notify.taskLabel}`;
+          notifMsg = `Une tâche est prête pour votre relecture${projectSuffix}.`;
+          notifType = 'be_a_relire';
+        } else if (status === 'a_valider' && notify.assigneeId) {
+          recipientProfileId = notify.assigneeId;
+          notifTitle = `Validé : ${notify.taskLabel}`;
+          notifMsg = `Votre travail a été validé${projectSuffix}.`;
+          notifType = 'be_a_valider';
+        } else if (status === 'cloturee' && notify.requesterId) {
+          recipientProfileId = notify.requesterId;
+          notifTitle = `Clôturée : ${notify.taskLabel}`;
+          notifMsg = `Votre prestation a été clôturée${projectSuffix}.`;
+          notifType = 'be_cloturee';
         }
 
-        // → a_valider : prévenir le worker que le manager a validé
-        if (status === 'a_valider' && notify.assigneeId && notify.assigneeId !== user?.id) {
-          notifications.push({
-            user_id: notify.assigneeId,
-            title: `Validé : ${notify.taskLabel}`,
-            message: `Votre travail a été validé par le manager${projectSuffix}.`,
-            type: 'be_a_valider',
-            related_entity_type: 'task',
-            related_entity_id: taskId,
-          });
-        }
-
-        // → cloturee : prévenir le demandeur que la tâche est clôturée
-        if (status === 'cloturee' && notify.requesterId && notify.requesterId !== user?.id) {
-          notifications.push({
-            user_id: notify.requesterId,
-            title: `Clôturée : ${notify.taskLabel}`,
-            message: `Votre prestation a été clôturée${projectSuffix}.`,
-            type: 'be_cloturee',
-            related_entity_type: 'task',
-            related_entity_id: taskId,
-          });
-        }
-
-        if (notifications.length > 0) {
-          await sb.from('notifications').insert(notifications);
+        if (recipientProfileId) {
+          const { data: prf } = await sb
+            .from('profiles')
+            .select('user_id')
+            .eq('id', recipientProfileId)
+            .maybeSingle();
+          const recipientUserId = prf?.user_id ?? null;
+          if (recipientUserId && recipientUserId !== user?.id) {
+            await sb.from('notifications').insert({
+              user_id: recipientUserId,
+              title: notifTitle,
+              message: notifMsg,
+              type: notifType,
+              related_entity_type: 'task',
+              related_entity_id: taskId,
+            });
+          }
         }
       }
 
