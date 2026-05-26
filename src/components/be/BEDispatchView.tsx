@@ -581,12 +581,28 @@ function AssigneeSelector({
       if (isAssigning && newBeStatus === 'affectee') {
         const projectSuffix = projectCode ? ` — ${projectCode}` : '';
         const assigneeName = profiles.find(p => p.id === assigneeId)?.display_name ?? '';
+
+        // notifications.user_id = auth.users.id (PAS profile.id) → on résout
+        // assigneeId/requesterId (profile.id) vers leur user_id auth via profiles.
+        const profileIdsToResolve = [assigneeId, requesterId].filter(Boolean) as string[];
+        const authIdByProfile = new Map<string, string>();
+        if (profileIdsToResolve.length > 0) {
+          const { data: prfs } = await sb
+            .from('profiles')
+            .select('id, user_id')
+            .in('id', profileIdsToResolve);
+          (prfs ?? []).forEach((p: any) => {
+            if (p.user_id) authIdByProfile.set(p.id, p.user_id);
+          });
+        }
+
         const notifications: any[] = [];
 
         // Notifier l'assigné (si ce n'est pas soi-même)
-        if (assigneeId !== user?.id) {
+        const assigneeAuthId = assigneeId ? authIdByProfile.get(assigneeId) : null;
+        if (assigneeAuthId && assigneeAuthId !== user?.id) {
           notifications.push({
-            user_id: assigneeId,
+            user_id: assigneeAuthId,
             title: `Affecté : ${taskLabel}`,
             message: `Vous avez été affecté(e) à une tâche BE${projectSuffix}.`,
             type: 'be_affectee',
@@ -596,9 +612,10 @@ function AssigneeSelector({
         }
 
         // Notifier le demandeur (si différent de l'opérateur et de l'assigné)
-        if (requesterId && requesterId !== user?.id && requesterId !== assigneeId) {
+        const requesterAuthId = requesterId ? authIdByProfile.get(requesterId) : null;
+        if (requesterAuthId && requesterAuthId !== user?.id && requesterId !== assigneeId) {
           notifications.push({
-            user_id: requesterId,
+            user_id: requesterAuthId,
             title: 'Demande prise en charge',
             message: `Votre demande a été affectée${assigneeName ? ` à ${assigneeName}` : ''}${projectSuffix}.`,
             type: 'be_affectee_requester',

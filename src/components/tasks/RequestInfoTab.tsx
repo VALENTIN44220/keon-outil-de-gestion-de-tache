@@ -40,7 +40,7 @@ export function RequestInfoTab({ task, profiles, departments }: RequestInfoTabPr
 
   // Si la tâche est elle-même une demande (type='request'), on lit ses propres
   // valeurs. Sinon (c'est une tâche enfant), on remonte au parent_request_id.
-  const targetRequestId = task.type === 'request' ? task.id : targetRequestId;
+  const targetRequestId = task.type === 'request' ? task.id : task.parent_request_id;
 
   useEffect(() => {
     if (targetRequestId) {

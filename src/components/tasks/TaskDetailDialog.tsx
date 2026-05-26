@@ -118,6 +118,15 @@ const statusConfig: Record<string, { label: string; icon: typeof CheckCircle2; c
   refused: { label: 'Refusé', icon: AlertCircle, color: 'text-destructive' },
 };
 
+/**
+ * Conversation unifiée au niveau DEMANDE : une étape (type !== 'request')
+ * partage le fil de discussion de sa demande parente plutôt qu'un fil isolé,
+ * pour que demandeur / manager / exécutant voient les mêmes messages.
+ */
+function conversationTaskId(t: { id: string; type?: string | null; parent_request_id?: string | null }): string {
+  return t.parent_request_id && t.type !== 'request' ? t.parent_request_id : t.id;
+}
+
 export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMutated }: TaskDetailDialogProps) {
   const { profile } = useAuth();
   const { isAdmin: realIsAdmin } = useUserRole();
@@ -151,6 +160,11 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
   const [parentRequestPersonIds, setParentRequestPersonIds] = useState<{
     requester_id: string | null;
     reporter_id: string | null;
+  } | null>(null);
+  /** Titre + n° de la demande parente (affiché en contexte sur une étape). */
+  const [parentRequestInfo, setParentRequestInfo] = useState<{
+    title: string | null;
+    request_number: string | null;
   } | null>(null);
   /** Pièces jointes / liens fournis par le demandeur sur la demande parente
       (le wizard BE stocke les liens sur la tâche parent_request, pas sur la
@@ -255,7 +269,7 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
         const [{ data: pr }, { data: parentAtts }] = await Promise.all([
           supabase
             .from('tasks')
-            .select('requester_id, reporter_id')
+            .select('requester_id, reporter_id, title, request_number')
             .eq('id', task.parent_request_id)
             .maybeSingle(),
           // Récupère les liens/fichiers que le demandeur a fournis sur la
@@ -271,9 +285,15 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
             ? { requester_id: pr.requester_id ?? null, reporter_id: pr.reporter_id ?? null }
             : null,
         );
+        setParentRequestInfo(
+          pr
+            ? { title: (pr as any).title ?? null, request_number: (pr as any).request_number ?? null }
+            : null,
+        );
         setParentAttachments((parentAtts as any[]) ?? []);
       } else {
         setParentRequestPersonIds(null);
+        setParentRequestInfo(null);
         setParentAttachments([]);
       }
 
@@ -765,7 +785,7 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
 
                   {/* Chat section for child task */}
                   <Separator />
-                  <TaskCommentsSection taskId={selectedChildTask.id} className="h-[36vh] max-h-[360px] min-h-[180px]" />
+                  <TaskCommentsSection taskId={conversationTaskId(selectedChildTask)} className="h-[36vh] max-h-[360px] min-h-[180px]" />
                 </TabsContent>
 
                 {selectedChildTask.parent_request_id && (
@@ -779,7 +799,7 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
                 )}
 
                 <TabsContent value="chat" className="mt-2">
-                  <TaskCommentsSection taskId={selectedChildTask.id} className="h-[48vh] max-h-[460px] min-h-[220px]" />
+                  <TaskCommentsSection taskId={conversationTaskId(selectedChildTask)} className="h-[48vh] max-h-[460px] min-h-[220px]" />
                 </TabsContent>
               </Tabs>
             )}
@@ -969,6 +989,21 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
               return parsed.name || task.title;
             })()}
           </DialogTitle>
+          {/* Contexte de la demande parente (quand on consulte une étape) */}
+          {task.type !== 'request' && task.parent_request_id && parentRequestInfo && (
+            <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+              <FileText className="h-3.5 w-3.5 shrink-0" />
+              <span>Demande :</span>
+              {parentRequestInfo.request_number && (
+                <span className="font-mono font-medium">{parentRequestInfo.request_number}</span>
+              )}
+              {parentRequestInfo.title && (
+                <span className="truncate">
+                  {parentRequestInfo.title.replace(/^([TD]-[A-Z][A-Z0-9-]*\d+\s*—\s*)+/, '')}
+                </span>
+              )}
+            </p>
+          )}
           {task.status !== 'done' && task.status !== 'validated' && (
             <div className="mt-3 flex justify-end gap-2 flex-wrap">
               {/* ── Boutons workflow BE — si la tâche a un be_status (= tâche
@@ -1604,7 +1639,7 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
                 )}
 
                 <TabsContent value="chat" className="mt-2">
-                  <TaskCommentsSection taskId={task.id} className="min-h-[180px] max-h-[40vh]" />
+                  <TaskCommentsSection taskId={conversationTaskId(task)} className="min-h-[180px] max-h-[40vh]" />
                 </TabsContent>
               </Tabs>
             </>
@@ -1627,7 +1662,7 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
                     </TabsTrigger>
                   </TabsList>
                   <TabsContent value="details" className="mt-2">
-                    <TaskCommentsSection taskId={task.id} className="min-h-[160px] max-h-[36vh]" />
+                    <TaskCommentsSection taskId={conversationTaskId(task)} className="min-h-[160px] max-h-[36vh]" />
                   </TabsContent>
                   <TabsContent value="request-info" className="mt-2">
                     <RequestInfoTab
@@ -1638,7 +1673,7 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
                   </TabsContent>
                 </Tabs>
               ) : (
-                <TaskCommentsSection taskId={task.id} className="min-h-[160px] max-h-[36vh]" />
+                <TaskCommentsSection taskId={conversationTaskId(task)} className="min-h-[160px] max-h-[36vh]" />
               )}
             </>
           )}

@@ -392,6 +392,11 @@ export default function RequestDetail() {
     (task as any).sub_process_template_id || (task as any).source_sub_process_template_id || '',
   );
 
+  // Conversation unifiée au niveau DEMANDE : une étape pointe vers le fil de
+  // discussion de sa demande parente (pas un fil isolé par étape), pour que
+  // demandeur / manager / exécutant partagent les mêmes messages.
+  const conversationTaskId = isStep && parentRequest ? parentRequest.id : task.id;
+
   // ─── Carte « Pièces jointes & liens » (partagée demande/étape) ──
   const attachmentsCard = (
     <Card className="overflow-hidden shadow-sm">
@@ -893,11 +898,11 @@ export default function RequestDetail() {
               <CardHeader className="pb-3 border-b-2 border-violet-200 bg-gradient-to-r from-violet-100 to-blue-100">
                 <CardTitle className="text-base font-semibold flex items-center gap-2 text-violet-900">
                   <MessageSquare className="h-4 w-4 text-violet-700" />
-                  {isStep ? "Conversation de l'étape" : 'Conversation de la demande'}
+                  Conversation de la demande
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-3">
-                <TaskCommentsSection taskId={task.id} className="max-h-[480px]" />
+                <TaskCommentsSection taskId={conversationTaskId} className="max-h-[480px]" />
               </CardContent>
             </Card>
 
@@ -925,10 +930,10 @@ export default function RequestDetail() {
         <aside className="hidden lg:flex flex-col w-[380px] xl:w-[420px] border-l-2 border-violet-300 bg-violet-100/60 shrink-0">
           <div className="px-4 h-12 flex items-center gap-2 border-b-2 border-violet-300 shrink-0 bg-gradient-to-r from-violet-200 to-blue-200">
             <MessageSquare className="h-4 w-4 text-violet-700" />
-            <h2 className="text-sm font-semibold text-violet-900">{isStep ? "Conversation de l'étape" : 'Conversation de la demande'}</h2>
+            <h2 className="text-sm font-semibold text-violet-900">Conversation de la demande</h2>
           </div>
           <div className="flex-1 overflow-hidden p-3 min-h-0">
-            <TaskCommentsSection taskId={task.id} className="h-full" />
+            <TaskCommentsSection taskId={conversationTaskId} className="h-full" />
           </div>
         </aside>
       </div>
