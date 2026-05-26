@@ -1148,10 +1148,10 @@ export function NewBERequestDialog({
                             const safeName = f.name.replace(/[^a-zA-Z0-9._-]/g, '_');
                             const path = `be-requests/draft/${Date.now()}-${safeName}`;
                             const { error: upErr } = await sb.storage
-                              .from('attachments')
+                              .from('task-attachments')
                               .upload(path, f, { upsert: false });
                             if (upErr) throw upErr;
-                            const { data: pub } = sb.storage.from('attachments').getPublicUrl(path);
+                            const { data: pub } = sb.storage.from('task-attachments').getPublicUrl(path);
                             setFiles(prev => [...prev, { name: f.name, url: pub.publicUrl, path, size: f.size }]);
                             toast.success(`Fichier ajouté : ${f.name}`);
                           } catch (err: any) {
