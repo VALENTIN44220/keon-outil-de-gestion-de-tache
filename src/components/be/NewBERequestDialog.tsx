@@ -84,6 +84,8 @@ interface SubStep {
   description: string | null;
   be_category: 'be' | 'be_reglementaire' | null;
   order_index: number | null;
+  /** Groupe parallèle (null = séquentiel) */
+  parallel_group: string | null;
   /** Manager qui dispatche (cas Cible = rôle générique) */
   dispatch_manager_id: string | null;
   /** Audit : créateur du template (legacy) */
@@ -94,6 +96,12 @@ interface SubStep {
   target_assignee_id: string | null;
   /** Durée prévue par défaut (heures) — héritée par tasks.duration_hours */
   default_duration_hours: number | null;
+  /** Niveau de validation 1 : 'manager' | 'fixed_user' | 'requester' | null */
+  validation_level_1_type: string | null;
+  validation_level_1_user_id: string | null;
+  /** Niveau de validation 2 : 'manager' | 'fixed_user' | 'requester' | null */
+  validation_level_2_type: string | null;
+  validation_level_2_user_id: string | null;
 }
 
 /**
@@ -336,7 +344,7 @@ export function NewBERequestDialog({
     if (step !== 1 && !(hasDefaultProject && step === 1)) return;
     setStepsLoading(true);
     sb.from('sub_process_templates')
-      .select('id,name,description,be_category,order_index,dispatch_manager_id,user_id,assignment_type,target_assignee_id,default_duration_hours')
+      .select('id,name,description,be_category,order_index,parallel_group,dispatch_manager_id,user_id,assignment_type,target_assignee_id,default_duration_hours,validation_level_1_type,validation_level_1_user_id,validation_level_2_type,validation_level_2_user_id')
       .eq('process_template_id', BE_PROCESS_TEMPLATE_ID)
       .eq('is_shared', true)
       .order('be_category')
@@ -437,34 +445,30 @@ export function NewBERequestDialog({
 
       if (reqError) throw reqError;
 
-      // 2. Charge tous les task_templates (= étapes) des prestations sélectionnées.
-      //    On crée UNE TÂCHE PAR ÉTAPE (pas une seule par prestation) — chaque
-      //    étape a son propre assigné, ses validateurs, son statut.
-      const selectedSubProcessIds = allSelectedSteps.map(s => s.id);
-      let allTaskTemplates: any[] = [];
-      if (selectedSubProcessIds.length > 0) {
-        const { data: tplRows, error: tplErr } = await (sb as any)
-          .from('task_templates')
-          .select('id, sub_process_template_id, title, default_duration_days, order_index, validation_level_1, validator_level_1_id, validation_level_2, validator_level_2_id, is_milestone, milestone_label, auto_milestone_delay_days, auto_milestone_label, required_docs_count, required_docs_description, start_mode, depends_on_task_template_id, delay_after_previous_days')
-          .in('sub_process_template_id', selectedSubProcessIds)
-          .order('order_index', { ascending: true });
-        if (tplErr) throw tplErr;
-        allTaskTemplates = tplRows ?? [];
-      }
+      // 2. Crée UNE TÂCHE PAR SOUS-ÉTAPE des prestations sélectionnées.
+      //    Architecture BE : les sub_process_templates SONT les étapes — il n'y a
+      //    pas de task_templates intermédiaires. On construit les tâches enfant
+      //    directement depuis allSelectedSteps.
+      const childInserts = allSelectedSteps.map((sub) => {
+        // Titre de l'étape : partie après " — " dans le nom du template
+        // Ex: "ICPE Déclaration — Étude préliminaire" → "Étude préliminaire"
+        const sepIdx = sub.name.indexOf(' — ');
+        const stepLabel = sepIdx !== -1 ? sub.name.slice(sepIdx + 3).trim() : sub.name;
 
-      // 3. Construit la liste des tâches enfant à créer (1 par task_template)
-      const subProcessById = new Map(allSelectedSteps.map(s => [s.id, s]));
-      const childInserts = allTaskTemplates.map((tpl, idx) => {
-        const sub = subProcessById.get(tpl.sub_process_template_id);
-        // Assigné initial : validator_level_1 si défini, sinon dispatch_manager du sub-process
-        const initialAssignee = tpl.validator_level_1_id
-          ? null  // validateur ≠ assigné → laisser le dispatcher décider qui exécute
-          : (sub?.target_assignee_id ?? sub?.dispatch_manager_id ?? null);
+        // Assigné initial : personne fixe si définie, sinon le dispatcher
+        const initialAssignee = sub.target_assignee_id ?? sub.dispatch_manager_id ?? null;
         const initialBeStatus = initialAssignee ? 'affectee' : 'soumise';
+
+        // Validateur niveau 1 : uniquement si type = 'fixed_user'
+        const val1Id = sub.validation_level_1_type === 'fixed_user'
+          ? (sub.validation_level_1_user_id ?? null)
+          : null;
+        const val2Id = sub.validation_level_2_type === 'fixed_user'
+          ? (sub.validation_level_2_user_id ?? null)
+          : null;
+
         return {
-          // Convention de titre : « titre demande — nom prestation — titre étape »
-          // (le sous-processus regroupera ces tâches dans l'UI)
-          title: `${title} — ${sub?.name ?? 'Prestation'} — ${tpl.title}`,
+          title: stepLabel,
           type: 'task',
           status: 'todo',
           be_project_id: selectedProjectId,
@@ -474,54 +478,25 @@ export function NewBERequestDialog({
           user_id: user.id,
           requester_id: profile.id,
           parent_request_id: request.id,
-          sub_process_template_id: tpl.sub_process_template_id,
-          source_task_template_id: tpl.id,
+          sub_process_template_id: sub.id,
           assignee_id: initialAssignee,
-          duration_hours: (tpl.default_duration_days ?? 1) * 8,
+          duration_hours: sub.default_duration_hours ?? 8,
+          order_index: sub.order_index ?? 0,
+          parallel_group: sub.parallel_group ?? null,
           source_process_template_id: BE_PROCESS_TEMPLATE_ID,
           process_template_id: BE_PROCESS_TEMPLATE_ID,
-          // Validateurs (recopiés depuis le template)
-          validator_level_1_id: tpl.validator_level_1_id ?? null,
-          validator_level_2_id: tpl.validator_level_2_id ?? null,
-          // Jalon + docs obligatoires (par étape, plus de cumul artificiel)
-          is_milestone: !!tpl.is_milestone,
-          milestone_label: tpl.milestone_label,
-          auto_milestone_delay_days: tpl.auto_milestone_delay_days,
-          auto_milestone_label: tpl.auto_milestone_label,
-          required_docs_count: tpl.required_docs_count ?? 0,
-          required_docs_description: tpl.required_docs_description,
-          start_mode: tpl.start_mode ?? 'parallel',
-          delay_after_previous_days: tpl.delay_after_previous_days ?? 0,
+          validator_level_1_id: val1Id,
+          validator_level_2_id: val2Id,
         };
       });
 
       const { data: createdChildren, error: childError } = await sb
         .from('tasks')
         .insert(childInserts)
-        .select('id, title, assignee_id, be_status, sub_process_template_id, source_task_template_id');
+        .select('id, title, assignee_id, be_status, sub_process_template_id');
       if (childError) throw childError;
 
-      // 4. Résolution des dépendances explicites : task.depends_on_task_id pointe
-      //    vers la tâche fille issue du task_template référencé par
-      //    depends_on_task_template_id (uniquement parmi les tâches qu'on vient
-      //    de créer pour cette même demande).
-      const taskByTemplateId = new Map<string, string>();
-      for (const t of (createdChildren ?? [])) {
-        if ((t as any).source_task_template_id) {
-          taskByTemplateId.set((t as any).source_task_template_id, t.id);
-        }
-      }
-      for (let i = 0; i < allTaskTemplates.length; i++) {
-        const tpl = allTaskTemplates[i];
-        if (tpl.start_mode !== 'after_specific' || !tpl.depends_on_task_template_id) continue;
-        const myTaskId = taskByTemplateId.get(tpl.id);
-        const targetTaskId = taskByTemplateId.get(tpl.depends_on_task_template_id);
-        if (myTaskId && targetTaskId) {
-          await sb.from('tasks').update({ depends_on_task_id: targetTaskId } as any).eq('id', myTaskId);
-        }
-      }
-
-      // 2bis. Notifications inbox — informe les managers/dispatchers et les
+      // 3. Notifications inbox — informe les managers/dispatchers et les
       // assignés que de nouvelles tâches BE leur arrivent. On résout
       // profile.id → user_id (auth.users.id) via la table profiles, puis
       // on INSERT en lot dans public.notifications.
@@ -608,7 +583,7 @@ export function NewBERequestDialog({
         console.warn('[NewBERequestDialog] notification step failed (non-blocking):', notifErr);
       }
 
-      // 3. Liens en tant que task_attachments sur la tâche parente
+      // 4. Liens en tant que task_attachments sur la tâche parente
       const validLinks = links.filter(l => l.url.trim());
       let insertedLinks = 0;
       let linksFailed = false;
@@ -633,7 +608,7 @@ export function NewBERequestDialog({
         }
       }
 
-      // 3bis. Fichiers uploadés en tant que task_attachments type='file'
+      // 4bis. Fichiers uploadés en tant que task_attachments type='file'
       let insertedFiles = 0;
       if (files.length > 0) {
         const { data: insertedFileRows, error: filesError } = await sb.from('task_attachments').insert(
