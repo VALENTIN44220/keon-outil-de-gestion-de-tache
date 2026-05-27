@@ -552,6 +552,16 @@ export default function Projects() {
               <div className="space-y-2">
                 {filteredProjects.map((project) => {
                   const affaires = affairesByProject.get(project.id) ?? [];
+                  // Quand un filtre activité est actif, la liste dépliée ne montre
+                  // que les affaires de l'activité sélectionnée (pas toutes celles
+                  // du projet).
+                  const shownAffaires =
+                    filterActivite.size > 0
+                      ? affaires.filter((a) => {
+                          const act = activiteFromCode(a.code_affaire);
+                          return act !== null && filterActivite.has(act);
+                        })
+                      : affaires;
                   const isExpanded = expanded.has(project.id);
                   const color = STATUS_COLOR[project.status] || STATUS_COLOR.active;
                   const hasGps = !!project.gps_coordinates;
@@ -635,12 +645,14 @@ export default function Projects() {
                       {/* Affaires (expanded) */}
                       {isExpanded && (
                         <div className="border-t divide-y bg-muted/10">
-                          {affaires.length === 0 ? (
+                          {shownAffaires.length === 0 ? (
                             <p className="px-6 py-2 text-xs text-muted-foreground italic">
-                              Aucune affaire pour ce projet
+                              {filterActivite.size > 0
+                                ? 'Aucune affaire pour cette activité'
+                                : 'Aucune affaire pour ce projet'}
                             </p>
                           ) : (
-                            affaires.map((affaire) => {
+                            shownAffaires.map((affaire) => {
                               const sc = BE_AFFAIRE_STATUS_CONFIG[affaire.status as BEAffaireStatus];
                               return (
                                 <button

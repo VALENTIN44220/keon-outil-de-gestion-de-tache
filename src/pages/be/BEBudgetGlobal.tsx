@@ -32,6 +32,15 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   ListChecks,
   Receipt,
   ReceiptText,
@@ -45,10 +54,16 @@ import {
   ArrowDown,
   ArrowUpDown,
   ExternalLink,
+  FolderTree,
+  Rows3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { BEAffaire, BEAffaireBudgetKPI } from '@/types/beAffaire';
-import { BE_AFFAIRE_STATUS_CONFIG, extractActiviteFromAffaire } from '@/types/beAffaire';
+import {
+  BE_AFFAIRE_STATUS_CONFIG,
+  extractActiviteFromAffaire,
+  extractProjectCodeFromAffaire,
+} from '@/types/beAffaire';
 import type { BEProject } from '@/types/beProject';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -71,19 +86,6 @@ type SortKey =
   | 'jours';
 
 type FilterMode = 'all' | 'with_ca' | 'with_rh' | 'neg_margin' | 'pos_margin';
-
-function kpiSortValue(k: BEProjectSyntheseKPI, key: SortKey): number {
-  switch (key) {
-    case 'nb_affaires':    return k.nb_affaires;
-    case 'ca_constate':    return k.ca_constate_brut;
-    case 'cogs':           return k.cogs_constate_brut;
-    case 'marge_brute':    return k.marge_brute_brut;
-    case 'cout_rh':        return k.cout_rh_declare;
-    case 'marge_directe':  return k.marge_directe_brut;
-    case 'jours':          return k.jours_declares;
-    default:               return 0;
-  }
-}
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -124,6 +126,7 @@ export default function BEBudgetGlobal() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
   const [selectedActivites, setSelectedActivites] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<'projet' | 'affaire'>('projet');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const { data: kpis = [], isLoading: kpisLoading } = useBEProjectsSyntheseKpi();
@@ -156,18 +159,6 @@ export default function BEBudgetGlobal() {
     for (const a of allAffaires) {
       if (!map.has(a.be_project_id)) map.set(a.be_project_id, []);
       map.get(a.be_project_id)!.push(a);
-    }
-    return map;
-  }, [allAffaires]);
-
-  // Map projet -> activités de ses affaires (3 dernières lettres du code_affaire)
-  const activitesByProject = useMemo(() => {
-    const map = new Map<string, Set<string>>();
-    for (const a of allAffaires) {
-      const act = extractActiviteFromAffaire(a.code_affaire);
-      if (!act) continue;
-      if (!map.has(a.be_project_id)) map.set(a.be_project_id, new Set());
-      map.get(a.be_project_id)!.add(act);
     }
     return map;
   }, [allAffaires]);
@@ -209,66 +200,163 @@ export default function BEBudgetGlobal() {
     return m;
   }, [projects]);
 
-  // Filter + sort
-  const displayKpis = useMemo(() => {
-    let result = [...kpis];
-    if (filterMode === 'with_ca')
-      result = result.filter((k) => k.ca_constate_brut > 0 || k.ca_engage_brut > 0);
-    else if (filterMode === 'with_rh')
-      result = result.filter((k) => k.jours_declares > 0);
-    else if (filterMode === 'neg_margin')
-      result = result.filter((k) => k.marge_brute_brut < 0);
-    else if (filterMode === 'pos_margin')
-      result = result.filter((k) => k.marge_brute_brut > 0);
+  const filterActive = selectedActivites.size > 0;
 
-    // Filtre par code activité : garde les projets ayant au moins une affaire
-    // de l'une des activités sélectionnées.
-    if (selectedActivites.size > 0) {
-      result = result.filter((k) => {
-        const acts = activitesByProject.get(k.be_project_id);
-        if (!acts) return false;
-        for (const act of selectedActivites) if (acts.has(act)) return true;
-        return false;
-      });
+  // Agrège les KPIs d'une liste d'affaires en métriques de ligne.
+  const aggregateAffaires = (list: BEAffaire[]) => {
+    const m = {
+      nb_affaires: 0, ca_engage: 0, ca_constate: 0, cogs_constate: 0,
+      marge_brute: 0, cout_rh: 0, marge_directe: 0, jours: 0,
+    };
+    for (const a of list) {
+      m.nb_affaires += 1;
+      const k = affaireKpisById.get(a.id);
+      if (!k) continue;
+      m.ca_engage += k.ca_engage_brut;
+      m.ca_constate += k.ca_constate_brut;
+      m.cogs_constate += k.cogs_constate_brut;
+      m.marge_brute += k.marge_brute_brut;
+      m.cout_rh += k.cout_rh_declare;
+      m.marge_directe += k.marge_directe_brut;
+      m.jours += k.jours_declares;
     }
+    return m;
+  };
 
-    result.sort((a, b) => {
+  // Vue "Par projet" : { k, m } où m = métriques affichées. Quand un filtre
+  // activité est actif, m est recalculé sur les SEULES affaires correspondantes
+  // (pour ne pas afficher les chiffres des autres activités du projet).
+  const projectRows = useMemo(() => {
+    let rows = kpis.map((k) => {
+      const m = filterActive
+        ? aggregateAffaires(
+            (affairesByProject.get(k.be_project_id) ?? []).filter(affaireMatchesActivite),
+          )
+        : {
+            nb_affaires: k.nb_affaires,
+            ca_engage: k.ca_engage_brut,
+            ca_constate: k.ca_constate_brut,
+            cogs_constate: k.cogs_constate_brut,
+            marge_brute: k.marge_brute_brut,
+            cout_rh: k.cout_rh_declare,
+            marge_directe: k.marge_directe_brut,
+            jours: k.jours_declares,
+          };
+      return { k, m };
+    });
+
+    // Filtre activité : ne garde que les projets ayant ≥1 affaire correspondante.
+    if (filterActive) rows = rows.filter((r) => r.m.nb_affaires > 0);
+
+    // Filtres rapides (appliqués sur les métriques effectives).
+    if (filterMode === 'with_ca') rows = rows.filter((r) => r.m.ca_constate > 0 || r.m.ca_engage > 0);
+    else if (filterMode === 'with_rh') rows = rows.filter((r) => r.m.jours > 0);
+    else if (filterMode === 'neg_margin') rows = rows.filter((r) => r.m.marge_brute < 0);
+    else if (filterMode === 'pos_margin') rows = rows.filter((r) => r.m.marge_brute > 0);
+
+    const metricKey: Record<Exclude<SortKey, 'code_projet'>, keyof typeof rows[number]['m']> = {
+      nb_affaires: 'nb_affaires',
+      ca_constate: 'ca_constate',
+      cogs: 'cogs_constate',
+      marge_brute: 'marge_brute',
+      cout_rh: 'cout_rh',
+      marge_directe: 'marge_directe',
+      jours: 'jours',
+    };
+    rows.sort((a, b) => {
       if (sortKey === 'code_projet') {
-        const cmp = a.code_projet.localeCompare(b.code_projet);
+        const cmp = a.k.code_projet.localeCompare(b.k.code_projet);
         return sortDir === 'asc' ? cmp : -cmp;
       }
-      const va = kpiSortValue(a, sortKey);
-      const vb = kpiSortValue(b, sortKey);
-      return sortDir === 'asc' ? va - vb : vb - va;
+      const f = metricKey[sortKey];
+      return sortDir === 'asc' ? a.m[f] - b.m[f] : b.m[f] - a.m[f];
     });
-    return result;
-  }, [kpis, sortKey, sortDir, filterMode, selectedActivites, activitesByProject]);
+    return rows;
+  }, [kpis, sortKey, sortDir, filterMode, filterActive, selectedActivites, affairesByProject, affaireKpisById]);
 
-  // Global totals
+  // Vue "Par affaire" : liste plate, sans regroupement projet, filtrée par
+  // activité + filtre rapide. Permet de voir toutes les affaires d'une activité.
+  const affaireRows = useMemo(() => {
+    let rows = allAffaires
+      .filter(affaireMatchesActivite)
+      .map((a) => ({
+        a,
+        k: affaireKpisById.get(a.id),
+        project: projectsById.get(a.be_project_id),
+      }));
+
+    if (filterMode === 'with_ca')
+      rows = rows.filter((r) => (r.k?.ca_constate_brut ?? 0) > 0 || (r.k?.ca_engage_brut ?? 0) > 0);
+    else if (filterMode === 'with_rh')
+      rows = rows.filter((r) => (r.k?.jours_declares ?? 0) > 0);
+    else if (filterMode === 'neg_margin')
+      rows = rows.filter((r) => (r.k?.marge_brute_brut ?? 0) < 0);
+    else if (filterMode === 'pos_margin')
+      rows = rows.filter((r) => (r.k?.marge_brute_brut ?? 0) > 0);
+
+    const val = (r: (typeof rows)[number]): number | string => {
+      switch (sortKey) {
+        case 'ca_constate':   return r.k?.ca_constate_brut ?? 0;
+        case 'cogs':          return r.k?.cogs_constate_brut ?? 0;
+        case 'marge_brute':   return r.k?.marge_brute_brut ?? 0;
+        case 'cout_rh':       return r.k?.cout_rh_declare ?? 0;
+        case 'marge_directe': return r.k?.marge_directe_brut ?? 0;
+        case 'jours':         return r.k?.jours_declares ?? 0;
+        default:              return r.a.code_affaire; // code_projet / nb_affaires -> tri par code
+      }
+    };
+    rows.sort((a, b) => {
+      const va = val(a);
+      const vb = val(b);
+      const cmp =
+        typeof va === 'number' && typeof vb === 'number'
+          ? va - vb
+          : String(va).localeCompare(String(vb));
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+    return rows;
+  }, [allAffaires, affaireKpisById, projectsById, filterMode, sortKey, sortDir, selectedActivites]);
+
+  // Nombre d'éléments affichés selon le mode courant.
+  const currentCount = viewMode === 'affaire' ? affaireRows.length : projectRows.length;
+
+  // Totaux globaux (cohérents avec le mode + les filtres actifs).
   const totals = useMemo(() => {
     const t = {
-      nb_projets: displayKpis.length,
-      nb_affaires: 0,
-      ca_engage: 0,
-      ca_constate: 0,
-      cogs_constate: 0,
-      marge_brute: 0,
-      cout_rh_declare: 0,
-      marge_directe: 0,
+      nb_projets: 0, nb_affaires: 0, ca_engage: 0, ca_constate: 0,
+      cogs_constate: 0, marge_brute: 0, cout_rh_declare: 0, marge_directe: 0,
       jours_declares: 0,
     };
-    for (const k of displayKpis) {
-      t.nb_affaires += k.nb_affaires;
-      t.ca_engage += k.ca_engage_brut;
-      t.ca_constate += k.ca_constate_brut;
-      t.cogs_constate += k.cogs_constate_brut;
-      t.marge_brute += k.marge_brute_brut;
-      t.cout_rh_declare += k.cout_rh_declare;
-      t.marge_directe += k.marge_directe_brut;
-      t.jours_declares += k.jours_declares;
+    if (viewMode === 'affaire') {
+      const projSet = new Set<string>();
+      for (const r of affaireRows) {
+        projSet.add(r.a.be_project_id);
+        t.nb_affaires += 1;
+        if (!r.k) continue;
+        t.ca_engage += r.k.ca_engage_brut;
+        t.ca_constate += r.k.ca_constate_brut;
+        t.cogs_constate += r.k.cogs_constate_brut;
+        t.marge_brute += r.k.marge_brute_brut;
+        t.cout_rh_declare += r.k.cout_rh_declare;
+        t.marge_directe += r.k.marge_directe_brut;
+        t.jours_declares += r.k.jours_declares;
+      }
+      t.nb_projets = projSet.size;
+    } else {
+      t.nb_projets = projectRows.length;
+      for (const { m } of projectRows) {
+        t.nb_affaires += m.nb_affaires;
+        t.ca_engage += m.ca_engage;
+        t.ca_constate += m.ca_constate;
+        t.cogs_constate += m.cogs_constate;
+        t.marge_brute += m.marge_brute;
+        t.cout_rh_declare += m.cout_rh;
+        t.marge_directe += m.marge_directe;
+        t.jours_declares += m.jours;
+      }
     }
     return t;
-  }, [displayKpis]);
+  }, [viewMode, projectRows, affaireRows]);
 
   const toggleExpand = (id: string) =>
     setExpanded((prev) => {
@@ -409,7 +497,7 @@ export default function BEBudgetGlobal() {
 
             {/* ── Tableau ───────────────────────────────────────────────── */}
             <Card className="border-border/50">
-              {/* Filter chips */}
+              {/* Filter chips + sélecteur d'affichage */}
               <div className="flex items-center gap-1.5 px-4 pt-3 pb-0 flex-wrap">
                 {FILTER_CHIPS.map((chip) => (
                   <button
@@ -425,11 +513,44 @@ export default function BEBudgetGlobal() {
                     {chip.label}
                   </button>
                 ))}
-                {filterMode !== 'all' && (
-                  <span className="text-xs text-muted-foreground ml-1">
-                    — {displayKpis.length} projet{displayKpis.length !== 1 ? 's' : ''}
-                  </span>
-                )}
+                <span className="text-xs text-muted-foreground ml-1">
+                  — {currentCount}{' '}
+                  {viewMode === 'affaire'
+                    ? `affaire${currentCount !== 1 ? 's' : ''}`
+                    : `projet${currentCount !== 1 ? 's' : ''}`}
+                </span>
+
+                {/* Bouton liste déroulante : regroupement par projet ou liste plate d'affaires */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="ml-auto gap-1.5 h-8">
+                      {viewMode === 'affaire' ? (
+                        <Rows3 className="h-3.5 w-3.5" />
+                      ) : (
+                        <FolderTree className="h-3.5 w-3.5" />
+                      )}
+                      {viewMode === 'affaire' ? 'Par affaire' : 'Par projet'}
+                      <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel>Affichage</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuRadioGroup
+                      value={viewMode}
+                      onValueChange={(v) => setViewMode(v as 'projet' | 'affaire')}
+                    >
+                      <DropdownMenuRadioItem value="projet">
+                        <FolderTree className="h-3.5 w-3.5 mr-2" />
+                        Regroupé par projet
+                      </DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="affaire">
+                        <Rows3 className="h-3.5 w-3.5 mr-2" />
+                        Liste des affaires
+                      </DropdownMenuRadioItem>
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
               {/* Filtre par code activité (3 dernières lettres du code affaire) */}
@@ -467,12 +588,111 @@ export default function BEBudgetGlobal() {
               )}
 
               <CardContent className="p-0 mt-3">
-                {displayKpis.length === 0 ? (
+                {currentCount === 0 ? (
                   <div className="py-12 text-center text-muted-foreground text-sm">
                     <Building2 className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                    Aucun projet BE pour ces critères.
+                    {viewMode === 'affaire'
+                      ? 'Aucune affaire pour ces critères.'
+                      : 'Aucun projet BE pour ces critères.'}
+                  </div>
+                ) : viewMode === 'affaire' ? (
+                  /* ── Vue plate : liste des affaires (sans regroupement projet) ── */
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/30 hover:bg-muted/30">
+                          <SortableHead label="Affaire" k="code_projet" />
+                          <TableHead className="whitespace-nowrap">Projet</TableHead>
+                          <SortableHead label="CA Constaté" k="ca_constate" className="text-right" />
+                          <SortableHead label="COGS" k="cogs" className="text-right" />
+                          <SortableHead label="Marge brute" k="marge_brute" className="text-right" />
+                          <SortableHead label="Coût RH" k="cout_rh" className="text-right" />
+                          <SortableHead label="Marge directe" k="marge_directe" className="text-right" />
+                          <SortableHead label="Jours décl." k="jours" className="text-right" />
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {affaireRows.map(({ a, k, project }) => {
+                          const sc = BE_AFFAIRE_STATUS_CONFIG[a.status];
+                          const aMarge = k?.marge_brute_brut ?? 0;
+                          const aDirecte = k?.marge_directe_brut ?? 0;
+                          const codeProjet =
+                            project?.code_projet ??
+                            extractProjectCodeFromAffaire(a.code_affaire) ??
+                            '';
+                          return (
+                            <TableRow
+                              key={a.id}
+                              className="hover:bg-muted/30 cursor-pointer"
+                              onClick={() =>
+                                codeProjet &&
+                                navigate(`/be/projects/${codeProjet}/budget/${a.code_affaire}`)
+                              }
+                            >
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <code className="text-xs font-mono font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                                    {a.code_affaire}
+                                  </code>
+                                  <span className="text-xs truncate max-w-[220px]">
+                                    {a.libelle ?? '—'}
+                                  </span>
+                                  <Badge
+                                    variant="outline"
+                                    className={cn('text-[10px] px-1.5 h-4 shrink-0 border', sc.className)}
+                                  >
+                                    {sc.label}
+                                  </Badge>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <Badge variant="outline" className="font-mono text-[10px] h-5">
+                                    {codeProjet || '—'}
+                                  </Badge>
+                                  <span className="text-xs text-muted-foreground truncate max-w-[160px]">
+                                    {project?.nom_projet ?? ''}
+                                  </span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums font-semibold">
+                                {k && k.ca_constate_brut > 0 ? eur(k.ca_constate_brut) : '—'}
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums text-muted-foreground">
+                                {k && k.cogs_constate_brut > 0 ? eur(k.cogs_constate_brut) : '—'}
+                              </TableCell>
+                              <TableCell
+                                className={cn(
+                                  'text-right tabular-nums font-semibold',
+                                  aMarge < 0 && 'text-red-600',
+                                  aMarge > 0 && 'text-emerald-600',
+                                )}
+                              >
+                                {aMarge !== 0 ? eur(aMarge) : '—'}
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums text-muted-foreground">
+                                {k && k.cout_rh_declare > 0 ? eur(k.cout_rh_declare) : '—'}
+                              </TableCell>
+                              <TableCell
+                                className={cn(
+                                  'text-right tabular-nums font-semibold',
+                                  aDirecte < 0 && 'text-red-600',
+                                  aDirecte > 0 && 'text-emerald-600',
+                                )}
+                              >
+                                {aDirecte !== 0 ? eur(aDirecte) : '—'}
+                              </TableCell>
+                              <TableCell className="text-right tabular-nums">
+                                {k && k.jours_declares > 0 ? `${num(k.jours_declares)} j` : '—'}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
                   </div>
                 ) : (
+                  /* ── Vue regroupée par projet ── */
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
@@ -490,10 +710,10 @@ export default function BEBudgetGlobal() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {displayKpis.map((k) => {
+                        {projectRows.map(({ k, m }) => {
                           const project = projectsById.get(k.be_project_id);
-                          const margeBrute = k.marge_brute_brut;
-                          const margeDirecte = k.marge_directe_brut;
+                          const margeBrute = m.marge_brute;
+                          const margeDirecte = m.marge_directe;
                           const isExpanded = expanded.has(k.be_project_id);
                           const projectAffaires = (
                             affairesByProject.get(k.be_project_id) ?? []
@@ -536,13 +756,13 @@ export default function BEBudgetGlobal() {
                                   </div>
                                 </TableCell>
                                 <TableCell className="text-right tabular-nums">
-                                  {k.nb_affaires}
+                                  {m.nb_affaires}
                                 </TableCell>
                                 <TableCell className="text-right tabular-nums font-semibold">
-                                  {k.ca_constate_brut > 0 ? eur(k.ca_constate_brut) : '—'}
+                                  {m.ca_constate > 0 ? eur(m.ca_constate) : '—'}
                                 </TableCell>
                                 <TableCell className="text-right tabular-nums text-muted-foreground">
-                                  {k.cogs_constate_brut > 0 ? eur(k.cogs_constate_brut) : '—'}
+                                  {m.cogs_constate > 0 ? eur(m.cogs_constate) : '—'}
                                 </TableCell>
                                 <TableCell
                                   className={cn(
@@ -554,7 +774,7 @@ export default function BEBudgetGlobal() {
                                   {margeBrute !== 0 ? eur(margeBrute) : '—'}
                                 </TableCell>
                                 <TableCell className="text-right tabular-nums text-muted-foreground">
-                                  {k.cout_rh_declare > 0 ? eur(k.cout_rh_declare) : '—'}
+                                  {m.cout_rh > 0 ? eur(m.cout_rh) : '—'}
                                 </TableCell>
                                 <TableCell
                                   className={cn(
@@ -564,14 +784,14 @@ export default function BEBudgetGlobal() {
                                   )}
                                 >
                                   {margeDirecte !== 0 ? eur(margeDirecte) : '—'}
-                                  {k.ca_constate_brut > 0 && margeDirecte !== 0 && (
+                                  {m.ca_constate > 0 && margeDirecte !== 0 && (
                                     <span className="block text-[10px] font-normal text-muted-foreground">
-                                      {Math.round((margeDirecte / k.ca_constate_brut) * 100)}% du CA
+                                      {Math.round((margeDirecte / m.ca_constate) * 100)}% du CA
                                     </span>
                                   )}
                                 </TableCell>
                                 <TableCell className="text-right tabular-nums">
-                                  {k.jours_declares > 0 ? `${num(k.jours_declares)} j` : '—'}
+                                  {m.jours > 0 ? `${num(m.jours)} j` : '—'}
                                 </TableCell>
                               </TableRow>
 
