@@ -48,7 +48,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { BEAffaire, BEAffaireBudgetKPI } from '@/types/beAffaire';
-import { BE_AFFAIRE_STATUS_CONFIG } from '@/types/beAffaire';
+import { BE_AFFAIRE_STATUS_CONFIG, extractActiviteFromAffaire } from '@/types/beAffaire';
 import type { BEProject } from '@/types/beProject';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -123,6 +123,7 @@ export default function BEBudgetGlobal() {
   const [sortKey, setSortKey] = useState<SortKey>('ca_constate');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
+  const [selectedActivites, setSelectedActivites] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const { data: kpis = [], isLoading: kpisLoading } = useBEProjectsSyntheseKpi();
@@ -159,6 +160,43 @@ export default function BEBudgetGlobal() {
     return map;
   }, [allAffaires]);
 
+  // Map projet -> activités de ses affaires (3 dernières lettres du code_affaire)
+  const activitesByProject = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const a of allAffaires) {
+      const act = extractActiviteFromAffaire(a.code_affaire);
+      if (!act) continue;
+      if (!map.has(a.be_project_id)) map.set(a.be_project_id, new Set());
+      map.get(a.be_project_id)!.add(act);
+    }
+    return map;
+  }, [allAffaires]);
+
+  // Liste des activités disponibles (dérivée dynamiquement)
+  const availableActivites = useMemo(() => {
+    const set = new Set<string>();
+    for (const a of allAffaires) {
+      const act = extractActiviteFromAffaire(a.code_affaire);
+      if (act) set.add(act);
+    }
+    return [...set].sort();
+  }, [allAffaires]);
+
+  const toggleActivite = (act: string) =>
+    setSelectedActivites((prev) => {
+      const next = new Set(prev);
+      if (next.has(act)) next.delete(act);
+      else next.add(act);
+      return next;
+    });
+
+  // True si l'affaire correspond au filtre activité (ou si aucun filtre actif)
+  const affaireMatchesActivite = (a: BEAffaire): boolean => {
+    if (selectedActivites.size === 0) return true;
+    const act = extractActiviteFromAffaire(a.code_affaire);
+    return act !== null && selectedActivites.has(act);
+  };
+
   const affaireKpisById = useMemo(() => {
     const map = new Map<string, BEAffaireBudgetKPI>();
     for (const k of affaireKpis) map.set(k.be_affaire_id, k);
@@ -183,6 +221,17 @@ export default function BEBudgetGlobal() {
     else if (filterMode === 'pos_margin')
       result = result.filter((k) => k.marge_brute_brut > 0);
 
+    // Filtre par code activité : garde les projets ayant au moins une affaire
+    // de l'une des activités sélectionnées.
+    if (selectedActivites.size > 0) {
+      result = result.filter((k) => {
+        const acts = activitesByProject.get(k.be_project_id);
+        if (!acts) return false;
+        for (const act of selectedActivites) if (acts.has(act)) return true;
+        return false;
+      });
+    }
+
     result.sort((a, b) => {
       if (sortKey === 'code_projet') {
         const cmp = a.code_projet.localeCompare(b.code_projet);
@@ -193,7 +242,7 @@ export default function BEBudgetGlobal() {
       return sortDir === 'asc' ? va - vb : vb - va;
     });
     return result;
-  }, [kpis, sortKey, sortDir, filterMode]);
+  }, [kpis, sortKey, sortDir, filterMode, selectedActivites, activitesByProject]);
 
   // Global totals
   const totals = useMemo(() => {
@@ -383,6 +432,40 @@ export default function BEBudgetGlobal() {
                 )}
               </div>
 
+              {/* Filtre par code activité (3 dernières lettres du code affaire) */}
+              {availableActivites.length > 0 && (
+                <div className="flex items-center gap-1.5 px-4 pt-2 pb-0 flex-wrap">
+                  <span className="text-[11px] font-medium text-muted-foreground mr-0.5">
+                    Activité
+                  </span>
+                  {availableActivites.map((act) => {
+                    const active = selectedActivites.has(act);
+                    return (
+                      <button
+                        key={act}
+                        onClick={() => toggleActivite(act)}
+                        className={cn(
+                          'text-xs font-mono px-2.5 py-1 rounded-full border transition-colors',
+                          active
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-transparent text-muted-foreground border-border hover:border-primary/50 hover:text-foreground',
+                        )}
+                      >
+                        {act}
+                      </button>
+                    );
+                  })}
+                  {selectedActivites.size > 0 && (
+                    <button
+                      onClick={() => setSelectedActivites(new Set())}
+                      className="text-[11px] text-muted-foreground hover:text-foreground underline underline-offset-2 ml-1"
+                    >
+                      effacer
+                    </button>
+                  )}
+                </div>
+              )}
+
               <CardContent className="p-0 mt-3">
                 {displayKpis.length === 0 ? (
                   <div className="py-12 text-center text-muted-foreground text-sm">
@@ -412,7 +495,9 @@ export default function BEBudgetGlobal() {
                           const margeBrute = k.marge_brute_brut;
                           const margeDirecte = k.marge_directe_brut;
                           const isExpanded = expanded.has(k.be_project_id);
-                          const projectAffaires = affairesByProject.get(k.be_project_id) ?? [];
+                          const projectAffaires = (
+                            affairesByProject.get(k.be_project_id) ?? []
+                          ).filter(affaireMatchesActivite);
 
                           return (
                             <Fragment key={k.be_project_id}>

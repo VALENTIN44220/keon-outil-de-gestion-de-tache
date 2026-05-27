@@ -217,6 +217,20 @@ export function extractProjectCodeFromAffaire(
   return codeAffaire.substring(1, 5);
 }
 
+/**
+ * Code activité = 3 dernières lettres du code_affaire
+ * (ex: 'EDOLEAEX' -> 'AEX', 'XXXX-ETD' -> 'ETD'). Renvoie null si le code est
+ * trop court. Sert à filtrer les affaires par type d'activité (EDT, PCU, …).
+ */
+export function extractActiviteFromAffaire(
+  codeAffaire: string | null | undefined,
+): string | null {
+  if (!codeAffaire) return null;
+  const c = codeAffaire.trim();
+  if (c.length < 3) return null;
+  return c.slice(-3).toUpperCase();
+}
+
 // ================================================
 // Types pour le détail des pièces Divalto
 // ================================================

@@ -50,7 +50,10 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { BEAffaire, BEAffaireStatus } from '@/types/beAffaire';
-import { BE_AFFAIRE_STATUS_CONFIG } from '@/types/beAffaire';
+import {
+  BE_AFFAIRE_STATUS_CONFIG,
+  extractActiviteFromAffaire as activiteFromCode,
+} from '@/types/beAffaire';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -100,6 +103,7 @@ export default function Projects() {
   const [filterProjectStatus, setFilterProjectStatus] = useState<Set<string>>(new Set());
   const [filterHasAffaires, setFilterHasAffaires] = useState<HasAffairesFilter>('all');
   const [filterAffaireStatus, setFilterAffaireStatus] = useState<Set<BEAffaireStatus>>(new Set());
+  const [filterActivite, setFilterActivite] = useState<Set<string>>(new Set());
 
   // Sort
   const [sortBy, setSortBy] = useState<SortKey>('code');
@@ -131,6 +135,17 @@ export default function Projects() {
     return map;
   }, [allAffaires]);
 
+  // Liste des activités disponibles (3 dernières lettres des codes affaires),
+  // dérivée dynamiquement des affaires chargées : pas de valeurs codées en dur.
+  const availableActivites = useMemo(() => {
+    const set = new Set<string>();
+    for (const a of allAffaires) {
+      const act = activiteFromCode(a.code_affaire);
+      if (act) set.add(act);
+    }
+    return [...set].sort();
+  }, [allAffaires]);
+
   // Apply filters + sort
   const filteredProjects = useMemo(() => {
     let result = [...projects];
@@ -159,6 +174,13 @@ export default function Projects() {
 
       if (filterAffaireStatus.size > 0) {
         if (!affs.some((a) => filterAffaireStatus.has(a.status as BEAffaireStatus))) return false;
+      }
+
+      if (filterActivite.size > 0) {
+        if (!affs.some((a) => {
+          const act = activiteFromCode(a.code_affaire);
+          return act !== null && filterActivite.has(act);
+        })) return false;
       }
 
       return true;
@@ -196,6 +218,7 @@ export default function Projects() {
     filterProjectStatus,
     filterHasAffaires,
     filterAffaireStatus,
+    filterActivite,
     sortBy,
     sortDir,
   ]);
@@ -224,10 +247,19 @@ export default function Projects() {
       return next;
     });
 
+  const toggleActivite = (activite: string) =>
+    setFilterActivite((prev) => {
+      const next = new Set(prev);
+      if (next.has(activite)) next.delete(activite);
+      else next.add(activite);
+      return next;
+    });
+
   const resetFilters = () => {
     setFilterProjectStatus(new Set());
     setFilterHasAffaires('all');
     setFilterAffaireStatus(new Set());
+    setFilterActivite(new Set());
     setSearch('');
   };
 
@@ -235,6 +267,7 @@ export default function Projects() {
     filterProjectStatus.size +
     (filterHasAffaires !== 'all' ? 1 : 0) +
     filterAffaireStatus.size +
+    filterActivite.size +
     (search.trim() ? 1 : 0);
 
   return (
@@ -387,6 +420,37 @@ export default function Projects() {
                       </div>
                     </div>
 
+                    {/* Activité (3 dernières lettres du code affaire) */}
+                    {availableActivites.length > 0 && (
+                      <div className="space-y-2">
+                        <Label className="text-xs font-semibold">
+                          Activité
+                          <span className="text-muted-foreground font-normal ml-1">
+                            (au moins une affaire correspondante)
+                          </span>
+                        </Label>
+                        <div className="flex flex-wrap gap-1.5">
+                          {availableActivites.map((act) => {
+                            const active = filterActivite.has(act);
+                            return (
+                              <button
+                                key={act}
+                                onClick={() => toggleActivite(act)}
+                                className={cn(
+                                  'text-xs font-mono px-2.5 py-1 rounded-full border transition-colors',
+                                  active
+                                    ? 'bg-primary text-primary-foreground border-primary'
+                                    : 'border-border hover:border-muted-foreground/50',
+                                )}
+                              >
+                                {act}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
                     {activeFilterCount > 0 && (
                       <Button
                         variant="ghost"
@@ -458,6 +522,17 @@ export default function Projects() {
                     onClick={() => toggleAffaireStatus(s)}
                   >
                     Aff. {BE_AFFAIRE_STATUS_CONFIG[s].label}
+                    <X className="h-2.5 w-2.5" />
+                  </Badge>
+                ))}
+                {[...filterActivite].map((act) => (
+                  <Badge
+                    key={`act-${act}`}
+                    variant="secondary"
+                    className="gap-1 cursor-pointer hover:bg-secondary/80 font-mono"
+                    onClick={() => toggleActivite(act)}
+                  >
+                    {act}
                     <X className="h-2.5 w-2.5" />
                   </Badge>
                 ))}
