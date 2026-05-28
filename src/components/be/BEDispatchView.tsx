@@ -37,6 +37,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   Select,
   SelectContent,
@@ -79,6 +84,9 @@ import {
   AlertTriangle,
   ShieldCheck,
   UserX,
+  UserPlus,
+  Ban,
+  Loader2,
   FolderOpen,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -756,7 +764,11 @@ function TaskRow({
   const isARelire = task.be_status === 'a_relire';
   const projectCode = task.be_project?.code_projet;
 
-  const { updateBEStatus, isUpdating } = useBETaskStatus();
+  const { updateBEStatus, submitValidationOutcome, isUpdating } = useBETaskStatus();
+  // Validation à 3 issues sur a_relire : dialog pour 'complement' / 'refuse'
+  const [validationOpen, setValidationOpen] = useState<null | 'complement' | 'refuse'>(null);
+  const [validationComment, setValidationComment] = useState('');
+  const [isSubmittingValidation, setIsSubmittingValidation] = useState(false);
 
   // ── Identité de l'utilisateur courant (avec support simulation) ──────────
   // Permet d'afficher les boutons d'action UNIQUEMENT à la personne concernée :
@@ -971,25 +983,136 @@ function TaskRow({
         </TooltipProvider>
       )}
 
-      {/* a_relire → a_valider : SEULEMENT le manager de dispatch
-          (ou un validateur niveau 1/2 explicitement configuré) */}
+      {/* a_relire → 3 issues : Valider / Demande de complément / Refuser
+          SEULEMENT le manager de dispatch (ou validateur N1/N2 configuré) */}
       {!isBlocked && task.be_status === 'a_relire' && canValidateAtRelire && (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                size="sm"
-                className="h-7 px-2 gap-1 text-xs shrink-0 bg-amber-500 hover:bg-amber-600 text-white"
-                onClick={() => changeStatus('a_valider')}
-                disabled={isUpdating}
-              >
-                <CheckCircle2 className="h-3 w-3" />
-                <span className="hidden lg:inline">Valider</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top">Valider — passer à « À valider »</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+          {/* Demande de complément (renvoi à l'exécutant, commentaire obligatoire) */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 gap-1 text-xs text-amber-700 border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                  onClick={() => { setValidationComment(''); setValidationOpen('complement'); }}
+                  disabled={isSubmittingValidation || isUpdating}
+                >
+                  <UserPlus className="h-3 w-3" />
+                  <span className="hidden xl:inline">Complément</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Demande de complément (commentaire requis, renvoyé à l'exécutant)</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          {/* Refuser (clôture refusée, commentaire obligatoire) */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 gap-1 text-xs text-red-600 border-red-300 hover:bg-red-50 dark:hover:bg-red-900/20"
+                  onClick={() => { setValidationComment(''); setValidationOpen('refuse'); }}
+                  disabled={isSubmittingValidation || isUpdating}
+                >
+                  <Ban className="h-3 w-3" />
+                  <span className="hidden xl:inline">Refuser</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Refuser (clôture refusée, commentaire requis)</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          {/* Valider (étape suivante) */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="sm"
+                  className="h-7 px-2 gap-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+                  onClick={async () => {
+                    setIsSubmittingValidation(true);
+                    try {
+                      await submitValidationOutcome({
+                        taskId: task.id,
+                        outcome: 'validate',
+                        taskLabel: presName,
+                        projectCode,
+                        assigneeId: task.assignee_id,
+                        requesterId,
+                        parentRequestId: task.parent_request_id,
+                      });
+                      onRefresh();
+                    } catch { /* déjà notifié */ } finally { setIsSubmittingValidation(false); }
+                  }}
+                  disabled={isSubmittingValidation || isUpdating}
+                >
+                  <CheckCircle2 className="h-3 w-3" />
+                  <span className="hidden lg:inline">Valider</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top">Valider — passer à « À valider »</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          {/* Dialog commentaire pour Complément / Refus */}
+          <AlertDialog
+            open={validationOpen !== null}
+            onOpenChange={(o) => { if (!o) { setValidationOpen(null); setValidationComment(''); } }}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  {validationOpen === 'refuse' ? 'Refuser cette étape' : 'Demande de complément'}
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  {validationOpen === 'refuse'
+                    ? 'L\'étape sera clôturée comme refusée. Précisez le motif du refus (obligatoire).'
+                    : 'L\'étape repart à l\'exécutant pour complément. Précisez ce qui est attendu (obligatoire).'}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <Textarea
+                value={validationComment}
+                onChange={(e) => setValidationComment(e.target.value)}
+                placeholder={validationOpen === 'refuse' ? 'Motif du refus…' : 'Détail du complément attendu…'}
+                rows={4}
+                autoFocus
+              />
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={isSubmittingValidation}>Annuler</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    if (!validationOpen) return;
+                    setIsSubmittingValidation(true);
+                    try {
+                      await submitValidationOutcome({
+                        taskId: task.id,
+                        outcome: validationOpen,
+                        comment: validationComment,
+                        taskLabel: presName,
+                        projectCode,
+                        assigneeId: task.assignee_id,
+                        requesterId,
+                        parentRequestId: task.parent_request_id,
+                      });
+                      setValidationOpen(null);
+                      setValidationComment('');
+                      onRefresh();
+                    } catch { /* déjà notifié */ } finally { setIsSubmittingValidation(false); }
+                  }}
+                  disabled={isSubmittingValidation || !validationComment.trim()}
+                  className={validationOpen === 'refuse' ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-amber-600 hover:bg-amber-700 text-white'}
+                >
+                  {isSubmittingValidation ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  {validationOpen === 'refuse' ? 'Refuser' : 'Demander complément'}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </div>
       )}
 
       {/* Placeholder pour maintenir l'alignement quand aucun bouton n'est affiché */}

@@ -28,7 +28,8 @@ export type BETaskStatus =
   | 'a_deposer'
   | 'en_instruction'
   | 'complement_demande'
-  | 'cloturee';
+  | 'cloturee'
+  | 'refusee';
 
 export interface BEStatusMeta {
   value: BETaskStatus;
@@ -142,6 +143,16 @@ export const BE_STATUS_META: Record<BETaskStatus, BEStatusMeta> = {
     nextStatuses: [],
     icon: '🎉',
   },
+  refusee: {
+    value: 'refusee',
+    label: 'Refusée',
+    color: '#dc2626',
+    textColor: '#991b1b',
+    bgClass: 'bg-red-100 dark:bg-red-900/30',
+    textClass: 'text-red-700 dark:text-red-400',
+    nextStatuses: [],
+    icon: '⛔',
+  },
 };
 
 /** Liste ordonnée pour affichage */
@@ -155,6 +166,7 @@ export const BE_STATUS_LIST: BEStatusMeta[] = [
   BE_STATUS_META.en_instruction,
   BE_STATUS_META.complement_demande,
   BE_STATUS_META.cloturee,
+  BE_STATUS_META.refusee,
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -308,8 +320,139 @@ export function useBETaskStatus() {
     [mutation],
   );
 
+  /**
+   * Validation à 3 issues sur une étape en relecture ('a_relire') :
+   *   - 'validate'  → be_status='a_valider'  (l'étape suivante peut démarrer)
+   *   - 'complement'→ be_status='en_cours'   (renvoi à l'exécutant, commentaire obligatoire,
+   *                                            posté sur la conversation de la demande)
+   *   - 'refuse'    → be_status='refusee'    (clôture refusée terminale, commentaire obligatoire)
+   * Insère le commentaire sur la conversation de la demande (parent_request_id si présent,
+   * sinon la tâche elle-même) et notifie le bon destinataire (auth.users.id résolu depuis
+   * profile.id).
+   */
+  const submitValidationOutcome = useCallback(
+    async (params: {
+      taskId: string;
+      outcome: 'validate' | 'complement' | 'refuse';
+      comment?: string;
+      taskLabel: string;
+      projectCode?: string;
+      assigneeId?: string | null;     // profile.id de l'exécutant
+      requesterId?: string | null;    // profile.id du demandeur
+      parentRequestId?: string | null;
+    }): Promise<void> => {
+      const { taskId, outcome, comment, taskLabel, projectCode, assigneeId, requesterId, parentRequestId } = params;
+      const projectSuffix = projectCode ? ` — ${projectCode}` : '';
+      const needsComment = outcome !== 'validate';
+      const trimmed = (comment ?? '').trim();
+      if (needsComment && !trimmed) {
+        toast.error('Un commentaire est requis pour cette action');
+        throw new Error('comment required');
+      }
+
+      // 1) Calcul du nouveau be_status
+      const newStatus: BETaskStatus =
+        outcome === 'validate' ? 'a_valider' :
+        outcome === 'complement' ? 'en_cours' :
+        'refusee';
+
+      // 2) Update du statut (mise à jour des dates incluses via la mutation existante)
+      const { data: existing } = await sb
+        .from('tasks').select('be_status_dates').eq('id', taskId).single();
+      const currentDates = (existing?.be_status_dates as Record<string, string> | null) ?? {};
+      const updatedDates = { ...currentDates, [newStatus]: new Date().toISOString() };
+      const updatePayload: any = { be_status: newStatus, be_status_dates: updatedDates };
+      // En cas de refus : marquer aussi status='cancelled' pour sortir des files actives
+      if (outcome === 'refuse') updatePayload.status = 'cancelled';
+      const { error: upErr } = await sb.from('tasks').update(updatePayload).eq('id', taskId);
+      if (upErr) {
+        toast.error(upErr.message || 'Erreur de mise à jour');
+        throw upErr;
+      }
+
+      // 3) Pour complément/refus : poster le commentaire sur la conversation
+      //    (parent demande si dispo, sinon la tâche)
+      if (needsComment && trimmed) {
+        const conversationTaskId = parentRequestId || taskId;
+        // Auteur = profile id courant (via auth uid → profiles.id) ; récupéré côté DB par select
+        const { data: me } = await sb
+          .from('profiles')
+          .select('id').eq('user_id', user?.id ?? '').maybeSingle();
+        if (me?.id) {
+          const prefix = outcome === 'refuse' ? '⛔ Refus' : '↩️ Demande de complément';
+          await sb.from('task_comments').insert({
+            task_id: conversationTaskId,
+            author_id: me.id,
+            content: `${prefix} (${taskLabel}) — ${trimmed}`,
+          });
+        }
+      }
+
+      // 4) Notifications (résolution profile.id → auth user_id)
+      type Notif = { user_id: string; title: string; message: string; type: string; related_entity_type: string; related_entity_id: string };
+      const recipients: Array<{ profileId: string; type: string; title: string; message: string }> = [];
+      if (outcome === 'validate' && assigneeId) {
+        recipients.push({
+          profileId: assigneeId,
+          type: 'be_a_valider',
+          title: `Validé : ${taskLabel}`,
+          message: `Votre travail a été validé${projectSuffix}.`,
+        });
+      } else if (outcome === 'complement' && assigneeId) {
+        recipients.push({
+          profileId: assigneeId,
+          type: 'be_complement_demande',
+          title: `Complément demandé : ${taskLabel}`,
+          message: `Un complément vous est demandé${projectSuffix} : ${trimmed.slice(0, 120)}`,
+        });
+      } else if (outcome === 'refuse') {
+        if (assigneeId) recipients.push({
+          profileId: assigneeId, type: 'be_refusee',
+          title: `Refusée : ${taskLabel}`,
+          message: `Votre travail a été refusé${projectSuffix} : ${trimmed.slice(0, 120)}`,
+        });
+        if (requesterId && requesterId !== assigneeId) recipients.push({
+          profileId: requesterId, type: 'be_refusee',
+          title: `Refusée : ${taskLabel}`,
+          message: `Cette étape a été refusée${projectSuffix} : ${trimmed.slice(0, 120)}`,
+        });
+      }
+      if (recipients.length > 0) {
+        const profileIds = recipients.map(r => r.profileId);
+        const { data: prfs } = await sb
+          .from('profiles').select('id, user_id').in('id', profileIds);
+        const authByProfile = new Map<string, string>();
+        (prfs ?? []).forEach((p: any) => { if (p.user_id) authByProfile.set(p.id, p.user_id); });
+        const notifs: Notif[] = [];
+        for (const r of recipients) {
+          const uid = authByProfile.get(r.profileId);
+          if (uid && uid !== user?.id) {
+            notifs.push({
+              user_id: uid,
+              title: r.title, message: r.message, type: r.type,
+              related_entity_type: 'task', related_entity_id: taskId,
+            });
+          }
+        }
+        if (notifs.length > 0) await sb.from('notifications').insert(notifs);
+      }
+
+      // 5) Toast + invalidation
+      const label =
+        outcome === 'validate' ? 'Validée' :
+        outcome === 'complement' ? 'Complément demandé' :
+        'Refusée';
+      toast.success(label);
+      qc.invalidateQueries({ queryKey: ['tasks'] });
+      qc.invalidateQueries({ queryKey: ['be-dispatch-tasks'] });
+      qc.invalidateQueries({ queryKey: ['be-project-tasks'] });
+    },
+    [qc, user],
+  );
+
   return {
     updateBEStatus,
+    submitValidationOutcome,
     isUpdating: mutation.isPending,
   };
 }
