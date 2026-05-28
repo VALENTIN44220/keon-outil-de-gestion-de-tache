@@ -47,6 +47,8 @@ import {
   ArrowUp,
   X,
   Plus,
+  FolderTree,
+  Rows3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { BEAffaire, BEAffaireStatus } from '@/types/beAffaire';
@@ -108,6 +110,9 @@ export default function Projects() {
   // Sort
   const [sortBy, setSortBy] = useState<SortKey>('code');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
+
+  // Mode d'affichage : regroupé par projet, ou liste plate d'affaires
+  const [viewMode, setViewMode] = useState<'projet' | 'affaire'>('projet');
 
   const { projects, isLoading } = useBEProjects();
 
@@ -223,6 +228,37 @@ export default function Projects() {
     sortDir,
   ]);
 
+  const projectById = useMemo(() => {
+    const m = new Map<string, (typeof projects)[number]>();
+    for (const p of projects) m.set(p.id, p);
+    return m;
+  }, [projects]);
+
+  // Liste plate des affaires (mode "Affaires") : on part des projets déjà
+  // filtrés (statut projet + recherche), puis on applique les filtres statut
+  // d'affaire + activité au niveau de chaque affaire. Pas de regroupement.
+  const flatAffaires = useMemo(() => {
+    const visibleIds = new Set(filteredProjects.map((p) => p.id));
+    const rows = allAffaires.filter((a) => {
+      if (!visibleIds.has(a.be_project_id)) return false;
+      if (
+        filterAffaireStatus.size > 0 &&
+        !filterAffaireStatus.has(a.status as BEAffaireStatus)
+      )
+        return false;
+      if (filterActivite.size > 0) {
+        const act = activiteFromCode(a.code_affaire);
+        if (act === null || !filterActivite.has(act)) return false;
+      }
+      return true;
+    });
+    rows.sort((a, b) => {
+      const cmp = a.code_affaire.localeCompare(b.code_affaire);
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+    return rows;
+  }, [allAffaires, filteredProjects, filterAffaireStatus, filterActivite, sortDir]);
+
   const toggleExpand = (id: string) =>
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -285,7 +321,9 @@ export default function Projects() {
               </div>
               <h3 className="text-lg font-bold tracking-tight">Projets BE</h3>
               <Badge variant="secondary">
-                {filteredProjects.length}/{projects.length}
+                {viewMode === 'affaire'
+                  ? `${flatAffaires.length} affaire${flatAffaires.length !== 1 ? 's' : ''}`
+                  : `${filteredProjects.length}/${projects.length}`}
               </Badge>
               <Button
                 size="sm"
@@ -466,6 +504,36 @@ export default function Projects() {
                 </PopoverContent>
               </Popover>
 
+              {/* Vue : regroupé par projet / liste plate d'affaires */}
+              <div className="inline-flex rounded-md border overflow-hidden h-10">
+                <button
+                  onClick={() => setViewMode('projet')}
+                  className={cn(
+                    'flex items-center gap-1.5 px-2.5 text-xs transition-colors',
+                    viewMode === 'projet'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-transparent text-muted-foreground hover:text-foreground',
+                  )}
+                  title="Regrouper par projet"
+                >
+                  <FolderTree className="h-4 w-4" />
+                  <span className="hidden sm:inline">Projets</span>
+                </button>
+                <button
+                  onClick={() => setViewMode('affaire')}
+                  className={cn(
+                    'flex items-center gap-1.5 px-2.5 text-xs transition-colors border-l',
+                    viewMode === 'affaire'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-transparent text-muted-foreground hover:text-foreground',
+                  )}
+                  title="Liste des affaires (sans regroupement projet)"
+                >
+                  <Rows3 className="h-4 w-4" />
+                  <span className="hidden sm:inline">Affaires</span>
+                </button>
+              </div>
+
               {/* Sort */}
               <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortKey)}>
                 <SelectTrigger className="w-[160px] h-10">
@@ -544,6 +612,54 @@ export default function Projects() {
               <div className="flex items-center justify-center h-32">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
               </div>
+            ) : viewMode === 'affaire' ? (
+              flatAffaires.length === 0 ? (
+                <div className="py-10 text-center text-muted-foreground text-sm">
+                  Aucune affaire ne correspond aux filtres
+                </div>
+              ) : (
+                <div className="border rounded-lg divide-y bg-card overflow-hidden">
+                  {flatAffaires.map((affaire) => {
+                    const project = projectById.get(affaire.be_project_id);
+                    const sc = BE_AFFAIRE_STATUS_CONFIG[affaire.status as BEAffaireStatus];
+                    return (
+                      <button
+                        key={affaire.id}
+                        className="w-full text-left flex items-center gap-2 px-3 py-2 hover:bg-muted/20 transition-colors"
+                        onClick={() =>
+                          project &&
+                          navigate(
+                            `/be/projects/${project.code_projet}/budget/${affaire.code_affaire}`,
+                          )
+                        }
+                      >
+                        <span className="font-mono text-[11px] text-muted-foreground w-28 shrink-0">
+                          {affaire.code_affaire}
+                        </span>
+                        <span className="text-xs flex-1 truncate">
+                          {affaire.libelle ?? '—'}
+                        </span>
+                        <Badge
+                          variant="outline"
+                          className="font-mono text-[10px] px-1.5 shrink-0"
+                        >
+                          {project?.code_projet ?? '—'}
+                        </Badge>
+                        <span className="text-[11px] text-muted-foreground hidden md:inline truncate max-w-[180px]">
+                          {project?.nom_projet ?? ''}
+                        </span>
+                        <Badge
+                          variant="outline"
+                          className={cn('text-[10px] px-1.5 h-4 shrink-0 border', sc.className)}
+                        >
+                          {sc.label}
+                        </Badge>
+                        <ChevronRight className="h-3 w-3 text-muted-foreground/40 shrink-0" />
+                      </button>
+                    );
+                  })}
+                </div>
+              )
             ) : filteredProjects.length === 0 ? (
               <div className="py-10 text-center text-muted-foreground text-sm">
                 Aucun projet ne correspond aux filtres
