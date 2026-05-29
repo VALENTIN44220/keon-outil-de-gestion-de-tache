@@ -27,9 +27,11 @@ import { useLinkSupplierEntry, type SupplierAccountingEntry } from '@/hooks/useS
 const eur = (n: number | null | undefined) =>
   (n ?? 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
 
-// Écritures TTC vs budgets HT — estimation à TVA 20% par défaut
+// Écritures TTC vs budgets HT — estimation à TVA 20% par défaut.
+// On travaille en valeur absolue (le solde peut être ± selon sens débit/crédit).
 const TVA_STD = 0.20;
-const htEstime = (ttc: number | null | undefined): number => (ttc ?? 0) / (1 + TVA_STD);
+const abs = (n: number | null | undefined): number => Math.abs(n ?? 0);
+const htEstime = (ttc: number | null | undefined): number => abs(ttc) / (1 + TVA_STD);
 
 interface Props {
   entry: SupplierAccountingEntry | null;
@@ -112,7 +114,7 @@ export function SupplierEntryLinkDialog({ entry, annee, entite, open, onOpenChan
               <div className="flex items-baseline gap-3 text-right">
                 <div>
                   <div className="text-[9px] uppercase text-muted-foreground leading-none">TTC</div>
-                  <div className="font-semibold tabular-nums">{eur(entry.solde)}</div>
+                  <div className="font-semibold tabular-nums">{eur(abs(entry.solde))}</div>
                 </div>
                 <div>
                   <div className="text-[9px] uppercase text-muted-foreground leading-none">HT est. (20%)</div>

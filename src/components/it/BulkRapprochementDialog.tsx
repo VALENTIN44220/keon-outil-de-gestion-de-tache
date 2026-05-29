@@ -537,7 +537,8 @@ export function BulkRapprochementDialog({
                   <div className="py-6 text-center text-xs text-muted-foreground">Aucune écriture</div>
                 ) : (
                   ecritures.map((e) => {
-                    const htEst = (e.solde ?? 0) / (1 + TVA_RATE);
+                    const soldeAbs = Math.abs(e.solde ?? 0);
+                    const htEst = soldeAbs / (1 + TVA_RATE);
                     const isSelected = selectedEcritureKeys.has(e.entry_key);
                     return (
                       <div
@@ -575,7 +576,7 @@ export function BulkRapprochementDialog({
                           </span>
                         </div>
                         <div className="text-right shrink-0 ml-4">
-                          <div className="tabular-nums font-semibold">{eur(e.solde)}<span className="text-[10px] text-muted-foreground ml-0.5">TTC</span></div>
+                          <div className="tabular-nums font-semibold">{eur(soldeAbs)}<span className="text-[10px] text-muted-foreground ml-0.5">TTC</span></div>
                           <div className="text-[10px] tabular-nums text-violet-700">≈ {eur(htEst)} HT</div>
                         </div>
                       </div>

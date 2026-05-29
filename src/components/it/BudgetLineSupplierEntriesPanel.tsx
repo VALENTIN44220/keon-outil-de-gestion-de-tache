@@ -31,7 +31,12 @@ const eur = (n: number | null | undefined) =>
   (n ?? 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
 
 const TVA_STD = 0.20;
-const htEstime = (ttc: number | null | undefined): number => (ttc ?? 0) / (1 + TVA_STD);
+// Convention : on travaille en valeur absolue côté UI rattachement budget.
+// Les écritures peuvent avoir un solde signé (sens=1 débit / sens=2 crédit)
+// selon qu'il s'agit d'un paiement ou d'une facturation. Pour le canon
+// "dépense constatée", ce qui compte est le montant absolu.
+const abs = (n: number | null | undefined): number => Math.abs(n ?? 0);
+const htEstime = (ttc: number | null | undefined): number => abs(ttc) / (1 + TVA_STD);
 
 interface Props {
   budgetLineId: string | null;
@@ -70,12 +75,12 @@ export function BudgetLineSupplierEntriesPanel({ budgetLineId, fournisseurPrevu 
     return new Set(liens.map((l: any) => l.supplier_entry_key));
   }, [liens]);
 
-  // Totaux consommation
+  // Totaux consommation — somme des valeurs absolues (cf. abs helper)
   const totals = useMemo(() => {
     let ttc = 0;
     for (const l of liens as any[]) {
       const ent = l.supplier_accounting_entries;
-      ttc += Number(ent?.solde ?? 0);
+      ttc += abs(ent?.solde);
     }
     return { ttc, ht: htEstime(ttc) };
   }, [liens]);
@@ -210,7 +215,7 @@ export function BudgetLineSupplierEntriesPanel({ budgetLineId, fournisseurPrevu 
                   </div>
                   <div className="text-right shrink-0">
                     <div className="text-[10px] text-muted-foreground tabular-nums">
-                      TTC {eur(ent.solde)}
+                      TTC {eur(abs(ent.solde))}
                     </div>
                     <div className="text-[10px] tabular-nums text-violet-700 font-medium">
                       HT est. {eur(htEstime(ent.solde))}
@@ -337,7 +342,7 @@ export function BudgetLineSupplierEntriesPanel({ budgetLineId, fournisseurPrevu 
                     </div>
                     <div className="text-right shrink-0">
                       <div className="text-[10px] text-muted-foreground tabular-nums">
-                        {eur(e.solde)} TTC
+                        {eur(abs(e.solde))} TTC
                       </div>
                       <div className="text-[10px] tabular-nums text-violet-700">
                         ≈ {eur(htEstime(e.solde))} HT

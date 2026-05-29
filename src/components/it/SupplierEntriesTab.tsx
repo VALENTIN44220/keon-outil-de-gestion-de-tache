@@ -62,7 +62,8 @@ const eur = (n: number | null | undefined) =>
  * de l'écriture côté Fabric quand on le voudra.
  */
 const TVA_STD = 0.20;
-const htEstime = (ttc: number | null | undefined): number => (ttc ?? 0) / (1 + TVA_STD);
+const abs = (n: number | null | undefined): number => Math.abs(n ?? 0);
+const htEstime = (ttc: number | null | undefined): number => abs(ttc) / (1 + TVA_STD);
 
 const STATUS_LABEL: Record<string, { label: string; className: string }> = {
   pending:   { label: 'À traiter', className: 'bg-slate-100 text-slate-700 border-slate-300' },
@@ -358,16 +359,21 @@ export function SupplierEntriesTab({ annee, entite }: Props) {
                             {e.libelle_ecriture ?? '—'}
                           </span>
                         </TableCell>
-                        <TableCell className={cn(
-                          'text-xs text-right tabular-nums font-semibold',
-                          (e.solde ?? 0) < 0 && 'text-red-600',
-                          (e.solde ?? 0) > 0 && 'text-foreground',
-                        )}>
-                          {eur(e.solde)}
+                        <TableCell
+                          className="text-xs text-right tabular-nums font-semibold"
+                          title={
+                            e.sens === 2
+                              ? `Crédit sur compte F (facturation) — sens=2`
+                              : e.sens === 1
+                              ? `Débit sur compte F (paiement) — sens=1`
+                              : undefined
+                          }
+                        >
+                          {eur(abs(e.solde))}
                         </TableCell>
                         <TableCell
                           className="text-xs text-right tabular-nums text-muted-foreground"
-                          title="HT estimé à TVA 20%"
+                          title="HT estimé à TVA 20% (valeur absolue)"
                         >
                           {eur(htEstime(e.solde))}
                         </TableCell>
