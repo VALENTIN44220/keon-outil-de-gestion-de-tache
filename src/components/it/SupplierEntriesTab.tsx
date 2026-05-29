@@ -68,7 +68,7 @@ export function SupplierEntriesTab({ annee, entite }: Props) {
   // ── Filters ─────────────────────────────────────────────────────────
   const [search, setSearch] = useState('');
   const [hasGescom, setHasGescom] = useState<'no' | 'yes' | 'all'>('no'); // défaut : sans Gescom
-  const [dos, setDos] = useState<string>('');
+  const [dos, setDos] = useState<string>('100'); // défaut : DOS 100 (KEON)
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
   const [statusUser, setStatusUser] = useState<string>('');
@@ -133,7 +133,7 @@ export function SupplierEntriesTab({ annee, entite }: Props) {
   const resetFilters = () => {
     setSearch('');
     setHasGescom('no');
-    setDos('');
+    setDos('100'); // reset = retour au défaut DOS 100
     setDateFrom('');
     setDateTo('');
     setStatusUser('');
@@ -145,7 +145,7 @@ export function SupplierEntriesTab({ annee, entite }: Props) {
   const hasActiveFilter =
     !!search ||
     hasGescom !== 'no' ||
-    !!dos ||
+    dos !== '100' ||
     !!dateFrom ||
     !!dateTo ||
     !!statusUser ||

@@ -217,20 +217,15 @@ export function useUpdateSupplierEntryStatus() {
   });
 }
 
-/** Liste distincte des DOS pour le filtre (cached longtemps). */
+/** Liste distincte des DOS pour le filtre (via RPC, sinon PostgREST tronque à 1000 lignes). */
 export function useSupplierEntryDosList() {
   return useQuery({
     queryKey: ['supplier-entries-dos-list'],
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
-      const { data, error } = await sb
-        .from('supplier_accounting_entries')
-        .select('dos')
-        .order('dos');
+      const { data, error } = await sb.rpc('supplier_entries_dos_list');
       if (error) throw error;
-      const set = new Set<string>();
-      for (const r of (data ?? []) as { dos: string }[]) set.add(r.dos);
-      return Array.from(set).sort();
+      return ((data ?? []) as string[]).filter(Boolean).sort();
     },
   });
 }
