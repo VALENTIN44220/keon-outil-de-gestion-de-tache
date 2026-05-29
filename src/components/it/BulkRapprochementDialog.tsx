@@ -5,6 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Link as LinkIcon } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -140,6 +142,7 @@ export function BulkRapprochementDialog({
   const [commandes, setCommandes] = useState<DivaltoCommande[]>([]);
   const [factures, setFactures] = useState<DivaltoFactureGrouped[]>([]);
   const [ecritures, setEcritures] = useState<SupplierEntryLite[]>([]);
+  const [selectedEcritureKeys, setSelectedEcritureKeys] = useState<Set<string>>(new Set());
   const [applying, setApplying] = useState(false);
 
   const count = selectedIds.length;
@@ -244,12 +247,18 @@ export function BulkRapprochementDialog({
       setCommandes([]);
       setFactures([]);
       setEcritures([]);
+      setSelectedEcritureKeys(new Set());
       return;
     }
     if (tab === 'commande') searchCommandes('');
     else if (tab === 'facture') searchFactures('');
     else searchEcritures('');
   }, [open, tab, searchCommandes, searchFactures, searchEcritures]);
+
+  // Reset sélection écritures quand on change de tab ou de recherche
+  useEffect(() => {
+    setSelectedEcritureKeys(new Set());
+  }, [tab, query]);
 
   useEffect(() => {
     if (!open) return;
@@ -283,22 +292,24 @@ export function BulkRapprochementDialog({
     }
   };
 
-  const applyEcriture = async (entry: SupplierEntryLite) => {
-    if (selectedIds.length === 0) return;
+  const applyEcrituresBulk = async (entryKeys: string[]) => {
+    if (selectedIds.length === 0 || entryKeys.length === 0) return;
     setApplying(true);
     try {
-      const rows = selectedIds.map((id) => ({
-        budget_line_id: id,
-        supplier_entry_key: entry.entry_key,
-        linked_by: user?.id ?? null,
-      }));
+      // N écritures × M lignes = N×M rows à insérer
+      const rows: { budget_line_id: string; supplier_entry_key: string; linked_by: string | null }[] = [];
+      for (const id of selectedIds) {
+        for (const key of entryKeys) {
+          rows.push({ budget_line_id: id, supplier_entry_key: key, linked_by: user?.id ?? null });
+        }
+      }
       const { error } = await (supabase as any)
         .from('it_budget_line_supplier_entries')
         .upsert(rows, { onConflict: 'budget_line_id,supplier_entry_key', ignoreDuplicates: true });
       if (error) throw error;
       toast({
-        title: 'Écriture rattachée',
-        description: `${selectedIds.length} ligne(s) liée(s) à ${entry.dos}/${entry.journal}/${entry.numero}`,
+        title: 'Écritures rattachées',
+        description: `${entryKeys.length} écriture(s) × ${selectedIds.length} ligne(s) = ${rows.length} liaison(s).`,
       });
       onSuccess?.();
       onOpenChange(false);
@@ -307,6 +318,22 @@ export function BulkRapprochementDialog({
     } finally {
       setApplying(false);
     }
+  };
+
+  const toggleEcritureSelect = (key: string) => {
+    setSelectedEcritureKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  const toggleSelectAllEcritures = () => {
+    const allKeys = ecritures.map((e) => e.entry_key);
+    const allSelected = allKeys.length > 0 && allKeys.every((k) => selectedEcritureKeys.has(k));
+    if (allSelected) setSelectedEcritureKeys(new Set());
+    else setSelectedEcritureKeys(new Set(allKeys));
   };
 
   const applyFacture = async (reference: string) => {
@@ -475,7 +502,31 @@ export function BulkRapprochementDialog({
             </TooltipProvider>
           </TabsContent>
 
-          <TabsContent value="ecriture" className="mt-3">
+          <TabsContent value="ecriture" className="mt-3 space-y-2">
+            {/* Barre d'action bulk : cocher N écritures puis 1 clic */}
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={toggleSelectAllEcritures}
+                disabled={ecritures.length === 0}
+                className="text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-40"
+              >
+                Tout cocher / décocher ({ecritures.length})
+              </button>
+              <Button
+                size="sm"
+                className="h-7 px-2.5 text-[11px] gap-1.5"
+                disabled={selectedEcritureKeys.size === 0 || applying}
+                onClick={() => applyEcrituresBulk([...selectedEcritureKeys])}
+              >
+                {applying ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <LinkIcon className="h-3 w-3" />
+                )}
+                Rattacher {selectedEcritureKeys.size} écriture(s) × {count} ligne(s)
+              </Button>
+            </div>
             <ScrollArea className="h-[320px] rounded-md border">
               <div className="p-1">
                 {searching ? (
@@ -487,15 +538,25 @@ export function BulkRapprochementDialog({
                 ) : (
                   ecritures.map((e) => {
                     const htEst = (e.solde ?? 0) / (1 + TVA_RATE);
+                    const isSelected = selectedEcritureKeys.has(e.entry_key);
                     return (
                       <div
                         key={e.entry_key}
-                        onClick={() => !applying && applyEcriture(e)}
+                        onClick={() => !applying && toggleEcritureSelect(e.entry_key)}
                         className={cn(
-                          'flex items-center justify-between rounded-sm px-2 py-2 text-sm',
-                          applying ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-accent',
+                          'flex items-center gap-2 rounded-sm px-2 py-2 text-sm',
+                          applying
+                            ? 'opacity-40 cursor-not-allowed'
+                            : 'cursor-pointer hover:bg-accent',
+                          isSelected && 'bg-primary/10 hover:bg-primary/15',
                         )}
                       >
+                        <Checkbox
+                          className="h-3.5 w-3.5 shrink-0"
+                          checked={isSelected}
+                          onCheckedChange={() => toggleEcritureSelect(e.entry_key)}
+                          onClick={(ev) => ev.stopPropagation()}
+                        />
                         <div className="flex flex-col min-w-0 flex-1">
                           <div className="flex items-center gap-1.5">
                             <Badge variant="outline" className="font-mono text-[10px] px-1 h-4">{e.dos}</Badge>
