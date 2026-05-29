@@ -227,6 +227,30 @@ export function useUnlinkSupplierEntry() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['supplier-entry-links'] });
       qc.invalidateQueries({ queryKey: ['it-budget-line-supplier-entries'] });
+      qc.invalidateQueries({ queryKey: ['supplier-entries-links-audit'] });
+      qc.invalidateQueries({ queryKey: ['it-budget-line-supplier-entries-agg'] });
+    },
+  });
+}
+
+/** Détache plusieurs liens en 1 requête (par exemple tout un groupement). */
+export function useUnlinkSupplierEntries() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (linkIds: string[]) => {
+      if (linkIds.length === 0) return { deleted: 0 };
+      const { error } = await sb
+        .from('it_budget_line_supplier_entries')
+        .delete()
+        .in('id', linkIds);
+      if (error) throw error;
+      return { deleted: linkIds.length };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['supplier-entry-links'] });
+      qc.invalidateQueries({ queryKey: ['it-budget-line-supplier-entries'] });
+      qc.invalidateQueries({ queryKey: ['supplier-entries-links-audit'] });
+      qc.invalidateQueries({ queryKey: ['it-budget-line-supplier-entries-agg'] });
     },
   });
 }
@@ -277,6 +301,17 @@ export interface ITBudgetLineSupplierEntryAgg {
   nb_supplier_entries: number;
 }
 
+export interface SupplierEntryLinkDetail {
+  link_id: string;
+  budget_line_id: string;
+  group_id: string | null;
+  group_name: string | null;
+  description: string | null;
+  categorie: string | null;
+  sous_categorie: string | null;
+  fournisseur_prevu: string | null;
+}
+
 export interface SupplierEntryLinkAudit {
   entry_key: string;
   dos: string;
@@ -290,7 +325,7 @@ export interface SupplierEntryLinkAudit {
   montant_abs_ttc: number;
   montant_abs_ht: number;
   nb_links: number;
-  budget_line_ids: string[];
+  links_detail: SupplierEntryLinkDetail[];
 }
 
 /** Vue d'audit : écritures rattachées avec leur nb_links (pour détecter les doublons). */
