@@ -27,6 +27,10 @@ import { useLinkSupplierEntry, type SupplierAccountingEntry } from '@/hooks/useS
 const eur = (n: number | null | undefined) =>
   (n ?? 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
 
+// Écritures TTC vs budgets HT — estimation à TVA 20% par défaut
+const TVA_STD = 0.20;
+const htEstime = (ttc: number | null | undefined): number => (ttc ?? 0) / (1 + TVA_STD);
+
 interface Props {
   entry: SupplierAccountingEntry | null;
   annee: number;
@@ -101,15 +105,27 @@ export function SupplierEntryLinkDialog({ entry, annee, entite, open, onOpenChan
 
         {entry && (
           <div className="border rounded-md p-3 bg-muted/40 text-xs space-y-1">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3">
               <span className="font-mono text-[11px] text-muted-foreground">
                 {entry.dos} · {entry.journal} · {entry.numero}
               </span>
-              <span className="font-semibold tabular-nums">{eur(entry.solde)}</span>
+              <div className="flex items-baseline gap-3 text-right">
+                <div>
+                  <div className="text-[9px] uppercase text-muted-foreground leading-none">TTC</div>
+                  <div className="font-semibold tabular-nums">{eur(entry.solde)}</div>
+                </div>
+                <div>
+                  <div className="text-[9px] uppercase text-muted-foreground leading-none">HT est. (20%)</div>
+                  <div className="font-semibold tabular-nums text-violet-700">{eur(htEstime(entry.solde))}</div>
+                </div>
+              </div>
             </div>
             <div className="font-medium truncate">
               {entry.supplier_name ?? entry.supplier_code ?? '—'}
               <span className="text-muted-foreground font-normal"> — {entry.libelle_ecriture ?? ''}</span>
+            </div>
+            <div className="text-[10px] text-amber-700 pt-1">
+              ⚠️ Le budget IT est en HT. Compare le <b>HT estimé</b> au <b>montant budgété</b> de la ligne sélectionnée ci-dessous.
             </div>
           </div>
         )}

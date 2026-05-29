@@ -52,6 +52,16 @@ import { SupplierEntryLinkDialog } from './SupplierEntryLinkDialog';
 const eur = (n: number | null | undefined) =>
   (n ?? 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
 
+/**
+ * Les écritures comptables F* sont stockées en TTC dans Divalto, alors que
+ * les it_budget_lines sont en HT. Pour comparer/rattacher proprement, on
+ * affiche un HT estimé à 20% (TVA standard FR). Approximation : ne couvre
+ * pas les taux 10% / 5,5% / 2,1% / exempté. À raffiner via la ligne TVA
+ * de l'écriture côté Fabric quand on le voudra.
+ */
+const TVA_STD = 0.20;
+const htEstime = (ttc: number | null | undefined): number => (ttc ?? 0) / (1 + TVA_STD);
+
 const STATUS_LABEL: Record<string, { label: string; className: string }> = {
   pending:   { label: 'À traiter', className: 'bg-slate-100 text-slate-700 border-slate-300' },
   validated: { label: 'Validé',    className: 'bg-green-100 text-green-800 border-green-300' },
@@ -166,6 +176,11 @@ export function SupplierEntriesTab({ annee, entite }: Props) {
             à-nouveau). Par défaut, on affiche celles SANS pièce Gescom — à rattacher manuellement
             à une ligne du budget IT.
           </p>
+          <p className="text-[11px] text-amber-700 mt-1">
+            ⚠️ Les écritures sont en <b>TTC</b>, les lignes budgétaires en <b>HT</b>.
+            L'<b>HT estimé</b> ci-dessous est calculé à TVA 20 % par défaut (taux standard FR) —
+            approximatif pour les taux 10 / 5,5 / 2,1 / exempté.
+          </p>
         </div>
       </div>
 
@@ -276,7 +291,10 @@ export function SupplierEntriesTab({ annee, entite }: Props) {
                     <TableHead className="text-xs">Journal</TableHead>
                     <TableHead className="text-xs">Fournisseur</TableHead>
                     <TableHead className="text-xs">Libellé</TableHead>
-                    <TableHead className="text-xs text-right">Solde</TableHead>
+                    <TableHead className="text-xs text-right whitespace-nowrap">Solde TTC</TableHead>
+                    <TableHead className="text-xs text-right whitespace-nowrap" title="HT estimé à TVA 20% (taux standard FR)">
+                      HT est.
+                    </TableHead>
                     <TableHead className="text-xs">Statut</TableHead>
                     <TableHead className="text-xs">Liens</TableHead>
                     <TableHead className="w-20" />
@@ -316,6 +334,12 @@ export function SupplierEntriesTab({ annee, entite }: Props) {
                           (e.solde ?? 0) > 0 && 'text-foreground',
                         )}>
                           {eur(e.solde)}
+                        </TableCell>
+                        <TableCell
+                          className="text-xs text-right tabular-nums text-muted-foreground"
+                          title="HT estimé à TVA 20%"
+                        >
+                          {eur(htEstime(e.solde))}
                         </TableCell>
                         <TableCell className="text-xs">
                           <Badge variant="outline" className={cn('text-[10px] h-4 px-1.5 border', sc.className)}>
