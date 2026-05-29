@@ -44,9 +44,11 @@ import {
   useSupplierEntryLinks,
   useUnlinkSupplierEntry,
   useSupplierEntryDosList,
+  useSupplierEntryVendorList,
   type SupplierAccountingEntry,
   type SupplierEntryFilters,
 } from '@/hooks/useSupplierAccountingEntries';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { SupplierEntryLinkDialog } from './SupplierEntryLinkDialog';
 
 const eur = (n: number | null | undefined) =>
@@ -84,6 +86,7 @@ export function SupplierEntriesTab({ annee, entite }: Props) {
   const [statusUser, setStatusUser] = useState<string>('');
   const [amountMin, setAmountMin] = useState<string>('');
   const [amountMax, setAmountMax] = useState<string>('');
+  const [supplierCode, setSupplierCode] = useState<string>('');
   const [page, setPage] = useState(0);
   const pageSize = 50;
 
@@ -93,14 +96,15 @@ export function SupplierEntriesTab({ annee, entite }: Props) {
     if (dos) f.dos = dos;
     if (dateFrom) f.date_from = dateFrom;
     if (dateTo) f.date_to = dateTo;
-    if (search.trim()) f.supplier_search = search.trim();
+    if (supplierCode) f.supplier_code = supplierCode;
+    else if (search.trim()) f.supplier_search = search.trim();
     if (statusUser) f.status_user = statusUser as any;
     const min = parseFloat(amountMin.replace(',', '.'));
     if (!isNaN(min)) f.amount_min = min;
     const max = parseFloat(amountMax.replace(',', '.'));
     if (!isNaN(max)) f.amount_max = max;
     return f;
-  }, [page, hasGescom, dos, dateFrom, dateTo, search, statusUser, amountMin, amountMax]);
+  }, [page, hasGescom, dos, dateFrom, dateTo, search, supplierCode, statusUser, amountMin, amountMax]);
 
   const { data: result, isLoading } = useSupplierAccountingEntries(filters);
   const entries = result?.data ?? [];
@@ -120,6 +124,19 @@ export function SupplierEntriesTab({ annee, entite }: Props) {
   }, [links]);
 
   const { data: dosList = [] } = useSupplierEntryDosList();
+  const { data: vendorList = [] } = useSupplierEntryVendorList();
+  const vendorOptions = useMemo(
+    () => [
+      { value: '__all__', label: 'Tous les fournisseurs' },
+      ...vendorList.map((v) => ({
+        value: v.supplier_code,
+        label: v.supplier_name
+          ? `${v.supplier_code} — ${v.supplier_name} (${v.nb})`
+          : `${v.supplier_code} (${v.nb})`,
+      })),
+    ],
+    [vendorList],
+  );
   const unlinkMutation = useUnlinkSupplierEntry();
 
   // ── Dialog rattachement ─────────────────────────────────────────────
@@ -149,6 +166,7 @@ export function SupplierEntriesTab({ annee, entite }: Props) {
     setStatusUser('');
     setAmountMin('');
     setAmountMax('');
+    setSupplierCode('');
     setPage(0);
   };
 
@@ -160,7 +178,8 @@ export function SupplierEntriesTab({ annee, entite }: Props) {
     !!dateTo ||
     !!statusUser ||
     !!amountMin ||
-    !!amountMax;
+    !!amountMax ||
+    !!supplierCode;
 
   return (
     <div className="space-y-4">
@@ -243,6 +262,17 @@ export function SupplierEntriesTab({ annee, entite }: Props) {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5">
+              <Label className="text-[11px] text-muted-foreground whitespace-nowrap">Fournisseur</Label>
+              <SearchableSelect
+                value={supplierCode || '__all__'}
+                onValueChange={(v) => { setSupplierCode(v === '__all__' ? '' : v); setPage(0); }}
+                options={vendorOptions}
+                placeholder="Tous"
+                searchPlaceholder="Code ou nom…"
+                triggerClassName="h-8 text-xs w-[240px]"
+              />
+            </div>
             <div className="flex items-center gap-1.5">
               <Label className="text-[11px] text-muted-foreground">Du</Label>
               <Input type="date" className="h-8 w-[140px] text-xs"

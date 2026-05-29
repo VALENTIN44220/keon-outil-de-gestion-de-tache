@@ -57,7 +57,10 @@ export interface SupplierEntryFilters {
   dos?: string;
   date_from?: string;
   date_to?: string;
+  /** Fuzzy : matche supplier_name / supplier_code / libelle_ecriture. */
   supplier_search?: string;
+  /** Strict : matche exactement supplier_code. Prioritaire sur supplier_search si défini. */
+  supplier_code?: string;
   amount_min?: number;
   amount_max?: number;
   status_user?: SupplierEntryStatus | '';
@@ -85,7 +88,9 @@ export function useSupplierAccountingEntries(filters: SupplierEntryFilters) {
       if (filters.dos) q = q.eq('dos', filters.dos);
       if (filters.date_from) q = q.gte('date', filters.date_from);
       if (filters.date_to) q = q.lte('date', filters.date_to);
-      if (filters.supplier_search) {
+      if (filters.supplier_code) {
+        q = q.eq('supplier_code', filters.supplier_code);
+      } else if (filters.supplier_search) {
         const s = filters.supplier_search.replace(/[%]/g, '');
         q = q.or(
           `supplier_name.ilike.%${s}%,supplier_code.ilike.%${s}%,libelle_ecriture.ilike.%${s}%`,
@@ -179,6 +184,35 @@ export function useLinkSupplierEntry() {
   });
 }
 
+/** Rattache plusieurs écritures à une ligne budgétaire en 1 insert. */
+export function useLinkSupplierEntries() {
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  return useMutation({
+    mutationFn: async (input: { budgetLineId: string; entryKeys: string[]; note?: string }) => {
+      if (input.entryKeys.length === 0) return { inserted: 0 };
+      const rows = input.entryKeys.map((k) => ({
+        budget_line_id: input.budgetLineId,
+        supplier_entry_key: k,
+        linked_by: user?.id ?? null,
+        note: input.note ?? null,
+      }));
+      const { error } = await sb
+        .from('it_budget_line_supplier_entries')
+        .upsert(rows, {
+          onConflict: 'budget_line_id,supplier_entry_key',
+          ignoreDuplicates: true,
+        });
+      if (error) throw error;
+      return { inserted: rows.length };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['supplier-entry-links'] });
+      qc.invalidateQueries({ queryKey: ['it-budget-line-supplier-entries'] });
+    },
+  });
+}
+
 /** Détache une écriture (suppression du lien). */
 export function useUnlinkSupplierEntry() {
   const qc = useQueryClient();
@@ -213,6 +247,25 @@ export function useUpdateSupplierEntryStatus() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['supplier-accounting-entries'] });
+    },
+  });
+}
+
+export interface SupplierEntryVendor {
+  supplier_code: string;
+  supplier_name: string | null;
+  nb: number;
+}
+
+/** Liste distincte des fournisseurs (via RPC). */
+export function useSupplierEntryVendorList() {
+  return useQuery({
+    queryKey: ['supplier-entries-vendor-list'],
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await sb.rpc('supplier_entries_supplier_list');
+      if (error) throw error;
+      return (data ?? []) as SupplierEntryVendor[];
     },
   });
 }

@@ -8,19 +8,21 @@
  * total HT estimé utilise TVA 20% (taux standard FR) — cohérent avec le
  * tab global Écritures fournisseurs.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Link as LinkIcon, Unlink, Search } from 'lucide-react';
+import { Loader2, Link as LinkIcon, Unlink, Search, CheckSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { extractErrorMessage } from '@/lib/extractErrorMessage';
 import {
   useITBudgetLineSupplierEntries,
   useLinkSupplierEntry,
+  useLinkSupplierEntries,
   useUnlinkSupplierEntry,
   useSupplierAccountingEntries,
 } from '@/hooks/useSupplierAccountingEntries';
@@ -38,18 +40,30 @@ interface Props {
 
 export function BudgetLineSupplierEntriesPanel({ budgetLineId, fournisseurPrevu }: Props) {
   const [search, setSearch] = useState(fournisseurPrevu ?? '');
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const { data: liens = [], isLoading: liensLoading } = useITBudgetLineSupplierEntries(budgetLineId);
   const linkMut = useLinkSupplierEntry();
+  const linkManyMut = useLinkSupplierEntries();
   const unlinkMut = useUnlinkSupplierEntry();
 
   // Suggestions : écritures du même fournisseur (ou recherche libre), sans Gescom par défaut.
+  // Si la recherche est exactement le code fournisseur de la ligne, on filtre STRICT
+  // sur supplier_code (plus précis que la recherche fuzzy multi-colonnes).
+  const searchTrim = search.trim();
+  const useStrict = !!fournisseurPrevu && searchTrim.toUpperCase() === fournisseurPrevu.toUpperCase();
   const { data: searchResult, isFetching: searching } = useSupplierAccountingEntries({
     has_gescom_piece: false,
-    supplier_search: search.trim() || undefined,
+    supplier_code: useStrict ? fournisseurPrevu! : undefined,
+    supplier_search: useStrict ? undefined : searchTrim || undefined,
     page: 0,
-    page_size: 30,
+    page_size: 50,
   });
   const candidates = searchResult?.data ?? [];
+
+  // Reset selection quand la recherche change ou budget line change
+  useEffect(() => {
+    setSelectedKeys(new Set());
+  }, [search, budgetLineId]);
 
   // Set des entry_keys déjà rattachées (pour griser dans la liste de suggestions)
   const alreadyLinked = useMemo(() => {
@@ -80,6 +94,48 @@ export function BudgetLineSupplierEntriesPanel({ budgetLineId, fournisseurPrevu 
       toast({ title: 'Écriture rattachée' });
     } catch (e) {
       toast({ title: 'Erreur', description: extractErrorMessage(e), variant: 'destructive' });
+    }
+  };
+
+  const handleLinkBulk = async () => {
+    const keys = [...selectedKeys].filter((k) => !alreadyLinked.has(k));
+    if (keys.length === 0) return;
+    try {
+      const res = await linkManyMut.mutateAsync({ budgetLineId, entryKeys: keys });
+      toast({ title: `${res.inserted} écriture(s) rattachée(s)` });
+      setSelectedKeys(new Set());
+    } catch (e) {
+      toast({ title: 'Erreur', description: extractErrorMessage(e), variant: 'destructive' });
+    }
+  };
+
+  const toggleSelect = (entryKey: string) => {
+    setSelectedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(entryKey)) next.delete(entryKey);
+      else next.add(entryKey);
+      return next;
+    });
+  };
+
+  const selectAllVisible = () => {
+    const eligible = candidates
+      .filter((c) => !alreadyLinked.has(c.entry_key))
+      .map((c) => c.entry_key);
+    const allSelected = eligible.length > 0 && eligible.every((k) => selectedKeys.has(k));
+    if (allSelected) {
+      // Désélectionne celles affichées
+      setSelectedKeys((prev) => {
+        const next = new Set(prev);
+        for (const k of eligible) next.delete(k);
+        return next;
+      });
+    } else {
+      setSelectedKeys((prev) => {
+        const next = new Set(prev);
+        for (const k of eligible) next.add(k);
+        return next;
+      });
     }
   };
 
@@ -179,13 +235,45 @@ export function BudgetLineSupplierEntriesPanel({ budgetLineId, fournisseurPrevu 
 
       {/* Section : Recherche / rattachement */}
       <div className="space-y-2">
-        <h4 className="text-xs font-semibold uppercase text-muted-foreground">
-          Rattacher une écriture comptable
-        </h4>
+        <div className="flex items-center justify-between">
+          <h4 className="text-xs font-semibold uppercase text-muted-foreground">
+            Rattacher des écritures comptables
+          </h4>
+          {selectedKeys.size > 0 && (
+            <Button
+              size="sm"
+              className="h-7 px-2 text-[11px] gap-1"
+              onClick={handleLinkBulk}
+              disabled={linkManyMut.isPending}
+            >
+              {linkManyMut.isPending ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <LinkIcon className="h-3 w-3" />
+              )}
+              Rattacher la sélection ({selectedKeys.size})
+            </Button>
+          )}
+        </div>
         <div className="space-y-1.5">
-          <Label className="text-[11px] text-muted-foreground">
-            Recherche (fournisseur, code, libellé) — pré-rempli avec le fournisseur de la ligne
-          </Label>
+          <div className="flex items-center justify-between gap-2">
+            <Label className="text-[11px] text-muted-foreground">
+              Recherche (fournisseur, code, libellé){' '}
+              {useStrict && (
+                <span className="text-emerald-700 font-medium">— filtre strict supplier_code</span>
+              )}
+            </Label>
+            {candidates.length > 0 && (
+              <button
+                type="button"
+                onClick={selectAllVisible}
+                className="text-[10px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+              >
+                <CheckSquare className="h-3 w-3" />
+                Tout cocher / décocher
+              </button>
+            )}
+          </div>
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
@@ -211,14 +299,25 @@ export function BudgetLineSupplierEntriesPanel({ budgetLineId, fournisseurPrevu 
             <div className="divide-y">
               {candidates.map((e) => {
                 const isLinked = alreadyLinked.has(e.entry_key);
+                const isSelected = selectedKeys.has(e.entry_key);
                 return (
                   <div
                     key={e.entry_key}
                     className={cn(
                       'px-2.5 py-1.5 flex items-center gap-2 text-xs',
-                      isLinked ? 'bg-emerald-50/30' : 'hover:bg-muted/30',
+                      isLinked
+                        ? 'bg-emerald-50/30'
+                        : isSelected
+                        ? 'bg-primary/10'
+                        : 'hover:bg-muted/30',
                     )}
                   >
+                    <Checkbox
+                      className="h-3.5 w-3.5 shrink-0"
+                      checked={isSelected}
+                      disabled={isLinked}
+                      onCheckedChange={() => toggleSelect(e.entry_key)}
+                    />
                     <Badge variant="outline" className="font-mono text-[10px] px-1 h-4 shrink-0">
                       {e.dos}
                     </Badge>
