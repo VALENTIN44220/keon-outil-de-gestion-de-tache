@@ -9,9 +9,13 @@
  * (La vue budget est disponible dans /be/budget)
  */
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useBEProjectsFilterPresets,
+  type BEProjectsFiltersPayload,
+} from '@/hooks/useBEProjectsFilterPresets';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { useBEProjects } from '@/hooks/useBEProjects';
@@ -25,6 +29,22 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -49,6 +69,10 @@ import {
   Plus,
   FolderTree,
   Rows3,
+  Bookmark,
+  Star,
+  Trash2,
+  Save,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { BEAffaire, BEAffaireStatus } from '@/types/beAffaire';
@@ -101,9 +125,10 @@ export default function Projects() {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [isNewRequestOpen, setIsNewRequestOpen] = useState(false);
 
-  // Filters
+  // Filters — défaut "Avec affaires" pour que la page ouvre sur les projets actifs.
+  // Un preset défini par défaut peut override (cf. useBEProjectsFilterPresets).
   const [filterProjectStatus, setFilterProjectStatus] = useState<Set<string>>(new Set());
-  const [filterHasAffaires, setFilterHasAffaires] = useState<HasAffairesFilter>('all');
+  const [filterHasAffaires, setFilterHasAffaires] = useState<HasAffairesFilter>('with');
   const [filterAffaireStatus, setFilterAffaireStatus] = useState<Set<BEAffaireStatus>>(new Set());
   const [filterActivite, setFilterActivite] = useState<Set<string>>(new Set());
 
@@ -227,6 +252,60 @@ export default function Projects() {
     sortBy,
     sortDir,
   ]);
+
+  // ─── Filter presets (sauvegarde / chargement de contextes) ──────────
+  const [savePresetOpen, setSavePresetOpen] = useState(false);
+  const [presetName, setPresetName] = useState('');
+  const [presetAsDefault, setPresetAsDefault] = useState(false);
+
+  const currentFilters: BEProjectsFiltersPayload = useMemo(
+    () => ({
+      search,
+      filterProjectStatus: [...filterProjectStatus],
+      filterHasAffaires,
+      filterAffaireStatus: [...filterAffaireStatus],
+      filterActivite: [...filterActivite],
+      sortBy,
+      sortDir,
+      viewMode,
+    }),
+    [
+      search,
+      filterProjectStatus,
+      filterHasAffaires,
+      filterAffaireStatus,
+      filterActivite,
+      sortBy,
+      sortDir,
+      viewMode,
+    ],
+  );
+
+  const applyFilters = useCallback((f: BEProjectsFiltersPayload) => {
+    setSearch(f.search ?? '');
+    setFilterProjectStatus(new Set(f.filterProjectStatus ?? []));
+    setFilterHasAffaires(f.filterHasAffaires ?? 'with');
+    setFilterAffaireStatus(new Set(f.filterAffaireStatus ?? []));
+    setFilterActivite(new Set(f.filterActivite ?? []));
+    setSortBy(f.sortBy ?? 'code');
+    setSortDir(f.sortDir ?? 'asc');
+    setViewMode(f.viewMode ?? 'projet');
+  }, []);
+
+  const {
+    presets,
+    savePreset,
+    deletePreset,
+    toggleDefault,
+    loadPreset,
+  } = useBEProjectsFilterPresets(currentFilters, applyFilters);
+
+  const handleSavePreset = async () => {
+    await savePreset(presetName, presetAsDefault);
+    setSavePresetOpen(false);
+    setPresetName('');
+    setPresetAsDefault(false);
+  };
 
   const projectById = useMemo(() => {
     const m = new Map<string, (typeof projects)[number]>();
@@ -534,6 +613,81 @@ export default function Projects() {
                 </button>
               </div>
 
+              {/* Contextes de filtres (presets persistés par utilisateur) */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-10 gap-2">
+                    <Bookmark className="h-4 w-4" />
+                    <span className="hidden sm:inline">Contextes</span>
+                    {presets.length > 0 && (
+                      <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
+                        {presets.length}
+                      </Badge>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-72">
+                  <DropdownMenuLabel>Mes contextes de filtres</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => setSavePresetOpen(true)}>
+                    <Save className="h-3.5 w-3.5 mr-2" />
+                    Sauvegarder le contexte courant…
+                  </DropdownMenuItem>
+                  {presets.length > 0 && <DropdownMenuSeparator />}
+                  {presets.length === 0 ? (
+                    <div className="px-2 py-2 text-[11px] text-muted-foreground italic">
+                      Aucun contexte sauvegardé pour l'instant.
+                    </div>
+                  ) : (
+                    presets.map((p) => (
+                      <div
+                        key={p.id}
+                        className="px-2 py-1.5 hover:bg-muted/50 rounded text-xs flex items-center gap-1.5"
+                      >
+                        <button
+                          type="button"
+                          className="flex-1 text-left flex items-center gap-1.5 min-w-0 cursor-pointer"
+                          onClick={() => loadPreset(p)}
+                          title="Charger ce contexte"
+                        >
+                          {p.is_default && (
+                            <Star className="h-3 w-3 fill-amber-400 text-amber-500 shrink-0" />
+                          )}
+                          <span className="truncate">{p.name}</span>
+                        </button>
+                        <button
+                          type="button"
+                          title={p.is_default ? 'Retirer du défaut' : 'Définir par défaut'}
+                          className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void toggleDefault(p.id);
+                          }}
+                        >
+                          <Star
+                            className={cn(
+                              'h-3.5 w-3.5',
+                              p.is_default && 'fill-amber-400 text-amber-500',
+                            )}
+                          />
+                        </button>
+                        <button
+                          type="button"
+                          title="Supprimer"
+                          className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void deletePreset(p.id);
+                          }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
               {/* Sort */}
               <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortKey)}>
                 <SelectTrigger className="w-[160px] h-10">
@@ -810,6 +964,51 @@ export default function Projects() {
           </div>
         </main>
       </div>
+
+      {/* Dialog : sauvegarder le contexte de filtres courant */}
+      <Dialog open={savePresetOpen} onOpenChange={setSavePresetOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Sauvegarder le contexte de filtres</DialogTitle>
+            <DialogDescription>
+              Donne un nom à ce contexte pour le retrouver rapidement plus tard.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="preset-name" className="text-xs">Nom</Label>
+              <Input
+                id="preset-name"
+                autoFocus
+                value={presetName}
+                onChange={(e) => setPresetName(e.target.value)}
+                placeholder="Ex. Projets PCU en cours"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && presetName.trim()) void handleSavePreset();
+                }}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="preset-default"
+                checked={presetAsDefault}
+                onCheckedChange={(c) => setPresetAsDefault(c === true)}
+              />
+              <Label htmlFor="preset-default" className="text-xs cursor-pointer font-normal">
+                Définir comme contexte par défaut (chargé à l'ouverture)
+              </Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSavePresetOpen(false)}>
+              Annuler
+            </Button>
+            <Button onClick={() => void handleSavePreset()} disabled={!presetName.trim()}>
+              Sauvegarder
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog : nouvelle demande BE (accessible aux non-managers) */}
       <NewBERequestDialog
