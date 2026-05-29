@@ -10,6 +10,7 @@ import { lineAnnualBudgetRevise } from '@/lib/itBudgetTotals';
 import { BudgetLineRapprochementPanel } from '@/components/it/BudgetLineRapprochementPanel';
 import { BudgetLineNdfPanel } from '@/components/it/BudgetLineNdfPanel';
 import { ITRHTab } from '@/components/it/ITRHTab';
+import { SupplierEntriesTab } from '@/components/it/SupplierEntriesTab';
 import { BulkRapprochementDialog } from '@/components/it/BulkRapprochementDialog';
 import { AssignGroupDialog } from '@/components/it/AssignGroupDialog';
 import { useITBudgetGroups } from '@/hooks/useITBudgetGroups';
@@ -342,7 +343,7 @@ export default function ITBudgetGlobal() {
     [prefs.filters_config, updateFilters]
   );
 
-  const [activeTab, setActiveTab] = useState<'synthese' | 'lignes' | 'depenses' | 'rh'>('synthese');
+  const [activeTab, setActiveTab] = useState<'synthese' | 'lignes' | 'depenses' | 'rh' | 'ecritures'>('synthese');
 
   const {
     lines,
@@ -1303,6 +1304,10 @@ export default function ITBudgetGlobal() {
                   <Users className="h-4 w-4" />
                   RH
                 </TabsTrigger>
+                <TabsTrigger value="ecritures" className="gap-2">
+                  <FileText className="h-4 w-4" />
+                  Écritures fournisseurs
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="synthese" className="space-y-6 mt-4">
@@ -2076,6 +2081,13 @@ export default function ITBudgetGlobal() {
 
               <TabsContent value="rh" className="space-y-4 mt-4">
                 <ITRHTab annee={Number(filters.annee) || new Date().getFullYear()} />
+              </TabsContent>
+
+              <TabsContent value="ecritures" className="space-y-4 mt-4">
+                <SupplierEntriesTab
+                  annee={Number(filters.annee) || new Date().getFullYear()}
+                  entite={filters.entite || ''}
+                />
               </TabsContent>
             </Tabs>
 
