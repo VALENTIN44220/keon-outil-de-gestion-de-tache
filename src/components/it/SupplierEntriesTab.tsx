@@ -50,6 +50,7 @@ import {
 } from '@/hooks/useSupplierAccountingEntries';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { SupplierEntryLinkDialog } from './SupplierEntryLinkDialog';
+import { SupplierEntriesAuditDialog } from './SupplierEntriesAuditDialog';
 
 const eur = (n: number | null | undefined) =>
   (n ?? 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
@@ -140,9 +141,10 @@ export function SupplierEntriesTab({ annee, entite }: Props) {
   );
   const unlinkMutation = useUnlinkSupplierEntry();
 
-  // ── Dialog rattachement ─────────────────────────────────────────────
+  // ── Dialog rattachement / audit ─────────────────────────────────────
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkEntry, setLinkEntry] = useState<SupplierAccountingEntry | null>(null);
+  const [auditOpen, setAuditOpen] = useState(false);
 
   const openLink = (entry: SupplierAccountingEntry) => {
     setLinkEntry(entry);
@@ -202,6 +204,16 @@ export function SupplierEntriesTab({ annee, entite }: Props) {
             approximatif pour les taux 10 / 5,5 / 2,1 / exempté.
           </p>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 gap-1.5 shrink-0"
+          onClick={() => setAuditOpen(true)}
+          title="Liste les écritures rattachées avec leur nb_links — repère les doublons potentiels"
+        >
+          <Filter className="h-3.5 w-3.5" />
+          Audit rattachements
+        </Button>
       </div>
 
       {/* Filtres */}
@@ -454,6 +466,8 @@ export function SupplierEntriesTab({ annee, entite }: Props) {
         open={linkOpen}
         onOpenChange={setLinkOpen}
       />
+
+      <SupplierEntriesAuditDialog open={auditOpen} onOpenChange={setAuditOpen} />
     </div>
   );
 }

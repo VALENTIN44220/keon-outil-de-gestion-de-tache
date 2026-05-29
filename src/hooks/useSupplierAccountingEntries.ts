@@ -277,6 +277,37 @@ export interface ITBudgetLineSupplierEntryAgg {
   nb_supplier_entries: number;
 }
 
+export interface SupplierEntryLinkAudit {
+  entry_key: string;
+  dos: string;
+  journal: string;
+  numero: string;
+  date: string | null;
+  supplier_code: string | null;
+  supplier_name: string | null;
+  libelle_ecriture: string | null;
+  solde_signed: number | null;
+  montant_abs_ttc: number;
+  montant_abs_ht: number;
+  nb_links: number;
+  budget_line_ids: string[];
+}
+
+/** Vue d'audit : écritures rattachées avec leur nb_links (pour détecter les doublons). */
+export function useSupplierEntriesLinksAudit() {
+  return useQuery({
+    queryKey: ['supplier-entries-links-audit'],
+    staleTime: 30 * 1000,
+    queryFn: async () => {
+      const { data, error } = await sb
+        .from('v_it_supplier_entries_links_audit')
+        .select('*');
+      if (error) throw error;
+      return (data ?? []) as SupplierEntryLinkAudit[];
+    },
+  });
+}
+
 /** Agrégation des écritures rattachées par ligne budgétaire IT. */
 export function useITBudgetLineSupplierEntriesAgg() {
   return useQuery({
