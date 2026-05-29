@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, Loader2, Search } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -114,17 +115,31 @@ interface BulkRapprochementDialogProps {
 const eur = (n: number | null | undefined) =>
   (n ?? 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
 
+interface SupplierEntryLite {
+  entry_key: string;
+  dos: string;
+  journal: string;
+  numero: string;
+  date: string | null;
+  supplier_code: string | null;
+  supplier_name: string | null;
+  libelle_ecriture: string | null;
+  solde: number | null;
+}
+
 export function BulkRapprochementDialog({
   open,
   onOpenChange,
   selectedIds,
   onSuccess,
 }: BulkRapprochementDialogProps) {
-  const [tab, setTab] = useState<'commande' | 'facture'>('commande');
+  const { user } = useAuth();
+  const [tab, setTab] = useState<'commande' | 'facture' | 'ecriture'>('commande');
   const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
   const [commandes, setCommandes] = useState<DivaltoCommande[]>([]);
   const [factures, setFactures] = useState<DivaltoFactureGrouped[]>([]);
+  const [ecritures, setEcritures] = useState<SupplierEntryLite[]>([]);
   const [applying, setApplying] = useState(false);
 
   const count = selectedIds.length;
@@ -200,25 +215,51 @@ export function BulkRapprochementDialog({
     }
   }, []);
 
+  const searchEcritures = useCallback(async (q: string) => {
+    setSearching(true);
+    try {
+      let req = (supabase as any)
+        .from('supplier_accounting_entries')
+        .select('entry_key, dos, journal, numero, date, supplier_code, supplier_name, libelle_ecriture, solde')
+        .eq('has_gescom_piece', false)
+        .order('date', { ascending: false, nullsFirst: false })
+        .limit(50);
+      if (q.trim()) {
+        const s = q.trim().replace(/[%]/g, '');
+        req = req.or(`supplier_name.ilike.%${s}%,supplier_code.ilike.%${s}%,libelle_ecriture.ilike.%${s}%`);
+      }
+      const { data, error } = await req;
+      if (error) throw error;
+      setEcritures((data ?? []) as SupplierEntryLite[]);
+    } catch (e) {
+      toast({ title: 'Erreur', description: extractErrorMessage(e), variant: 'destructive' });
+    } finally {
+      setSearching(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!open) {
       setQuery('');
       setCommandes([]);
       setFactures([]);
+      setEcritures([]);
       return;
     }
     if (tab === 'commande') searchCommandes('');
-    else searchFactures('');
-  }, [open, tab, searchCommandes, searchFactures]);
+    else if (tab === 'facture') searchFactures('');
+    else searchEcritures('');
+  }, [open, tab, searchCommandes, searchFactures, searchEcritures]);
 
   useEffect(() => {
     if (!open) return;
     const t = setTimeout(() => {
       if (tab === 'commande') searchCommandes(query);
-      else searchFactures(query);
+      else if (tab === 'facture') searchFactures(query);
+      else searchEcritures(query);
     }, 300);
     return () => clearTimeout(t);
-  }, [query, open, tab, searchCommandes, searchFactures]);
+  }, [query, open, tab, searchCommandes, searchFactures, searchEcritures]);
 
   const applyCommande = async (fullcdno: string) => {
     if (selectedIds.length === 0) return;
@@ -232,6 +273,32 @@ export function BulkRapprochementDialog({
       toast({
         title: 'Commande affectée',
         description: `${selectedIds.length} ligne(s) liée(s) à ${fullcdno}`,
+      });
+      onSuccess?.();
+      onOpenChange(false);
+    } catch (e) {
+      toast({ title: 'Erreur', description: extractErrorMessage(e), variant: 'destructive' });
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  const applyEcriture = async (entry: SupplierEntryLite) => {
+    if (selectedIds.length === 0) return;
+    setApplying(true);
+    try {
+      const rows = selectedIds.map((id) => ({
+        budget_line_id: id,
+        supplier_entry_key: entry.entry_key,
+        linked_by: user?.id ?? null,
+      }));
+      const { error } = await (supabase as any)
+        .from('it_budget_line_supplier_entries')
+        .upsert(rows, { onConflict: 'budget_line_id,supplier_entry_key', ignoreDuplicates: true });
+      if (error) throw error;
+      toast({
+        title: 'Écriture rattachée',
+        description: `${selectedIds.length} ligne(s) liée(s) à ${entry.dos}/${entry.journal}/${entry.numero}`,
       });
       onSuccess?.();
       onOpenChange(false);
@@ -265,7 +332,7 @@ export function BulkRapprochementDialog({
   };
 
   const header = useMemo(
-    () => `Affecter ${count} ligne${count > 1 ? 's' : ''} à une commande/facture`,
+    () => `Affecter ${count} ligne${count > 1 ? 's' : ''} à une pièce ou écriture`,
     [count]
   );
 
@@ -276,10 +343,11 @@ export function BulkRapprochementDialog({
           <DialogTitle>{header}</DialogTitle>
         </DialogHeader>
 
-        <Tabs value={tab} onValueChange={(v) => setTab(v as 'commande' | 'facture')}>
-          <TabsList className="grid w-full grid-cols-2">
+        <Tabs value={tab} onValueChange={(v) => setTab(v as 'commande' | 'facture' | 'ecriture')}>
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="commande">Commande (CFK)</TabsTrigger>
             <TabsTrigger value="facture">Facture (FFK)</TabsTrigger>
+            <TabsTrigger value="ecriture">Écriture comptable</TabsTrigger>
           </TabsList>
 
           <div className="mt-3 space-y-2">
@@ -292,10 +360,21 @@ export function BulkRapprochementDialog({
                 autoFocus
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder={tab === 'commande' ? 'Rechercher par fullcdno...' : 'Rechercher par référence...'}
+                placeholder={
+                  tab === 'commande'
+                    ? 'Rechercher par fullcdno...'
+                    : tab === 'facture'
+                    ? 'Rechercher par référence...'
+                    : 'Rechercher par fournisseur / libellé...'
+                }
                 className="pl-8 h-9 text-sm"
               />
             </div>
+            {tab === 'ecriture' && (
+              <div className="text-[11px] text-amber-700 bg-amber-50/60 border border-amber-200 rounded px-2 py-1">
+                ⚠️ Les écritures sont en TTC, les budgets en HT. HT estimé à TVA 20%.
+              </div>
+            )}
           </div>
 
           <TabsContent value="commande" className="mt-3">
@@ -394,6 +473,56 @@ export function BulkRapprochementDialog({
                 </div>
               </ScrollArea>
             </TooltipProvider>
+          </TabsContent>
+
+          <TabsContent value="ecriture" className="mt-3">
+            <ScrollArea className="h-[320px] rounded-md border">
+              <div className="p-1">
+                {searching ? (
+                  <div className="flex items-center justify-center py-6">
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                  </div>
+                ) : ecritures.length === 0 ? (
+                  <div className="py-6 text-center text-xs text-muted-foreground">Aucune écriture</div>
+                ) : (
+                  ecritures.map((e) => {
+                    const htEst = (e.solde ?? 0) / (1 + TVA_RATE);
+                    return (
+                      <div
+                        key={e.entry_key}
+                        onClick={() => !applying && applyEcriture(e)}
+                        className={cn(
+                          'flex items-center justify-between rounded-sm px-2 py-2 text-sm',
+                          applying ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-accent',
+                        )}
+                      >
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <Badge variant="outline" className="font-mono text-[10px] px-1 h-4">{e.dos}</Badge>
+                            <span className="font-mono text-[11px] text-muted-foreground">
+                              {e.journal}/{e.numero}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground tabular-nums">
+                              {e.date?.slice(0, 10) ?? '—'}
+                            </span>
+                          </div>
+                          <span className="text-xs font-medium truncate mt-0.5">
+                            {e.supplier_name ?? e.supplier_code ?? '—'}
+                          </span>
+                          <span className="text-[11px] text-muted-foreground truncate">
+                            {e.libelle_ecriture ?? ''}
+                          </span>
+                        </div>
+                        <div className="text-right shrink-0 ml-4">
+                          <div className="tabular-nums font-semibold">{eur(e.solde)}<span className="text-[10px] text-muted-foreground ml-0.5">TTC</span></div>
+                          <div className="text-[10px] tabular-nums text-violet-700">≈ {eur(htEst)} HT</div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </ScrollArea>
           </TabsContent>
         </Tabs>
 

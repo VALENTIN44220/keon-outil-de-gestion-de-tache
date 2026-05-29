@@ -11,6 +11,7 @@ import { BudgetLineRapprochementPanel } from '@/components/it/BudgetLineRapproch
 import { BudgetLineNdfPanel } from '@/components/it/BudgetLineNdfPanel';
 import { ITRHTab } from '@/components/it/ITRHTab';
 import { SupplierEntriesTab } from '@/components/it/SupplierEntriesTab';
+import { BudgetLineSupplierEntriesPanel } from '@/components/it/BudgetLineSupplierEntriesPanel';
 import { BulkRapprochementDialog } from '@/components/it/BulkRapprochementDialog';
 import { AssignGroupDialog } from '@/components/it/AssignGroupDialog';
 import { useITBudgetGroups } from '@/hooks/useITBudgetGroups';
@@ -2106,11 +2107,12 @@ export default function ITBudgetGlobal() {
             <DialogTitle>{editingLine ? 'Modifier la ligne budgétaire' : 'Nouvelle ligne budgétaire'}</DialogTitle>
           </DialogHeader>
           <Tabs defaultValue="general">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="general">Général</TabsTrigger>
               <TabsTrigger value="rapprochement">
                 {linePaiementViaNdf ? 'Rapprochement NDF' : 'Rapprochement Divalto'}
               </TabsTrigger>
+              <TabsTrigger value="ecritures">Écritures comptables</TabsTrigger>
             </TabsList>
             <TabsContent value="general" className="space-y-3 py-2 mt-2">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -2481,6 +2483,12 @@ export default function ITBudgetGlobal() {
                   fournisseurPrevu={lineFournisseur || null}
                 />
               )}
+            </TabsContent>
+            <TabsContent value="ecritures" className="py-2 mt-2">
+              <BudgetLineSupplierEntriesPanel
+                budgetLineId={editingLine?.id ?? null}
+                fournisseurPrevu={lineFournisseur || null}
+              />
             </TabsContent>
           </Tabs>
           <DialogFooter>
