@@ -12,6 +12,7 @@ import { BudgetLineNdfPanel } from '@/components/it/BudgetLineNdfPanel';
 import { ITRHTab } from '@/components/it/ITRHTab';
 import { SupplierEntriesTab } from '@/components/it/SupplierEntriesTab';
 import { BudgetLineSupplierEntriesPanel } from '@/components/it/BudgetLineSupplierEntriesPanel';
+import { useITBudgetLineSupplierEntriesAgg } from '@/hooks/useSupplierAccountingEntries';
 import { BulkRapprochementDialog } from '@/components/it/BulkRapprochementDialog';
 import { AssignGroupDialog } from '@/components/it/AssignGroupDialog';
 import { useITBudgetGroups } from '@/hooks/useITBudgetGroups';
@@ -369,8 +370,42 @@ export default function ITBudgetGlobal() {
     annee: filters.annee,
     entite: filters.entite,
   });
-  const engageGlobal   = engageConstateData?.totalEngage   ?? 0;
-  const constateGlobal = engageConstateData?.totalConstate ?? 0;
+
+  // Agrégation écritures comptables rattachées par ligne (HT estimé) — canon CONSTATÉ
+  const { data: supplierAggRows = [] } = useITBudgetLineSupplierEntriesAgg();
+  const supplierAggByLine = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of supplierAggRows) m.set(r.budget_line_id, Number(r.supplier_ht_amount ?? 0));
+    return m;
+  }, [supplierAggRows]);
+  const engageByLine = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of engageConstateData?.rows ?? []) m.set(r.budget_line_id, Number(r.engage ?? 0));
+    return m;
+  }, [engageConstateData]);
+  const constateByLine = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of engageConstateData?.rows ?? []) m.set(r.budget_line_id, Number(r.constate ?? 0));
+    return m;
+  }, [engageConstateData]);
+
+  // ─── Globaux : on applique le canon ligne par ligne sur les lignes de
+  //     l'année/entité courantes (engage = CF si dispo, sinon fallback
+  //     statut=engage_total ; constate = FF + écritures rapprochées HT)
+  const canonGlobal = useMemo(() => {
+    let engage = 0;
+    let constate = 0;
+    for (const l of lines) {
+      const cf  = engageByLine.get(l.id) ?? 0;
+      const ff  = constateByLine.get(l.id) ?? 0;
+      const sup = supplierAggByLine.get(l.id) ?? 0;
+      engage   += cf > 0 ? cf : (l.statut === 'engage_total' ? lineAnnualBudgetRevise(l) : 0);
+      constate += ff + sup;
+    }
+    return { engage, constate };
+  }, [lines, engageByLine, constateByLine, supplierAggByLine]);
+  const engageGlobal   = canonGlobal.engage;
+  const constateGlobal = canonGlobal.constate;
 
   // Ventilation mensuelle + par fournisseur pour les cards de la synthèse
   const { monthlyRows, supplierRows, linkedRefs } = useITBudgetGlobalBreakdown(lines);
@@ -698,8 +733,11 @@ export default function ITBudgetGlobal() {
         projet_it_label: l.it_project_id
           ? projectNameMap.get(l.it_project_id) ?? null
           : null,
+        _cf_amount:          engageByLine.get(l.id) ?? 0,
+        _ff_amount:          constateByLine.get(l.id) ?? 0,
+        _supplier_ht_amount: supplierAggByLine.get(l.id) ?? 0,
       })) as ITBudgetLineRow[],
-    [filteredLines, projectNameMap]
+    [filteredLines, projectNameMap, engageByLine, constateByLine, supplierAggByLine]
   );
 
   /**

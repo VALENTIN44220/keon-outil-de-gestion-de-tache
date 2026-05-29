@@ -270,6 +270,28 @@ export function useSupplierEntryVendorList() {
   });
 }
 
+export interface ITBudgetLineSupplierEntryAgg {
+  budget_line_id: string;
+  supplier_ht_amount: number;
+  supplier_ttc_amount: number;
+  nb_supplier_entries: number;
+}
+
+/** Agrégation des écritures rattachées par ligne budgétaire IT. */
+export function useITBudgetLineSupplierEntriesAgg() {
+  return useQuery({
+    queryKey: ['it-budget-line-supplier-entries-agg'],
+    staleTime: 30 * 1000,
+    queryFn: async () => {
+      const { data, error } = await sb
+        .from('v_it_budget_line_supplier_entries_agg')
+        .select('budget_line_id, supplier_ht_amount, supplier_ttc_amount, nb_supplier_entries');
+      if (error) throw error;
+      return (data ?? []) as ITBudgetLineSupplierEntryAgg[];
+    },
+  });
+}
+
 /** Liste distincte des DOS pour le filtre (via RPC, sinon PostgREST tronque à 1000 lignes). */
 export function useSupplierEntryDosList() {
   return useQuery({
