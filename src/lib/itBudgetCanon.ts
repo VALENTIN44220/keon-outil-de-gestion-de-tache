@@ -65,3 +65,35 @@ export function computeBudgetCanon(
 
   return { budget_initial, budget_revise, engage, constate };
 }
+
+/**
+ * Agrège le canon sur une liste de lignes IT.
+ * Centralise la réduction utilisée par les KPI globaux, les groupes de rapprochement,
+ * les breakdowns de la Synthèse (byType/byCategorie/byEntite/byFournisseur/byProjet)
+ * et le Hub projet IT — pour garantir que tous les écrans parlent la même langue financière.
+ *
+ * Les maps fournies indexent par budget_line_id. Toute valeur manquante = 0.
+ */
+export function aggregateCanonOverLines(
+  lines: Array<Parameters<typeof computeBudgetCanon>[0] & { id: string }>,
+  engageByLine?: Map<string, number> | null,
+  constateByLine?: Map<string, number> | null,
+  supplierAggByLine?: Map<string, number> | null,
+): BudgetCanon {
+  let budget_initial = 0;
+  let budget_revise = 0;
+  let engage = 0;
+  let constate = 0;
+  for (const line of lines) {
+    const canon = computeBudgetCanon(line, {
+      cf_amount: engageByLine?.get(line.id) ?? 0,
+      ff_amount: constateByLine?.get(line.id) ?? 0,
+      supplier_ht_amount: supplierAggByLine?.get(line.id) ?? 0,
+    });
+    budget_initial += canon.budget_initial;
+    budget_revise += canon.budget_revise;
+    engage += canon.engage;
+    constate += canon.constate;
+  }
+  return { budget_initial, budget_revise, engage, constate };
+}

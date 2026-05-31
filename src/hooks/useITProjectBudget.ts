@@ -8,6 +8,10 @@ import {
   itManualExpenseAnnualEquivalent,
 } from '@/types/itProject';
 import { lineAnnualBudget, lineAnnualBudgetRevise } from '@/lib/itBudgetTotals';
+import { aggregateCanonOverLines, computeBudgetCanon } from '@/lib/itBudgetCanon';
+import { useITBudgetEngageConstate } from './useITBudgetEngageConstate';
+import { useITBudgetLineSupplierEntriesAgg } from './useSupplierAccountingEntries';
+import { useMemo } from 'react';
 
 export function useITProjectBudget(projectId: string | undefined) {
   const qc = useQueryClient();
@@ -112,18 +116,45 @@ export function useITProjectBudget(projectId: string | undefined) {
     enabled: !!projectId,
   });
 
-  // ── KPIs (calcul client-side MVP) ───────────────────────────────────
+  // ── KPIs canoniques ─────────────────────────────────────────────────
+  // engage/constate alimentés depuis v_it_budget_engage_constate (CF/FF Divalto)
+  // + v_it_budget_line_supplier_entries_agg (HT estimé écritures comptables).
+  // Les vues sont globales : on fetch sans filtre puis on indexe par budget_line_id —
+  // le scoping projet vient de la liste `lines` (filtrée par it_project_id).
   const lines    = linesQuery.data    ?? [];
   const expenses = expensesQuery.data ?? [];
 
-  const budget_initial  = lines.reduce((s, l) => s + lineAnnualBudget(l), 0);
-  const budget_revise   = lines.reduce((s, l) => s + lineAnnualBudgetRevise(l), 0);
-  const engage          = 0; // TODO Phase 2 : CFK Divalto
-  const constate        = 0; // TODO Phase 2 : FFK Divalto
+  const { data: engageConstateData, isLoading: engageLoading } = useITBudgetEngageConstate({});
+  const { data: supplierAggRows = [], isLoading: supplierLoading } = useITBudgetLineSupplierEntriesAgg();
+
+  const engageByLine = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of engageConstateData?.rows ?? []) m.set(r.budget_line_id, Number(r.engage ?? 0));
+    return m;
+  }, [engageConstateData]);
+  const constateByLine = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of engageConstateData?.rows ?? []) m.set(r.budget_line_id, Number(r.constate ?? 0));
+    return m;
+  }, [engageConstateData]);
+  const supplierAggByLine = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of supplierAggRows) m.set(r.budget_line_id, Number(r.supplier_ht_amount ?? 0));
+    return m;
+  }, [supplierAggRows]);
+
+  const canonTotals = aggregateCanonOverLines(lines, engageByLine, constateByLine, supplierAggByLine);
+  const budget_initial = canonTotals.budget_initial;
+  const budget_revise  = canonTotals.budget_revise;
+  const engage         = canonTotals.engage;
+  const constate       = canonTotals.constate;
+
   const manuel_prevu = expenses
     .filter((e) => e.statut !== 'annule')
     .reduce((s, e) => s + itManualExpenseAnnualEquivalent(e), 0);
-  const forecast_fin_annee   = constate + (engage - constate) + manuel_prevu;
+  // Forecast = engagé (contient déjà le constaté) + manuel prévu.
+  // Math.max() couvre le cas marginal d'une facture sans CF (constate > engage).
+  const forecast_fin_annee   = Math.max(engage, constate) + manuel_prevu;
   const ecart_budget         = forecast_fin_annee - budget_revise;
   const montant_reaffectable = Math.max(budget_revise - forecast_fin_annee, 0);
   const depassement          = Math.max(forecast_fin_annee - budget_revise, 0);
@@ -149,10 +180,27 @@ export function useITProjectBudget(projectId: string | undefined) {
     addExpense, updateExpense, deleteExpense,
     reallocations: reallocQuery.data ?? [],
     kpis,
+    canonLoading: engageLoading || supplierLoading,
+    // Maps exposées pour les écrans qui veulent un canon par ligne (ex: chart par catégorie)
+    engageByLine, constateByLine, supplierAggByLine,
   };
 }
 
-export function useITBudgetGlobal(filters: { annee?: number; entite?: string; type_depense?: string; categorie?: string }) {
+/**
+ * Inputs canoniques optionnels — maps budget_line_id → montant.
+ * Si fournis, les KPI et les breakdowns intègrent engage/constate ; sinon ils restent à 0
+ * (compat. ascendante pour appelants qui ne consomment que budget_initial/budget_revise).
+ */
+export interface ITBudgetGlobalCanonInputs {
+  engageByLine?: Map<string, number>;
+  constateByLine?: Map<string, number>;
+  supplierAggByLine?: Map<string, number>;
+}
+
+export function useITBudgetGlobal(
+  filters: { annee?: number; entite?: string; type_depense?: string; categorie?: string },
+  canonInputs?: ITBudgetGlobalCanonInputs,
+) {
   const qc = useQueryClient();
 
   const linesQuery = useQuery({
@@ -262,15 +310,24 @@ export function useITBudgetGlobal(filters: { annee?: number; entite?: string; ty
   const lines    = linesQuery.data    ?? [];
   const expenses = expensesQuery.data ?? [];
 
-  // KPIs globaux
-  const budget_initial       = lines.reduce((s, l) => s + lineAnnualBudget(l), 0);
-  const budget_revise        = lines.reduce((s, l) => s + lineAnnualBudgetRevise(l), 0);
-  const engage               = 0;
-  const constate             = 0;
+  // KPIs globaux — canon ligne par ligne (engage = CF Divalto ou fallback statut=engage_total ;
+  // constate = FF Divalto + écritures comptables HT estimées TVA 20%).
+  const canonTotals = aggregateCanonOverLines(
+    lines,
+    canonInputs?.engageByLine,
+    canonInputs?.constateByLine,
+    canonInputs?.supplierAggByLine,
+  );
+  const budget_initial = canonTotals.budget_initial;
+  const budget_revise  = canonTotals.budget_revise;
+  const engage         = canonTotals.engage;
+  const constate       = canonTotals.constate;
   const manuel_prevu = expenses
     .filter((e) => e.statut !== 'annule')
     .reduce((s, e) => s + itManualExpenseAnnualEquivalent(e), 0);
-  const forecast_fin_annee   = constate + (engage - constate) + manuel_prevu;
+  // Forecast = ce qui sortira en cash d'ici fin d'année :
+  // engagé (CF/déclaratif, contient déjà le constaté) + dépenses manuelles prévues.
+  const forecast_fin_annee   = engage + manuel_prevu;
   const ecart_budget         = forecast_fin_annee - budget_revise;
   const montant_reaffectable = Math.max(budget_revise - forecast_fin_annee, 0);
   const depassement          = Math.max(forecast_fin_annee - budget_revise, 0);
@@ -283,58 +340,62 @@ export function useITBudgetGlobal(filters: { annee?: number; entite?: string; ty
     taux_consommation: budget_revise > 0 ? Math.round((constate / budget_revise) * 100) : 0,
   };
 
+  // ─── Breakdowns canoniques uniformes ──────────────────────────────────
+  // Chaque ligne est convertie en {budget_initial, budget_revise, engage, constate}
+  // via le canon, puis bucketée. Garantit cohérence avec les KPI globaux.
+  type Bucket = {
+    budget_initial: number;
+    budget_revise: number;
+    engage: number;
+    constate: number;
+  };
+  const emptyBucket = (): Bucket => ({ budget_initial: 0, budget_revise: 0, engage: 0, constate: 0 });
+  const accBucket = (b: Bucket, line: ITBudgetLine) => {
+    const canon = computeBudgetCanon(line, {
+      cf_amount: canonInputs?.engageByLine?.get(line.id) ?? 0,
+      ff_amount: canonInputs?.constateByLine?.get(line.id) ?? 0,
+      supplier_ht_amount: canonInputs?.supplierAggByLine?.get(line.id) ?? 0,
+    });
+    b.budget_initial += canon.budget_initial;
+    b.budget_revise  += canon.budget_revise;
+    b.engage         += canon.engage;
+    b.constate       += canon.constate;
+  };
+  const bucketBy = <K extends string>(keyFn: (l: ITBudgetLine) => K) => {
+    const m = new Map<K, Bucket>();
+    for (const l of lines) {
+      const k = keyFn(l);
+      let b = m.get(k);
+      if (!b) { b = emptyBucket(); m.set(k, b); }
+      accBucket(b, l);
+    }
+    return m;
+  };
+
   // Répartition par type_depense pour waterfall
-  const byType = ['Opex', 'Capex', 'RH', 'Amortissement'].map(type => ({
-    type,
-    budget_initial: lines.filter(l => l.type_depense === type).reduce((s, l) => s + lineAnnualBudget(l), 0),
-    budget_revise:  lines.filter(l => l.type_depense === type).reduce((s, l) => s + lineAnnualBudgetRevise(l), 0),
-  }));
+  const byType = ['Opex', 'Capex', 'RH', 'Amortissement'].map(type => {
+    const b = emptyBucket();
+    for (const l of lines) if (l.type_depense === type) accBucket(b, l);
+    return { type, ...b };
+  });
 
   // Répartition par catégorie pour graphique
-  const byCategorie = Array.from(
-    lines.reduce((map, l) => {
-      const key = l.categorie?.trim() || 'Sans catégorie';
-      const cur = map.get(key) || { categorie: key, budget_initial: 0, budget_revise: 0 };
-      cur.budget_initial += lineAnnualBudget(l);
-      cur.budget_revise  += lineAnnualBudgetRevise(l);
-      map.set(key, cur);
-      return map;
-    }, new Map<string, { categorie: string; budget_initial: number; budget_revise: number }>())
-  ).map(([, v]) => v).sort((a, b) => b.budget_revise - a.budget_revise);
+  const byCategorie = Array.from(bucketBy(l => l.categorie?.trim() || 'Sans catégorie'))
+    .map(([categorie, v]) => ({ categorie, ...v }))
+    .sort((a, b) => b.budget_revise - a.budget_revise);
 
   // Répartition par entite
-  const byEntite = Array.from(
-    lines.reduce((map, l) => {
-      const key = l.entite?.trim() || 'Non affecté';
-      const cur = map.get(key) || { entite: key, budget: 0 };
-      cur.budget += lineAnnualBudgetRevise(l);
-      map.set(key, cur);
-      return map;
-    }, new Map<string, { entite: string; budget: number }>())
-  ).map(([, v]) => v).sort((a, b) => b.budget - a.budget);
+  const byEntite = Array.from(bucketBy(l => l.entite?.trim() || 'Non affecté'))
+    .map(([entite, v]) => ({ entite, ...v }))
+    .sort((a, b) => b.budget_revise - a.budget_revise);
 
-  const byFournisseur = Array.from(
-    lines.reduce((map, l) => {
-      const key = l.fournisseur_prevu?.trim() || 'Sans fournisseur';
-      const cur = map.get(key) || { fournisseur: key, budget: 0 };
-      cur.budget += lineAnnualBudgetRevise(l);
-      map.set(key, cur);
-      return map;
-    }, new Map<string, { fournisseur: string; budget: number }>())
-  ).map(([, v]) => v)
-    .sort((a, b) => b.budget - a.budget)
+  const byFournisseur = Array.from(bucketBy(l => l.fournisseur_prevu?.trim() || 'Sans fournisseur'))
+    .map(([fournisseur, v]) => ({ fournisseur, ...v }))
+    .sort((a, b) => b.budget_revise - a.budget_revise)
     .slice(0, 10); // top 10
 
-  const bySousCategorie = Array.from(
-    lines.reduce((map, l) => {
-      const key = l.sous_categorie?.trim() || 'Sans sous-catégorie';
-      const cur = map.get(key) || { sous_categorie: key, budget_initial: 0, budget_revise: 0 };
-      cur.budget_initial += lineAnnualBudget(l);
-      cur.budget_revise  += lineAnnualBudgetRevise(l);
-      map.set(key, cur);
-      return map;
-    }, new Map<string, { sous_categorie: string; budget_initial: number; budget_revise: number }>())
-  ).map(([, v]) => v)
+  const bySousCategorie = Array.from(bucketBy(l => l.sous_categorie?.trim() || 'Sans sous-catégorie'))
+    .map(([sous_categorie, v]) => ({ sous_categorie, ...v }))
     .sort((a, b) => b.budget_revise - a.budget_revise);
 
   return {

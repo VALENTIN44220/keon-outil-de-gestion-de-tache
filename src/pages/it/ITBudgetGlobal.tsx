@@ -7,6 +7,7 @@ import { useITBudgetEngageConstate } from '@/hooks/useITBudgetEngageConstate';
 import { useITBudgetGlobalBreakdown } from '@/hooks/useITBudgetGlobalBreakdown';
 import { useITBudgetRapprochement } from '@/hooks/useITBudgetRapprochement';
 import { lineAnnualBudgetRevise } from '@/lib/itBudgetTotals';
+import { computeBudgetCanon } from '@/lib/itBudgetCanon';
 import { BudgetLineRapprochementPanel } from '@/components/it/BudgetLineRapprochementPanel';
 import { BudgetLineNdfPanel } from '@/components/it/BudgetLineNdfPanel';
 import { ITRHTab } from '@/components/it/ITRHTab';
@@ -347,6 +348,30 @@ export default function ITBudgetGlobal() {
 
   const [activeTab, setActiveTab] = useState<'synthese' | 'lignes' | 'depenses' | 'rh' | 'ecritures'>('synthese');
 
+  // ── Sources canoniques : engage/constate (Divalto) + écritures comptables HT ──
+  // Fetch AVANT useITBudgetGlobal pour pouvoir lui passer les maps et obtenir
+  // des KPI + breakdowns canoniques d'un seul coup.
+  const { data: engageConstateData } = useITBudgetEngageConstate({
+    annee: filters.annee,
+    entite: filters.entite,
+  });
+  const { data: supplierAggRows = [] } = useITBudgetLineSupplierEntriesAgg();
+  const supplierAggByLine = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of supplierAggRows) m.set(r.budget_line_id, Number(r.supplier_ht_amount ?? 0));
+    return m;
+  }, [supplierAggRows]);
+  const engageByLine = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of engageConstateData?.rows ?? []) m.set(r.budget_line_id, Number(r.engage ?? 0));
+    return m;
+  }, [engageConstateData]);
+  const constateByLine = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of engageConstateData?.rows ?? []) m.set(r.budget_line_id, Number(r.constate ?? 0));
+    return m;
+  }, [engageConstateData]);
+
   const {
     lines,
     linesLoading,
@@ -365,47 +390,11 @@ export default function ITBudgetGlobal() {
     byEntite,
     byFournisseur,
     bySousCategorie,
-  } = useITBudgetGlobal(filters);
-  const { data: engageConstateData } = useITBudgetEngageConstate({
-    annee: filters.annee,
-    entite: filters.entite,
-  });
+  } = useITBudgetGlobal(filters, { engageByLine, constateByLine, supplierAggByLine });
 
-  // Agrégation écritures comptables rattachées par ligne (HT estimé) — canon CONSTATÉ
-  const { data: supplierAggRows = [] } = useITBudgetLineSupplierEntriesAgg();
-  const supplierAggByLine = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const r of supplierAggRows) m.set(r.budget_line_id, Number(r.supplier_ht_amount ?? 0));
-    return m;
-  }, [supplierAggRows]);
-  const engageByLine = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const r of engageConstateData?.rows ?? []) m.set(r.budget_line_id, Number(r.engage ?? 0));
-    return m;
-  }, [engageConstateData]);
-  const constateByLine = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const r of engageConstateData?.rows ?? []) m.set(r.budget_line_id, Number(r.constate ?? 0));
-    return m;
-  }, [engageConstateData]);
-
-  // ─── Globaux : on applique le canon ligne par ligne sur les lignes de
-  //     l'année/entité courantes (engage = CF si dispo, sinon fallback
-  //     statut=engage_total ; constate = FF + écritures rapprochées HT)
-  const canonGlobal = useMemo(() => {
-    let engage = 0;
-    let constate = 0;
-    for (const l of lines) {
-      const cf  = engageByLine.get(l.id) ?? 0;
-      const ff  = constateByLine.get(l.id) ?? 0;
-      const sup = supplierAggByLine.get(l.id) ?? 0;
-      engage   += cf > 0 ? cf : (l.statut === 'engage_total' ? lineAnnualBudgetRevise(l) : 0);
-      constate += ff + sup;
-    }
-    return { engage, constate };
-  }, [lines, engageByLine, constateByLine, supplierAggByLine]);
-  const engageGlobal   = canonGlobal.engage;
-  const constateGlobal = canonGlobal.constate;
+  // KPI canoniques exposés par le hook — alias rétro-compat pour les consommateurs locaux.
+  const engageGlobal   = kpis.engage;
+  const constateGlobal = kpis.constate;
 
   // Ventilation mensuelle + par fournisseur pour les cards de la synthèse
   const { monthlyRows, supplierRows, linkedRefs } = useITBudgetGlobalBreakdown(lines);
@@ -424,19 +413,36 @@ export default function ITBudgetGlobal() {
   );
 
   const byProjet = useMemo(() => {
-    return Array.from(
-      lines.reduce((map, l) => {
-        if (!l.it_project_id) return map;
-        const key = l.it_project_id;
-        const label = projectNameMap.get(key) ?? `Projet ${key.slice(0, 8)}…`;
-        const cur = map.get(key) || { projet_id: key, projet: label, budget: 0 };
-        cur.budget += lineAnnualBudgetRevise(l);
-        map.set(key, cur);
-        return map;
-      }, new Map<string, { projet_id: string; projet: string; budget: number }>())
-    ).map(([, v]) => v)
-      .sort((a, b) => b.budget - a.budget);
-  }, [lines, projectNameMap]);
+    type ProjetBucket = {
+      projet_id: string;
+      projet: string;
+      budget_initial: number;
+      budget_revise: number;
+      engage: number;
+      constate: number;
+    };
+    const m = new Map<string, ProjetBucket>();
+    for (const l of lines) {
+      if (!l.it_project_id) continue;
+      const key = l.it_project_id;
+      const label = projectNameMap.get(key) ?? `Projet ${key.slice(0, 8)}…`;
+      let cur = m.get(key);
+      if (!cur) {
+        cur = { projet_id: key, projet: label, budget_initial: 0, budget_revise: 0, engage: 0, constate: 0 };
+        m.set(key, cur);
+      }
+      const canon = computeBudgetCanon(l, {
+        cf_amount: engageByLine.get(l.id) ?? 0,
+        ff_amount: constateByLine.get(l.id) ?? 0,
+        supplier_ht_amount: supplierAggByLine.get(l.id) ?? 0,
+      });
+      cur.budget_initial += canon.budget_initial;
+      cur.budget_revise  += canon.budget_revise;
+      cur.engage         += canon.engage;
+      cur.constate       += canon.constate;
+    }
+    return Array.from(m.values()).sort((a, b) => b.budget_revise - a.budget_revise);
+  }, [lines, projectNameMap, engageByLine, constateByLine, supplierAggByLine]);
 
   const [filterTypeDepense, setFilterTypeDepense] = useState<string>('__all__');
   const [filterMois, setFilterMois] = useState<string>('__all__');
@@ -755,9 +761,13 @@ export default function ITBudgetGlobal() {
     kind: 'manuel' | 'commande' | 'facture' | 'none';
     groupId?: string | null;
     rows: ITBudgetLineRow[];
-    totalBudget: number;
-    totalCommande: number;
-    totalFacture: number;
+    // Totaux canoniques (cf. src/lib/itBudgetCanon.ts) — alignés sur les KPI globaux
+    // et l'affichage par ligne. Inclut la HT estimée des écritures comptables et le
+    // fallback déclaratif statut=engage_total.
+    totalBudgetInitial: number;
+    totalBudgetRevise: number;
+    totalEngage: number;
+    totalConstate: number;
   };
   const lineGroups: LineGroup[] = useMemo(() => {
     if (!groupByRapprochement) return [];
@@ -765,7 +775,11 @@ export default function ITBudgetGlobal() {
     const getOrInit = (key: string, label: string, kind: LineGroup['kind'], extras?: Partial<LineGroup>): LineGroup => {
       let g = map.get(key);
       if (!g) {
-        g = { key, label, kind, rows: [], totalBudget: 0, totalCommande: 0, totalFacture: 0, ...extras };
+        g = {
+          key, label, kind, rows: [],
+          totalBudgetInitial: 0, totalBudgetRevise: 0, totalEngage: 0, totalConstate: 0,
+          ...extras,
+        };
         map.set(key, g);
       }
       return g;
@@ -795,10 +809,15 @@ export default function ITBudgetGlobal() {
       }
       const g = getOrInit(key, label, kind, extras);
       g.rows.push(row);
-      g.totalBudget += lineAnnualBudgetRevise(row);
-      const ec = engageConstateData?.rows.find((r) => r.budget_line_id === row.id);
-      g.totalCommande += Number(ec?.engage ?? 0);
-      g.totalFacture += Number(ec?.constate ?? 0);
+      const canon = computeBudgetCanon(row, {
+        cf_amount: row._cf_amount,
+        ff_amount: row._ff_amount,
+        supplier_ht_amount: row._supplier_ht_amount,
+      });
+      g.totalBudgetInitial += canon.budget_initial;
+      g.totalBudgetRevise += canon.budget_revise;
+      g.totalEngage       += canon.engage;
+      g.totalConstate     += canon.constate;
     }
     // Tri : groupes manuels d'abord, puis CFK/FFK, puis lignes non rattachées
     const order: Record<LineGroup['kind'], number> = { manuel: 0, commande: 1, facture: 2, none: 3 };
@@ -806,7 +825,7 @@ export default function ITBudgetGlobal() {
       if (order[a.kind] !== order[b.kind]) return order[a.kind] - order[b.kind];
       return a.label.localeCompare(b.label);
     });
-  }, [groupByRapprochement, filteredLineRows, linkedRefs, engageConstateData, groupById]);
+  }, [groupByRapprochement, filteredLineRows, linkedRefs, groupById]);
 
   const toggleGroup = useCallback((key: string) => {
     setCollapsedGroups((prev) => {
@@ -829,15 +848,11 @@ export default function ITBudgetGlobal() {
   const budgetReviseGlobal = kpis.budget_revise;
 
   /**
-   * Forecast corrigé : `useITBudgetGlobal` renvoie engage/constate = 0 (TODO
-   * Phase 2). Ici on recalcule avec les données réelles de Divalto via
-   * `useITBudgetEngageConstate`, ce qui évite l'incohérence "Forecast = 0 et
-   * Écart = -Budget révisé".
-   *
-   * Règle : le forecast représente le décaissement anticipé à fin d'année =
-   * le plus grand entre engagé (commandes) et constaté (factures), + les
-   * dépenses manuelles prévues. On ne gonfle pas le forecast avec le budget
-   * restant non-engagé, pour rester réaliste sur la trajectoire réelle.
+   * Forecast corrigé : décaissement anticipé à fin d'année = max(engagé, constaté)
+   * + dépenses manuelles prévues. Le hook fournit déjà engage/constate canoniques
+   * (CF Divalto / FF Divalto + écritures comptables HT estimées TVA 20% + fallback
+   * statut=engage_total). On garde le max() pour couvrir le cas marginal où une
+   * facture arrive sans commande Divalto associée (constate > engage).
    */
   const forecastCorrige = Math.max(engageGlobal, constateGlobal) + manuel_prevu;
   const ecartCorrige = forecastCorrige - kpis.budget_revise;
@@ -1372,6 +1387,10 @@ export default function ITBudgetGlobal() {
                               <p className="mt-1 text-base font-bold tabular-nums">{eur(row.budget_revise)}</p>
                               <Progress value={pct} className="h-1.5 mt-2" />
                               <p className="text-[10px] text-muted-foreground mt-1">{pct}% du total</p>
+                              <div className="mt-2 flex items-center justify-between text-[10px] tabular-nums">
+                                <span className="text-amber-700 dark:text-amber-400">Eng. {eur(row.engage)}</span>
+                                <span className="text-emerald-700 dark:text-emerald-400">Const. {eur(row.constate)}</span>
+                              </div>
                             </div>
                           );
                         })}
@@ -1401,7 +1420,10 @@ export default function ITBudgetGlobal() {
                             <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={(v) => eur(Number(v))} />
                             <YAxis type="category" dataKey="sous_categorie" width={120} tick={{ fontSize: 10 }} />
                             <RechartsTooltip formatter={(value: number) => eur(value)} />
-                            <Bar dataKey="budget_revise" name="Budget révisé" fill="#6366f1" radius={[0, 4, 4, 0]} />
+                            <Legend wrapperStyle={{ fontSize: 10 }} />
+                            <Bar dataKey="budget_revise" name="Révisé" fill="#6366f1" radius={[0, 4, 4, 0]} />
+                            <Bar dataKey="engage" name="Engagé" fill="#f59e0b" radius={[0, 4, 4, 0]} />
+                            <Bar dataKey="constate" name="Constaté" fill="#10b981" radius={[0, 4, 4, 0]} />
                           </BarChart>
                         </ResponsiveContainer>
                       )}
@@ -1433,6 +1455,8 @@ export default function ITBudgetGlobal() {
                             <Legend />
                             <Bar dataKey="budget_initial" name="Initial" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                             <Bar dataKey="budget_revise" name="Révisé" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="engage" name="Engagé" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="constate" name="Constaté" fill="#10b981" radius={[4, 4, 0, 0]} />
                           </BarChart>
                         </ResponsiveContainer>
                       )}
@@ -1454,7 +1478,10 @@ export default function ITBudgetGlobal() {
                             <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={(v) => eur(Number(v))} />
                             <YAxis type="category" dataKey="entite" width={100} tick={{ fontSize: 10 }} />
                             <RechartsTooltip formatter={(value: number) => eur(value)} />
-                            <Bar dataKey="budget" name="Budget" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                            <Legend wrapperStyle={{ fontSize: 10 }} />
+                            <Bar dataKey="budget_revise" name="Révisé" fill="#6366f1" radius={[0, 4, 4, 0]} />
+                            <Bar dataKey="engage" name="Engagé" fill="#f59e0b" radius={[0, 4, 4, 0]} />
+                            <Bar dataKey="constate" name="Constaté" fill="#10b981" radius={[0, 4, 4, 0]} />
                           </BarChart>
                         </ResponsiveContainer>
                       )}
@@ -1484,7 +1511,10 @@ export default function ITBudgetGlobal() {
                             <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={(v) => eur(Number(v))} />
                             <YAxis type="category" dataKey="fournisseur" width={130} tick={{ fontSize: 10 }} />
                             <RechartsTooltip formatter={(value: number) => eur(value)} />
-                            <Bar dataKey="budget" name="Budget révisé" fill="#f59e0b" radius={[0, 4, 4, 0]} />
+                            <Legend wrapperStyle={{ fontSize: 10 }} />
+                            <Bar dataKey="budget_revise" name="Révisé" fill="#6366f1" radius={[0, 4, 4, 0]} />
+                            <Bar dataKey="engage" name="Engagé" fill="#f59e0b" radius={[0, 4, 4, 0]} />
+                            <Bar dataKey="constate" name="Constaté" fill="#10b981" radius={[0, 4, 4, 0]} />
                           </BarChart>
                         </ResponsiveContainer>
                       )}
@@ -1510,7 +1540,10 @@ export default function ITBudgetGlobal() {
                             <XAxis type="number" tick={{ fontSize: 10 }} tickFormatter={(v) => eur(Number(v))} />
                             <YAxis type="category" dataKey="projet" width={140} tick={{ fontSize: 10 }} />
                             <RechartsTooltip formatter={(value: number) => eur(value)} />
-                            <Bar dataKey="budget" name="Budget révisé" fill="#10b981" radius={[0, 4, 4, 0]} />
+                            <Legend wrapperStyle={{ fontSize: 10 }} />
+                            <Bar dataKey="budget_revise" name="Révisé" fill="#6366f1" radius={[0, 4, 4, 0]} />
+                            <Bar dataKey="engage" name="Engagé" fill="#f59e0b" radius={[0, 4, 4, 0]} />
+                            <Bar dataKey="constate" name="Constaté" fill="#10b981" radius={[0, 4, 4, 0]} />
                           </BarChart>
                         </ResponsiveContainer>
                       )}
@@ -1980,11 +2013,14 @@ export default function ITBudgetGlobal() {
                                           Rapprocher
                                         </Button>
                                       )}
-                                      <span className="ml-auto flex items-center gap-4 text-xs text-muted-foreground">
-                                        <span>Budget <span className="tabular-nums text-foreground font-medium">{eur(g.totalBudget)}</span></span>
-                                        <span>Engagé <span className="tabular-nums text-indigo-700 dark:text-indigo-400 font-medium">{eur(g.totalCommande)}</span></span>
-                                        <span>Constaté <span className="tabular-nums text-violet-700 dark:text-violet-400 font-medium">{eur(g.totalFacture)}</span></span>
-                                      </span>
+                                      {g.kind !== 'none' && (
+                                        <span className="ml-auto flex items-center gap-4 text-xs text-muted-foreground">
+                                          <span>Initial <span className="tabular-nums text-foreground font-medium">{eur(g.totalBudgetInitial)}</span></span>
+                                          <span>Reforecast <span className="tabular-nums text-foreground font-medium">{eur(g.totalBudgetRevise)}</span></span>
+                                          <span>Engagé <span className="tabular-nums text-indigo-700 dark:text-indigo-400 font-medium">{eur(g.totalEngage)}</span></span>
+                                          <span>Constaté <span className="tabular-nums text-violet-700 dark:text-violet-400 font-medium">{eur(g.totalConstate)}</span></span>
+                                        </span>
+                                      )}
                                     </div>
                                   </TableCell>
                                 </TableRow>

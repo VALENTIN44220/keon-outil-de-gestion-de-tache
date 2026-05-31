@@ -11,6 +11,7 @@ import { useITBudgetOptions, PRESET_CATEGORIES } from '@/hooks/useITBudgetOption
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { extractErrorMessage } from '@/lib/extractErrorMessage';
 import { lineAnnualBudget, lineAnnualBudgetRevise } from '@/lib/itBudgetTotals';
+import { computeBudgetCanon } from '@/lib/itBudgetCanon';
 import { useITProjects } from '@/hooks/useITProjects';
 import {
   BUDGET_LINE_STATUT_CONFIG,
@@ -181,6 +182,9 @@ export default function ITProjectHubBudget() {
     deleteExpense,
     reallocations,
     kpis,
+    engageByLine,
+    constateByLine,
+    supplierAggByLine,
   } = useITProjectBudget(project?.id);
   const { projects: allProjects = [] } = useITProjects();
 
@@ -427,16 +431,27 @@ export default function ITProjectHubBudget() {
   }, [lines, filterTypeDepense, filterMois]);
 
   const chartRows = useMemo(() => {
-    const map = new Map<string, { categorie: string; budget_initial: number; budget_revise: number }>();
+    type Row = { categorie: string; budget_initial: number; budget_revise: number; engage: number; constate: number };
+    const map = new Map<string, Row>();
     for (const l of lines) {
       const key = (l.categorie?.trim() || 'Sans catégorie');
-      const cur = map.get(key) || { categorie: key, budget_initial: 0, budget_revise: 0 };
-      cur.budget_initial += lineAnnualBudget(l);
-      cur.budget_revise += lineAnnualBudgetRevise(l);
-      map.set(key, cur);
+      let cur = map.get(key);
+      if (!cur) {
+        cur = { categorie: key, budget_initial: 0, budget_revise: 0, engage: 0, constate: 0 };
+        map.set(key, cur);
+      }
+      const canon = computeBudgetCanon(l, {
+        cf_amount: engageByLine?.get(l.id) ?? 0,
+        ff_amount: constateByLine?.get(l.id) ?? 0,
+        supplier_ht_amount: supplierAggByLine?.get(l.id) ?? 0,
+      });
+      cur.budget_initial += canon.budget_initial;
+      cur.budget_revise  += canon.budget_revise;
+      cur.engage         += canon.engage;
+      cur.constate       += canon.constate;
     }
     return Array.from(map.values()).sort((a, b) => a.categorie.localeCompare(b.categorie, 'fr'));
-  }, [lines]);
+  }, [lines, engageByLine, constateByLine, supplierAggByLine]);
 
   const lineLabelById = useMemo(() => {
     const m = new Map<string, string>();
@@ -735,12 +750,7 @@ export default function ITProjectHubBudget() {
               <div className="flex flex-1 min-w-[160px] max-w-[220px] flex-col rounded-xl border border-indigo-200 bg-indigo-50/50 p-4 shadow-sm dark:bg-indigo-950/20">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-medium text-muted-foreground">Engagé</span>
-                  <div className="flex items-center gap-1.5">
-                    <Badge variant="secondary" className="text-[10px] font-normal px-1.5 py-0 text-muted-foreground">
-                      Phase 2
-                    </Badge>
-                    <ShoppingCart className="h-4 w-4 text-indigo-600 shrink-0" />
-                  </div>
+                  <ShoppingCart className="h-4 w-4 text-indigo-600 shrink-0" />
                 </div>
                 <p className="mt-2 text-xl font-bold tabular-nums text-indigo-800 dark:text-indigo-200">
                   {eur(kpis.engage)}
@@ -749,12 +759,7 @@ export default function ITProjectHubBudget() {
               <div className="flex flex-1 min-w-[160px] max-w-[220px] flex-col rounded-xl border border-violet-200 bg-violet-50/50 p-4 shadow-sm dark:bg-violet-950/20">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-medium text-muted-foreground">Constaté</span>
-                  <div className="flex items-center gap-1.5">
-                    <Badge variant="secondary" className="text-[10px] font-normal px-1.5 py-0 text-muted-foreground">
-                      Phase 2
-                    </Badge>
-                    <CheckCircle2 className="h-4 w-4 text-violet-600 shrink-0" />
-                  </div>
+                  <CheckCircle2 className="h-4 w-4 text-violet-600 shrink-0" />
                 </div>
                 <p className="mt-2 text-xl font-bold tabular-nums text-violet-800 dark:text-violet-200">
                   {eur(kpis.constate)}
@@ -783,7 +788,7 @@ export default function ITProjectHubBudget() {
                 </div>
                 <Progress value={progressValue} className="h-3" />
                 <p className="text-[11px] text-muted-foreground">
-                  ℹ Engagé et Constaté seront alimentés depuis Divalto (Phase 2)
+                  ℹ Engagé = CF Divalto (ou fallback statut « engagé total »). Constaté = FF Divalto + écritures comptables HT estimées (TVA 20%).
                 </p>
               </CardContent>
             </Card>
@@ -948,7 +953,7 @@ export default function ITProjectHubBudget() {
 
               <TabsContent value="expenses" className="space-y-4 mt-4">
                 <p className="text-xs text-muted-foreground rounded-md border border-blue-200/60 bg-blue-50/40 px-3 py-2 dark:bg-blue-950/20">
-                  Les dépenses Divalto (CFK commandes / FFK factures) seront connectées en Phase 2
+                  Les dépenses manuelles complètent les CF/FF Divalto et les écritures comptables rattachées pour calculer le forecast.
                 </p>
                 <Button onClick={openAddExpense} className="gap-2">
                   <Plus className="h-4 w-4" />
@@ -1125,8 +1130,10 @@ export default function ITProjectHubBudget() {
                         labelFormatter={(l) => String(l)}
                       />
                       <Legend />
-                      <Bar dataKey="budget_initial" name="Budget initial" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="budget_revise" name="Budget révisé" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="budget_initial" name="Initial" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="budget_revise" name="Révisé" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="engage" name="Engagé" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="constate" name="Constaté" fill="#10b981" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 )}
