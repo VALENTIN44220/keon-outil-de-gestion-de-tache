@@ -827,6 +827,56 @@ export default function ITBudgetGlobal() {
     });
   }, [groupByRapprochement, filteredLineRows, linkedRefs, groupById]);
 
+  // ── Bilan par groupe (toujours actif, pour la Synthèse) ──────────────────
+  // Même logique que lineGroups mais indépendant du toggle, trié par F26 desc.
+  // Utilisé par le tableau bilan en haut de l'onglet Synthèse — vue la plus
+  // consultée pour identifier les groupes en sur-engagement ou sur-consommation.
+  const summaryGroups: LineGroup[] = useMemo(() => {
+    const map = new Map<string, LineGroup>();
+    const getOrInit = (key: string, label: string, kind: LineGroup['kind'], extras?: Partial<LineGroup>): LineGroup => {
+      let g = map.get(key);
+      if (!g) {
+        g = {
+          key, label, kind, rows: [],
+          totalBudgetInitial: 0, totalBudgetRevise: 0, totalEngage: 0, totalConstate: 0,
+          ...extras,
+        };
+        map.set(key, g);
+      }
+      return g;
+    };
+    for (const row of filteredLineRows) {
+      let key = '_none_';
+      let label = 'Lignes non rattachées';
+      let kind: LineGroup['kind'] = 'none';
+      let extras: Partial<LineGroup> | undefined;
+      if (row.rapprochement_group_id) {
+        const grp = groupById.get(row.rapprochement_group_id);
+        key = 'grp:' + row.rapprochement_group_id;
+        label = grp?.nom ?? `Groupe ${row.rapprochement_group_id.slice(0, 8)}…`;
+        kind = 'manuel';
+        extras = { groupId: row.rapprochement_group_id, description: grp?.description ?? null };
+      } else {
+        const refs = linkedRefs.get(row.id);
+        if (refs && refs.commandes.length > 0) { key = 'cmd:' + refs.commandes[0]; label = refs.commandes[0]; kind = 'commande'; }
+        else if (refs && refs.factures.length > 0) { key = 'fac:' + refs.factures[0]; label = refs.factures[0]; kind = 'facture'; }
+      }
+      const g = getOrInit(key, label, kind, extras);
+      g.rows.push(row);
+      const canon = computeBudgetCanon(row, {
+        cf_amount: row._cf_amount,
+        ff_amount: row._ff_amount,
+        supplier_ht_amount: row._supplier_ht_amount,
+      });
+      g.totalBudgetInitial += canon.budget_initial;
+      g.totalBudgetRevise  += canon.budget_revise;
+      g.totalEngage        += canon.engage;
+      g.totalConstate      += canon.constate;
+    }
+    // Tri par F26 desc (les plus gros budgets en premier)
+    return Array.from(map.values()).sort((a, b) => b.totalBudgetRevise - a.totalBudgetRevise);
+  }, [filteredLineRows, linkedRefs, groupById]);
+
   const toggleGroup = useCallback((key: string) => {
     setCollapsedGroups((prev) => {
       const next = new Set(prev);
@@ -1421,7 +1471,7 @@ export default function ITBudgetGlobal() {
                             <YAxis type="category" dataKey="sous_categorie" width={120} tick={{ fontSize: 10 }} />
                             <RechartsTooltip formatter={(value: number) => eur(value)} />
                             <Legend wrapperStyle={{ fontSize: 10 }} />
-                            <Bar dataKey="budget_revise" name="Révisé" fill="#6366f1" radius={[0, 4, 4, 0]} />
+                            <Bar dataKey="budget_revise" name="F26" fill="#6366f1" radius={[0, 4, 4, 0]} />
                             <Bar dataKey="engage" name="Engagé" fill="#f59e0b" radius={[0, 4, 4, 0]} />
                             <Bar dataKey="constate" name="Constaté" fill="#10b981" radius={[0, 4, 4, 0]} />
                           </BarChart>
@@ -1453,8 +1503,8 @@ export default function ITBudgetGlobal() {
                             <YAxis tick={{ fontSize: 10 }} />
                             <RechartsTooltip formatter={(value: number) => eur(value)} />
                             <Legend />
-                            <Bar dataKey="budget_initial" name="Initial" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                            <Bar dataKey="budget_revise" name="Révisé" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="budget_initial" name="BUD26" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="budget_revise" name="F26" fill="#6366f1" radius={[4, 4, 0, 0]} />
                             <Bar dataKey="engage" name="Engagé" fill="#f59e0b" radius={[4, 4, 0, 0]} />
                             <Bar dataKey="constate" name="Constaté" fill="#10b981" radius={[4, 4, 0, 0]} />
                           </BarChart>
@@ -1479,7 +1529,7 @@ export default function ITBudgetGlobal() {
                             <YAxis type="category" dataKey="entite" width={100} tick={{ fontSize: 10 }} />
                             <RechartsTooltip formatter={(value: number) => eur(value)} />
                             <Legend wrapperStyle={{ fontSize: 10 }} />
-                            <Bar dataKey="budget_revise" name="Révisé" fill="#6366f1" radius={[0, 4, 4, 0]} />
+                            <Bar dataKey="budget_revise" name="F26" fill="#6366f1" radius={[0, 4, 4, 0]} />
                             <Bar dataKey="engage" name="Engagé" fill="#f59e0b" radius={[0, 4, 4, 0]} />
                             <Bar dataKey="constate" name="Constaté" fill="#10b981" radius={[0, 4, 4, 0]} />
                           </BarChart>
@@ -1512,7 +1562,7 @@ export default function ITBudgetGlobal() {
                             <YAxis type="category" dataKey="fournisseur" width={130} tick={{ fontSize: 10 }} />
                             <RechartsTooltip formatter={(value: number) => eur(value)} />
                             <Legend wrapperStyle={{ fontSize: 10 }} />
-                            <Bar dataKey="budget_revise" name="Révisé" fill="#6366f1" radius={[0, 4, 4, 0]} />
+                            <Bar dataKey="budget_revise" name="F26" fill="#6366f1" radius={[0, 4, 4, 0]} />
                             <Bar dataKey="engage" name="Engagé" fill="#f59e0b" radius={[0, 4, 4, 0]} />
                             <Bar dataKey="constate" name="Constaté" fill="#10b981" radius={[0, 4, 4, 0]} />
                           </BarChart>
@@ -1541,7 +1591,7 @@ export default function ITBudgetGlobal() {
                             <YAxis type="category" dataKey="projet" width={140} tick={{ fontSize: 10 }} />
                             <RechartsTooltip formatter={(value: number) => eur(value)} />
                             <Legend wrapperStyle={{ fontSize: 10 }} />
-                            <Bar dataKey="budget_revise" name="Révisé" fill="#6366f1" radius={[0, 4, 4, 0]} />
+                            <Bar dataKey="budget_revise" name="F26" fill="#6366f1" radius={[0, 4, 4, 0]} />
                             <Bar dataKey="engage" name="Engagé" fill="#f59e0b" radius={[0, 4, 4, 0]} />
                             <Bar dataKey="constate" name="Constaté" fill="#10b981" radius={[0, 4, 4, 0]} />
                           </BarChart>
@@ -1550,6 +1600,118 @@ export default function ITBudgetGlobal() {
                     </CardContent>
                   </Card>
                 </div>
+
+                {/* --- Bilan par groupe de rapprochement (vue rapide écarts) --- */}
+                <Card>
+                  <CardContent className="pt-6">
+                    <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                      <Boxes className="h-4 w-4" />
+                      Bilan par groupe — BUD26 / F26 / Engagé / Constaté
+                      <span className="text-xs font-normal text-muted-foreground ml-2">
+                        ({summaryGroups.length} groupes — trié par F26 desc.)
+                      </span>
+                    </h3>
+                    {summaryGroups.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-8 text-muted-foreground border border-dashed rounded-lg">
+                        <p className="text-sm">Aucun groupe</p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto max-h-[60vh]">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Groupe</TableHead>
+                              <TableHead className="text-right">Lignes</TableHead>
+                              <TableHead className="text-right">BUD26</TableHead>
+                              <TableHead className="text-right">F26</TableHead>
+                              <TableHead className="text-right">Engagé</TableHead>
+                              <TableHead className="text-right">Constaté</TableHead>
+                              <TableHead className="text-right">Conso %</TableHead>
+                              <TableHead className="text-right">Reste F26</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {summaryGroups.map((g) => {
+                              const overEngage = g.totalBudgetRevise > 0 && g.totalEngage > g.totalBudgetRevise * 1.001;
+                              const overConstateBudget = g.totalBudgetRevise > 0 && g.totalConstate > g.totalBudgetRevise * 1.001;
+                              const overConstateEngage = g.totalEngage > 0 && g.totalConstate > g.totalEngage * 1.001 && !overConstateBudget;
+                              const pct = g.totalBudgetRevise > 0 ? (g.totalConstate / g.totalBudgetRevise) * 100 : 0;
+                              const pctTone =
+                                pct > 100 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 font-semibold'
+                                : pct > 80 ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300 font-semibold'
+                                : pct > 0  ? 'text-emerald-700 dark:text-emerald-400'
+                                : 'text-muted-foreground';
+                              const reste = g.totalBudgetRevise - g.totalConstate;
+                              const Icon = g.kind === 'manuel' ? Boxes
+                                : g.kind === 'commande' ? Receipt
+                                : g.kind === 'facture' ? FileText
+                                : Layers;
+                              return (
+                                <TableRow key={g.key} className={cn(g.kind === 'none' && 'bg-muted/30')}>
+                                  <TableCell>
+                                    <div className="flex items-center gap-2">
+                                      <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                                      <span className={cn('truncate max-w-[260px]', g.kind === 'manuel' ? 'font-semibold' : 'font-mono text-xs')}>{g.label}</span>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-right text-xs tabular-nums">{g.rows.length}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{eur(g.totalBudgetInitial)}</TableCell>
+                                  <TableCell className="text-right tabular-nums font-medium">{eur(g.totalBudgetRevise)}</TableCell>
+                                  <TableCell className="text-right">
+                                    <span className={cn(
+                                      'tabular-nums inline-block px-1 rounded',
+                                      g.totalEngage > 0 && !overEngage && 'text-indigo-700 dark:text-indigo-400',
+                                      overEngage && 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 font-semibold',
+                                    )}>{eur(g.totalEngage)}</span>
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <span className={cn(
+                                      'tabular-nums inline-block px-1 rounded',
+                                      g.totalConstate > 0 && !overConstateEngage && !overConstateBudget && 'text-violet-700 dark:text-violet-400 font-medium',
+                                      overConstateEngage && 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300 font-semibold',
+                                      overConstateBudget && 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 font-semibold',
+                                    )}>{eur(g.totalConstate)}</span>
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <span className={cn('tabular-nums inline-block px-1 rounded', pctTone)}>
+                                      {pct.toFixed(0)}%
+                                    </span>
+                                  </TableCell>
+                                  <TableCell className={cn(
+                                    'text-right tabular-nums',
+                                    reste < 0 ? 'text-red-700 font-semibold' : 'text-muted-foreground',
+                                  )}>{eur(reste)}</TableCell>
+                                </TableRow>
+                              );
+                            })}
+                            {/* Ligne totaux */}
+                            {(() => {
+                              const tBI = summaryGroups.reduce((s, g) => s + g.totalBudgetInitial, 0);
+                              const tBR = summaryGroups.reduce((s, g) => s + g.totalBudgetRevise, 0);
+                              const tEn = summaryGroups.reduce((s, g) => s + g.totalEngage, 0);
+                              const tCo = summaryGroups.reduce((s, g) => s + g.totalConstate, 0);
+                              const tNL = summaryGroups.reduce((s, g) => s + g.rows.length, 0);
+                              const pct = tBR > 0 ? (tCo / tBR) * 100 : 0;
+                              const reste = tBR - tCo;
+                              return (
+                                <TableRow className="bg-muted/60 font-semibold border-t-2">
+                                  <TableCell>TOTAL</TableCell>
+                                  <TableCell className="text-right text-xs tabular-nums">{tNL}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{eur(tBI)}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{eur(tBR)}</TableCell>
+                                  <TableCell className="text-right tabular-nums text-indigo-700 dark:text-indigo-400">{eur(tEn)}</TableCell>
+                                  <TableCell className="text-right tabular-nums text-violet-700 dark:text-violet-400">{eur(tCo)}</TableCell>
+                                  <TableCell className="text-right tabular-nums">{pct.toFixed(0)}%</TableCell>
+                                  <TableCell className={cn('text-right tabular-nums', reste < 0 && 'text-red-700')}>{eur(reste)}</TableCell>
+                                </TableRow>
+                              );
+                            })()}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
 
                 {/* --- Ventilation mensuelle globale --- */}
                 <Card>
@@ -1806,7 +1968,10 @@ export default function ITBudgetGlobal() {
                     </p>
                   </div>
                 ) : (
-                  <div className="rounded-md border overflow-hidden min-w-0">
+                  // overflow-auto + max-h pour garder la scrollbar horizontale
+                  // visible en permanence (sinon elle n'apparaît qu'en bas de page
+                  // après avoir scrollé verticalement la page entière).
+                  <div className="rounded-md border overflow-auto min-w-0 max-h-[calc(100vh-260px)]">
                     <BudgetLinesBulkActionsBar
                       selectedIds={Array.from(selectedLineIds)}
                       allLines={lines as any}
