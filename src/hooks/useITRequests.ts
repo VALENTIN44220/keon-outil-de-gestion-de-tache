@@ -10,7 +10,14 @@ export interface ITRequest {
   id: string;
   title: string;
   description: string | null;
+  /** @deprecated Statut legacy partagé. Préférer `it_request_status` pour le workflow IT. */
   status: string;
+  /** Machine d'état dédiée IT (voir useITRequestStatus). Initialisé à 'affectee' par le trigger. */
+  it_request_status: string | null;
+  /** Historique des transitions {statut: timestamp ISO} (merge côté useITRequestStatus). */
+  it_status_dates: Record<string, string> | null;
+  /** Urgence IT (normal|urgent|critique) — défaut 'normal'. */
+  it_urgency: string | null;
   assignee_id: string | null;
   requester_id: string | null;
   source_process_template_id: string | null;

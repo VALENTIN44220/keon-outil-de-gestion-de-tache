@@ -32,47 +32,31 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSimulation } from '@/contexts/SimulationContext';
 import type { TaskStats } from '@/types/task';
 import { ITRequestDetailDialog } from '@/components/it/ITRequestDetailDialog';
+import {
+  IT_REQUEST_STATUS_META, useITRequestStatus, type ITRequestStatus,
+} from '@/hooks/useITRequestStatus';
+import { ITRequestStatusBadge } from '@/components/it/ITRequestStatusBadge';
 import type {
   ModuleDispatchConfig, ModuleKpi, ModuleRowCtx,
 } from '@/components/modules/ModuleDispatchView';
 
-const STATUS_LABELS: Record<string, string> = {
-  todo: 'À affecter',
-  affectee: 'Affectée',
-  in_progress: 'En cours',
-  'in-progress': 'En cours',
-  en_attente_complement_demandeur: 'Attente compléments',
-  en_attente_retour_externe: 'Attente tiers',
-  en_attente_retour_ticket_itp: 'Attente ticket ITP',
-  en_attente_retour_ticket_blc: 'Attente ticket BLC',
-  en_attente_chiffrage: 'Attente chiffrage',
-  realisee: 'Réalisée',
-  done: 'Terminée',
-  cancelled: 'Annulée',
-};
+// Labels/colors résolus depuis le canon useITRequestStatus (source de vérité).
+const STATUS_LABELS: Record<string, string> = Object.fromEntries(
+  Object.entries(IT_REQUEST_STATUS_META).map(([k, m]) => [k, m.label])
+);
 
-const STATUS_COLORS: Record<string, string> = {
-  todo: 'bg-amber-100 text-amber-800 border-amber-300',
-  affectee: 'bg-blue-100 text-blue-800 border-blue-300',
-  in_progress: 'bg-violet-100 text-violet-800 border-violet-300',
-  'in-progress': 'bg-violet-100 text-violet-800 border-violet-300',
-  en_attente_complement_demandeur: 'bg-yellow-100 text-yellow-800 border-yellow-300',
-  en_attente_retour_externe: 'bg-orange-100 text-orange-800 border-orange-300',
-  en_attente_retour_ticket_itp: 'bg-orange-100 text-orange-800 border-orange-300',
-  en_attente_retour_ticket_blc: 'bg-orange-100 text-orange-800 border-orange-300',
-  en_attente_chiffrage: 'bg-amber-100 text-amber-800 border-amber-300',
-  realisee: 'bg-emerald-100 text-emerald-800 border-emerald-300',
-  done: 'bg-green-100 text-green-800 border-green-300',
-  cancelled: 'bg-gray-100 text-gray-700 border-gray-300',
-};
+const TERMINAL_STATUSES: string[] = ['cloturee', 'refusee'];
 
-const TERMINAL_STATUSES = ['realisee', 'cloturee', 'cancelled', 'abandonnee', 'done'];
+// Helper : statut métier d'une demande (canon IT en priorité, fallback legacy).
+const itStatusOf = (r: ITRequest): string =>
+  (r.it_request_status as string | null) ?? r.status;
 
 interface ITExtraFilter {
   prestation: string; // process_template_id ou 'all'
   project: string;    // it_project_id ou 'all' ou 'none'
 }
 
+// Update status legacy via colonne `status` — conservé pour les cas hors canon (cancelled).
 const updateStatus = async (id: string, newStatus: string, refetch: () => void) => {
   try {
     const { error } = await supabase.from('tasks').update({ status: newStatus }).eq('id', id);
@@ -120,7 +104,9 @@ export const itDispatchConfig: ModuleDispatchConfig<ITRequest, ITExtraFilter> = 
 
   useRequests: useITRequests,
   getId: (r) => r.id,
-  getStatus: (r) => r.status,
+  // Source de vérité = it_request_status (canon IT). Fallback sur status legacy pour
+  // les demandes pré-migration ou les statuts non couverts par le canon (cancelled).
+  getStatus: (r) => itStatusOf(r),
   getRequesterId: (r) => r.requester_id,
   getAssigneeId: (r) => r.assignee_id,
 
@@ -131,15 +117,18 @@ export const itDispatchConfig: ModuleDispatchConfig<ITRequest, ITExtraFilter> = 
   extraProfileIds: (r) => [r.module_data?.referent_metier_profile_id as string | undefined],
 
   computeKpis: (requests): ModuleKpi[] => {
-    const actives = requests.filter(r => !['realisee', 'done', 'cancelled'].includes(r.status)).length;
-    const enCours = requests.filter(r => ['in_progress', 'in-progress'].includes(r.status)).length;
-    const enAttente = requests.filter(r => [
-      'en_attente_complement_demandeur', 'en_attente_retour_externe',
-      'en_attente_retour_ticket_itp', 'en_attente_retour_ticket_blc', 'en_attente_chiffrage',
-    ].includes(r.status)).length;
+    // KPIs basés sur it_request_status (canon).
+    const TERMINAL = new Set(['cloturee', 'refusee']);
+    const WAITING = new Set([
+      'complement_demande', 'en_attente_externe',
+      'en_attente_ticket_itp', 'en_attente_ticket_blc', 'en_attente_chiffrage',
+    ]);
+    const actives = requests.filter(r => !TERMINAL.has(itStatusOf(r))).length;
+    const enCours = requests.filter(r => itStatusOf(r) === 'en_cours').length;
+    const enAttente = requests.filter(r => WAITING.has(itStatusOf(r))).length;
     const now = new Date();
-    const realiseesMois = requests.filter(r => {
-      if (!['realisee', 'done'].includes(r.status)) return false;
+    const cloturesMois = requests.filter(r => {
+      if (itStatusOf(r) !== 'cloturee') return false;
       const d = new Date(r.updated_at);
       return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
     }).length;
@@ -147,19 +136,22 @@ export const itDispatchConfig: ModuleDispatchConfig<ITRequest, ITExtraFilter> = 
       { icon: ListChecks, label: 'Actives', value: actives, color: 'bg-slate-100 text-slate-700' },
       { icon: Clock, label: 'En cours', value: enCours, color: 'bg-violet-100 text-violet-700' },
       { icon: AlertCircle, label: 'En attente', value: enAttente, color: 'bg-amber-100 text-amber-700' },
-      { icon: CheckCircle2, label: 'Réalisées ce mois', value: realiseesMois, color: 'bg-emerald-100 text-emerald-700' },
+      { icon: CheckCircle2, label: 'Clôturées ce mois', value: cloturesMois, color: 'bg-emerald-100 text-emerald-700' },
     ];
   },
 
   computeStats: (requests): TaskStats => {
     const total = requests.length;
-    const todo = requests.filter(t => t.status === 'todo').length;
-    const inProgress = requests.filter(t => t.status === 'in-progress' || t.status === 'in_progress').length;
-    const done = requests.filter(t => t.status === 'realisee' || t.status === 'done').length;
-    const pendingValidation = requests.filter(t => t.status === 'pending_validation_1' || t.status === 'pending_validation_2').length;
-    const validated = requests.filter(t => t.status === 'validated').length;
-    const refused = requests.filter(t => t.status === 'refused').length;
-    const completionRate = total > 0 ? Math.round(((done + validated) / total) * 100) : 0;
+    const todo = requests.filter(r => itStatusOf(r) === 'affectee').length;
+    const inProgress = requests.filter(r => itStatusOf(r) === 'en_cours').length;
+    const done = requests.filter(r => itStatusOf(r) === 'cloturee').length;
+    const pendingValidation = requests.filter(r => {
+      const s = itStatusOf(r);
+      return s === 'a_relire' || s === 'a_valider';
+    }).length;
+    const validated = done;
+    const refused = requests.filter(r => itStatusOf(r) === 'refusee').length;
+    const completionRate = total > 0 ? Math.round((done / total) * 100) : 0;
     return { total, todo, inProgress, done, pendingValidation, validated, refused, completionRate };
   },
 
@@ -211,9 +203,7 @@ export const itDispatchConfig: ModuleDispatchConfig<ITRequest, ITExtraFilter> = 
       key: 'status',
       header: 'Statut',
       cell: (r) => (
-        <Badge variant="outline" className={cn('text-xs', STATUS_COLORS[r.status])}>
-          {STATUS_LABELS[r.status] ?? r.status}
-        </Badge>
+        <ITRequestStatusBadge status={itStatusOf(r)} compact />
       ),
     },
     {
@@ -418,26 +408,55 @@ function ITRowActions({ request: r, ctx }: { request: ITRequest; ctx: ModuleRowC
   const { profile: authProfile } = useAuth();
   const { isSimulating, simulatedProfile } = useSimulation();
   const myProfile = isSimulating && simulatedProfile ? simulatedProfile : authProfile;
+  const { updateITRequestStatus, isUpdating } = useITRequestStatus();
 
   const [showComplement, setShowComplement] = useState(false);
   const [complementMsg, setComplementMsg] = useState('');
   const [busy, setBusy] = useState(false);
 
+  // Action transition via canon IT (it_request_status). Si pas encore migrée, fallback legacy status.
+  const transition = async (next: ITRequestStatus) => {
+    setBusy(true);
+    try {
+      const prestation = (r.module_data?.prestation as string) ?? undefined;
+      await updateITRequestStatus({
+        taskId: r.id,
+        status: next,
+        notify: {
+          taskLabel: r.title,
+          prestationName: prestation,
+          dispatchManagerId: r.assignee_id,
+          assigneeId: r.assignee_id,
+          requesterId: r.requester_id,
+        },
+      });
+      ctx.refetch();
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const submitComplement = async () => {
     if (!myProfile?.id || !complementMsg.trim()) return;
     setBusy(true);
     try {
+      // Commentaire dans le chat (visible demandeur)
       const { error: cErr } = await supabase.from('task_comments').insert({
         task_id: r.id,
         author_id: myProfile.id,
         content: '[Complément demandé] ' + complementMsg.trim(),
       });
       if (cErr) throw cErr;
-      const { error: sErr } = await supabase
-        .from('tasks')
-        .update({ status: 'en_attente_complement_demandeur' })
-        .eq('id', r.id);
-      if (sErr) throw sErr;
+      // Transition canonique it_request_status='complement_demande'
+      await updateITRequestStatus({
+        taskId: r.id,
+        status: 'complement_demande',
+        notify: {
+          taskLabel: r.title,
+          prestationName: (r.module_data?.prestation as string) ?? undefined,
+          requesterId: r.requester_id,
+        },
+      });
       toast.success('Complément demandé — message posté');
       setShowComplement(false);
       setComplementMsg('');
@@ -449,34 +468,55 @@ function ITRowActions({ request: r, ctx }: { request: ITRequest; ctx: ModuleRowC
     }
   };
 
+  const currentStatus = itStatusOf(r);
+  const disabled = busy || isUpdating;
   let actionBtn: React.ReactNode = null;
-  switch (r.status) {
-    case 'todo':
+  switch (currentStatus) {
+    // Statuts canoniques IT
     case 'affectee':
       actionBtn = (
-        <Button size="sm" onClick={(e) => { e.stopPropagation(); updateStatus(r.id, 'in-progress', ctx.refetch); }}>
+        <Button size="sm" disabled={disabled} onClick={(e) => { e.stopPropagation(); void transition('en_cours'); }}>
           Démarrer
         </Button>
       );
       break;
-    case 'in_progress':
-    case 'in-progress':
+    case 'en_cours':
       actionBtn = (
         <div className="flex gap-1">
-          <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); setShowComplement(true); }}>
+          <Button size="sm" variant="outline" disabled={disabled} onClick={(e) => { e.stopPropagation(); setShowComplement(true); }}>
             Demander complément
           </Button>
-          <Button size="sm" onClick={(e) => { e.stopPropagation(); updateStatus(r.id, 'realisee', ctx.refetch); }}>
-            Réalisée
+          <Button size="sm" disabled={disabled} onClick={(e) => { e.stopPropagation(); void transition('a_relire'); }}>
+            Soumettre N1
           </Button>
         </div>
       );
       break;
-    case 'en_attente_complement_demandeur':
-    case 'en_attente_retour_externe':
+    case 'complement_demande':
+    case 'en_attente_externe':
+    case 'en_attente_ticket_itp':
+    case 'en_attente_ticket_blc':
+    case 'en_attente_chiffrage':
       actionBtn = (
-        <Button size="sm" onClick={(e) => { e.stopPropagation(); updateStatus(r.id, 'in-progress', ctx.refetch); }}>
+        <Button size="sm" disabled={disabled} onClick={(e) => { e.stopPropagation(); void transition('en_cours'); }}>
           Reprendre
+        </Button>
+      );
+      break;
+    // Statuts a_relire / a_valider : action via dashboard "IT — à valider", pas ici.
+    case 'a_relire':
+    case 'a_valider':
+      actionBtn = (
+        <span className="text-[10px] text-muted-foreground italic">→ dashboard</span>
+      );
+      break;
+    // Fallback statuts legacy pré-migration
+    case 'todo':
+    case 'in_progress':
+    case 'in-progress':
+      actionBtn = (
+        <Button size="sm" disabled={disabled} onClick={(e) => { e.stopPropagation(); void transition('en_cours'); }}>
+          Démarrer
         </Button>
       );
       break;

@@ -115,6 +115,12 @@ export default function NewITRequest() {
       if (attachments.length) moduleData.attachments = attachments;
       if (links.length) moduleData.links = links;
 
+      // Mapping priority UI (low|medium|high|urgent) → it_urgency canon (normal|urgent|critique)
+      const it_urgency: string =
+        priority === 'urgent' || priority === 'high' ? 'urgent' :
+        priority === 'critique' ? 'critique' :
+        'normal';
+
       const { data: inserted, error } = await supabase.from('tasks').insert({
         type: 'request',
         status: 'todo',
@@ -126,6 +132,9 @@ export default function NewITRequest() {
         source_process_template_id: prestation.id,
         it_project_id: itProjectId !== 'none' ? itProjectId : null,
         priority: priority as any,
+        it_urgency,
+        // Le trigger handle_it_request_submission pose it_request_status='affectee'
+        // + it_status_dates + assignee_id automatiquement après cet INSERT.
         due_date: echeanceSouhaitee || null,
         module_data: moduleData,
       }).select('id').single();

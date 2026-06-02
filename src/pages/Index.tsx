@@ -42,10 +42,12 @@ import { BulkActionDialog } from '@/components/tasks/BulkActionDialog';
 import { PendingValidationsPanel } from '@/components/dashboard/PendingValidationsPanel';
 import { PendingTaskValidationsPanel } from '@/components/dashboard/PendingTaskValidationsPanel';
 import { BEPendingValidationsPanel } from '@/components/dashboard/BEPendingValidationsPanel';
+import { ITPendingValidationsPanel } from '@/components/dashboard/ITPendingValidationsPanel';
 import { MyDayPanel } from '@/components/dashboard/MyDayPanel';
 import { usePendingValidationRequests } from '@/hooks/usePendingValidationRequests';
 import { usePendingTaskValidations } from '@/hooks/usePendingTaskValidations';
 import { useBEPendingValidations } from '@/hooks/useBEPendingValidations';
+import { useITPendingValidations } from '@/hooks/useITPendingValidations';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
@@ -118,6 +120,7 @@ const Index = () => {
   const { requests: pendingValidations, count: pendingValidationCount, isLoading: isLoadingValidations, refetch: refetchValidations } = usePendingValidationRequests();
   const { tasks: pendingTaskValidations, count: pendingTaskValidationCount, isLoading: isLoadingTaskValidations, refetch: refetchTaskValidations } = usePendingTaskValidations();
   const { tasks: pendingBEValidations, count: pendingBEValidationCount, isLoading: isLoadingBEValidations, refetch: refetchBEValidations } = useBEPendingValidations();
+  const { tasks: pendingITValidations, count: pendingITValidationCount, isLoading: isLoadingITValidations, refetch: refetchITValidations } = useITPendingValidations();
   const totalValidationCount = pendingValidationCount + pendingTaskValidationCount + pendingBEValidationCount;
   
   // State for comment notification task detail
@@ -703,10 +706,18 @@ const Index = () => {
               )}
             </TabsTrigger>
             <TabsTrigger value="be" className="gap-1.5">
-              BE — à relire
+              BE — à valider
               {pendingBEValidationCount > 0 && (
                 <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
                   {pendingBEValidationCount}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="it" className="gap-1.5">
+              IT — à valider
+              {pendingITValidationCount > 0 && (
+                <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                  {pendingITValidationCount}
                 </Badge>
               )}
             </TabsTrigger>
@@ -738,6 +749,13 @@ const Index = () => {
               tasks={pendingBEValidations}
               isLoading={isLoadingBEValidations}
               onRefresh={refetchBEValidations}
+            />
+          </TabsContent>
+          <TabsContent value="it">
+            <ITPendingValidationsPanel
+              tasks={pendingITValidations}
+              isLoading={isLoadingITValidations}
+              onRefresh={refetchITValidations}
             />
           </TabsContent>
         </Tabs>

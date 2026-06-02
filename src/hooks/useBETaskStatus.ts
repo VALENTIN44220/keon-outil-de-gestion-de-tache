@@ -148,9 +148,10 @@ export const BE_STATUS_META: Record<BETaskStatus, BEStatusMeta> = {
     label: 'Refusée',
     color: '#dc2626',
     textColor: '#991b1b',
-    bgClass: 'bg-red-100 dark:bg-red-900/30',
-    textClass: 'text-red-700 dark:text-red-400',
-    nextStatuses: [],
+    bgClass: 'bg-rose-100 dark:bg-rose-900/30',
+    textClass: 'text-rose-700 dark:text-rose-400',
+    // Récupération possible : un admin peut renvoyer la tâche à l'exécutant.
+    nextStatuses: ['en_cours'],
     icon: '⛔',
   },
 };
@@ -203,6 +204,21 @@ export interface BEStatusNotifyContext {
 }
 
 /**
+ * Notification(s) explicite(s) — court-circuite la logique automatique basée sur
+ * le statut. Utilisé par la chaîne de validation N1/N2 où le destinataire et le
+ * message dépendent de l'action (valider / complément / refus) et pas seulement
+ * du statut cible. Chaque destinataire est un profile.id (résolu en user_id auth).
+ */
+export interface BEStatusNotifyOverride {
+  recipients: Array<{
+    profileId: string | null | undefined;
+    title: string;
+    message: string;
+    type: string;
+  }>;
+}
+
+/**
  * Fournit une mutation pour mettre à jour le be_status d'une tâche.
  * Envoie une notification in-app au bon destinataire selon la transition.
  *
@@ -219,10 +235,14 @@ export function useBETaskStatus() {
       taskId,
       status,
       notify,
+      notifyOverride,
+      extraUpdates,
     }: {
       taskId: string;
       status: BETaskStatus;
       notify?: BEStatusNotifyContext;
+      notifyOverride?: BEStatusNotifyOverride;
+      extraUpdates?: Record<string, unknown>;
     }) => {
       // Récupère l'historique courant des transitions pour le merger avec
       // la nouvelle entrée (on ne veut pas écraser les statuts précédents).
@@ -239,6 +259,7 @@ export function useBETaskStatus() {
         .update({
           be_status: status,
           be_status_dates: updatedDates,
+          ...(extraUpdates ?? {}),
         })
         .eq('id', taskId)
         .select('id, be_status, be_project_id, be_status_dates')
@@ -250,7 +271,28 @@ export function useBETaskStatus() {
       // Les destinataires (dispatchManagerId/assigneeId/requesterId) sont des
       // profile.id → on les résout en user_id auth via la table profiles, sinon
       // la notif est créée avec un mauvais user_id et n'est jamais reçue.
-      if (notify) {
+      if (notifyOverride) {
+        // Chaîne de validation N1/N2 : destinataires explicites fournis par l'appelant.
+        for (const rec of notifyOverride.recipients) {
+          if (!rec.profileId) continue;
+          const { data: prf } = await sb
+            .from('profiles')
+            .select('user_id')
+            .eq('id', rec.profileId)
+            .maybeSingle();
+          const recipientUserId = prf?.user_id ?? null;
+          if (recipientUserId && recipientUserId !== user?.id) {
+            await sb.from('notifications').insert({
+              user_id: recipientUserId,
+              title: rec.title,
+              message: rec.message,
+              type: rec.type,
+              related_entity_type: 'task',
+              related_entity_id: taskId,
+            });
+          }
+        }
+      } else if (notify) {
         const projectSuffix = notify.projectCode ? ` — ${notify.projectCode}` : '';
 
         // Destinataire (profile.id) + contenu selon la transition
@@ -315,8 +357,13 @@ export function useBETaskStatus() {
   });
 
   const updateBEStatus = useCallback(
-    (params: { taskId: string; status: BETaskStatus; notify?: BEStatusNotifyContext }) =>
-      mutation.mutateAsync(params),
+    (params: {
+      taskId: string;
+      status: BETaskStatus;
+      notify?: BEStatusNotifyContext;
+      notifyOverride?: BEStatusNotifyOverride;
+      extraUpdates?: Record<string, unknown>;
+    }) => mutation.mutateAsync(params),
     [mutation],
   );
 

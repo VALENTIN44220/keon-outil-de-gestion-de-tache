@@ -26,6 +26,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSimulation } from '@/contexts/SimulationContext';
 import { ITRequest } from '@/hooks/useITRequests';
 import { Textarea } from '@/components/ui/textarea';
+import { ITRequestStatusBadge } from '@/components/it/ITRequestStatusBadge';
 
 const STATUS_LABELS: Record<string, string> = {
   todo: 'À traiter',
@@ -264,9 +265,10 @@ export function ITRequestDetailDialog({
         <DialogHeader className="p-4 pb-3 border-b">
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <Badge variant="outline" className="font-mono text-xs">{request.title.split(' — ')[0]}</Badge>
-            <Badge variant="outline" className={cn('text-xs', STATUS_COLORS[request.status])}>
-              {STATUS_LABELS[request.status] ?? request.status}
-            </Badge>
+            <ITRequestStatusBadge
+              status={(request as any).it_request_status ?? request.status}
+              compact
+            />
             {data.priority && (
               <Badge variant="outline" className="text-xs">
                 {PRIORITY_LABELS[data.priority as string] ?? data.priority}
