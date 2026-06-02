@@ -29,6 +29,7 @@ import ProcessSettings from "./pages/ProcessSettings";
 import SubProcessSettings from "./pages/SubProcessSettings";
 import BEPrestationSettings from "./pages/templates/BEPrestationSettings";
 import BEPrestationGroupSettings from "./pages/templates/BEPrestationGroupSettings";
+import ITPrestationSettings from "./pages/templates/ITPrestationSettings";
 import Projects from "./pages/Projects";
 import Admin from "./pages/Admin";
 import Workload from "./pages/Workload";
@@ -123,6 +124,7 @@ const App = () => (
                 { path: "/templates/subprocess/:subProcessId", end: true, element: <ProtectedRoute><SubProcessSettings /></ProtectedRoute> },
                 { path: "/templates/be-prestation/:subProcessId", end: true, element: <ProtectedRoute><BEPrestationSettings /></ProtectedRoute> },
                 { path: "/templates/be-prestation-group/:prestationName", end: true, element: <ProtectedRoute><BEPrestationGroupSettings /></ProtectedRoute> },
+                { path: "/templates/it-prestation/:subProcessId", end: true, element: <ProtectedRoute><ITPrestationSettings /></ProtectedRoute> },
 
                 { path: "/projects", end: true, element: <ProtectedRoute><Projects /></ProtectedRoute> },
                 { path: "/admin", end: true, element: <ProtectedRoute><Admin /></ProtectedRoute> },
@@ -204,6 +206,7 @@ const App = () => (
             <Route path="/templates/subprocess/:subProcessId" element={<></>} />
             <Route path="/templates/be-prestation/:subProcessId" element={<></>} />
             <Route path="/templates/be-prestation-group/:prestationName" element={<></>} />
+            <Route path="/templates/it-prestation/:subProcessId" element={<></>} />
             <Route path="/projects" element={<></>} />
             <Route path="/admin" element={<></>} />
             <Route path="/workload" element={<></>} />

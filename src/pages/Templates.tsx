@@ -265,6 +265,9 @@ export default function Templates() {
     } else if (d.source === 'subprocess') {
       if (d.id.startsWith('be-group::')) {
         navigate(`/templates/be-prestation-group/${encodeURIComponent(d.name)}`);
+      } else if (typeof d.raw?.process_template_id === 'string' && d.raw.process_template_id.startsWith('11111111-1111-4111-8111-1111111113')) {
+        // Process IT — page d'édition dédiée IT
+        navigate(`/templates/it-prestation/${d.id}`);
       } else {
         navigate(`/templates/be-prestation/${d.id}`);
       }

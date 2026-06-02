@@ -35,6 +35,10 @@ import { NewPrestationBEWizard } from '../NewPrestationBEWizard';
 // Constante : ID du processus Bureau d'Études
 const BE_PROCESS_ID = 'bd75a3b0-c918-4b43-befe-739b83f7461a';
 
+// Process IT : préfixe stable (cf. seeds IT 11111111-1111-4111-8111-1111111113xx)
+const IT_PROCESS_ID_PREFIX = '11111111-1111-4111-8111-1111111113';
+const isITProcessId = (id: string) => id.startsWith(IT_PROCESS_ID_PREFIX);
+
 interface SubProcess {
   id: string;
   name: string;
@@ -74,8 +78,10 @@ export function ProcessSubProcessesTab({
   const [search, setSearch] = useState('');
 
   const isBEProcess = processId === BE_PROCESS_ID;
-  const label = isBEProcess ? 'prestation' : 'sous-processus';
-  const labelPlural = isBEProcess ? 'prestations' : 'sous-processus';
+  const isITProcess = isITProcessId(processId);
+  const hasDedicatedPage = isBEProcess || isITProcess;
+  const label = (isBEProcess || isITProcess) ? 'prestation' : 'sous-processus';
+  const labelPlural = (isBEProcess || isITProcess) ? 'prestations' : 'sous-processus';
 
   useEffect(() => {
     fetchSubProcesses();
@@ -441,15 +447,19 @@ export function ProcessSubProcessesTab({
 
                   {/* Actions */}
                   <div className="flex items-center gap-1 shrink-0">
-                    {isBEProcess ? (
-                      // Pour les prestations BE : un seul bouton Modifier vers la
-                      // nouvelle page dédiée alignée sur le wizard de création.
+                    {hasDedicatedPage ? (
+                      // BE et IT ont une page dédiée d'édition complète (validations,
+                      // dispatcher, durée, etc.).
                       <Button
                         variant="outline"
                         size="sm"
                         className="h-8 text-xs gap-1"
-                        onClick={() => navigate(`/templates/be-prestation/${sp.id}`)}
-                        title="Modifier cette prestation BE"
+                        onClick={() => navigate(
+                          isITProcess
+                            ? `/templates/it-prestation/${sp.id}`
+                            : `/templates/be-prestation/${sp.id}`
+                        )}
+                        title={`Modifier cette prestation ${isITProcess ? 'IT' : 'BE'}`}
                       >
                         <Settings className="h-3.5 w-3.5" />
                         <span className="hidden sm:inline">Modifier</span>
