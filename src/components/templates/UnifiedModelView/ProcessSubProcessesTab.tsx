@@ -45,6 +45,14 @@ interface SubProcess {
   taskCount: number;
   hasValidation: boolean;
   totalDurationDays: number;
+  // Config exécution (utilisée par BE et IT — affichage des badges récap)
+  dispatch_manager_id: string | null;
+  dispatcher_name: string | null;
+  validation_level_1_type: string | null;
+  validation_level_2_type: string | null;
+  validation_level_1_user_id: string | null;
+  validation_level_2_user_id: string | null;
+  default_duration_hours: number | null;
 }
 
 interface ProcessSubProcessesTabProps {
@@ -85,6 +93,13 @@ export function ProcessSubProcessesTab({
           assignment_type,
           order_index,
           is_mandatory,
+          dispatch_manager_id,
+          validation_level_1_type,
+          validation_level_2_type,
+          validation_level_1_user_id,
+          validation_level_2_user_id,
+          default_duration_hours,
+          dispatcher:profiles!sub_process_templates_dispatch_manager_id_fkey ( display_name ),
           task_templates (
             id,
             default_duration_days,
@@ -99,6 +114,11 @@ export function ProcessSubProcessesTab({
         setSubProcesses(
           data.map((sp: any) => {
             const tasks = sp.task_templates || [];
+            // hasValidation : prend en compte la config N1/N2 sur le sub_process lui-même
+            // (modèle BE/IT) OU sur les task_templates enfants (legacy).
+            const subHasValidation =
+              (sp.validation_level_1_type && sp.validation_level_1_type !== 'none') ||
+              (sp.validation_level_2_type && sp.validation_level_2_type !== 'none');
             return {
               id: sp.id,
               name: sp.name,
@@ -107,7 +127,7 @@ export function ProcessSubProcessesTab({
               order_index: sp.order_index,
               is_mandatory: sp.is_mandatory || false,
               taskCount: tasks.length,
-              hasValidation: tasks.some((t: any) =>
+              hasValidation: subHasValidation || tasks.some((t: any) =>
                 (t.validation_level_1 && t.validation_level_1 !== 'none') ||
                 (t.validation_level_2 && t.validation_level_2 !== 'none')
               ),
@@ -115,6 +135,13 @@ export function ProcessSubProcessesTab({
                 (acc: number, t: any) => acc + (t.default_duration_days ?? 0),
                 0
               ),
+              dispatch_manager_id: sp.dispatch_manager_id ?? null,
+              dispatcher_name: sp.dispatcher?.display_name ?? null,
+              validation_level_1_type: sp.validation_level_1_type ?? null,
+              validation_level_2_type: sp.validation_level_2_type ?? null,
+              validation_level_1_user_id: sp.validation_level_1_user_id ?? null,
+              validation_level_2_user_id: sp.validation_level_2_user_id ?? null,
+              default_duration_hours: sp.default_duration_hours ?? null,
             };
           })
         );
@@ -209,13 +236,29 @@ export function ProcessSubProcessesTab({
   const getAssignmentLabel = (type: string) => {
     switch (type) {
       case 'user':
-        return 'Affectation directe';
+      case 'fixed_user':
+        return 'Utilisateur fixé';
       case 'manager':
+      case 'manager_dispatch':
         return 'Via manager';
       case 'role':
+      case 'fixed_role':
         return 'Par rôle';
+      case 'team':
+        return 'Équipe';
       default:
         return 'Standard';
+    }
+  };
+
+  const getValidationLabel = (type: string | null) => {
+    if (!type || type === 'none') return null;
+    switch (type) {
+      case 'manager':    return 'Manager';
+      case 'requester':  return 'Demandeur';
+      case 'fixed_user': return 'Utilisateur fixé';
+      case 'team':       return 'Équipe';
+      default:           return type;
     }
   };
 
@@ -361,7 +404,7 @@ export function ProcessSubProcessesTab({
                         {sp.description}
                       </p>
                     )}
-                    <div className="flex items-center gap-3 mt-1.5 text-[11px] text-muted-foreground">
+                    <div className="flex items-center gap-3 mt-1.5 text-[11px] text-muted-foreground flex-wrap">
                       <span className="flex items-center gap-1">
                         {getAssignmentIcon(sp.assignment_type)}
                         {getAssignmentLabel(sp.assignment_type)}
@@ -371,9 +414,27 @@ export function ProcessSubProcessesTab({
                         {sp.taskCount} étape{sp.taskCount > 1 ? 's' : ''}
                       </span>
                       {sp.totalDurationDays > 0 && (
-                        <span>
-                          ~ {sp.totalDurationDays} j
-                        </span>
+                        <span>~ {sp.totalDurationDays} j</span>
+                      )}
+                      {sp.default_duration_hours != null && sp.default_duration_hours > 0 && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-slate-50">
+                          ⏱ {sp.default_duration_hours}h
+                        </Badge>
+                      )}
+                      {sp.dispatcher_name && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-indigo-50 text-indigo-700 border-indigo-200">
+                          👤 Dispatch : {sp.dispatcher_name}
+                        </Badge>
+                      )}
+                      {getValidationLabel(sp.validation_level_1_type) && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-amber-50 text-amber-700 border-amber-200">
+                          N1 : {getValidationLabel(sp.validation_level_1_type)}
+                        </Badge>
+                      )}
+                      {getValidationLabel(sp.validation_level_2_type) && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-emerald-50 text-emerald-700 border-emerald-200">
+                          N2 : {getValidationLabel(sp.validation_level_2_type)}
+                        </Badge>
                       )}
                     </div>
                   </div>
