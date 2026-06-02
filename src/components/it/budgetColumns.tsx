@@ -116,9 +116,15 @@ export const IT_BUDGET_COLUMNS: ITBudgetColumnDef[] = [
     render: (l) => <span className="truncate block max-w-[220px]">{l.commentaire ?? '—'}</span>,
   },
   // ─── CANON FINANCIER (montants HT annuels) ────────────────────────────────
+  // Convention : BUD26 = budget initial annuel, F26 = reforecast annuel.
+  // Coloration des écarts pour vue rapide :
+  //   • Engagé > F26      → fond rouge   (sur-engagement)
+  //   • Constaté > Engagé → fond orange  (facturé au-delà des CF)
+  //   • Constaté > F26    → fond rouge   (dépassement budget)
+  //   • Consommation > 100% → rouge ; > 80% → orange ; sinon vert
   {
     key: 'montant_budget',
-    label: 'Budget initial',
+    label: 'BUD26',
     defaultVisible: true,
     align: 'right',
     render: (l, h) => (
@@ -127,7 +133,7 @@ export const IT_BUDGET_COLUMNS: ITBudgetColumnDef[] = [
   },
   {
     key: 'montant_budget_revise',
-    label: 'Reforecast',
+    label: 'F26',
     defaultVisible: true,
     align: 'right',
     render: (l, h) => {
@@ -137,7 +143,7 @@ export const IT_BUDGET_COLUMNS: ITBudgetColumnDef[] = [
       return (
         <span
           className={cn('tabular-nums', isRevised && 'font-semibold text-violet-700')}
-          title={isRevised ? 'Reforecast appliqué' : 'Aucun reforecast'}
+          title={isRevised ? `Reforecast appliqué (BUD26 ${h.eur(initial)} → F26 ${h.eur(revise)})` : 'F26 = BUD26 (aucun reforecast)'}
         >
           {h.eur(revise)}
         </span>
@@ -154,16 +160,21 @@ export const IT_BUDGET_COLUMNS: ITBudgetColumnDef[] = [
       const revise = lineAnnualBudgetRevise(l);
       const engage = cf > 0 ? cf : (l.statut === 'engage_total' ? revise : 0);
       const fromStatut = cf === 0 && l.statut === 'engage_total' && engage > 0;
+      // Sur-engagement vs F26 → fond rouge
+      const overBudget = revise > 0 && engage > revise * 1.001; // tolérance 0,1% arrondi
+      const tooltip = fromStatut
+        ? 'Engagé déclaratif (statut = Engagé total, pas de CF Divalto)'
+        : cf > 0
+        ? `Somme CF Divalto liées : ${h.eur(cf)}${overBudget ? ` (dépasse F26 ${h.eur(revise)})` : ''}`
+        : undefined;
       return (
         <span
-          className={cn('tabular-nums', engage > 0 && 'text-blue-700')}
-          title={
-            fromStatut
-              ? 'Engagé déclaratif (statut = Engagé total, pas de CF Divalto)'
-              : cf > 0
-              ? `Somme CF Divalto liées : ${h.eur(cf)}`
-              : undefined
-          }
+          className={cn(
+            'tabular-nums inline-block px-1 rounded',
+            engage > 0 && !overBudget && 'text-blue-700',
+            overBudget && 'bg-red-100 text-red-700 font-semibold dark:bg-red-900/30 dark:text-red-300',
+          )}
+          title={tooltip}
         >
           {engage > 0 ? h.eur(engage) : '—'}
           {fromStatut && <sup className="text-[8px] text-amber-600 ml-0.5">*</sup>}
@@ -179,17 +190,62 @@ export const IT_BUDGET_COLUMNS: ITBudgetColumnDef[] = [
     render: (l, h) => {
       const ff = Number(l._ff_amount ?? 0);
       const sup = Number(l._supplier_ht_amount ?? 0);
+      const cf = Number(l._cf_amount ?? 0);
+      const revise = lineAnnualBudgetRevise(l);
       const constate = ff + sup;
+      const engage = cf > 0 ? cf : (l.statut === 'engage_total' ? revise : 0);
+      // Constaté > Engagé → orange (facture sans commande / dépassement engagement)
+      // Constaté > F26   → rouge (dépassement budget)
+      const overBudget = revise > 0 && constate > revise * 1.001;
+      const overEngage = engage > 0 && constate > engage * 1.001 && !overBudget;
       const tooltip = [
         ff > 0 ? `FF Divalto : ${h.eur(ff)}` : null,
         sup > 0 ? `Écritures comptables (HT est.) : ${h.eur(sup)}` : null,
+        overBudget ? `⚠ dépasse F26 (${h.eur(revise)})` : null,
+        overEngage ? `⚠ dépasse l'engagé (${h.eur(engage)})` : null,
       ].filter(Boolean).join(' · ');
       return (
         <span
-          className={cn('tabular-nums', constate > 0 && 'text-emerald-700 font-medium')}
+          className={cn(
+            'tabular-nums inline-block px-1 rounded',
+            constate > 0 && !overEngage && !overBudget && 'text-emerald-700 font-medium',
+            overEngage && 'bg-orange-100 text-orange-800 font-semibold dark:bg-orange-900/30 dark:text-orange-300',
+            overBudget && 'bg-red-100 text-red-700 font-semibold dark:bg-red-900/30 dark:text-red-300',
+          )}
           title={tooltip || undefined}
         >
           {constate > 0 ? h.eur(constate) : '—'}
+        </span>
+      );
+    },
+  },
+  {
+    key: 'consommation',
+    label: 'Conso %',
+    defaultVisible: true,
+    align: 'right',
+    render: (l, h) => {
+      const ff = Number(l._ff_amount ?? 0);
+      const sup = Number(l._supplier_ht_amount ?? 0);
+      const constate = ff + sup;
+      const revise = lineAnnualBudgetRevise(l);
+      if (revise <= 0) return <span className="text-muted-foreground">—</span>;
+      const pct = (constate / revise) * 100;
+      // Couleurs : >100 rouge ; >80 orange ; >0 vert ; 0 neutre
+      const tone =
+        pct > 100
+          ? 'bg-red-100 text-red-700 font-semibold dark:bg-red-900/30 dark:text-red-300'
+          : pct > 80
+          ? 'bg-orange-100 text-orange-800 font-semibold dark:bg-orange-900/30 dark:text-orange-300'
+          : pct > 0
+          ? 'text-emerald-700'
+          : 'text-muted-foreground';
+      return (
+        <span
+          className={cn('tabular-nums inline-block px-1 rounded', tone)}
+          title={`Constaté ${h.eur(constate)} / F26 ${h.eur(revise)}`}
+        >
+          {pct.toFixed(0)}%
         </span>
       );
     },

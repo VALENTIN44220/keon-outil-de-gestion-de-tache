@@ -39,7 +39,13 @@ export function useITBudgetPreferences() {
   const qc = useQueryClient();
   const userId = user?.id ?? null;
 
-  const [localPrefs, setLocalPrefs] = useState<ITBudgetUserPreferences>(() => readLocal() ?? DEFAULT_PREFS);
+  // Merge dès le hydrate depuis localStorage pour intégrer les nouvelles colonnes
+  // ajoutées en code depuis la dernière sauvegarde des prefs (sinon les colonnes
+  // récentes — ex: Conso% — restent invisibles tant que prefsQuery n'a pas fini).
+  const [localPrefs, setLocalPrefs] = useState<ITBudgetUserPreferences>(() => {
+    const fromLocal = readLocal();
+    return fromLocal ? mergeWithDefaults(fromLocal) : DEFAULT_PREFS;
+  });
 
   const prefsQuery = useQuery({
     queryKey: ['it-budget-user-prefs', userId],

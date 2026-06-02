@@ -2013,14 +2013,35 @@ export default function ITBudgetGlobal() {
                                           Rapprocher
                                         </Button>
                                       )}
-                                      {g.kind !== 'none' && (
-                                        <span className="ml-auto flex items-center gap-4 text-xs text-muted-foreground">
-                                          <span>Initial <span className="tabular-nums text-foreground font-medium">{eur(g.totalBudgetInitial)}</span></span>
-                                          <span>Reforecast <span className="tabular-nums text-foreground font-medium">{eur(g.totalBudgetRevise)}</span></span>
-                                          <span>Engagé <span className="tabular-nums text-indigo-700 dark:text-indigo-400 font-medium">{eur(g.totalEngage)}</span></span>
-                                          <span>Constaté <span className="tabular-nums text-violet-700 dark:text-violet-400 font-medium">{eur(g.totalConstate)}</span></span>
-                                        </span>
-                                      )}
+                                      {g.kind !== 'none' && (() => {
+                                        const overEngage = g.totalBudgetRevise > 0 && g.totalEngage > g.totalBudgetRevise * 1.001;
+                                        const overConstateBudget = g.totalBudgetRevise > 0 && g.totalConstate > g.totalBudgetRevise * 1.001;
+                                        const overConstateEngage = g.totalEngage > 0 && g.totalConstate > g.totalEngage * 1.001 && !overConstateBudget;
+                                        const pct = g.totalBudgetRevise > 0 ? (g.totalConstate / g.totalBudgetRevise) * 100 : 0;
+                                        const pctTone =
+                                          pct > 100 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                                          : pct > 80 ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300'
+                                          : pct > 0  ? 'text-emerald-700 dark:text-emerald-400'
+                                          : 'text-muted-foreground';
+                                        return (
+                                          <span className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
+                                            <span>BUD26 <span className="tabular-nums text-foreground font-medium">{eur(g.totalBudgetInitial)}</span></span>
+                                            <span>F26 <span className="tabular-nums text-foreground font-medium">{eur(g.totalBudgetRevise)}</span></span>
+                                            <span>Engagé <span className={cn(
+                                              'tabular-nums font-medium px-1 rounded',
+                                              !overEngage && 'text-indigo-700 dark:text-indigo-400',
+                                              overEngage && 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 font-semibold',
+                                            )}>{eur(g.totalEngage)}</span></span>
+                                            <span>Constaté <span className={cn(
+                                              'tabular-nums font-medium px-1 rounded',
+                                              !overConstateEngage && !overConstateBudget && 'text-violet-700 dark:text-violet-400',
+                                              overConstateEngage && 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300 font-semibold',
+                                              overConstateBudget && 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 font-semibold',
+                                            )}>{eur(g.totalConstate)}</span></span>
+                                            <span>Conso <span className={cn('tabular-nums font-medium px-1 rounded', pctTone)}>{pct.toFixed(0)}%</span></span>
+                                          </span>
+                                        );
+                                      })()}
                                     </div>
                                   </TableCell>
                                 </TableRow>
