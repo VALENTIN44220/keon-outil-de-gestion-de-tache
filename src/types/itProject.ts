@@ -132,6 +132,22 @@ export interface ITProject {
   // Par défaut : les 5 phases sont actives.
   phases_actives?: ITProjectPhase[] | null;
 
+  // ---- Feuille de Route & Plan de Charge ----
+  statut_portefeuille?: string | null;      // StatutPortefeuille
+  categorie_fdr?: string | null;            // 'IA' | 'HORS IA'
+  activite_metier?: string | null;
+  profil_principal?: string | null;         // code fdr_profils
+  date_kickoff?: string | null;
+  date_mep_saisie?: string | null;
+  delai_projete_mois?: number | null;
+  echeance_cible?: string | null;
+  suivi_j_mois?: number | null;
+  externe?: boolean | null;
+  pct_reduction_si_externe?: number | null;
+  budget_externe_eur?: number | null;
+  sur_feuille_de_route?: boolean | null;
+  pct_avancement?: number | null;
+
   // Joined data (optional, for display)
   responsable_it?: { id: string; display_name: string; avatar_url?: string | null } | null;
   chef_projet?: { id: string; display_name: string; avatar_url?: string | null } | null;

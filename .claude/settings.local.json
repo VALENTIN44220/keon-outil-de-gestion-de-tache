@@ -52,7 +52,9 @@
       "Bash(grep -iE \"Dispatch\\\\.tsx$\")",
       "Bash(git merge *)",
       "Bash(git -c core.editor=true merge --continue)",
-      "Bash(git -c core.autocrlf=false commit -m ' *)"
+      "Bash(git -c core.autocrlf=false commit -m ' *)",
+      "Bash(npm test *)",
+      "mcp__0a14636c-fc56-463b-9cf1-d56619542dfc__list_projects"
     ]
   }
 }

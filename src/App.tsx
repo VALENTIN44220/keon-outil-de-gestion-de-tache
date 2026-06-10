@@ -92,6 +92,11 @@ import ITProjectHubFiles from "./pages/it/ITProjectHubFiles";
 import ITProjectHubBudget from "./pages/it/ITProjectHubBudget";
 import ITBudgetGlobal from "./pages/it/ITBudgetGlobal";
 import ITCartographie from "./pages/it/ITCartographie";
+import ITAdminFDR from "./pages/it/ITAdminFDR";
+import ITPlanning from "./pages/it/ITPlanning";
+import ITRoadmap from "./pages/it/ITRoadmap";
+import ITRoadmapDefinition from "./pages/it/ITRoadmapDefinition";
+import ITRoadmapTracking from "./pages/it/ITRoadmapTracking";
 import SMQDashboard from "./pages/smq/SMQDashboard";
 import SMQNewDeclaration from "./pages/smq/SMQNewDeclaration";
 import SMQDetail from "./pages/smq/SMQDetail";
@@ -183,6 +188,11 @@ const App = () => (
                 { path: "/it/projects/import-fdr", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectImportFDR /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/budget", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITBudgetGlobal /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/cartographie", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITCartographie /></ITProjectsAccessGate></ProtectedRoute> },
+                { path: "/it/admin/fdr", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITAdminFDR /></ITProjectsAccessGate></ProtectedRoute> },
+                { path: "/it/plan-de-charge", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITPlanning /></ITProjectsAccessGate></ProtectedRoute> },
+                { path: "/it/feuille-de-route", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITRoadmap /></ITProjectsAccessGate></ProtectedRoute> },
+                { path: "/it/feuille-de-route/definition", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITRoadmapDefinition /></ITProjectsAccessGate></ProtectedRoute> },
+                { path: "/it/feuille-de-route/suivi", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITRoadmapTracking /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/projects/:code/overview", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubOverview /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/projects/:code/governance", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubGovernance /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/projects/:code/tasks", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubTasks /></ITProjectsAccessGate></ProtectedRoute> },
@@ -255,6 +265,11 @@ const App = () => (
             <Route path="/it/projects/import-fdr" element={<></>} />
             <Route path="/it/budget" element={<></>} />
             <Route path="/it/cartographie" element={<></>} />
+            <Route path="/it/admin/fdr" element={<></>} />
+            <Route path="/it/plan-de-charge" element={<></>} />
+            <Route path="/it/feuille-de-route" element={<></>} />
+            <Route path="/it/feuille-de-route/definition" element={<></>} />
+            <Route path="/it/feuille-de-route/suivi" element={<></>} />
             <Route path="/it/projects/:code/overview" element={<></>} />
             <Route path="/it/projects/:code/governance" element={<></>} />
             <Route path="/it/projects/:code/tasks" element={<></>} />

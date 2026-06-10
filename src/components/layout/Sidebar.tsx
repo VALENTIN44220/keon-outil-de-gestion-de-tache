@@ -4,7 +4,7 @@ import {
   Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText,
   ArrowLeftRight, Calendar, MessageCircle, Building2, ClipboardList,
   Lightbulb, Monitor, Leaf, Euro, Map as MapIcon, Users, Wallet,
-  Package, Truck, Plus, Minus, ChevronsDownUp, ChevronsUpDown, ShieldAlert,
+  Package, Truck, Plus, Minus, ChevronsDownUp, ChevronsUpDown, ShieldAlert, Settings2, BarChart2,
 } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
@@ -81,6 +81,9 @@ const menuGroups: MenuGroup[] = [
       { id: 'it-projects', label: 'Projets', icon: Monitor, path: '/it/projects', permissionKey: 'can_access_it_projects' },
       { id: 'it-budget', label: 'Budget', icon: Euro, path: '/it/budget', permissionKey: 'can_access_it_budget' },
       { id: 'it-cartographie', label: 'Cartographie', icon: MapIcon, path: '/it/cartographie', permissionKey: 'can_access_it_cartographie' },
+      { id: 'it-feuille-de-route', label: 'Feuille de route', icon: CalendarClock, path: '/it/feuille-de-route', permissionKey: 'can_access_it_projects' },
+      { id: 'it-plan-de-charge', label: 'Plan de charge', icon: BarChart2, path: '/it/plan-de-charge', permissionKey: 'can_access_it_projects' },
+      { id: 'it-admin-fdr', label: 'Params FDR', icon: Settings2, path: '/it/admin/fdr', permissionKey: 'can_access_it_projects' },
     ],
   },
   {

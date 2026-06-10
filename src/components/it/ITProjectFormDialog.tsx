@@ -7,11 +7,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { ITProject, ITProjectStatus, ITProjectType, ITProjectPriority, ITProjectPhase, ITProjectPilier, IT_PROJECT_PHASES, ALL_IT_PROJECT_PHASES, IT_PROJECT_PILIER_CONFIG, STATUT_FDR_CONFIG, StatutFDR } from '@/types/itProject';
+import { Switch } from '@/components/ui/switch';
+import { ITProject, ITProjectStatus, ITProjectType, ITProjectPriority, ITProjectPhase, IT_PROJECT_PHASES, ALL_IT_PROJECT_PHASES, IT_PROJECT_PILIER_CONFIG, STATUT_FDR_CONFIG, StatutFDR } from '@/types/itProject';
+import { ACTIVITES_METIER, STATUT_PORTEFEUILLE_CONFIG, type StatutPortefeuille } from '@/types/fdr';
 import { useITProjects } from '@/hooks/useITProjects';
+import { useFdrProfils } from '@/hooks/useFdrSettings';
+import { useITProjectLoad, useUpsertITProjectLoad } from '@/hooks/useITProjectLoad';
 import { supabase } from '@/integrations/supabase/client';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Monitor, Users, Calendar, Euro, Link2, MessageSquareText, Loader2, Target } from 'lucide-react';
+import { Monitor, Users, Calendar, Euro, Link2, MessageSquareText, Loader2, Target, BarChart3 } from 'lucide-react';
 
 const NONE = '__none__';
 
@@ -55,6 +59,29 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
   const [fdrPriorite, setFdrPriorite] = useState('');
   const [fdrDescription, setFdrDescription] = useState('');
   const [fdrCommentaires, setFdrCommentaires] = useState('');
+
+  // Plan de charge — nouveaux champs
+  const [statutPortefeuille, setStatutPortefeuille] = useState<StatutPortefeuille>('Idée');
+  const [categorieFdr, setCategorieFdr] = useState<'IA' | 'HORS IA' | ''>('');
+  const [activiteMetier, setActiviteMetier] = useState('');
+  const [profilPrincipal, setProfilPrincipal] = useState(NONE);
+  const [dateKickoff, setDateKickoff] = useState('');
+  const [dateMepSaisie, setDateMepSaisie] = useState('');
+  const [delaiProjete, setDelaiProjete] = useState('');
+  const [echeanceCible, setEcheanceCible] = useState('');
+  const [suiviJMois, setSuiviJMois] = useState('0');
+  const [externe, setExterne] = useState(false);
+  const [pctReduction, setPctReduction] = useState('0');
+  const [surFdr, setSurFdr] = useState(true);
+  const [pctAvancement, setPctAvancement] = useState('0');
+  // Ventilation build par profil : map profil_id → j_mois (string pour l'input)
+  const [loadMap, setLoadMap] = useState<Record<string, string>>({});
+
+  // Profils FDR (pour la ventilation build)
+  const { data: fdrProfils = [] } = useFdrProfils();
+  const upsertLoad = useUpsertITProjectLoad();
+  // Charge existante (en mode édition)
+  const { data: existingLoads = [] } = useITProjectLoad(project?.id);
 
   // Lookup data
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
@@ -122,10 +149,34 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
       setFdrPriorite(project.fdr_priorite || '');
       setFdrDescription(project.fdr_description || '');
       setFdrCommentaires(project.fdr_commentaires || '');
+      // Plan de charge
+      setStatutPortefeuille((project.statut_portefeuille as StatutPortefeuille) || 'Idée');
+      setCategorieFdr((project.categorie_fdr as 'IA' | 'HORS IA') || '');
+      setActiviteMetier(project.activite_metier || '');
+      setProfilPrincipal(project.profil_principal || NONE);
+      setDateKickoff(project.date_kickoff?.slice(0, 10) || '');
+      setDateMepSaisie(project.date_mep_saisie?.slice(0, 10) || '');
+      setDelaiProjete(project.delai_projete_mois?.toString() || '');
+      setEcheanceCible(project.echeance_cible?.slice(0, 10) || '');
+      setSuiviJMois(project.suivi_j_mois?.toString() || '0');
+      setExterne(project.externe ?? false);
+      setPctReduction(((project.pct_reduction_si_externe ?? 0) * 100).toString());
+      setSurFdr(project.sur_feuille_de_route ?? true);
+      setPctAvancement(project.pct_avancement?.toString() || '0');
     } else {
       resetForm();
     }
   }, [project, open]);
+
+  // Charger la ventilation build existante quand les profils et les loads sont prêts
+  useEffect(() => {
+    if (!open || existingLoads.length === 0 || fdrProfils.length === 0) return;
+    const map: Record<string, string> = {};
+    for (const l of existingLoads) {
+      map[l.profil_id] = String(l.j_mois);
+    }
+    setLoadMap(map);
+  }, [open, existingLoads, fdrProfils]);
 
   const resetForm = () => {
     setCodeProjetDigital('');
@@ -150,6 +201,20 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
     setFdrPriorite('');
     setFdrDescription('');
     setFdrCommentaires('');
+    setStatutPortefeuille('Idée');
+    setCategorieFdr('');
+    setActiviteMetier('');
+    setProfilPrincipal(NONE);
+    setDateKickoff('');
+    setDateMepSaisie('');
+    setDelaiProjete('');
+    setEcheanceCible('');
+    setSuiviJMois('0');
+    setExterne(false);
+    setPctReduction('0');
+    setSurFdr(true);
+    setPctAvancement('0');
+    setLoadMap({});
   };
 
   const orderedActivePhases = IT_PROJECT_PHASES
@@ -200,12 +265,37 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
       fdr_priorite: fdrPriorite || null,
       fdr_description: fdrDescription || null,
       fdr_commentaires: fdrCommentaires || null,
+      // Plan de charge
+      statut_portefeuille: statutPortefeuille,
+      categorie_fdr: categorieFdr || null,
+      activite_metier: activiteMetier || null,
+      profil_principal: profilPrincipal !== NONE ? profilPrincipal : null,
+      date_kickoff: dateKickoff || null,
+      date_mep_saisie: dateMepSaisie || null,
+      delai_projete_mois: delaiProjete ? parseInt(delaiProjete) : null,
+      echeance_cible: echeanceCible || null,
+      suivi_j_mois: parseFloat(suiviJMois) || 0,
+      externe,
+      pct_reduction_si_externe: (parseFloat(pctReduction) || 0) / 100,
+      sur_feuille_de_route: surFdr,
+      pct_avancement: parseFloat(pctAvancement) || 0,
     };
 
+    let savedId: string | undefined;
     if (isEdit && project) {
       await updateProject(project.id, payload);
+      savedId = project.id;
     } else {
-      await addProject(payload);
+      const result = await addProject(payload);
+      savedId = (result as any)?.id;
+    }
+
+    // Sauvegarder la ventilation build
+    if (savedId) {
+      const loads = fdrProfils
+        .filter(p => p.actif)
+        .map(p => ({ profil_id: p.id, j_mois: parseFloat(loadMap[p.id] || '0') || 0 }));
+      await upsertLoad.mutateAsync({ projectId: savedId, loads });
     }
 
     setIsSaving(false);
@@ -224,7 +314,7 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
         </DialogHeader>
 
         <Tabs defaultValue="general" className="mt-2">
-          <TabsList className="grid grid-cols-5 w-full">
+          <TabsList className="grid grid-cols-6 w-full">
             <TabsTrigger value="general" className="text-xs gap-1">
               <Monitor className="h-3.5 w-3.5" /> Général
             </TabsTrigger>
@@ -235,10 +325,13 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
               <Calendar className="h-3.5 w-3.5" /> Planning
             </TabsTrigger>
             <TabsTrigger value="fdr" className="text-xs gap-1">
-              <Target className="h-3.5 w-3.5" /> FDR / Contexte
+              <Target className="h-3.5 w-3.5" /> FDR
+            </TabsTrigger>
+            <TabsTrigger value="charge" className="text-xs gap-1">
+              <BarChart3 className="h-3.5 w-3.5" /> Charge
             </TabsTrigger>
             <TabsTrigger value="microsoft" className="text-xs gap-1">
-              <Link2 className="h-3.5 w-3.5" /> Microsoft 365
+              <Link2 className="h-3.5 w-3.5" /> M365
             </TabsTrigger>
           </TabsList>
 
@@ -522,6 +615,160 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
             <div className="space-y-2">
               <Label htmlFor="fdr-comm" className="flex items-center gap-1.5">💬 Commentaires</Label>
               <Textarea id="fdr-comm" placeholder="Commentaires, notes, remarques..." value={fdrCommentaires} onChange={e => setFdrCommentaires(e.target.value)} rows={3} />
+            </div>
+          </TabsContent>
+
+          {/* Plan de charge tab */}
+          <TabsContent value="charge" className="space-y-4 pt-4">
+
+            {/* Statut portefeuille + sur FDR */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Statut portefeuille</Label>
+                <Select value={statutPortefeuille} onValueChange={v => setStatutPortefeuille(v as StatutPortefeuille)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {(Object.entries(STATUT_PORTEFEUILLE_CONFIG) as [StatutPortefeuille, typeof STATUT_PORTEFEUILLE_CONFIG['Idée']][]).map(([k, cfg]) => (
+                      <SelectItem key={k} value={k}>
+                        <span className="flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full inline-block" style={{ background: cfg.color }} />
+                          {cfg.label}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Catégorie</Label>
+                <Select value={categorieFdr || '__none__'} onValueChange={v => setCategorieFdr(v === '__none__' ? '' : v as 'IA' | 'HORS IA')}>
+                  <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— Non défini —</SelectItem>
+                    <SelectItem value="IA">IA</SelectItem>
+                    <SelectItem value="HORS IA">HORS IA</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Activité métier</Label>
+                <Select value={activiteMetier || '__none__'} onValueChange={v => setActiviteMetier(v === '__none__' ? '' : v)}>
+                  <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— Non défini —</SelectItem>
+                    {ACTIVITES_METIER.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>% Avancement</Label>
+                <div className="flex items-center gap-2">
+                  <Input type="number" min={0} max={100} step={5} value={pctAvancement}
+                    onChange={e => setPctAvancement(e.target.value)} className="w-24" />
+                  <span className="text-sm text-muted-foreground">%</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Dates capacitaires */}
+            <div className="rounded-lg border bg-muted/20 p-3 space-y-3">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Dates & durée</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="kickoff" className="text-xs">Date kickoff</Label>
+                  <Input id="kickoff" type="date" value={dateKickoff} onChange={e => setDateKickoff(e.target.value)} className="h-8 text-sm" />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="delai" className="text-xs">Délai build projeté (mois)</Label>
+                  <Input id="delai" type="number" min={0} value={delaiProjete} onChange={e => setDelaiProjete(e.target.value)} className="h-8 text-sm w-28" placeholder="ex: 6" />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="mep" className="text-xs">MEP saisie manuellement <span className="text-muted-foreground">(optionnel)</span></Label>
+                  <Input id="mep" type="date" value={dateMepSaisie} onChange={e => setDateMepSaisie(e.target.value)} className="h-8 text-sm" />
+                  <p className="text-[10px] text-muted-foreground">Si renseignée, écrase kickoff + délai.</p>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="echeance" className="text-xs">Échéance cible <span className="text-muted-foreground">(tâches permanentes)</span></Label>
+                  <Input id="echeance" type="date" value={echeanceCible} onChange={e => setEcheanceCible(e.target.value)} className="h-8 text-sm" />
+                </div>
+              </div>
+            </div>
+
+            {/* Ventilation charge BUILD par profil */}
+            <div className="rounded-lg border bg-muted/20 p-3 space-y-2">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Charge BUILD par profil (j/mois)</p>
+              {fdrProfils.filter(p => p.actif).length === 0 ? (
+                <p className="text-xs text-muted-foreground">Aucun profil défini. Configurez les profils dans Paramètres FDR.</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {fdrProfils.filter(p => p.actif).map(p => (
+                    <div key={p.id} className="flex items-center gap-3">
+                      <span className="text-xs flex-1 truncate">{p.nom}</span>
+                      <Input
+                        type="number" min={0} step={0.5}
+                        value={loadMap[p.id] ?? '0'}
+                        onChange={e => setLoadMap(m => ({ ...m, [p.id]: e.target.value }))}
+                        className="h-7 w-24 text-right text-sm tabular-nums"
+                      />
+                      <span className="text-xs text-muted-foreground w-12">j/mois</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Suivi + profil principal */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Profil principal <span className="text-muted-foreground text-xs">(suivi post-MEP)</span></Label>
+                <Select value={profilPrincipal} onValueChange={setProfilPrincipal}>
+                  <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE}>— Aucun —</SelectItem>
+                    {fdrProfils.filter(p => p.actif).map(p => (
+                      <SelectItem key={p.id} value={p.code}>{p.nom}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="suivi" className="text-sm">Charge suivi (j/mois)</Label>
+                <div className="flex items-center gap-2">
+                  <Input id="suivi" type="number" min={0} step={0.5} value={suiviJMois}
+                    onChange={e => setSuiviJMois(e.target.value)} className="w-24" />
+                  <span className="text-sm text-muted-foreground">j/mois</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Externalisation + FDR toggle */}
+            <div className="rounded-lg border bg-muted/20 p-3 space-y-3">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Externalisation & visibilité</p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label className="text-sm">Projet externalisé</Label>
+                  <p className="text-xs text-muted-foreground">Réduit la charge interne du pourcentage ci-dessous</p>
+                </div>
+                <Switch checked={externe} onCheckedChange={setExterne} />
+              </div>
+              {externe && (
+                <div className="flex items-center gap-3">
+                  <Label className="text-xs shrink-0">Réduction charge interne</Label>
+                  <Input type="number" min={0} max={100} step={5} value={pctReduction}
+                    onChange={e => setPctReduction(e.target.value)} className="h-8 w-24 text-right" />
+                  <span className="text-xs text-muted-foreground">%</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between pt-1 border-t border-border/50">
+                <div>
+                  <Label className="text-sm">Inclus dans la feuille de route</Label>
+                  <p className="text-xs text-muted-foreground">Décocher pour exclure des calculs de charge sans supprimer</p>
+                </div>
+                <Switch checked={surFdr} onCheckedChange={setSurFdr} />
+              </div>
             </div>
           </TabsContent>
 
