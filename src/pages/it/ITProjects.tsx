@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useITProjects } from '@/hooks/useITProjects';
-import { ITProject, ITProjectStatus, ITProjectPilier, IT_PROJECT_STATUS_CONFIG, IT_PROJECT_TYPE_CONFIG, IT_PROJECT_PHASES, IT_PROJECT_PILIER_CONFIG, STATUT_FDR_CONFIG, StatutFDR, ITProjectPhase } from '@/types/itProject';
+import { ITProject, ITProjectStatus, ITProjectPilier, IT_PROJECT_TYPE_CONFIG, IT_PROJECT_PHASES, IT_PROJECT_PILIER_CONFIG, STATUT_FDR_CONFIG, StatutFDR, ITProjectPhase } from '@/types/itProject';
+import { STATUT_PORTEFEUILLE_CONFIG, type StatutPortefeuille } from '@/types/fdr';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -221,7 +222,7 @@ export default function ITProjects() {
       }
       if (filters.entiteId !== NONE && p.company_id !== filters.entiteId) return false;
       if (filters.responsableItId !== NONE && p.chef_projet_it_id !== filters.responsableItId) return false;
-      if (filters.statut !== 'all' && p.statut !== filters.statut) return false;
+      if (filters.statut !== 'all' && (p.statut_portefeuille ?? 'Idée') !== filters.statut) return false;
       if (filters.pilier !== 'all' && p.pilier !== filters.pilier) return false;
       if (filters.statutFdr !== 'all' && (p.statut_fdr || '') !== filters.statutFdr) return false;
       if (filters.phase !== 'all' && (p.phase_courante || '') !== filters.phase) return false;
@@ -260,10 +261,10 @@ export default function ITProjects() {
   // KPIs
   const kpis = useMemo(() => {
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    const enCours = filtered.filter(p => p.statut === 'en_cours').length;
+    const enCours = filtered.filter(p => p.statut_portefeuille === 'En développement').length;
     const enRetard = filtered.filter(p => {
       if (!p.date_fin_prevue) return false;
-      if (['deploye', 'cloture'].includes(p.statut)) return false;
+      if (['Déployé', 'Abandonné'].includes(p.statut_portefeuille ?? '')) return false;
       return new Date(p.date_fin_prevue) < today;
     }).length;
     const avgProgress = filtered.length > 0
@@ -272,12 +273,12 @@ export default function ITProjects() {
     return { total: filtered.length, enCours, enRetard, avgProgress };
   }, [filtered]);
 
-  // Chart: par statut
+  // Chart: par statut portefeuille
   const statusChartData = useMemo(() => {
     const counts: Record<string, number> = {};
-    filtered.forEach(p => { counts[p.statut] = (counts[p.statut] || 0) + 1; });
-    return Object.entries(IT_PROJECT_STATUS_CONFIG).map(([key, cfg]) => ({
-      name: cfg.label, value: counts[key] || 0, fill: STATUS_COLORS[key] || '#94a3b8',
+    filtered.forEach(p => { const s = p.statut_portefeuille ?? 'Idée'; counts[s] = (counts[s] || 0) + 1; });
+    return (Object.entries(STATUT_PORTEFEUILLE_CONFIG) as [StatutPortefeuille, typeof STATUT_PORTEFEUILLE_CONFIG['Idée']][]).map(([key, cfg]) => ({
+      name: cfg.label, value: counts[key] || 0, fill: cfg.color,
     })).filter(d => d.value > 0);
   }, [filtered]);
 
@@ -386,8 +387,8 @@ export default function ITProjects() {
                 <SelectTrigger className="h-8 text-xs w-[130px]"><SelectValue placeholder="Statut" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Tous statuts</SelectItem>
-                  {Object.entries(IT_PROJECT_STATUS_CONFIG).map(([k, v]) => (
-                    <SelectItem key={k} value={k}>{v.label}</SelectItem>
+                  {Object.keys(STATUT_PORTEFEUILLE_CONFIG).map(k => (
+                    <SelectItem key={k} value={k}>{k}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -634,12 +635,12 @@ export default function ITProjects() {
                       </thead>
                       <tbody>
                         {sorted.map(p => {
-                          const sc = IT_PROJECT_STATUS_CONFIG[p.statut] || IT_PROJECT_STATUS_CONFIG.backlog;
+                          const sc = STATUT_PORTEFEUILLE_CONFIG[(p.statut_portefeuille as StatutPortefeuille) ?? 'Idée'] || STATUT_PORTEFEUILLE_CONFIG['Idée'];
                           const tc = p.type_projet ? IT_PROJECT_TYPE_CONFIG[p.type_projet] : null;
                           const pc = p.pilier ? IT_PROJECT_PILIER_CONFIG[p.pilier as ITProjectPilier] : null;
                           const fdrCfg = p.statut_fdr ? STATUT_FDR_CONFIG[p.statut_fdr as StatutFDR] : null;
                           const today = new Date(); today.setHours(0, 0, 0, 0);
-                          const isLate = p.date_fin_prevue && !['deploye', 'cloture'].includes(p.statut) && new Date(p.date_fin_prevue) < today;
+                          const isLate = p.date_fin_prevue && !['Déployé', 'Abandonné'].includes(p.statut_portefeuille ?? '') && new Date(p.date_fin_prevue) < today;
                           return (
                             <tr
                               key={p.id}

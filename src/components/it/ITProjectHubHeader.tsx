@@ -1,5 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ITProject, IT_PROJECT_STATUS_CONFIG, IT_PROJECT_PRIORITY_CONFIG, IT_PROJECT_PILIER_CONFIG, ITProjectPilier, STATUT_FDR_CONFIG, StatutFDR } from '@/types/itProject';
+import { ITProject, IT_PROJECT_PRIORITY_CONFIG, IT_PROJECT_PILIER_CONFIG, ITProjectPilier, STATUT_FDR_CONFIG, StatutFDR } from '@/types/itProject';
+import { STATUT_PORTEFEUILLE_CONFIG, type StatutPortefeuille } from '@/types/fdr';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -29,7 +30,7 @@ export function ITProjectHubHeader({ project, stats, onEditProject }: ITProjectH
   const location = useLocation();
   const { openTeams, openLoop, hasTeams, hasLoop } = useITProjectSync(project);
   const activeTab = location.pathname.split('/').pop() || 'overview';
-  const statusConfig = IT_PROJECT_STATUS_CONFIG[project.statut] || IT_PROJECT_STATUS_CONFIG.backlog;
+  const statusConfig = STATUT_PORTEFEUILLE_CONFIG[(project.statut_portefeuille as StatutPortefeuille) ?? 'Idée'] || STATUT_PORTEFEUILLE_CONFIG['Idée'];
   const priorityConfig = project.priorite ? IT_PROJECT_PRIORITY_CONFIG[project.priorite] : null;
   const pilierConfig = project.pilier ? IT_PROJECT_PILIER_CONFIG[project.pilier as ITProjectPilier] : null;
   const fdrConfig = project.statut_fdr ? STATUT_FDR_CONFIG[project.statut_fdr as StatutFDR] : null;

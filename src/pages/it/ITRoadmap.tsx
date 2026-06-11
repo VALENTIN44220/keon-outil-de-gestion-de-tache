@@ -22,6 +22,7 @@ import { toast } from '@/hooks/use-toast';
 import { extractErrorMessage } from '@/lib/extractErrorMessage';
 import { useFdrProjects, usePatchFdrProject, type FdrRoadmapProject, type FdrProjectPatch } from '@/hooks/useFdrProjects';
 import { FdrImportExport } from '@/components/it/FdrImportExport';
+import { FdrHistorySheet } from '@/components/it/FdrHistorySheet';
 import { useFdrSettings, useFdrProfils } from '@/hooks/useFdrSettings';
 import {
   computeCapacityMatrix, computeProjectMonthLoads, generateHorizon, getMepRetenue, toYM, addMonths, cmpYM,
@@ -212,6 +213,8 @@ function RoadmapContent() {
   const [wideLabels, setWideLabels] = useState(true);
   const labelW = wideLabels ? LABEL_W_WIDE : LABEL_W;
 
+  const [historyOpen, setHistoryOpen] = useState(false);
+
   // ---- Granularité temporelle par année ----
   const [yearGran, setYearGran] = useState<Record<string, YearGran>>({});
   const cycleYearGran = (year: string) =>
@@ -291,6 +294,19 @@ function RoadmapContent() {
 
   // Années présentes dans l'horizon (pour les boutons de granularité)
   const years = useMemo(() => [...new Set(months.map(m => m.slice(0, 4)))], [months]);
+
+  // Position en px de la ligne « aujourd'hui » dans la zone des barres (null si hors horizon)
+  const todayX = useMemo(() => {
+    const now = new Date();
+    const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const idx = periods.findIndex(per => per.months.includes(ym));
+    if (idx < 0) return null;
+    const per = periods[idx];
+    const monthPos = per.months.indexOf(ym);
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const frac = (monthPos + now.getDate() / daysInMonth) / per.months.length;
+    return idx * MONTH_W + frac * MONTH_W;
+  }, [periods]);
 
   // ---- Paramètres moteur (sert au calcul de charge, aux sommes et au tri) ----
   const engineSettings = useMemo<FdrEngineSettings | null>(() => {
@@ -584,6 +600,7 @@ function RoadmapContent() {
             </Button>
           )}
           <div className="ml-auto flex items-center gap-2">
+            <FdrHistorySheet open={historyOpen} onOpenChange={setHistoryOpen} />
             <FdrImportExport projects={projects} />
             <Select value={groupBy} onValueChange={v => setGroupBy(v as GroupMode)}>
               <SelectTrigger className="h-8 text-xs w-44"><SelectValue /></SelectTrigger>
@@ -665,6 +682,7 @@ function RoadmapContent() {
                 {periods.map(per => {
                   const surcharge = per.months.some(ym => (surchargeByYm.get(ym) ?? 0) > 0);
                   const sorted = sort?.key === per.key;
+                  const isNow = per.months.includes(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`);
                   return (
                     <button
                       key={per.key} type="button"
@@ -675,6 +693,7 @@ function RoadmapContent() {
                         surcharge ? 'text-red-600 bg-red-50' : 'text-muted-foreground',
                         sorted && 'bg-violet-100 text-violet-700',
                         per.kind !== 'month' && 'bg-muted/50',
+                        isNow && 'border-b-2 border-b-red-500',
                       )}
                       title={`Trier par charge — ${per.label}${per.sub ? ' ' + per.sub : ''}`}
                     >
@@ -719,6 +738,7 @@ function RoadmapContent() {
                       key={p.id}
                       project={p}
                       periods={periods}
+                      todayX={todayX}
                       labelW={labelW}
                       showCode={showCode}
                       ymIndex={ymIndex}
@@ -803,11 +823,12 @@ function FilterSelect({ value, onChange, placeholder, options }: {
 }
 
 function GanttRow({
-  project: p, periods, labelW, showCode, ymIndex, engineSettings, dragging,
+  project: p, periods, todayX, labelW, showCode, ymIndex, engineSettings, dragging,
   onPointerDown, onToggleFdr, onChangeStatus, onShift, onOpen,
 }: {
   project: FdrRoadmapProject;
   periods: Period[];
+  todayX: number | null;
   labelW: number;
   showCode: boolean;
   ymIndex: (ym: string | null) => number | null;
@@ -883,6 +904,11 @@ function GanttRow({
                 per.kind === 'month' ? 'border-border/20' : 'border-border/40',
               )} style={{ left: i * MONTH_W }} />
             ))}
+
+            {/* Ligne « aujourd'hui » */}
+            {todayX != null && (
+              <div className="absolute top-0 bottom-0 w-px bg-red-500/60 z-[5] pointer-events-none" style={{ left: todayX }} />
+            )}
 
             {/* Barre build / permanente */}
             {hasBuild && (

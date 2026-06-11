@@ -37,7 +37,6 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
   const [description, setDescription] = useState('');
   const [typeProjet, setTypeProjet] = useState<ITProjectType>('applicatif');
   const [priorite, setPriorite] = useState<ITProjectPriority>('normale');
-  const [statut, setStatut] = useState<ITProjectStatus>('backlog');
   const [phaseCourante, setPhaseCourante] = useState<ITProjectPhase>('cadrage');
   const [phasesActives, setPhasesActives] = useState<ITProjectPhase[]>([...ALL_IT_PROJECT_PHASES]);
 
@@ -130,7 +129,6 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
       setDescription(project.description || '');
       setTypeProjet((project.type_projet as ITProjectType) || 'applicatif');
       setPriorite((project.priorite as ITProjectPriority) || 'normale');
-      setStatut(project.statut || 'backlog');
       setPhaseCourante((project.phase_courante as ITProjectPhase) || 'cadrage');
       const rawPhases = project.phases_actives as unknown;
       const arr = Array.isArray(rawPhases) ? (rawPhases as ITProjectPhase[]) : null;
@@ -184,7 +182,6 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
     setDescription('');
     setTypeProjet('applicatif');
     setPriorite('normale');
-    setStatut('backlog');
     setPhaseCourante('cadrage');
     setPhasesActives([...ALL_IT_PROJECT_PHASES]);
     setDateFinPrevue('');
@@ -248,7 +245,6 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
       description: description || null,
       type_projet: typeProjet,
       priorite,
-      statut,
       phase_courante: finalPhaseCourante,
       phases_actives: finalPhasesActives,
       date_fin_prevue: dateFinPrevue || null,
