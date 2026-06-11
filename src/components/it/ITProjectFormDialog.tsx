@@ -387,21 +387,6 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Statut delivery <span className="text-muted-foreground text-xs font-normal">(cycle de vie)</span></Label>
-                <Select value={statut} onValueChange={v => setStatut(v as ITProjectStatus)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="backlog">Backlog</SelectItem>
-                    <SelectItem value="en_cours">En cours</SelectItem>
-                    <SelectItem value="recette">Recette</SelectItem>
-                    <SelectItem value="deploye">Déployé</SelectItem>
-                    <SelectItem value="cloture">Clôturé</SelectItem>
-                    <SelectItem value="suspendu">Suspendu</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-[10px] text-muted-foreground">Avancement opérationnel. Le statut d'arbitrage portefeuille (Idée → Déployé) est dans l'onglet « Charge & planning ».</p>
-              </div>
-              <div className="space-y-2">
                 <Label>Phase courante</Label>
                 <Select value={phaseCourante} onValueChange={v => setPhaseCourante(v as ITProjectPhase)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -411,6 +396,7 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-[10px] text-muted-foreground">Le statut du projet est piloté par le « Statut portefeuille » (onglet Charge &amp; planning).</p>
               </div>
             </div>
 
@@ -585,10 +571,6 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="fdr-prio" className="flex items-center gap-1.5">⚡ Priorité FDR</Label>
-              <Input id="fdr-prio" placeholder="Valeur brute FDR (ex: Haute, P1, ...)" value={fdrPriorite} onChange={e => setFdrPriorite(e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="fdr-desc" className="flex items-center gap-1.5">📝 Description FDR</Label>

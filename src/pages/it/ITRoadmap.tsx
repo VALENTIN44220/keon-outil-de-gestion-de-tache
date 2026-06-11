@@ -15,7 +15,8 @@ import {
 } from '@/components/ui/context-menu';
 import {
   Map as MapIcon, Undo2, Redo2, AlertTriangle, Loader2, ExternalLink,
-  EyeOff, Eye, CalendarRange, Filter, X,
+  EyeOff, Eye, CalendarRange, Filter, X, ChevronDown, ChevronRight, Hash,
+  ArrowUp, ArrowDown, Maximize2, Minimize2, CalendarClock,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { extractErrorMessage } from '@/lib/extractErrorMessage';
@@ -23,7 +24,7 @@ import { useFdrProjects, usePatchFdrProject, type FdrRoadmapProject, type FdrPro
 import { FdrImportExport } from '@/components/it/FdrImportExport';
 import { useFdrSettings, useFdrProfils } from '@/hooks/useFdrSettings';
 import {
-  computeCapacityMatrix, generateHorizon, getMepRetenue, toYM, addMonths, cmpYM,
+  computeCapacityMatrix, computeProjectMonthLoads, generateHorizon, getMepRetenue, toYM, addMonths, cmpYM,
 } from '@/lib/fdr/calculationEngine';
 import { STATUT_PORTEFEUILLE_CONFIG, ACTIVITES_METIER, type StatutPortefeuille, type FdrEngineSettings } from '@/types/fdr';
 import { IT_PROJECT_PILIER_CONFIG } from '@/types/itProject';
@@ -33,9 +34,48 @@ import { cn } from '@/lib/utils';
 
 const MONTH_W = 56;       // largeur d'un mois en px
 const ROW_H = 34;         // hauteur d'une ligne projet
-const LABEL_W = 260;      // largeur de la colonne libellés
+const LABEL_W = 260;      // largeur par défaut de la colonne libellés
+const LABEL_W_WIDE = 460; // largeur élargie
 
 const ALL = '__all__';
+
+// ---- Groupements ----
+
+type GroupMode = 'activite' | 'profil' | 'pilier' | 'categorie' | 'statut' | 'trimestre' | 'annee' | 'none';
+
+const GROUP_OPTIONS: { value: GroupMode; label: string }[] = [
+  { value: 'activite', label: 'Activité' },
+  { value: 'profil', label: 'Profil principal' },
+  { value: 'pilier', label: 'Pilier' },
+  { value: 'categorie', label: 'Catégorie' },
+  { value: 'statut', label: 'Statut portefeuille' },
+  { value: 'trimestre', label: 'Trimestre (kickoff)' },
+  { value: 'annee', label: 'Année (kickoff)' },
+  { value: 'none', label: 'Aucun groupe' },
+];
+
+/** Trimestre 'YYYY T#' depuis 'YYYY-MM-DD'. */
+function quarterOf(date: string | null | undefined): string | null {
+  const ym = toYM(date);
+  if (!ym) return null;
+  const [y, m] = ym.split('-').map(Number);
+  return `${y} T${Math.ceil(m / 3)}`;
+}
+
+/** Somme de charge (build+suivi, j/mois) d'un projet sur un mois donné. */
+function projectMonthCharge(
+  p: FdrRoadmapProject,
+  ym: string,
+  settings: { echeance_standard_permanentes: string; jours_productifs_mois: number } | null,
+): number {
+  if (!settings) return 0;
+  return computeProjectMonthLoads(p, ym, settings).reduce((s, l) => s + l.j_mois, 0);
+}
+
+/** Un projet « a des jours » s'il porte une charge build ou suivi. */
+function hasDays(p: FdrRoadmapProject): boolean {
+  return p.loads.some(l => l.j_mois > 0) || (p.suivi_j_mois ?? 0) > 0;
+}
 
 // ---- Utilitaires date ----
 
@@ -122,11 +162,29 @@ function RoadmapContent() {
   const [fPilier, setFPilier] = useState(ALL);
   const [fStatut, setFStatut] = useState(ALL);
   const [fProfil, setFProfil] = useState(ALL);
-  const [groupBy, setGroupBy] = useState<'activite' | 'profil' | 'none'>('activite');
+  const [onlyWithDays, setOnlyWithDays] = useState(false);
+  const [groupBy, setGroupBy] = useState<GroupMode>('activite');
 
-  const hasFilters = fCategorie !== ALL || fActivite !== ALL || fPilier !== ALL || fStatut !== ALL || fProfil !== ALL || !!search;
+  // ---- Affichage ----
+  const [showCode, setShowCode] = useState(true);
+  const [wideLabels, setWideLabels] = useState(false);
+  const labelW = wideLabels ? LABEL_W_WIDE : LABEL_W;
+
+  // ---- Groupes repliés (affichent la somme) ----
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const toggleCollapse = (key: string) => setCollapsed(s => {
+    const n = new Set(s); n.has(key) ? n.delete(key) : n.add(key); return n;
+  });
+
+  // ---- Tri par colonne ----
+  // key = 'name' (libellé) | 'YYYY-MM' (charge du mois) ; null = ordre naturel
+  const [sort, setSort] = useState<{ key: string; dir: 'asc' | 'desc' } | null>(null);
+  const onSortColumn = (key: string) => setSort(s =>
+    s && s.key === key ? (s.dir === 'desc' ? { key, dir: 'asc' } : null) : { key, dir: 'desc' });
+
+  const hasFilters = fCategorie !== ALL || fActivite !== ALL || fPilier !== ALL || fStatut !== ALL || fProfil !== ALL || onlyWithDays || !!search;
   const resetFilters = () => {
-    setSearch(''); setFCategorie(ALL); setFActivite(ALL); setFPilier(ALL); setFStatut(ALL); setFProfil(ALL);
+    setSearch(''); setFCategorie(ALL); setFActivite(ALL); setFPilier(ALL); setFStatut(ALL); setFProfil(ALL); setOnlyWithDays(false);
   };
 
   // ---- Drag & historique ----
@@ -187,6 +245,18 @@ function RoadmapContent() {
     return cmpYM(ym, months[0]) < 0 ? -1 : months.length;
   }, [months]);
 
+  // ---- Paramètres moteur (sert au calcul de charge, aux sommes et au tri) ----
+  const engineSettings = useMemo<FdrEngineSettings | null>(() => {
+    if (!settings || profils.length === 0) return null;
+    return {
+      jours_productifs_mois: settings.jours_productifs_mois,
+      echeance_standard_permanentes: toYM(settings.echeance_standard_permanentes) ?? '2030-12',
+      horizon_debut: horizonDebut,
+      horizon_duree_mois: horizonDuree,
+      profils: profils.filter(p => p.actif).map(p => ({ code: p.code, capacite_j_mois: p.capacite_j_mois })),
+    };
+  }, [settings, profils, horizonDebut, horizonDuree]);
+
   // ---- Projets avec preview drag appliqué ----
   const previewProjects = useMemo<FdrRoadmapProject[]>(() => {
     if (!drag || drag.delta === 0) return projects;
@@ -228,37 +298,64 @@ function RoadmapContent() {
         const hasLoad = p.loads.some(l => l.profil_code === fProfil) || p.profil_principal === fProfil;
         if (!hasLoad) return false;
       }
+      if (onlyWithDays && !hasDays(p)) return false;
       return true;
     });
-  }, [previewProjects, search, fCategorie, fActivite, fPilier, fStatut, fProfil]);
+  }, [previewProjects, search, fCategorie, fActivite, fPilier, fStatut, fProfil, onlyWithDays]);
+
+  // ---- Clé de groupe selon le mode ----
+  const groupKeyOf = useCallback((p: FdrRoadmapProject): string => {
+    switch (groupBy) {
+      case 'activite':  return p.activite_metier ?? '— Sans activité —';
+      case 'profil':    return profils.find(pr => pr.code === p.profil_principal)?.nom ?? '— Sans profil —';
+      case 'pilier':    return p.pilier ?? '— Sans pilier —';
+      case 'categorie': return p.categorie_fdr ?? '— Sans catégorie —';
+      case 'statut':    return p.statut_portefeuille ?? '— Sans statut —';
+      case 'trimestre': return quarterOf(p.date_kickoff) ?? '— Sans date —';
+      case 'annee':     return toYM(p.date_kickoff)?.slice(0, 4) ?? '— Sans date —';
+      default:          return '';
+    }
+  }, [groupBy, profils]);
+
+  // ---- Tri des projets (par libellé ou par charge d'un mois) ----
+  const sortItems = useCallback((items: FdrRoadmapProject[]): FdrRoadmapProject[] => {
+    if (!sort) return items;
+    const dir = sort.dir === 'asc' ? 1 : -1;
+    const val = (p: FdrRoadmapProject) =>
+      sort.key === 'name' ? p.nom.toLowerCase() : projectMonthCharge(p, sort.key, engineSettings);
+    return [...items].sort((a, b) => {
+      const va = val(a), vb = val(b);
+      if (va < vb) return -1 * dir;
+      if (va > vb) return 1 * dir;
+      return 0;
+    });
+  }, [sort, engineSettings]);
 
   // ---- Groupes ----
   const groups = useMemo(() => {
-    if (groupBy === 'none') return [{ label: null as string | null, items: filtered }];
+    if (groupBy === 'none') return [{ label: null as string | null, items: sortItems(filtered) }];
     const map = new Map<string, FdrRoadmapProject[]>();
     for (const p of filtered) {
-      const key = groupBy === 'activite'
-        ? (p.activite_metier ?? '— Sans activité —')
-        : (profils.find(pr => pr.code === p.profil_principal)?.nom ?? '— Sans profil —');
+      const key = groupKeyOf(p);
       (map.get(key) ?? map.set(key, []).get(key)!).push(p);
     }
     return [...map.entries()]
       .sort(([a], [b]) => a.localeCompare(b, 'fr'))
-      .map(([label, items]) => ({ label: label as string | null, items }));
-  }, [filtered, groupBy, profils]);
+      .map(([label, items]) => ({ label: label as string | null, items: sortItems(items) }));
+  }, [filtered, groupBy, groupKeyOf, sortItems]);
+
+  /** Somme de charge du groupe par mois (pour l'affichage replié). */
+  const groupMonthSums = useCallback((items: FdrRoadmapProject[]): Record<string, number> => {
+    const out: Record<string, number> = {};
+    for (const ym of months) {
+      let s = 0;
+      for (const p of items) s += projectMonthCharge(p, ym, engineSettings);
+      out[ym] = Math.round(s * 10) / 10;
+    }
+    return out;
+  }, [months, engineSettings]);
 
   // ---- Matrice capacité temps réel (sur TOUS les projets, pas seulement filtrés) ----
-  const engineSettings = useMemo<FdrEngineSettings | null>(() => {
-    if (!settings || profils.length === 0) return null;
-    return {
-      jours_productifs_mois: settings.jours_productifs_mois,
-      echeance_standard_permanentes: toYM(settings.echeance_standard_permanentes) ?? '2030-12',
-      horizon_debut: horizonDebut,
-      horizon_duree_mois: horizonDuree,
-      profils: profils.filter(p => p.actif).map(p => ({ code: p.code, capacite_j_mois: p.capacite_j_mois })),
-    };
-  }, [settings, profils, horizonDebut, horizonDuree]);
-
   const matrix = useMemo(() => {
     if (!engineSettings) return null;
     return computeCapacityMatrix(previewProjects, engineSettings);
@@ -414,6 +511,14 @@ function RoadmapContent() {
             options={Object.keys(STATUT_PORTEFEUILLE_CONFIG).map(s => [s, s])} />
           <FilterSelect value={fProfil} onChange={setFProfil} placeholder="Profil"
             options={profils.filter(p => p.actif).map(p => [p.code, p.nom])} />
+          <Button
+            variant={onlyWithDays ? 'default' : 'outline'} size="sm"
+            className="h-8 gap-1.5 text-xs"
+            onClick={() => setOnlyWithDays(v => !v)}
+            title="N'afficher que les projets portant une charge (j/mois)"
+          >
+            <CalendarClock className="h-3.5 w-3.5" />Avec charge
+          </Button>
           {hasFilters && (
             <Button variant="ghost" size="sm" className="h-8 gap-1 text-xs" onClick={resetFilters}>
               <X className="h-3 w-3" />Réinitialiser
@@ -421,14 +526,30 @@ function RoadmapContent() {
           )}
           <div className="ml-auto flex items-center gap-2">
             <FdrImportExport projects={projects} />
-            <Select value={groupBy} onValueChange={v => setGroupBy(v as typeof groupBy)}>
-              <SelectTrigger className="h-8 text-xs w-40"><SelectValue /></SelectTrigger>
+            <Select value={groupBy} onValueChange={v => setGroupBy(v as GroupMode)}>
+              <SelectTrigger className="h-8 text-xs w-44"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="activite">Grouper par activité</SelectItem>
-                <SelectItem value="profil">Grouper par profil</SelectItem>
-                <SelectItem value="none">Sans groupe</SelectItem>
+                {GROUP_OPTIONS.map(o => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.value === 'none' ? o.label : `Grouper par ${o.label.toLowerCase()}`}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
+            <Button
+              variant={showCode ? 'outline' : 'default'} size="icon" className="h-8 w-8"
+              onClick={() => setShowCode(v => !v)}
+              title={showCode ? 'Masquer le numéro de projet' : 'Afficher le numéro de projet'}
+            >
+              <Hash className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="outline" size="icon" className="h-8 w-8"
+              onClick={() => setWideLabels(v => !v)}
+              title={wideLabels ? 'Réduire la colonne projets' : 'Élargir la colonne projets'}
+            >
+              {wideLabels ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+            </Button>
             <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={undo} disabled={undoStack.length === 0 || patchProject.isPending}>
               <Undo2 className="h-3.5 w-3.5" />Annuler
             </Button>
@@ -443,53 +564,89 @@ function RoadmapContent() {
       {/* Gantt */}
       <Card className="border-border/50">
         <CardContent className="p-0 overflow-x-auto select-none" onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
-          <div style={{ minWidth: LABEL_W + months.length * MONTH_W }}>
-            {/* En-tête mois */}
+          <div style={{ minWidth: labelW + months.length * MONTH_W }}>
+            {/* En-tête mois (cliquable pour trier) */}
             <div className="flex border-b bg-muted/30 sticky top-0 z-20">
-              <div style={{ width: LABEL_W }} className="shrink-0 px-3 py-2 text-xs font-medium text-muted-foreground sticky left-0 bg-muted/30 z-10">
+              <button
+                type="button"
+                onClick={() => onSortColumn('name')}
+                style={{ width: labelW }}
+                className="shrink-0 px-3 py-2 text-xs font-medium text-muted-foreground sticky left-0 bg-muted/30 z-10 flex items-center gap-1 hover:text-foreground text-left"
+                title="Trier par nom"
+              >
                 Projet ({filtered.length})
-              </div>
+                <SortIcon sort={sort} col="name" />
+              </button>
               {months.map(ym => {
                 const surcharge = (surchargeByYm.get(ym) ?? 0) > 0;
+                const sorted = sort?.key === ym;
                 return (
-                  <div key={ym} style={{ width: MONTH_W }} className={cn(
-                    'shrink-0 text-center text-[10px] py-2 font-medium border-l border-border/30',
-                    surcharge ? 'text-red-600 bg-red-50' : 'text-muted-foreground',
-                  )}>
+                  <button
+                    key={ym} type="button"
+                    onClick={() => onSortColumn(ym)}
+                    style={{ width: MONTH_W }}
+                    className={cn(
+                      'shrink-0 text-center text-[10px] py-2 font-medium border-l border-border/30 hover:bg-muted/60',
+                      surcharge ? 'text-red-600 bg-red-50' : 'text-muted-foreground',
+                      sorted && 'bg-violet-100 text-violet-700',
+                    )}
+                    title={`Trier par charge de ${fmtYM(ym)}`}
+                  >
                     {fmtYM(ym)}
                     {surcharge && <AlertTriangle className="h-2.5 w-2.5 inline ml-0.5 text-red-500" />}
-                  </div>
+                    <SortIcon sort={sort} col={ym} />
+                  </button>
                 );
               })}
             </div>
 
             {/* Lignes */}
-            {groups.map(group => (
-              <div key={group.label ?? '__nogroup__'}>
-                {group.label && (
-                  <div className="flex items-center bg-muted/20 border-b border-border/40">
-                    <div className="px-3 py-1 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide sticky left-0">
-                      {group.label} <span className="font-normal">({group.items.length})</span>
-                    </div>
-                  </div>
-                )}
-                {group.items.map(p => (
-                  <GanttRow
-                    key={p.id}
-                    project={p}
-                    months={months}
-                    ymIndex={ymIndex}
-                    engineSettings={engineSettings}
-                    dragging={drag?.projectId === p.id}
-                    onPointerDown={onBarPointerDown}
-                    onToggleFdr={() => toggleFdr(p)}
-                    onChangeStatus={s => changeStatus(p, s)}
-                    onShift={n => shiftProject(p, n)}
-                    onOpen={() => navigate(`/it/projects/${encodeURIComponent(p.code)}/overview`)}
-                  />
-                ))}
-              </div>
-            ))}
+            {groups.map(group => {
+              const key = group.label ?? '__nogroup__';
+              const isCollapsed = group.label != null && collapsed.has(key);
+              return (
+                <div key={key}>
+                  {group.label && (
+                    <button
+                      type="button"
+                      onClick={() => toggleCollapse(key)}
+                      className="w-full flex items-stretch bg-muted/20 border-b border-border/40 hover:bg-muted/40 text-left"
+                    >
+                      <div style={{ width: labelW }} className="shrink-0 px-3 py-1 text-[11px] font-semibold text-muted-foreground uppercase tracking-wide sticky left-0 bg-muted/20 flex items-center gap-1.5">
+                        {isCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                        {group.label} <span className="font-normal normal-case">({group.items.length})</span>
+                      </div>
+                      {/* Somme du groupe par mois (toujours visible) */}
+                      {(() => {
+                        const sums = groupMonthSums(group.items);
+                        return months.map(ym => (
+                          <div key={ym} style={{ width: MONTH_W }} className="shrink-0 text-center text-[10px] py-1 tabular-nums border-l border-border/20 text-violet-700 font-medium">
+                            {sums[ym] > 0 ? sums[ym] : ''}
+                          </div>
+                        ));
+                      })()}
+                    </button>
+                  )}
+                  {!isCollapsed && group.items.map(p => (
+                    <GanttRow
+                      key={p.id}
+                      project={p}
+                      months={months}
+                      labelW={labelW}
+                      showCode={showCode}
+                      ymIndex={ymIndex}
+                      engineSettings={engineSettings}
+                      dragging={drag?.projectId === p.id}
+                      onPointerDown={onBarPointerDown}
+                      onToggleFdr={() => toggleFdr(p)}
+                      onChangeStatus={s => changeStatus(p, s)}
+                      onShift={n => shiftProject(p, n)}
+                      onOpen={() => navigate(`/it/projects/${encodeURIComponent(p.code)}/overview`)}
+                    />
+                  ))}
+                </div>
+              );
+            })}
             {filtered.length === 0 && (
               <div className="py-12 text-center text-sm text-muted-foreground">
                 Aucun projet ne correspond aux filtres.
@@ -499,7 +656,7 @@ function RoadmapContent() {
             {/* Bandeau surcharge */}
             {matrix && (
               <div className="flex border-t bg-muted/30">
-                <div style={{ width: LABEL_W }} className="shrink-0 px-3 py-1.5 text-[11px] font-medium text-muted-foreground sticky left-0 bg-muted/30">
+                <div style={{ width: labelW }} className="shrink-0 px-3 py-1.5 text-[11px] font-medium text-muted-foreground sticky left-0 bg-muted/30">
                   Sous-effectif net (j)
                 </div>
                 {months.map(ym => {
@@ -532,6 +689,13 @@ function RoadmapContent() {
 
 // ---- Sous-composants ----
 
+function SortIcon({ sort, col }: { sort: { key: string; dir: 'asc' | 'desc' } | null; col: string }) {
+  if (!sort || sort.key !== col) return null;
+  return sort.dir === 'desc'
+    ? <ArrowDown className="h-2.5 w-2.5 inline ml-0.5" />
+    : <ArrowUp className="h-2.5 w-2.5 inline ml-0.5" />;
+}
+
 function FilterSelect({ value, onChange, placeholder, options }: {
   value: string;
   onChange: (v: string) => void;
@@ -552,11 +716,13 @@ function FilterSelect({ value, onChange, placeholder, options }: {
 }
 
 function GanttRow({
-  project: p, months, ymIndex, engineSettings, dragging,
+  project: p, months, labelW, showCode, ymIndex, engineSettings, dragging,
   onPointerDown, onToggleFdr, onChangeStatus, onShift, onOpen,
 }: {
   project: FdrRoadmapProject;
   months: string[];
+  labelW: number;
+  showCode: boolean;
   ymIndex: (ym: string | null) => number | null;
   engineSettings: FdrEngineSettings | null;
   dragging: boolean;
@@ -609,11 +775,11 @@ function GanttRow({
           style={{ height: ROW_H }}
         >
           {/* Libellé */}
-          <div style={{ width: LABEL_W }} className="shrink-0 px-3 flex items-center gap-2 sticky left-0 bg-background z-10 overflow-hidden">
+          <div style={{ width: labelW }} className="shrink-0 px-3 flex items-center gap-2 sticky left-0 bg-background z-10 overflow-hidden">
             {excluded && <EyeOff className="h-3 w-3 text-muted-foreground shrink-0" />}
             <span className="w-2 h-2 rounded-full shrink-0" style={{ background: statutCfg?.color ?? '#94a3b8' }} />
             <span className="text-xs truncate" title={`${p.code} — ${p.nom}`}>
-              <span className="font-mono text-[10px] text-muted-foreground mr-1.5">{p.code}</span>
+              {showCode && <span className="font-mono text-[10px] text-muted-foreground mr-1.5">{p.code}</span>}
               {p.nom}
             </span>
           </div>
