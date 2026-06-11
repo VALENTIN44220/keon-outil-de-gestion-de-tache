@@ -15,7 +15,7 @@ import { useFdrProfils } from '@/hooks/useFdrSettings';
 import { useITProjectLoad, useUpsertITProjectLoad } from '@/hooks/useITProjectLoad';
 import { supabase } from '@/integrations/supabase/client';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Monitor, Users, Calendar, Euro, Link2, MessageSquareText, Loader2, Target, BarChart3 } from 'lucide-react';
+import { Monitor, Users, Euro, Link2, MessageSquareText, Loader2, Target, BarChart3 } from 'lucide-react';
 
 const NONE = '__none__';
 
@@ -314,21 +314,18 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
         </DialogHeader>
 
         <Tabs defaultValue="general" className="mt-2">
-          <TabsList className="grid grid-cols-6 w-full">
+          <TabsList className="grid grid-cols-5 w-full">
             <TabsTrigger value="general" className="text-xs gap-1">
               <Monitor className="h-3.5 w-3.5" /> Général
             </TabsTrigger>
             <TabsTrigger value="equipe" className="text-xs gap-1">
               <Users className="h-3.5 w-3.5" /> Équipe
             </TabsTrigger>
-            <TabsTrigger value="planning" className="text-xs gap-1">
-              <Calendar className="h-3.5 w-3.5" /> Planning
-            </TabsTrigger>
             <TabsTrigger value="fdr" className="text-xs gap-1">
               <Target className="h-3.5 w-3.5" /> FDR
             </TabsTrigger>
             <TabsTrigger value="charge" className="text-xs gap-1">
-              <BarChart3 className="h-3.5 w-3.5" /> Charge
+              <BarChart3 className="h-3.5 w-3.5" /> Charge & planning
             </TabsTrigger>
             <TabsTrigger value="microsoft" className="text-xs gap-1">
               <Link2 className="h-3.5 w-3.5" /> M365
@@ -390,7 +387,7 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Statut</Label>
+                <Label>Statut delivery <span className="text-muted-foreground text-xs font-normal">(cycle de vie)</span></Label>
                 <Select value={statut} onValueChange={v => setStatut(v as ITProjectStatus)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -402,6 +399,7 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
                     <SelectItem value="suspendu">Suspendu</SelectItem>
                   </SelectContent>
                 </Select>
+                <p className="text-[10px] text-muted-foreground">Avancement opérationnel. Le statut d'arbitrage portefeuille (Idée → Déployé) est dans l'onglet « Charge & planning ».</p>
               </div>
               <div className="space-y-2">
                 <Label>Phase courante</Label>
@@ -548,22 +546,6 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-          </TabsContent>
-
-          {/* Planning tab */}
-          <TabsContent value="planning" className="space-y-4 pt-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="date-fin">Date de fin prévue</Label>
-                <Input id="date-fin" type="date" value={dateFinPrevue} onChange={e => setDateFinPrevue(e.target.value)} />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="budget" className="flex items-center gap-1.5">
-                <Euro className="h-3.5 w-3.5" /> Budget prévisionnel (€)
-              </Label>
-              <Input id="budget" type="number" placeholder="Ex: 50000" value={budgetPrevisionnel} onChange={e => setBudgetPrevisionnel(e.target.value)} />
             </div>
           </TabsContent>
 
@@ -742,6 +724,14 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
                   <span className="text-sm text-muted-foreground">j/mois</span>
                 </div>
               </div>
+            </div>
+
+            {/* Budget prévisionnel */}
+            <div className="space-y-2">
+              <Label htmlFor="budget" className="flex items-center gap-1.5 text-sm">
+                <Euro className="h-3.5 w-3.5" /> Budget prévisionnel (€)
+              </Label>
+              <Input id="budget" type="number" placeholder="Ex: 50000" value={budgetPrevisionnel} onChange={e => setBudgetPrevisionnel(e.target.value)} className="w-48" />
             </div>
 
             {/* Externalisation + FDR toggle */}

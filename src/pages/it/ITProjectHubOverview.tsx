@@ -29,7 +29,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Monitor, Calendar, TrendingUp, Target, Euro, Flag, CalendarRange,
-  MessageSquareText, Link2, ExternalLink, Shield, Pencil,
+  MessageSquareText, Link2, ExternalLink, Shield, Pencil, BarChart3, Rocket, EyeOff,
 } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -37,7 +37,12 @@ import { cn } from '@/lib/utils';
 import {
   IT_PROJECT_TYPE_CONFIG, IT_PHASE_BADGE_CONFIG, ITProjectPhase, getActivePhases,
   STATUT_FDR_CONFIG, FDR_ETAPES, StatutFDR, ITProjectFDRValidation,
+  IT_PROJECT_PILIER_CONFIG,
 } from '@/types/itProject';
+import { STATUT_PORTEFEUILLE_CONFIG, type StatutPortefeuille, type FdrProjectInput } from '@/types/fdr';
+import { useITProjectLoad } from '@/hooks/useITProjectLoad';
+import { useFdrProfils } from '@/hooks/useFdrSettings';
+import { getMepRetenue, totalBuildNet, toYM } from '@/lib/fdr/calculationEngine';
 import { ITProjectFormDialog } from '@/components/it/ITProjectFormDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -51,6 +56,8 @@ export default function ITProjectHubOverview() {
   const { openTeams, openLoop, hasTeams, hasLoop } = useITProjectSync(project);
   const { etapes, initFDRValidation, updateEtape } = useITProjectFDR(project?.id);
   const { data: phaseProgressMap = new Map() } = useITProjectPhaseProgress(project?.id);
+  const { data: projectLoads = [] } = useITProjectLoad(project?.id);
+  const { data: fdrProfils = [] } = useFdrProfils();
 
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editingEtape, setEditingEtape] = useState<ITProjectFDRValidation | null>(null);
@@ -99,6 +106,47 @@ export default function ITProjectHubOverview() {
     [milestones],
   );
 
+  // Adaptateur ITProject + loads → FdrProjectInput pour réutiliser le moteur de calcul.
+  const fdrInput = useMemo<FdrProjectInput | null>(() => {
+    if (!project) return null;
+    return {
+      id: project.id,
+      code: project.code_projet_digital,
+      nom: project.nom_projet,
+      activite_metier: project.activite_metier ?? null,
+      profil_principal: project.profil_principal ?? null,
+      statut_portefeuille: (project.statut_portefeuille as StatutPortefeuille) ?? 'Idée',
+      sur_feuille_de_route: project.sur_feuille_de_route ?? true,
+      date_kickoff: project.date_kickoff ?? null,
+      date_mep_saisie: project.date_mep_saisie ?? null,
+      delai_projete_mois: project.delai_projete_mois ?? null,
+      echeance_cible: project.echeance_cible ?? null,
+      suivi_j_mois: project.suivi_j_mois ?? 0,
+      loads: projectLoads.map(l => ({ profil_code: (l.profil as any)?.code ?? '', j_mois: l.j_mois })),
+      externe: project.externe ?? false,
+      pct_reduction_si_externe: project.pct_reduction_si_externe ?? 0,
+    };
+  }, [project, projectLoads]);
+
+  const charge = useMemo(() => {
+    if (!fdrInput) return null;
+    const isPermanente = fdrInput.statut_portefeuille === 'Tâche permanente';
+    const mep = getMepRetenue(fdrInput);
+    const buildNet = totalBuildNet(fdrInput);
+    const profilName = (code: string | null | undefined) =>
+      fdrProfils.find(p => p.code === code)?.nom ?? code ?? '—';
+    return {
+      isPermanente,
+      mepRetenue: mep,
+      buildNet,
+      suivi: fdrInput.suivi_j_mois,
+      ventilation: projectLoads
+        .filter(l => l.j_mois > 0)
+        .map(l => ({ nom: (l.profil as any)?.nom ?? '—', j_mois: l.j_mois })),
+      profilPrincipalNom: profilName(fdrInput.profil_principal),
+    };
+  }, [fdrInput, projectLoads, fdrProfils]);
+
   if (isLoading) {
     return (
       <Layout>
@@ -120,9 +168,6 @@ export default function ITProjectHubOverview() {
   }
 
   const today = new Date(); today.setHours(0, 0, 0, 0);
-  const dDay = project.date_fin_prevue
-    ? differenceInDays(parseISO(project.date_fin_prevue as unknown as string), today)
-    : null;
 
   const currentPhase = activePhases.find(p => p.value === project.phase_courante);
   const currentPhaseProgress = currentPhase ? phaseProgressValues[currentPhase.value] ?? 0 : 0;
@@ -130,6 +175,17 @@ export default function ITProjectHubOverview() {
   const typeConfig = project.type_projet ? IT_PROJECT_TYPE_CONFIG[project.type_projet] : null;
   const statutFdr = (project.statut_fdr as StatutFDR) || null;
   const fdrConfig = statutFdr ? STATUT_FDR_CONFIG[statutFdr] : null;
+  const statutPf = (project.statut_portefeuille as StatutPortefeuille) || null;
+  const statutPfConfig = statutPf ? STATUT_PORTEFEUILLE_CONFIG[statutPf] : null;
+  const pilierConfig = project.pilier ? IT_PROJECT_PILIER_CONFIG[project.pilier as keyof typeof IT_PROJECT_PILIER_CONFIG] : null;
+  const pctAvancementFdr = project.pct_avancement ?? 0;
+  // Délai restant calculé vs MEP retenue (cohérent avec le plan de charge).
+  const mepDate = charge?.mepRetenue ? parseISO(`${charge.mepRetenue}-01`) : null;
+  const dDayMep = mepDate ? differenceInDays(mepDate, today) : null;
+  const fmtMonth = (ym: string | null) => {
+    if (!ym) return '—';
+    try { return format(parseISO(`${ym}-01`), 'MMM yyyy', { locale: fr }); } catch { return ym; }
+  };
 
   const handleFdrStatutChange = async (value: string) => {
     setSavingFdrStatut(true);
@@ -193,6 +249,32 @@ export default function ITProjectHubOverview() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-5">
+                  {/* Bandeau portefeuille / arbitrage FDR */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {statutPfConfig && (
+                      <Badge className={cn('border', statutPfConfig.className)}>
+                        <span className="w-1.5 h-1.5 rounded-full inline-block mr-1.5" style={{ background: statutPfConfig.color }} />
+                        {statutPfConfig.label}
+                      </Badge>
+                    )}
+                    {project.categorie_fdr && (
+                      <Badge variant="outline" className="text-xs">{project.categorie_fdr}</Badge>
+                    )}
+                    {pilierConfig && (
+                      <Badge className={cn('text-[10px] border', pilierConfig.className)}>
+                        {project.pilier} — {pilierConfig.label}
+                      </Badge>
+                    )}
+                    {project.activite_metier && (
+                      <Badge variant="outline" className="text-xs">{project.activite_metier}</Badge>
+                    )}
+                    {project.sur_feuille_de_route === false && (
+                      <Badge variant="outline" className="text-xs gap-1 border-amber-300 text-amber-700 bg-amber-50">
+                        <EyeOff className="h-3 w-3" /> Hors feuille de route
+                      </Badge>
+                    )}
+                  </div>
+
                   <div>
                     <div className="flex justify-between items-baseline mb-2">
                       <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -203,10 +285,56 @@ export default function ITProjectHubOverview() {
                       </span>
                     </div>
                     <Progress value={globalProgress} className="h-3" />
-                    <p className="text-[11px] text-muted-foreground mt-1.5">
-                      Moyenne pondérée sur {activePhases.length} phase{activePhases.length > 1 ? 's' : ''} active{activePhases.length > 1 ? 's' : ''}
-                    </p>
+                    <div className="flex justify-between items-center mt-1.5">
+                      <p className="text-[11px] text-muted-foreground">
+                        Moyenne pondérée sur {activePhases.length} phase{activePhases.length > 1 ? 's' : ''} active{activePhases.length > 1 ? 's' : ''}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        Avancement FDR saisi : <strong className="text-foreground tabular-nums">{Math.round(pctAvancementFdr)}%</strong>
+                      </p>
+                    </div>
                   </div>
+
+                  {/* Plan de charge */}
+                  {charge && (
+                    <div className="rounded-xl border bg-violet-50/30 dark:bg-violet-950/10 p-3 space-y-3">
+                      <div className="flex items-center gap-2 text-xs font-semibold text-violet-700">
+                        <BarChart3 className="h-3.5 w-3.5" />
+                        Plan de charge
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Build net</p>
+                          <p className="text-lg font-bold tabular-nums">{Math.round(charge.buildNet * 10) / 10}<span className="text-xs font-normal text-muted-foreground"> j/mois</span></p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Suivi</p>
+                          <p className="text-lg font-bold tabular-nums">{Math.round(charge.suivi * 10) / 10}<span className="text-xs font-normal text-muted-foreground"> j/mois</span></p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{charge.isPermanente ? 'Échéance' : 'MEP retenue'}</p>
+                          <p className="text-lg font-bold tabular-nums">{fmtMonth(charge.mepRetenue)}</p>
+                        </div>
+                      </div>
+                      {charge.ventilation.length > 0 && (
+                        <div className="pt-2 border-t border-violet-200/50 space-y-1">
+                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Ventilation build par profil</p>
+                          {charge.ventilation.map((v, i) => (
+                            <div key={i} className="flex items-center justify-between text-xs">
+                              <span className="text-muted-foreground">{v.nom}</span>
+                              <span className="tabular-nums font-medium">{v.j_mois} j/mois</span>
+                            </div>
+                          ))}
+                          {charge.suivi > 0 && (
+                            <div className="flex items-center justify-between text-xs pt-1 border-t border-violet-200/30">
+                              <span className="text-muted-foreground">Suivi → {charge.profilPrincipalNom}</span>
+                              <span className="tabular-nums font-medium">{charge.suivi} j/mois</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-3 gap-3">
                     <div className="text-center p-3 rounded-xl bg-slate-50 dark:bg-slate-950/30 border">
@@ -260,22 +388,34 @@ export default function ITProjectHubOverview() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    <DateTile label="Début" date={project.date_debut as unknown as string | null} />
-                    <DateTile label="Fin prévue" date={project.date_fin_prevue as unknown as string | null} />
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <DateTile label="Kickoff" date={project.date_kickoff as unknown as string | null} />
+                    <div className="rounded-lg border bg-card p-3">
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                        <Rocket className="h-3 w-3" />{charge?.isPermanente ? 'Échéance' : 'MEP retenue'}
+                      </p>
+                      <p className="text-sm font-semibold mt-1 tabular-nums">{fmtMonth(charge?.mepRetenue ?? null)}</p>
+                    </div>
+                    <DateTile label="Échéance cible" date={project.echeance_cible as unknown as string | null} />
                     <div className="rounded-lg border bg-violet-50/40 dark:bg-violet-950/20 p-3">
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Délai restant</p>
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                        {charge?.isPermanente ? 'Avant échéance' : 'Avant MEP'}
+                      </p>
                       <p className="text-sm font-semibold mt-1">
-                        {dDay === null ? '—' : dDay < 0 ? (
-                          <span className="text-red-600">+{Math.abs(dDay)} j de retard</span>
-                        ) : dDay === 0 ? (
-                          <span className="text-amber-600">Aujourd'hui</span>
+                        {dDayMep === null ? '—' : dDayMep < 0 ? (
+                          <span className="text-red-600">+{Math.abs(dDayMep)} j de retard</span>
                         ) : (
-                          <span className="text-violet-700">J–{dDay}</span>
+                          <span className="text-violet-700">J–{dDayMep}</span>
                         )}
                       </p>
                     </div>
                   </div>
+                  {project.delai_projete_mois != null && !charge?.isPermanente && (
+                    <p className="text-[11px] text-muted-foreground">
+                      Délai build projeté : <strong className="text-foreground">{project.delai_projete_mois} mois</strong>
+                      {project.date_mep_saisie && <span> · MEP saisie manuellement</span>}
+                    </p>
+                  )}
 
                   <div className="pt-2 border-t">
                     <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1.5">
@@ -332,8 +472,11 @@ export default function ITProjectHubOverview() {
                     <span className="font-mono font-bold text-violet-600">{project.code_projet_digital}</span>
                   } />
                   {typeConfig && <InfoRow label="Type" value={`${typeConfig.icon} ${typeConfig.label}`} />}
-                  {project.date_debut && <InfoRow label="Début" value={format(new Date(project.date_debut), 'dd/MM/yyyy')} />}
-                  {project.date_fin_prevue && <InfoRow label="Fin prévue" value={format(new Date(project.date_fin_prevue), 'dd/MM/yyyy')} />}
+                  {statutPfConfig && <InfoRow label="Statut portefeuille" value={
+                    <Badge className={cn('text-[10px] border', statutPfConfig.className)}>{statutPfConfig.label}</Badge>
+                  } />}
+                  {project.date_kickoff && <InfoRow label="Kickoff" value={format(new Date(project.date_kickoff), 'dd/MM/yyyy')} />}
+                  {charge?.mepRetenue && <InfoRow label={charge.isPermanente ? 'Échéance' : 'MEP retenue'} value={fmtMonth(charge.mepRetenue)} />}
                   {project.responsable_it && <InfoRow label="Responsable IT" value={project.responsable_it.display_name} />}
                   {project.chef_projet && <InfoRow label="Chef de projet" value={project.chef_projet.display_name} />}
                   {project.sponsor && <InfoRow label="Sponsor" value={project.sponsor.display_name} />}
