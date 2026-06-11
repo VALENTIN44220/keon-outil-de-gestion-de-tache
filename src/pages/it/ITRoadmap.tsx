@@ -41,7 +41,7 @@ const ALL = '__all__';
 
 // ---- Groupements ----
 
-type GroupMode = 'activite' | 'profil' | 'pilier' | 'categorie' | 'statut' | 'trimestre' | 'annee' | 'none';
+type GroupMode = 'activite' | 'profil' | 'pilier' | 'categorie' | 'statut' | 'none';
 
 const GROUP_OPTIONS: { value: GroupMode; label: string }[] = [
   { value: 'activite', label: 'Activité' },
@@ -49,17 +49,65 @@ const GROUP_OPTIONS: { value: GroupMode; label: string }[] = [
   { value: 'pilier', label: 'Pilier' },
   { value: 'categorie', label: 'Catégorie' },
   { value: 'statut', label: 'Statut portefeuille' },
-  { value: 'trimestre', label: 'Trimestre (kickoff)' },
-  { value: 'annee', label: 'Année (kickoff)' },
   { value: 'none', label: 'Aucun groupe' },
 ];
 
-/** Trimestre 'YYYY T#' depuis 'YYYY-MM-DD'. */
-function quarterOf(date: string | null | undefined): string | null {
-  const ym = toYM(date);
+// ---- Granularité temporelle par année (regroupement des colonnes) ----
+
+type YearGran = 'month' | 'quarter' | 'year';
+const GRAN_CYCLE: Record<YearGran, YearGran> = { month: 'quarter', quarter: 'year', year: 'month' };
+const GRAN_LETTER: Record<YearGran, string> = { month: 'M', quarter: 'T', year: 'A' };
+
+/** Une colonne affichée = 1 mois, 1 trimestre ou 1 année. */
+interface Period {
+  key: string;
+  label: string;
+  sub?: string;
+  year: string;
+  kind: YearGran;
+  months: string[];
+}
+
+function fmtYMShort(ym: string): string {
+  const [y, m] = ym.split('-');
+  const months = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
+  return `${months[parseInt(m) - 1]} ${y.slice(2)}`;
+}
+
+/** Construit la liste des colonnes en repliant chaque année selon sa granularité. */
+function buildPeriods(months: string[], gran: Record<string, YearGran>): Period[] {
+  const byYear = new Map<string, string[]>();
+  for (const ym of months) {
+    const y = ym.slice(0, 4);
+    (byYear.get(y) ?? byYear.set(y, []).get(y)!).push(ym);
+  }
+  const periods: Period[] = [];
+  for (const [year, yms] of byYear) {
+    const g = gran[year] ?? 'month';
+    if (g === 'year') {
+      periods.push({ key: `Y-${year}`, label: year, year, kind: 'year', months: yms });
+    } else if (g === 'quarter') {
+      const q = new Map<number, string[]>();
+      for (const ym of yms) {
+        const qq = Math.ceil(parseInt(ym.slice(5, 7)) / 3);
+        (q.get(qq) ?? q.set(qq, []).get(qq)!).push(ym);
+      }
+      for (const [qq, qms] of [...q.entries()].sort((a, b) => a[0] - b[0])) {
+        periods.push({ key: `Q-${year}-${qq}`, label: `T${qq}`, sub: year.slice(2), year, kind: 'quarter', months: qms });
+      }
+    } else {
+      for (const ym of yms) periods.push({ key: ym, label: fmtYMShort(ym), year, kind: 'month', months: [ym] });
+    }
+  }
+  return periods;
+}
+
+/** Index de la colonne contenant un mois (clamp -1 / length hors horizon). */
+function periodIndexOfMonth(periods: Period[], ym: string | null): number | null {
   if (!ym) return null;
-  const [y, m] = ym.split('-').map(Number);
-  return `${y} T${Math.ceil(m / 3)}`;
+  for (let i = 0; i < periods.length; i++) if (periods[i].months.includes(ym)) return i;
+  if (periods.length === 0) return null;
+  return cmpYM(ym, periods[0].months[0]) < 0 ? -1 : periods.length;
 }
 
 /** Somme de charge (build+suivi, j/mois) d'un projet sur un mois donné. */
@@ -88,12 +136,6 @@ function shiftDateMonths(date: string, n: number): string {
   const lastDay = new Date(ny, nm, 0).getDate();
   const nd = Math.min(d || 1, lastDay);
   return `${String(ny).padStart(4, '0')}-${String(nm).padStart(2, '0')}-${String(nd).padStart(2, '0')}`;
-}
-
-function fmtYM(ym: string): string {
-  const [y, m] = ym.split('-');
-  const months = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
-  return `${months[parseInt(m) - 1]} ${y.slice(2)}`;
 }
 
 // ---- Drag state ----
@@ -165,10 +207,15 @@ function RoadmapContent() {
   const [onlyWithDays, setOnlyWithDays] = useState(false);
   const [groupBy, setGroupBy] = useState<GroupMode>('activite');
 
-  // ---- Affichage ----
-  const [showCode, setShowCode] = useState(true);
-  const [wideLabels, setWideLabels] = useState(false);
+  // ---- Affichage (configuration standard : N° masqué, colonne large) ----
+  const [showCode, setShowCode] = useState(false);
+  const [wideLabels, setWideLabels] = useState(true);
   const labelW = wideLabels ? LABEL_W_WIDE : LABEL_W;
+
+  // ---- Granularité temporelle par année ----
+  const [yearGran, setYearGran] = useState<Record<string, YearGran>>({});
+  const cycleYearGran = (year: string) =>
+    setYearGran(g => ({ ...g, [year]: GRAN_CYCLE[g[year] ?? 'month'] }));
 
   // ---- Groupes repliés (affichent la somme) ----
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -237,13 +284,13 @@ function RoadmapContent() {
   const horizonDebut = toYM(settings?.horizon_debut) ?? '2026-06';
   const horizonDuree = settings?.horizon_duree_mois ?? 19;
   const months = useMemo(() => generateHorizon(horizonDebut, horizonDuree), [horizonDebut, horizonDuree]);
-  const ymIndex = useCallback((ym: string | null) => {
-    if (!ym) return null;
-    const idx = months.indexOf(ym);
-    if (idx >= 0) return idx;
-    // hors horizon : clamp
-    return cmpYM(ym, months[0]) < 0 ? -1 : months.length;
-  }, [months]);
+
+  // Colonnes affichées (mois repliés en trimestre/année selon yearGran)
+  const periods = useMemo(() => buildPeriods(months, yearGran), [months, yearGran]);
+  const ymIndex = useCallback((ym: string | null) => periodIndexOfMonth(periods, ym), [periods]);
+
+  // Années présentes dans l'horizon (pour les boutons de granularité)
+  const years = useMemo(() => [...new Set(months.map(m => m.slice(0, 4)))], [months]);
 
   // ---- Paramètres moteur (sert au calcul de charge, aux sommes et au tri) ----
   const engineSettings = useMemo<FdrEngineSettings | null>(() => {
@@ -311,25 +358,33 @@ function RoadmapContent() {
       case 'pilier':    return p.pilier ?? '— Sans pilier —';
       case 'categorie': return p.categorie_fdr ?? '— Sans catégorie —';
       case 'statut':    return p.statut_portefeuille ?? '— Sans statut —';
-      case 'trimestre': return quarterOf(p.date_kickoff) ?? '— Sans date —';
-      case 'annee':     return toYM(p.date_kickoff)?.slice(0, 4) ?? '— Sans date —';
       default:          return '';
     }
   }, [groupBy, profils]);
 
-  // ---- Tri des projets (par libellé ou par charge d'un mois) ----
+  const periodByKey = useMemo(() => new Map(periods.map(p => [p.key, p])), [periods]);
+
+  /** Pic de charge (build+suivi) d'un projet sur une période (max de ses mois). */
+  const projectPeriodPeak = useCallback((p: FdrRoadmapProject, per: Period): number => {
+    let peak = 0;
+    for (const ym of per.months) { const v = projectMonthCharge(p, ym, engineSettings); if (v > peak) peak = v; }
+    return peak;
+  }, [engineSettings]);
+
+  // ---- Tri des projets (par libellé ou par charge d'une colonne) ----
   const sortItems = useCallback((items: FdrRoadmapProject[]): FdrRoadmapProject[] => {
     if (!sort) return items;
     const dir = sort.dir === 'asc' ? 1 : -1;
-    const val = (p: FdrRoadmapProject) =>
-      sort.key === 'name' ? p.nom.toLowerCase() : projectMonthCharge(p, sort.key, engineSettings);
+    const per = sort.key === 'name' ? null : periodByKey.get(sort.key);
+    const val = (p: FdrRoadmapProject): string | number =>
+      sort.key === 'name' ? p.nom.toLowerCase() : (per ? projectPeriodPeak(p, per) : 0);
     return [...items].sort((a, b) => {
       const va = val(a), vb = val(b);
       if (va < vb) return -1 * dir;
       if (va > vb) return 1 * dir;
       return 0;
     });
-  }, [sort, engineSettings]);
+  }, [sort, periodByKey, projectPeriodPeak]);
 
   // ---- Groupes ----
   const groups = useMemo(() => {
@@ -344,16 +399,20 @@ function RoadmapContent() {
       .map(([label, items]) => ({ label: label as string | null, items: sortItems(items) }));
   }, [filtered, groupBy, groupKeyOf, sortItems]);
 
-  /** Somme de charge du groupe par mois (pour l'affichage replié). */
-  const groupMonthSums = useCallback((items: FdrRoadmapProject[]): Record<string, number> => {
+  /** Charge cumulée du groupe par colonne = pic mensuel de la période. */
+  const groupPeriodSums = useCallback((items: FdrRoadmapProject[]): Record<string, number> => {
     const out: Record<string, number> = {};
-    for (const ym of months) {
-      let s = 0;
-      for (const p of items) s += projectMonthCharge(p, ym, engineSettings);
-      out[ym] = Math.round(s * 10) / 10;
+    for (const per of periods) {
+      let peak = 0;
+      for (const ym of per.months) {
+        let s = 0;
+        for (const p of items) s += projectMonthCharge(p, ym, engineSettings);
+        if (s > peak) peak = s;
+      }
+      out[per.key] = Math.round(peak * 10) / 10;
     }
     return out;
-  }, [months, engineSettings]);
+  }, [periods, engineSettings]);
 
   // ---- Matrice capacité temps réel (sur TOUS les projets, pas seulement filtrés) ----
   const matrix = useMemo(() => {
@@ -564,40 +623,68 @@ function RoadmapContent() {
       {/* Gantt */}
       <Card className="border-border/50">
         <CardContent className="p-0 overflow-x-auto select-none" onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
-          <div style={{ minWidth: labelW + months.length * MONTH_W }}>
-            {/* En-tête mois (cliquable pour trier) */}
-            <div className="flex border-b bg-muted/30 sticky top-0 z-20">
-              <button
-                type="button"
-                onClick={() => onSortColumn('name')}
-                style={{ width: labelW }}
-                className="shrink-0 px-3 py-2 text-xs font-medium text-muted-foreground sticky left-0 bg-muted/30 z-10 flex items-center gap-1 hover:text-foreground text-left"
-                title="Trier par nom"
-              >
-                Projet ({filtered.length})
-                <SortIcon sort={sort} col="name" />
-              </button>
-              {months.map(ym => {
-                const surcharge = (surchargeByYm.get(ym) ?? 0) > 0;
-                const sorted = sort?.key === ym;
-                return (
-                  <button
-                    key={ym} type="button"
-                    onClick={() => onSortColumn(ym)}
-                    style={{ width: MONTH_W }}
-                    className={cn(
-                      'shrink-0 text-center text-[10px] py-2 font-medium border-l border-border/30 hover:bg-muted/60',
-                      surcharge ? 'text-red-600 bg-red-50' : 'text-muted-foreground',
-                      sorted && 'bg-violet-100 text-violet-700',
-                    )}
-                    title={`Trier par charge de ${fmtYM(ym)}`}
-                  >
-                    {fmtYM(ym)}
-                    {surcharge && <AlertTriangle className="h-2.5 w-2.5 inline ml-0.5 text-red-500" />}
-                    <SortIcon sort={sort} col={ym} />
-                  </button>
-                );
-              })}
+          <div style={{ minWidth: labelW + periods.length * MONTH_W }}>
+            {/* En-tête : bande années (granularité) + colonnes */}
+            <div className="sticky top-0 z-20 bg-muted/30">
+              {/* Bande années avec bouton de granularité */}
+              <div className="flex border-b border-border/20">
+                <div style={{ width: labelW }} className="shrink-0 px-3 py-1 sticky left-0 bg-muted/30 z-10 text-[10px] text-muted-foreground flex items-center">
+                  Granularité / année →
+                </div>
+                {years.map(year => {
+                  const cnt = periods.filter(pe => pe.year === year).length;
+                  if (cnt === 0) return null;
+                  const g = yearGran[year] ?? 'month';
+                  return (
+                    <div key={year} style={{ width: cnt * MONTH_W }} className="shrink-0 border-l border-border/30 flex items-center justify-center gap-1.5 py-1">
+                      <span className="text-[10px] font-semibold text-muted-foreground">{year}</span>
+                      <button
+                        type="button"
+                        onClick={() => cycleYearGran(year)}
+                        className="text-[9px] font-bold w-4 h-4 rounded bg-violet-100 text-violet-700 hover:bg-violet-200 leading-none"
+                        title="Granularité : Mois → Trimestre → Année"
+                      >
+                        {GRAN_LETTER[g]}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Colonnes (cliquables pour trier) */}
+              <div className="flex border-b">
+                <button
+                  type="button"
+                  onClick={() => onSortColumn('name')}
+                  style={{ width: labelW }}
+                  className="shrink-0 px-3 py-2 text-xs font-medium text-muted-foreground sticky left-0 bg-muted/30 z-10 flex items-center gap-1 hover:text-foreground text-left"
+                  title="Trier par nom"
+                >
+                  Projet ({filtered.length})
+                  <SortIcon sort={sort} col="name" />
+                </button>
+                {periods.map(per => {
+                  const surcharge = per.months.some(ym => (surchargeByYm.get(ym) ?? 0) > 0);
+                  const sorted = sort?.key === per.key;
+                  return (
+                    <button
+                      key={per.key} type="button"
+                      onClick={() => onSortColumn(per.key)}
+                      style={{ width: MONTH_W }}
+                      className={cn(
+                        'shrink-0 text-center text-[10px] py-2 font-medium border-l border-border/30 hover:bg-muted/60 leading-tight',
+                        surcharge ? 'text-red-600 bg-red-50' : 'text-muted-foreground',
+                        sorted && 'bg-violet-100 text-violet-700',
+                        per.kind !== 'month' && 'bg-muted/50',
+                      )}
+                      title={`Trier par charge — ${per.label}${per.sub ? ' ' + per.sub : ''}`}
+                    >
+                      {per.label}{per.sub && <span className="opacity-60"> {per.sub}</span>}
+                      {surcharge && <AlertTriangle className="h-2.5 w-2.5 inline ml-0.5 text-red-500" />}
+                      <SortIcon sort={sort} col={per.key} />
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Lignes */}
@@ -616,12 +703,12 @@ function RoadmapContent() {
                         {isCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                         {group.label} <span className="font-normal normal-case">({group.items.length})</span>
                       </div>
-                      {/* Somme du groupe par mois (toujours visible) */}
+                      {/* Pic de charge du groupe par colonne */}
                       {(() => {
-                        const sums = groupMonthSums(group.items);
-                        return months.map(ym => (
-                          <div key={ym} style={{ width: MONTH_W }} className="shrink-0 text-center text-[10px] py-1 tabular-nums border-l border-border/20 text-violet-700 font-medium">
-                            {sums[ym] > 0 ? sums[ym] : ''}
+                        const sums = groupPeriodSums(group.items);
+                        return periods.map(per => (
+                          <div key={per.key} style={{ width: MONTH_W }} className="shrink-0 text-center text-[10px] py-1 tabular-nums border-l border-border/20 text-violet-700 font-medium">
+                            {sums[per.key] > 0 ? sums[per.key] : ''}
                           </div>
                         ));
                       })()}
@@ -631,7 +718,7 @@ function RoadmapContent() {
                     <GanttRow
                       key={p.id}
                       project={p}
-                      months={months}
+                      periods={periods}
                       labelW={labelW}
                       showCode={showCode}
                       ymIndex={ymIndex}
@@ -653,16 +740,16 @@ function RoadmapContent() {
               </div>
             )}
 
-            {/* Bandeau surcharge */}
+            {/* Bandeau surcharge (pic du sous-effectif net par colonne) */}
             {matrix && (
               <div className="flex border-t bg-muted/30">
                 <div style={{ width: labelW }} className="shrink-0 px-3 py-1.5 text-[11px] font-medium text-muted-foreground sticky left-0 bg-muted/30">
-                  Sous-effectif net (j)
+                  Sous-effectif net (j, pic)
                 </div>
-                {months.map(ym => {
-                  const v = surchargeByYm.get(ym) ?? 0;
+                {periods.map(per => {
+                  const v = Math.max(0, ...per.months.map(ym => surchargeByYm.get(ym) ?? 0));
                   return (
-                    <div key={ym} style={{ width: MONTH_W }} className={cn(
+                    <div key={per.key} style={{ width: MONTH_W }} className={cn(
                       'shrink-0 text-center text-[10px] py-1.5 tabular-nums border-l border-border/30',
                       v > 0 ? 'text-red-700 font-bold bg-red-100' : 'text-muted-foreground/40',
                     )}>
@@ -716,11 +803,11 @@ function FilterSelect({ value, onChange, placeholder, options }: {
 }
 
 function GanttRow({
-  project: p, months, labelW, showCode, ymIndex, engineSettings, dragging,
+  project: p, periods, labelW, showCode, ymIndex, engineSettings, dragging,
   onPointerDown, onToggleFdr, onChangeStatus, onShift, onOpen,
 }: {
   project: FdrRoadmapProject;
-  months: string[];
+  periods: Period[];
   labelW: number;
   showCode: boolean;
   ymIndex: (ym: string | null) => number | null;
@@ -735,8 +822,9 @@ function GanttRow({
   const excluded = !p.sur_feuille_de_route || p.statut_portefeuille === 'Abandonné';
   const isPermanente = p.statut_portefeuille === 'Tâche permanente';
   const statutCfg = STATUT_PORTEFEUILLE_CONFIG[p.statut_portefeuille];
+  const nCols = periods.length;
 
-  // Géométrie des segments
+  // Géométrie des segments (en index de colonnes/périodes)
   const kickoff = toYM(p.date_kickoff);
   const kIdx = ymIndex(kickoff);
   let buildStart: number | null = null, buildEnd: number | null = null;
@@ -745,22 +833,24 @@ function GanttRow({
   if (kIdx != null && kickoff) {
     if (isPermanente) {
       const fin = toYM(p.date_mep_saisie) ?? toYM(p.echeance_cible) ?? engineSettings?.echeance_standard_permanentes ?? null;
-      const fIdx = fin ? ymIndex(fin) : months.length - 1;
+      const fIdx = fin ? ymIndex(fin) : nCols - 1;
       buildStart = Math.max(0, kIdx);
-      buildEnd = Math.min(months.length - 1, fIdx ?? months.length - 1);
+      buildEnd = Math.min(nCols - 1, fIdx ?? nCols - 1);
     } else {
       const mep = getMepRetenue(p);
       const mIdx = mep ? ymIndex(mep) : null;
       buildStart = Math.max(0, kIdx);
-      buildEnd = mIdx != null ? Math.min(months.length - 1, mIdx - 1) : months.length - 1;
-      if (mIdx != null && mIdx < months.length && p.suivi_j_mois > 0) {
+      // En vue repliée, build et suivi peuvent tomber dans la même colonne :
+      // on garde au moins la colonne du kickoff pour le build.
+      buildEnd = mIdx != null ? Math.min(nCols - 1, Math.max(buildStart, mIdx - 1)) : nCols - 1;
+      if (mIdx != null && mIdx < nCols && p.suivi_j_mois > 0) {
         suiviStart = Math.max(0, mIdx);
-        suiviEnd = months.length - 1;
+        suiviEnd = nCols - 1;
       }
     }
   }
 
-  const hasBuild = buildStart != null && buildEnd != null && buildEnd >= buildStart && buildStart < months.length;
+  const hasBuild = buildStart != null && buildEnd != null && buildEnd >= buildStart && buildStart < nCols;
   const hasSuivi = suiviStart != null && suiviEnd != null && suiviEnd >= suiviStart;
 
   return (
@@ -785,10 +875,13 @@ function GanttRow({
           </div>
 
           {/* Zone barres */}
-          <div className="relative" style={{ width: months.length * MONTH_W }}>
-            {/* Grille mois */}
-            {months.map((ym, i) => (
-              <div key={ym} className="absolute top-0 bottom-0 border-l border-border/20" style={{ left: i * MONTH_W }} />
+          <div className="relative" style={{ width: nCols * MONTH_W }}>
+            {/* Grille colonnes */}
+            {periods.map((per, i) => (
+              <div key={per.key} className={cn(
+                'absolute top-0 bottom-0 border-l',
+                per.kind === 'month' ? 'border-border/20' : 'border-border/40',
+              )} style={{ left: i * MONTH_W }} />
             ))}
 
             {/* Barre build / permanente */}
