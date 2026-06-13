@@ -47,6 +47,8 @@ import InnovationRequests from "./pages/InnovationRequests";
 import InnovationNew from "./pages/InnovationNew";
 import MaintenanceDispatch from "./pages/maintenance/MaintenanceDispatch";
 import NewMaintenanceRequest from "./pages/maintenance/NewMaintenanceRequest";
+import RHDispatch from "./pages/rh/RHDispatch";
+import NewRHRequest from "./pages/rh/NewRHRequest";
 import LogistiqueDispatch from "./pages/logistique/LogistiqueDispatch";
 import NewLogistiqueRequest from "./pages/logistique/NewLogistiqueRequest";
 import ITDispatch from "./pages/it/ITDispatch";
@@ -151,6 +153,8 @@ const App = () => (
                 { path: "/smq/:id", end: true, element: <ProtectedRoute><SMQDetail /></ProtectedRoute> },
                 { path: "/maintenance/dispatch", end: true, element: <ProtectedRoute><MaintenanceDispatch /></ProtectedRoute> },
                 { path: "/maintenance/new", end: true, element: <ProtectedRoute><NewMaintenanceRequest /></ProtectedRoute> },
+                { path: "/rh/dispatch", end: true, element: <ProtectedRoute><RHDispatch /></ProtectedRoute> },
+                { path: "/rh/new", end: true, element: <ProtectedRoute><NewRHRequest /></ProtectedRoute> },
                 { path: "/logistique/dispatch", end: true, element: <ProtectedRoute><LogistiqueDispatch /></ProtectedRoute> },
                 { path: "/logistique/new", end: true, element: <ProtectedRoute><NewLogistiqueRequest /></ProtectedRoute> },
                 { path: "/it/dispatch", end: true, element: <ProtectedRoute><ITDispatch /></ProtectedRoute> },
@@ -234,6 +238,8 @@ const App = () => (
             <Route path="/smq/:id" element={<></>} />
             <Route path="/maintenance/dispatch" element={<></>} />
             <Route path="/maintenance/new" element={<></>} />
+            <Route path="/rh/dispatch" element={<></>} />
+            <Route path="/rh/new" element={<></>} />
             <Route path="/logistique/dispatch" element={<></>} />
             <Route path="/logistique/new" element={<></>} />
             <Route path="/it/dispatch" element={<></>} />

@@ -5,6 +5,7 @@ import {
   ArrowLeftRight, Calendar, MessageCircle, Building2, ClipboardList,
   Lightbulb, Monitor, Leaf, Euro, Map as MapIcon, Users, Wallet,
   Package, Truck, Plus, Minus, ChevronsDownUp, ChevronsUpDown, ShieldAlert, Settings2, BarChart2,
+  UserPlus,
 } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
@@ -99,6 +100,12 @@ const menuGroups: MenuGroup[] = [
     ],
   },
   {
+    label: 'RH',
+    items: [
+      { id: 'rh-dispatch', label: 'Mouvements collaborateurs', icon: UserPlus, path: '/rh/dispatch', permissionKey: 'can_access_rh' },
+    ],
+  },
+  {
     label: 'LOGISTIQUE',
     items: [
       { id: 'logistique-dispatch', label: 'Transports', icon: Truck, path: '/logistique/dispatch', permissionKey: 'can_access_logistique' },
@@ -147,6 +154,7 @@ const SECTION_COLORS: Record<string, string> = {
   'IT / DIGITAL':    '#0ea5e9', // sky-500
   'INNOVATION':      '#f59e0b', // amber-500
   'MAINTENANCE':     '#ef4444', // red-500
+  'RH':              '#ec4899', // pink-500
   'LOGISTIQUE':      '#06b6d4', // cyan-500
   'ACHATS':          '#f97316', // orange-500
   'CONFIGURATION':   '#64748b', // slate-500
