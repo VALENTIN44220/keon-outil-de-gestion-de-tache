@@ -1,5 +1,4 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { DeadlineTasksOverrideProvider } from '@/contexts/DeadlineTasksOverrideContext';
@@ -57,7 +56,6 @@ const Index = () => {
   /** Même profil que `useTasks` (simulation incluse) pour périmètre et filtre stakeholder. */
   const profile = isSimulating && simulatedProfile ? simulatedProfile : authProfile;
   const { isAdmin } = useUserRole();
-  const [searchParams, setSearchParams] = useSearchParams();
   const [activeView, setActiveView] = useState('dashboard');
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const [taskView, setTaskView] = useState<TaskView>('table');
@@ -334,52 +332,6 @@ const Index = () => {
     return map;
   }, [profilesMap]);
 
-  const openTaskOrRequestFromId = useCallback(
-    async (taskId: string) => {
-      let task = allTasks.find((t) => t.id === taskId);
-      if (!task) {
-        const { data, error } = await supabase.from('tasks').select('*').eq('id', taskId).maybeSingle();
-        if (error || !data) {
-          toast.error('Élément introuvable ou inaccessible');
-          return false;
-        }
-        task = data as Task;
-      }
-      if (task.type === 'request') {
-        setSelectedRequest(task);
-        setIsRequestDetailOpen(true);
-      } else {
-        setSelectedTaskForComment(task);
-        setIsCommentDetailOpen(true);
-      }
-      return true;
-    },
-    [allTasks]
-  );
-
-  // Deep link: /?openTask=<uuid> (used when notification is clicked from pages without local handlers)
-  const openTaskParam = searchParams.get('openTask');
-  useEffect(() => {
-    if (!openTaskParam || !profile?.id) return;
-
-    let cancelled = false;
-    (async () => {
-      await openTaskOrRequestFromId(openTaskParam);
-      if (cancelled) return;
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev);
-          next.delete('openTask');
-          return next;
-        },
-        { replace: true }
-      );
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [openTaskParam, profile?.id, openTaskOrRequestFromId, setSearchParams]);
 
   const handleScopeChange = (newScope: TaskScope) => {
     setScope(newScope);

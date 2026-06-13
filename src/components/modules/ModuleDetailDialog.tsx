@@ -27,6 +27,7 @@ import {
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useAutoCloseOnRouteChange } from '@/components/routing/PersistentRoutes';
 
 export interface DetailInfoLine {
   label: string;
@@ -138,6 +139,8 @@ export function ModuleDetailDialog(props: ModuleDetailDialogProps) {
     isAdmin, allowDelete, onDeleteConfirm,
     notAuthorizedHint, authorized = true,
   } = props;
+
+  useAutoCloseOnRouteChange(open, onClose);
 
   const [busy, setBusy] = useState(false);
   const [showComplement, setShowComplement] = useState(false);

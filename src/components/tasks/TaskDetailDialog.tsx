@@ -52,7 +52,6 @@ import {
   Play,
   Link as LinkIcon,
 } from 'lucide-react';
-import { RequestValidationButton } from './RequestValidationButton';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -70,6 +69,7 @@ import { ITProjectPhaseSelect } from '@/components/it/ITProjectPhaseSelect';
 import { IT_PROJECT_PHASES } from '@/types/itProject';
 import { ReassignTaskDialog } from '@/components/workload/ReassignTaskDialog';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAutoCloseOnRouteChange } from '@/components/routing/PersistentRoutes';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useSimulation } from '@/contexts/SimulationContext';
 import { canInitiateTaskReassignment } from '@/lib/taskReassignmentPermissions';
@@ -80,7 +80,6 @@ import {
   sendTaskForValidationFromExecutorState,
   rejectValidationWithExecutorPolicy,
 } from '@/services/taskStatusService';
-import { useSubProcessFinalRejectionPolicy } from '@/hooks/useSubProcessFinalRejectionPolicy';
 
 interface Profile {
   id: string;
@@ -128,6 +127,9 @@ function conversationTaskId(t: { id: string; type?: string | null; parent_reques
 }
 
 export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMutated }: TaskDetailDialogProps) {
+  // Ferme la modale si la page persistante qui l'héberge passe en arrière-plan
+  // (évite l'empilement de dialogs portalisés lors d'une navigation).
+  useAutoCloseOnRouteChange(open, onClose);
   const { profile } = useAuth();
   const { isAdmin: realIsAdmin } = useUserRole();
   // En mode simulation, on évalue les permissions COMME le user simulé. L'admin
@@ -223,10 +225,8 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
     [task?.reporter_id, parentRequestPersonIds?.reporter_id],
   );
 
-  // Politique de rejet : retour exécuteur ou refus terminal ?
-  const returnsToExecutorOnReject = useSubProcessFinalRejectionPolicy(
-    task?.source_sub_process_template_id ?? undefined,
-  );
+  // Politique de rejet standard : le refus de la validation finale renvoie à l'exécuteur.
+  const returnsToExecutorOnReject = true;
 
   // L'utilisateur courant peut-il valider/rejeter la tâche ?
   const validationLevel = task?.status === 'pending_validation_2' ? 2 : 1;
@@ -806,19 +806,7 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
 
             {/* Actions footer */}
             {!isEditing && (
-              <div className="flex justify-between items-center gap-2 pt-3 border-t mt-3">
-                <RequestValidationButton 
-                  taskId={selectedChildTask.id} 
-                  taskStatus={selectedChildTask.status}
-                  onValidationTriggered={() => {
-                    setChildTasks(prev => prev.map(t => 
-                      t.id === selectedChildTask.id 
-                        ? { ...t, status: 'pending_validation_1' as TaskStatus }
-                        : t
-                    ));
-                    setSelectedChildTask(prev => prev ? { ...prev, status: 'pending_validation_1' as TaskStatus } : null);
-                  }}
-                />
+              <div className="flex justify-end items-center gap-2 pt-3 border-t mt-3">
                 <div className="flex gap-2">
                   <Button variant="outline" onClick={handleCloseChildTask}>
                     Retour à la demande

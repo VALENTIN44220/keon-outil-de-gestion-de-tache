@@ -281,7 +281,7 @@ export default function SMQDetail() {
                       </div>
                     </div>
                     {act.linked_task_id ? (
-                      <Button size="sm" variant="outline" className="gap-1.5" onClick={() => navigate(`/?openTask=${act.linked_task_id}`)}>
+                      <Button size="sm" variant="outline" className="gap-1.5" onClick={() => navigate(`/demande/${act.linked_task_id}`)}>
                         <ExternalLink className="h-3.5 w-3.5" /> Tâche
                       </Button>
                     ) : (

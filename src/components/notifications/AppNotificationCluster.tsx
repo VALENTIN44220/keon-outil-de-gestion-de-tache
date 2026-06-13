@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { ValidationNotificationBell } from '@/components/notifications/ValidationNotificationBell';
@@ -22,7 +22,6 @@ interface AppNotificationClusterProps {
 
 export function AppNotificationCluster({ collapsed, className }: AppNotificationClusterProps) {
   const navigate = useNavigate();
-  const location = useLocation();
   const { profile } = useAuth();
   const deadlineOverride = useDeadlineTasksOverride();
 
@@ -68,24 +67,22 @@ export function AppNotificationCluster({ collapsed, className }: AppNotification
     deleteAll: deleteAllWorkflow,
   } = useInAppNotifications();
 
-  // ID du processus Bureau d'Études — détection des tâches/demandes BE
-  const BE_PROCESS_ID = 'bd75a3b0-c918-4b43-befe-739b83f7461a';
-
   const defaultOpenTask = async (taskId: string) => {
-    const path = location.pathname;
-    // On charge plusieurs colonnes pour pouvoir router correctement
-    // selon la nature de la tâche (module IT/Logistique/Maintenance ou flux BE).
+    // Modules IT / Logistique / Maintenance : vues métier dédiées (dispatch
+    // avec dialog spécifique au module). Le reste — flux BE, RH, demandes
+    // génériques et étapes — converge vers la page plein écran /demande/:taskId
+    // (nouveau modèle unifié), qui sait afficher une demande comme une étape
+    // et fonctionne pour tous les rôles. Cela évite l'empilement de dialogs
+    // (les anciennes pages persistantes portalisaient leurs modales par-dessus).
     try {
       const { supabase } = await import('@/integrations/supabase/client');
       const { data } = await supabase
         .from('tasks')
-        .select('module_code, type, source_process_template_id, process_template_id, be_status, parent_request_id, requester_id')
+        .select('module_code')
         .eq('id', taskId)
         .maybeSingle();
-      const t = (data as any) ?? {};
-      const mc = t.module_code as string | null;
+      const mc = (data as any)?.module_code as string | null;
 
-      // 1. Modules IT / Logistique / Maintenance via module_code
       const moduleRoutes: Record<string, string> = {
         it: '/it/dispatch',
         logistique: '/logistique/dispatch',
@@ -95,33 +92,11 @@ export function AppNotificationCluster({ collapsed, className }: AppNotification
         navigate(`${moduleRoutes[mc]}?openTask=${encodeURIComponent(taskId)}`);
         return;
       }
-
-      // 2. Flux BE : détecté par process_template_id, be_status, ou parent BE
-      const isBE =
-        t.source_process_template_id === BE_PROCESS_ID ||
-        t.process_template_id === BE_PROCESS_ID ||
-        Boolean(t.be_status);
-      if (isBE) {
-        // On route vers /  (Index) qui sait ouvrir n'importe quelle tâche
-        // via ?openTask=... — fonctionne pour TOUS les rôles (assigné,
-        // demandeur, validateur, admin). /be/dispatch n'est accessible
-        // qu'au manager BE, donc impraticable comme cible générique.
-        navigate(`/?openTask=${encodeURIComponent(taskId)}`);
-        return;
-      }
     } catch (e) {
       // Fallback ci-dessous
     }
 
-    // 3. Si on est déjà sur /requests, on reste dessus
-    if (path === '/requests' || path.startsWith('/requests/')) {
-      navigate(`/requests?openTask=${encodeURIComponent(taskId)}`);
-      return;
-    }
-
-    // 4. Fallback générique : / (Index) qui sait ouvrir une tâche via
-    //    ?openTask=... — évite l'écran blanc à la racine.
-    navigate(`/?openTask=${encodeURIComponent(taskId)}`);
+    navigate(`/demande/${encodeURIComponent(taskId)}`);
   };
 
   return (

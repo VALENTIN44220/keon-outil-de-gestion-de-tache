@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useMemo, useState } from 'react';
+import { ReactNode, createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { matchPath, useLocation } from 'react-router-dom';
 
 type PersistentRoute = {
@@ -9,6 +9,33 @@ type PersistentRoute = {
   /** Rendered screen (usually wrapped in ProtectedRoute). */
   element: ReactNode;
 };
+
+/**
+ * Indique si la route persistante qui héberge le composant est actuellement
+ * affichée. true par défaut (composants rendus hors PersistentRoutes).
+ */
+const PersistentRouteActiveContext = createContext<boolean>(true);
+
+export function usePersistentRouteActive(): boolean {
+  return useContext(PersistentRouteActiveContext);
+}
+
+/**
+ * Ferme automatiquement un dialog quand sa page hôte devient inactive.
+ *
+ * Les pages de PersistentRoutes restent montées (display:none) quand on
+ * navigue ailleurs, mais les dialogs Radix sont portalisés dans document.body
+ * et resteraient donc visibles par-dessus la nouvelle page — c'est la cause
+ * des fenêtres empilées. À appeler dans tout dialog de détail ouvert par une
+ * page persistante.
+ */
+export function useAutoCloseOnRouteChange(open: boolean, onClose: () => void) {
+  const isActive = usePersistentRouteActive();
+  useEffect(() => {
+    if (!isActive && open) onClose();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive]);
+}
 
 /**
  * Keeps selected route screens mounted across navigation.
@@ -57,11 +84,12 @@ export function PersistentRoutes({ routes }: { routes: PersistentRoute[] }) {
             aria-hidden={!isActive}
             data-persistent-route={r.path}
           >
-            {r.element}
+            <PersistentRouteActiveContext.Provider value={isActive}>
+              {r.element}
+            </PersistentRouteActiveContext.Provider>
           </div>
         );
       })}
     </>
   );
 }
-

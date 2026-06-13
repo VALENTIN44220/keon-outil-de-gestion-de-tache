@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Task, TaskStatus, TaskPriority } from '@/types/task';
+import { useAutoCloseOnRouteChange } from '@/components/routing/PersistentRoutes';
 import { useMaterialValidation } from '@/hooks/useMaterialValidation';
 import {
   Dialog,
@@ -81,6 +82,7 @@ import { sendTaskForValidationFromExecutorState } from '@/services/taskStatusSer
 import { TaskValidationChainPanel } from '@/components/tasks/TaskValidationChainPanel';
 
 export function RequestDetailDialog({ task, open, onClose, onStatusChange, onTaskMutated }: RequestDetailDialogProps) {
+  useAutoCloseOnRouteChange(open, onClose);
   const { profile } = useAuth();
   const { isAdmin: realIsAdmin } = useUserRole();
   // En mode simulation, on désactive le bypass admin pour évaluer les permissions
@@ -479,26 +481,7 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange, onTas
         console.warn('[handleCancelRequest] request_sub_processes table absente, ignoré', e);
       }
 
-      // 3. Cancel any active workflow runs (tolère — table peut être absente)
-      try {
-        const { error: workflowError } = await supabase
-          .from('workflow_runs' as any)
-          .update({
-            status: 'cancelled' as const,
-            completed_at: new Date().toISOString(),
-          })
-          .eq('trigger_entity_id', task.id)
-          .neq('status', 'completed')
-          .neq('status', 'failed')
-          .neq('status', 'cancelled');
-        if (workflowError) {
-          console.warn('[handleCancelRequest] workflow_runs warning:', workflowError);
-        }
-      } catch (e) {
-        console.warn('[handleCancelRequest] workflow_runs table absente, ignoré', e);
-      }
-
-      // 4. Cancel the main request — c'est la SEULE étape critique.
+      // 3. Cancel the main request — c'est la SEULE étape critique.
       const { error: requestError } = await supabase
         .from('tasks')
         .update({
@@ -508,24 +491,6 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange, onTas
         .eq('id', task.id);
 
       if (requestError) throw requestError;
-
-      // 5. Emit workflow event (tolère — table workflow_events supprimée par
-      //    la migration be_001_drop_wf_tables sur certains environnements).
-      try {
-        await supabase.from('workflow_events' as any).insert({
-          event_type: 'task_status_changed',
-          entity_type: 'request',
-          entity_id: task.id,
-          payload: {
-            from_status: task.status,
-            to_status: 'cancelled',
-            task_title: task.title,
-            cancelled_tasks_count: childTasks.length,
-          },
-        });
-      } catch (e) {
-        console.warn('[handleCancelRequest] workflow_events table absente, ignoré', e);
-      }
 
       onStatusChange(task.id, 'cancelled');
       toast.success('Demande annulée avec succès');
@@ -582,23 +547,6 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange, onTas
         })
         .eq('id', task.id);
       if (requestError) throw requestError;
-
-      // 4) Emit workflow event (best-effort — table peut être absente)
-      try {
-        await supabase.from('workflow_events' as any).insert({
-          event_type: 'task_status_changed',
-          entity_type: 'request',
-          entity_id: task.id,
-          payload: {
-            from_status: task.status,
-            to_status: 'done',
-            task_title: task.title,
-            completed_tasks_count: childTasks.length,
-          },
-        });
-      } catch (e) {
-        console.warn('[handleCompleteRequest] workflow_events table absente, ignoré', e);
-      }
 
       onStatusChange(task.id, 'done');
       toast.success('Demande marquée comme complétée');

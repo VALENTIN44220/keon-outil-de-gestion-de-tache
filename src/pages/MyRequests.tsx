@@ -3,19 +3,16 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { DeadlineTasksOverrideProvider } from '@/contexts/DeadlineTasksOverrideContext';
-import { UnifiedTaskDetailDialog } from '@/components/tasks/UnifiedTaskDetailDialog';
 import { DataTableWidget } from '@/components/dashboard/widgets/DataTableWidget';
 import { FilterDrawerButton } from '@/components/dashboard/FilterDrawerButton';
 import { CrossFilters, DEFAULT_CROSS_FILTERS } from '@/components/dashboard/types';
 import { useTasks } from '@/hooks/useTasks';
-import { usePendingAssignments } from '@/hooks/usePendingAssignments';
 import { Task } from '@/types/task';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Eye } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSimulation } from '@/contexts/SimulationContext';
-import { toast } from 'sonner';
 import { isWithinInterval, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 
 const MyRequests = () => {
@@ -27,12 +24,9 @@ const MyRequests = () => {
   const [activeView, setActiveView] = useState('my-requests');
   const [requests, setRequests] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedRequest, setSelectedRequest] = useState<Task | null>(null);
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [crossFilters, setCrossFilters] = useState<CrossFilters>(DEFAULT_CROSS_FILTERS);
 
-  const { allTasks, searchQuery, setSearchQuery, updateTaskStatus } = useTasks();
-  const { refetch: refetchPending } = usePendingAssignments();
+  const { allTasks, searchQuery, setSearchQuery } = useTasks();
 
   const fetchRequests = useCallback(async () => {
     setIsLoading(true);
@@ -68,7 +62,6 @@ const MyRequests = () => {
           const updated = payload?.new;
           if (!updated?.id) return;
           setRequests((prev) => prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)));
-          setSelectedRequest((prev) => (prev && prev.id === updated.id ? { ...prev, ...updated } : prev));
         },
       )
       .subscribe();
@@ -119,46 +112,15 @@ const MyRequests = () => {
     });
   }, [myRequests, crossFilters]);
 
-  const openNotificationTarget = useCallback(
-    async (taskId: string) => {
-      let task = requests.find((r) => r.id === taskId) || allTasks.find((t) => t.id === taskId);
-      if (!task) {
-        const { data, error } = await supabase.from('tasks').select('*').eq('id', taskId).maybeSingle();
-        if (error || !data) {
-          toast.error('Élément introuvable ou inaccessible');
-          return;
-        }
-        task = data as Task;
-      }
-      setSelectedRequest(task);
-      setIsDetailOpen(true);
-    },
-    [requests, allTasks],
-  );
-
+  // Deep-link ?openTask=<uuid> → page de suivi plein écran (modèle unifié).
   useEffect(() => {
     const taskId = searchParams.get('openTask');
     if (!taskId) return;
-    void openNotificationTarget(taskId);
     const next = new URLSearchParams(searchParams);
     next.delete('openTask');
     setSearchParams(next, { replace: true });
-  }, [searchParams, setSearchParams, openNotificationTarget]);
-
-  const handleRefresh = () => {
-    fetchRequests();
-    refetchPending();
-  };
-
-  const handleRequestStatusChange = useCallback(
-    async (taskId: string, status: any) => {
-      await updateTaskStatus(taskId, status);
-      const now = new Date().toISOString();
-      setRequests((prev) => prev.map((t) => (t.id === taskId ? { ...t, status, updated_at: now } : t)));
-      setSelectedRequest((prev) => (prev && prev.id === taskId ? { ...prev, status, updated_at: now } : prev));
-    },
-    [updateTaskStatus],
-  );
+    navigate(`/demande/${taskId}`);
+  }, [searchParams, setSearchParams, navigate]);
 
   const activeFilterCount = filteredRequests.length !== myRequests.length;
 
@@ -207,20 +169,6 @@ const MyRequests = () => {
             </div>
           </main>
         </div>
-
-        {selectedRequest && (
-          <UnifiedTaskDetailDialog
-            task={selectedRequest}
-            open={isDetailOpen}
-            onClose={() => {
-              setIsDetailOpen(false);
-              setSelectedRequest(null);
-              handleRefresh();
-            }}
-            onStatusChange={handleRequestStatusChange}
-            onTaskMutated={handleRefresh}
-          />
-        )}
       </div>
     </DeadlineTasksOverrideProvider>
   );

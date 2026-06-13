@@ -10,7 +10,7 @@
  * Compat legacy conservée :
  *  - `?supplierRequest=1`         → ouvre NewRequestDialog ciblant le sous-processus fournisseur
  *  - `/service-achat/nouveau-fournisseur` → idem
- *  - `?openTask=<uuid>`           → redirige vers /mes-demandes?openTask=<uuid>
+ *  - `?openTask=<uuid>`           → redirige vers la page de suivi /demande/<uuid>
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useNavigate, useLocation, matchPath } from 'react-router-dom';
@@ -100,11 +100,11 @@ const Requests = () => {
     setIsNewRequestOpen(true);
   }, [location.pathname]);
 
-  // Deep-link ?openTask=<uuid> → rediriger vers la page de suivi
+  // Deep-link ?openTask=<uuid> → page de suivi plein écran (modèle unifié)
   useEffect(() => {
     const taskId = searchParams.get('openTask');
     if (!taskId) return;
-    navigate(`/mes-demandes?openTask=${taskId}`, { replace: true });
+    navigate(`/demande/${taskId}`, { replace: true });
   }, [searchParams, navigate]);
 
   const handleCloseNewRequestDialog = useCallback(() => {
