@@ -25,6 +25,8 @@ export const SCREEN_PERMISSIONS = [
   'can_access_maintenance',
   'can_access_logistique',
   'can_access_smq',
+  'can_access_rh',
+  'can_access_comm',
   // Transverse
   'can_access_suppliers',
   'can_access_templates',
@@ -81,6 +83,8 @@ export const SCREEN_PERMISSION_GROUPS: Array<{
       'can_access_maintenance',
       'can_access_logistique',
       'can_access_smq',
+      'can_access_rh',
+      'can_access_comm',
       'can_access_suppliers',
     ],
   },
@@ -152,6 +156,8 @@ export const SCREEN_LABELS: Record<ScreenPermissionKey, string> = {
   can_access_maintenance:      'Maintenance',
   can_access_logistique:       'Logistique',
   can_access_smq:              'SMQ — Non-conformités',
+  can_access_rh:               'RH — Mouvements collaborateurs',
+  can_access_comm:             'Communication',
   can_access_suppliers:        'Fournisseurs',
   can_access_templates:        'Modèles',
   can_access_team:             'Équipe',
@@ -188,6 +194,8 @@ export interface UserPermissionOverride {
   can_access_maintenance: boolean | null;
   can_access_logistique: boolean | null;
   can_access_smq: boolean | null;
+  can_access_rh: boolean | null;
+  can_access_comm: boolean | null;
   can_manage_smq: boolean | null;
   can_manage_logistique: boolean | null;
   can_manage_maintenance: boolean | null;
@@ -254,6 +262,8 @@ export interface EffectivePermissions {
   can_access_maintenance: boolean;
   can_access_logistique: boolean;
   can_access_smq: boolean;
+  can_access_rh: boolean;
+  can_access_comm: boolean;
   can_manage_smq: boolean;
   can_manage_logistique: boolean;
   can_manage_maintenance: boolean;

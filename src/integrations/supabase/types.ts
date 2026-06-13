@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_audit_log: {
+        Row: {
+          action: string
+          actor_id: string | null
+          created_at: string
+          id: string
+          payload: Json
+          target_id: string | null
+          target_type: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          created_at?: string
+          id?: string
+          payload?: Json
+          target_id?: string | null
+          target_type: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          created_at?: string
+          id?: string
+          payload?: Json
+          target_id?: string | null
+          target_type?: string
+        }
+        Relationships: []
+      }
       admin_table_lookup_configs: {
         Row: {
           created_at: string
@@ -1618,6 +1648,120 @@ export type Database = {
         }
         Relationships: []
       }
+      fdr_changelog: {
+        Row: {
+          action: string
+          created_at: string
+          field_changed: string
+          id: string
+          it_project_id: string
+          new_value: string | null
+          old_value: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          field_changed: string
+          id?: string
+          it_project_id: string
+          new_value?: string | null
+          old_value?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          field_changed?: string
+          id?: string
+          it_project_id?: string
+          new_value?: string | null
+          old_value?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fdr_changelog_it_project_id_fkey"
+            columns: ["it_project_id"]
+            isOneToOne: false
+            referencedRelation: "it_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fdr_changelog_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fdr_profils: {
+        Row: {
+          actif: boolean
+          capacite_j_mois: number
+          code: string
+          created_at: string
+          id: string
+          nom: string
+          note: string | null
+          ordre: number
+          updated_at: string
+        }
+        Insert: {
+          actif?: boolean
+          capacite_j_mois?: number
+          code: string
+          created_at?: string
+          id?: string
+          nom: string
+          note?: string | null
+          ordre?: number
+          updated_at?: string
+        }
+        Update: {
+          actif?: boolean
+          capacite_j_mois?: number
+          code?: string
+          created_at?: string
+          id?: string
+          nom?: string
+          note?: string | null
+          ordre?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      fdr_settings: {
+        Row: {
+          created_at: string
+          echeance_standard_permanentes: string
+          horizon_debut: string
+          horizon_duree_mois: number
+          id: string
+          jours_productifs_mois: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          echeance_standard_permanentes?: string
+          horizon_debut?: string
+          horizon_duree_mois?: number
+          id?: string
+          jours_productifs_mois?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          echeance_standard_permanentes?: string
+          horizon_debut?: string
+          horizon_duree_mois?: number
+          id?: string
+          jours_productifs_mois?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       form_sections: {
         Row: {
           condition_field_id: string | null
@@ -2180,6 +2324,62 @@ export type Database = {
           },
         ]
       }
+      it_budget_line_supplier_entries: {
+        Row: {
+          budget_line_id: string
+          id: string
+          linked_at: string
+          linked_by: string | null
+          note: string | null
+          supplier_entry_key: string
+        }
+        Insert: {
+          budget_line_id: string
+          id?: string
+          linked_at?: string
+          linked_by?: string | null
+          note?: string | null
+          supplier_entry_key: string
+        }
+        Update: {
+          budget_line_id?: string
+          id?: string
+          linked_at?: string
+          linked_by?: string | null
+          note?: string | null
+          supplier_entry_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_budget_line_supplier_entries_budget_line_id_fkey"
+            columns: ["budget_line_id"]
+            isOneToOne: false
+            referencedRelation: "it_budget_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "it_budget_line_supplier_entries_budget_line_id_fkey"
+            columns: ["budget_line_id"]
+            isOneToOne: false
+            referencedRelation: "v_it_budget_engage_constate"
+            referencedColumns: ["budget_line_id"]
+          },
+          {
+            foreignKeyName: "it_budget_line_supplier_entries_supplier_entry_key_fkey"
+            columns: ["supplier_entry_key"]
+            isOneToOne: false
+            referencedRelation: "supplier_accounting_entries"
+            referencedColumns: ["entry_key"]
+          },
+          {
+            foreignKeyName: "it_budget_line_supplier_entries_supplier_entry_key_fkey"
+            columns: ["supplier_entry_key"]
+            isOneToOne: false
+            referencedRelation: "v_it_supplier_entries_links_audit"
+            referencedColumns: ["entry_key"]
+          },
+        ]
+      }
       it_budget_lines: {
         Row: {
           annee: number
@@ -2657,6 +2857,48 @@ export type Database = {
           },
         ]
       }
+      it_project_load: {
+        Row: {
+          created_at: string
+          id: string
+          it_project_id: string
+          j_mois: number
+          profil_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          it_project_id: string
+          j_mois?: number
+          profil_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          it_project_id?: string
+          j_mois?: number
+          profil_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_project_load_it_project_id_fkey"
+            columns: ["it_project_id"]
+            isOneToOne: false
+            referencedRelation: "it_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "it_project_load_profil_id_fkey"
+            columns: ["profil_id"]
+            isOneToOne: false
+            referencedRelation: "fdr_profils"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       it_project_milestones: {
         Row: {
           created_at: string
@@ -2747,8 +2989,11 @@ export type Database = {
       }
       it_projects: {
         Row: {
+          activite_metier: string | null
           budget_consomme: number | null
+          budget_externe_eur: number
           budget_previsionnel: number | null
+          categorie_fdr: string | null
           chef_projet_id: string | null
           chef_projet_it_id: string | null
           chef_projet_metier_id: string | null
@@ -2759,9 +3004,14 @@ export type Database = {
           date_debut: string | null
           date_fin_prevue: string | null
           date_fin_reelle: string | null
+          date_kickoff: string | null
+          date_mep_saisie: string | null
+          delai_projete_mois: number | null
           description: string | null
           directeur_id: string | null
+          echeance_cible: string | null
           etape_validation_fdr: number | null
+          externe: boolean
           fdr_commentaires: string | null
           fdr_description: string | null
           fdr_priorite: string | null
@@ -2772,24 +3022,33 @@ export type Database = {
           loop_workspace_url: string | null
           membres_ids: string[] | null
           nom_projet: string
+          pct_avancement: number
+          pct_reduction_si_externe: number
           phase_courante: string | null
           phases_actives: Json
           pilier: string | null
           priorite: string | null
+          profil_principal: string | null
           progress: number | null
           responsable_it_id: string | null
           sharepoint_library_url: string | null
           sponsor_id: string | null
           statut: string
           statut_fdr: string | null
+          statut_portefeuille: string | null
+          suivi_j_mois: number
+          sur_feuille_de_route: boolean
           teams_channel_id: string | null
           teams_channel_url: string | null
           type_projet: string | null
           updated_at: string
         }
         Insert: {
+          activite_metier?: string | null
           budget_consomme?: number | null
+          budget_externe_eur?: number
           budget_previsionnel?: number | null
+          categorie_fdr?: string | null
           chef_projet_id?: string | null
           chef_projet_it_id?: string | null
           chef_projet_metier_id?: string | null
@@ -2800,9 +3059,14 @@ export type Database = {
           date_debut?: string | null
           date_fin_prevue?: string | null
           date_fin_reelle?: string | null
+          date_kickoff?: string | null
+          date_mep_saisie?: string | null
+          delai_projete_mois?: number | null
           description?: string | null
           directeur_id?: string | null
+          echeance_cible?: string | null
           etape_validation_fdr?: number | null
+          externe?: boolean
           fdr_commentaires?: string | null
           fdr_description?: string | null
           fdr_priorite?: string | null
@@ -2813,24 +3077,33 @@ export type Database = {
           loop_workspace_url?: string | null
           membres_ids?: string[] | null
           nom_projet: string
+          pct_avancement?: number
+          pct_reduction_si_externe?: number
           phase_courante?: string | null
           phases_actives?: Json
           pilier?: string | null
           priorite?: string | null
+          profil_principal?: string | null
           progress?: number | null
           responsable_it_id?: string | null
           sharepoint_library_url?: string | null
           sponsor_id?: string | null
           statut?: string
           statut_fdr?: string | null
+          statut_portefeuille?: string | null
+          suivi_j_mois?: number
+          sur_feuille_de_route?: boolean
           teams_channel_id?: string | null
           teams_channel_url?: string | null
           type_projet?: string | null
           updated_at?: string
         }
         Update: {
+          activite_metier?: string | null
           budget_consomme?: number | null
+          budget_externe_eur?: number
           budget_previsionnel?: number | null
+          categorie_fdr?: string | null
           chef_projet_id?: string | null
           chef_projet_it_id?: string | null
           chef_projet_metier_id?: string | null
@@ -2841,9 +3114,14 @@ export type Database = {
           date_debut?: string | null
           date_fin_prevue?: string | null
           date_fin_reelle?: string | null
+          date_kickoff?: string | null
+          date_mep_saisie?: string | null
+          delai_projete_mois?: number | null
           description?: string | null
           directeur_id?: string | null
+          echeance_cible?: string | null
           etape_validation_fdr?: number | null
+          externe?: boolean
           fdr_commentaires?: string | null
           fdr_description?: string | null
           fdr_priorite?: string | null
@@ -2854,16 +3132,22 @@ export type Database = {
           loop_workspace_url?: string | null
           membres_ids?: string[] | null
           nom_projet?: string
+          pct_avancement?: number
+          pct_reduction_si_externe?: number
           phase_courante?: string | null
           phases_actives?: Json
           pilier?: string | null
           priorite?: string | null
+          profil_principal?: string | null
           progress?: number | null
           responsable_it_id?: string | null
           sharepoint_library_url?: string | null
           sponsor_id?: string | null
           statut?: string
           statut_fdr?: string | null
+          statut_portefeuille?: string | null
+          suivi_j_mois?: number
+          sur_feuille_de_route?: boolean
           teams_channel_id?: string | null
           teams_channel_url?: string | null
           type_projet?: string | null
@@ -4106,6 +4390,7 @@ export type Database = {
           can_access_be_dispatch: boolean
           can_access_be_tjm: boolean
           can_access_calendar: boolean
+          can_access_comm: boolean
           can_access_dashboard: boolean
           can_access_innovation: boolean
           can_access_it_budget: boolean
@@ -4118,6 +4403,7 @@ export type Database = {
           can_access_process_tracking: boolean
           can_access_projects: boolean
           can_access_requests: boolean
+          can_access_rh: boolean
           can_access_settings: boolean
           can_access_smq: boolean
           can_access_spv: boolean
@@ -4175,6 +4461,7 @@ export type Database = {
           can_access_be_dispatch?: boolean
           can_access_be_tjm?: boolean
           can_access_calendar?: boolean
+          can_access_comm?: boolean
           can_access_dashboard?: boolean
           can_access_innovation?: boolean
           can_access_it_budget?: boolean
@@ -4187,6 +4474,7 @@ export type Database = {
           can_access_process_tracking?: boolean
           can_access_projects?: boolean
           can_access_requests?: boolean
+          can_access_rh?: boolean
           can_access_settings?: boolean
           can_access_smq?: boolean
           can_access_spv?: boolean
@@ -4244,6 +4532,7 @@ export type Database = {
           can_access_be_dispatch?: boolean
           can_access_be_tjm?: boolean
           can_access_calendar?: boolean
+          can_access_comm?: boolean
           can_access_dashboard?: boolean
           can_access_innovation?: boolean
           can_access_it_budget?: boolean
@@ -4256,6 +4545,7 @@ export type Database = {
           can_access_process_tracking?: boolean
           can_access_projects?: boolean
           can_access_requests?: boolean
+          can_access_rh?: boolean
           can_access_settings?: boolean
           can_access_smq?: boolean
           can_access_spv?: boolean
@@ -6271,6 +6561,7 @@ export type Database = {
           recurrence_unit: string | null
           required_docs_count: number
           required_docs_description: string | null
+          required_docs_references: string | null
           show_quick_launch: boolean
           start_mode: string
           target_assignee_id: string | null
@@ -6325,6 +6616,7 @@ export type Database = {
           recurrence_unit?: string | null
           required_docs_count?: number
           required_docs_description?: string | null
+          required_docs_references?: string | null
           show_quick_launch?: boolean
           start_mode?: string
           target_assignee_id?: string | null
@@ -6379,6 +6671,7 @@ export type Database = {
           recurrence_unit?: string | null
           required_docs_count?: number
           required_docs_description?: string | null
+          required_docs_references?: string | null
           show_quick_launch?: boolean
           start_mode?: string
           target_assignee_id?: string | null
@@ -6562,6 +6855,96 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      supplier_accounting_entries: {
+        Row: {
+          axe_1: string | null
+          axe_2: string | null
+          axe_3: string | null
+          compte: string | null
+          created_at: string
+          date: string | null
+          devise: string | null
+          dos: string
+          ecrlg: number
+          entry_key: string
+          fabric_synced_at: string | null
+          has_gescom_piece: boolean
+          id: string
+          journal: string
+          libelle_ecriture: string | null
+          montant: number | null
+          montant_devise: number | null
+          note_user: string | null
+          numero: string
+          project_code: string | null
+          reference_externe: string | null
+          sens: number | null
+          solde: number | null
+          status_user: string
+          supplier_code: string | null
+          supplier_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          axe_1?: string | null
+          axe_2?: string | null
+          axe_3?: string | null
+          compte?: string | null
+          created_at?: string
+          date?: string | null
+          devise?: string | null
+          dos: string
+          ecrlg: number
+          entry_key: string
+          fabric_synced_at?: string | null
+          has_gescom_piece?: boolean
+          id?: string
+          journal: string
+          libelle_ecriture?: string | null
+          montant?: number | null
+          montant_devise?: number | null
+          note_user?: string | null
+          numero: string
+          project_code?: string | null
+          reference_externe?: string | null
+          sens?: number | null
+          solde?: number | null
+          status_user?: string
+          supplier_code?: string | null
+          supplier_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          axe_1?: string | null
+          axe_2?: string | null
+          axe_3?: string | null
+          compte?: string | null
+          created_at?: string
+          date?: string | null
+          devise?: string | null
+          dos?: string
+          ecrlg?: number
+          entry_key?: string
+          fabric_synced_at?: string | null
+          has_gescom_piece?: boolean
+          id?: string
+          journal?: string
+          libelle_ecriture?: string | null
+          montant?: number | null
+          montant_devise?: number | null
+          note_user?: string | null
+          numero?: string
+          project_code?: string | null
+          reference_externe?: string | null
+          sens?: number | null
+          solde?: number | null
+          status_user?: string
+          supplier_code?: string | null
+          supplier_name?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       supplier_attachments: {
         Row: {
@@ -7938,6 +8321,9 @@ export type Database = {
           is_milestone: boolean
           it_project_id: string | null
           it_project_phase: string | null
+          it_request_status: string | null
+          it_status_dates: Json | null
+          it_urgency: string | null
           milestone_label: string | null
           module_code: Database["public"]["Enums"]["module_code"] | null
           module_data: Json | null
@@ -8042,6 +8428,9 @@ export type Database = {
           is_milestone?: boolean
           it_project_id?: string | null
           it_project_phase?: string | null
+          it_request_status?: string | null
+          it_status_dates?: Json | null
+          it_urgency?: string | null
           milestone_label?: string | null
           module_code?: Database["public"]["Enums"]["module_code"] | null
           module_data?: Json | null
@@ -8146,6 +8535,9 @@ export type Database = {
           is_milestone?: boolean
           it_project_id?: string | null
           it_project_phase?: string | null
+          it_request_status?: string | null
+          it_status_dates?: Json | null
+          it_urgency?: string | null
           milestone_label?: string | null
           module_code?: Database["public"]["Enums"]["module_code"] | null
           module_data?: Json | null
@@ -8862,6 +9254,7 @@ export type Database = {
           can_access_be_dispatch: boolean | null
           can_access_be_tjm: boolean | null
           can_access_calendar: boolean | null
+          can_access_comm: boolean | null
           can_access_dashboard: boolean | null
           can_access_innovation: boolean | null
           can_access_it_budget: boolean | null
@@ -8874,6 +9267,7 @@ export type Database = {
           can_access_process_tracking: boolean | null
           can_access_projects: boolean | null
           can_access_requests: boolean | null
+          can_access_rh: boolean | null
           can_access_settings: boolean | null
           can_access_smq: boolean | null
           can_access_spv: boolean | null
@@ -8914,6 +9308,7 @@ export type Database = {
           can_access_be_dispatch?: boolean | null
           can_access_be_tjm?: boolean | null
           can_access_calendar?: boolean | null
+          can_access_comm?: boolean | null
           can_access_dashboard?: boolean | null
           can_access_innovation?: boolean | null
           can_access_it_budget?: boolean | null
@@ -8926,6 +9321,7 @@ export type Database = {
           can_access_process_tracking?: boolean | null
           can_access_projects?: boolean | null
           can_access_requests?: boolean | null
+          can_access_rh?: boolean | null
           can_access_settings?: boolean | null
           can_access_smq?: boolean | null
           can_access_spv?: boolean | null
@@ -8966,6 +9362,7 @@ export type Database = {
           can_access_be_dispatch?: boolean | null
           can_access_be_tjm?: boolean | null
           can_access_calendar?: boolean | null
+          can_access_comm?: boolean | null
           can_access_dashboard?: boolean | null
           can_access_innovation?: boolean | null
           can_access_it_budget?: boolean | null
@@ -8978,6 +9375,7 @@ export type Database = {
           can_access_process_tracking?: boolean | null
           can_access_projects?: boolean | null
           can_access_requests?: boolean | null
+          can_access_rh?: boolean | null
           can_access_settings?: boolean | null
           can_access_smq?: boolean | null
           can_access_spv?: boolean | null
@@ -9616,6 +10014,30 @@ export type Database = {
           },
         ]
       }
+      v_it_budget_line_supplier_entries_agg: {
+        Row: {
+          budget_line_id: string | null
+          nb_supplier_entries: number | null
+          supplier_ht_amount: number | null
+          supplier_ttc_amount: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "it_budget_line_supplier_entries_budget_line_id_fkey"
+            columns: ["budget_line_id"]
+            isOneToOne: false
+            referencedRelation: "it_budget_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "it_budget_line_supplier_entries_budget_line_id_fkey"
+            columns: ["budget_line_id"]
+            isOneToOne: false
+            referencedRelation: "v_it_budget_engage_constate"
+            referencedColumns: ["budget_line_id"]
+          },
+        ]
+      }
       v_it_rh_cout: {
         Row: {
           annee: number | null
@@ -9668,6 +10090,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      v_it_supplier_entries_links_audit: {
+        Row: {
+          date: string | null
+          dos: string | null
+          entry_key: string | null
+          journal: string | null
+          libelle_ecriture: string | null
+          links_detail: Json | null
+          montant_abs_ht: number | null
+          montant_abs_ttc: number | null
+          nb_links: number | null
+          numero: string | null
+          solde_signed: number | null
+          supplier_code: string | null
+          supplier_name: string | null
+        }
+        Relationships: []
       }
       v_spv_affaire_budget_kpi: {
         Row: {
@@ -9941,6 +10381,15 @@ export type Database = {
       reject_supplier_waiting: {
         Args: { p_reason: string; p_waiting_id: string }
         Returns: undefined
+      }
+      supplier_entries_dos_list: { Args: never; Returns: string[] }
+      supplier_entries_supplier_list: {
+        Args: never
+        Returns: {
+          nb: number
+          supplier_code: string
+          supplier_name: string
+        }[]
       }
       sync_divalto_suppliers_to_enrichment: {
         Args: never

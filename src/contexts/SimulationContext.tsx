@@ -31,7 +31,7 @@ interface SimulationContextType {
 const SimulationContext = createContext<SimulationContextType | undefined>(undefined);
 
 export function SimulationProvider({ children }: { children: ReactNode }) {
-  const { profile: authProfile } = useAuth();
+  const { profile: authProfile, user } = useAuth();
   const [isSimulating, setIsSimulating] = useState(false);
   const [simulatedProfile, setSimulatedProfile] = useState<SimulatedProfile | null>(null);
   const [originalProfile, setOriginalProfile] = useState<SimulatedProfile | null>(null);
@@ -56,18 +56,38 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
 
       setSimulatedProfile(data as SimulatedProfile);
       setIsSimulating(true);
+
+      // Trace d'audit : qui simule qui (append-only, lecture admin)
+      if (user?.id) {
+        void supabase.from('admin_audit_log' as any).insert({
+          actor_id: user.id,
+          action: 'start_user_simulation',
+          target_type: 'profiles',
+          target_id: profileId,
+          payload: { simulated_display_name: data.display_name },
+        });
+      }
       return true;
     } catch (err) {
       console.error('Simulation error:', err);
       return false;
     }
-  }, [authProfile]);
+  }, [authProfile, user?.id]);
 
   const stopSimulation = useCallback(() => {
+    if (user?.id && simulatedProfile) {
+      void supabase.from('admin_audit_log' as any).insert({
+        actor_id: user.id,
+        action: 'stop_user_simulation',
+        target_type: 'profiles',
+        target_id: simulatedProfile.id,
+        payload: { simulated_display_name: simulatedProfile.display_name },
+      });
+    }
     setIsSimulating(false);
     setSimulatedProfile(null);
     setOriginalProfile(null);
-  }, []);
+  }, [user?.id, simulatedProfile]);
 
   const getActiveProfile = useCallback((): SimulatedProfile | null => {
     if (isSimulating && simulatedProfile) {
