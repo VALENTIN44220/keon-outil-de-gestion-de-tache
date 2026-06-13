@@ -61,6 +61,35 @@ async function fetchTasksAsStakeholder(profileId: string): Promise<Task[]> {
   return (data || []) as Task[];
 }
 
+/**
+ * Tâches affectées à un GROUPE dont l'utilisateur est membre
+ * (sub-process configuré en affectation "équipe"/groupe → group_assignee_ids).
+ * Fetch additif tolérant, mergé dans la liste perso (cf. fetchTasksAsStakeholder).
+ */
+async function fetchTasksAsGroupMember(profileId: string): Promise<Task[]> {
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('*')
+    .eq('type', 'task')
+    .contains('group_assignee_ids', [profileId])
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    const m = error.message?.toLowerCase() ?? '';
+    if (
+      m.includes('column') ||
+      m.includes('does not exist') ||
+      m.includes('schema cache') ||
+      error.code === '42703'
+    ) {
+      return [];
+    }
+    console.warn('fetchTasksAsGroupMember:', error);
+    return [];
+  }
+  return (data || []) as Task[];
+}
+
 export function useTasks(externalScope?: TaskScope) {
   const { user, profile: authProfile } = useAuth();
   const { isSimulating, simulatedProfile } = useSimulation();
@@ -182,6 +211,12 @@ export function useTasks(externalScope?: TaskScope) {
       (effectivePermissions.can_view_all_tasks || effectivePermissions.can_view_subordinates_tasks)
     ) {
       rows = await withStakeholder(rows);
+    }
+
+    // Tâches affectées à un groupe dont l'utilisateur est membre (additif, dédupliqué).
+    const groupTasks = await fetchTasksAsGroupMember(profile.id);
+    if (groupTasks.length) {
+      rows = mergeTasksDedupeById(rows, groupTasks);
     }
 
     setTasks(sortTasksNewestFirst(rows));
