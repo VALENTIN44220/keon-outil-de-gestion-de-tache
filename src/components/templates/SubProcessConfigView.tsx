@@ -73,7 +73,6 @@ import { AddTaskTemplateDialog } from './AddTaskTemplateDialog';
 import { EditTaskTemplateDialog } from './EditTaskTemplateDialog';
 import { SubProcessNotificationsPanel } from './SubProcessNotificationsPanel';
 import { TableOutputMappingPanel } from './TableOutputMappingPanel';
-import { addTaskToWorkflow, removeTaskFromWorkflow } from '@/hooks/useAutoWorkflowGeneration';
 import { cn } from '@/lib/utils';
 
 interface SubProcessConfigViewProps {
@@ -391,11 +390,8 @@ export function SubProcessConfigView({
 
       if (error) throw error;
 
-      // Add task node to the workflow
-      await addTaskToWorkflow(subProcessId, data.id, data.title, data.default_duration_days || 5);
-
       setTasks(prev => [...prev, { ...data, checklist_count: 0 } as TaskTemplateWithChecklist]);
-      toast.success('Tâche ajoutée au workflow');
+      toast.success('Tâche ajoutée');
       setIsAddTaskOpen(false);
       // onUpdate() removed to prevent tab reset
     } catch (error) {
@@ -406,9 +402,6 @@ export function SubProcessConfigView({
 
   const handleDeleteTask = async (taskId: string) => {
     try {
-      // Remove task node from workflow first
-      await removeTaskFromWorkflow(subProcessId, taskId);
-
       const { error } = await supabase
         .from('task_templates')
         .delete()

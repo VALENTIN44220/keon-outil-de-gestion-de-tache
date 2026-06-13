@@ -10,10 +10,9 @@ import { useTableSort } from '@/hooks/useTableSort';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Trash2, Briefcase, Pencil, Upload } from 'lucide-react';
+import { Plus, Trash2, Briefcase, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { RefreshButton } from './RefreshButton';
-import { BulkDepartmentImportDialog } from './BulkDepartmentImportDialog';
 import type { Department, Company } from '@/types/admin';
 
 interface DepartmentsTabProps {
@@ -35,7 +34,6 @@ export function DepartmentsTab({ departments, companies, onAdd, onUpdate, onDele
   const [editCompanyId, setEditCompanyId] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
-  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -170,10 +168,6 @@ export function DepartmentsTab({ departments, companies, onAdd, onUpdate, onDele
             <Button onClick={handleAdd} disabled={isAdding}>
               <Plus className="mr-2 h-4 w-4" />
               Ajouter
-            </Button>
-            <Button variant="outline" onClick={() => setIsBulkImportOpen(true)}>
-              <Upload className="mr-2 h-4 w-4" />
-              Import en masse
             </Button>
           </div>
         </CardContent>
@@ -328,14 +322,6 @@ export function DepartmentsTab({ departments, companies, onAdd, onUpdate, onDele
         </DialogContent>
       </Dialog>
 
-      <BulkDepartmentImportDialog
-        open={isBulkImportOpen}
-        onOpenChange={setIsBulkImportOpen}
-        existingDepartments={departments}
-        companies={companies}
-        onAdd={onAdd}
-        onImportComplete={onRefresh}
-      />
     </div>
   );
 }

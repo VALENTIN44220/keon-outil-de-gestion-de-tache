@@ -69,13 +69,6 @@ export function AuditTimeline({ requestId, className, maxHeight = '500px' }: Aud
     const fetchAuditData = async () => {
       setIsLoading(true);
       try {
-        // Fetch workflow events for this request
-        const { data: workflowEvents } = await supabase
-          .from('workflow_events')
-          .select('*')
-          .or(`entity_id.eq.${requestId},payload->>request_id.eq.${requestId}`)
-          .order('created_at', { ascending: false });
-
         // Fetch status transitions for child tasks
         const { data: childTasks } = await supabase
           .from('tasks')
@@ -96,9 +89,6 @@ export function AuditTimeline({ requestId, className, maxHeight = '500px' }: Aud
 
         // Fetch profiles for actor names
         const actorIds = new Set<string>();
-        workflowEvents?.forEach(e => {
-          if (e.triggered_by) actorIds.add(e.triggered_by);
-        });
         statusTransitions.forEach(t => {
           if (t.changed_by) actorIds.add(t.changed_by);
         });
@@ -118,20 +108,6 @@ export function AuditTimeline({ requestId, className, maxHeight = '500px' }: Aud
 
         // Combine and format events
         const allEvents: AuditEvent[] = [];
-
-        workflowEvents?.forEach(e => {
-          allEvents.push({
-            id: e.id,
-            timestamp: e.created_at,
-            event_type: e.event_type,
-            actor_name: e.triggered_by ? profiles.get(e.triggered_by) || null : null,
-            actor_id: e.triggered_by,
-            description: formatEventDescription(e.event_type, e.payload as Record<string, unknown>),
-            details: e.payload as Record<string, unknown>,
-            entity_type: e.entity_type,
-            entity_id: e.entity_id,
-          });
-        });
 
         statusTransitions.forEach(t => {
           allEvents.push({
@@ -298,37 +274,6 @@ export function AuditTimeline({ requestId, className, maxHeight = '500px' }: Aud
       </CardContent>
     </Card>
   );
-}
-
-function formatEventDescription(eventType: string, payload: Record<string, unknown>): string {
-  switch (eventType) {
-    case 'request_created':
-      return `Nouvelle demande de type "${payload.request_type || 'standard'}" créée`;
-    case 'task_created':
-      return `Nouvelle tâche créée${payload.title ? `: ${payload.title}` : ''}`;
-    case 'task_assigned':
-      return `Tâche assignée${payload.assignee_name ? ` à ${payload.assignee_name}` : ''}`;
-    case 'task_completed':
-      return 'Tâche marquée comme terminée';
-    case 'validation_requested':
-      return `Validation demandée (niveau ${payload.level || 1})`;
-    case 'validation_decided':
-      return payload.decision === 'approved' ? 'Validation approuvée' : 'Validation refusée';
-    case 'sub_process_started':
-      return `Sous-processus "${payload.sub_process_name || ''}" démarré`;
-    case 'sub_process_completed':
-      return `Sous-processus "${payload.sub_process_name || ''}" terminé`;
-    case 'process_completed':
-      return 'Processus complet terminé avec succès';
-    case 'comment_added':
-      return 'Nouveau commentaire ajouté';
-    case 'notification_sent':
-      return `Notification envoyée${payload.channel ? ` via ${payload.channel}` : ''}`;
-    case 'reminder_triggered':
-      return 'Rappel automatique déclenché';
-    default:
-      return eventType;
-  }
 }
 
 function formatStatus(status: string): string {

@@ -5,7 +5,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import type { TaskStatus } from '@/types/task';
-import { emitWorkflowEvent } from './workflowEventService';
 
 /**
  * Déclenche la sortie vers table si un mapping est configuré (non-bloquant)
@@ -334,29 +333,7 @@ export async function transitionTaskStatus(
       return { success: false, error: updateError.message };
     }
 
-    // Émettre l'événement de changement de statut
-    if (!options.skipEventEmission) {
-      await emitWorkflowEvent(
-        'task_status_changed',
-        'task',
-        taskId,
-        {
-          from_status: currentStatus,
-          to_status: newStatus,
-          task_id: taskId,
-          task_title: task.title,
-          assignee_id: task.assignee_id,
-          requester_id: task.requester_id,
-          validator_id: newStatus === 'pending_validation_1' 
-            ? (options.validatorId || task.validator_level_1_id)
-            : newStatus === 'pending_validation_2'
-              ? (options.validatorId || task.validator_level_2_id)
-              : undefined,
-          comment: options.comment,
-        },
-        task.workflow_run_id || undefined
-      );
-    }
+    // Le changement de statut est historisé via task_status_transitions (trigger DB).
 
     // Trigger table output if task is done or validated
     if (newStatus === 'done' || newStatus === 'validated') {

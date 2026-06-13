@@ -17,7 +17,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { useSubProcessFinalRejectionPolicy } from '@/hooks/useSubProcessFinalRejectionPolicy';
 import { rejectValidationWithExecutorPolicy } from '@/services/taskStatusService';
 
 interface PendingTaskValidationsPanelProps {
@@ -41,9 +40,8 @@ export function PendingTaskValidationsPanel({
   } | null>(null);
   const [comment, setComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const returnsToExecutorOnReject = useSubProcessFinalRejectionPolicy(
-    actionDialog?.task?.source_sub_process_template_id ?? undefined,
-  );
+  // Politique de rejet standard : le refus de la validation finale renvoie à l'exécuteur.
+  const returnsToExecutorOnReject = true;
 
   const getLevel = (task: Task): 1 | 2 => {
     return task.status === 'pending_validation_2' ? 2 : 1;

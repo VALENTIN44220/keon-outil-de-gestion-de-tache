@@ -1,8 +1,8 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { SubProcessWorkflowView } from './SubProcessWorkflowView';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
 import { Layers, AlertCircle, Loader2 } from 'lucide-react';
 import { Task } from '@/types/task';
 
@@ -132,54 +132,37 @@ export function WorkflowProgressTab({ task }: WorkflowProgressTabProps) {
 
   return (
     <div className="space-y-6">
-      {/* Global progress summary */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Layers className="h-4 w-4" />
-            Vue globale des workflows
+            Avancement par sous-processus
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {subProcesses.map((sp) => (
-            <SubProcessWorkflowView
-              key={sp.id}
-              subProcessTemplateId={sp.id}
-              requestId={task.id}
-              workflowRunId={null}
-              compact
-              title={sp.name}
-            />
-          ))}
+          {subProcesses.map((sp) => {
+            const percent = sp.taskCount > 0
+              ? Math.round((sp.completedCount / sp.taskCount) * 100)
+              : 0;
+            return (
+              <div key={sp.id} className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{sp.name}</p>
+                    {sp.departmentName && (
+                      <p className="text-xs text-muted-foreground">{sp.departmentName}</p>
+                    )}
+                  </div>
+                  <Badge variant={percent === 100 ? 'default' : 'outline'} className="shrink-0">
+                    {sp.completedCount}/{sp.taskCount} tâches
+                  </Badge>
+                </div>
+                <Progress value={percent} className="h-2" />
+              </div>
+            );
+          })}
         </CardContent>
       </Card>
-
-      {/* Detailed view per sub-process */}
-      <div className="space-y-4">
-        <h3 className="text-sm font-medium text-muted-foreground">Détail par sous-processus</h3>
-        {subProcesses.map((sp) => (
-          <Card key={sp.id}>
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base">{sp.name}</CardTitle>
-                <Badge variant="outline">
-                  {sp.completedCount}/{sp.taskCount} tâches
-                </Badge>
-              </div>
-              {sp.departmentName && (
-                <p className="text-xs text-muted-foreground">{sp.departmentName}</p>
-              )}
-            </CardHeader>
-            <CardContent>
-              <SubProcessWorkflowView
-                subProcessTemplateId={sp.id}
-                requestId={task.id}
-                workflowRunId={null}
-              />
-            </CardContent>
-          </Card>
-        ))}
-      </div>
     </div>
   );
 }

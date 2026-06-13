@@ -25,7 +25,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { TaskChecklist } from './TaskChecklist';
 import { TaskLinksEditor } from './TaskLinksEditor';
 import { TaskCommentsSection } from './TaskCommentsSection';
-import { RequestValidationButton } from './RequestValidationButton';
 import { Badge } from '@/components/ui/badge';
 import { Ticket, CheckSquare, Save, Loader2, Info, MessageSquare, Lock, UserRoundPlus, Send } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -601,16 +600,6 @@ export function TaskEditDialog({ task, open, onClose, onTaskUpdated }: TaskEditD
                   Envoyer pour validation
                 </Button>
               )}
-              {isAssigneeReadOnly && task ? (
-                <RequestValidationButton
-                  taskId={task.id}
-                  taskStatus={task.status}
-                  onValidationTriggered={() => {
-                    onTaskUpdated();
-                    onClose();
-                  }}
-                />
-              ) : null}
             </div>
             <div className="flex gap-3 flex-wrap justify-end">
               {!isRequest && canReassign && (

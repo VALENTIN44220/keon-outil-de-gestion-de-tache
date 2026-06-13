@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  Building2, Briefcase, Users, Layers, Shield, UserCog, Download,
+  Building2, Briefcase, Users, Layers, Shield, UserCog,
   UsersRound, UserRoundCog, Database,
   FolderKanban, Tags, MonitorSmartphone, GitMerge, ShieldAlert,
 } from 'lucide-react';
@@ -11,7 +11,6 @@ import { JobTitlesTab } from './JobTitlesTab';
 import { HierarchyLevelsTab } from './HierarchyLevelsTab';
 import { AccessRightsTab } from './AccessRightsTab'; // remplace les anciens onglets PermissionProfiles / PermissionMatrix / UserPermissionViewer (supprimes)
 import { UsersTab } from './UsersTab';
-import { DataExportTab } from './DataExportTab';
 import { CollaboratorGroupsTab } from './CollaboratorGroupsTab';
 
 import { DatabaseResetDialog } from './DatabaseResetDialog';
@@ -96,9 +95,6 @@ export function AdminTabs(props: AdminTabsProps) {
           </TabsTrigger>
 
           {/* ── Outils ── */}
-          <TabsTrigger value="export" className="px-2 py-1.5" title="Export de données">
-            <Download className="h-4 w-4" />
-          </TabsTrigger>
           <TabsTrigger value="simulation" className="px-2 py-1.5" title="Simulation utilisateur">
             <UserRoundCog className="h-4 w-4" />
           </TabsTrigger>
@@ -204,11 +200,6 @@ export function AdminTabs(props: AdminTabsProps) {
             onRefresh={props.refetch}
           />
         </TabsContent>
-
-        <TabsContent value="export">
-          <DataExportTab />
-        </TabsContent>
-
 
         <TabsContent value="simulation">
           <div className="max-w-lg">

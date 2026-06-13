@@ -70,7 +70,6 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { AddTaskTemplateDialog } from '@/components/templates/AddTaskTemplateDialog';
 import { EditTaskTemplateDialog } from '@/components/templates/EditTaskTemplateDialog';
-import { addTaskToWorkflow, removeTaskFromWorkflow } from '@/hooks/useAutoWorkflowGeneration';
 import { SubProcessCustomFieldsEditor } from '@/components/templates/SubProcessCustomFieldsEditor';
 import { RecurrenceConfig, RecurrenceData } from '@/components/templates/RecurrenceConfig';
 
@@ -413,11 +412,8 @@ export default function SubProcessSettings() {
 
       if (error) throw error;
 
-      // Add task node to the workflow
-      await addTaskToWorkflow(subProcessId!, data.id, data.title, data.default_duration_days || 5);
-
       setTasks(prev => [...prev, { ...data, checklist_count: 0 } as TaskTemplateWithChecklist]);
-      toast.success('Tâche ajoutée au workflow');
+      toast.success('Tâche ajoutée');
       setIsAddTaskOpen(false);
     } catch (error) {
       console.error('Error adding task:', error);
@@ -427,9 +423,6 @@ export default function SubProcessSettings() {
 
   const handleDeleteTask = async (taskId: string) => {
     try {
-      // Remove task node from workflow first
-      await removeTaskFromWorkflow(subProcessId!, taskId);
-
       const { error } = await supabase
         .from('task_templates')
         .delete()

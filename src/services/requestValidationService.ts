@@ -4,8 +4,6 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
-import { emitWorkflowEvent } from './workflowEventService';
-import type { Json } from '@/integrations/supabase/types';
 
 export type RequestValidationAction = 'approve' | 'refuse_cancel' | 'refuse_return';
 
@@ -80,13 +78,6 @@ export async function validateRequest(
       await finalizeRequestValidation(requestId, validatorProfileId, comment, 2);
     }
 
-    await emitWorkflowEvent('validation_decided', 'request', requestId, {
-      validator_id: validatorProfileId,
-      validation_level: level,
-      decision: 'approved',
-      comment,
-    });
-
     return { success: true };
   } catch (err: any) {
     console.error('Error validating request:', err);
@@ -133,14 +124,6 @@ export async function refuseRequest(
         .eq('request_id', requestId);
     }
 
-    await emitWorkflowEvent('validation_decided', 'request', requestId, {
-      validator_id: validatorProfileId,
-      validation_level: level,
-      decision: 'rejected',
-      comment,
-      custom_data: { refusal_action: action },
-    });
-
     return { success: true };
   } catch (err: any) {
     console.error('Error refusing request:', err);
@@ -174,10 +157,6 @@ export async function resubmitRequest(
 
     if (error) throw error;
 
-    await emitWorkflowEvent('validation_requested', 'request', requestId, {
-      custom_data: { resubmission: true },
-    });
-
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message || 'Erreur' };
@@ -203,70 +182,9 @@ async function finalizeRequestValidation(
     })
     .eq('id', requestId);
 
-  // 2. Activate sub-processes
+  // 2. Activate sub-processes (les tâches sont créées par le trigger auto-spawn côté DB)
   await supabase
     .from('request_sub_processes')
     .update({ status: 'pending', updated_at: new Date().toISOString() })
     .eq('request_id', requestId);
-
-  // 3. Start workflow
-  const { data: request } = await (supabase as any)
-    .from('tasks')
-    .select('process_template_id, user_id, requester_id, target_department_id')
-    .eq('id', requestId)
-    .single();
-
-  if (!request?.process_template_id) return;
-
-  const { data: wfTemplate } = await supabase
-    .from('workflow_templates')
-    .select('id')
-    .eq('process_template_id', request.process_template_id)
-    .eq('status', 'active')
-    .eq('is_default', true)
-    .order('version', { ascending: false })
-    .limit(1)
-    .single();
-
-  if (wfTemplate) {
-    // Get selected sub-processes
-    const { data: sps } = await supabase
-      .from('request_sub_processes')
-      .select('sub_process_template_id')
-      .eq('request_id', requestId);
-
-    const selectedSpIds = sps?.map(sp => sp.sub_process_template_id) || [];
-
-    const { data: workflowRun } = await supabase
-      .from('workflow_runs')
-      .insert([{
-        workflow_id: wfTemplate.id,
-        workflow_version: 1,
-        trigger_entity_type: 'request' as const,
-        trigger_entity_id: requestId,
-        status: 'running' as const,
-        context_data: JSON.stringify({
-          entityType: 'request',
-          entityId: requestId,
-          requester_id: request.requester_id,
-          department_id: request.target_department_id,
-          selected_sub_processes: selectedSpIds,
-        }) as unknown as Json,
-        started_by: request.user_id,
-        execution_log: JSON.stringify([{
-          timestamp: new Date().toISOString(),
-          action: 'workflow_started_after_request_validation',
-          details: { validated_by: validatorProfileId, level }
-        }]) as unknown as Json,
-      }])
-      .select()
-      .single();
-
-    if (workflowRun) {
-      await supabase
-        .from('tasks')
-        .update({ workflow_run_id: workflowRun.id })
-        .eq('id', requestId);
-    }
-  }
 }

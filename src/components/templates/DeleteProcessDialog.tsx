@@ -28,7 +28,6 @@ interface ConstraintCheck {
   activeRequestCount: number;
   hasSubProcesses: boolean;
   subProcessCount: number;
-  hasWorkflow: boolean;
 }
 
 export function DeleteProcessDialog({
@@ -67,19 +66,11 @@ export function DeleteProcessDialog({
           .select('id')
           .eq('process_template_id', processId);
 
-        // Check for workflow
-        const { data: workflow } = await supabase
-          .from('workflow_templates')
-          .select('id')
-          .eq('process_template_id', processId)
-          .maybeSingle();
-
         setConstraints({
           hasActiveRequests: activeRequests.length > 0,
           activeRequestCount: activeRequests.length,
           hasSubProcesses: (subProcesses?.length || 0) > 0,
           subProcessCount: subProcesses?.length || 0,
-          hasWorkflow: !!workflow,
         });
       } catch (error) {
         console.error('Error checking constraints:', error);
@@ -88,7 +79,6 @@ export function DeleteProcessDialog({
           activeRequestCount: 0,
           hasSubProcesses: false,
           subProcessCount: 0,
-          hasWorkflow: false,
         });
       } finally {
         setIsChecking(false);
@@ -139,14 +129,7 @@ export function DeleteProcessDialog({
                     </div>
                   )}
 
-                  {constraints.hasWorkflow && (
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline">Workflow configuré</Badge>
-                      <span className="text-muted-foreground">sera supprimé</span>
-                    </div>
-                  )}
-
-                  {!constraints.hasActiveRequests && !constraints.hasSubProcesses && !constraints.hasWorkflow && (
+                  {!constraints.hasActiveRequests && !constraints.hasSubProcesses && (
                     <p className="text-muted-foreground">
                       Ce processus peut être supprimé en toute sécurité.
                     </p>

@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Plus, UserPlus, Users, Building2, Briefcase, Layers, Shield, ChevronUp, ChevronDown, AlertCircle, RefreshCw, Upload, Trash2, Search, UserX, UserCheck, Pause, Key, Copy, LayoutGrid, Table2, Mail, CheckCircle2, XCircle, Send, UserMinus } from 'lucide-react';
+import { Plus, UserPlus, Users, Building2, Briefcase, Layers, Shield, ChevronUp, ChevronDown, AlertCircle, RefreshCw, Trash2, Search, UserX, UserCheck, Pause, Key, Copy, LayoutGrid, Table2, Mail, CheckCircle2, XCircle, Send, UserMinus } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { useTableSort } from '@/hooks/useTableSort';
@@ -17,7 +17,6 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { RefreshButton } from './RefreshButton';
-import { BulkUserImportDialog } from './BulkUserImportDialog';
 import type { Company, Department, JobTitle, HierarchyLevel, PermissionProfile, UserProfile, UserStatus, LovableStatus } from '@/types/admin';
 import { USER_STATUS_LABELS } from '@/types/admin';
 
@@ -61,7 +60,6 @@ export function UsersTab({
   onRefresh,
 }: UsersTabProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -632,10 +630,6 @@ export function UsersTab({
                 Inviter en masse
               </Button>
               <RefreshButton onRefresh={onRefresh} />
-              <Button variant="outline" onClick={() => setIsBulkImportOpen(true)}>
-                <Upload className="mr-2 h-4 w-4" />
-                Import en masse
-              </Button>
             <Dialog open={isDialogOpen} onOpenChange={(open) => {
               setIsDialogOpen(open);
               if (!open) resetForm();
@@ -1562,17 +1556,6 @@ export function UsersTab({
         </CardContent>
       </Card>
 
-      {/* Bulk Import Dialog */}
-      <BulkUserImportDialog
-        open={isBulkImportOpen}
-        onOpenChange={setIsBulkImportOpen}
-        companies={companies}
-        departments={departments}
-        jobTitles={jobTitles}
-        permissionProfiles={permissionProfiles}
-        users={users}
-        onImportComplete={onUserCreated}
-      />
     </div>
   );
 }
