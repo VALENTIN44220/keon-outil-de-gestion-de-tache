@@ -209,6 +209,13 @@ export function useChat() {
   useEffect(() => {
     if (!profile?.id) return;
 
+    // Débounce : une rafale de messages ne déclenche qu'un seul refetch.
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleRefresh = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => fetchConversations(), 500);
+    };
+
     const channel = supabase
       .channel('chat-updates')
       .on(
@@ -218,10 +225,7 @@ export function useChat() {
           schema: 'public',
           table: 'chat_messages',
         },
-        () => {
-          // Refresh conversations when new message arrives
-          fetchConversations();
-        }
+        scheduleRefresh
       )
       .on(
         'postgres_changes',
@@ -230,14 +234,12 @@ export function useChat() {
           schema: 'public',
           table: 'chat_members',
         },
-        () => {
-          // Refresh when membership changes
-          fetchConversations();
-        }
+        scheduleRefresh
       )
       .subscribe();
 
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       supabase.removeChannel(channel);
     };
   }, [profile?.id, fetchConversations]);
