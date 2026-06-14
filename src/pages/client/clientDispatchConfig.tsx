@@ -2,13 +2,21 @@
  * clientDispatchConfig — suivi des demandes de création client (flux
  * séquentiel CRM → Compta → Affaire).
  */
-import { UserPlus, ListChecks, Clock, CheckCircle2, AlertTriangle, User, Calendar, Building2 } from 'lucide-react';
+import { useState } from 'react';
+import { UserPlus, ListChecks, Clock, CheckCircle2, AlertTriangle, User, Calendar, Building2, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
+import { useSimulation } from '@/contexts/SimulationContext';
 import { useClientRequests, ClientRequest } from '@/hooks/useClientRequests';
 import type { TaskStats } from '@/types/task';
 import { ModuleDetailDialog, DetailSection, DetailInfoLine } from '@/components/modules/ModuleDetailDialog';
@@ -30,6 +38,18 @@ const STEP_STATUS_LABELS: Record<string, string> = {
   refused: 'Refusée', cancelled: 'Annulée',
 };
 const TERMINAL = ['done', 'cancelled', 'refused'];
+/** Statuts terminaux d'une ÉTAPE (sous-tâche). */
+const STEP_TERMINAL = ['done', 'validated', 'realisee', 'cloturee', 'refused', 'cancelled'];
+
+/**
+ * Codes à saisir par le valideur pour clore une étape (indexés par order_index) :
+ *  - 1 = Contrôle Compta  → code client
+ *  - 2 = Création affaire → code affaire
+ */
+const STEP_CODE_BY_ORDER: Record<number, { key: string; label: string; placeholder: string }> = {
+  1: { key: 'code_client', label: 'Code client', placeholder: 'Code client attribué en compta' },
+  2: { key: 'code_affaire', label: 'Code affaire', placeholder: 'Code affaire créé' },
+};
 
 export const clientDispatchConfig: ModuleDispatchConfig<ClientRequest, {}> = {
   moduleCode: 'client',
@@ -130,7 +150,51 @@ export const clientDispatchConfig: ModuleDispatchConfig<ClientRequest, {}> = {
 function ClientDetailDialog({ request, open, onClose, refetch, isAdmin, profilesMap }: {
   request: ClientRequest; open: boolean; onClose: () => void; refetch: () => void; isAdmin: boolean; profilesMap: Map<string, string>;
 }) {
+  const { profile } = useAuth();
+  const { isSimulating, simulatedProfile } = useSimulation();
+  const currentProfileId = (isSimulating && simulatedProfile ? simulatedProfile : profile)?.id ?? null;
+  const [codeValue, setCodeValue] = useState('');
+  const [validating, setValidating] = useState(false);
+
   const d = request.module_data ?? {};
+
+  // Étape active (1re non terminée) + droit de validation de l'utilisateur courant.
+  const activeStep = request.steps.find((s) => !STEP_TERMINAL.includes(s.status)) ?? null;
+  const codeReq = activeStep ? STEP_CODE_BY_ORDER[activeStep.order_index] ?? null : null;
+  const canValidateActive = !!activeStep && (
+    isAdmin ||
+    (!!currentProfileId && (activeStep.assignee_id === currentProfileId
+      || (activeStep.group_assignee_ids ?? []).includes(currentProfileId)))
+  );
+
+  const handleValidateStep = async () => {
+    if (!activeStep) return;
+    const code = codeValue.trim();
+    if (codeReq && !code) { toast.error(`${codeReq.label} obligatoire`); return; }
+    setValidating(true);
+    try {
+      // 1) Code rangé dans le module_data de la demande (avant le passage à done).
+      if (codeReq) {
+        const { data: parent } = await supabase
+          .from('tasks').select('module_data').eq('id', request.task_id).maybeSingle();
+        const merged = { ...(((parent as any)?.module_data) ?? {}), [codeReq.key]: code };
+        const { error } = await supabase
+          .from('tasks').update({ module_data: merged }).eq('id', request.task_id);
+        if (error) throw error;
+      }
+      // 2) Étape → done (déclenche le spawn de l'étape suivante côté DB).
+      const { error: sErr } = await supabase.from('tasks').update({ status: 'done' }).eq('id', activeStep.id);
+      if (sErr) throw sErr;
+      toast.success(codeReq ? `${codeReq.label} enregistré — étape validée` : 'Étape validée');
+      setCodeValue('');
+      refetch();
+    } catch (e: any) {
+      console.error('handleValidateStep:', e);
+      toast.error(`Erreur : ${e.message ?? 'inconnue'}`);
+    } finally {
+      setValidating(false);
+    }
+  };
   const fields: Record<string, string> = {
     nom_client: 'Raison sociale', adresse_siege: 'Adresse du siège', siret: 'N° SIRET',
     tva: 'N° TVA', naf: 'NAF', contact_facturation: 'Contact facturation', devise: 'Devise',
@@ -178,11 +242,45 @@ function ClientDetailDialog({ request, open, onClose, refetch, isAdmin, profiles
     ),
   };
 
+  const validationSection: DetailSection | null = (activeStep && canValidateActive) ? {
+    title: 'Valider l\'étape en cours', icon: <CheckCircle2 className="h-3 w-3" />,
+    content: (
+      <div className="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50/40 p-3">
+        <p className="text-sm font-medium">{activeStep.title.split(' — ').pop()}</p>
+        {codeReq && (
+          <div className="space-y-1.5">
+            <Label htmlFor="client-dispatch-code">{codeReq.label} *</Label>
+            <Input
+              id="client-dispatch-code"
+              value={codeValue}
+              onChange={(e) => setCodeValue(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && codeValue.trim() && !validating) void handleValidateStep(); }}
+              placeholder={codeReq.placeholder}
+              disabled={validating}
+            />
+          </div>
+        )}
+        <div className="flex justify-end">
+          <Button
+            onClick={() => void handleValidateStep()}
+            disabled={validating || (!!codeReq && !codeValue.trim())}
+            className="gap-2 bg-emerald-600 hover:bg-emerald-700"
+          >
+            {validating ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+            Valider l'étape
+          </Button>
+        </div>
+      </div>
+    ),
+  } : null;
+
   return (
     <ModuleDetailDialog
       open={open} onClose={onClose} taskId={request.task_id} title={request.title}
       status={request.status} statusLabels={STATUS_LABELS} statusColors={STATUS_COLORS}
-      infoLines={infoLines} sections={[infoSection, stepsSection]} refetch={refetch}
+      infoLines={infoLines}
+      sections={[infoSection, stepsSection, ...(validationSection ? [validationSection] : [])]}
+      refetch={refetch}
       isAdmin={isAdmin} allowDelete={isAdmin}
       onDeleteConfirm="Supprimer définitivement cette demande de création client et ses étapes ?"
     />

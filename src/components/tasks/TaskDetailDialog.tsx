@@ -126,6 +126,27 @@ function conversationTaskId(t: { id: string; type?: string | null; parent_reques
   return t.parent_request_id && t.type !== 'request' ? t.parent_request_id : t.id;
 }
 
+/**
+ * Module « Création client » : à la validation de certaines étapes, le valideur
+ * doit saisir un code qui est rangé dans le module_data de la DEMANDE parente
+ * (lu par le suivi dispatch + le trigger DB d'enchaînement des étapes).
+ *  - Contrôle Compta   → code client
+ *  - Création affaire  → code affaire
+ */
+const CLIENT_STEP_CODE_BY_SP: Record<string, { key: string; label: string; placeholder: string }> = {
+  '44444444-4444-4444-8444-000000000102': { key: 'code_client', label: 'Code client', placeholder: 'Code client attribué en compta' },
+  '44444444-4444-4444-8444-000000000103': { key: 'code_affaire', label: 'Code affaire', placeholder: 'Code affaire créé' },
+};
+
+/** Renvoie le code à saisir pour valider cette étape client, ou null si aucun. */
+function clientStepCodeRequirement(
+  t: { module_code?: string | null; source_sub_process_template_id?: string | null } | null,
+): { key: string; label: string; placeholder: string } | null {
+  if (!t || (t as any).module_code !== 'client') return null;
+  const sp = t.source_sub_process_template_id;
+  return sp ? CLIENT_STEP_CODE_BY_SP[sp] ?? null : null;
+}
+
 export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMutated }: TaskDetailDialogProps) {
   // Ferme la modale si la page persistante qui l'héberge passe en arrière-plan
   // (évite l'empilement de dialogs portalisés lors d'une navigation).
@@ -188,6 +209,15 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
     type: 'approve' | 'refuse';
   } | null>(null);
   const [validationComment, setValidationComment] = useState('');
+  /** Saisie d'un code (module client) avant de marquer une étape terminée. */
+  const [clientCodeDialog, setClientCodeDialog] = useState<{
+    taskId: string;
+    parentRequestId: string | null;
+    field: { key: string; label: string; placeholder: string };
+    afterDone: () => void;
+  } | null>(null);
+  const [clientCodeValue, setClientCodeValue] = useState('');
+  const [isCompletingClient, setIsCompletingClient] = useState(false);
   const [activeTab, setActiveTab] = useState<'tasks' | 'chat' | 'request-info'>('tasks');
   const [editForm, setEditForm] = useState({
     title: '',
@@ -523,6 +553,105 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
     }
   };
 
+  /**
+   * Marque une étape comme terminée. Pour les étapes du module client qui
+   * exigent un code (Compta → code client, Affaire → code affaire), ouvre
+   * d'abord la saisie ; sinon complète directement.
+   */
+  const completeStepWithOptionalCode = (
+    stepTask: { id: string; parent_request_id?: string | null; module_code?: string | null; source_sub_process_template_id?: string | null },
+    afterDone: () => void,
+  ) => {
+    const req = clientStepCodeRequirement(stepTask);
+    if (req) {
+      setClientCodeValue('');
+      setClientCodeDialog({
+        taskId: stepTask.id,
+        parentRequestId: stepTask.parent_request_id ?? null,
+        field: req,
+        afterDone,
+      });
+    } else {
+      onStatusChange(stepTask.id, 'done');
+      afterDone();
+    }
+  };
+
+  /** Valide l'étape client après saisie du code (écrit dans la demande parente). */
+  const handleClientCodeSubmit = async () => {
+    if (!clientCodeDialog) return;
+    const code = clientCodeValue.trim();
+    if (!code) {
+      toast.error(`${clientCodeDialog.field.label} obligatoire`);
+      return;
+    }
+    setIsCompletingClient(true);
+    try {
+      // 1) Ranger le code dans le module_data de la DEMANDE parente (avant le
+      //    passage à done, pour que le trigger d'enchaînement le voie).
+      if (clientCodeDialog.parentRequestId) {
+        const { data: parent } = await supabase
+          .from('tasks').select('module_data').eq('id', clientCodeDialog.parentRequestId).maybeSingle();
+        const merged = { ...(((parent as any)?.module_data) ?? {}), [clientCodeDialog.field.key]: code };
+        const { error } = await supabase
+          .from('tasks').update({ module_data: merged }).eq('id', clientCodeDialog.parentRequestId);
+        if (error) throw error;
+      }
+      // 2) Passer l'étape à done.
+      onStatusChange(clientCodeDialog.taskId, 'done');
+      toast.success(`${clientCodeDialog.field.label} enregistré`);
+      const after = clientCodeDialog.afterDone;
+      setClientCodeDialog(null);
+      setClientCodeValue('');
+      after();
+    } catch (e: any) {
+      console.error('handleClientCodeSubmit:', e);
+      toast.error(`Erreur : ${e.message ?? 'inconnue'}`);
+    } finally {
+      setIsCompletingClient(false);
+    }
+  };
+
+  const clientCodeDialogNode = (
+    <Dialog open={!!clientCodeDialog} onOpenChange={(o) => { if (!o && !isCompletingClient) { setClientCodeDialog(null); setClientCodeValue(''); } }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{clientCodeDialog ? `Valider l'étape — ${clientCodeDialog.field.label}` : ''}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Renseigne le {clientCodeDialog?.field.label.toLowerCase()} pour valider cette étape.
+          </p>
+          <div className="space-y-2">
+            <Label htmlFor="client-step-code">{clientCodeDialog?.field.label} *</Label>
+            <Input
+              id="client-step-code"
+              autoFocus
+              value={clientCodeValue}
+              onChange={(e) => setClientCodeValue(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && clientCodeValue.trim() && !isCompletingClient) void handleClientCodeSubmit(); }}
+              placeholder={clientCodeDialog?.field.placeholder}
+              disabled={isCompletingClient}
+            />
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 mt-4">
+          <Button variant="outline" onClick={() => { setClientCodeDialog(null); setClientCodeValue(''); }} disabled={isCompletingClient}>
+            Annuler
+          </Button>
+          <Button
+            onClick={() => void handleClientCodeSubmit()}
+            disabled={isCompletingClient || !clientCodeValue.trim()}
+            className="bg-success hover:bg-success/90 text-success-foreground"
+          >
+            {isCompletingClient ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+            Valider l'étape
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+
   if (!task) return null;
 
   const completedTasks = childTasks.filter((t) => t.status === 'done' || t.status === 'validated').length;
@@ -824,7 +953,7 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
                       Envoyer pour validation
                     </Button>
                   ) : (
-                    <Button onClick={() => { onStatusChange(selectedChildTask.id, 'done'); handleCloseChildTask(); }}>
+                    <Button onClick={() => completeStepWithOptionalCode(selectedChildTask, handleCloseChildTask)}>
                       <CheckCircle2 className="h-4 w-4 mr-2" />
                       Marquer terminé
                     </Button>
@@ -845,6 +974,7 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
         onReassigned={handleReassigned}
         includeWorkloadSlots={false}
       />
+      {clientCodeDialogNode}
       </>
     );
   }
@@ -1194,7 +1324,7 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
                 && task.source_process_template_id !== 'bd75a3b0-c918-4b43-befe-739b83f7461a' // BE process
                 && task.status !== 'pending_validation_1' && task.status !== 'pending_validation_2' && (
                 <Button
-                  onClick={() => { onStatusChange(task.id, 'done'); onClose(); }}
+                  onClick={() => completeStepWithOptionalCode(task, onClose)}
                   className="gap-2"
                 >
                   <CheckCircle2 className="h-4 w-4" />
@@ -1736,6 +1866,7 @@ export function TaskDetailDialog({ task, open, onClose, onStatusChange, onTaskMu
         </div>
       </DialogContent>
     </Dialog>
+    {clientCodeDialogNode}
     </>
   );
 }
