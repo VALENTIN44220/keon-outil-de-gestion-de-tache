@@ -103,6 +103,8 @@ import ITRoadmapTracking from "./pages/it/ITRoadmapTracking";
 import SMQDashboard from "./pages/smq/SMQDashboard";
 import SMQNewDeclaration from "./pages/smq/SMQNewDeclaration";
 import SMQDetail from "./pages/smq/SMQDetail";
+import SSTDashboard from "./pages/sst/SSTDashboard";
+import NewSituationRisque from "./pages/sst/NewSituationRisque";
 
 const App = () => (
     <AuthProvider>
@@ -151,6 +153,9 @@ const App = () => (
                 { path: "/smq", end: true, element: <ProtectedRoute><SMQDashboard /></ProtectedRoute> },
                 { path: "/smq/new", end: true, element: <ProtectedRoute><SMQNewDeclaration /></ProtectedRoute> },
                 { path: "/smq/:id", end: true, element: <ProtectedRoute><SMQDetail /></ProtectedRoute> },
+                // Module SST — Situations à risque (COPIL SST)
+                { path: "/sst", end: true, element: <ProtectedRoute><SSTDashboard /></ProtectedRoute> },
+                { path: "/sst/new", end: true, element: <ProtectedRoute><NewSituationRisque /></ProtectedRoute> },
                 { path: "/maintenance/dispatch", end: true, element: <ProtectedRoute><MaintenanceDispatch /></ProtectedRoute> },
                 { path: "/maintenance/new", end: true, element: <ProtectedRoute><NewMaintenanceRequest /></ProtectedRoute> },
                 { path: "/rh/dispatch", end: true, element: <ProtectedRoute><RHDispatch /></ProtectedRoute> },
@@ -237,6 +242,8 @@ const App = () => (
             <Route path="/smq" element={<></>} />
             <Route path="/smq/new" element={<></>} />
             <Route path="/smq/:id" element={<></>} />
+            <Route path="/sst" element={<></>} />
+            <Route path="/sst/new" element={<></>} />
             <Route path="/maintenance/dispatch" element={<></>} />
             <Route path="/maintenance/new" element={<></>} />
             <Route path="/rh/dispatch" element={<></>} />

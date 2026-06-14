@@ -5,7 +5,7 @@ import {
   ArrowLeftRight, Calendar, MessageCircle, Building2, ClipboardList,
   Lightbulb, Monitor, Leaf, Euro, Map as MapIcon, Users, Wallet,
   Package, Truck, Plus, Minus, ChevronsDownUp, ChevronsUpDown, ShieldAlert, Settings2, BarChart2,
-  UserPlus,
+  UserPlus, AlertTriangle,
 } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
@@ -127,6 +127,7 @@ const menuGroups: MenuGroup[] = [
     label: 'QUALITÉ (SMQ)',
     items: [
       { id: 'smq', label: 'Non-conformités', icon: ShieldAlert, path: '/smq', permissionKey: 'can_access_smq' },
+      { id: 'sst', label: 'Situations à risque', icon: AlertTriangle, path: '/sst', permissionKey: 'can_access_sst' },
     ],
   },
   {

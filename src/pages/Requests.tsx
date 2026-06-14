@@ -27,7 +27,7 @@ import { usePendingAssignments } from '@/hooks/usePendingAssignments';
 import { useTasks } from '@/hooks/useTasks';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FolderOpen, Building2, Lightbulb, ListChecks, ClipboardList, UserCog, ArrowRight, Monitor, Truck, Package, ShieldAlert, UserPlus, Users } from 'lucide-react';
+import { FolderOpen, Building2, Lightbulb, ListChecks, ClipboardList, UserCog, ArrowRight, Monitor, Truck, Package, ShieldAlert, UserPlus, Users, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   SUPPLIER_NEW_REQUEST_PROCESS_TEMPLATE_ID,
@@ -194,6 +194,15 @@ const Requests = () => {
       icon: ShieldAlert,
       accent: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
       onClick: () => navigate('/smq/new'),
+      visible: true,
+    },
+    {
+      key: 'sst',
+      label: 'Situation à risque (SST)',
+      description: 'Remonter un accident, presque-accident ou situation à risque',
+      icon: AlertTriangle,
+      accent: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+      onClick: () => navigate('/sst/new'),
       visible: true,
     },
     {

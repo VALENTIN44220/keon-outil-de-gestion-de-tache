@@ -189,6 +189,7 @@ const DEFAULT_PERMISSIONS: Record<string, boolean> = {
   can_access_maintenance: true,
   can_access_logistique: true,
   can_access_smq: true,
+  can_access_sst: false,
   can_manage_smq: false,
   can_manage_logistique: false,
   can_manage_maintenance: false,
