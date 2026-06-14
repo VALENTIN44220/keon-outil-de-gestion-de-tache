@@ -99,6 +99,11 @@ const COMPANY_FIELDS: FieldKey[] = ['societe', 'ancienne_societe', 'nouvelle_soc
 const DEPARTMENT_FIELDS: FieldKey[] = ['service'];
 const PROFILE_FIELDS: FieldKey[] = ['manager', 'ancien_manager', 'nouveau_manager'];
 
+/** Lieu de travail : liste déroulante avec saisie libre autorisée. */
+const LIEU_OPTIONS = ['Bouguenais', 'Malakoff', 'Narbonne'];
+/** Type de véhicule (quand véhicule = oui). */
+const VEHICULE_TYPE_OPTIONS = ['Véhicule de service', 'Véhicule de fonction'];
+
 export default function NewRHRequest() {
   const navigate = useNavigate();
   const { profile: authProfile, user } = useAuth();
@@ -216,6 +221,42 @@ export default function NewRHRequest() {
             onChange={(e) => setValue(f, e.target.value)}
             disabled={isSubmitting}
           />
+        </div>
+      );
+    }
+    if (f === 'lieu_travail') {
+      return (
+        <div key={f}>
+          <Label>{FIELD_LABELS[f]}</Label>
+          <Input
+            list="rh-lieu-options"
+            value={values[f] ?? ''}
+            onChange={(e) => setValue(f, e.target.value)}
+            disabled={isSubmitting}
+            placeholder="Bouguenais, Malakoff, Narbonne… ou saisir"
+          />
+          <datalist id="rh-lieu-options">
+            {LIEU_OPTIONS.map(o => <option key={o} value={o} />)}
+          </datalist>
+        </div>
+      );
+    }
+    if (f === 'type_vehicule') {
+      return (
+        <div key={f}>
+          <Label>{FIELD_LABELS[f]}</Label>
+          <Select
+            value={values[f] ?? ''}
+            onValueChange={(v) => setValue(f, v)}
+            disabled={isSubmitting}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Sélectionner…" />
+            </SelectTrigger>
+            <SelectContent>
+              {VEHICULE_TYPE_OPTIONS.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
       );
     }

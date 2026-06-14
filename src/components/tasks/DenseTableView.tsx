@@ -16,7 +16,6 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { formatTaskCalendarDate } from '@/lib/formatTaskDate';
 import { supabase } from '@/integrations/supabase/client';
-import { TaskDetailDialog } from './TaskDetailDialog';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -112,7 +111,6 @@ export function DenseTableView({ tasks, onStatusChange, onDelete, progressMap, o
   const [categoriesMap, setCategoriesMap] = useState<Map<string, string>>(new Map());
   const [itProjectsMap, setItProjectsMap] = useState<Map<string, string>>(new Map());
   const [itProjectsList, setItProjectsList] = useState<ITProjectOption[]>([]);
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [colSelectorOpen, setColSelectorOpen] = useState(false);
   const [editingItProjectTaskId, setEditingItProjectTaskId] = useState<string | null>(null);
   const [itProjectSearch, setItProjectSearch] = useState('');
@@ -405,7 +403,7 @@ export function DenseTableView({ tasks, onStatusChange, onDelete, progressMap, o
                 <TableRow
                   key={task.id}
                   className="cursor-pointer hover:bg-keon-50/50 h-8"
-                  onClick={() => setSelectedTask(task)}
+                  onClick={() => navigate(`/demande/${task.id}`)}
                 >
                   {visibleCols.map(col => (
                     <TableCell key={col.key} className="py-1 px-2 text-xs">
@@ -461,15 +459,6 @@ export function DenseTableView({ tasks, onStatusChange, onDelete, progressMap, o
         </Table>
       </div>
 
-      {selectedTask && (
-        <TaskDetailDialog
-          task={selectedTask}
-          open={!!selectedTask}
-          onClose={() => setSelectedTask(null)}
-          onStatusChange={onStatusChange}
-          onTaskMutated={onTaskUpdated}
-        />
-      )}
     </>
   );
 }

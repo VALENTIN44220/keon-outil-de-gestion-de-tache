@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Task, TaskStatus } from '@/types/task';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isToday } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -6,7 +7,6 @@ import { ChevronLeft, ChevronRight, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { TaskDetailDialog } from '@/components/tasks/TaskDetailDialog';
 import { getStatusFilterOptions, matchesStatusFilter } from '@/services/taskStatusService';
 
 interface CalendarViewProps {
@@ -42,9 +42,9 @@ const MAX_VISIBLE_PER_DAY = 3;
 const statusFilterOptions = getStatusFilterOptions();
 
 export function CalendarView({ tasks, onStatusChange, onDelete, progressMap, onTaskUpdated }: CalendarViewProps) {
+  const navigate = useNavigate();
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [statusFilter, setStatusFilter] = useState('all');
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   const filteredTasks = useMemo(() => {
     if (statusFilter === 'all') return tasks;
@@ -171,7 +171,7 @@ export function CalendarView({ tasks, onStatusChange, onDelete, progressMap, onT
                   {visible.map(task => (
                     <button
                       key={task.id}
-                      onClick={() => setSelectedTask(task)}
+                      onClick={() => navigate(`/demande/${task.id}`)}
                       className={cn(
                         "w-full text-left text-[10px] leading-tight px-1.5 py-0.5 rounded border truncate hover:opacity-80 transition-opacity flex items-center gap-1 cursor-pointer",
                         STATUS_BG[task.status] || 'bg-muted text-muted-foreground border-border'
@@ -205,7 +205,7 @@ export function CalendarView({ tasks, onStatusChange, onDelete, progressMap, onT
             {tasksWithoutDate.slice(0, 12).map(t => (
               <button
                 key={t.id}
-                onClick={() => setSelectedTask(t)}
+                onClick={() => navigate(`/demande/${t.id}`)}
                 className="text-[10px] px-2 py-0.5 rounded border border-border bg-card hover:bg-accent truncate max-w-[180px] cursor-pointer"
               >
                 {t.title}
@@ -218,18 +218,6 @@ export function CalendarView({ tasks, onStatusChange, onDelete, progressMap, onT
             )}
           </div>
         </div>
-      )}
-
-      {/* Task detail dialog */}
-      {selectedTask && (
-        <TaskDetailDialog
-          task={selectedTask}
-          open={!!selectedTask}
-          onClose={() => setSelectedTask(null)}
-          onStatusChange={onStatusChange}
-          onTaskMutated={onTaskUpdated}
-        />
-
       )}
     </div>
   );

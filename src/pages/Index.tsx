@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { DeadlineTasksOverrideProvider } from '@/contexts/DeadlineTasksOverrideContext';
@@ -16,8 +17,6 @@ import { DenseTableView } from '@/components/tasks/DenseTableView';
 import { CreateFromTemplateDialog } from '@/components/tasks/CreateFromTemplateDialog';
 import { PendingAssignmentsView } from '@/components/tasks/PendingAssignmentsView';
 import { TeamModule } from '@/components/team/TeamModule';
-import { TaskDetailDialog } from '@/components/tasks/TaskDetailDialog';
-import { UnifiedTaskDetailDialog } from '@/components/tasks/UnifiedTaskDetailDialog';
 import { PlannerSyncPanel } from '@/components/planner/PlannerSyncPanel';
 import { useTasks } from '@/hooks/useTasks';
 import { useTaskScope, TaskScope } from '@/hooks/useTaskScope';
@@ -56,6 +55,7 @@ const Index = () => {
   /** Même profil que `useTasks` (simulation incluse) pour périmètre et filtre stakeholder. */
   const profile = isSimulating && simulatedProfile ? simulatedProfile : authProfile;
   const { isAdmin } = useUserRole();
+  const navigate = useNavigate();
   const [activeView, setActiveView] = useState('dashboard');
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
   const [taskView, setTaskView] = useState<TaskView>('table');
@@ -77,8 +77,6 @@ const Index = () => {
   
   // All requests for analytics mode
   const [allRequests, setAllRequests] = useState<Task[]>([]);
-  const [selectedRequest, setSelectedRequest] = useState<Task | null>(null);
-  const [isRequestDetailOpen, setIsRequestDetailOpen] = useState(false);
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFiltersState>({
     assigneeId: 'all',
     requesterId: 'all',
@@ -120,10 +118,6 @@ const Index = () => {
   const { tasks: pendingBEValidations, count: pendingBEValidationCount, isLoading: isLoadingBEValidations, refetch: refetchBEValidations } = useBEPendingValidations();
   const { tasks: pendingITValidations, count: pendingITValidationCount, isLoading: isLoadingITValidations, refetch: refetchITValidations } = useITPendingValidations();
   const totalValidationCount = pendingValidationCount + pendingTaskValidationCount + pendingBEValidationCount;
-  
-  // State for comment notification task detail
-  const [selectedTaskForComment, setSelectedTaskForComment] = useState<Task | null>(null);
-  const [isCommentDetailOpen, setIsCommentDetailOpen] = useState(false);
   
   // Get progress for all tasks
   const taskIds = useMemo(() => allTasks.map(t => t.id), [allTasks]);
@@ -413,15 +407,7 @@ const Index = () => {
           tasks={analyticsTasksAndRequests}
           stats={stats}
           globalProgress={globalProgress}
-          onTaskClick={(task) => {
-            if (task.type === 'request') {
-              setSelectedRequest(task);
-              setIsRequestDetailOpen(true);
-            } else {
-              setSelectedTaskForComment(task);
-              setIsCommentDetailOpen(true);
-            }
-          }}
+          onTaskClick={(task) => navigate(`/demande/${task.id}`)}
         />
       );
     }
@@ -679,10 +665,7 @@ const Index = () => {
               requests={pendingValidations}
               isLoading={isLoadingValidations}
               onRefresh={refetchValidations}
-              onRequestClick={(request) => {
-                setSelectedRequest(request);
-                setIsRequestDetailOpen(true);
-              }}
+              onRequestClick={(request) => navigate(`/demande/${request.id}`)}
             />
           </TabsContent>
           <TabsContent value="tasks">
@@ -690,10 +673,7 @@ const Index = () => {
               tasks={pendingTaskValidations}
               isLoading={isLoadingTaskValidations}
               onRefresh={refetchTaskValidations}
-              onTaskClick={(task) => {
-                setSelectedTaskForComment(task);
-                setIsCommentDetailOpen(true);
-              }}
+              onTaskClick={(task) => navigate(`/demande/${task.id}`)}
             />
           </TabsContent>
           <TabsContent value="be">
@@ -761,32 +741,6 @@ const Index = () => {
         onClose={() => setIsTemplateDialogOpen(false)}
         onTasksCreated={refetch}
       />
-
-      {selectedTaskForComment && (
-        <TaskDetailDialog
-          task={selectedTaskForComment}
-          open={isCommentDetailOpen}
-          onClose={() => {
-            setIsCommentDetailOpen(false);
-            setSelectedTaskForComment(null);
-          }}
-          onStatusChange={updateTaskStatus}
-          onTaskMutated={refetch}
-        />
-      )}
-
-      {selectedRequest && (
-        <UnifiedTaskDetailDialog
-          task={selectedRequest}
-          open={isRequestDetailOpen}
-          onClose={() => {
-            setIsRequestDetailOpen(false);
-            setSelectedRequest(null);
-          }}
-          onStatusChange={updateTaskStatus}
-          onTaskMutated={refetch}
-        />
-      )}
 
       <BulkActionDialog
         open={isBulkActionOpen}

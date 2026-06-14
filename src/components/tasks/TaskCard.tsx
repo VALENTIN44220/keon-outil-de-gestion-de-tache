@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { UserPlus } from 'lucide-react';
 import { Clock, User, MoreVertical, Trash2, ChevronDown, ChevronRight, ListChecks, FileText, Eye, Building2, Pencil, CalendarClock, CalendarCheck } from 'lucide-react';
 import { Task, TaskStatus } from '@/types/task';
@@ -18,7 +19,6 @@ import { TaskChecklist } from './TaskChecklist';
 import { TaskProgressBadge } from './TaskProgressBadge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { CreateTemplateFromTaskDialog } from './CreateTemplateFromTaskDialog';
-import { TaskDetailDialog } from './TaskDetailDialog';
 import { TaskEditDialog } from './TaskEditDialog';
 
 interface TaskCardProps {
@@ -59,9 +59,9 @@ const statusLabels: Record<string, string> = {
 };
 
 export function TaskCard({ task, onStatusChange, onDelete, compact = false, taskProgress, onTaskUpdated }: TaskCardProps) {
+  const navigate = useNavigate();
   const [isChecklistOpen, setIsChecklistOpen] = useState(false);
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const dueDate = parseTaskCalendarDate(task.due_date);
   const isOverdue =
@@ -73,12 +73,13 @@ export function TaskCard({ task, onStatusChange, onDelete, compact = false, task
   const parentRequestNumber = useParentRequestNumber(task.parent_request_id);
 
   const handleCardClick = (e: React.MouseEvent) => {
-    // Don't open edit if clicking on interactive elements
+    // Don't navigate if clicking on interactive elements
     const target = e.target as HTMLElement;
     if (target.closest('button') || target.closest('[role="menuitem"]') || target.closest('input') || target.closest('a')) {
       return;
     }
-    setIsEditOpen(true);
+    // Converge vers la page de suivi unifiée (modèle BE), au lieu de l'ancien dialog.
+    navigate(`/demande/${task.id}`);
   };
 
   return (
@@ -239,12 +240,10 @@ export function TaskCard({ task, onStatusChange, onDelete, compact = false, task
               <FileText className="w-4 h-4 mr-2" />
               Créer un modèle
             </DropdownMenuItem>
-            {isRequest && (
-              <DropdownMenuItem onClick={() => setIsDetailOpen(true)}>
-                <Eye className="w-4 h-4 mr-2" />
-                Voir les détails
-              </DropdownMenuItem>
-            )}
+            <DropdownMenuItem onClick={() => navigate(`/demande/${task.id}`)}>
+              <Eye className="w-4 h-4 mr-2" />
+              Voir les détails
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="text-destructive" onClick={() => onDelete(task.id)}>
               <Trash2 className="w-4 h-4 mr-2" />
@@ -266,15 +265,6 @@ export function TaskCard({ task, onStatusChange, onDelete, compact = false, task
         open={isTemplateDialogOpen}
         onClose={() => setIsTemplateDialogOpen(false)}
         task={task}
-      />
-
-      {/* Task detail dialog for requests */}
-      <TaskDetailDialog
-        task={task}
-        open={isDetailOpen}
-        onClose={() => setIsDetailOpen(false)}
-        onStatusChange={onStatusChange}
-        onTaskMutated={onTaskUpdated}
       />
 
       {/* Task edit dialog */}
