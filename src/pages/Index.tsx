@@ -42,6 +42,7 @@ import { PendingTaskValidationsPanel } from '@/components/dashboard/PendingTaskV
 import { BEPendingValidationsPanel } from '@/components/dashboard/BEPendingValidationsPanel';
 import { ITPendingValidationsPanel } from '@/components/dashboard/ITPendingValidationsPanel';
 import { MyDayPanel } from '@/components/dashboard/MyDayPanel';
+import { MyRequestsPanel } from '@/components/dashboard/MyRequestsPanel';
 import { usePendingValidationRequests } from '@/hooks/usePendingValidationRequests';
 import { usePendingTaskValidations } from '@/hooks/usePendingTaskValidations';
 import { useBEPendingValidations } from '@/hooks/useBEPendingValidations';
@@ -61,7 +62,7 @@ const Index = () => {
   const [taskView, setTaskView] = useState<TaskView>('table');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [showFullStats, setShowFullStats] = useState(false);
-  const [dashboardMode, setDashboardMode] = useState<'tasks' | 'planner' | 'validations'>('tasks');
+  const [dashboardMode, setDashboardMode] = useState<'tasks' | 'my-requests' | 'planner' | 'validations'>('tasks');
   // Garde : si un non-admin se retrouve sur 'planner' (état persisté ou lien direct),
   // on retombe sur 'tasks' pour ne pas laisser une zone vide.
   useEffect(() => {
@@ -497,6 +498,9 @@ const Index = () => {
         <TabsTrigger value="tasks" className="rounded-none border-b-2 border-transparent data-[state=active]:border-keon-blue data-[state=active]:text-keon-blue data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 h-10">
           Tâches & Demandes
         </TabsTrigger>
+        <TabsTrigger value="my-requests" className="rounded-none border-b-2 border-transparent data-[state=active]:border-keon-blue data-[state=active]:text-keon-blue data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 h-10">
+          Mes demandes
+        </TabsTrigger>
         {/* Onglet Planner — accès ultra-limité (admin global uniquement) */}
         {isAdmin && (
           <TabsTrigger value="planner" className="rounded-none border-b-2 border-transparent data-[state=active]:border-keon-blue data-[state=active]:text-keon-blue data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 h-10 gap-1">
@@ -614,6 +618,12 @@ const Index = () => {
         </div>
 
         {renderTasksSubContent()}
+      </TabsContent>
+
+      <TabsContent value="my-requests" className="mt-0">
+        <div className="p-4">
+          <MyRequestsPanel currentUserId={profile?.id} />
+        </div>
       </TabsContent>
 
       {/* Garde de défense : même si le user atterrit sur ce tab via état persisté,
