@@ -34,8 +34,11 @@ export interface RHChildTask {
   title: string;
   status: string;
   assignee_id: string | null;
+  group_assignee_ids: string[] | null;
   due_date: string | null;
   source_sub_process_template_id: string | null;
+  /** Libellé d'affectation prêt à afficher : personne, « Équipe : … », ou « À affecter ». */
+  assigneeLabel: string;
 }
 
 export interface RHRequest {
@@ -81,18 +84,44 @@ export function useRHRequests() {
       if (ids.length > 0) {
         const { data: children, error: childErr } = await supabase
           .from('tasks')
-          .select('id, title, status, assignee_id, due_date, parent_request_id, source_sub_process_template_id')
+          .select('id, title, status, assignee_id, group_assignee_ids, due_date, parent_request_id, source_sub_process_template_id')
           .in('parent_request_id', ids);
         if (childErr) throw childErr;
+
+        // Résout les noms (assignés + membres des groupes) pour un libellé lisible.
+        const profileIds = new Set<string>();
         for (const c of children ?? []) {
+          if (c.assignee_id) profileIds.add(c.assignee_id);
+          for (const g of ((c as any).group_assignee_ids as string[] | null) ?? []) profileIds.add(g);
+        }
+        const nameById = new Map<string, string>();
+        if (profileIds.size > 0) {
+          const { data: profs } = await supabase
+            .from('profiles')
+            .select('id, display_name')
+            .in('id', Array.from(profileIds));
+          for (const p of profs ?? []) nameById.set(p.id, p.display_name ?? '—');
+        }
+        const labelFor = (assigneeId: string | null, group: string[] | null): string => {
+          if (assigneeId) return nameById.get(assigneeId) ?? '—';
+          if (group && group.length > 0) {
+            return 'Équipe : ' + group.map(id => nameById.get(id) ?? '—').join(', ');
+          }
+          return 'À affecter';
+        };
+
+        for (const c of children ?? []) {
+          const group = ((c as any).group_assignee_ids as string[] | null) ?? null;
           const list = childrenByParent.get(c.parent_request_id!) ?? [];
           list.push({
             id: c.id,
             title: c.title,
             status: c.status,
             assignee_id: c.assignee_id,
+            group_assignee_ids: group,
             due_date: c.due_date,
             source_sub_process_template_id: c.source_sub_process_template_id,
+            assigneeLabel: labelFor(c.assignee_id, group),
           });
           childrenByParent.set(c.parent_request_id!, list);
         }

@@ -316,7 +316,11 @@ function RHDetailDialog({ request, open, onClose, refetch, isAdmin, profilesMap 
             <TableRow key={c.id}>
               <TableCell className="text-sm">{c.title.split(' — ').pop()}</TableCell>
               <TableCell className="text-xs">
-                {c.assignee_id ? profilesMap.get(c.assignee_id) ?? '—' : <span className="text-muted-foreground">À affecter</span>}
+                {c.assignee_id
+                  ? (profilesMap.get(c.assignee_id) ?? c.assigneeLabel)
+                  : c.group_assignee_ids && c.group_assignee_ids.length > 0
+                    ? <span className="text-muted-foreground">{c.assigneeLabel}</span>
+                    : <span className="text-muted-foreground">À affecter</span>}
               </TableCell>
               <TableCell>
                 <Badge variant="outline" className="text-xs">
