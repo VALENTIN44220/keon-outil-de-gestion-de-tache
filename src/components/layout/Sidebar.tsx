@@ -35,6 +35,8 @@ interface SidebarMenuItem {
   icon: React.ComponentType<{ className?: string }>;
   path: string;
   permissionKey?: ScreenPermissionKey;
+  /** Visible uniquement pour les administrateurs (en plus de la permission). */
+  adminOnly?: boolean;
   children?: SidebarMenuItem[];
 }
 
@@ -50,7 +52,6 @@ const menuGroups: MenuGroup[] = [
       { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard, path: '/', permissionKey: 'can_access_dashboard' },
       { id: 'requests', label: 'Demandes', icon: FileText, path: '/requests', permissionKey: 'can_access_requests' },
       { id: 'my-requests', label: 'Mes demandes', icon: ClipboardList, path: '/mes-demandes', permissionKey: 'can_access_my_requests' },
-      { id: 'process-tracking', label: 'Suivi de processus', icon: ClipboardList, path: '/process-tracking', permissionKey: 'can_access_process_tracking' },
     ],
   },
   {
@@ -65,7 +66,7 @@ const menuGroups: MenuGroup[] = [
       { id: 'projects', label: 'Projets', icon: FolderOpen, path: '/projects', permissionKey: 'can_access_projects' },
       { id: 'be-dispatch', label: 'Dispatch & Suivi', icon: Users, path: '/be/dispatch', permissionKey: 'can_access_be_dispatch' },
       { id: 'be-budget', label: 'Budget', icon: Wallet, path: '/be/budget', permissionKey: 'can_access_be_budget' },
-      { id: 'be-admin-tjm', label: 'Référentiel TJM', icon: Euro, path: '/be/admin/tjm', permissionKey: 'can_access_be_tjm' },
+      { id: 'be-admin-tjm', label: 'Référentiel TJM', icon: Euro, path: '/be/admin/tjm', permissionKey: 'can_access_be_tjm', adminOnly: true },
     ],
   },
   {
@@ -340,6 +341,7 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
 
   const filteredGroups = useMemo(() => {
     const filterItem = (item: SidebarMenuItem): SidebarMenuItem | null => {
+      if (item.adminOnly && !isAdmin) return null;
       const screenOk = !item.permissionKey || canAccessScreen(item.permissionKey);
       if (!screenOk) return null;
       if (item.children?.length) {

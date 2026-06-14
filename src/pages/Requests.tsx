@@ -27,7 +27,7 @@ import { usePendingAssignments } from '@/hooks/usePendingAssignments';
 import { useTasks } from '@/hooks/useTasks';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FolderOpen, Building2, Lightbulb, ListChecks, ClipboardList, UserCog, ArrowRight, Monitor, Truck, Package } from 'lucide-react';
+import { FolderOpen, Building2, Lightbulb, ListChecks, ClipboardList, UserCog, ArrowRight, Monitor, Truck, Package, ShieldAlert, UserPlus, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   SUPPLIER_NEW_REQUEST_PROCESS_TEMPLATE_ID,
@@ -167,6 +167,33 @@ const Requests = () => {
       icon: Truck,
       accent: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
       onClick: () => navigate('/logistique/new'),
+      visible: true,
+    },
+    {
+      key: 'rh',
+      label: 'Mouvement collaborateur',
+      description: 'RH : arrivée, départ ou mouvement d\'un collaborateur',
+      icon: Users,
+      accent: 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300',
+      onClick: () => navigate('/rh/new'),
+      visible: true,
+    },
+    {
+      key: 'client',
+      label: 'Création client',
+      description: 'Créer un client / une affaire (CRM → Compta → Affaire)',
+      icon: UserPlus,
+      accent: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',
+      onClick: () => navigate('/client/new'),
+      visible: true,
+    },
+    {
+      key: 'smq',
+      label: 'Non-conformité (SMQ)',
+      description: 'Déclarer une non-conformité ou une action corrective',
+      icon: ShieldAlert,
+      accent: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+      onClick: () => navigate('/smq/new'),
       visible: true,
     },
     {

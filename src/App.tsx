@@ -41,7 +41,6 @@ import Chat from "./pages/Chat";
 import DesignSystem from "./pages/DesignSystem";
 import NotFound from "./pages/NotFound";
 import SupplierReference from "./pages/SupplierReference";
-import ProcessTracking from "./pages/ProcessTracking";
 import Innovation from "./pages/Innovation";
 import InnovationRequests from "./pages/InnovationRequests";
 import InnovationNew from "./pages/InnovationNew";
@@ -144,7 +143,6 @@ const App = () => (
                 { path: "/calendar", end: true, element: <ProtectedRoute><CalendarPage /></ProtectedRoute> },
                 { path: "/chat", end: true, element: <ProtectedRoute><Chat /></ProtectedRoute> },
                 { path: "/suppliers", end: true, element: <ProtectedRoute><SupplierReference /></ProtectedRoute> },
-                { path: "/process-tracking", end: true, element: <ProtectedRoute><ProcessTracking /></ProtectedRoute> },
 
                 { path: "/innovation", end: true, element: <ProtectedRoute><Innovation /></ProtectedRoute> },
                 { path: "/innovation/new", end: true, element: <ProtectedRoute><InnovationNew /></ProtectedRoute> },
@@ -234,7 +232,6 @@ const App = () => (
             <Route path="/calendar" element={<></>} />
             <Route path="/chat" element={<></>} />
             <Route path="/suppliers" element={<></>} />
-            <Route path="/process-tracking" element={<></>} />
             <Route path="/innovation" element={<></>} />
             <Route path="/innovation/new" element={<></>} />
             <Route path="/smq" element={<></>} />

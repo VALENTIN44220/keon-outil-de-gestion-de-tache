@@ -38,6 +38,7 @@ import {
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { extractErrorMessage } from '@/lib/extractErrorMessage';
+import { useUserRole } from '@/hooks/useUserRole';
 import { BEBudgetKpiCards } from '@/components/be/budget/BEBudgetKpiCards';
 import { BEAffaireCard } from '@/components/be/budget/BEAffaireCard';
 import { BEAffaireDialog } from '@/components/be/budget/BEAffaireDialog';
@@ -81,6 +82,7 @@ function loadColumns(): BEAffaireColumnKey[] {
 export default function BEProjectHubBudget() {
   const code = useBEProjectHubCode();
   const navigate = useNavigate();
+  const { isAdmin } = useUserRole();
   const { data: project, isLoading: projectLoading } = useBEProjectByCode(code);
   const {
     affaires,
@@ -316,12 +318,14 @@ export default function BEProjectHubBudget() {
               </Button>
             </div>
 
-            <Button asChild variant="outline" size="sm" className="gap-1.5" title="Gérer le référentiel TJM et les postes BE des collaborateurs">
-              <Link to="/be/admin/tjm">
-                <Coins className="h-4 w-4" />
-                Référentiel TJM
-              </Link>
-            </Button>
+            {isAdmin && (
+              <Button asChild variant="outline" size="sm" className="gap-1.5" title="Gérer le référentiel TJM et les postes BE des collaborateurs">
+                <Link to="/be/admin/tjm">
+                  <Coins className="h-4 w-4" />
+                  Référentiel TJM
+                </Link>
+              </Button>
+            )}
             <Button onClick={() => setCreateOpen(true)} className="gap-1.5">
               <Plus className="h-4 w-4" />
               Nouvelle affaire
