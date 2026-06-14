@@ -106,6 +106,12 @@ const menuGroups: MenuGroup[] = [
     ],
   },
   {
+    label: 'CLIENTS',
+    items: [
+      { id: 'client-dispatch', label: 'Création client', icon: UserPlus, path: '/client/dispatch', permissionKey: 'can_access_client' },
+    ],
+  },
+  {
     label: 'LOGISTIQUE',
     items: [
       { id: 'logistique-dispatch', label: 'Transports', icon: Truck, path: '/logistique/dispatch', permissionKey: 'can_access_logistique' },
@@ -155,6 +161,7 @@ const SECTION_COLORS: Record<string, string> = {
   'INNOVATION':      '#f59e0b', // amber-500
   'MAINTENANCE':     '#ef4444', // red-500
   'RH':              '#ec4899', // pink-500
+  'CLIENTS':         '#06b6d4', // cyan-500
   'LOGISTIQUE':      '#06b6d4', // cyan-500
   'ACHATS':          '#f97316', // orange-500
   'CONFIGURATION':   '#64748b', // slate-500

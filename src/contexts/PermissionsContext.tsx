@@ -45,6 +45,7 @@ const DEFAULT_PERMISSIONS: EffectivePermissions = {
   can_access_smq: true,        // Q2 : tous peuvent voir/déclarer
   can_access_rh: false,        // Déploiement contrôlé : activé par profil via Droits & Accès
   can_access_comm: false,      // Déploiement contrôlé : activé par profil via Droits & Accès
+  can_access_client: false,    // Déploiement contrôlé : activé par profil via Droits & Accès
   can_manage_smq: false,       // Pilote / admin uniquement
   can_manage_logistique: false, // Dispatch logistique / admin uniquement
   can_manage_maintenance: false, // Dispatch maintenance / admin uniquement

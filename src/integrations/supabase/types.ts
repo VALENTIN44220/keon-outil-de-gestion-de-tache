@@ -4390,6 +4390,7 @@ export type Database = {
           can_access_be_dispatch: boolean
           can_access_be_tjm: boolean
           can_access_calendar: boolean
+          can_access_client: boolean
           can_access_comm: boolean
           can_access_dashboard: boolean
           can_access_innovation: boolean
@@ -4461,6 +4462,7 @@ export type Database = {
           can_access_be_dispatch?: boolean
           can_access_be_tjm?: boolean
           can_access_calendar?: boolean
+          can_access_client?: boolean
           can_access_comm?: boolean
           can_access_dashboard?: boolean
           can_access_innovation?: boolean
@@ -4532,6 +4534,7 @@ export type Database = {
           can_access_be_dispatch?: boolean
           can_access_be_tjm?: boolean
           can_access_calendar?: boolean
+          can_access_client?: boolean
           can_access_comm?: boolean
           can_access_dashboard?: boolean
           can_access_innovation?: boolean
@@ -9254,6 +9257,7 @@ export type Database = {
           can_access_be_dispatch: boolean | null
           can_access_be_tjm: boolean | null
           can_access_calendar: boolean | null
+          can_access_client: boolean | null
           can_access_comm: boolean | null
           can_access_dashboard: boolean | null
           can_access_innovation: boolean | null
@@ -9308,6 +9312,7 @@ export type Database = {
           can_access_be_dispatch?: boolean | null
           can_access_be_tjm?: boolean | null
           can_access_calendar?: boolean | null
+          can_access_client?: boolean | null
           can_access_comm?: boolean | null
           can_access_dashboard?: boolean | null
           can_access_innovation?: boolean | null
@@ -9362,6 +9367,7 @@ export type Database = {
           can_access_be_dispatch?: boolean | null
           can_access_be_tjm?: boolean | null
           can_access_calendar?: boolean | null
+          can_access_client?: boolean | null
           can_access_comm?: boolean | null
           can_access_dashboard?: boolean | null
           can_access_innovation?: boolean | null
@@ -10440,6 +10446,7 @@ export type Database = {
         | "comm"
         | "innovation"
         | "smq"
+        | "client"
       notification_channel: "in_app" | "email" | "teams"
       page_access_level: "none" | "read" | "write"
       template_visibility:
@@ -10674,6 +10681,7 @@ export const Constants = {
         "comm",
         "innovation",
         "smq",
+        "client",
       ],
       notification_channel: ["in_app", "email", "teams"],
       page_access_level: ["none", "read", "write"],
