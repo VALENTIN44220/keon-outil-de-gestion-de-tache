@@ -84,7 +84,6 @@ function SpvBudgetRedirect() {
 
 // IT Project Hub pages
 import ITProjects from "./pages/it/ITProjects";
-import ITProjectImportFDR from "./pages/it/ITProjectImportFDR";
 import ITProjectHubOverview from "./pages/it/ITProjectHubOverview";
 import ITProjectHubGovernance from "./pages/it/ITProjectHubGovernance";
 import ITProjectHubTasks from "./pages/it/ITProjectHubTasks";
@@ -196,7 +195,6 @@ const App = () => (
 
                 // IT project hub (écran dédié + voir projet IT)
                 { path: "/it/projects", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjects /></ITProjectsAccessGate></ProtectedRoute> },
-                { path: "/it/projects/import-fdr", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectImportFDR /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/budget", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITBudgetGlobal /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/cartographie", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITCartographie /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/admin/fdr", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITAdminFDR /></ITProjectsAccessGate></ProtectedRoute> },
@@ -278,7 +276,6 @@ const App = () => (
             <Route path="/spv/projects/:code/discussions" element={<></>} />
             <Route path="/spv/projects/:code/files" element={<></>} />
             <Route path="/it/projects" element={<></>} />
-            <Route path="/it/projects/import-fdr" element={<></>} />
             <Route path="/it/budget" element={<></>} />
             <Route path="/it/cartographie" element={<></>} />
             <Route path="/it/admin/fdr" element={<></>} />

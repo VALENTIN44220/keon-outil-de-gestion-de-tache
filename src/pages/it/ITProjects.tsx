@@ -18,10 +18,11 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import {
-  Plus, Monitor, Search, Download, Save, RotateCcw, Filter,
+  Plus, Monitor, Search, Save, RotateCcw, Filter,
   FolderKanban, AlertTriangle, TrendingUp, ArrowUpDown, ChevronRight, Target,
-  FolderOpen, Bookmark, Trash2, GitMerge
+  FolderOpen, Bookmark, Trash2, GitMerge, FileSpreadsheet
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { ITProjectMergeDialog } from '@/components/it/ITProjectMergeDialog';
 import { format, subMonths, startOfMonth, startOfYear, isAfter } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -192,6 +193,30 @@ export default function ITProjects() {
     localStorage.removeItem(LS_KEY);
   };
 
+  // Export Excel des projets affichés (filtrés + triés)
+  const handleExportExcel = () => {
+    const companyMap = new Map(companies.map(c => [c.id, c.name]));
+    const rows = sorted.map(p => ({
+      'Code': p.code_projet_digital ?? '',
+      'Nom': p.nom_projet ?? '',
+      'Type': p.type_projet ? (IT_PROJECT_TYPE_CONFIG[p.type_projet]?.label ?? p.type_projet) : '',
+      'Statut': p.statut_portefeuille ?? '',
+      'Phase': p.phase_courante ? (IT_PROJECT_PHASES.find(ph => ph.value === p.phase_courante)?.label ?? p.phase_courante) : '',
+      'Avancement (%)': p.progress ?? 0,
+      'Date fin prévue': p.date_fin_prevue ? format(new Date(p.date_fin_prevue), 'dd/MM/yyyy') : '',
+      'Pilier': p.pilier ?? '',
+      'Statut FDR': p.statut_fdr ? (STATUT_FDR_CONFIG[p.statut_fdr as StatutFDR]?.label ?? p.statut_fdr) : '',
+      'Chef de projet IT': p.chef_projet_it?.display_name ?? '',
+      'Société': p.company_id ? (companyMap.get(p.company_id) ?? '') : '',
+      'Créé le': p.created_at ? format(new Date(p.created_at), 'dd/MM/yyyy') : '',
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Projets IT');
+    XLSX.writeFile(wb, `Projets_IT_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+    toast.success(`${rows.length} projet(s) exporté(s)`);
+  };
+
   // Apply filters
   const filtered = useMemo(() => {
     const now = new Date();
@@ -332,8 +357,8 @@ export default function ITProjects() {
               <Button variant="outline" onClick={() => setShowMerge(true)} className="gap-2">
                 <GitMerge className="h-4 w-4" /> Fusionner
               </Button>
-              <Button variant="outline" onClick={() => navigate('/it/projects/import-fdr')} className="gap-2">
-                <Download className="h-4 w-4" /> Importer FDR
+              <Button variant="outline" onClick={handleExportExcel} className="gap-2">
+                <FileSpreadsheet className="h-4 w-4" /> Export Excel
               </Button>
               <Button onClick={() => setShowCreate(true)} className="gap-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 shadow-lg shadow-violet-500/25">
                 <Plus className="h-4 w-4" /> Nouveau projet
