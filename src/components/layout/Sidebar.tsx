@@ -1,12 +1,12 @@
 import React, { Fragment, useState, useEffect, useMemo } from 'react';
 import {
-  LayoutDashboard, ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
-  Workflow, ShieldCheck, FolderOpen, CalendarClock, FileText,
-  ArrowLeftRight, Calendar, MessageCircle, Building2, ClipboardList,
-  Lightbulb, Monitor, Leaf, Euro, Map as MapIcon, Users, Wallet,
-  Package, Truck, Plus, Minus, ChevronsDownUp, ChevronsUpDown, ShieldAlert, Settings2, BarChart2,
-  UserPlus, AlertTriangle,
+  ChevronLeft, ChevronRight, ArrowLeftRight,
+  Plus, Minus, ChevronsDownUp, ChevronsUpDown,
 } from 'lucide-react';
+import {
+  menuGroups, adminMenuItem, getSectionColor,
+  type SidebarMenuItem, type MenuGroup,
+} from '@/config/sidebarMenu';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useEffectivePermissions } from '@/hooks/useEffectivePermissions';
 import { useAuth } from '@/contexts/AuthContext';
@@ -18,159 +18,15 @@ import { usePageDeviceVisibility } from '@/hooks/usePageDeviceVisibility';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import keonLogo from '@/assets/keon-logo.jpg';
-import { useIsMobile } from '@/hooks/use-mobile';
+import { useIsMobile, MOBILE_BREAKPOINT } from '@/hooks/use-mobile';
 import { UserProfilePopover } from './UserProfilePopover';
 import { AppNotificationCluster } from '@/components/notifications/AppNotificationCluster';
-import type { ScreenPermissionKey } from '@/types/permissions';
 import { usePendingValidationRequests } from '@/hooks/usePendingValidationRequests';
 
 interface SidebarProps {
   activeView: string;
   onViewChange: (view: string) => void;
 }
-
-interface SidebarMenuItem {
-  id: string;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  path: string;
-  permissionKey?: ScreenPermissionKey;
-  /** Visible uniquement pour les administrateurs (en plus de la permission). */
-  adminOnly?: boolean;
-  children?: SidebarMenuItem[];
-}
-
-interface MenuGroup {
-  label?: string;
-  items: SidebarMenuItem[];
-}
-
-const menuGroups: MenuGroup[] = [
-  {
-    label: 'MON ESPACE',
-    items: [
-      { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard, path: '/', permissionKey: 'can_access_dashboard' },
-      { id: 'requests', label: 'Demandes', icon: FileText, path: '/requests', permissionKey: 'can_access_requests' },
-    ],
-  },
-  {
-    label: 'ÉQUIPE',
-    items: [
-      { id: 'workload', label: 'Plan de charge équipe', icon: CalendarClock, path: '/workload', permissionKey: 'can_access_workload' },
-    ],
-  },
-  {
-    label: 'BUREAU D\'ÉTUDES',
-    items: [
-      { id: 'projects', label: 'Projets', icon: FolderOpen, path: '/projects', permissionKey: 'can_access_projects' },
-      { id: 'be-dispatch', label: 'Dispatch & Suivi', icon: Users, path: '/be/dispatch', permissionKey: 'can_access_be_dispatch' },
-      { id: 'be-planning', label: 'Plan de charge', icon: BarChart2, path: '/be/plan-de-charge', permissionKey: 'can_access_be_dispatch' },
-      { id: 'be-budget', label: 'Budget', icon: Wallet, path: '/be/budget', permissionKey: 'can_access_be_budget' },
-      { id: 'be-admin-tjm', label: 'Référentiel TJM', icon: Euro, path: '/be/admin/tjm', permissionKey: 'can_access_be_tjm', adminOnly: true },
-    ],
-  },
-  {
-    label: 'SPV',
-    items: [
-      { id: 'spv', label: 'Projets SPV', icon: Leaf, path: '/spv', permissionKey: 'can_access_spv' },
-      { id: 'spv-budget', label: 'Budget & temps', icon: Wallet, path: '/spv/budget', permissionKey: 'can_access_spv' },
-    ],
-  },
-  {
-    label: 'IT / DIGITAL',
-    items: [
-      { id: 'it-dispatch', label: 'Demandes IT', icon: ClipboardList, path: '/it/dispatch', permissionKey: 'can_access_it_dispatch' },
-      { id: 'it-projects', label: 'Projets', icon: Monitor, path: '/it/projects', permissionKey: 'can_access_it_projects' },
-      { id: 'it-budget', label: 'Budget', icon: Euro, path: '/it/budget', permissionKey: 'can_access_it_budget' },
-      { id: 'it-cartographie', label: 'Cartographie', icon: MapIcon, path: '/it/cartographie', permissionKey: 'can_access_it_cartographie' },
-      { id: 'it-feuille-de-route', label: 'Feuille de route', icon: CalendarClock, path: '/it/feuille-de-route', permissionKey: 'can_access_it_projects' },
-      { id: 'it-plan-de-charge', label: 'Plan de charge', icon: BarChart2, path: '/it/plan-de-charge', permissionKey: 'can_access_it_projects' },
-      { id: 'it-admin-fdr', label: 'Params FDR', icon: Settings2, path: '/it/admin/fdr', permissionKey: 'can_access_it_projects' },
-    ],
-  },
-  {
-    label: 'INNOVATION',
-    items: [
-      { id: 'innovation', label: 'Projets INNO', icon: Lightbulb, path: '/innovation/requests', permissionKey: 'can_access_innovation' },
-    ],
-  },
-  {
-    label: 'MAINTENANCE',
-    items: [
-      { id: 'maintenance-dispatch', label: 'Demandes matériel', icon: Package, path: '/maintenance/dispatch', permissionKey: 'can_access_maintenance' },
-    ],
-  },
-  {
-    label: 'RH',
-    items: [
-      { id: 'rh-dispatch', label: 'Mouvements collaborateurs', icon: UserPlus, path: '/rh/dispatch', permissionKey: 'can_access_rh' },
-    ],
-  },
-  {
-    label: 'CLIENTS',
-    items: [
-      { id: 'client-dispatch', label: 'Création client', icon: UserPlus, path: '/client/dispatch', permissionKey: 'can_access_client' },
-    ],
-  },
-  {
-    label: 'LOGISTIQUE',
-    items: [
-      { id: 'logistique-dispatch', label: 'Transports', icon: Truck, path: '/logistique/dispatch', permissionKey: 'can_access_logistique' },
-    ],
-  },
-  {
-    label: 'ACHATS',
-    items: [
-      { id: 'suppliers', label: 'Fournisseurs', icon: Building2, path: '/suppliers', permissionKey: 'can_access_suppliers' },
-    ],
-  },
-  {
-    label: 'QUALITÉ (SMQ)',
-    items: [
-      { id: 'smq', label: 'Non-conformités', icon: ShieldAlert, path: '/smq', permissionKey: 'can_access_smq' },
-      { id: 'sst', label: 'Situations à risque', icon: AlertTriangle, path: '/sst', permissionKey: 'can_access_sst' },
-    ],
-  },
-  {
-    label: 'CONFIGURATION',
-    items: [
-      { id: 'templates', label: 'Modèles', icon: Workflow, path: '/templates', permissionKey: 'can_access_templates' },
-    ],
-  },
-  {
-    label: 'OUTILS',
-    items: [
-      { id: 'calendar', label: 'Calendrier', icon: Calendar, path: '/calendar', permissionKey: 'can_access_calendar' },
-      { id: 'chat', label: 'Messages', icon: MessageCircle, path: '/chat', permissionKey: 'can_access_dashboard' },
-    ],
-  },
-];
-
-const adminMenuItem = {
-  id: 'admin',
-  label: 'Administration',
-  icon: ShieldCheck,
-  path: '/admin',
-};
-
-// ─── Section accent colors (1 couleur par section, sobre) ────────────────────
-const SECTION_COLORS: Record<string, string> = {
-  'MON ESPACE':      '#3b82f6', // blue-500
-  'ÉQUIPE':          '#8b5cf6', // violet-500
-  'BUREAU D\'ÉTUDES':'#10b981', // emerald-500
-  'SPV':             '#059669', // emerald-600
-  'IT / DIGITAL':    '#0ea5e9', // sky-500
-  'INNOVATION':      '#f59e0b', // amber-500
-  'MAINTENANCE':     '#ef4444', // red-500
-  'RH':              '#ec4899', // pink-500
-  'CLIENTS':         '#06b6d4', // cyan-500
-  'LOGISTIQUE':      '#06b6d4', // cyan-500
-  'ACHATS':          '#f97316', // orange-500
-  'CONFIGURATION':   '#64748b', // slate-500
-  'OUTILS':          '#a855f7', // purple-500
-};
-
-const getSectionColor = (label?: string) => SECTION_COLORS[label ?? ''] ?? '#64748b';
 
 // ─── Nav row ─────────────────────────────────────────────────────────────────
 type SidebarNavRowProps = {
@@ -331,7 +187,10 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
   useEffect(() => {
     const updateDevice = () => {
       const w = window.innerWidth;
-      setCurrentDevice(w < 640 ? 'mobile' : w < 1024 ? 'tablet' : 'desktop');
+      // Le seuil 'mobile' est aligné sur celui du drawer (useIsMobile) : tant que
+      // le drawer mobile est affiché, c'est la colonne « Téléphone » qui pilote la
+      // visibilité des écrans. Au-delà (sidebar desktop) : tablette puis bureau.
+      setCurrentDevice(w < MOBILE_BREAKPOINT ? 'mobile' : w < 1024 ? 'tablet' : 'desktop');
     };
     updateDevice();
     window.addEventListener('resize', updateDevice);
@@ -360,10 +219,14 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
       }))
       .filter((group) => group.items.length > 0);
 
-    if (isAdmin && isPageVisibleOnDevice('admin', currentDevice)) {
+    // L'accès Admin est gardé par `isAdmin` (la vraie barrière de sécurité) et
+    // reste volontairement indépendant de la visibilité par appareil : un admin
+    // doit toujours pouvoir l'atteindre, y compris sur mobile (sinon lockout —
+    // impossible de rouvrir le panneau admin depuis un téléphone).
+    if (isAdmin) {
       const configGroup = groups.find((g) => g.label === 'CONFIGURATION');
-      if (configGroup) configGroup.items.push(adminMenuItem as any);
-      else groups.push({ label: 'CONFIGURATION', items: [adminMenuItem as any] });
+      if (configGroup) configGroup.items.push(adminMenuItem);
+      else groups.push({ label: 'CONFIGURATION', items: [adminMenuItem] });
     }
 
     return groups;
