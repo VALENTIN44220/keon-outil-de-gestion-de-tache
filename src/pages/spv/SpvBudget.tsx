@@ -27,7 +27,7 @@ import {
 import {
   ListChecks, Coins, Users, ChevronRight, ChevronDown, Search, Leaf,
   Receipt, ReceiptText, TrendingUp, TrendingDown, Plus, Trash2, Wallet, Clock,
-  FileText, CalendarDays, FilePen,
+  FileText, CalendarDays, FilePen, Gauge,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -41,6 +41,15 @@ const eur = (n: number) =>
   (Number(n) || 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
 const num = (n: number, frac = 1) =>
   (Number(n) || 0).toLocaleString('fr-FR', { minimumFractionDigits: frac, maximumFractionDigits: frac });
+
+/** Taux de consommation = COGS constaté / budget (null si pas de budget). */
+const tauxConso = (cogs: number, budget: number): number | null =>
+  budget > 0 ? (Number(cogs) || 0) / budget * 100 : null;
+const consoColor = (pct: number | null): string =>
+  pct == null ? 'text-muted-foreground'
+    : pct > 100 ? 'text-red-600 font-semibold'
+    : pct > 80 ? 'text-amber-600 font-semibold'
+    : 'text-emerald-700';
 
 function KpiCard({ icon: Icon, label, value, color, hint }: { icon: any; label: string; value: string; color: string; hint?: string }) {
   return (
@@ -434,14 +443,24 @@ export default function SpvBudget() {
             </div>
 
             {/* KPI globaux */}
-            <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
-              <KpiCard icon={ListChecks} label="Affaires M" value={String(affaires.length)} color="bg-emerald-100 text-emerald-700" />
-              <KpiCard icon={Receipt} label="CA constaté" value={eur(totals.ca)} color="bg-blue-100 text-blue-700" />
-              <KpiCard icon={ReceiptText} label="COGS constaté" value={eur(totals.cogs)} color="bg-orange-100 text-orange-700" />
-              <KpiCard icon={TrendingUp} label="Marge brute" value={eur(totals.marge)} color="bg-violet-100 text-violet-700" />
-              <KpiCard icon={Coins} label="Coût RH" value={eur(totals.cout_rh)} color="bg-amber-100 text-amber-700" />
-              <KpiCard icon={TrendingDown} label="Marge directe" value={eur(totals.marge_directe)} color={totals.marge_directe >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'} />
-            </div>
+            {(() => {
+              const consoGlobal = tauxConso(totals.cogs, totals.budget);
+              return (
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <KpiCard icon={ListChecks} label="Affaires M" value={String(affaires.length)} color="bg-emerald-100 text-emerald-700" />
+                  <KpiCard icon={Receipt} label="CA constaté" value={eur(totals.ca)} color="bg-blue-100 text-blue-700" />
+                  <KpiCard icon={ReceiptText} label="COGS constaté" value={eur(totals.cogs)} color="bg-orange-100 text-orange-700" />
+                  <KpiCard icon={TrendingUp} label="Marge brute" value={eur(totals.marge)} color="bg-violet-100 text-violet-700" />
+                  <KpiCard icon={Coins} label="Coût RH" value={eur(totals.cout_rh)} color="bg-amber-100 text-amber-700" />
+                  <KpiCard icon={TrendingDown} label="Marge directe" value={eur(totals.marge_directe)} color={totals.marge_directe >= 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'} />
+                  <KpiCard icon={Wallet} label="Budget" value={eur(totals.budget)} color="bg-slate-100 text-slate-700" />
+                  <KpiCard icon={Gauge} label="Conso budget"
+                    value={consoGlobal == null ? '—' : `${num(consoGlobal, 0)}%`}
+                    color="bg-cyan-100 text-cyan-700"
+                    hint={totals.budget > 0 ? `COGS constaté / budget${totals.cogs > totals.budget ? ` · dépassement ${eur(totals.cogs - totals.budget)}` : ''}` : 'aucun budget saisi'} />
+                </div>
+              );
+            })()}
 
             <div className="relative max-w-xs">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -459,16 +478,17 @@ export default function SpvBudget() {
                     <TableHead className="h-9 text-xs text-right">Marge brute</TableHead>
                     <TableHead className="h-9 text-xs text-right">Coût RH</TableHead>
                     <TableHead className="h-9 text-xs text-right">Marge directe</TableHead>
+                    <TableHead className="h-9 text-xs text-right">Conso</TableHead>
                     <TableHead className="h-9 text-xs text-right">Jours</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
                     Array.from({ length: 6 }).map((_, i) => (
-                      <TableRow key={i}><TableCell colSpan={8} className="py-2"><Skeleton className="h-6 w-full" /></TableCell></TableRow>
+                      <TableRow key={i}><TableCell colSpan={9} className="py-2"><Skeleton className="h-6 w-full" /></TableCell></TableRow>
                     ))
                   ) : filtered.length === 0 ? (
-                    <TableRow><TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">Aucune affaire SPV (M).</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">Aucune affaire SPV (M).</TableCell></TableRow>
                   ) : (
                     filtered.map((a: SpvAffaireBudgetKpi) => {
                       const isOpen = expanded === a.spv_affaire_id;
@@ -489,11 +509,15 @@ export default function SpvBudget() {
                             <TableCell className={cn('py-1.5 text-right text-sm tabular-nums font-medium', Number(a.marge_directe) < 0 ? 'text-red-600' : 'text-emerald-700')}>
                               {eur(a.marge_directe)}
                             </TableCell>
+                            <TableCell className={cn('py-1.5 text-right text-sm tabular-nums', consoColor(tauxConso(Number(a.cogs_constate_brut), Number(a.budget_total))))}
+                              title={Number(a.budget_total) > 0 ? `COGS constaté ${eur(a.cogs_constate_brut)} / budget ${eur(a.budget_total)}` : 'Aucun budget saisi'}>
+                              {(() => { const p = tauxConso(Number(a.cogs_constate_brut), Number(a.budget_total)); return p == null ? '—' : `${num(p, 0)}%`; })()}
+                            </TableCell>
                             <TableCell className="py-1.5 text-right text-sm tabular-nums">{num(a.jours_declares)}</TableCell>
                           </TableRow>
                           {isOpen && (
                             <TableRow className="hover:bg-transparent">
-                              <TableCell colSpan={8} className="p-0">
+                              <TableCell colSpan={9} className="p-0">
                                 <div className="bg-muted/30 p-3 space-y-3">
                                   {/* sous-onglets */}
                                   <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5 w-fit flex-wrap">
