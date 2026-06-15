@@ -37,8 +37,9 @@ import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import {
   IT_PHASE_BADGE_CONFIG, ITProjectPhase, getActivePhases,
-  STATUT_FDR_CONFIG, FDR_ETAPES, StatutFDR, ITProjectFDRValidation,
+  FDR_ETAPES, ITProjectFDRValidation, FDR_ANNEE_OPTIONS, FDR_ETAT_CONFIG, type FdrEtat,
 } from '@/types/itProject';
+import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -103,12 +104,12 @@ export default function ITProjectHubGovernance() {
   }
 
   const currentPhaseIndex = activePhases.findIndex(p => p.value === project.phase_courante);
-  const statutFdr = (project.statut_fdr as StatutFDR) || null;
-  const fdrConfig = statutFdr ? STATUT_FDR_CONFIG[statutFdr] : null;
+  const fdrAnnee = project.fdr_annee || 'AUCUNE';
+  const fdrEtat = (project.fdr_etat as FdrEtat) || 'non_soumis';
 
-  const handleFdrStatutChange = async (value: string) => {
+  const updateFdr = async (patch: Record<string, any>) => {
     setSavingFdrStatut(true);
-    const { error } = await supabase.from('it_projects').update({ statut_fdr: value }).eq('id', project.id);
+    const { error } = await supabase.from('it_projects').update(patch as any).eq('id', project.id);
     setSavingFdrStatut(false);
     if (error) { toast.error('Erreur'); return; }
     toast.success('Statut FDR mis à jour');
@@ -161,43 +162,40 @@ export default function ITProjectHubGovernance() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {statutFdr === 'fdr_2027' && (
+                {fdrEtat === 'validee' && fdrAnnee !== 'AUCUNE' && (
                   <div className="rounded-lg bg-emerald-100 border border-emerald-300 text-emerald-800 px-4 py-2 text-sm font-medium">
-                    ✅ Projet validé et intégré à la Feuille de Route 2027
-                  </div>
-                )}
-                {statutFdr === 'fdr_2030' && (
-                  <div className="rounded-lg bg-emerald-100 border border-emerald-300 text-emerald-800 px-4 py-2 text-sm font-medium">
-                    ✅ Projet validé et intégré à la Feuille de Route 2030
-                  </div>
-                )}
-                {statutFdr === 'abandonne' && (
-                  <div className="rounded-lg bg-red-100 border border-red-300 text-red-800 px-4 py-2 text-sm font-medium">
-                    ❌ Projet abandonné
-                  </div>
-                )}
-                {statutFdr === 'stand_by' && (
-                  <div className="rounded-lg bg-amber-100 border border-amber-300 text-amber-800 px-4 py-2 text-sm font-medium">
-                    ⏸️ Projet mis en stand-by
+                    ✅ Projet validé et intégré à la Feuille de Route {fdrAnnee}
                   </div>
                 )}
 
-                <div className="flex items-center gap-3 flex-wrap">
-                  <span className="text-xs font-medium text-muted-foreground">Statut FDR :</span>
-                  <Select value={statutFdr || 'non_soumis'} onValueChange={handleFdrStatutChange} disabled={savingFdrStatut}>
-                    <SelectTrigger className="h-8 text-xs w-[260px]"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {(Object.entries(STATUT_FDR_CONFIG) as [StatutFDR, typeof STATUT_FDR_CONFIG['non_soumis']][]).map(([key, cfg]) => (
-                        <SelectItem key={key} value={key}>
-                          <span className="flex items-center gap-2"><span>{cfg.icon}</span><span>{cfg.label}</span></span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {fdrConfig && (
-                    <Badge className={cn(fdrConfig.className, 'border text-[10px]')}>
-                      {fdrConfig.icon} {fdrConfig.label}
-                    </Badge>
+                <div className="flex items-end gap-3 flex-wrap">
+                  <div className="space-y-1">
+                    <span className="text-xs font-medium text-muted-foreground">Année FDR</span>
+                    <Select value={fdrAnnee} onValueChange={(v) => updateFdr({ fdr_annee: v === 'AUCUNE' ? null : v, ...(v === 'AUCUNE' ? { fdr_etat: 'non_soumis' } : {}) })} disabled={savingFdrStatut}>
+                      <SelectTrigger className="h-8 text-xs w-[130px]"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="AUCUNE">Aucune</SelectItem>
+                        {FDR_ANNEE_OPTIONS.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-xs font-medium text-muted-foreground">État FDR</span>
+                    <Select value={fdrAnnee === 'AUCUNE' ? 'non_soumis' : fdrEtat} onValueChange={(v) => updateFdr({ fdr_etat: v })} disabled={savingFdrStatut || fdrAnnee === 'AUCUNE'}>
+                      <SelectTrigger className="h-8 text-xs w-[150px]"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {(Object.entries(FDR_ETAT_CONFIG) as [FdrEtat, typeof FDR_ETAT_CONFIG['non_soumis']][]).map(([k, cfg]) => (
+                          <SelectItem key={k} value={k}>{cfg.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-2 pb-1.5">
+                    <Switch checked={project.sur_feuille_de_route ?? true} onCheckedChange={(c) => updateFdr({ sur_feuille_de_route: c })} disabled={savingFdrStatut} />
+                    <span className="text-xs font-medium text-muted-foreground">Inclus PDR</span>
+                  </div>
+                  {fdrAnnee !== 'AUCUNE' && FDR_ETAT_CONFIG[fdrEtat] && (
+                    <Badge className={cn(FDR_ETAT_CONFIG[fdrEtat].className, 'border text-[10px] mb-1.5')}>{fdrAnnee} · {FDR_ETAT_CONFIG[fdrEtat].label}</Badge>
                   )}
                 </div>
 

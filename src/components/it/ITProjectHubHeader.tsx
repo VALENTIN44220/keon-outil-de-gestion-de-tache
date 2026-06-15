@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import { ITProject, IT_PROJECT_PRIORITY_CONFIG, IT_PROJECT_PILIER_CONFIG, ITProjectPilier, STATUT_FDR_CONFIG, StatutFDR } from '@/types/itProject';
+import { ITProject, IT_PROJECT_PRIORITY_CONFIG, IT_PROJECT_PILIER_CONFIG, ITProjectPilier, FDR_ETAT_CONFIG, type FdrEtat } from '@/types/itProject';
 import { STATUT_PORTEFEUILLE_CONFIG, type StatutPortefeuille } from '@/types/fdr';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -33,7 +33,7 @@ export function ITProjectHubHeader({ project, stats, onEditProject }: ITProjectH
   const statusConfig = STATUT_PORTEFEUILLE_CONFIG[(project.statut_portefeuille as StatutPortefeuille) ?? 'Idée'] || STATUT_PORTEFEUILLE_CONFIG['Idée'];
   const priorityConfig = project.priorite ? IT_PROJECT_PRIORITY_CONFIG[project.priorite] : null;
   const pilierConfig = project.pilier ? IT_PROJECT_PILIER_CONFIG[project.pilier as ITProjectPilier] : null;
-  const fdrConfig = project.statut_fdr ? STATUT_FDR_CONFIG[project.statut_fdr as StatutFDR] : null;
+  const fdrEtatCfg = project.fdr_annee ? FDR_ETAT_CONFIG[(project.fdr_etat as FdrEtat) || 'non_soumis'] : null;
 
   return (
     <div className="space-y-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -65,9 +65,9 @@ export function ITProjectHubHeader({ project, stats, onEditProject }: ITProjectH
                     {project.pilier} — {pilierConfig.label}
                   </Badge>
                 )}
-                {fdrConfig && (
-                  <Badge className={cn(fdrConfig.className, 'border')}>
-                    {fdrConfig.icon} {fdrConfig.label}
+                {fdrEtatCfg && (
+                  <Badge className={cn(fdrEtatCfg.className, 'border')}>
+                    FDR {project.fdr_annee} · {fdrEtatCfg.label}
                   </Badge>
                 )}
               </div>

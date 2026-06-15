@@ -36,7 +36,7 @@ import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import {
   IT_PROJECT_TYPE_CONFIG, IT_PHASE_BADGE_CONFIG, ITProjectPhase, getActivePhases,
-  STATUT_FDR_CONFIG, FDR_ETAPES, StatutFDR, ITProjectFDRValidation,
+  FDR_ETAPES, ITProjectFDRValidation,
   IT_PROJECT_PILIER_CONFIG,
 } from '@/types/itProject';
 import { STATUT_PORTEFEUILLE_CONFIG, type StatutPortefeuille, type FdrProjectInput } from '@/types/fdr';
@@ -173,8 +173,6 @@ export default function ITProjectHubOverview() {
   const currentPhaseProgress = currentPhase ? phaseProgressValues[currentPhase.value] ?? 0 : 0;
   const phaseBadge = currentPhase ? IT_PHASE_BADGE_CONFIG[currentPhase.value as ITProjectPhase] : null;
   const typeConfig = project.type_projet ? IT_PROJECT_TYPE_CONFIG[project.type_projet] : null;
-  const statutFdr = (project.statut_fdr as StatutFDR) || null;
-  const fdrConfig = statutFdr ? STATUT_FDR_CONFIG[statutFdr] : null;
   const statutPf = (project.statut_portefeuille as StatutPortefeuille) || null;
   const statutPfConfig = statutPf ? STATUT_PORTEFEUILLE_CONFIG[statutPf] : null;
   const pilierConfig = project.pilier ? IT_PROJECT_PILIER_CONFIG[project.pilier as keyof typeof IT_PROJECT_PILIER_CONFIG] : null;

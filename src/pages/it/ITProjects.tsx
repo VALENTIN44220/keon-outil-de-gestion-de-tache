@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useITProjects } from '@/hooks/useITProjects';
-import { ITProject, ITProjectStatus, ITProjectPilier, IT_PROJECT_TYPE_CONFIG, IT_PROJECT_PHASES, IT_PROJECT_PILIER_CONFIG, STATUT_FDR_CONFIG, StatutFDR, ITProjectPhase } from '@/types/itProject';
+import { ITProject, ITProjectStatus, ITProjectPilier, IT_PROJECT_TYPE_CONFIG, IT_PROJECT_PHASES, IT_PROJECT_PILIER_CONFIG, FDR_ANNEE_OPTIONS, FDR_ETAT_CONFIG, type FdrEtat, ITProjectPhase } from '@/types/itProject';
 import { STATUT_PORTEFEUILLE_CONFIG, type StatutPortefeuille } from '@/types/fdr';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
@@ -51,7 +51,8 @@ interface Filters {
   progress: ProgressFilter;
   pilier: string;
   search: string;
-  statutFdr: string;
+  fdrAnnee: string;
+  fdrEtat: string;
   phase: string;
 }
 
@@ -69,7 +70,8 @@ const DEFAULT_FILTERS: Filters = {
   progress: 'all',
   pilier: 'all',
   search: '',
-  statutFdr: 'all',
+  fdrAnnee: 'all',
+  fdrEtat: 'all',
   phase: 'all',
 };
 
@@ -79,7 +81,7 @@ const STANDARD_CONTEXT: FilterContext = {
   filters: {
     ...DEFAULT_FILTERS,
     statut: 'en_cours',
-    statutFdr: 'fdr_2027',
+    fdrAnnee: '2027',
   },
 };
 
@@ -205,7 +207,9 @@ export default function ITProjects() {
       'Avancement (%)': p.progress ?? 0,
       'Date fin prévue': p.date_fin_prevue ? format(new Date(p.date_fin_prevue), 'dd/MM/yyyy') : '',
       'Pilier': p.pilier ?? '',
-      'Statut FDR': p.statut_fdr ? (STATUT_FDR_CONFIG[p.statut_fdr as StatutFDR]?.label ?? p.statut_fdr) : '',
+      'Année FDR': p.fdr_annee ?? 'AUCUNE',
+      'État FDR': p.fdr_annee ? (FDR_ETAT_CONFIG[(p.fdr_etat as FdrEtat) || 'non_soumis']?.label ?? p.fdr_etat) : '',
+      'Inclus PDR': p.sur_feuille_de_route === false ? 'Non' : 'Oui',
       'Chef de projet IT': p.chef_projet_it?.display_name ?? '',
       'Société': p.company_id ? (companyMap.get(p.company_id) ?? '') : '',
       'Créé le': p.created_at ? format(new Date(p.created_at), 'dd/MM/yyyy') : '',
@@ -249,7 +253,8 @@ export default function ITProjects() {
       if (filters.responsableItId !== NONE && p.chef_projet_it_id !== filters.responsableItId) return false;
       if (filters.statut !== 'all' && (p.statut_portefeuille ?? 'Idée') !== filters.statut) return false;
       if (filters.pilier !== 'all' && p.pilier !== filters.pilier) return false;
-      if (filters.statutFdr !== 'all' && (p.statut_fdr || '') !== filters.statutFdr) return false;
+      if (filters.fdrAnnee !== 'all' && (p.fdr_annee || 'AUCUNE') !== filters.fdrAnnee) return false;
+      if (filters.fdrEtat !== 'all' && (p.fdr_etat || 'non_soumis') !== filters.fdrEtat) return false;
       if (filters.phase !== 'all' && (p.phase_courante || '') !== filters.phase) return false;
       // Progress
       const prog = p.progress || 0;
@@ -417,12 +422,20 @@ export default function ITProjects() {
                   ))}
                 </SelectContent>
               </Select>
-              <Select value={filters.statutFdr} onValueChange={v => setFilter('statutFdr', v)}>
-                <SelectTrigger className="h-8 text-xs w-[170px]"><SelectValue placeholder="Statut FDR" /></SelectTrigger>
+              <Select value={filters.fdrAnnee} onValueChange={v => setFilter('fdrAnnee', v)}>
+                <SelectTrigger className="h-8 text-xs w-[130px]"><SelectValue placeholder="Année FDR" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Tous statuts FDR</SelectItem>
-                  {(Object.entries(STATUT_FDR_CONFIG) as [StatutFDR, typeof STATUT_FDR_CONFIG['non_soumis']][]).map(([k, cfg]) => (
-                    <SelectItem key={k} value={k}>{cfg.icon} {cfg.label}</SelectItem>
+                  <SelectItem value="all">Toutes années FDR</SelectItem>
+                  <SelectItem value="AUCUNE">Aucune</SelectItem>
+                  {FDR_ANNEE_OPTIONS.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Select value={filters.fdrEtat} onValueChange={v => setFilter('fdrEtat', v)}>
+                <SelectTrigger className="h-8 text-xs w-[140px]"><SelectValue placeholder="État FDR" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous états FDR</SelectItem>
+                  {(Object.entries(FDR_ETAT_CONFIG) as [FdrEtat, typeof FDR_ETAT_CONFIG['non_soumis']][]).map(([k, cfg]) => (
+                    <SelectItem key={k} value={k}>{cfg.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -663,7 +676,6 @@ export default function ITProjects() {
                           const sc = STATUT_PORTEFEUILLE_CONFIG[(p.statut_portefeuille as StatutPortefeuille) ?? 'Idée'] || STATUT_PORTEFEUILLE_CONFIG['Idée'];
                           const tc = p.type_projet ? IT_PROJECT_TYPE_CONFIG[p.type_projet] : null;
                           const pc = p.pilier ? IT_PROJECT_PILIER_CONFIG[p.pilier as ITProjectPilier] : null;
-                          const fdrCfg = p.statut_fdr ? STATUT_FDR_CONFIG[p.statut_fdr as StatutFDR] : null;
                           const today = new Date(); today.setHours(0, 0, 0, 0);
                           const isLate = p.date_fin_prevue && !['Déployé', 'Abandonné'].includes(p.statut_portefeuille ?? '') && new Date(p.date_fin_prevue) < today;
                           return (
@@ -699,8 +711,15 @@ export default function ITProjects() {
                                 )}
                               </td>
                               <td className="px-3 py-2.5">
-                                {fdrCfg ? (
-                                  <Badge className={cn(fdrCfg.className, 'border text-[10px]')}>{fdrCfg.icon} {fdrCfg.label}</Badge>
+                                {p.fdr_annee ? (
+                                  <span className="flex items-center gap-1">
+                                    <Badge variant="outline" className="text-[10px]">{p.fdr_annee}</Badge>
+                                    {p.fdr_etat && FDR_ETAT_CONFIG[p.fdr_etat as FdrEtat] && (
+                                      <Badge className={cn(FDR_ETAT_CONFIG[p.fdr_etat as FdrEtat].className, 'border text-[10px]')}>
+                                        {FDR_ETAT_CONFIG[p.fdr_etat as FdrEtat].label}
+                                      </Badge>
+                                    )}
+                                  </span>
                                 ) : (
                                   <span className="text-xs text-muted-foreground">—</span>
                                 )}

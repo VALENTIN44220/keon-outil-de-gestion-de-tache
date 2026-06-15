@@ -52,6 +52,18 @@ export const STATUT_FDR_CONFIG: Record<StatutFDR, { label: string; className: st
   inclus_autre_projet: { label: 'Inclus dans un autre projet IT', icon: '🔗', className: 'bg-cyan-100 text-cyan-700 border-cyan-300' },
 };
 
+// ─── Statut FDR éclaté en 3 champs (remplace l'usage de statut_fdr) ──────────
+// Année FDR (AUCUNE = null) · État FDR · Inclus PDR (= it_projects.sur_feuille_de_route)
+export const FDR_ANNEE_OPTIONS = ['2026', '2027', '2030', '2035'] as const;
+export type FdrAnnee = typeof FDR_ANNEE_OPTIONS[number];
+
+export type FdrEtat = 'non_soumis' | 'soumis' | 'validee';
+export const FDR_ETAT_CONFIG: Record<FdrEtat, { label: string; className: string }> = {
+  non_soumis: { label: 'Non soumis', className: 'bg-slate-100 text-slate-600 border-slate-300' },
+  soumis:     { label: 'Soumis',     className: 'bg-blue-100 text-blue-700 border-blue-300' },
+  validee:    { label: 'Validée',    className: 'bg-emerald-100 text-emerald-700 border-emerald-300' },
+};
+
 export interface ITProjectFDRValidation {
   id: string;
   it_project_id: string;
@@ -124,7 +136,9 @@ export interface ITProject {
   created_by?: string | null;
 
   // FDR governance
-  statut_fdr?: StatutFDR | null;
+  statut_fdr?: StatutFDR | null;          // legacy (conservé, plus utilisé en UI)
+  fdr_annee?: FdrAnnee | string | null;   // Année FDR (null = AUCUNE)
+  fdr_etat?: FdrEtat | string | null;     // État FDR
   etape_validation_fdr?: number | null;
 
   // Sous-ensemble des phases standard activées pour ce projet.

@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { ITProject, ITProjectStatus, ITProjectType, ITProjectPriority, ITProjectPhase, IT_PROJECT_PHASES, ALL_IT_PROJECT_PHASES, IT_PROJECT_PILIER_CONFIG, STATUT_FDR_CONFIG, StatutFDR } from '@/types/itProject';
+import { ITProject, ITProjectStatus, ITProjectType, ITProjectPriority, ITProjectPhase, IT_PROJECT_PHASES, ALL_IT_PROJECT_PHASES, IT_PROJECT_PILIER_CONFIG, FDR_ANNEE_OPTIONS, FDR_ETAT_CONFIG, type FdrEtat } from '@/types/itProject';
 import { ACTIVITES_METIER, STATUT_PORTEFEUILLE_CONFIG, type StatutPortefeuille } from '@/types/fdr';
 import { useITProjects } from '@/hooks/useITProjects';
 import { useFdrProfils } from '@/hooks/useFdrSettings';
@@ -54,6 +54,8 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
 
   // FDR / Contexte
   const [statutFdr, setStatutFdr] = useState('__none__');
+  const [fdrAnnee, setFdrAnnee] = useState('AUCUNE');
+  const [fdrEtat, setFdrEtat] = useState<FdrEtat>('non_soumis');
   const [pilier, setPilier] = useState(NONE);
   const [fdrPriorite, setFdrPriorite] = useState('');
   const [fdrDescription, setFdrDescription] = useState('');
@@ -144,6 +146,8 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
       setDirecteurId(project.directeur_id || NONE);
       setPilier(project.pilier || NONE);
       setStatutFdr(project.statut_fdr || '__none__');
+      setFdrAnnee(project.fdr_annee || 'AUCUNE');
+      setFdrEtat((project.fdr_etat as FdrEtat) || 'non_soumis');
       setFdrPriorite(project.fdr_priorite || '');
       setFdrDescription(project.fdr_description || '');
       setFdrCommentaires(project.fdr_commentaires || '');
@@ -195,6 +199,8 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
     setDirecteurId(NONE);
     setPilier(NONE);
     setStatutFdr('__none__');
+    setFdrAnnee('AUCUNE');
+    setFdrEtat('non_soumis');
     setFdrPriorite('');
     setFdrDescription('');
     setFdrCommentaires('');
@@ -258,6 +264,8 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
       directeur_id: directeurId !== NONE ? directeurId : null,
       pilier: pilier !== NONE ? pilier : null,
       statut_fdr: statutFdr !== '__none__' ? statutFdr : null,
+      fdr_annee: fdrAnnee !== 'AUCUNE' ? fdrAnnee : null,
+      fdr_etat: fdrAnnee === 'AUCUNE' ? 'non_soumis' : fdrEtat,
       fdr_priorite: fdrPriorite || null,
       fdr_description: fdrDescription || null,
       fdr_commentaires: fdrCommentaires || null,
@@ -533,22 +541,35 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
 
           {/* FDR / Contexte tab */}
           <TabsContent value="fdr" className="space-y-4 pt-4">
-            <div className="space-y-2">
-              <Label className="flex items-center gap-1.5">📋 Statut Feuille de Route</Label>
-              <Select value={statutFdr} onValueChange={setStatutFdr}>
-                <SelectTrigger><SelectValue placeholder="Sélectionner un statut FDR" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">— Aucun —</SelectItem>
-                  {(Object.entries(STATUT_FDR_CONFIG) as [StatutFDR, typeof STATUT_FDR_CONFIG['non_soumis']][]).map(([key, cfg]) => (
-                    <SelectItem key={key} value={key}>
-                      <span className="flex items-center gap-2">
-                        <span>{cfg.icon}</span>
-                        <span>{cfg.label}</span>
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1.5">📅 Année FDR</Label>
+                <Select value={fdrAnnee} onValueChange={(v) => { setFdrAnnee(v); if (v === 'AUCUNE') setFdrEtat('non_soumis'); }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="AUCUNE">Aucune</SelectItem>
+                    {FDR_ANNEE_OPTIONS.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1.5">📋 État FDR</Label>
+                <Select value={fdrAnnee === 'AUCUNE' ? 'non_soumis' : fdrEtat} onValueChange={(v) => setFdrEtat(v as FdrEtat)} disabled={fdrAnnee === 'AUCUNE'}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {(Object.entries(FDR_ETAT_CONFIG) as [FdrEtat, typeof FDR_ETAT_CONFIG['non_soumis']][]).map(([k, cfg]) => (
+                      <SelectItem key={k} value={k}>{cfg.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div>
+                <Label className="text-sm">Inclus PDR</Label>
+                <p className="text-xs text-muted-foreground">Inclus dans le Plan de Route (feuille de route) — décocher pour exclure des calculs de charge</p>
+              </div>
+              <Switch checked={surFdr} onCheckedChange={setSurFdr} />
             </div>
             <div className="space-y-2">
               <Label className="flex items-center gap-1.5">🎯 Pilier stratégique</Label>
