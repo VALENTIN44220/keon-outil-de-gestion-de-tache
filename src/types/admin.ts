@@ -81,6 +81,8 @@ export interface PermissionProfile {
   qst_pilier_06_write: boolean;
   qst_pilier_07_read: boolean;
   qst_pilier_07_write: boolean;
+  /** Autorise la modification des données des projets SPV (questionnaire projet). */
+  can_edit_spv_data: boolean;
   created_at: string;
   updated_at: string;
 }

@@ -112,6 +112,12 @@ const FEATURE_GROUPS: Array<{
     ],
   },
   {
+    label: "Projets SPV",
+    items: [
+      { key: "can_edit_spv_data", label: "Modifier les données (questionnaire projet)" },
+    ],
+  },
+  {
     label: "Fournisseurs",
     items: [
       { key: "can_view_suppliers", label: "Voir" },
@@ -179,6 +185,7 @@ const DEFAULT_PERMISSIONS: Record<string, boolean> = {
   can_access_be_tjm: false,
   // SPV
   can_access_spv: true,
+  can_edit_spv_data: false,
   // IT
   can_access_it_dispatch: true,
   can_access_it_projects: false,

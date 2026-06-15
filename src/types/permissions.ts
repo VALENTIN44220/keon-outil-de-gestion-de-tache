@@ -132,6 +132,8 @@ export const FEATURE_PERMISSIONS = [
   // Modules avec gestion (dispatch / modification)
   'can_manage_logistique',
   'can_manage_maintenance',
+  // SPV — édition des données (questionnaire projet)
+  'can_edit_spv_data',
 ] as const;
 
 export type FeaturePermissionKey = typeof FEATURE_PERMISSIONS[number];
@@ -207,6 +209,7 @@ export interface UserPermissionOverride {
   can_manage_smq: boolean | null;
   can_manage_logistique: boolean | null;
   can_manage_maintenance: boolean | null;
+  can_edit_spv_data: boolean | null;
   // Transverse
   can_access_suppliers: boolean | null;
   can_access_templates: boolean | null;
@@ -277,6 +280,7 @@ export interface EffectivePermissions {
   can_manage_smq: boolean;
   can_manage_logistique: boolean;
   can_manage_maintenance: boolean;
+  can_edit_spv_data: boolean;
   // Transverse
   can_access_suppliers: boolean;
   can_access_templates: boolean;

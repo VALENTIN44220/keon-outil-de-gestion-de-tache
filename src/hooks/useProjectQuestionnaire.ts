@@ -23,7 +23,7 @@ export function useProjectQuestionnaire(projectId: string, codeDivalto: string) 
   const { user, profile } = useAuth();
   const { isAdmin } = useUserRole();
   const { isSimulating, simulatedProfile } = useSimulation();
-  const { permissionProfile } = usePermissionsContext();
+  const { permissionProfile, effectivePermissions } = usePermissionsContext();
   const [answers, setAnswers] = useState<AnswersMap>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -39,12 +39,15 @@ export function useProjectQuestionnaire(projectId: string, codeDivalto: string) 
     return questionnairePermissionProfile[`qst_pilier_${pilierCode}_read`] === true;
   }, [activeProfile, isEffectivelyAdmin, questionnairePermissionProfile]);
 
-  const canWritePilier = useCallback((pilierCode: PilierCode): boolean => {
+  // L'édition des données SPV est pilotée par une permission unique
+  // (`can_edit_spv_data`), exposée comme case à cocher dans Droits & Accès
+  // (niveau profil, surchargeable par utilisateur). On lit les permissions
+  // effectives (profil + surcharge). La granularité par pilier
+  // (`qst_pilier_*_write`) n'est plus utilisée pour l'écriture.
+  const canWritePilier = useCallback((_pilierCode: PilierCode): boolean => {
     if (isEffectivelyAdmin) return true;
-    if (!activeProfile?.permission_profile_id) return false;
-    if (!questionnairePermissionProfile) return false;
-    return questionnairePermissionProfile[`qst_pilier_${pilierCode}_write`] === true;
-  }, [activeProfile, isEffectivelyAdmin, questionnairePermissionProfile]);
+    return effectivePermissions.can_edit_spv_data === true;
+  }, [isEffectivelyAdmin, effectivePermissions]);
 
   /**
    * Charge les réponses pour un pilier depuis project_field_values,
