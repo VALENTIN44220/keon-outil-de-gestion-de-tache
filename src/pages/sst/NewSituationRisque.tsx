@@ -96,12 +96,12 @@ export default function NewSituationRisque() {
                   <Label>Date de l'événement *</Label>
                   <Input type="date" value={v.date_evenement ?? ''} onChange={(e) => set('date_evenement', e.target.value)} disabled={isSubmitting} />
                 </div>
-                <Choice k="type_situation" label="Type de situation" options={SST_TYPES} req />
-                <Txt k="titre" label="Titre" />
-                <Choice k="societe" label="Société" options={SST_SOCIETES} />
-                <Choice k="service" label="Service" options={SST_SERVICES} />
-                <Txt k="projet" label="Projet" />
-                <Choice k="lieu_environnement" label="Lieu / environnement" options={SST_LIEUX} />
+                {Choice({ k: 'type_situation', label: 'Type de situation', options: SST_TYPES, req: true })}
+                {Txt({ k: 'titre', label: 'Titre' })}
+                {Choice({ k: 'societe', label: 'Société', options: SST_SOCIETES })}
+                {Choice({ k: 'service', label: 'Service', options: SST_SERVICES })}
+                {Txt({ k: 'projet', label: 'Projet' })}
+                {Choice({ k: 'lieu_environnement', label: 'Lieu / environnement', options: SST_LIEUX })}
               </div>
 
               <div>
@@ -123,7 +123,7 @@ export default function NewSituationRisque() {
                       placeholder="Collaborateur…" searchPlaceholder="Rechercher…" options={profileOptions}
                     />
                   </div>
-                  <Txt k="victime_externe" label="Victime (externe)" />
+                  {Txt({ k: 'victime_externe', label: 'Victime (externe)' })}
                   <div>
                     <Label>Témoin</Label>
                     <SearchableSelect
@@ -141,8 +141,8 @@ export default function NewSituationRisque() {
                   <Textarea rows={2} value={v.action ?? ''} onChange={(e) => set('action', e.target.value)} disabled={isSubmitting} />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <Choice k="arbre_causes" label="Arbre des causes" options={SST_ARBRE_CAUSES} />
-                  <Choice k="etat_avancement" label="État d'avancement" options={SST_ETATS} />
+                  {Choice({ k: 'arbre_causes', label: 'Arbre des causes', options: SST_ARBRE_CAUSES })}
+                  {Choice({ k: 'etat_avancement', label: 'État d\'avancement', options: SST_ETATS })}
                 </div>
                 <div>
                   <Label>Validation CODIR</Label>

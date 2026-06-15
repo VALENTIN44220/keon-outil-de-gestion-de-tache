@@ -283,6 +283,9 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
       pct_reduction_si_externe: (parseFloat(pctReduction) || 0) / 100,
       sur_feuille_de_route: surFdr,
       pct_avancement: parseFloat(pctAvancement) || 0,
+      // `progress` est la colonne affichée dans la liste/KPI : on la garde
+      // synchronisée avec la saisie manuelle (aucun trigger ne la calcule).
+      progress: parseFloat(pctAvancement) || 0,
     };
 
     let savedId: string | undefined;
