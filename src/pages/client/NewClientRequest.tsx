@@ -113,8 +113,8 @@ export default function NewClientRequest() {
 
             <Card><CardContent className="pt-6 space-y-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Txt k="nom_client" label="Raison sociale du client" req />
-                <Txt k="code_site" label="Code site" req />
+                {Txt({ k: 'nom_client', label: 'Raison sociale du client', req: true })}
+                {Txt({ k: 'code_site', label: 'Code site', req: true })}
                 <div>
                   <Label>Origine *</Label>
                   <Select value={v.origine ?? ''} onValueChange={(val) => set('origine', val)} disabled={isSubmitting}>
@@ -129,11 +129,11 @@ export default function NewClientRequest() {
                     <SelectContent>{PARC_OPTIONS.map(o => <SelectItem key={o.v} value={o.v}>{o.label}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
-                <Txt k="siret" label="N° SIRET du siège" />
-                <Txt k="tva" label="N° TVA" />
-                <Txt k="naf" label="NAF du siège" />
-                <Txt k="contact_facturation" label="Contact facturation" />
-                <Txt k="devise" label="Devise (si ≠ EUR)" />
+                {Txt({ k: 'siret', label: 'N° SIRET du siège' })}
+                {Txt({ k: 'tva', label: 'N° TVA' })}
+                {Txt({ k: 'naf', label: 'NAF du siège' })}
+                {Txt({ k: 'contact_facturation', label: 'Contact facturation' })}
+                {Txt({ k: 'devise', label: 'Devise (si ≠ EUR)' })}
                 <div>
                   <Label>Commercial</Label>
                   <Select value={v.commercial ?? ''} onValueChange={(val) => set('commercial', val)} disabled={isSubmitting}>
@@ -148,7 +148,7 @@ export default function NewClientRequest() {
                     <SelectContent><SelectItem value="Oui">Oui</SelectItem><SelectItem value="Non">Non</SelectItem></SelectContent>
                   </Select>
                 </div>
-                <Txt k="code_prospect" label="Code prospect" />
+                {Txt({ k: 'code_prospect', label: 'Code prospect' })}
               </div>
 
               <div>
