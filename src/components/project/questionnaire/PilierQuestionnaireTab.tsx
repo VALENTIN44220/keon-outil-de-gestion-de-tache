@@ -22,9 +22,12 @@ import { Save, Info, Lock, Plus, GripVertical } from 'lucide-react';
 import { OPTIONS_EVALUATION_RISQUE, type PilierCode } from '@/config/questionnaireConfig';
 import { useProjectQuestionnaire, type AnswersMap } from '@/hooks/useProjectQuestionnaire';
 import { useQuestionnaireFieldDefs, type FieldDefinition } from '@/hooks/useQuestionnaireFieldDefs';
-import { getCanonicalSectionGroups, useQuestionnaireSectionOrder } from '@/hooks/useQuestionnaireSectionOrder';
+import { buildOrderedSectionGroups, useDbSectionOrder } from '@/hooks/useQuestionnaireSectionOrder';
+import { useQuestionnaireSections, useQuestionnaireSousSections } from '@/hooks/useQuestionnaireSections';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserRole } from '@/hooks/useUserRole';
+import { usePermissionsContext } from '@/contexts/PermissionsContext';
 import { cn } from '@/lib/utils';
 import { AddCustomFieldDialog } from './AddCustomFieldDialog';
 import { TableInsertSpreadsheet } from './TableInsertSpreadsheet';
@@ -304,18 +307,27 @@ export function PilierQuestionnaireTab({
   pilierCode,
   readonly = false,
 }: PilierQuestionnaireTabProps) {
-  const { profile } = useAuth();
   const { answers, isLoading: isLoadingAnswers, isSaving, fetchAnswers, saveSectionAnswers, canWritePilier } =
     useProjectQuestionnaire(projectId, codeDivalto);
   const { data: fieldDefs = [], isLoading: isLoadingDefs } = useQuestionnaireFieldDefs(pilierCode);
+  const { data: sectionRows = [] } = useQuestionnaireSections(pilierCode);
+  const { data: sousSectionRows = [] } = useQuestionnaireSousSections(pilierCode);
+  const { isAdmin } = useUserRole();
+  const { effectivePermissions } = usePermissionsContext();
 
   const [localAnswers, setLocalAnswers] = useState<AnswersMap>({});
   const [dirtySection, setDirtySection] = useState<Set<string>>(new Set());
   const [addFieldCtx, setAddFieldCtx] = useState<AddFieldContext | null>(null);
 
   const canWrite = !readonly && canWritePilier(pilierCode);
-  const canonicalGroups = useMemo(() => getCanonicalSectionGroups(fieldDefs, pilierCode), [fieldDefs, pilierCode]);
-  const { orderedGroups, order, onDragEnd } = useQuestionnaireSectionOrder(profile?.id, projectId, pilierCode, canonicalGroups);
+  // Le réordonnancement des sections est GLOBAL (toutes les SPV) : réservé aux
+  // gestionnaires de questionnaire (admin OU can_manage_questionnaire).
+  const canReorder = !readonly && (isAdmin || effectivePermissions.can_manage_questionnaire === true);
+  const allGroups = useMemo(
+    () => buildOrderedSectionGroups(fieldDefs, sectionRows, sousSectionRows, pilierCode),
+    [fieldDefs, sectionRows, sousSectionRows, pilierCode],
+  );
+  const { orderedGroups, order, onDragEnd } = useDbSectionOrder(pilierCode, allGroups, sectionRows, canReorder);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -492,7 +504,7 @@ export function PilierQuestionnaireTab({
     );
   }
 
-  if (canonicalGroups.length === 0) {
+  if (orderedGroups.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-2">
         <p className="text-sm">Aucun champ défini pour ce pilier.</p>
@@ -512,16 +524,18 @@ export function PilierQuestionnaireTab({
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
         <Accordion type="multiple" defaultValue={[]} className="space-y-2">
           <SortableContext items={order} strategy={verticalListSortingStrategy}>
-            {orderedGroups.map(({ section, fields: sectionFields }) => {
+            {orderedGroups.map(({ section, fields: sectionFields, orderedSousSections }) => {
               const isDirty = dirtySection.has(section);
               const filledCount = sectionFields.filter(f => localAnswers[f.champ_id]?.valeur).length;
-              const sousSections = [...new Set(sectionFields.map(f => f.sous_section || ''))];
+              const sousSections = orderedSousSections.length > 0
+                ? orderedSousSections
+                : [...new Set(sectionFields.map(f => f.sous_section || ''))];
 
               return (
                 <SortableQuestionnaireSection
                   key={section}
                   section={section}
-                  draggable={canWrite}
+                  draggable={canReorder}
                   triggerSummary={
                     <>
                       <span className="font-semibold text-sm text-left flex-1 min-w-0">{section}</span>

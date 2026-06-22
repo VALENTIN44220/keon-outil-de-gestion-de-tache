@@ -83,6 +83,8 @@ export interface PermissionProfile {
   qst_pilier_07_write: boolean;
   /** Autorise la modification des données des projets SPV (questionnaire projet). */
   can_edit_spv_data: boolean;
+  /** Autorise la gestion de la structure des questionnaires (sections / sous-sections / champs). */
+  can_manage_questionnaire: boolean;
   created_at: string;
   updated_at: string;
 }

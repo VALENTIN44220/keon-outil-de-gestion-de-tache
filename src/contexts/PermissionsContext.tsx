@@ -51,6 +51,7 @@ const DEFAULT_PERMISSIONS: EffectivePermissions = {
   can_manage_logistique: false, // Dispatch logistique / admin uniquement
   can_manage_maintenance: false, // Dispatch maintenance / admin uniquement
   can_edit_spv_data: false,    // Édition questionnaire SPV : activé par profil
+  can_manage_questionnaire: false, // Gestion structure questionnaire : activé par profil
   // Transverse
   can_access_suppliers: false,
   can_access_templates: false,

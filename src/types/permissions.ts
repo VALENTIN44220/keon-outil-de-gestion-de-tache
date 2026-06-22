@@ -134,6 +134,8 @@ export const FEATURE_PERMISSIONS = [
   'can_manage_maintenance',
   // SPV — édition des données (questionnaire projet)
   'can_edit_spv_data',
+  // SPV — gestion de la structure des questionnaires (sections / champs)
+  'can_manage_questionnaire',
 ] as const;
 
 export type FeaturePermissionKey = typeof FEATURE_PERMISSIONS[number];
@@ -210,6 +212,7 @@ export interface UserPermissionOverride {
   can_manage_logistique: boolean | null;
   can_manage_maintenance: boolean | null;
   can_edit_spv_data: boolean | null;
+  can_manage_questionnaire: boolean | null;
   // Transverse
   can_access_suppliers: boolean | null;
   can_access_templates: boolean | null;
@@ -281,6 +284,7 @@ export interface EffectivePermissions {
   can_manage_logistique: boolean;
   can_manage_maintenance: boolean;
   can_edit_spv_data: boolean;
+  can_manage_questionnaire: boolean;
   // Transverse
   can_access_suppliers: boolean;
   can_access_templates: boolean;

@@ -115,6 +115,7 @@ const FEATURE_GROUPS: Array<{
     label: "Projets SPV",
     items: [
       { key: "can_edit_spv_data", label: "Modifier les données (questionnaire projet)" },
+      { key: "can_manage_questionnaire", label: "Gérer la structure des questionnaires (sections / champs)" },
     ],
   },
   {
@@ -186,6 +187,7 @@ const DEFAULT_PERMISSIONS: Record<string, boolean> = {
   // SPV
   can_access_spv: true,
   can_edit_spv_data: false,
+  can_manage_questionnaire: false,
   // IT
   can_access_it_dispatch: true,
   can_access_it_projects: false,
