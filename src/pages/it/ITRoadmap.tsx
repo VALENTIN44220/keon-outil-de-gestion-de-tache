@@ -968,7 +968,7 @@ function GanttRow({
               </div>
             )}
 
-            {/* Barre suivi (hachurée) */}
+            {/* Barre suivi (hachurée) — même code couleur que le build (par groupe) */}
             {hasSuivi && (
               <div
                 className="absolute rounded-md pointer-events-none flex items-center px-1.5 text-[9px] text-violet-900"
@@ -976,7 +976,9 @@ function GanttRow({
                   left: suiviStart! * MONTH_W + 1,
                   width: (suiviEnd! - suiviStart! + 1) * MONTH_W - 2,
                   top: 9, bottom: 9,
-                  background: 'repeating-linear-gradient(45deg,#a78bfa,#a78bfa 3px,#ede9fe 3px,#ede9fe 6px)',
+                  background: barColor
+                    ? `repeating-linear-gradient(45deg,${barColor},${barColor} 3px,${barColor}33 3px,${barColor}33 6px)`
+                    : 'repeating-linear-gradient(45deg,#a78bfa,#a78bfa 3px,#ede9fe 3px,#ede9fe 6px)',
                 }}
               >
                 <span className="truncate">{p.suivi_j_mois}j/m</span>
