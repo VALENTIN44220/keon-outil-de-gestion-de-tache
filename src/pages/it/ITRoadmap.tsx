@@ -53,6 +53,12 @@ const GROUP_OPTIONS: { value: GroupMode; label: string }[] = [
   { value: 'none', label: 'Aucun groupe' },
 ];
 
+/** Palette (teintes ~600, texte blanc lisible) pour colorer les barres par groupe. */
+const GROUP_COLORS = [
+  '#4f46e5', '#0284c7', '#059669', '#d97706', '#dc2626', '#7c3aed',
+  '#db2777', '#0d9488', '#ea580c', '#65a30d', '#0891b2', '#9333ea',
+];
+
 // ---- Granularité temporelle par année (regroupement des colonnes) ----
 
 type YearGran = 'month' | 'quarter' | 'year';
@@ -415,6 +421,16 @@ function RoadmapContent() {
       .map(([label, items]) => ({ label: label as string | null, items: sortItems(items) }));
   }, [filtered, groupBy, groupKeyOf, sortItems]);
 
+  // ---- Couleur de barre par groupe (selon le paramètre de groupement) ----
+  const groupColors = useMemo(() => {
+    const m = new Map<string, string>();
+    if (groupBy === 'none') return m;
+    groups.forEach((g, i) => {
+      if (g.label != null) m.set(g.label, GROUP_COLORS[i % GROUP_COLORS.length]);
+    });
+    return m;
+  }, [groups, groupBy]);
+
   /** Charge cumulée du groupe par colonne = pic mensuel de la période. */
   const groupPeriodSums = useCallback((items: FdrRoadmapProject[]): Record<string, number> => {
     const out: Record<string, number> = {};
@@ -737,6 +753,7 @@ function RoadmapContent() {
                     <GanttRow
                       key={p.id}
                       project={p}
+                      barColor={group.label != null ? groupColors.get(group.label) : undefined}
                       periods={periods}
                       todayX={todayX}
                       labelW={labelW}
@@ -823,10 +840,11 @@ function FilterSelect({ value, onChange, placeholder, options }: {
 }
 
 function GanttRow({
-  project: p, periods, todayX, labelW, showCode, ymIndex, engineSettings, dragging,
+  project: p, barColor, periods, todayX, labelW, showCode, ymIndex, engineSettings, dragging,
   onPointerDown, onToggleFdr, onChangeStatus, onShift, onOpen,
 }: {
   project: FdrRoadmapProject;
+  barColor?: string;
   periods: Period[];
   todayX: number | null;
   labelW: number;
@@ -914,15 +932,17 @@ function GanttRow({
             {hasBuild && (
               <div
                 className={cn(
-                  'absolute rounded-md flex items-center px-1.5 text-[10px] text-white font-medium overflow-hidden whitespace-nowrap',
+                  'absolute rounded-md flex items-center px-1.5 text-[10px] font-medium overflow-hidden whitespace-nowrap',
                   excluded ? 'cursor-not-allowed' : 'cursor-grab active:cursor-grabbing',
-                  isPermanente ? 'bg-amber-400 text-amber-950' : 'bg-violet-500',
+                  // Sans couleur de groupe : couleurs par défaut (build violet / permanente ambre)
+                  barColor ? 'text-white' : (isPermanente ? 'bg-amber-400 text-amber-950' : 'bg-violet-500 text-white'),
                   dragging && 'ring-2 ring-violet-300 shadow-lg',
                 )}
                 style={{
                   left: buildStart! * MONTH_W + 1,
                   width: (buildEnd! - buildStart! + 1) * MONTH_W - 2,
                   top: 5, bottom: 5,
+                  ...(barColor ? { background: barColor } : {}),
                 }}
                 onPointerDown={e => !excluded && onPointerDown(e, p, 'move')}
               >
@@ -933,6 +953,11 @@ function GanttRow({
                 <span className="relative pointer-events-none truncate">
                   {isPermanente ? '∞' : ''} {Math.round(p.loads.reduce((s, l) => s + l.j_mois, 0) * 10) / 10}j/m
                 </span>
+                {(p.pct_avancement ?? 0) > 0 && (
+                  <span className="relative ml-auto pl-1 pr-2.5 tabular-nums font-semibold pointer-events-none">
+                    {Math.round(p.pct_avancement!)}%
+                  </span>
+                )}
                 {/* Poignée resize */}
                 {!excluded && (
                   <div
