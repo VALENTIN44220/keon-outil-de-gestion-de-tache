@@ -3,7 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Building2, Briefcase, Users, Layers, Shield, UserCog,
   UsersRound, UserRoundCog, Database,
-  FolderKanban, Tags, MonitorSmartphone, GitMerge, ShieldAlert, ClipboardList,
+  FolderKanban, Tags, MonitorSmartphone, GitMerge, ShieldAlert,
 } from 'lucide-react';
 import { CompaniesTab } from './CompaniesTab';
 import { DepartmentsTab } from './DepartmentsTab';
@@ -23,7 +23,6 @@ import { CategoriesManagementTab } from './CategoriesManagementTab';
 import { PageDeviceVisibilityTab } from './PageDeviceVisibilityTab';
 import { LuccaDuplicatesTab } from './LuccaDuplicatesTab';
 import { SMQAdminTab } from './SMQAdminTab';
-import { QuestionnaireAdminTab } from './questionnaire/QuestionnaireAdminTab';
 import type { Company, Department, JobTitle, HierarchyLevel, PermissionProfile, UserProfile } from '@/types/admin';
 
 interface AdminTabsProps {
@@ -114,9 +113,6 @@ export function AdminTabs(props: AdminTabsProps) {
           </TabsTrigger>
           <TabsTrigger value="smq" className="px-2 py-1.5" title="SMQ — pilotes par processus">
             <ShieldAlert className="h-4 w-4" />
-          </TabsTrigger>
-          <TabsTrigger value="questionnaires" className="px-2 py-1.5" title="Questionnaires SPV — sections & champs">
-            <ClipboardList className="h-4 w-4" />
           </TabsTrigger>
 
         </TabsList>
@@ -231,10 +227,6 @@ export function AdminTabs(props: AdminTabsProps) {
 
         <TabsContent value="smq">
           <SMQAdminTab />
-        </TabsContent>
-
-        <TabsContent value="questionnaires">
-          <QuestionnaireAdminTab />
         </TabsContent>
 
       </Tabs>

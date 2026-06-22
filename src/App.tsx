@@ -32,6 +32,7 @@ import BEPrestationGroupSettings from "./pages/templates/BEPrestationGroupSettin
 import ITPrestationSettings from "./pages/templates/ITPrestationSettings";
 import Projects from "./pages/Projects";
 import Admin from "./pages/Admin";
+import Questionnaires from "./pages/Questionnaires";
 import Workload from "./pages/Workload";
 import Requests from "./pages/Requests";
 import MyRequests from "./pages/MyRequests";
@@ -138,6 +139,7 @@ const App = () => (
 
                 { path: "/projects", end: true, element: <ProtectedRoute><Projects /></ProtectedRoute> },
                 { path: "/admin", end: true, element: <ProtectedRoute><Admin /></ProtectedRoute> },
+                { path: "/questionnaires", end: true, element: <ProtectedRoute><Questionnaires /></ProtectedRoute> },
                 { path: "/workload", end: true, element: <ProtectedRoute><Workload /></ProtectedRoute> },
                 { path: "/requests", end: false, element: <ProtectedRoute><Requests /></ProtectedRoute> },
                 { path: "/mes-demandes", end: true, element: <ProtectedRoute><MyRequests /></ProtectedRoute> },
@@ -230,6 +232,7 @@ const App = () => (
             <Route path="/templates/it-prestation/:subProcessId" element={<></>} />
             <Route path="/projects" element={<></>} />
             <Route path="/admin" element={<></>} />
+            <Route path="/questionnaires" element={<></>} />
             <Route path="/workload" element={<></>} />
             <Route path="/requests/*" element={<></>} />
             <Route path="/mes-demandes" element={<></>} />

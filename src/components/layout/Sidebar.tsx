@@ -204,6 +204,8 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
       if (item.adminOnly && !isAdmin) return null;
       const screenOk = !item.permissionKey || canAccessScreen(item.permissionKey);
       if (!screenOk) return null;
+      const featureOk = !item.featureKey || isAdmin || effectivePermissions[item.featureKey] === true;
+      if (!featureOk) return null;
       if (item.children?.length) {
         if (!isPageVisibleOnDevice(item.id, currentDevice)) return null;
         const children = item.children.map(filterItem).filter((c): c is SidebarMenuItem => c != null);

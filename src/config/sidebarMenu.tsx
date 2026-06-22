@@ -4,9 +4,9 @@ import {
   Calendar, MessageCircle, Building2, ClipboardList,
   Lightbulb, Monitor, Leaf, Euro, Map as MapIcon, Users, Wallet,
   Package, Truck, ShieldAlert, Settings2, BarChart2,
-  UserPlus, AlertTriangle,
+  UserPlus, AlertTriangle, ListChecks,
 } from 'lucide-react';
-import type { ScreenPermissionKey } from '@/types/permissions';
+import type { ScreenPermissionKey, FeaturePermissionKey } from '@/types/permissions';
 
 export interface SidebarMenuItem {
   id: string;
@@ -14,6 +14,8 @@ export interface SidebarMenuItem {
   icon: React.ComponentType<{ className?: string }>;
   path: string;
   permissionKey?: ScreenPermissionKey;
+  /** Visible si l'utilisateur a cette permission fonctionnelle (ou est admin). */
+  featureKey?: FeaturePermissionKey;
   /** Visible uniquement pour les administrateurs (en plus de la permission). */
   adminOnly?: boolean;
   children?: SidebarMenuItem[];
@@ -114,6 +116,7 @@ export const menuGroups: MenuGroup[] = [
     label: 'CONFIGURATION',
     items: [
       { id: 'templates', label: 'Modèles', icon: Workflow, path: '/templates', permissionKey: 'can_access_templates' },
+      { id: 'questionnaires', label: 'Questionnaires SPV', icon: ListChecks, path: '/questionnaires', featureKey: 'can_manage_questionnaire' },
     ],
   },
   {
