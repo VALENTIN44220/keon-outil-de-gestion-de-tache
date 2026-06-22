@@ -337,7 +337,7 @@ export const BUDGET_LINE_STATUT_CONFIG: Record<BudgetLineStatut, { label: string
   anomalie:        { label: 'Anomalie',           className: 'bg-red-100 text-red-700 border-red-300' },
 };
 
-export type BudgetType = 'mensuel' | 'mensuel_variable' | 'annuel';
+export type BudgetType = 'mensuel' | 'mensuel_variable' | 'annuel' | 'annuel_multi';
 
 export interface ITBudgetLine {
   id: string;
@@ -356,8 +356,11 @@ export interface ITBudgetLine {
   description?: string | null;
   /**
    * Type de budget :
-   * - 'mensuel' : le même montant est affecté à chaque mois
-   * - 'annuel'  : le montant est décaissé sur le mois `mois_budget`
+   * - 'mensuel'          : le même montant est affecté à chaque mois
+   * - 'mensuel_variable' : 12 montants distincts (it_budget_line_months)
+   * - 'annuel'           : le montant est décaissé sur le mois `mois_budget`
+   * - 'annuel_multi'     : montant annuel réparti sur plusieurs mois choisis
+   *                        (échéancier dans it_budget_line_months ; montant_annuel = somme)
    */
   budget_type: BudgetType;
   /** Mois de décaissement (1-12) utilisé quand budget_type = 'annuel'. */

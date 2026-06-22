@@ -153,7 +153,7 @@ function CommandesSection({ liees, isLoading, fournisseurPrevu, searchCommandes,
           <PopoverContent className="w-[420px] p-0" align="end">
             <div className="p-2 border-b">
               <Input
-                placeholder="Rechercher par fullcdno..."
+                placeholder="N° de pièce, libellé ou fournisseur..."
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 className="h-8 text-xs"
@@ -179,9 +179,12 @@ function CommandesSection({ liees, isLoading, fournisseurPrevu, searchCommandes,
                         deja ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-accent'
                       )}
                     >
-                      <div className="flex flex-col">
+                      <div className="flex flex-col min-w-0">
                         <span className="font-medium font-mono">{r.fullcdno}</span>
-                        <span className="text-muted-foreground">{r.tiers} {r.nomfournisseur ? `— ${r.nomfournisseur}` : ''}</span>
+                        <span className="text-muted-foreground truncate">
+                          {r.tiers}{r.nomfournisseur ? ` — ${r.nomfournisseur}` : ''}
+                          {r.libelle ? ` · ${r.libelle}` : ''}
+                        </span>
                       </div>
                       <div className="text-right shrink-0 ml-4">
                         <div className="font-semibold tabular-nums">{eur(r.montant_ht)}</div>
@@ -292,7 +295,7 @@ function FacturesSection({ liens, grouped, isLoading, searchFactures, onLier, on
           <PopoverContent className="w-[480px] p-0" align="end">
             <div className="p-2 border-b">
               <Input
-                placeholder="Rechercher par référence..."
+                placeholder="Référence, libellé ou fournisseur..."
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 className="h-8 text-xs"

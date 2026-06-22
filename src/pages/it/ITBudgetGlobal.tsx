@@ -123,6 +123,8 @@ const EXPENSE_MOIS_LIBELLES = MOIS_LONGS;
 
 function formatBudgetPeriode(l: Pick<ITBudgetLine, 'budget_type' | 'mois_budget'>): string {
   if (l.budget_type === 'mensuel') return 'Mensuel';
+  if (l.budget_type === 'mensuel_variable') return 'Mensuel variable';
+  if (l.budget_type === 'annuel_multi') return 'Annuel — multi-échéances';
   if (l.mois_budget == null) return 'Annuel';
   return `Annuel — ${MOIS_COURTS[l.mois_budget] ?? `M${l.mois_budget}`}`;
 }
@@ -171,54 +173,118 @@ const EXPENSE_STATUT_LABEL: Record<ITManualExpense['statut'], string> = {
  *     qui dédoublonne déjà gescom/compta et calcule un HT réel ou estimé)
  */
 function ExpandedMonths({ line }: { line: ITBudgetLine }) {
+  const queryClient = useQueryClient();
   const {
     commandesLiees,
     facturesLieesGrouped,
     isLoading,
   } = useITBudgetRapprochement(line.id, line.fournisseur_prevu ?? null);
 
-  // Pour mensuel_variable : on lit les montants par mois depuis it_budget_line_months
-  const [monthlyAmounts, setMonthlyAmounts] = useState<number[]>(Array(12).fill(0));
-  useEffect(() => {
-    if ((line.budget_type as string) !== 'mensuel_variable') {
-      setMonthlyAmounts(Array(12).fill(0));
+  const isVariable =
+    (line.budget_type as string) === 'mensuel_variable' ||
+    (line.budget_type as string) === 'annuel_multi';
+  // Reforecast actif si un montant révisé OU un type révisé est posé sur la ligne
+  const hasRevise =
+    line.montant_budget_revise != null || (line as LineExtra & { budget_type_revise?: string | null }).budget_type_revise != null;
+
+  // Montants par mois (initial + révisé) depuis it_budget_line_months (variable/multi)
+  const [monthlyInit, setMonthlyInit] = useState<number[]>(Array(12).fill(0));
+  const [monthlyRev, setMonthlyRev] = useState<(number | null)[]>(Array(12).fill(null));
+  const reload = useCallback(() => {
+    if (!isVariable) {
+      setMonthlyInit(Array(12).fill(0));
+      setMonthlyRev(Array(12).fill(null));
       return;
     }
-    void supabase.from('it_budget_line_months').select('mois, montant_budget').eq('budget_line_id', line.id)
+    void supabase.from('it_budget_line_months').select('mois, montant_budget, montant_revise').eq('budget_line_id', line.id)
       .then(({ data }) => {
-        const arr = Array(12).fill(0);
-        for (const r of (data ?? []) as Array<{ mois: number; montant_budget: number | string }>) {
-          if (r.mois >= 1 && r.mois <= 12) arr[r.mois - 1] = Number(r.montant_budget) || 0;
+        const ai = Array(12).fill(0);
+        const ar: (number | null)[] = Array(12).fill(null);
+        for (const r of (data ?? []) as Array<{ mois: number; montant_budget: number | string; montant_revise: number | string | null }>) {
+          if (r.mois >= 1 && r.mois <= 12) {
+            ai[r.mois - 1] = Number(r.montant_budget) || 0;
+            ar[r.mois - 1] = r.montant_revise != null ? Number(r.montant_revise) : null;
+          }
         }
-        setMonthlyAmounts(arr);
+        setMonthlyInit(ai);
+        setMonthlyRev(ar);
       });
-  }, [line.id, line.budget_type]);
+  }, [isVariable, line.id]);
+  useEffect(() => { reload(); }, [reload]);
+
+  // ── Édition inline d'un montant mensuel (variable / multi) ──
+  const [editingMonth, setEditingMonth] = useState<number | null>(null);
+  const [draft, setDraft] = useState('');
+  const [savingMonth, setSavingMonth] = useState(false);
+
+  const saveMonth = useCallback(async (i: number, raw: string) => {
+    const val = Number(String(raw).replace(',', '.')) || 0;
+    const next = [...monthlyInit];
+    next[i] = val;
+    setMonthlyInit(next);
+    setEditingMonth(null);
+    setSavingMonth(true);
+    try {
+      await supabase.from('it_budget_line_months')
+        .upsert({ budget_line_id: line.id, mois: i + 1, montant_budget: val }, { onConflict: 'budget_line_id,mois' });
+      const total = next.reduce((a, b) => a + b, 0);
+      await supabase.from('it_budget_lines')
+        .update({ montant_annuel: total, montant_budget: total / 12 }).eq('id', line.id);
+      await queryClient.invalidateQueries({ queryKey: ['it-budget-global-lines'] });
+      toast({ title: 'Montant mensuel mis à jour' });
+    } catch (e: unknown) {
+      toast({ title: 'Erreur', description: extractErrorMessage(e), variant: 'destructive' });
+      reload();
+    } finally {
+      setSavingMonth(false);
+    }
+  }, [monthlyInit, line.id, queryClient, reload]);
 
   const MOIS_LABELS = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
 
+  type RefDetail = { ref: string; date: string | null; montant: number };
   type MonthRow = {
     mois: number;
     budget: number;
+    revise: number;
     commande: number;
     facture: number;
-    refsCmd: string[];
-    refsFac: string[];
+    refsCmd: RefDetail[];
+    refsFac: RefDetail[];
   };
 
   const rows: MonthRow[] = useMemo(() => {
     const init: MonthRow[] = Array.from({ length: 12 }, (_, i) => ({
-      mois: i + 1, budget: 0, commande: 0, facture: 0, refsCmd: [], refsFac: [],
+      mois: i + 1, budget: 0, revise: 0, commande: 0, facture: 0, refsCmd: [], refsFac: [],
     }));
 
-    // Budget par mois selon le type
-    const montant = line.montant_budget_revise ?? line.montant_budget ?? 0;
+    // ── Budget INITIAL par mois selon le type ──
+    const lx = line as LineExtra & { budget_type_revise?: string | null; mois_budget_revise?: number | null };
+    const initMontant = line.montant_budget ?? 0;
     if (line.budget_type === 'mensuel') {
-      for (let i = 0; i < 12; i++) init[i].budget = montant;
-    } else if ((line.budget_type as string) === 'mensuel_variable') {
-      for (let i = 0; i < 12; i++) init[i].budget = monthlyAmounts[i] ?? 0;
+      for (let i = 0; i < 12; i++) init[i].budget = initMontant;
+    } else if (isVariable) {
+      for (let i = 0; i < 12; i++) init[i].budget = monthlyInit[i] ?? 0;
     } else if (line.budget_type === 'annuel' && line.mois_budget) {
       const idx = line.mois_budget - 1;
-      if (idx >= 0 && idx < 12) init[idx].budget = montant;
+      if (idx >= 0 && idx < 12) init[idx].budget = initMontant;
+    }
+
+    // ── Budget REFORECAST (F26) par mois ──
+    if (!hasRevise) {
+      // F26 = BUD26 : on recopie l'initial
+      for (let i = 0; i < 12; i++) init[i].revise = init[i].budget;
+    } else {
+      const rbt = (lx.budget_type_revise as string) || line.budget_type;
+      const revMontant = line.montant_budget_revise;
+      if (rbt === 'mensuel') {
+        for (let i = 0; i < 12; i++) init[i].revise = revMontant ?? initMontant;
+      } else if (rbt === 'mensuel_variable' || rbt === 'annuel_multi') {
+        for (let i = 0; i < 12; i++) init[i].revise = monthlyRev[i] ?? monthlyInit[i] ?? 0;
+      } else if (rbt === 'annuel') {
+        const mm = lx.mois_budget_revise ?? line.mois_budget;
+        if (mm && mm >= 1 && mm <= 12) init[mm - 1].revise = revMontant ?? initMontant;
+      }
     }
 
     // Commandes par mois (date_commande → mois)
@@ -228,7 +294,7 @@ function ExpandedMonths({ line }: { line: ITBudgetLine }) {
       const m = new Date(c.date_commande).getMonth();
       if (m >= 0 && m < 12) {
         init[m].commande += c.montant_ht ?? 0;
-        init[m].refsCmd.push(link.fullcdno);
+        init[m].refsCmd.push({ ref: link.fullcdno, date: c.date_commande, montant: c.montant_ht ?? 0 });
       }
     }
 
@@ -238,31 +304,47 @@ function ExpandedMonths({ line }: { line: ITBudgetLine }) {
       const m = new Date(g.date_facture).getMonth();
       if (m >= 0 && m < 12) {
         init[m].facture += g.montant_ht ?? 0;
-        init[m].refsFac.push(g.reference);
+        init[m].refsFac.push({ ref: g.reference, date: g.date_facture, montant: g.montant_ht ?? 0 });
       }
     }
 
     return init;
-  }, [commandesLiees, facturesLieesGrouped, line.budget_type, line.mois_budget, line.montant_budget, line.montant_budget_revise, monthlyAmounts]);
+  }, [commandesLiees, facturesLieesGrouped, line, isVariable, hasRevise, monthlyInit, monthlyRev]);
 
   const totals = rows.reduce(
     (acc, r) => ({
       budget: acc.budget + r.budget,
+      revise: acc.revise + r.revise,
       commande: acc.commande + r.commande,
       facture: acc.facture + r.facture,
     }),
-    { budget: 0, commande: 0, facture: 0 }
+    { budget: 0, revise: 0, commande: 0, facture: 0 }
   );
+
+  const refTitle = (d: RefDetail) =>
+    `${d.date ? d.date.slice(0, 10) : 'sans date'} · ${eur(d.montant)}`;
+  const renderRefs = (refs: RefDetail[]) =>
+    refs.length === 0 ? '—' : refs.map((d, k) => (
+      <span key={`${d.ref}-${k}`} title={refTitle(d)} className="cursor-help underline decoration-dotted decoration-muted-foreground/40">
+        {d.ref}{k < refs.length - 1 ? ', ' : ''}
+      </span>
+    ));
 
   if (isLoading) return <div className="p-4 text-sm text-muted-foreground">Chargement…</div>;
 
   return (
     <div className="px-4 pb-4 bg-muted/30">
+      {isVariable && (
+        <p className="text-[11px] text-muted-foreground pt-2 pb-1">
+          💡 Cliquez un montant de la colonne <strong>Budget initial</strong> pour l'éditer directement.
+        </p>
+      )}
       <table className="w-full text-xs border-collapse">
         <thead>
           <tr className="border-b">
             <th className="text-left py-2 px-2 font-medium text-muted-foreground">Mois</th>
-            <th className="text-right py-2 px-2 font-medium text-muted-foreground">Budget</th>
+            <th className="text-right py-2 px-2 font-medium text-muted-foreground">Budget initial</th>
+            <th className="text-right py-2 px-2 font-medium text-violet-700 dark:text-violet-400">Reforecast F26</th>
             <th className="text-right py-2 px-2 font-medium text-muted-foreground">Commandé</th>
             <th className="text-right py-2 px-2 font-medium text-muted-foreground">Facturé</th>
             <th className="text-left py-2 px-2 font-medium text-muted-foreground">Réf. Commande(s)</th>
@@ -270,12 +352,44 @@ function ExpandedMonths({ line }: { line: ITBudgetLine }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => {
-            const isEmpty = r.budget === 0 && r.commande === 0 && r.facture === 0;
+          {rows.map((r, i) => {
+            const isEmpty = r.budget === 0 && r.revise === 0 && r.commande === 0 && r.facture === 0;
+            const deltaRev = r.revise - r.budget;
             return (
               <tr key={r.mois} className={cn('border-b last:border-0', isEmpty ? 'text-muted-foreground/60' : 'hover:bg-muted/50')}>
                 <td className="py-1.5 px-2 font-medium">{MOIS_LABELS[r.mois - 1]}</td>
-                <td className="py-1.5 px-2 text-right tabular-nums">{r.budget ? eur(r.budget) : '—'}</td>
+                <td
+                  className={cn('py-1.5 px-2 text-right tabular-nums', isVariable && 'cursor-pointer hover:bg-violet-100/60 dark:hover:bg-violet-900/30 rounded')}
+                  onClick={() => { if (isVariable && editingMonth === null) { setEditingMonth(i); setDraft(monthlyInit[i] ? String(monthlyInit[i]) : ''); } }}
+                  title={isVariable ? 'Cliquer pour éditer' : undefined}
+                >
+                  {editingMonth === i ? (
+                    <input
+                      type="number"
+                      step="0.01"
+                      autoFocus
+                      value={draft}
+                      disabled={savingMonth}
+                      onChange={(e) => setDraft(e.target.value)}
+                      onBlur={() => saveMonth(i, draft)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') saveMonth(i, draft);
+                        if (e.key === 'Escape') setEditingMonth(null);
+                      }}
+                      className="w-20 text-right tabular-nums border rounded px-1 py-0.5 text-xs bg-background"
+                    />
+                  ) : (
+                    r.budget ? eur(r.budget) : '—'
+                  )}
+                </td>
+                <td className={cn('py-1.5 px-2 text-right tabular-nums', hasRevise && deltaRev !== 0 ? 'text-violet-700 dark:text-violet-400 font-medium' : 'text-muted-foreground')}>
+                  {r.revise ? eur(r.revise) : '—'}
+                  {hasRevise && deltaRev !== 0 && (
+                    <span className={cn('block text-[9px]', deltaRev > 0 ? 'text-amber-600' : 'text-emerald-600')}>
+                      {deltaRev > 0 ? '+' : ''}{eur(deltaRev)}
+                    </span>
+                  )}
+                </td>
                 <td className="py-1.5 px-2 text-right tabular-nums text-indigo-700 dark:text-indigo-400">
                   {r.commande ? eur(r.commande) : '—'}
                 </td>
@@ -283,10 +397,10 @@ function ExpandedMonths({ line }: { line: ITBudgetLine }) {
                   {r.facture ? eur(r.facture) : '—'}
                 </td>
                 <td className="py-1.5 px-2 font-mono text-[11px] text-muted-foreground">
-                  {r.refsCmd.length ? r.refsCmd.join(', ') : '—'}
+                  {renderRefs(r.refsCmd)}
                 </td>
                 <td className="py-1.5 px-2 font-mono text-[11px] text-muted-foreground">
-                  {r.refsFac.length ? r.refsFac.join(', ') : '—'}
+                  {renderRefs(r.refsFac)}
                 </td>
               </tr>
             );
@@ -294,6 +408,7 @@ function ExpandedMonths({ line }: { line: ITBudgetLine }) {
           <tr className="border-t-2 font-semibold bg-muted/40">
             <td className="py-2 px-2">Total</td>
             <td className="py-2 px-2 text-right tabular-nums">{eur(totals.budget)}</td>
+            <td className="py-2 px-2 text-right tabular-nums text-violet-700 dark:text-violet-400">{eur(totals.revise)}</td>
             <td className="py-2 px-2 text-right tabular-nums text-indigo-700 dark:text-indigo-400">{eur(totals.commande)}</td>
             <td className="py-2 px-2 text-right tabular-nums text-violet-700 dark:text-violet-400">{eur(totals.facture)}</td>
             <td colSpan={2} className="py-2 px-2 text-[11px] text-muted-foreground font-normal">
@@ -520,6 +635,9 @@ export default function ITBudgetGlobal() {
   const [lineDescription, setLineDescription] = useState('');
   const [lineBudgetType, setLineBudgetType] = useState<BudgetType>('mensuel');
   const [lineMontantsMois, setLineMontantsMois] = useState<string[]>(Array(12).fill(''));
+  // Aide à la répartition pour le mode 'annuel_multi' : montant annuel + mois cochés
+  const [lineMultiAmount, setLineMultiAmount] = useState<string>('');
+  const [lineMultiMonths, setLineMultiMonths] = useState<boolean[]>(Array(12).fill(false));
   const [linePaiementViaNdf, setLinePaiementViaNdf] = useState(false);
   const [lineIsReforecast, setLineIsReforecast] = useState(false);
   const [lineReforecastEnabled, setLineReforecastEnabled] = useState(false);
@@ -596,6 +714,8 @@ export default function ITBudgetGlobal() {
     setLineDescription('');
     setLineBudgetType('mensuel');
     setLineMontantsMois(Array(12).fill(''));
+    setLineMultiAmount('');
+    setLineMultiMonths(Array(12).fill(false));
     setLinePaiementViaNdf(false);
     setLineIsReforecast(false);
     setLineReforecastEnabled(false);
@@ -643,25 +763,32 @@ export default function ITBudgetGlobal() {
     setLineReforecastEnabled(line.montant_budget_revise != null || (line as any).budget_type_revise != null);
     setLineBudgetTypeRevise(((line as any).budget_type_revise as BudgetType) || '');
     setLineMoisDecaissementRevise((line as any).mois_budget_revise != null ? String((line as any).mois_budget_revise) : '1');
-    // Charge les 12 montants mensuels (initial + revise) si la ligne est en 'mensuel_variable'
-    if ((line.budget_type as string) === 'mensuel_variable') {
+    // Charge les 12 montants mensuels (initial + revise) pour 'mensuel_variable' et 'annuel_multi'
+    if ((line.budget_type as string) === 'mensuel_variable' || (line.budget_type as string) === 'annuel_multi') {
       const { data } = await supabase
         .from('it_budget_line_months')
         .select('mois, montant_budget, montant_revise')
         .eq('budget_line_id', line.id);
       const arrInit = Array(12).fill('');
       const arrRev = Array(12).fill('');
+      const checked = Array(12).fill(false);
       for (const r of (data ?? []) as Array<{ mois: number; montant_budget: number | string; montant_revise: number | string | null }>) {
         if (r.mois >= 1 && r.mois <= 12) {
-          arrInit[r.mois - 1] = String(r.montant_budget ?? '');
+          const v = Number(r.montant_budget) || 0;
+          arrInit[r.mois - 1] = v ? String(v) : '';
           arrRev[r.mois - 1] = r.montant_revise != null ? String(r.montant_revise) : '';
+          if (v > 0) checked[r.mois - 1] = true;
         }
       }
       setLineMontantsMois(arrInit);
       setLineMontantsMoisRevise(arrRev);
+      setLineMultiMonths(checked);
+      setLineMultiAmount(line.montant_annuel != null ? String(line.montant_annuel) : '');
     } else {
       setLineMontantsMois(Array(12).fill(''));
       setLineMontantsMoisRevise(Array(12).fill(''));
+      setLineMultiMonths(Array(12).fill(false));
+      setLineMultiAmount('');
     }
     setLineDialogOpen(true);
   };
@@ -936,17 +1063,24 @@ export default function ITBudgetGlobal() {
   };
 
   const submitLine = async () => {
-    // Pour mensuel_variable on calcule la somme des 12 montants mensuels (montant_budget devient le total / 12 pour compat)
+    // mensuel_variable et annuel_multi : échéancier de 12 montants → montant_annuel = somme,
+    // montant_budget = moyenne (total / 12) pour compat affichage.
+    const usesMonthGrid = lineBudgetType === 'mensuel_variable' || lineBudgetType === 'annuel_multi';
     let montant: number;
     let mensualValeurs: number[] = [];
-    if (lineBudgetType === 'mensuel_variable') {
+    if (usesMonthGrid) {
       mensualValeurs = lineMontantsMois.map((s) => {
         const n = Number(String(s).replace(',', '.'));
         return Number.isFinite(n) ? n : 0;
       });
       const total = mensualValeurs.reduce((a, b) => a + b, 0);
       if (total <= 0) {
-        toast({ title: 'Renseigne au moins un montant mensuel', variant: 'destructive' });
+        toast({
+          title: lineBudgetType === 'annuel_multi'
+            ? 'Renseigne au moins un mois de décaissement'
+            : 'Renseigne au moins un montant mensuel',
+          variant: 'destructive',
+        });
         return;
       }
       // montant_budget : moyenne (pour compat affichage), montant_annuel : somme reelle
@@ -1003,7 +1137,7 @@ export default function ITBudgetGlobal() {
       let montantReviseFinal: number | null = montantRevise;
       let mensualReviseValeurs: number[] = [];
       if (lineReforecastEnabled) {
-        if (effectiveReviseType === 'mensuel_variable') {
+        if (effectiveReviseType === 'mensuel_variable' || effectiveReviseType === 'annuel_multi') {
           mensualReviseValeurs = lineMontantsMoisRevise.map((s) => {
             const n = Number(String(s).replace(',', '.'));
             return Number.isFinite(n) ? n : 0;
@@ -1037,7 +1171,7 @@ export default function ITBudgetGlobal() {
         montant_budget: montant,
         montant_budget_revise: montantReviseFinal,
         montant_annuel:
-          lineBudgetType === 'mensuel_variable'
+          usesMonthGrid
             ? mensualValeurs.reduce((a, b) => a + b, 0)
             : (lineBudgetType === 'mensuel' ? montant * 12 : (mois ? montant : null)),
         statut: lineStatut,
@@ -1071,19 +1205,20 @@ export default function ITBudgetGlobal() {
       }
 
       // Persistance des montants par mois dans it_budget_line_months :
-      // - Si type initial = mensuel_variable : on stocke montant_budget par mois
-      // - Si type revise = mensuel_variable (different ou pas) : on stocke montant_revise par mois
+      // - Si type initial utilise la grille (mensuel_variable / annuel_multi) : montant_budget par mois
+      // - Si type revise utilise la grille : montant_revise par mois
+      const reviseUsesGrid = lineBudgetTypeRevise === 'mensuel_variable' || lineBudgetTypeRevise === 'annuel_multi';
       const needsMonthRows =
         savedLineId && (
-          lineBudgetType === 'mensuel_variable' ||
-          (lineReforecastEnabled && lineBudgetTypeRevise === 'mensuel_variable')
+          usesMonthGrid ||
+          (lineReforecastEnabled && reviseUsesGrid)
         );
       if (needsMonthRows) {
         const rows = Array.from({ length: 12 }, (_, i) => {
-          const initVal = lineBudgetType === 'mensuel_variable' ? mensualValeurs[i] : 0;
+          const initVal = usesMonthGrid ? mensualValeurs[i] : 0;
           const revRaw = lineMontantsMoisRevise[i];
           const revIsSet = lineReforecastEnabled
-            && lineBudgetTypeRevise === 'mensuel_variable'
+            && reviseUsesGrid
             && String(revRaw ?? '').trim() !== '';
           return {
             budget_line_id: savedLineId!,
@@ -2514,6 +2649,7 @@ export default function ITBudgetGlobal() {
                     <SelectItem value="mensuel">Mensuel (même montant/mois)</SelectItem>
                     <SelectItem value="mensuel_variable">Mensuel variable (montant différent/mois)</SelectItem>
                     <SelectItem value="annuel">Annuel (décaissement unique)</SelectItem>
+                    <SelectItem value="annuel_multi">Annuel — décaissement multiple</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -2535,7 +2671,92 @@ export default function ITBudgetGlobal() {
                 </div>
               )}
             </div>
-            {lineBudgetType === 'mensuel_variable' ? (
+            {lineBudgetType === 'annuel_multi' ? (
+              <div className="space-y-3 rounded-lg border border-indigo-200 bg-indigo-50/40 dark:bg-indigo-950/20 p-3">
+                {/* Aide à la répartition : montant annuel + mois cochés → répartition égale */}
+                <div className="flex flex-wrap items-end gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Montant annuel à répartir</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="0"
+                      value={lineMultiAmount}
+                      onChange={(e) => setLineMultiAmount(e.target.value)}
+                      className="h-8 text-sm w-40"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8"
+                    onClick={() => {
+                      const amt = Number(String(lineMultiAmount).replace(',', '.')) || 0;
+                      const checked = lineMultiMonths.filter(Boolean).length;
+                      const per = checked > 0 ? Math.round((amt / checked) * 100) / 100 : 0;
+                      setLineMontantsMois(lineMontantsMois.map((_, i) => (lineMultiMonths[i] ? String(per) : '')));
+                    }}
+                  >
+                    Répartir également
+                  </Button>
+                  <span className="text-[11px] text-muted-foreground">
+                    sur {lineMultiMonths.filter(Boolean).length} mois coché(s)
+                  </span>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Cochez les mois de décaissement, puis ajustez chaque montant si besoin</Label>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-1.5">
+                    {MOIS_LONGS.map((label, i) => {
+                      const checked = lineMultiMonths[i];
+                      return (
+                        <div key={label} className={cn('space-y-1 rounded-md border p-1.5', checked ? 'border-indigo-300 bg-background' : 'border-transparent opacity-60')}>
+                          <label className="flex items-center gap-1.5 text-[11px] font-medium cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(e) => {
+                                const nextM = [...lineMultiMonths];
+                                nextM[i] = e.target.checked;
+                                setLineMultiMonths(nextM);
+                                if (!e.target.checked) {
+                                  const nextV = [...lineMontantsMois];
+                                  nextV[i] = '';
+                                  setLineMontantsMois(nextV);
+                                }
+                              }}
+                              className="h-3.5 w-3.5"
+                            />
+                            {label}
+                          </label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="0"
+                            disabled={!checked}
+                            value={lineMontantsMois[i]}
+                            onChange={(e) => {
+                              const next = [...lineMontantsMois];
+                              next[i] = e.target.value;
+                              setLineMontantsMois(next);
+                            }}
+                            className="h-7 text-sm"
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Total annuel décaissé :{' '}
+                  <strong>
+                    {lineMontantsMois
+                      .reduce((a, s) => a + (Number(String(s).replace(',', '.')) || 0), 0)
+                      .toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                  </strong>
+                </p>
+              </div>
+            ) : lineBudgetType === 'mensuel_variable' ? (
               <div className="space-y-2">
                 <Label>Montant par mois (requis pour les mois concernés)</Label>
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
@@ -2619,12 +2840,14 @@ export default function ITBudgetGlobal() {
                           <SelectItem value="mensuel">Mensuel (même montant/mois)</SelectItem>
                           <SelectItem value="mensuel_variable">Mensuel variable (différent/mois)</SelectItem>
                           <SelectItem value="annuel">Annuel (décaissement unique)</SelectItem>
+                          <SelectItem value="annuel_multi">Annuel — décaissement multiple</SelectItem>
                         </SelectContent>
                       </Select>
                       <p className="text-[10px] text-muted-foreground">
                         Initial : {
                           lineBudgetType === 'mensuel' ? 'Mensuel'
                           : lineBudgetType === 'mensuel_variable' ? 'Mensuel variable'
+                          : lineBudgetType === 'annuel_multi' ? 'Annuel multi-échéances'
                           : 'Annuel'
                         }
                       </p>
@@ -2645,7 +2868,7 @@ export default function ITBudgetGlobal() {
                   </div>
 
                   {/* Inputs montants selon le type revise */}
-                  {(lineBudgetTypeRevise || lineBudgetType) === 'mensuel_variable' ? (
+                  {((lineBudgetTypeRevise || lineBudgetType) === 'mensuel_variable' || (lineBudgetTypeRevise || lineBudgetType) === 'annuel_multi') ? (
                     <div className="space-y-2">
                       <Label className="text-xs">Montant révisé par mois (vide = pas de révision sur ce mois)</Label>
                       <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
@@ -2655,7 +2878,7 @@ export default function ITBudgetGlobal() {
                             <Input
                               type="number"
                               step="0.01"
-                              placeholder={lineBudgetType === 'mensuel_variable' ? (lineMontantsMois[i] || '0') : (lineBudgetType === 'mensuel' ? lineMontantBudget : '')}
+                              placeholder={(lineBudgetType === 'mensuel_variable' || lineBudgetType === 'annuel_multi') ? (lineMontantsMois[i] || '0') : (lineBudgetType === 'mensuel' ? lineMontantBudget : '')}
                               value={lineMontantsMoisRevise[i]}
                               onChange={(e) => {
                                 const next = [...lineMontantsMoisRevise];

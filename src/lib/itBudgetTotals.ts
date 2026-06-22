@@ -10,10 +10,11 @@ type BudgetLineLike = Pick<ITBudgetLine, 'budget_type' | 'montant_budget' | 'mon
  * Total budgétaire annuel d'une ligne, en tenant compte de `budget_type` :
  *  - `mensuel`           : le montant saisi est mensuel → total annuel = montant × 12
  *  - `mensuel_variable`  : 12 montants distincts → on lit `montant_annuel` (somme déjà persistée)
+ *  - `annuel_multi`      : montant annuel réparti sur plusieurs mois → on lit `montant_annuel`
  *  - `annuel`            : le montant saisi est déjà annuel → total = montant
  */
 export function lineAnnualBudget(line: BudgetLineLike): number {
-  if (line.budget_type === 'mensuel_variable') {
+  if (line.budget_type === 'mensuel_variable' || line.budget_type === 'annuel_multi') {
     return Number(line.montant_annuel ?? 0);
   }
   const m = line.montant_budget ?? 0;
@@ -34,8 +35,8 @@ export function lineAnnualBudgetRevise(line: BudgetLineLike): number {
     return lineAnnualBudget(line);
   }
 
-  if (effectiveType === 'mensuel_variable') {
-    // En mensuel_variable revise, montant_budget_revise contient deja la somme annuelle
+  if (effectiveType === 'mensuel_variable' || effectiveType === 'annuel_multi') {
+    // En mensuel_variable / annuel_multi revise, montant_budget_revise contient deja la somme annuelle
     return Number(line.montant_budget_revise);
   }
   if (effectiveType === 'mensuel') {

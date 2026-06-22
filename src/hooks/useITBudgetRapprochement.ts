@@ -8,8 +8,25 @@ export interface DivaltoCommande {
   fullcdno: string;
   tiers: string | null;
   nomfournisseur: string | null;
+  libelle: string | null;
   montant_ht: number | null;
   date_commande: string | null;
+}
+
+/** Échappe les caractères qui casseraient la syntaxe PostgREST `.or(...)`. */
+function sanitizeTerm(term: string): string {
+  return term.trim().replace(/[(),]/g, ' ');
+}
+
+/**
+ * Pièce Divalto inexploitable : pas de n° de pièce ('0' / vide). Le rattachement
+ * se faisant par n° de pièce, une pièce non numérotée mélangerait des milliers de
+ * mouvements sans rapport (bucket fourre-tout '0') → montants non fiables, on ne
+ * les compte pas (engagé / constaté) et on ne les propose pas au rapprochement.
+ */
+function isUnusablePiece(numeroPiece: string | null | undefined): boolean {
+  const np = (numeroPiece ?? '').trim();
+  return np === '' || np === '0';
 }
 
 /**
@@ -145,6 +162,7 @@ export function useITBudgetRapprochement(
 
       const dMap = new Map<string, { fullcdno: string; tiers: string|null; nomfournisseur: string|null; montant_ht: number|null; date_commande: string|null }>();
       for (const d of divaltoData ?? []) {
+        if (isUnusablePiece(d.numero_piece)) continue;
         const existing = dMap.get(d.numero_piece);
         if (!existing) {
           dMap.set(d.numero_piece, { fullcdno: d.numero_piece, tiers: d.tiers_code, nomfournisseur: d.nom_tiers, montant_ht: d.montant_ht, date_commande: d.date_piece });
@@ -187,15 +205,18 @@ export function useITBudgetRapprochement(
       if (e2) throw e2;
 
       // Mappe au format DivaltoFactureRaw pour groupFacturesByReference
-      const rawRows: DivaltoFactureRaw[] = (divaltoData ?? []).map((d: any) => ({
-        reference:     d.numero_piece,
-        source:        d.source,
-        tiers:         d.tiers_code,
-        nomfournisseur: d.nom_tiers,
-        libelle:       d.libelle,
-        montant_ht:    d.montant_ht,
-        date_facture:  d.date_piece,
-      }));
+      // (on ignore les pièces inexploitables : pas de n° ET pas de tiers)
+      const rawRows: DivaltoFactureRaw[] = (divaltoData ?? [])
+        .filter((d: any) => !isUnusablePiece(d.numero_piece))
+        .map((d: any) => ({
+          reference:     d.numero_piece,
+          source:        d.source,
+          tiers:         d.tiers_code,
+          nomfournisseur: d.nom_tiers,
+          libelle:       d.libelle,
+          montant_ht:    d.montant_ht,
+          date_facture:  d.date_piece,
+        }));
 
       return { links, grouped: groupFacturesByReference(rawRows) };
     },
@@ -206,29 +227,34 @@ export function useITBudgetRapprochement(
   const searchCommandes = async (query: string): Promise<DivaltoCommande[]> => {
     let q = (supabase as any)
       .from('divalto_mouvements_all')
-      .select('numero_piece, tiers_code, nom_tiers, montant_ht, date_piece')
+      .select('numero_piece, tiers_code, nom_tiers, libelle, montant_ht, date_piece')
       .eq('doc_type', 'commande')
       .order('date_piece', { ascending: false })
       .limit(100);   // 2× limit pour couvrir les doublons gescom/compta
     if (fournisseurPrevu) q = q.eq('tiers_code', fournisseurPrevu);
-    if (query.trim())     q = q.ilike('numero_piece', `%${query.trim()}%`);
+    // Recherche multi-colonnes : n° de pièce, libellé OU tiers/fournisseur
+    const term = sanitizeTerm(query);
+    if (term) q = q.or(`numero_piece.ilike.%${term}%,libelle.ilike.%${term}%,tiers_code.ilike.%${term}%,nom_tiers.ilike.%${term}%`);
     const { data, error } = await q;
     if (error) throw error;
 
     // Déduplique par numero_piece (cas multi-lignes) et mappe vers DivaltoCommande
     const seen = new Map<string, DivaltoCommande>();
     for (const d of data ?? []) {
+      if (isUnusablePiece(d.numero_piece)) continue;
       const existing = seen.get(d.numero_piece);
       if (!existing) {
         seen.set(d.numero_piece, {
           fullcdno:      d.numero_piece,
           tiers:         d.tiers_code,
           nomfournisseur: d.nom_tiers,
+          libelle:       d.libelle,
           montant_ht:    d.montant_ht,
           date_commande: d.date_piece,
         });
       } else {
         existing.montant_ht = (existing.montant_ht ?? 0) + (d.montant_ht ?? 0);
+        existing.libelle ??= d.libelle;
       }
     }
     return Array.from(seen.values()).slice(0, 50);
@@ -243,19 +269,23 @@ export function useITBudgetRapprochement(
       .order('date_piece', { ascending: false })
       .limit(200);
     if (fournisseurPrevu) q = q.eq('tiers_code', fournisseurPrevu);
-    if (query.trim())     q = q.ilike('numero_piece', `%${query.trim()}%`);
+    // Recherche multi-colonnes : n° de pièce, libellé OU tiers/fournisseur
+    const term = sanitizeTerm(query);
+    if (term) q = q.or(`numero_piece.ilike.%${term}%,libelle.ilike.%${term}%,tiers_code.ilike.%${term}%,nom_tiers.ilike.%${term}%`);
     const { data, error } = await q;
     if (error) throw error;
 
-    const rawRows: DivaltoFactureRaw[] = (data ?? []).map((d: any) => ({
-      reference:     d.numero_piece,
-      source:        d.source,
-      tiers:         d.tiers_code,
-      nomfournisseur: d.nom_tiers,
-      libelle:       d.libelle,
-      montant_ht:    d.montant_ht,
-      date_facture:  d.date_piece,
-    }));
+    const rawRows: DivaltoFactureRaw[] = (data ?? [])
+      .filter((d: any) => !isUnusablePiece(d.numero_piece))
+      .map((d: any) => ({
+        reference:     d.numero_piece,
+        source:        d.source,
+        tiers:         d.tiers_code,
+        nomfournisseur: d.nom_tiers,
+        libelle:       d.libelle,
+        montant_ht:    d.montant_ht,
+        date_facture:  d.date_piece,
+      }));
     const grouped = groupFacturesByReference(rawRows);
     grouped.sort((a, b) => {
       const da = a.date_facture ?? '';
