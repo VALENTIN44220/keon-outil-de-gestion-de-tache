@@ -8,6 +8,8 @@ export type ITProjectType =
   | 'securite'
   | 'data'
   | 'integration'
+  | 'organisation'
+  | 'ie'
   | 'autre';
 
 export type ITProjectPriority = 'critique' | 'haute' | 'normale' | 'basse';
@@ -260,6 +262,8 @@ export const IT_PROJECT_TYPE_CONFIG: Record<ITProjectType, { label: string; icon
   securite: { label: 'Sécurité', icon: '🔒' },
   data: { label: 'Data / BI', icon: '📊' },
   integration: { label: 'Intégration', icon: '🔗' },
+  organisation: { label: 'Organisation', icon: '🏛️' },
+  ie: { label: 'IE', icon: '🧠' },
   autre: { label: 'Autre', icon: '📦' },
 };
 

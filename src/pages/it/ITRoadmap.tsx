@@ -16,7 +16,7 @@ import {
 import {
   Map as MapIcon, Undo2, Redo2, AlertTriangle, Loader2, ExternalLink,
   EyeOff, Eye, CalendarRange, Filter, X, ChevronDown, ChevronRight, Hash,
-  ArrowUp, ArrowDown, Maximize2, Minimize2, CalendarClock,
+  ArrowUp, ArrowDown, Maximize2, Minimize2, CalendarClock, Bookmark, RotateCcw,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { extractErrorMessage } from '@/lib/extractErrorMessage';
@@ -24,9 +24,13 @@ import { useFdrProjects, usePatchFdrProject, type FdrRoadmapProject, type FdrPro
 import { FdrImportExport } from '@/components/it/FdrImportExport';
 import { FdrHistorySheet } from '@/components/it/FdrHistorySheet';
 import { useFdrSettings, useFdrProfils } from '@/hooks/useFdrSettings';
+import { useViewPreferences } from '@/hooks/useViewPreferences';
 import {
-  computeCapacityMatrix, computeProjectMonthLoads, generateHorizon, getMepRetenue, toYM, addMonths, cmpYM,
+  computeCapacityMatrix, computeProjectMonthLoads, generateHorizon, getMepRetenue, toYM, addMonths,
 } from '@/lib/fdr/calculationEngine';
+import {
+  type YearGran, type Period, GRAN_CYCLE, GRAN_LETTER, buildPeriods, periodIndexOfMonth,
+} from '@/lib/fdr/periods';
 import { STATUT_PORTEFEUILLE_CONFIG, ACTIVITES_METIER, type StatutPortefeuille, type FdrEngineSettings } from '@/types/fdr';
 import { IT_PROJECT_PILIER_CONFIG } from '@/types/itProject';
 import { cn } from '@/lib/utils';
@@ -59,63 +63,26 @@ const GROUP_COLORS = [
   '#db2777', '#0d9488', '#ea580c', '#65a30d', '#0891b2', '#9333ea',
 ];
 
-// ---- Granularité temporelle par année (regroupement des colonnes) ----
-
-type YearGran = 'month' | 'quarter' | 'year';
-const GRAN_CYCLE: Record<YearGran, YearGran> = { month: 'quarter', quarter: 'year', year: 'month' };
-const GRAN_LETTER: Record<YearGran, string> = { month: 'M', quarter: 'T', year: 'A' };
-
-/** Une colonne affichée = 1 mois, 1 trimestre ou 1 année. */
-interface Period {
-  key: string;
-  label: string;
-  sub?: string;
-  year: string;
-  kind: YearGran;
-  months: string[];
+// ---- Préférences de vue (enregistrement personnel "standard") ----
+interface RoadmapViewConfig {
+  search: string;
+  fCategorie: string;
+  fActivite: string;
+  fPilier: string;
+  fStatut: string;
+  fProfil: string;
+  onlyWithDays: boolean;
+  groupBy: GroupMode;
+  yearGran: Record<string, YearGran>;
+  showCode: boolean;
+  wideLabels: boolean;
 }
+const ROADMAP_VIEW_DEFAULTS: RoadmapViewConfig = {
+  search: '', fCategorie: ALL, fActivite: ALL, fPilier: ALL, fStatut: ALL, fProfil: ALL,
+  onlyWithDays: false, groupBy: 'activite', yearGran: {}, showCode: false, wideLabels: true,
+};
 
-function fmtYMShort(ym: string): string {
-  const [y, m] = ym.split('-');
-  const months = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
-  return `${months[parseInt(m) - 1]} ${y.slice(2)}`;
-}
-
-/** Construit la liste des colonnes en repliant chaque année selon sa granularité. */
-function buildPeriods(months: string[], gran: Record<string, YearGran>): Period[] {
-  const byYear = new Map<string, string[]>();
-  for (const ym of months) {
-    const y = ym.slice(0, 4);
-    (byYear.get(y) ?? byYear.set(y, []).get(y)!).push(ym);
-  }
-  const periods: Period[] = [];
-  for (const [year, yms] of byYear) {
-    const g = gran[year] ?? 'month';
-    if (g === 'year') {
-      periods.push({ key: `Y-${year}`, label: year, year, kind: 'year', months: yms });
-    } else if (g === 'quarter') {
-      const q = new Map<number, string[]>();
-      for (const ym of yms) {
-        const qq = Math.ceil(parseInt(ym.slice(5, 7)) / 3);
-        (q.get(qq) ?? q.set(qq, []).get(qq)!).push(ym);
-      }
-      for (const [qq, qms] of [...q.entries()].sort((a, b) => a[0] - b[0])) {
-        periods.push({ key: `Q-${year}-${qq}`, label: `T${qq}`, sub: year.slice(2), year, kind: 'quarter', months: qms });
-      }
-    } else {
-      for (const ym of yms) periods.push({ key: ym, label: fmtYMShort(ym), year, kind: 'month', months: [ym] });
-    }
-  }
-  return periods;
-}
-
-/** Index de la colonne contenant un mois (clamp -1 / length hors horizon). */
-function periodIndexOfMonth(periods: Period[], ym: string | null): number | null {
-  if (!ym) return null;
-  for (let i = 0; i < periods.length; i++) if (periods[i].months.includes(ym)) return i;
-  if (periods.length === 0) return null;
-  return cmpYM(ym, periods[0].months[0]) < 0 ? -1 : periods.length;
-}
+// ---- Granularité temporelle : voir src/lib/fdr/periods.ts (partagé avec le Plan de charge) ----
 
 /** Somme de charge (build+suivi, j/mois) d'un projet sur un mois donné. */
 function projectMonthCharge(
@@ -226,10 +193,41 @@ function RoadmapContent() {
   const cycleYearGran = (year: string) =>
     setYearGran(g => ({ ...g, [year]: GRAN_CYCLE[g[year] ?? 'month'] }));
 
+  // ---- Vue enregistrée (standard personnel) : filtres + granularité + groupement ----
+  const { config: savedView, isLoaded: viewLoaded, save: saveView, reset: resetView, isSaving: viewSaving } =
+    useViewPreferences<RoadmapViewConfig>('it-roadmap', ROADMAP_VIEW_DEFAULTS);
+  const hydratedRef = useRef(false);
+  useEffect(() => {
+    if (hydratedRef.current || !viewLoaded) return;
+    hydratedRef.current = true;
+    const v = savedView;
+    setSearch(v.search); setFCategorie(v.fCategorie); setFActivite(v.fActivite);
+    setFPilier(v.fPilier); setFStatut(v.fStatut); setFProfil(v.fProfil);
+    setOnlyWithDays(v.onlyWithDays); setGroupBy(v.groupBy); setYearGran(v.yearGran ?? {});
+    setShowCode(v.showCode); setWideLabels(v.wideLabels);
+  }, [viewLoaded, savedView]);
+
+  const handleSaveView = () => {
+    saveView({
+      search, fCategorie, fActivite, fPilier, fStatut, fProfil,
+      onlyWithDays, groupBy, yearGran, showCode, wideLabels,
+    });
+    toast({ title: 'Vue enregistrée', description: 'Cet affichage est désormais votre standard.' });
+  };
+  const handleResetView = () => {
+    resetView();
+    const d = ROADMAP_VIEW_DEFAULTS;
+    setSearch(d.search); setFCategorie(d.fCategorie); setFActivite(d.fActivite);
+    setFPilier(d.fPilier); setFStatut(d.fStatut); setFProfil(d.fProfil);
+    setOnlyWithDays(d.onlyWithDays); setGroupBy(d.groupBy); setYearGran(d.yearGran);
+    setShowCode(d.showCode); setWideLabels(d.wideLabels);
+    toast({ title: 'Vue réinitialisée' });
+  };
+
   // ---- Groupes repliés (affichent la somme) ----
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const toggleCollapse = (key: string) => setCollapsed(s => {
-    const n = new Set(s); n.has(key) ? n.delete(key) : n.add(key); return n;
+    const n = new Set(s); if (n.has(key)) n.delete(key); else n.add(key); return n;
   });
 
   // ---- Tri par colonne ----
@@ -628,6 +626,21 @@ function RoadmapContent() {
                 ))}
               </SelectContent>
             </Select>
+            <Button
+              variant="outline" size="sm" className="h-8 gap-1.5 text-xs"
+              onClick={handleSaveView} disabled={viewSaving}
+              title="Enregistrer cet affichage (filtres + granularité + groupement) comme votre standard"
+            >
+              {viewSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Bookmark className="h-3.5 w-3.5" />}
+              Enregistrer la vue
+            </Button>
+            <Button
+              variant="ghost" size="icon" className="h-8 w-8"
+              onClick={handleResetView}
+              title="Réinitialiser la vue standard (retour aux défauts)"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+            </Button>
             <Button
               variant={showCode ? 'outline' : 'default'} size="icon" className="h-8 w-8"
               onClick={() => setShowCode(v => !v)}

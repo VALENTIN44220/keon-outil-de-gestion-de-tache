@@ -375,6 +375,8 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
                     <SelectItem value="securite">🔒 Sécurité</SelectItem>
                     <SelectItem value="data">📊 Data / BI</SelectItem>
                     <SelectItem value="integration">🔗 Intégration</SelectItem>
+                    <SelectItem value="organisation">🏛️ Organisation</SelectItem>
+                    <SelectItem value="ie">🧠 IE</SelectItem>
                     <SelectItem value="autre">📦 Autre</SelectItem>
                   </SelectContent>
                 </Select>
