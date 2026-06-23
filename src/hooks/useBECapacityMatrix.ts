@@ -22,6 +22,16 @@ import {
 const sb = supabase as any;
 const BE_GROUP_ID = '301ffee1-718f-42af-aec0-545cf4765ffa';
 const HORIZON_MONTHS = 12;
+const MAX_MONTHS = 36;
+
+/** Parse 'YYYY-MM' → Date (1er du mois). */
+function parseYm(s: string): Date {
+  const [y, m] = s.split('-').map(Number);
+  return new Date(y, (m || 1) - 1, 1);
+}
+function monthsBetween(a: Date, b: Date): number {
+  return (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
+}
 
 export interface BECapacityCell { capacity: number; reel: number; projete: number; ecart: number; }
 /** Détail d'une affaire/projet pour un collaborateur (projeté + réel par mois). */
@@ -48,15 +58,20 @@ export interface BECapacityMatrix {
 const ym = (d: Date) => format(d, 'yyyy-MM');
 const dayKey = (d: Date) => format(d, 'yyyy-MM-dd');
 
-export function useBECapacityMatrix() {
+export function useBECapacityMatrix(range?: { startYm?: string; endYm?: string }) {
+  const startYm = range?.startYm;
+  const endYm = range?.endYm;
   const [matrix, setMatrix] = useState<BECapacityMatrix>({ months: [], rows: [] });
   const [isLoading, setIsLoading] = useState(true);
 
   const fetch = useCallback(async () => {
     setIsLoading(true);
     try {
-      const first = startOfMonth(new Date());
-      const monthsDates = Array.from({ length: HORIZON_MONTHS }, (_, i) => addMonths(first, i));
+      const first = startOfMonth(startYm ? parseYm(startYm) : new Date());
+      const endBase = endYm ? parseYm(endYm) : addMonths(first, HORIZON_MONTHS - 1);
+      const last = endBase < first ? first : endBase;
+      const count = Math.min(MAX_MONTHS, Math.max(1, monthsBetween(first, last) + 1));
+      const monthsDates = Array.from({ length: count }, (_, i) => addMonths(first, i));
       const months = monthsDates.map((d) => ({ ym: ym(d), label: format(d, 'MMM yy') }));
       const horizonStart = first;
       const horizonEnd = endOfMonth(monthsDates[monthsDates.length - 1]);
@@ -212,7 +227,7 @@ export function useBECapacityMatrix() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [startYm, endYm]);
 
   useEffect(() => { void fetch(); }, [fetch]);
 

@@ -36,6 +36,18 @@ const POSTE_LABELS: Record<string, string> = {
 
 const num = (n: number) => (Math.round((Number(n) || 0) * 10) / 10).toLocaleString('fr-FR');
 
+/** 'YYYY-MM' du mois courant. */
+function nowYm(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+/** Décale un 'YYYY-MM' de n mois. */
+function addYm(s: string, n: number): string {
+  const [y, m] = s.split('-').map(Number);
+  const t = y * 12 + (m - 1) + n;
+  return `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, '0')}`;
+}
+
 /** Couleur de cellule selon l'écart capacité − projeté (en jours, agrégé période). */
 function cellClass(ecart: number): string {
   if (ecart > 8) return 'bg-emerald-100 text-emerald-900';
@@ -67,7 +79,17 @@ function aggDetail(byYm: Record<string, { projete: number; reel: number }>, mont
 
 export default function BEPlanning() {
   const [activeView, setActiveView] = useState('be-planning');
-  const { matrix, isLoading, refetch } = useBECapacityMatrix();
+
+  // Plage de temps affichée (début/fin inclus). Défaut : mois courant → +11.
+  const [startYm, setStartYm] = useState(() => nowYm());
+  const [endYm, setEndYm] = useState(() => addYm(nowYm(), 11));
+  const applyPreset = (sOff: number, eOff: number) => {
+    const base = nowYm();
+    setStartYm(addYm(base, sOff));
+    setEndYm(addYm(base, eOff));
+  };
+
+  const { matrix, isLoading, refetch } = useBECapacityMatrix({ startYm, endYm });
 
   const { config: view, isLoaded: viewLoaded, save: saveView, reset: resetView, isSaving } =
     useViewPreferences<BEViewConfig>('be-planning', BE_VIEW_DEFAULTS);
@@ -136,6 +158,18 @@ export default function BEPlanning() {
                     {postesPresent.map(p => <SelectItem key={p} value={p}>{POSTE_LABELS[p] ?? p}</SelectItem>)}
                   </SelectContent>
                 </Select>
+                {/* Plage de temps (début → fin, mois précédents inclus) */}
+                <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                  <span className="mr-0.5">Période :</span>
+                  <input type="month" value={startYm} max={endYm} onChange={e => e.target.value && setStartYm(e.target.value)}
+                    className="h-7 rounded-md border bg-background px-1.5 text-[11px]" />
+                  <span>→</span>
+                  <input type="month" value={endYm} min={startYm} onChange={e => e.target.value && setEndYm(e.target.value)}
+                    className="h-7 rounded-md border bg-background px-1.5 text-[11px]" />
+                  <Button variant="ghost" size="sm" className="h-7 px-1.5 text-[10px]" onClick={() => applyPreset(-11, 0)} title="11 mois précédents + mois courant">12 derniers</Button>
+                  <Button variant="ghost" size="sm" className="h-7 px-1.5 text-[10px]" onClick={() => applyPreset(-6, 5)} title="6 mois avant / 6 après">±6 mois</Button>
+                  <Button variant="ghost" size="sm" className="h-7 px-1.5 text-[10px]" onClick={() => applyPreset(0, 11)} title="12 prochains mois">12 prochains</Button>
+                </div>
                 {/* Granularité par année */}
                 <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
                   <span className="mr-1">Granularité :</span>
