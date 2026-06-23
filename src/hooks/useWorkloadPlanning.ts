@@ -168,6 +168,22 @@ export function useWorkloadPlanning({
       } else {
         const subordinateIds = await findSubordinates(profile.id);
         memberIds = [profile.id, ...subordinateIds];
+
+        // Manager dispatch BE → visibilité sur TOUTE l'équipe BE (au-delà des N-1).
+        const { data: mgrRows } = await supabase
+          .from('sub_process_templates')
+          .select('id')
+          .eq('dispatch_manager_id', profile.id)
+          .eq('process_template_id', 'bd75a3b0-c918-4b43-befe-739b83f7461a')
+          .limit(1);
+        if (mgrRows && mgrRows.length > 0) {
+          const { data: beMembers } = await supabase
+            .from('collaborator_group_members')
+            .select('user_id')
+            .eq('group_id', '301ffee1-718f-42af-aec0-545cf4765ffa');
+          const beIds = (beMembers ?? []).map((m: { user_id: string }) => m.user_id).filter(Boolean);
+          memberIds = Array.from(new Set([...memberIds, ...beIds]));
+        }
       }
 
       // Apply company filter

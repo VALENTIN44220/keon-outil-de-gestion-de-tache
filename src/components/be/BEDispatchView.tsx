@@ -88,6 +88,7 @@ import {
   Ban,
   Loader2,
   FolderOpen,
+  CalendarClock,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { getBEStatusMeta } from '@/hooks/useBETaskStatus';
@@ -99,7 +100,7 @@ import { BEStatusBadge } from '@/components/be/BEStatusBadge';
 import { NewBERequestDialog } from '@/components/be/NewBERequestDialog';
 import { useBETaskStatus } from '@/hooks/useBETaskStatus';
 import { useUserWeekLoad, type UserWeekLoad } from '@/hooks/useUserWeekLoad';
-import { clearBETaskSlots, resyncBESlots } from '@/lib/be/distributeBESlots';
+import { clearBETaskSlots, resyncBESlots, distributeBESlots } from '@/lib/be/distributeBESlots';
 import {
   useRequestStates,
   MACRO_STATE_CATEGORIES,
@@ -642,28 +643,58 @@ function AssigneeSelector({
       // Rafraîchit la charge hebdo affichée sous chaque profil
       qc.invalidateQueries({ queryKey: ['user-week-load'] });
       onAssigned();
-
-      if (assigneeId) {
-        // Affecté à un collaborateur → on bascule sur le Plan de charge,
-        // pré-filtré sur la demande + le salarié, pour placer la tâche sur
-        // une date par drag-drop.
-        toast.success('Tâche assignée — ouverture du plan de charge');
-        const params = new URLSearchParams();
-        if (parentRequestId) params.set('demandId', parentRequestId);
-        params.set('userId', assigneeId);
-        navigate(`/workload?${params.toString()}`);
-      } else {
-        toast.success('Affectation retirée');
-      }
+      // Plus de navigation forcée : le dispatcheur choisit le mode de planification
+      // via les deux boutons (1er créneau dispo / date précise).
+      toast.success(assigneeId ? 'Tâche assignée — choisissez le mode de planification' : 'Affectation retirée');
     },
     onError: (err: any) => {
       toast.error(err.message || "Erreur lors de l'assignation");
     },
   });
 
+  // ── Planification après affectation : 2 modes ──
+  const [scheduling, setScheduling] = useState<'auto' | null>(null);
+
+  const planAuto = async () => {
+    if (!currentAssigneeId) return;
+    if (!durationHours || durationHours <= 0) {
+      toast.message('Renseignez d\'abord une durée (badge ⏱) pour planifier automatiquement.');
+      return;
+    }
+    setScheduling('auto');
+    try {
+      const res = await distributeBESlots({
+        taskId, userId: currentAssigneeId, startDate, dueDate,
+        totalHours: durationHours, avoidUserBusy: true,
+      });
+      qc.invalidateQueries({ queryKey: ['user-week-load'] });
+      if (res.slotsCreated === 0) {
+        toast.message('Aucun créneau disponible posé.');
+      } else {
+        toast.success(
+          `Planifié au plus tôt : ${res.slotsCreated} demi-journée(s)` +
+          (res.truncated ? ' (fenêtre trop courte, reste à placer)' : ''),
+        );
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'Erreur de planification');
+    } finally {
+      setScheduling(null);
+    }
+  };
+
+  const planManual = () => {
+    if (!currentAssigneeId) return;
+    const params = new URLSearchParams();
+    if (parentRequestId) params.set('demandId', parentRequestId);
+    params.set('userId', currentAssigneeId);
+    navigate(`/workload?${params.toString()}`);
+  };
+
   const current = profiles.find(p => p.id === currentAssigneeId);
 
   return (
+    <div className="flex items-center gap-1">
     <Select
       value={currentAssigneeId ?? '__none__'}
       onValueChange={v => mutation.mutate(v === '__none__' ? null : v)}
@@ -735,6 +766,31 @@ function AssigneeSelector({
           })}
       </SelectContent>
     </Select>
+
+    {/* Deux modes de planification après affectation */}
+    {currentAssigneeId && (
+      <TooltipProvider delayDuration={200}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-emerald-600 hover:text-emerald-700"
+              onClick={planAuto} disabled={scheduling === 'auto' || mutation.isPending}>
+              {scheduling === 'auto' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent className="text-xs">Planifier au 1er créneau disponible (sans ouvrir le plan de charge)</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button type="button" variant="ghost" size="icon" className="h-7 w-7 text-violet-600 hover:text-violet-700"
+              onClick={planManual} disabled={mutation.isPending}>
+              <CalendarClock className="h-3.5 w-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent className="text-xs">Choisir une date précise (ouvre le plan de charge équipe)</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    )}
+    </div>
   );
 }
 

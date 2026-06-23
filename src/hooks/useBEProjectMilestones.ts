@@ -69,6 +69,33 @@ export function useBEProjectMilestones(beProjectId: string | undefined) {
     return true;
   };
 
+  /** Ajout manuel d'un jalon (affaires anciennes, ou jalon hors workflow). */
+  const addMilestone = async (payload: { titre: string; date_prevue?: string | null; date_reelle?: string | null; ordre?: number | null }) => {
+    if (!beProjectId) return false;
+    const statut = payload.date_reelle ? 'termine' : 'a_venir';
+    const { error } = await (supabase as any).from('be_project_milestones').insert({
+      be_project_id: beProjectId,
+      titre: payload.titre,
+      date_prevue: payload.date_prevue || null,
+      date_reelle: payload.date_reelle || null,
+      statut,
+      ordre: payload.ordre ?? null,
+      source_task_id: null,
+    });
+    if (error) { toast.error(`Erreur : ${error.message}`); return false; }
+    toast.success('Jalon ajouté');
+    invalidate();
+    return true;
+  };
+
+  const deleteMilestone = async (id: string) => {
+    const { error } = await (supabase as any).from('be_project_milestones').delete().eq('id', id);
+    if (error) { toast.error(`Erreur : ${error.message}`); return false; }
+    toast.success('Jalon supprimé');
+    invalidate();
+    return true;
+  };
+
   const updateStatut = async (id: string, statut: BEProjectMilestone['statut']) => {
     const { error } = await (supabase as any)
       .from('be_project_milestones')
@@ -85,5 +112,7 @@ export function useBEProjectMilestones(beProjectId: string | undefined) {
     refetch: invalidate,
     updateDates,
     updateStatut,
+    addMilestone,
+    deleteMilestone,
   };
 }

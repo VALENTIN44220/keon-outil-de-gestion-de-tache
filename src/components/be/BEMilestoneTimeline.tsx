@@ -13,7 +13,7 @@
 import { useMemo, useState } from 'react';
 import { format, parseISO, differenceInDays, isAfter, isBefore } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { Flag, CheckCircle2, Clock, AlertTriangle, Calendar, Pencil, Loader2 } from 'lucide-react';
+import { Flag, CheckCircle2, Clock, AlertTriangle, Calendar, Pencil, Loader2, Plus, Trash2 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,6 +23,13 @@ import { cn } from '@/lib/utils';
 import { useBEProjectMilestones, BEProjectMilestone } from '@/hooks/useBEProjectMilestones';
 
 type Status = 'a_venir' | 'en_cours' | 'termine' | 'retarde';
+
+/** Jalons réglementaires standard (ajout rapide pour les affaires anciennes). */
+const STANDARD_MILESTONES: { group: string; titres: string[] }[] = [
+  { group: 'ICPE', titres: ['ICPE — Dépôt dossier', 'ICPE — Complétude obtenue', 'ICPE — Purge', 'ICPE — Arrêté'] },
+  { group: 'Permis de construire', titres: ['Permis de construire — Dépôt', 'Permis de construire — Arrêté', 'Permis de construire — Purge'] },
+  { group: 'Agrément sanitaire', titres: ['Agrément sanitaire — Dépôt', 'Agrément sanitaire — Agrément provisoire', 'Agrément sanitaire — Agrément définitif'] },
+];
 
 const STATUS_META: Record<Status, { label: string; dot: string; ring: string; badge: string; icon: any }> = {
   termine:  { label: 'Terminé',  dot: 'bg-emerald-500', ring: 'ring-emerald-200', badge: 'bg-emerald-100 text-emerald-700', icon: CheckCircle2 },
@@ -38,7 +45,7 @@ interface Props {
 }
 
 export function BEMilestoneTimeline({ beProjectId, maxItems }: Props) {
-  const { milestones, isLoading, updateDates } = useBEProjectMilestones(beProjectId);
+  const { milestones, isLoading, updateDates, addMilestone, deleteMilestone } = useBEProjectMilestones(beProjectId);
 
   // Détecte les retards : statut !== 'termine' && date_prevue < today
   const enriched = useMemo(() => {
@@ -70,13 +77,18 @@ export function BEMilestoneTimeline({ beProjectId, maxItems }: Props) {
         <p className="text-sm text-muted-foreground">
           Aucun jalon défini pour ce projet.
         </p>
-        <p className="text-xs text-muted-foreground/70 mt-1">
-          Les étapes flaggées « Jalon » dans le paramétrage des prestations
-          apparaîtront ici dès qu'elles seront prises en charge ou complétées.
+        <p className="text-xs text-muted-foreground/70 mt-1 mb-3">
+          Les étapes flaggées « Jalon » dans le paramétrage des prestations apparaissent ici
+          automatiquement. Pour une affaire ancienne, ajoutez les jalons à la main :
         </p>
+        <div className="flex justify-center">
+          <AddMilestone onAdd={addMilestone} existing={[]} />
+        </div>
       </div>
     );
   }
+
+  const existingTitres = enriched.map((m) => m.titre);
 
   return (
     <div className="space-y-4">
@@ -91,9 +103,15 @@ export function BEMilestoneTimeline({ beProjectId, maxItems }: Props) {
               key={m.id}
               milestone={m}
               onSave={(patch) => updateDates(m.id, patch)}
+              onDelete={m.source_task_id ? undefined : () => deleteMilestone(m.id)}
             />
           ))}
         </div>
+      </div>
+
+      {/* Ajout manuel d'un jalon */}
+      <div className="flex justify-end">
+        <AddMilestone onAdd={addMilestone} existing={existingTitres} />
       </div>
 
       {hidden > 0 && (
@@ -121,9 +139,11 @@ export function BEMilestoneTimeline({ beProjectId, maxItems }: Props) {
 function MilestoneNode({
   milestone,
   onSave,
+  onDelete,
 }: {
   milestone: BEProjectMilestone & { effectiveStatus: Status; daysUntil: number | null };
   onSave: (patch: { date_prevue?: string | null; date_reelle?: string | null }) => Promise<boolean>;
+  onDelete?: () => Promise<boolean>;
 }) {
   const meta = STATUS_META[milestone.effectiveStatus];
   const Icon = meta.icon;
@@ -255,13 +275,107 @@ function MilestoneNode({
             </div>
           </div>
 
+          <div className="flex justify-between gap-2 pt-1">
+            {onDelete ? (
+              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive gap-1.5"
+                disabled={saving}
+                onClick={async () => { setSaving(true); const ok = await onDelete(); setSaving(false); if (ok) setOpen(false); }}>
+                <Trash2 className="h-3.5 w-3.5" />Supprimer
+              </Button>
+            ) : <span />}
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => setOpen(false)} disabled={saving}>
+                Annuler
+              </Button>
+              <Button size="sm" onClick={handleSave} disabled={saving} className="gap-1.5">
+                {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Pencil className="h-3.5 w-3.5" />}
+                Enregistrer
+              </Button>
+            </div>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// Ajout manuel d'un jalon (presets réglementaires + saisie libre)
+// ════════════════════════════════════════════════════════════════════════
+function AddMilestone({
+  onAdd,
+  existing,
+}: {
+  onAdd: (p: { titre: string; date_prevue?: string | null; date_reelle?: string | null }) => Promise<boolean>;
+  existing: string[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [titre, setTitre] = useState('');
+  const [datePrevue, setDatePrevue] = useState('');
+  const [dateReelle, setDateReelle] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const reset = () => { setTitre(''); setDatePrevue(''); setDateReelle(''); };
+
+  const handleAdd = async () => {
+    if (!titre.trim()) return;
+    setSaving(true);
+    const ok = await onAdd({ titre: titre.trim(), date_prevue: datePrevue || null, date_reelle: dateReelle || null });
+    setSaving(false);
+    if (ok) { reset(); setOpen(false); }
+  };
+
+  return (
+    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset(); }}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs">
+          <Plus className="h-3.5 w-3.5" />Ajouter un jalon
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80" align="end">
+        <div className="space-y-3">
+          <p className="text-sm font-semibold">Ajouter un jalon</p>
+
+          {/* Presets réglementaires */}
+          <div className="space-y-1.5">
+            <Label className="text-[11px] text-muted-foreground">Jalons standard</Label>
+            {STANDARD_MILESTONES.map((grp) => (
+              <div key={grp.group} className="flex flex-wrap gap-1">
+                {grp.titres.map((t) => {
+                  const used = existing.includes(t);
+                  return (
+                    <button key={t} type="button" disabled={used}
+                      onClick={() => setTitre(t)}
+                      className={cn('text-[10px] px-1.5 py-0.5 rounded border',
+                        used ? 'opacity-40 cursor-not-allowed line-through' : 'hover:bg-accent',
+                        titre === t && 'border-violet-400 bg-violet-50')}>
+                      {t.replace(/^.*— /, '')}
+                      <span className="text-muted-foreground/60 ml-1">{grp.group.slice(0, 4)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs">Libellé</Label>
+            <Input value={titre} onChange={(e) => setTitre(e.target.value)} placeholder="Intitulé du jalon" className="h-8 text-xs" />
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Date cible</Label>
+              <Input type="date" value={datePrevue} onChange={(e) => setDatePrevue(e.target.value)} className="h-8 text-xs" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Date réelle</Label>
+              <Input type="date" value={dateReelle} onChange={(e) => setDateReelle(e.target.value)} className="h-8 text-xs" />
+            </div>
+          </div>
           <div className="flex justify-end gap-2 pt-1">
-            <Button variant="outline" size="sm" onClick={() => setOpen(false)} disabled={saving}>
-              Annuler
-            </Button>
-            <Button size="sm" onClick={handleSave} disabled={saving} className="gap-1.5">
-              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Pencil className="h-3.5 w-3.5" />}
-              Enregistrer
+            <Button variant="outline" size="sm" onClick={() => setOpen(false)} disabled={saving}>Annuler</Button>
+            <Button size="sm" onClick={handleAdd} disabled={saving || !titre.trim()} className="gap-1.5">
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}Ajouter
             </Button>
           </div>
         </div>

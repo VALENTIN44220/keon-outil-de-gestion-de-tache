@@ -35,6 +35,9 @@ export interface DistributeBESlotsInput {
   /** ISO yyyy-MM-dd ou Date. */
   dueDate?: string | Date | null;
   totalHours: number;
+  /** Si true, saute les demi-journées déjà occupées par d'autres slots de l'utilisateur
+   *  → planification « au premier créneau réellement disponible ». */
+  avoidUserBusy?: boolean;
 }
 
 export interface DistributeBESlotsResult {
@@ -76,7 +79,24 @@ export async function distributeBESlots(
 
   const nbHalfDaysNeeded = Math.ceil(totalHours / SLOT_HOURS);
 
-  // 1. Construit la liste des demi-journées candidates (jours ouvrés)
+  // Pré-charge les demi-journées déjà occupées par l'utilisateur (hors cette tâche)
+  // pour planifier « au premier créneau réellement disponible ».
+  const busy = new Set<string>();
+  if (input.avoidUserBusy) {
+    const hardCapStr = format(addDays(start, 180), 'yyyy-MM-dd');
+    const { data: existing } = await sb
+      .from('workload_slots')
+      .select('date, half_day, task_id')
+      .eq('user_id', userId)
+      .gte('date', format(start, 'yyyy-MM-dd'))
+      .lte('date', hardCapStr);
+    for (const s of existing ?? []) {
+      if (s.task_id === taskId) continue; // ses propres slots seront supprimés
+      busy.add(`${String(s.date).slice(0, 10)}|${s.half_day}`);
+    }
+  }
+
+  // 1. Construit la liste des demi-journées candidates (jours ouvrés, non occupées)
   const candidates: { date: string; halfDay: 'morning' | 'afternoon' }[] = [];
   let cursor = new Date(start);
   cursor.setHours(0, 0, 0, 0);
@@ -89,8 +109,10 @@ export async function distributeBESlots(
     (!due || !isAfter(cursor, due))
   ) {
     if (!isWeekend(cursor)) {
+      const ds = format(cursor, 'yyyy-MM-dd');
       for (const hd of HALF_DAYS) {
-        candidates.push({ date: format(cursor, 'yyyy-MM-dd'), halfDay: hd });
+        if (busy.has(`${ds}|${hd}`)) continue;
+        candidates.push({ date: ds, halfDay: hd });
         if (candidates.length >= nbHalfDaysNeeded) break;
       }
     }

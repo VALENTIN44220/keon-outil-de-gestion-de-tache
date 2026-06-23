@@ -50,7 +50,11 @@ import {
   ChevronRight,
   ExternalLink,
    UserRoundPlus,
+  Send,
+  ShieldCheck,
+  Loader2,
 } from 'lucide-react';
+import { useBETaskStatus } from '@/hooks/useBETaskStatus';
 import { format, parseISO, differenceInDays, isPast, isToday, differenceInBusinessDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -118,6 +122,7 @@ export function UnifiedTaskDrawer({
   const [assigneeManagerId, setAssigneeManagerId] = useState<string | null>(null);
   const { profile } = useAuth();
   const { isAdmin } = useUserRole();
+  const { updateBEStatus, isUpdating: isBeUpdating } = useBETaskStatus();
 
   const assigneeIdForManager =
     item?.type === 'task' && item.task ? item.task.assignee_id : null;
@@ -497,11 +502,62 @@ export function UnifiedTaskDrawer({
           </div>
         </ScrollArea>
 
+        {/* ── Workflow BE : actions accessibles directement (Commencer, etc.) ── */}
+        {(() => {
+          const beStatus = (task as any).be_status as string | null | undefined;
+          if (!beStatus) return null;
+          const currentProfileId = profile?.id ?? null;
+          const isAssignee = currentProfileId !== null && task.assignee_id === currentProfileId;
+          const isValidator1 = currentProfileId !== null && (task as any).validator_level_1_id === currentProfileId;
+          const isValidator2 = currentProfileId !== null && (task as any).validator_level_2_id === currentProfileId;
+          const canValidateBE = isAdmin || isValidator1 || isValidator2;
+
+          const beAction = async (status: string) => {
+            await updateBEStatus({
+              taskId: task.id,
+              status: status as any,
+              notify: { taskLabel: task.title, assigneeId: task.assignee_id, dispatchManagerId: null },
+            });
+            onClose();
+          };
+
+          const canStart = (beStatus === 'affectee' || (beStatus === 'soumise' && !!task.assignee_id)) && isAssignee;
+          const canSubmit = beStatus === 'en_cours' && isAssignee;
+          const canValidate = beStatus === 'a_relire' && canValidateBE;
+          const canClose = (beStatus === 'a_valider' || beStatus === 'a_deposer') && canValidateBE;
+          if (!canStart && !canSubmit && !canValidate && !canClose) return null;
+
+          return (
+            <div className="px-4 pt-3 flex flex-wrap gap-2 border-t">
+              {canStart && (
+                <Button onClick={() => void beAction('en_cours')} disabled={isBeUpdating} className="gap-2 bg-indigo-600 hover:bg-indigo-700 flex-1">
+                  {isBeUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}Commencer
+                </Button>
+              )}
+              {canSubmit && (
+                <Button onClick={() => void beAction('a_relire')} disabled={isBeUpdating} className="gap-2 bg-blue-600 hover:bg-blue-700 flex-1">
+                  {isBeUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}Soumettre pour relecture
+                </Button>
+              )}
+              {canValidate && (
+                <Button onClick={() => void beAction('a_valider')} disabled={isBeUpdating} className="gap-2 bg-amber-500 hover:bg-amber-600 text-white flex-1">
+                  {isBeUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}Valider
+                </Button>
+              )}
+              {canClose && (
+                <Button onClick={() => void beAction('cloturee')} disabled={isBeUpdating} className="gap-2 bg-emerald-600 hover:bg-emerald-700 flex-1">
+                  {isBeUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}Clôturer
+                </Button>
+              )}
+            </div>
+          );
+        })()}
+
         {/* Footer */}
         <div className="p-4 border-t bg-muted/30 flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             className="gap-2 flex-1"
             onClick={() => onViewDetails?.(task.id, task.type)}
           >

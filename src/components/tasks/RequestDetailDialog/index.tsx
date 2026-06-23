@@ -223,7 +223,7 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange, onTas
         .order('created_at', { ascending: true });
       setRequestAttachments((attData as any[]) ?? []);
 
-      // Fetch child tasks
+      // Fetch child tasks (le tri définitif se fait par order_index du modèle ci-dessous)
       const { data: children } = await supabase
         .from('tasks')
         .select('*')
@@ -231,36 +231,41 @@ export function RequestDetailDialog({ task, open, onClose, onStatusChange, onTas
         .order('created_at', { ascending: true });
 
       if (children) {
-        setChildTasks(children as Task[]);
-
         // Get unique sub-process IDs.
         // Pour les tâches "classiques" (création via NewRequestDialog drilldown),
         // l'identifiant du sous-processus source est dans `source_sub_process_template_id`.
         // Pour les tâches BE (création via NewBERequestDialog), il est dans
         // `sub_process_template_id`. On accepte les deux pour que le dialog
         // affiche les onglets de prestation dans les 2 cas.
-        const spIds = [...new Set(
-          children
-            .map((c) => c.source_sub_process_template_id ?? (c as any).sub_process_template_id)
-            .filter(Boolean),
-        )];
-        
+        const spIdOf = (c: any) => c.source_sub_process_template_id ?? c.sub_process_template_id;
+        const spIds = [...new Set(children.map(spIdOf).filter(Boolean))];
+
+        // order_index du modèle pour ordonner les étapes selon le paramétrage.
+        const orderMap = new Map<string, number>();
         if (spIds.length > 0) {
-          // Fetch sub-process template names and departments
           const { data: spData } = await supabase
             .from('sub_process_templates')
-            .select('id, name, target_department_id')
+            .select('id, name, target_department_id, order_index')
             .in('id', spIds);
-          
+
           if (spData) {
             const spMap = new Map<string, { name: string; departmentId: string | null }>();
-            spData.forEach(sp => spMap.set(sp.id, { 
-              name: sp.name, 
-              departmentId: sp.target_department_id 
-            }));
+            spData.forEach(sp => {
+              spMap.set(sp.id, { name: sp.name, departmentId: sp.target_department_id });
+              orderMap.set(sp.id, (sp as any).order_index ?? 9999);
+            });
             setSubProcessNames(spMap);
           }
         }
+
+        // Tri impératif par order_index du modèle, puis created_at en départage.
+        const sortedChildren = [...children].sort((a, b) => {
+          const oa = orderMap.get(spIdOf(a)) ?? 9999;
+          const ob = orderMap.get(spIdOf(b)) ?? 9999;
+          if (oa !== ob) return oa - ob;
+          return String(a.created_at).localeCompare(String(b.created_at));
+        });
+        setChildTasks(sortedChildren as Task[]);
       }
 
       // Fetch profiles with manager_id
