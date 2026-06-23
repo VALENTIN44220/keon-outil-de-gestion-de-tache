@@ -1,11 +1,16 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-/** Une embauche simulée : un profil, un nombre d'ETP, à partir d'un mois 'YYYY-MM'. */
+/** Nature d'un renfort simulé : embauche interne ou sous-traitance externe. */
+export type HireKind = 'embauche' | 'sous_traitance';
+
+/** Un renfort simulé : un profil, un nombre d'ETP, à partir d'un mois 'YYYY-MM'. */
 export interface SimulatedHire {
   profil_code: string;
   nb_etp: number;
   start_ym: string;
+  /** 'embauche' (interne) par défaut, ou 'sous_traitance' (externe). */
+  kind?: HireKind;
 }
 
 export interface FdrHireScenario {

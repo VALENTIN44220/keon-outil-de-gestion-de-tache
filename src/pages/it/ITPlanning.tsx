@@ -214,7 +214,10 @@ function PlanningContent() {
       {/* Heatmap principale */}
       <HeatmapCard adjusted={adjusted} activeProfils={activeProfils} periods={periods} />
 
-      {/* Cascade RSI */}
+      {/* Sous-effectif différencié par profil */}
+      <SousEffectifParProfilCard adjusted={adjusted} activeProfils={activeProfils} periods={periods} joursProductifs={joursProductifs} />
+
+      {/* Cascade RSI (dev/IA + digital, appui RSI) */}
       <CascadeCard adjusted={adjusted} baseline={matrix.rsi_cascade} periods={periods} hasHires={hasHires} />
 
       {/* Sparklines par profil (mensuel) */}
@@ -240,7 +243,7 @@ function SimulationPanel({
 
   const addHire = () => setHires([
     ...hires,
-    { profil_code: activeProfils[0]?.code ?? '', nb_etp: 1, start_ym: months[0] ?? '' },
+    { profil_code: activeProfils[0]?.code ?? '', nb_etp: 1, start_ym: months[0] ?? '', kind: 'embauche' },
   ]);
   const patchHire = (i: number, patch: Partial<SimulatedHire>) =>
     setHires(hires.map((h, k) => (k === i ? { ...h, ...patch } : h)));
@@ -270,16 +273,17 @@ function SimulationPanel({
     });
   };
 
-  const totalEtp = hires.reduce((s, h) => s + (Number(h.nb_etp) || 0), 0);
+  const etpEmbauche = hires.filter(h => (h.kind ?? 'embauche') === 'embauche').reduce((s, h) => s + (Number(h.nb_etp) || 0), 0);
+  const etpSousTraitance = hires.filter(h => h.kind === 'sous_traitance').reduce((s, h) => s + (Number(h.nb_etp) || 0), 0);
 
   return (
     <Card className="border-violet-200/70 bg-violet-50/30 dark:bg-violet-950/10">
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-base">
           <FlaskConical className="h-4 w-4 text-violet-600" />
-          Simulation d'embauches
+          Simulation de renforts
           <span className="text-xs font-normal text-muted-foreground ml-1">
-            (what-if non destructif — {totalEtp} ETP simulé{totalEtp > 1 ? 's' : ''})
+            (what-if non destructif — {round1(etpEmbauche)} ETP embauche · {round1(etpSousTraitance)} ETP sous-traitance)
           </span>
         </CardTitle>
       </CardHeader>
@@ -320,6 +324,15 @@ function SimulationPanel({
           <div className="space-y-2">
             {hires.map((h, i) => (
               <div key={i} className="flex flex-wrap items-center gap-2">
+                <Select value={h.kind ?? 'embauche'} onValueChange={v => patchHire(i, { kind: v as SimulatedHire['kind'] })}>
+                  <SelectTrigger className={cn('h-8 text-xs w-36', (h.kind ?? 'embauche') === 'sous_traitance' ? 'border-amber-300 text-amber-700' : 'border-emerald-300 text-emerald-700')}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="embauche">👤 Embauche</SelectItem>
+                    <SelectItem value="sous_traitance">🤝 Sous-traitance</SelectItem>
+                  </SelectContent>
+                </Select>
                 <Select value={h.profil_code} onValueChange={v => patchHire(i, { profil_code: v })}>
                   <SelectTrigger className="h-8 text-xs w-52"><SelectValue placeholder="Profil" /></SelectTrigger>
                   <SelectContent>
@@ -450,6 +463,96 @@ function HeatmapCard({
             })}
           </tbody>
         </table>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---- Sous-effectif par profil ----
+
+function SousEffectifParProfilCard({
+  adjusted, activeProfils, periods, joursProductifs,
+}: {
+  adjusted: AdjustedMatrix;
+  activeProfils: ActiveProfil[];
+  periods: Period[];
+  joursProductifs: number;
+}) {
+  const peakDef = (code: string, ms: string[]) =>
+    ms.reduce((mx, ym) => Math.max(mx, adjusted.by_profil[code]?.deficit[ym] ?? 0), 0);
+  const horizonPeak = (code: string) =>
+    adjusted.months.reduce((mx, ym) => Math.max(mx, adjusted.by_profil[code]?.deficit[ym] ?? 0), 0);
+  const horizonMax = (rec: Record<string, number> | undefined) =>
+    rec ? adjusted.months.reduce((mx, ym) => Math.max(mx, rec[ym] ?? 0), 0) : 0;
+
+  // Tri : plus gros sous-effectif d'abord
+  const rows = [...activeProfils].sort((a, b) => horizonPeak(b.code) - horizonPeak(a.code));
+  const anyDeficit = rows.some(p => horizonPeak(p.code) > 0);
+
+  return (
+    <Card className="border-border/50">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+          Sous-effectif par profil
+          <span className="text-[11px] font-normal text-muted-foreground">(après simulation — pic de la période)</span>
+        </CardTitle>
+        <p className="text-xs text-muted-foreground mt-1">
+          Déficit propre à chaque profil = max(0, demande − capacité simulée). Les profils sans ressource interne
+          (ex. <em>Responsable IT</em>) ressortent ici : la <strong>sous-traitance</strong> simulée résorbe leur déficit.
+        </p>
+      </CardHeader>
+      <CardContent className="overflow-x-auto">
+        <table className="text-xs border-collapse w-full min-w-max">
+          <thead>
+            <tr>
+              <th className="text-left font-medium text-muted-foreground px-2 py-1.5 sticky left-0 bg-background z-10 min-w-[160px]">Profil</th>
+              <th className="text-center font-medium text-muted-foreground px-2 py-1.5 whitespace-nowrap w-28">Pic sous-effectif</th>
+              {periods.map(per => (
+                <th key={per.key} className="text-center font-medium text-muted-foreground px-1 py-1.5 whitespace-nowrap w-16">
+                  {periodHeader(per)}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(profil => {
+              const code = profil.code;
+              const peak = horizonPeak(code);
+              const etp = joursProductifs > 0 ? peak / joursProductifs : 0;
+              const addEmb = horizonMax(adjusted.by_profil[code]?.addedEmbauche);
+              const addSst = horizonMax(adjusted.by_profil[code]?.addedSousTraitance);
+              return (
+                <tr key={code} className={cn('border-t border-border/40', peak <= 0 && 'opacity-60')}>
+                  <td className="text-left px-2 py-1.5 sticky left-0 bg-background z-10 font-medium">
+                    {profil.nom}
+                    {(addEmb > 0 || addSst > 0) && (
+                      <span className="block text-[9px] font-normal text-muted-foreground">
+                        {addEmb > 0 && <span className="text-emerald-600">+{round1(addEmb)} emb</span>}
+                        {addEmb > 0 && addSst > 0 && ' · '}
+                        {addSst > 0 && <span className="text-amber-600">+{round1(addSst)} ST</span>}
+                      </span>
+                    )}
+                  </td>
+                  <td className={cn('text-center px-2 py-1.5 tabular-nums', peak > 0 ? 'text-red-700 font-semibold' : 'text-emerald-600')}>
+                    {peak > 0 ? <>{round1(peak)} j <span className="text-[10px] text-muted-foreground">({round1(etp)} ETP)</span></> : '✓'}
+                  </td>
+                  {periods.map(per => {
+                    const v = peakDef(code, per.months);
+                    return (
+                      <td key={per.key} className={cn('text-center px-1 py-1.5 tabular-nums', v > 0 ? 'text-red-700 font-semibold bg-red-50' : 'text-muted-foreground')}>
+                        {v > 0 ? round1(v) : <span className="opacity-30">—</span>}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        {!anyDeficit && (
+          <p className="text-xs text-emerald-600 mt-2">✓ Aucun sous-effectif sur l'horizon (compte tenu de la simulation).</p>
+        )}
       </CardContent>
     </Card>
   );

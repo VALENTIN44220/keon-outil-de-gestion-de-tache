@@ -9,10 +9,16 @@ export interface AdjustedProfilRow {
   code: string;
   capaciteBase: number;
   demande: Record<string, number>;
-  /** Capacité ajoutée par les embauches simulées (j/mois), par mois. */
+  /** Capacité ajoutée par les renforts simulés (j/mois), par mois — total. */
   addedCap: Record<string, number>;
+  /** Capacité ajoutée par les embauches internes (j/mois), par mois. */
+  addedEmbauche: Record<string, number>;
+  /** Capacité ajoutée par la sous-traitance externe (j/mois), par mois. */
+  addedSousTraitance: Record<string, number>;
   /** Écart ajusté = (capaciteBase + addedCap) − demande. */
   ecart: Record<string, number>;
+  /** Sous-effectif = max(0, −écart) (j/mois), par mois. */
+  deficit: Record<string, number>;
 }
 
 export interface AdjustedCascadeRow {
@@ -45,16 +51,25 @@ export function applyHires(
   for (const code of Object.keys(matrix.by_profil)) {
     const base = matrix.by_profil[code];
     const addedCap: Record<string, number> = {};
+    const addedEmbauche: Record<string, number> = {};
+    const addedSousTraitance: Record<string, number> = {};
     const ecart: Record<string, number> = {};
+    const deficit: Record<string, number> = {};
     for (const ym of months) {
-      let add = 0;
+      let emb = 0;
+      let sst = 0;
       for (const h of hires) {
-        if (h.profil_code === code && ym >= h.start_ym) add += (Number(h.nb_etp) || 0) * joursProductifsMois;
+        if (h.profil_code !== code || ym < h.start_ym) continue;
+        const j = (Number(h.nb_etp) || 0) * joursProductifsMois;
+        if (h.kind === 'sous_traitance') sst += j; else emb += j;
       }
-      addedCap[ym] = add;
-      ecart[ym] = base.capacite + add - (base.demande[ym] ?? 0);
+      addedEmbauche[ym] = emb;
+      addedSousTraitance[ym] = sst;
+      addedCap[ym] = emb + sst;
+      ecart[ym] = base.capacite + emb + sst - (base.demande[ym] ?? 0);
+      deficit[ym] = Math.max(0, -ecart[ym]);
     }
-    by_profil[code] = { code, capaciteBase: base.capacite, demande: base.demande, addedCap, ecart };
+    by_profil[code] = { code, capaciteBase: base.capacite, demande: base.demande, addedCap, addedEmbauche, addedSousTraitance, ecart, deficit };
   }
 
   const cascade: AdjustedCascadeRow[] = months.map((ym) => {
