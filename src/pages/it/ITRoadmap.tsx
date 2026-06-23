@@ -668,10 +668,10 @@ function RoadmapContent() {
 
       {/* Gantt */}
       <Card className="border-border/50">
-        <CardContent className="p-0 overflow-x-auto select-none" onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
+        <CardContent className="p-0 overflow-auto select-none max-h-[calc(100vh-220px)]" onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
           <div style={{ minWidth: labelW + periods.length * MONTH_W }}>
-            {/* En-tête : bande années (granularité) + colonnes */}
-            <div className="sticky top-0 z-20 bg-muted/30">
+            {/* En-tête : bande années (granularité) + colonnes — collé en haut au scroll */}
+            <div className="sticky top-0 z-20 bg-background">
               {/* Bande années avec bouton de granularité */}
               <div className="flex border-b border-border/20">
                 <div style={{ width: labelW }} className="shrink-0 px-3 py-1 sticky left-0 bg-muted/30 z-10 text-[10px] text-muted-foreground flex items-center">
