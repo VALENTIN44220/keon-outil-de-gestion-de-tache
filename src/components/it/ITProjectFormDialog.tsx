@@ -8,9 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { ITProject, ITProjectStatus, ITProjectType, ITProjectPriority, ITProjectPhase, IT_PROJECT_PHASES, ALL_IT_PROJECT_PHASES, IT_PROJECT_PILIER_CONFIG, FDR_ANNEE_OPTIONS, FDR_ETAT_CONFIG, type FdrEtat } from '@/types/itProject';
+import { ITProject, ITProjectStatus, ITProjectPriority, ITProjectPhase, IT_PROJECT_PHASES, ALL_IT_PROJECT_PHASES, IT_PROJECT_PILIER_CONFIG, FDR_ANNEE_OPTIONS, FDR_ETAT_CONFIG, type FdrEtat } from '@/types/itProject';
 import { ACTIVITES_METIER, STATUT_PORTEFEUILLE_CONFIG, type StatutPortefeuille } from '@/types/fdr';
 import { useITProjects } from '@/hooks/useITProjects';
+import { useITProjectTypes } from '@/hooks/useITProjectTypes';
 import { useFdrProfils } from '@/hooks/useFdrSettings';
 import { useITProjectLoad, useUpsertITProjectLoad } from '@/hooks/useITProjectLoad';
 import { supabase } from '@/integrations/supabase/client';
@@ -28,6 +29,7 @@ interface ITProjectFormDialogProps {
 
 export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProjectFormDialogProps) {
   const { addProject, updateProject } = useITProjects();
+  const { activeTypes, resolve: resolveType } = useITProjectTypes();
   const isEdit = !!project;
   const [isSaving, setIsSaving] = useState(false);
 
@@ -35,7 +37,7 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
   const [codeProjetDigital, setCodeProjetDigital] = useState('');
   const [nomProjet, setNomProjet] = useState('');
   const [description, setDescription] = useState('');
-  const [typeProjet, setTypeProjet] = useState<ITProjectType>('applicatif');
+  const [typeProjet, setTypeProjet] = useState<string>('applicatif');
   const [priorite, setPriorite] = useState<ITProjectPriority>('normale');
   const [phaseCourante, setPhaseCourante] = useState<ITProjectPhase>('cadrage');
   const [phasesActives, setPhasesActives] = useState<ITProjectPhase[]>([...ALL_IT_PROJECT_PHASES]);
@@ -129,7 +131,7 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
       setCodeProjetDigital(project.code_projet_digital || '');
       setNomProjet(project.nom_projet || '');
       setDescription(project.description || '');
-      setTypeProjet((project.type_projet as ITProjectType) || 'applicatif');
+      setTypeProjet((project.type_projet as string) || 'applicatif');
       setPriorite((project.priorite as ITProjectPriority) || 'normale');
       setPhaseCourante((project.phase_courante as ITProjectPhase) || 'cadrage');
       const rawPhases = project.phases_actives as unknown;
@@ -367,17 +369,20 @@ export function ITProjectFormDialog({ open, onClose, project, onSaved }: ITProje
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Type de projet</Label>
-                <Select value={typeProjet} onValueChange={v => setTypeProjet(v as ITProjectType)}>
+                <Select value={typeProjet} onValueChange={setTypeProjet}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="infrastructure">🖧 Infrastructure</SelectItem>
-                    <SelectItem value="applicatif">💻 Applicatif</SelectItem>
-                    <SelectItem value="securite">🔒 Sécurité</SelectItem>
-                    <SelectItem value="data">📊 Data / BI</SelectItem>
-                    <SelectItem value="integration">🔗 Intégration</SelectItem>
-                    <SelectItem value="organisation">🏛️ Organisation</SelectItem>
-                    <SelectItem value="ie">🧠 IE</SelectItem>
-                    <SelectItem value="autre">📦 Autre</SelectItem>
+                    {(() => {
+                      const opts = activeTypes.map(t => ({ value: t.value, label: t.label, icon: t.icon }));
+                      // Conserve le type courant s'il n'est plus actif/listé (legacy)
+                      if (typeProjet && !opts.some(o => o.value === typeProjet)) {
+                        const r = resolveType(typeProjet);
+                        opts.push({ value: typeProjet, label: r.label, icon: r.icon });
+                      }
+                      return opts.map(o => (
+                        <SelectItem key={o.value} value={o.value}>{o.icon} {o.label}</SelectItem>
+                      ));
+                    })()}
                   </SelectContent>
                 </Select>
               </div>

@@ -571,7 +571,13 @@ function SparklinesCard({
   months: string[];
 }) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-4 text-[11px] text-muted-foreground px-1">
+        <span className="flex items-center gap-1.5"><span className="w-6 h-0.5 bg-[#8b5cf6] inline-block" /> Demande</span>
+        <span className="flex items-center gap-1.5"><span className="w-6 h-0.5 bg-[#10b981] inline-block" /> Capacité avec embauches simulées</span>
+        <span className="flex items-center gap-1.5"><span className="w-6 border-t-2 border-dashed border-[#ef4444] inline-block" /> Capacité de base</span>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
       {activeProfils.map(profil => {
         const row = adjusted.by_profil[profil.code];
         if (!row) return null;
@@ -614,16 +620,24 @@ function SparklinesCard({
                   <YAxis tick={{ fontSize: 9 }} />
                   <RcTooltip
                     contentStyle={{ fontSize: 11 }}
-                    formatter={(v: number, name: string) => [`${v} j/mois`, name === 'demande' ? 'Demande' : 'Capacité']}
+                    formatter={(v: number, name: string) => [
+                      `${v} j/mois`,
+                      name === 'demande' ? 'Demande' : 'Capacité (avec simulation)',
+                    ]}
                   />
+                  {/* Capacité de base (référence) */}
                   <ReferenceLine y={profil.capacite_j_mois} stroke="#ef4444" strokeDasharray="4 2" strokeWidth={1.5} />
+                  {/* Demande */}
                   <Line type="monotone" dataKey="demande" stroke="#8b5cf6" strokeWidth={2} dot={false} activeDot={{ r: 3 }} />
+                  {/* Capacité ajustée des embauches simulées (escalier) */}
+                  <Line type="stepAfter" dataKey="capacite" stroke="#10b981" strokeWidth={2} dot={false} activeDot={{ r: 3 }} />
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
         );
       })}
+      </div>
     </div>
   );
 }

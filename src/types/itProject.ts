@@ -90,7 +90,8 @@ export interface ITProject {
   code_projet_digital: string;
   nom_projet: string;
   description?: string | null;
-  type_projet?: ITProjectType | null;
+  /** Valeur paramétrable (table it_project_types). Les valeurs historiques restent dans ITProjectType. */
+  type_projet?: ITProjectType | string | null;
   priorite?: ITProjectPriority | null;
   statut: ITProjectStatus;
   phase_courante?: ITProjectPhase | null;

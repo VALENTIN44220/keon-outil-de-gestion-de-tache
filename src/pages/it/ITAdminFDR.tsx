@@ -12,13 +12,14 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Loader2, Save, X, Plus, Trash2, Settings2, Users, CalendarDays } from 'lucide-react';
+import { Loader2, Save, X, Plus, Trash2, Settings2, Users, CalendarDays, Tags } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { extractErrorMessage } from '@/lib/extractErrorMessage';
 import {
   useFdrSettings, useUpdateFdrSettings,
   useFdrProfils, useUpdateFdrProfil, useAddFdrProfil, useDeleteFdrProfil,
 } from '@/hooks/useFdrSettings';
+import { useITProjectTypes, type ITProjectTypeOption } from '@/hooks/useITProjectTypes';
 import type { FdrProfil } from '@/types/fdr';
 
 export default function ITAdminFDR() {
@@ -53,6 +54,7 @@ function ITAdminFDRContent() {
 
         <GlobalSettingsCard />
         <ProfilsCard />
+        <ProjectTypesCard />
       </div>
     </Layout>
   );
@@ -375,6 +377,172 @@ function ProfilsCard() {
         ) : (
           <Button variant="outline" size="sm" onClick={() => setShowAdd(true)} className="gap-2">
             <Plus className="h-4 w-4" />Ajouter un profil
+          </Button>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---- Types de projet ----
+
+function ProjectTypesCard() {
+  const { types, isLoading, add, update, remove } = useITProjectTypes();
+
+  const [editMap, setEditMap] = useState<Record<string, Partial<ITProjectTypeOption>>>({});
+  const editing = (id: string) => editMap[id] != null;
+  const startEdit = (t: ITProjectTypeOption) => setEditMap(m => ({
+    ...m, [t.id]: { label: t.label, icon: t.icon, ordre: t.ordre, actif: t.actif },
+  }));
+  const cancelEdit = (id: string) => setEditMap(m => { const n = { ...m }; delete n[id]; return n; });
+
+  const saveEdit = async (id: string) => {
+    const patch = editMap[id];
+    if (!patch?.label?.trim()) { toast({ title: 'Libellé obligatoire', variant: 'destructive' }); return; }
+    try {
+      await update.mutateAsync({
+        id,
+        label: patch.label.trim(),
+        icon: (patch.icon ?? '').trim() || '📦',
+        ordre: Number(patch.ordre) || 0,
+        actif: !!patch.actif,
+      });
+      toast({ title: 'Type mis à jour' });
+      cancelEdit(id);
+    } catch (e) {
+      toast({ title: 'Erreur', description: extractErrorMessage(e), variant: 'destructive' });
+    }
+  };
+
+  const [showAdd, setShowAdd] = useState(false);
+  const [newLabel, setNewLabel] = useState('');
+  const [newIcon, setNewIcon] = useState('📦');
+
+  const addNew = async () => {
+    if (!newLabel.trim()) { toast({ title: 'Libellé obligatoire', variant: 'destructive' }); return; }
+    try {
+      await add.mutateAsync({ label: newLabel.trim(), icon: newIcon.trim() || '📦', ordre: types.length + 1 });
+      toast({ title: `Type « ${newLabel} » ajouté` });
+      setNewLabel(''); setNewIcon('📦'); setShowAdd(false);
+    } catch (e) {
+      toast({ title: 'Erreur', description: extractErrorMessage(e), variant: 'destructive' });
+    }
+  };
+
+  const handleDelete = async (t: ITProjectTypeOption) => {
+    if (!confirm(`Supprimer le type « ${t.label} » ? Les projets existants conserveront la valeur « ${t.value} ».`)) return;
+    try {
+      await remove.mutateAsync(t.id);
+      toast({ title: `Type « ${t.label} » supprimé` });
+    } catch (e) {
+      toast({ title: 'Erreur', description: extractErrorMessage(e), variant: 'destructive' });
+    }
+  };
+
+  return (
+    <Card className="border-border/50">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-lg">
+          <Tags className="h-5 w-5 text-muted-foreground" />
+          Types de projet
+          {!isLoading && <Badge variant="secondary" className="ml-1 text-xs">{types.length} types</Badge>}
+        </CardTitle>
+        <p className="text-xs text-muted-foreground mt-1">
+          Liste paramétrable des types de projet proposés dans le formulaire. L'<em>identifiant</em> est généré
+          automatiquement à la création et reste stable (les projets le réutilisent).
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {isLoading ? (
+          <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10" />)}</div>
+        ) : (
+          <div className="rounded-lg border overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/30 hover:bg-muted/30">
+                  <TableHead className="w-[70px] text-center">Icône</TableHead>
+                  <TableHead>Libellé</TableHead>
+                  <TableHead className="font-mono">Identifiant</TableHead>
+                  <TableHead className="w-[90px] text-right">Ordre</TableHead>
+                  <TableHead className="w-[80px] text-center">Actif</TableHead>
+                  <TableHead className="w-[80px]" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {types.map(t => editing(t.id) ? (
+                  <TableRow key={t.id} className="bg-blue-500/5">
+                    <TableCell className="text-center">
+                      <Input value={editMap[t.id]?.icon ?? ''} onChange={e => setEditMap(m => ({ ...m, [t.id]: { ...m[t.id], icon: e.target.value } }))} className="h-8 text-sm text-center w-14 mx-auto" />
+                    </TableCell>
+                    <TableCell>
+                      <Input value={editMap[t.id]?.label ?? ''} onChange={e => setEditMap(m => ({ ...m, [t.id]: { ...m[t.id], label: e.target.value } }))} className="h-8 text-sm" />
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{t.value}</TableCell>
+                    <TableCell>
+                      <Input type="number" value={editMap[t.id]?.ordre ?? 0} onChange={e => setEditMap(m => ({ ...m, [t.id]: { ...m[t.id], ordre: parseInt(e.target.value) } }))} className="h-8 text-sm text-right w-20 ml-auto" />
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Switch checked={!!editMap[t.id]?.actif} onCheckedChange={v => setEditMap(m => ({ ...m, [t.id]: { ...m[t.id], actif: v } }))} />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button size="icon" className="h-7 w-7" onClick={() => saveEdit(t.id)} disabled={update.isPending}>
+                          {update.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => cancelEdit(t.id)}>
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  <TableRow key={t.id} className={!t.actif ? 'opacity-40' : ''}>
+                    <TableCell className="text-center text-lg">{t.icon}</TableCell>
+                    <TableCell className="text-sm font-medium">{t.label}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{t.value}</TableCell>
+                    <TableCell className="text-right tabular-nums text-sm">{t.ordre}</TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant={t.actif ? 'default' : 'secondary'} className="text-[10px]">{t.actif ? 'Actif' : 'Inactif'}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => startEdit(t)}>
+                          <Settings2 className="h-3 w-3" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDelete(t)}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+
+        {showAdd ? (
+          <div className="rounded-lg border p-4 bg-muted/20 space-y-3">
+            <p className="text-sm font-medium">Nouveau type</p>
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="ntIcon" className="text-xs">Icône</Label>
+                <Input id="ntIcon" value={newIcon} onChange={e => setNewIcon(e.target.value)} className="h-8 text-sm text-center w-16" />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="ntLabel" className="text-xs">Libellé</Label>
+                <Input id="ntLabel" value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="Ex. Cybersécurité" className="h-8 text-sm w-64" />
+              </div>
+              <Button size="sm" onClick={addNew} disabled={add.isPending} className="gap-2">
+                {add.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                Ajouter
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setShowAdd(false)}>Annuler</Button>
+            </div>
+          </div>
+        ) : (
+          <Button variant="outline" size="sm" onClick={() => setShowAdd(true)} className="gap-2">
+            <Plus className="h-4 w-4" />Ajouter un type
           </Button>
         )}
       </CardContent>

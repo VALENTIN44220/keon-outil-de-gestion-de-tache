@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useITProjects } from '@/hooks/useITProjects';
-import { ITProject, ITProjectStatus, ITProjectPilier, IT_PROJECT_TYPE_CONFIG, IT_PROJECT_PHASES, IT_PROJECT_PILIER_CONFIG, FDR_ANNEE_OPTIONS, FDR_ETAT_CONFIG, type FdrEtat, ITProjectPhase } from '@/types/itProject';
+import { useITProjectTypes } from '@/hooks/useITProjectTypes';
+import { ITProject, ITProjectStatus, ITProjectPilier, IT_PROJECT_PHASES, IT_PROJECT_PILIER_CONFIG, FDR_ANNEE_OPTIONS, FDR_ETAT_CONFIG, type FdrEtat, ITProjectPhase } from '@/types/itProject';
 import { STATUT_PORTEFEUILLE_CONFIG, type StatutPortefeuille } from '@/types/fdr';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/ui/button';
@@ -123,6 +124,7 @@ export default function ITProjects() {
   const navigate = useNavigate();
   const { projects, isLoading, deleteProject, fetchProjects } = useITProjects();
   const { isAdmin } = useUserRole();
+  const { resolve: resolveType } = useITProjectTypes();
   const [showCreate, setShowCreate] = useState(false);
   const [showMerge, setShowMerge] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ITProject | null>(null);
@@ -201,7 +203,7 @@ export default function ITProjects() {
     const rows = sorted.map(p => ({
       'Code': p.code_projet_digital ?? '',
       'Nom': p.nom_projet ?? '',
-      'Type': p.type_projet ? (IT_PROJECT_TYPE_CONFIG[p.type_projet]?.label ?? p.type_projet) : '',
+      'Type': p.type_projet ? resolveType(p.type_projet).label : '',
       'Statut': p.statut_portefeuille ?? '',
       'Phase': p.phase_courante ? (IT_PROJECT_PHASES.find(ph => ph.value === p.phase_courante)?.label ?? p.phase_courante) : '',
       'Avancement (%)': p.progress ?? 0,
@@ -315,11 +317,12 @@ export default function ITProjects() {
   // Chart: par type
   const typeChartData = useMemo(() => {
     const counts: Record<string, number> = {};
-    filtered.forEach(p => { const t = p.type_projet || 'autre'; counts[t] = (counts[t] || 0) + 1; });
-    return Object.entries(IT_PROJECT_TYPE_CONFIG).map(([key, cfg]) => ({
-      name: cfg.label, value: counts[key] || 0,
-    })).filter(d => d.value > 0);
-  }, [filtered]);
+    filtered.forEach(p => { const t = (p.type_projet as string) || 'autre'; counts[t] = (counts[t] || 0) + 1; });
+    return Object.entries(counts)
+      .map(([key, value]) => ({ name: resolveType(key).label, value }))
+      .filter(d => d.value > 0)
+      .sort((a, b) => b.value - a.value);
+  }, [filtered, resolveType]);
 
   // Chart: par pilier
   const pilierChartData = useMemo(() => {
@@ -674,7 +677,7 @@ export default function ITProjects() {
                       <tbody>
                         {sorted.map(p => {
                           const sc = STATUT_PORTEFEUILLE_CONFIG[(p.statut_portefeuille as StatutPortefeuille) ?? 'Idée'] || STATUT_PORTEFEUILLE_CONFIG['Idée'];
-                          const tc = p.type_projet ? IT_PROJECT_TYPE_CONFIG[p.type_projet] : null;
+                          const tc = p.type_projet ? resolveType(p.type_projet) : null;
                           const pc = p.pilier ? IT_PROJECT_PILIER_CONFIG[p.pilier as ITProjectPilier] : null;
                           const today = new Date(); today.setHours(0, 0, 0, 0);
                           const isLate = p.date_fin_prevue && !['Déployé', 'Abandonné'].includes(p.statut_portefeuille ?? '') && new Date(p.date_fin_prevue) < today;

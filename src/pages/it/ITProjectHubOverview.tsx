@@ -35,13 +35,14 @@ import { format, parseISO, differenceInDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import {
-  IT_PROJECT_TYPE_CONFIG, IT_PHASE_BADGE_CONFIG, ITProjectPhase, getActivePhases,
+  IT_PHASE_BADGE_CONFIG, ITProjectPhase, getActivePhases,
   FDR_ETAPES, ITProjectFDRValidation,
   IT_PROJECT_PILIER_CONFIG,
 } from '@/types/itProject';
 import { STATUT_PORTEFEUILLE_CONFIG, type StatutPortefeuille, type FdrProjectInput } from '@/types/fdr';
 import { useITProjectLoad } from '@/hooks/useITProjectLoad';
 import { useFdrProfils } from '@/hooks/useFdrSettings';
+import { useITProjectTypes } from '@/hooks/useITProjectTypes';
 import { getMepRetenue, totalBuildNet, toYM } from '@/lib/fdr/calculationEngine';
 import { ITProjectFormDialog } from '@/components/it/ITProjectFormDialog';
 import { supabase } from '@/integrations/supabase/client';
@@ -58,6 +59,7 @@ export default function ITProjectHubOverview() {
   const { data: phaseProgressMap = new Map() } = useITProjectPhaseProgress(project?.id);
   const { data: projectLoads = [] } = useITProjectLoad(project?.id);
   const { data: fdrProfils = [] } = useFdrProfils();
+  const { resolve: resolveType } = useITProjectTypes();
 
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [editingEtape, setEditingEtape] = useState<ITProjectFDRValidation | null>(null);
@@ -172,7 +174,7 @@ export default function ITProjectHubOverview() {
   const currentPhase = activePhases.find(p => p.value === project.phase_courante);
   const currentPhaseProgress = currentPhase ? phaseProgressValues[currentPhase.value] ?? 0 : 0;
   const phaseBadge = currentPhase ? IT_PHASE_BADGE_CONFIG[currentPhase.value as ITProjectPhase] : null;
-  const typeConfig = project.type_projet ? IT_PROJECT_TYPE_CONFIG[project.type_projet] : null;
+  const typeConfig = project.type_projet ? resolveType(project.type_projet) : null;
   const statutPf = (project.statut_portefeuille as StatutPortefeuille) || null;
   const statutPfConfig = statutPf ? STATUT_PORTEFEUILLE_CONFIG[statutPf] : null;
   const pilierConfig = project.pilier ? IT_PROJECT_PILIER_CONFIG[project.pilier as keyof typeof IT_PROJECT_PILIER_CONFIG] : null;
