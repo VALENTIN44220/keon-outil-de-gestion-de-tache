@@ -4,7 +4,7 @@ import {
   Calendar, MessageCircle, Building2, ClipboardList,
   Lightbulb, Monitor, Leaf, Euro, Map as MapIcon, Users, Wallet,
   Package, Truck, ShieldAlert, Settings2, BarChart2,
-  UserPlus, AlertTriangle, ListChecks, BookOpen,
+  UserPlus, AlertTriangle, ListChecks, BookOpen, TrendingUp,
 } from 'lucide-react';
 import type { ScreenPermissionKey, FeaturePermissionKey } from '@/types/permissions';
 
@@ -66,6 +66,7 @@ export const menuGroups: MenuGroup[] = [
       { id: 'it-cartographie', label: 'Cartographie', icon: MapIcon, path: '/it/cartographie', permissionKey: 'can_access_it_cartographie' },
       { id: 'it-feuille-de-route', label: 'Feuille de route', icon: CalendarClock, path: '/it/feuille-de-route', permissionKey: 'can_access_it_projects' },
       { id: 'it-plan-de-charge', label: 'Plan de charge', icon: BarChart2, path: '/it/plan-de-charge', permissionKey: 'can_access_it_projects' },
+      { id: 'it-portfolio-roi', label: 'Synthèse ROI', icon: TrendingUp, path: '/it/portfolio-roi', permissionKey: 'can_access_it_projects' },
       { id: 'it-admin-fdr', label: 'Params FDR', icon: Settings2, path: '/it/admin/fdr', permissionKey: 'can_access_it_projects' },
     ],
   },

@@ -529,3 +529,57 @@ export interface ITBudgetUserPreferences {
   columns_config: ITBudgetColumnsConfig;
   filters_config: ITBudgetFiltersConfig;
 }
+
+// ================================================
+// ROI / Rentabilité projet IT
+// ================================================
+
+/** TJM de référence par profil FDR (stocké dans it_tjm_referentiel). */
+export interface ITTjmReferentiel {
+  profil_code: string;
+  tjm_eur: number;
+  description?: string | null;
+  updated_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Unité de mesure pour l'économie ETP hors IT. */
+export type ITRHHorsITUnite = 'jours_an' | 'jours_spv';
+
+/** Profil RH interne hors service IT contribuant au projet. */
+export interface ITProjectRHHorsIT {
+  id: string;
+  it_project_id: string;
+  profil_label: string;
+  /** Jours passés sur le BUILD (coût one-shot, s'ajoute au coût RH). Typiquement pour chef de projet métier. */
+  j_build?: number | null;
+  unite: ITRHHorsITUnite;
+  /** Économie en jours/an (si unite = 'jours_an'). */
+  jours_an?: number | null;
+  /** Économie en jours par SPV (si unite = 'jours_spv'). */
+  jours_par_spv?: number | null;
+  /** Nombre de SPV par an (si unite = 'jours_spv'). */
+  nb_spv?: number | null;
+  /** TJM interne utilisé pour valoriser le gain et le coût build en €. */
+  tjm_interne: number;
+  note?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Résultat du calcul ROI pour un projet IT. */
+export interface ITRoiCalc {
+  /** Coût si sous-traitance (= budget_externe_eur ou COGS saisi). */
+  cogs_eur: number;
+  /** Coût RH IT build = Σ(j_build_profil × TJM_profil). */
+  rh_it_eur: number;
+  /** Économies annuelles (gains ETP hors IT valorisés). */
+  gain_annuel_eur: number;
+  /** BILAN = gain_annuel − cogs − rh_it. */
+  bilan_annuel_eur: number;
+  /** Temps de retour (ans) = (cogs + rh_it) / gain_annuel. */
+  temps_retour_an: number | null;
+  /** Jours build total (tous profils). */
+  total_j_build: number;
+}

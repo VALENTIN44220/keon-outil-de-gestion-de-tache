@@ -101,10 +101,12 @@ import ITProjectHubSync from "./pages/it/ITProjectHubSync";
 import ITProjectHubDiscussions from "./pages/it/ITProjectHubDiscussions";
 import ITProjectHubFiles from "./pages/it/ITProjectHubFiles";
 import ITProjectHubBudget from "./pages/it/ITProjectHubBudget";
+import ITProjectHubROI from "./pages/it/ITProjectHubROI";
 import ITBudgetGlobal from "./pages/it/ITBudgetGlobal";
 import ITCartographie from "./pages/it/ITCartographie";
 import ITAdminFDR from "./pages/it/ITAdminFDR";
 import ITPlanning from "./pages/it/ITPlanning";
+import ITPortfolioROI from "./pages/it/ITPortfolioROI";
 import ITRoadmap from "./pages/it/ITRoadmap";
 import ITRoadmapDefinition from "./pages/it/ITRoadmapDefinition";
 import ITRoadmapTracking from "./pages/it/ITRoadmapTracking";
@@ -223,6 +225,8 @@ const App = () => (
                 { path: "/it/projects/:code/discussions", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubDiscussions /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/projects/:code/files", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubFiles /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/projects/:code/budget", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubBudget /></ITProjectsAccessGate></ProtectedRoute> },
+                { path: "/it/projects/:code/roi", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubROI /></ITProjectsAccessGate></ProtectedRoute> },
+                { path: "/it/portfolio-roi", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITPortfolioROI /></ITProjectsAccessGate></ProtectedRoute> },
 
                 { path: "/documentation", end: true, element: <ProtectedRoute><Documentation /></ProtectedRoute> },
               ]}
@@ -309,6 +313,8 @@ const App = () => (
             <Route path="/it/projects/:code/discussions" element={<></>} />
             <Route path="/it/projects/:code/files" element={<></>} />
             <Route path="/it/projects/:code/budget" element={<></>} />
+            <Route path="/it/projects/:code/roi" element={<></>} />
+            <Route path="/it/portfolio-roi" element={<></>} />
             <Route path="/design-system" element={<DesignSystem />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />

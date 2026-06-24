@@ -4,7 +4,7 @@ import { STATUT_PORTEFEUILLE_CONFIG, type StatutPortefeuille } from '@/types/fdr
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { ArrowLeft, LayoutDashboard, ListTodo, Calendar, MessageSquare, Paperclip, RefreshCw, Pencil, ChevronRight, Monitor, AlertTriangle, TrendingUp, CheckCircle2, Clock, MessageSquareText, Link2, ExternalLink, Euro, Shield } from 'lucide-react';
+import { ArrowLeft, LayoutDashboard, ListTodo, Calendar, MessageSquare, Paperclip, RefreshCw, Pencil, ChevronRight, Monitor, AlertTriangle, TrendingUp, CheckCircle2, Clock, MessageSquareText, Link2, ExternalLink, Euro, Shield, BarChart3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useITProjectSync } from '@/hooks/useITProjectSync';
 
@@ -23,6 +23,7 @@ const navItems = [
   { value: 'discussions', label: 'Discussions',              icon: MessageSquare },
   { value: 'files',       label: 'Fichiers',                 icon: Paperclip },
   { value: 'budget',      label: 'Budget',                   icon: Euro },
+  { value: 'roi',         label: 'ROI',                      icon: BarChart3 },
 ];
 
 export function ITProjectHubHeader({ project, stats, onEditProject }: ITProjectHubHeaderProps) {

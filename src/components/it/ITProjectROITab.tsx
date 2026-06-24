@@ -1,0 +1,621 @@
+/**
+ * ITProjectROITab — Onglet ROI / Rentabilité d'un projet IT.
+ *
+ * Sections :
+ *  1. Profils RH interne hors service IT (CRUD)
+ *  2. Calcul ROI : COGS / RH IT / GAIN / BILAN / Temps de retour
+ */
+import { useState, useMemo } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/ui/table';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Separator } from '@/components/ui/separator';
+import {
+  Plus, Pencil, Trash2, Loader2, TrendingUp, Users, Euro, Clock,
+  AlertCircle, CheckCircle2, Info,
+} from 'lucide-react';
+import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+import { extractErrorMessage } from '@/lib/extractErrorMessage';
+import type { ITProject, ITProjectRHHorsIT, ITRHHorsITUnite, ITRoiCalc } from '@/types/itProject';
+import type { ITProjectLoad } from '@/types/fdr';
+import {
+  useITProjectRHHorsIT,
+  useAddITProjectRHHorsIT,
+  useUpdateITProjectRHHorsIT,
+  useDeleteITProjectRHHorsIT,
+} from '@/hooks/useITProjectRHHorsIT';
+import { useITTjmReferentiel } from '@/hooks/useITTjmReferentiel';
+import { useFdrProfils } from '@/hooks/useFdrSettings';
+
+// ── Formatage ──────────────────────────────────────────────────────────────
+
+const eur = (n: number) =>
+  n.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
+
+const jours = (n: number) =>
+  `${n.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} j`;
+
+// ── Calcul ROI ─────────────────────────────────────────────────────────────
+
+function computeRoi(
+  project: ITProject,
+  loads: ITProjectLoad[],
+  tjmMap: Record<string, number>,
+  rhHorsIT: ITProjectRHHorsIT[],
+): ITRoiCalc {
+  // COGS = budget externe (coût si ST)
+  const cogs_eur = project.budget_externe_eur ?? 0;
+
+  // RH IT BUILD : j/mois × durée build × TJM
+  const duree = project.delai_projete_mois ?? 0;
+  let rh_it_eur = 0;
+  let total_j_build = 0;
+  for (const load of loads) {
+    const code = load.profil?.code ?? '';
+    const tjm = tjmMap[code] ?? 0;
+    const jBuild = load.j_mois * duree;
+    total_j_build += jBuild;
+    rh_it_eur += jBuild * tjm;
+  }
+
+  // RH HORS IT BUILD : j_build × tjm_interne (ex : chef de projet métier)
+  for (const rh of rhHorsIT) {
+    if ((rh.j_build ?? 0) > 0) {
+      rh_it_eur += (rh.j_build ?? 0) * rh.tjm_interne;
+      total_j_build += rh.j_build ?? 0;
+    }
+  }
+
+  // GAIN = économies ETP hors IT valorisées (annuelles post-déploiement)
+  let gain_annuel_eur = 0;
+  for (const rh of rhHorsIT) {
+    let joursAn = 0;
+    if (rh.unite === 'jours_an') {
+      joursAn = rh.jours_an ?? 0;
+    } else {
+      joursAn = (rh.jours_par_spv ?? 0) * (rh.nb_spv ?? 0);
+    }
+    gain_annuel_eur += joursAn * rh.tjm_interne;
+  }
+
+  const bilan_annuel_eur = gain_annuel_eur - cogs_eur - rh_it_eur;
+  const investissement = cogs_eur + rh_it_eur;
+  const temps_retour_an =
+    gain_annuel_eur > 0 ? investissement / gain_annuel_eur : null;
+
+  return { cogs_eur, rh_it_eur, gain_annuel_eur, bilan_annuel_eur, temps_retour_an, total_j_build };
+}
+
+// ── Formulaire RH hors IT ──────────────────────────────────────────────────
+
+interface RHFormState {
+  profil_label: string;
+  j_build: string;
+  unite: ITRHHorsITUnite;
+  jours_an: string;
+  jours_par_spv: string;
+  nb_spv: string;
+  tjm_interne: string;
+  note: string;
+}
+
+const emptyForm = (): RHFormState => ({
+  profil_label: '',
+  j_build: '',
+  unite: 'jours_an',
+  jours_an: '',
+  jours_par_spv: '',
+  nb_spv: '',
+  tjm_interne: '400',
+  note: '',
+});
+
+function rhFormToPayload(f: RHFormState, projectId: string) {
+  return {
+    it_project_id: projectId,
+    profil_label: f.profil_label.trim(),
+    j_build: parseFloat(f.j_build) || null,
+    unite: f.unite,
+    jours_an: f.unite === 'jours_an' ? parseFloat(f.jours_an) || null : null,
+    jours_par_spv: f.unite === 'jours_spv' ? parseFloat(f.jours_par_spv) || null : null,
+    nb_spv: f.unite === 'jours_spv' ? parseInt(f.nb_spv) || null : null,
+    tjm_interne: parseFloat(f.tjm_interne) || 0,
+    note: f.note.trim() || null,
+  };
+}
+
+// ── Composant principal ────────────────────────────────────────────────────
+
+interface Props {
+  project: ITProject;
+  loads: ITProjectLoad[];
+}
+
+export function ITProjectROITab({ project, loads }: Props) {
+  const { data: rhHorsIT = [], isLoading: rhLoading } = useITProjectRHHorsIT(project.id);
+  const { data: tjmList = [], isLoading: tjmLoading } = useITTjmReferentiel();
+  const { data: profils = [] } = useFdrProfils();
+  const add = useAddITProjectRHHorsIT();
+  const update = useUpdateITProjectRHHorsIT();
+  const del = useDeleteITProjectRHHorsIT();
+
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<ITProjectRHHorsIT | null>(null);
+  const [form, setForm] = useState<RHFormState>(emptyForm());
+
+  const tjmMap = useMemo(
+    () => Object.fromEntries(tjmList.map(t => [t.profil_code, t.tjm_eur])),
+    [tjmList],
+  );
+
+  const roi = useMemo(
+    () => computeRoi(project, loads, tjmMap, rhHorsIT),
+    [project, loads, tjmMap, rhHorsIT],
+  );
+
+  const openAdd = () => {
+    setEditTarget(null);
+    setForm(emptyForm());
+    setDialogOpen(true);
+  };
+
+  const openEdit = (row: ITProjectRHHorsIT) => {
+    setEditTarget(row);
+    setForm({
+      profil_label: row.profil_label,
+      j_build: row.j_build != null ? String(row.j_build) : '',
+      unite: row.unite,
+      jours_an: row.jours_an != null ? String(row.jours_an) : '',
+      jours_par_spv: row.jours_par_spv != null ? String(row.jours_par_spv) : '',
+      nb_spv: row.nb_spv != null ? String(row.nb_spv) : '',
+      tjm_interne: String(row.tjm_interne),
+      note: row.note ?? '',
+    });
+    setDialogOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!form.profil_label.trim()) {
+      toast.error('Libellé du profil obligatoire'); return;
+    }
+    try {
+      const payload = rhFormToPayload(form, project.id);
+      if (editTarget) {
+        await update.mutateAsync({ id: editTarget.id, projectId: project.id, ...payload });
+        toast.success('Profil mis à jour');
+      } else {
+        await add.mutateAsync(payload);
+        toast.success('Profil ajouté');
+      }
+      setDialogOpen(false);
+    } catch (e) {
+      toast.error(extractErrorMessage(e));
+    }
+  };
+
+  const handleDelete = async (row: ITProjectRHHorsIT) => {
+    if (!confirm(`Supprimer le profil « ${row.profil_label} » ?`)) return;
+    try {
+      await del.mutateAsync({ id: row.id, projectId: project.id });
+      toast.success('Profil supprimé');
+    } catch (e) {
+      toast.error(extractErrorMessage(e));
+    }
+  };
+
+  const isSaving = add.isPending || update.isPending;
+
+  // Gain annuel par ligne
+  const gainByRow = (rh: ITProjectRHHorsIT) => {
+    const j = rh.unite === 'jours_an'
+      ? (rh.jours_an ?? 0)
+      : (rh.jours_par_spv ?? 0) * (rh.nb_spv ?? 0);
+    return j * rh.tjm_interne;
+  };
+
+  // Libellé du champ volume
+  const volumeLabel = (rh: ITProjectRHHorsIT) => {
+    if (rh.unite === 'jours_an') return jours(rh.jours_an ?? 0) + '/an';
+    return `${jours(rh.jours_par_spv ?? 0)}/SPV × ${rh.nb_spv ?? 0} SPV`;
+  };
+
+  const hasTjmWarning = loads.some(l => {
+    const code = l.profil?.code ?? '';
+    return (tjmMap[code] ?? 0) === 0;
+  });
+
+  return (
+    <div className="space-y-6">
+      {/* ── Section 1 : RH hors IT ─────────────────────────────────────── */}
+      <Card className="border-border/50">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Users className="h-5 w-5 text-violet-500" />
+            Profils RH interne hors service IT
+            {!rhLoading && rhHorsIT.length > 0 && (
+              <Badge variant="secondary" className="ml-1 text-xs">{rhHorsIT.length}</Badge>
+            )}
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Ressources internes hors IT mobilisées sur le projet (chef de projet métier,
+            référents, formateurs…). Les économies ETP sont valorisées pour le calcul ROI.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {rhLoading ? (
+            <div className="space-y-2">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-10" />)}</div>
+          ) : rhHorsIT.length > 0 ? (
+            <div className="rounded-lg border overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/30 hover:bg-muted/30">
+                    <TableHead>Profil</TableHead>
+                    <TableHead className="text-right">J. Build</TableHead>
+                    <TableHead>Gain ETP / an</TableHead>
+                    <TableHead className="text-right">TJM interne</TableHead>
+                    <TableHead className="text-right">Coût build</TableHead>
+                    <TableHead className="text-right">Gain annuel</TableHead>
+                    <TableHead>Note</TableHead>
+                    <TableHead className="w-[72px]" />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rhHorsIT.map(row => (
+                    <TableRow key={row.id}>
+                      <TableCell className="font-medium text-sm">{row.profil_label}</TableCell>
+                      <TableCell className="text-right tabular-nums text-sm text-violet-600">
+                        {(row.j_build ?? 0) > 0 ? jours(row.j_build!) : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground tabular-nums">
+                        {volumeLabel(row)}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-sm">
+                        {eur(row.tjm_interne)}/j
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-sm text-violet-600">
+                        {(row.j_build ?? 0) > 0
+                          ? eur((row.j_build!) * row.tjm_interne)
+                          : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums text-sm font-semibold text-emerald-600">
+                        {gainByRow(row) > 0 ? eur(gainByRow(row)) : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{row.note ?? '—'}</TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(row)}>
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive"
+                            onClick={() => handleDelete(row)}>
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+              Aucun profil RH hors IT renseigné.
+            </div>
+          )}
+          <Button variant="outline" size="sm" onClick={openAdd} className="gap-2">
+            <Plus className="h-4 w-4" />Ajouter un profil
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* ── Section 2 : Calcul ROI ─────────────────────────────────────── */}
+      <Card className="border-border/50">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <TrendingUp className="h-5 w-5 text-emerald-500" />
+            Calcul ROI / Rentabilité
+          </CardTitle>
+          {hasTjmWarning && (
+            <div className="flex items-center gap-2 rounded-md bg-amber-500/10 border border-amber-500/20 px-3 py-2 text-xs text-amber-700 mt-1">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              Certains profils du plan de charge n'ont pas de TJM renseigné — configurer dans
+              <strong className="ml-1">Params FDR → TJM référentiel</strong>.
+            </div>
+          )}
+        </CardHeader>
+        <CardContent>
+          {tjmLoading ? (
+            <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10" />)}</div>
+          ) : (
+            <div className="space-y-4">
+              {/* Détail charges RH IT */}
+              {loads.length > 0 && (
+                <div className="rounded-lg border overflow-hidden">
+                  <div className="bg-muted/30 px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Charge BUILD par profil IT
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/10 hover:bg-muted/10">
+                        <TableHead>Profil</TableHead>
+                        <TableHead className="text-right">j/mois</TableHead>
+                        <TableHead className="text-right">Durée build</TableHead>
+                        <TableHead className="text-right">J total</TableHead>
+                        <TableHead className="text-right">TJM</TableHead>
+                        <TableHead className="text-right">Coût RH</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {loads.map(l => {
+                        const code = l.profil?.code ?? '';
+                        const tjm = tjmMap[code] ?? 0;
+                        const duree = project.delai_projete_mois ?? 0;
+                        const jTotal = l.j_mois * duree;
+                        const cout = jTotal * tjm;
+                        return (
+                          <TableRow key={l.id}>
+                            <TableCell className="text-sm">{l.profil?.nom ?? code}</TableCell>
+                            <TableCell className="text-right tabular-nums text-sm">{l.j_mois} j</TableCell>
+                            <TableCell className="text-right tabular-nums text-sm text-muted-foreground">
+                              {duree ? `× ${duree} mois` : '—'}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums text-sm font-medium">
+                              {duree ? jours(jTotal) : '—'}
+                            </TableCell>
+                            <TableCell className={cn('text-right tabular-nums text-sm', tjm === 0 && 'text-amber-500')}>
+                              {tjm > 0 ? `${eur(tjm)}/j` : '—'}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums text-sm font-semibold">
+                              {tjm > 0 && duree > 0 ? eur(cout) : '—'}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              {/* Tableau synthèse ROI */}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                <RoiKpi
+                  label="COGS (si ST)"
+                  value={eur(roi.cogs_eur)}
+                  sub={project.budget_externe_eur != null ? 'budget externe' : 'non renseigné'}
+                  color="text-blue-600"
+                  icon={<Euro className="h-4 w-4" />}
+                />
+                <RoiKpi
+                  label="Coût RH IT"
+                  value={eur(roi.rh_it_eur)}
+                  sub={roi.total_j_build > 0 ? `${jours(roi.total_j_build)} build` : 'aucune charge'}
+                  color="text-violet-600"
+                  icon={<Users className="h-4 w-4" />}
+                />
+                <RoiKpi
+                  label="Gain annuel ETP"
+                  value={eur(roi.gain_annuel_eur)}
+                  sub={rhHorsIT.length > 0 ? `${rhHorsIT.length} profil${rhHorsIT.length > 1 ? 's' : ''}` : 'aucun profil'}
+                  color="text-emerald-600"
+                  icon={<TrendingUp className="h-4 w-4" />}
+                />
+                <RoiKpi
+                  label="BILAN annuel"
+                  value={eur(roi.bilan_annuel_eur)}
+                  sub="Gain − COGS − RH"
+                  color={roi.bilan_annuel_eur >= 0 ? 'text-emerald-600' : 'text-red-600'}
+                  icon={roi.bilan_annuel_eur >= 0
+                    ? <CheckCircle2 className="h-4 w-4" />
+                    : <AlertCircle className="h-4 w-4" />}
+                  highlight
+                />
+                <RoiKpi
+                  label="Temps de retour"
+                  value={roi.temps_retour_an != null
+                    ? `${roi.temps_retour_an.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} an${roi.temps_retour_an >= 2 ? 's' : ''}`
+                    : '—'}
+                  sub={roi.temps_retour_an != null ? `${Math.round(roi.temps_retour_an * 12)} mois` : 'gain nul'}
+                  color={roi.temps_retour_an != null && roi.temps_retour_an <= 2 ? 'text-emerald-600'
+                    : roi.temps_retour_an != null ? 'text-amber-600' : 'text-muted-foreground'}
+                  icon={<Clock className="h-4 w-4" />}
+                />
+              </div>
+
+              {(roi.rh_it_eur === 0 && roi.gain_annuel_eur === 0) && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Info className="h-4 w-4 shrink-0" />
+                  Renseignez la charge build (plan de charge), les TJM référentiel et les profils RH
+                  hors IT pour obtenir le calcul ROI complet.
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Dialog ajout / édition ─────────────────────────────────────── */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {editTarget ? 'Modifier le profil RH' : 'Ajouter un profil RH hors IT'}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-1">
+              <Label htmlFor="profil_label">Profil / fonction</Label>
+              <Input
+                id="profil_label"
+                placeholder="Chef de projet métier, Référent RH, Formateur…"
+                value={form.profil_label}
+                onChange={e => setForm(f => ({ ...f, profil_label: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="j_build">Jours de BUILD (participation au projet)</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="j_build"
+                  type="number"
+                  min={0}
+                  step={0.5}
+                  placeholder="ex : 20"
+                  value={form.j_build}
+                  onChange={e => setForm(f => ({ ...f, j_build: e.target.value }))}
+                  className="w-36"
+                />
+                <span className="text-sm text-muted-foreground">jours (one-shot)</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Temps passé sur le build (ex : chef de projet métier). S'ajoute au coût RH du projet.
+              </p>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-1">
+              <Label>Unité de mesure de l'économie ETP</Label>
+              <Select value={form.unite} onValueChange={v => setForm(f => ({ ...f, unite: v as ITRHHorsITUnite }))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="jours_an">Jours / an (ETP annuel)</SelectItem>
+                  <SelectItem value="jours_spv">Jours / SPV × nombre de SPV</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {form.unite === 'jours_an' ? (
+              <div className="space-y-1">
+                <Label htmlFor="jours_an">Économie (jours/an)</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="jours_an"
+                    type="number"
+                    min={0}
+                    step={0.5}
+                    placeholder="ex : 15"
+                    value={form.jours_an}
+                    onChange={e => setForm(f => ({ ...f, jours_an: e.target.value }))}
+                    className="w-36"
+                  />
+                  <span className="text-sm text-muted-foreground">j/an</span>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="jours_par_spv">Jours / SPV</Label>
+                  <Input
+                    id="jours_par_spv"
+                    type="number"
+                    min={0}
+                    step={0.5}
+                    placeholder="ex : 2"
+                    value={form.jours_par_spv}
+                    onChange={e => setForm(f => ({ ...f, jours_par_spv: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="nb_spv">Nombre de SPV / an</Label>
+                  <Input
+                    id="nb_spv"
+                    type="number"
+                    min={0}
+                    step={1}
+                    placeholder="ex : 8"
+                    value={form.nb_spv}
+                    onChange={e => setForm(f => ({ ...f, nb_spv: e.target.value }))}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-1">
+              <Label htmlFor="tjm_interne">TJM interne (€/j)</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="tjm_interne"
+                  type="number"
+                  min={0}
+                  step={10}
+                  placeholder="400"
+                  value={form.tjm_interne}
+                  onChange={e => setForm(f => ({ ...f, tjm_interne: e.target.value }))}
+                  className="w-36"
+                />
+                <span className="text-sm text-muted-foreground">€/jour</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Coût journalier interne estimé (charges incluses / TJM marché).
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="note">Note (optionnel)</Label>
+              <Textarea
+                id="note"
+                placeholder="Précisions sur le rôle, les hypothèses…"
+                value={form.note}
+                onChange={e => setForm(f => ({ ...f, note: e.target.value }))}
+                rows={2}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDialogOpen(false)}>Annuler</Button>
+            <Button onClick={handleSave} disabled={isSaving} className="gap-2">
+              {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
+              {editTarget ? 'Enregistrer' : 'Ajouter'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ── KPI card ───────────────────────────────────────────────────────────────
+
+function RoiKpi({
+  label, value, sub, color, icon, highlight = false,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  color: string;
+  icon?: React.ReactNode;
+  highlight?: boolean;
+}) {
+  return (
+    <div className={cn(
+      'rounded-lg border p-4 space-y-1',
+      highlight ? 'bg-muted/40 border-border' : 'bg-background',
+    )}>
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <span className={color}>{icon}</span>
+        {label}
+      </div>
+      <div className={cn('text-xl font-bold tabular-nums', color)}>{value}</div>
+      {sub && <div className="text-xs text-muted-foreground">{sub}</div>}
+    </div>
+  );
+}
