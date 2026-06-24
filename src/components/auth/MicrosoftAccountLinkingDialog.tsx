@@ -54,6 +54,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   already_has_profile:    "Cette session Microsoft a déjà un profil dans l'application. Déconnectez-vous et reconnectez-vous directement avec Microsoft.",
   not_an_azure_user:      "Cette session n'est pas une connexion Microsoft valide pour la liaison.",
   transfer_failed:        "La liaison a échoué côté serveur. Réessayez ou contactez votre administrateur.",
+  same_user:              "Votre compte Microsoft n'est pas encore enregistré dans l'application. Contactez votre administrateur pour qu'il crée votre profil.",
   internal_error:         "Erreur interne. Réessayez dans quelques instants.",
 };
 

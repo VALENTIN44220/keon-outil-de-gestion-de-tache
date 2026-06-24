@@ -13,6 +13,13 @@ import { AuthGate } from "@/components/auth/AuthGate";
 import { ForcePasswordChange } from "@/components/auth/ForcePasswordChange";
 import { PersistentRoutes } from "@/components/routing/PersistentRoutes";
 import { ITProjectsAccessGate } from "@/components/it/ITProjectsAccessGate";
+import { useBEAutoSync } from "@/hooks/useBEAutoSync";
+
+/** Composant invisible qui déclenche la sync BE au démarrage de l'app. */
+function BESyncEffect() {
+  useBEAutoSync();
+  return null;
+}
 
 // Eager imports — the production build already sets `inlineDynamicImports: true`, so
 // `React.lazy` provides no bundle-splitting benefit. Worse, in Vite dev the first navigation
@@ -101,6 +108,7 @@ import ITPlanning from "./pages/it/ITPlanning";
 import ITRoadmap from "./pages/it/ITRoadmap";
 import ITRoadmapDefinition from "./pages/it/ITRoadmapDefinition";
 import ITRoadmapTracking from "./pages/it/ITRoadmapTracking";
+import Documentation from "./pages/Documentation";
 import SMQDashboard from "./pages/smq/SMQDashboard";
 import SMQNewDeclaration from "./pages/smq/SMQNewDeclaration";
 import SMQDetail from "./pages/smq/SMQDetail";
@@ -124,6 +132,7 @@ const App = () => (
               }}
             >
             <AuthGate>
+            <BESyncEffect />
             <PersistentRoutes
               routes={[
                 // Keep ALL main app sections mounted to preserve React state across navigation.
@@ -214,6 +223,8 @@ const App = () => (
                 { path: "/it/projects/:code/discussions", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubDiscussions /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/projects/:code/files", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubFiles /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/projects/:code/budget", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubBudget /></ITProjectsAccessGate></ProtectedRoute> },
+
+                { path: "/documentation", end: true, element: <ProtectedRoute><Documentation /></ProtectedRoute> },
               ]}
             />
             <Routes>
@@ -239,6 +250,7 @@ const App = () => (
             <Route path="/demande/:taskId" element={<></>} />
             <Route path="/calendar" element={<></>} />
             <Route path="/chat" element={<></>} />
+            <Route path="/documentation" element={<></>} />
             <Route path="/suppliers" element={<></>} />
             <Route path="/innovation" element={<></>} />
             <Route path="/innovation/new" element={<></>} />

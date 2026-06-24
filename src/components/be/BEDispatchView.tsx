@@ -872,12 +872,10 @@ function TaskRow({
           : '',
       )}
     >
-      {/* Pastille statut interactive (non-interactive si tâche bloquée) */}
+      {/* Pastille statut — lecture seule, changement via boutons workflow uniquement */}
       <BEStatusBadge
         status={task.be_status}
         dot
-        taskId={isBlocked ? undefined : task.id}
-        onStatusChange={isBlocked ? undefined : onRefresh}
       />
 
       {/* Infos prestation */}
@@ -1374,6 +1372,16 @@ export function BEDispatchView({ projectId, projectCode }: BEDispatchViewProps) 
       const key = t.parent_request_id ?? '__standalone__';
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(t);
+    }
+    // Tri par order_index pour chaque groupe de demande
+    for (const [key, list] of map.entries()) {
+      list.sort((a, b) => {
+        const oa = a.sub_process_template?.order_index ?? 9999;
+        const ob = b.sub_process_template?.order_index ?? 9999;
+        if (oa !== ob) return oa - ob;
+        return a.created_at.localeCompare(b.created_at);
+      });
+      map.set(key, list);
     }
     return map;
   }, [tasks]);

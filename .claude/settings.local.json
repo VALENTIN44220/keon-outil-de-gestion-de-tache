@@ -54,7 +54,22 @@
       "Bash(git -c core.editor=true merge --continue)",
       "Bash(git -c core.autocrlf=false commit -m ' *)",
       "Bash(npm test *)",
-      "mcp__0a14636c-fc56-463b-9cf1-d56619542dfc__list_projects"
+      "mcp__0a14636c-fc56-463b-9cf1-d56619542dfc__list_projects",
+      "Bash(python3 -c \"import openpyxl\")",
+      "Bash(ls -d \"C:/Users/vltbe/Downloads\" \"C:/Users/vltbe/Desktop\" \"C:/Users/vltbe/OneDrive/Bureau\" \"C:/Users/vltbe/OneDrive/Desktop\" 2>&1 | head)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(git commit -q -m ' *)",
+      "Bash(rm -f tmp_sync2.sql)",
+      "Bash(echo \"---exit:$?---\")",
+      "mcp__0a14636c-fc56-463b-9cf1-d56619542dfc__get_advisors",
+      "Bash(python -c ' *)",
+      "Bash(npx eslint *)",
+      "Bash(git commit *)",
+      "Bash(rm -f .git/COMMIT_MSG_TMP.txt)",
+      "Bash(npm run *)",
+      "Bash(npx vitest *)",
+      "Bash(mkdir -p \"C:\\\\DEV\\\\GITHUB\\\\app_task\\\\keon-outil-de-gestion-de-tache\\\\docs\\\\screenshots\")",
+      "mcp__Claude_in_Chrome__navigate"
     ]
   }
 }

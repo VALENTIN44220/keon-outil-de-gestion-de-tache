@@ -4,7 +4,7 @@ import {
   Calendar, MessageCircle, Building2, ClipboardList,
   Lightbulb, Monitor, Leaf, Euro, Map as MapIcon, Users, Wallet,
   Package, Truck, ShieldAlert, Settings2, BarChart2,
-  UserPlus, AlertTriangle, ListChecks,
+  UserPlus, AlertTriangle, ListChecks, BookOpen,
 } from 'lucide-react';
 import type { ScreenPermissionKey, FeaturePermissionKey } from '@/types/permissions';
 
@@ -124,6 +124,7 @@ export const menuGroups: MenuGroup[] = [
     items: [
       { id: 'calendar', label: 'Calendrier', icon: Calendar, path: '/calendar', permissionKey: 'can_access_calendar' },
       { id: 'chat', label: 'Messages', icon: MessageCircle, path: '/chat', permissionKey: 'can_access_dashboard' },
+      { id: 'documentation', label: 'Documentation', icon: BookOpen, path: '/documentation', permissionKey: 'can_access_dashboard' },
     ],
   },
 ];

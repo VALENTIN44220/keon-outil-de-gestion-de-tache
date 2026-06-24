@@ -1,0 +1,242 @@
+[
+  {
+    "url": "/",
+    "file": "01_dashboard.jpg",
+    "id": "01_dashboard",
+    "module": "Mon Espace",
+    "label": "Tableau de bord",
+    "access": "standard"
+  },
+  {
+    "url": "/requests",
+    "file": "02_requests.jpg",
+    "id": "02_requests",
+    "module": "Mon Espace",
+    "label": "Demandes",
+    "access": "standard"
+  },
+  {
+    "url": "/mes-demandes",
+    "file": "03_mes_demandes.jpg",
+    "id": "03_mes_demandes",
+    "module": "Mon Espace",
+    "label": "Mes demandes",
+    "access": "standard"
+  },
+  {
+    "url": "/workload",
+    "file": "04_workload.jpg",
+    "id": "04_workload",
+    "module": "Mon Espace",
+    "label": "Plan de charge personnel",
+    "access": "standard"
+  },
+  {
+    "url": "/calendar",
+    "file": "05_calendar.jpg",
+    "id": "05_calendar",
+    "module": "Mon Espace",
+    "label": "Calendrier",
+    "access": "standard"
+  },
+  {
+    "url": "/workload",
+    "file": "06_team_workload.jpg",
+    "id": "06_team_workload",
+    "module": "Équipe",
+    "label": "Plan de charge équipe",
+    "access": "profil"
+  },
+  {
+    "url": "/be/dispatch",
+    "file": "07_be_dispatch.jpg",
+    "id": "07_be_dispatch",
+    "module": "Bureau d'Études",
+    "label": "Dispatch & Suivi BE",
+    "access": "standard"
+  },
+  {
+    "url": "/projects",
+    "file": "08_be_projects.jpg",
+    "id": "08_be_projects",
+    "module": "Bureau d'Études",
+    "label": "Projets BE",
+    "access": "profil"
+  },
+  {
+    "url": "/be/plan-de-charge",
+    "file": "09_be_planning.jpg",
+    "id": "09_be_planning",
+    "module": "Bureau d'Études",
+    "label": "Plan de charge BE",
+    "access": "profil"
+  },
+  {
+    "url": "/be/budget",
+    "file": "10_be_budget.jpg",
+    "id": "10_be_budget",
+    "module": "Bureau d'Études",
+    "label": "Budget BE",
+    "access": "profil"
+  },
+  {
+    "url": "/be/admin/tjm",
+    "file": "11_be_tjm.jpg",
+    "id": "11_be_tjm",
+    "module": "Bureau d'Études",
+    "label": "Référentiel TJM",
+    "access": "admin"
+  },
+  {
+    "url": "/be/projects/ABIL/overview",
+    "file": "28a_be_overview.jpg",
+    "id": "28a_be_overview",
+    "module": "Bureau d'Études",
+    "label": "Fiche projet BE — Vue d'ensemble",
+    "access": "profil"
+  },
+  {
+    "url": "/be/projects/ABIL/timeline",
+    "file": "28b_be_timeline.jpg",
+    "id": "28b_be_timeline",
+    "module": "Bureau d'Études",
+    "label": "Fiche projet BE — Gantt",
+    "access": "profil"
+  },
+  {
+    "url": "/be/projects/ABIL/budget",
+    "file": "28c_be_budget.jpg",
+    "id": "28c_be_budget",
+    "module": "Bureau d'Études",
+    "label": "Fiche projet BE — Budget",
+    "access": "profil"
+  },
+  {
+    "url": "/spv",
+    "file": "12_spv.jpg",
+    "id": "12_spv",
+    "module": "SPV",
+    "label": "Projets SPV",
+    "access": "profil"
+  },
+  {
+    "url": "/it/dispatch",
+    "file": "13_it_dispatch.jpg",
+    "id": "13_it_dispatch",
+    "module": "IT / Digital",
+    "label": "Demandes IT",
+    "access": "standard"
+  },
+  {
+    "url": "/it/projects",
+    "file": "14_it_projects.jpg",
+    "id": "14_it_projects",
+    "module": "IT / Digital",
+    "label": "Projets IT",
+    "access": "double"
+  },
+  {
+    "url": "/it/feuille-de-route",
+    "file": "15_it_roadmap.jpg",
+    "id": "15_it_roadmap",
+    "module": "IT / Digital",
+    "label": "Feuille de route IT",
+    "access": "profil"
+  },
+  {
+    "url": "/it/plan-de-charge",
+    "file": "16_it_planning.jpg",
+    "id": "16_it_planning",
+    "module": "IT / Digital",
+    "label": "Plan de charge IT",
+    "access": "profil"
+  },
+  {
+    "url": "/it/budget",
+    "file": "17_it_budget.jpg",
+    "id": "17_it_budget",
+    "module": "IT / Digital",
+    "label": "Budget IT",
+    "access": "profil"
+  },
+  {
+    "url": "/it/cartographie",
+    "file": "18_it_carto.jpg",
+    "id": "18_it_carto",
+    "module": "IT / Digital",
+    "label": "Cartographie IT",
+    "access": "profil"
+  },
+  {
+    "url": "/smq",
+    "file": "19_smq.jpg",
+    "id": "19_smq",
+    "module": "Qualité",
+    "label": "Non-conformités (SMQ)",
+    "access": "standard"
+  },
+  {
+    "url": "/innovation/requests",
+    "file": "20_innovation.jpg",
+    "id": "20_innovation",
+    "module": "Modules",
+    "label": "Innovation",
+    "access": "profil"
+  },
+  {
+    "url": "/maintenance/dispatch",
+    "file": "21_maintenance.jpg",
+    "id": "21_maintenance",
+    "module": "Modules",
+    "label": "Maintenance matériel",
+    "access": "profil"
+  },
+  {
+    "url": "/rh/dispatch",
+    "file": "22_rh.jpg",
+    "id": "22_rh",
+    "module": "Modules",
+    "label": "Mouvements RH",
+    "access": "profil"
+  },
+  {
+    "url": "/client/dispatch",
+    "file": "23_client.jpg",
+    "id": "23_client",
+    "module": "Modules",
+    "label": "Création client",
+    "access": "profil"
+  },
+  {
+    "url": "/logistique/dispatch",
+    "file": "24_logistique.jpg",
+    "id": "24_logistique",
+    "module": "Modules",
+    "label": "Logistique transports",
+    "access": "profil"
+  },
+  {
+    "url": "/sst",
+    "file": "25_sst.jpg",
+    "id": "25_sst",
+    "module": "Modules",
+    "label": "Situations à risque (SST)",
+    "access": "profil"
+  },
+  {
+    "url": "/templates",
+    "file": "26_templates.jpg",
+    "id": "26_templates",
+    "module": "Configuration",
+    "label": "Modèles de processus",
+    "access": "profil"
+  },
+  {
+    "url": "/admin",
+    "file": "27_admin.jpg",
+    "id": "27_admin",
+    "module": "Administration",
+    "label": "Administration",
+    "access": "admin"
+  }
+]
