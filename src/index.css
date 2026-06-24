@@ -7,6 +7,34 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Impression / Export PDF documentation ─────────────────────────────── */
+@media print {
+  /* Supprime les contraintes de hauteur/scroll du layout flex */
+  html, body { height: auto !important; overflow: visible !important; }
+
+  /* La page documentation utilise flex h-screen → on passe en block */
+  .doc-layout { display: block !important; height: auto !important; overflow: visible !important; }
+
+  /* Masque la sidebar de navigation */
+  .doc-layout aside { display: none !important; }
+
+  /* Le main n'est plus scrollable */
+  .doc-layout main {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  /* Sauts de page entre les grands groupes */
+  .doc-group-break { page-break-before: always; }
+
+  /* Évite les coupures dans les blocs de contenu */
+  .doc-block-nobreak { page-break-inside: avoid; }
+
+  /* Masque les boutons de navigation */
+  .print\:hidden { display: none !important; }
+}
+
 /* ================================
    Validation Animations
    ================================ */
