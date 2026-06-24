@@ -38,7 +38,7 @@ export default function ITProjectHubROI() {
         <ITProjectFormDialog
           project={project}
           open={showEditDialog}
-          onOpenChange={setShowEditDialog}
+          onClose={() => setShowEditDialog(false)}
         />
       )}
     </Layout>
