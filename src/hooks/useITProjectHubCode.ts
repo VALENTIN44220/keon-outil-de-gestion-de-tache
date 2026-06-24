@@ -23,6 +23,7 @@ export function useITProjectHubCode(): string | undefined {
       /^\/it\/projects\/([^/]+)\/sync/,
       /^\/it\/projects\/([^/]+)\/discussions/,
       /^\/it\/projects\/([^/]+)\/files/,
+      /^\/it\/projects\/([^/]+)\/roi/,
     ];
     for (const re of patterns) {
       const m = pathname.match(re);
