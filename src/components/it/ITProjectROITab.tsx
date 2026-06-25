@@ -47,6 +47,9 @@ import {
 import {
   useITProjectTempsManuel, useAddITProjectTempsManuel, useDeleteITProjectTempsManuel,
 } from '@/hooks/useITProjectTempsManuel';
+import { useLuccaCodeSites } from '@/hooks/useLuccaCodeSites';
+import { useActiveProfiles } from '@/hooks/useActiveProfiles';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 
 // ── Formatage ──────────────────────────────────────────────────────────────
 
@@ -168,9 +171,26 @@ export function ITProjectROITab({ project, loads }: Props) {
   const { data: tempsManuel = [] } = useITProjectTempsManuel(project.id);
   const addManuel = useAddITProjectTempsManuel();
   const delManuel = useDeleteITProjectTempsManuel();
+  const { data: luccaSites = [] } = useLuccaCodeSites();
+  const { data: activeProfiles = [] } = useActiveProfiles();
 
   const [newCode, setNewCode] = useState('');
-  const [manForm, setManForm] = useState({ profil_label: '', mois: '', jours: '', note: '' });
+  // Mode B : person picker (value = profile id, ou texte libre si saisi à la main)
+  const [manForm, setManForm] = useState({ person: '', mois: '', jours: '', note: '' });
+
+  const luccaOptions = useMemo(
+    () => luccaSites
+      .filter(s => !luccaCodes.some(c => c.code_site === s.code_site))
+      .map(s => ({ value: s.code_site, label: `${s.code_site} · ${Math.round(s.jours)} j` })),
+    [luccaSites, luccaCodes],
+  );
+  const profileOptions = useMemo(
+    () => activeProfiles.map(p => ({
+      value: p.id,
+      label: p.job_title ? `${p.display_name} — ${p.job_title}` : p.display_name,
+    })),
+    [activeProfiles],
+  );
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<ITProjectRHHorsIT | null>(null);
@@ -253,19 +273,23 @@ export function ITProjectROITab({ project, loads }: Props) {
 
   const handleAddManuel = async () => {
     const j = parseFloat(manForm.jours);
-    if (!manForm.profil_label.trim() || !j) {
-      toast.error('Renseignez au moins un collaborateur/profil et un nombre de jours');
+    if (!manForm.person.trim() || !j) {
+      toast.error('Renseignez un collaborateur et un nombre de jours');
       return;
     }
+    // Si la valeur correspond à un profil connu → user_id (valorisé via TJM fonction),
+    // sinon on conserve le texte libre comme profil_label.
+    const matched = activeProfiles.find(p => p.id === manForm.person);
     try {
       await addManuel.mutateAsync({
         it_project_id: project.id,
-        profil_label: manForm.profil_label.trim(),
+        user_id: matched ? matched.id : null,
+        profil_label: matched ? null : manForm.person.trim(),
         mois: manForm.mois ? `${manForm.mois}-01` : null,
         jours: j,
         note: manForm.note.trim() || null,
       });
-      setManForm({ profil_label: '', mois: '', jours: '', note: '' });
+      setManForm({ person: '', mois: '', jours: '', note: '' });
       toast.success('Temps ajouté');
     } catch (e) {
       toast.error(extractErrorMessage(e));
@@ -586,17 +610,27 @@ export function ITProjectROITab({ project, loads }: Props) {
               )}
             </div>
             <div className="flex items-center gap-2">
-              <Input
-                placeholder="Code analytique Lucca (code_site)"
-                value={newCode}
-                onChange={e => setNewCode(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') handleAddCode(); }}
-                className="h-8 w-64 font-mono text-xs"
-              />
-              <Button size="sm" variant="outline" onClick={handleAddCode} disabled={addLucca.isPending} className="gap-1">
+              <div className="w-80">
+                <SearchableSelect
+                  value={newCode}
+                  onValueChange={setNewCode}
+                  options={luccaOptions}
+                  placeholder="Choisir un code Lucca (préfixe S/R)…"
+                  searchPlaceholder="Rechercher un code…"
+                  emptyMessage="Aucun code disponible"
+                  allowCustom
+                  customPlaceholder="Saisir un code à la main"
+                  triggerClassName="h-8 text-xs font-mono"
+                />
+              </div>
+              <Button size="sm" variant="outline" onClick={handleAddCode} disabled={addLucca.isPending || !newCode} className="gap-1">
                 <Plus className="h-3.5 w-3.5" /> Ajouter
               </Button>
             </div>
+            <p className="text-[11px] text-muted-foreground">
+              Les temps IT sont déclarés sous des codes entité/activité (ex : SDEVE000, SEXPL000,
+              RGENE000). Rattachez le ou les codes correspondant à ce projet.
+            </p>
           </div>
 
           {/* Mode B : saisie manuelle */}
@@ -619,7 +653,11 @@ export function ITProjectROITab({ project, loads }: Props) {
                   <TableBody>
                     {tempsManuel.map(row => (
                       <TableRow key={row.id}>
-                        <TableCell className="text-sm">{row.profil_label ?? '—'}</TableCell>
+                        <TableCell className="text-sm">
+                          {row.profil_label
+                            ?? activeProfiles.find(p => p.id === row.user_id)?.display_name
+                            ?? '—'}
+                        </TableCell>
                         <TableCell className="text-sm tabular-nums">{row.mois ? row.mois.slice(0, 7) : '—'}</TableCell>
                         <TableCell className="text-right tabular-nums text-sm">{jours(row.jours)}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{row.note ?? '—'}</TableCell>
@@ -637,9 +675,18 @@ export function ITProjectROITab({ project, loads }: Props) {
             )}
             <div className="grid grid-cols-1 sm:grid-cols-[1fr_130px_90px_auto] gap-2 items-end">
               <div className="space-y-1">
-                <Label className="text-xs">Collaborateur / profil</Label>
-                <Input placeholder="ex : Jean Dupont" value={manForm.profil_label}
-                  onChange={e => setManForm(f => ({ ...f, profil_label: e.target.value }))} className="h-8" />
+                <Label className="text-xs">Collaborateur</Label>
+                <SearchableSelect
+                  value={manForm.person}
+                  onValueChange={v => setManForm(f => ({ ...f, person: v }))}
+                  options={profileOptions}
+                  placeholder="Choisir un collaborateur…"
+                  searchPlaceholder="Rechercher…"
+                  emptyMessage="Aucun collaborateur"
+                  allowCustom
+                  customPlaceholder="Saisir un libellé"
+                  triggerClassName="h-8 text-sm"
+                />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Mois</Label>
