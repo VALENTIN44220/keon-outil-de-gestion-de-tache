@@ -5,8 +5,6 @@ import { useITProject, useITProjectTasks, useITProjectStats } from '@/hooks/useI
 import { useITProjectLoad } from '@/hooks/useITProjectLoad';
 import { ITProjectROITab } from '@/components/it/ITProjectROITab';
 import { Loader2 } from 'lucide-react';
-import { useState } from 'react';
-import { ITProjectFormDialog } from '@/components/it/ITProjectFormDialog';
 
 export default function ITProjectHubROI() {
   const code = useITProjectHubCode();
@@ -14,7 +12,6 @@ export default function ITProjectHubROI() {
   const { data: tasks = [] } = useITProjectTasks(project?.id);
   const stats = useITProjectStats(tasks, project);
   const { data: loads = [] } = useITProjectLoad(project?.id);
-  const [showEditDialog, setShowEditDialog] = useState(false);
 
   if (isLoading || !project) {
     return (
@@ -29,18 +26,11 @@ export default function ITProjectHubROI() {
   return (
     <Layout>
       <div className="flex flex-col min-h-full">
-        <ITProjectHubHeader project={project} stats={stats} onEditProject={() => setShowEditDialog(true)} />
+        <ITProjectHubHeader project={project} stats={stats} />
         <div className="flex-1 p-6">
           <ITProjectROITab project={project} loads={loads} />
         </div>
       </div>
-      {showEditDialog && (
-        <ITProjectFormDialog
-          project={project}
-          open={showEditDialog}
-          onClose={() => setShowEditDialog(false)}
-        />
-      )}
     </Layout>
   );
 }

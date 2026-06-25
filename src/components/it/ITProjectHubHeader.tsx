@@ -11,26 +11,41 @@ import { useITProjectSync } from '@/hooks/useITProjectSync';
 interface ITProjectHubHeaderProps {
   project: ITProject;
   stats: { totalTasks: number; openTasks: number; doneTasks: number; overdueTasks: number; progress: number; budgetRatio: number | null };
-  onEditProject?: () => void;
 }
 
-const navItems = [
-  { value: 'overview',    label: 'Synthèse',                 icon: LayoutDashboard },
-  { value: 'governance',  label: 'Gouvernance & Phasage',    icon: Shield },
-  { value: 'tasks',       label: 'Tâches & Demandes',        icon: ListTodo },
-  { value: 'timeline',    label: 'Planning',                 icon: Calendar },
-  { value: 'sync',        label: 'Teams / Loop',             icon: RefreshCw },
-  { value: 'discussions', label: 'Discussions',              icon: MessageSquare },
-  { value: 'files',       label: 'Fichiers',                 icon: Paperclip },
-  { value: 'budget',      label: 'Budget',                   icon: Euro },
-  { value: 'roi',         label: 'ROI',                      icon: BarChart3 },
+type NavChild = { value: string; label: string; icon: typeof LayoutDashboard };
+type NavGroup = { id: string; label: string; icon: typeof LayoutDashboard; children: NavChild[] };
+
+const navGroups: NavGroup[] = [
+  { id: 'synthese', label: 'Synthèse', icon: LayoutDashboard, children: [
+    { value: 'overview', label: 'Synthèse', icon: LayoutDashboard },
+  ] },
+  { id: 'pilotage', label: 'Pilotage', icon: Shield, children: [
+    { value: 'governance', label: 'Gouvernance & Phasage', icon: Shield },
+    { value: 'timeline',   label: 'Planning',              icon: Calendar },
+  ] },
+  { id: 'travaux', label: 'Travaux', icon: ListTodo, children: [
+    { value: 'tasks', label: 'Tâches & Demandes', icon: ListTodo },
+  ] },
+  { id: 'finance', label: 'Finance', icon: Euro, children: [
+    { value: 'budget', label: 'Budget', icon: Euro },
+    { value: 'roi',    label: 'ROI',    icon: BarChart3 },
+  ] },
+  { id: 'collaboration', label: 'Collaboration', icon: MessageSquare, children: [
+    { value: 'sync',        label: 'Teams / Loop', icon: RefreshCw },
+    { value: 'discussions', label: 'Discussions',  icon: MessageSquare },
+    { value: 'files',       label: 'Fichiers',     icon: Paperclip },
+  ] },
 ];
 
-export function ITProjectHubHeader({ project, stats, onEditProject }: ITProjectHubHeaderProps) {
+export function ITProjectHubHeader({ project, stats }: ITProjectHubHeaderProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { openTeams, openLoop, hasTeams, hasLoop } = useITProjectSync(project);
   const activeTab = location.pathname.split('/').pop() || 'overview';
+  const activeGroup = navGroups.find(g => g.children.some(c => c.value === activeTab)) ?? navGroups[0];
+  const isEditing = activeTab === 'edit';
+  const goTo = (value: string) => navigate(`/it/projects/${project.code_projet_digital}/${value}`);
   const statusConfig = STATUT_PORTEFEUILLE_CONFIG[(project.statut_portefeuille as StatutPortefeuille) ?? 'Idée'] || STATUT_PORTEFEUILLE_CONFIG['Idée'];
   const priorityConfig = project.priorite ? IT_PROJECT_PRIORITY_CONFIG[project.priorite] : null;
   const pilierConfig = project.pilier ? IT_PROJECT_PILIER_CONFIG[project.pilier as ITProjectPilier] : null;
@@ -105,11 +120,14 @@ export function ITProjectHubHeader({ project, stats, onEditProject }: ITProjectH
                   <TooltipContent>Ouvrir Loop</TooltipContent>
                 </Tooltip>
               )}
-              {onEditProject && (
-                <Button size="sm" variant="outline" onClick={onEditProject} className="gap-2">
-                  <Pencil className="h-4 w-4" /> Modifier
-                </Button>
-              )}
+              <Button
+                size="sm"
+                variant={isEditing ? 'default' : 'outline'}
+                onClick={() => goTo('edit')}
+                className="gap-2"
+              >
+                <Pencil className="h-4 w-4" /> Modifier
+              </Button>
 
               {/* KPI tâches retirés — l'avancement global est affiché dans la carte
                   « Synthèse d'avancement » de l'onglet Synthèse pour éviter le doublon. */}
@@ -119,14 +137,15 @@ export function ITProjectHubHeader({ project, stats, onEditProject }: ITProjectH
       </div>
 
       <div className="px-6">
+        {/* Niveau 1 : groupes thématiques */}
         <div className="flex gap-1 border-b -mb-px">
-          {navItems.map(item => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.value;
+          {navGroups.map(group => {
+            const Icon = group.icon;
+            const isActive = !isEditing && group.id === activeGroup.id;
             return (
               <button
-                key={item.value}
-                onClick={() => navigate(`/it/projects/${project.code_projet_digital}/${item.value}`)}
+                key={group.id}
+                onClick={() => goTo(group.children[0].value)}
                 className={cn(
                   'flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors',
                   isActive
@@ -135,11 +154,36 @@ export function ITProjectHubHeader({ project, stats, onEditProject }: ITProjectH
                 )}
               >
                 <Icon className="h-4 w-4" />
-                {item.label}
+                {group.label}
               </button>
             );
           })}
         </div>
+
+        {/* Niveau 2 : sous-onglets du groupe actif (si plusieurs) */}
+        {!isEditing && activeGroup.children.length > 1 && (
+          <div className="flex gap-1 pt-2 pb-1">
+            {activeGroup.children.map(child => {
+              const Icon = child.icon;
+              const isActive = activeTab === child.value;
+              return (
+                <button
+                  key={child.value}
+                  onClick={() => goTo(child.value)}
+                  className={cn(
+                    'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
+                    isActive
+                      ? 'bg-violet-100 text-violet-700'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  )}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {child.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

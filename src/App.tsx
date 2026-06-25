@@ -102,6 +102,8 @@ import ITProjectHubDiscussions from "./pages/it/ITProjectHubDiscussions";
 import ITProjectHubFiles from "./pages/it/ITProjectHubFiles";
 import ITProjectHubBudget from "./pages/it/ITProjectHubBudget";
 import ITProjectHubROI from "./pages/it/ITProjectHubROI";
+import ITProjectHubEdit from "./pages/it/ITProjectHubEdit";
+import ITProjectCreate from "./pages/it/ITProjectCreate";
 import ITBudgetGlobal from "./pages/it/ITBudgetGlobal";
 import ITCartographie from "./pages/it/ITCartographie";
 import ITAdminFDR from "./pages/it/ITAdminFDR";
@@ -210,6 +212,7 @@ const App = () => (
 
                 // IT project hub (écran dédié + voir projet IT)
                 { path: "/it/projects", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjects /></ITProjectsAccessGate></ProtectedRoute> },
+                { path: "/it/projects/new", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectCreate /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/budget", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITBudgetGlobal /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/cartographie", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITCartographie /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/admin/fdr", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITAdminFDR /></ITProjectsAccessGate></ProtectedRoute> },
@@ -226,6 +229,7 @@ const App = () => (
                 { path: "/it/projects/:code/files", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubFiles /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/projects/:code/budget", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubBudget /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/projects/:code/roi", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubROI /></ITProjectsAccessGate></ProtectedRoute> },
+                { path: "/it/projects/:code/edit", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITProjectHubEdit /></ITProjectsAccessGate></ProtectedRoute> },
                 { path: "/it/portfolio-roi", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITPortfolioROI /></ITProjectsAccessGate></ProtectedRoute> },
 
                 { path: "/documentation", end: true, element: <ProtectedRoute><Documentation /></ProtectedRoute> },
@@ -314,6 +318,8 @@ const App = () => (
             <Route path="/it/projects/:code/files" element={<></>} />
             <Route path="/it/projects/:code/budget" element={<></>} />
             <Route path="/it/projects/:code/roi" element={<></>} />
+            <Route path="/it/projects/:code/edit" element={<></>} />
+            <Route path="/it/projects/new" element={<></>} />
             <Route path="/it/portfolio-roi" element={<></>} />
             <Route path="/design-system" element={<DesignSystem />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

@@ -29,7 +29,6 @@ import { format, subMonths, startOfMonth, startOfYear, isAfter } from 'date-fns'
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
-import { ITProjectFormDialog } from '@/components/it/ITProjectFormDialog';
 import { useUserRole } from '@/hooks/useUserRole';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -125,7 +124,6 @@ export default function ITProjects() {
   const { projects, isLoading, deleteProject, fetchProjects } = useITProjects();
   const { isAdmin } = useUserRole();
   const { resolve: resolveType } = useITProjectTypes();
-  const [showCreate, setShowCreate] = useState(false);
   const [showMerge, setShowMerge] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ITProject | null>(null);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
@@ -368,7 +366,7 @@ export default function ITProjects() {
               <Button variant="outline" onClick={handleExportExcel} className="gap-2">
                 <FileSpreadsheet className="h-4 w-4" /> Export Excel
               </Button>
-              <Button onClick={() => setShowCreate(true)} className="gap-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 shadow-lg shadow-violet-500/25">
+              <Button onClick={() => navigate('/it/projects/new')} className="gap-2 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 shadow-lg shadow-violet-500/25">
                 <Plus className="h-4 w-4" /> Nouveau projet
               </Button>
             </div>
@@ -764,7 +762,6 @@ export default function ITProjects() {
         </div>
       </div>
 
-      <ITProjectFormDialog open={showCreate} onClose={() => setShowCreate(false)} onSaved={fetchProjects} />
       <ITProjectMergeDialog
         open={showMerge}
         onOpenChange={setShowMerge}

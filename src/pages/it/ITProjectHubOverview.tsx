@@ -44,7 +44,6 @@ import { useITProjectLoad } from '@/hooks/useITProjectLoad';
 import { useFdrProfils } from '@/hooks/useFdrSettings';
 import { useITProjectTypes } from '@/hooks/useITProjectTypes';
 import { getMepRetenue, totalBuildNet, toYM } from '@/lib/fdr/calculationEngine';
-import { ITProjectFormDialog } from '@/components/it/ITProjectFormDialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -61,7 +60,6 @@ export default function ITProjectHubOverview() {
   const { data: fdrProfils = [] } = useFdrProfils();
   const { resolve: resolveType } = useITProjectTypes();
 
-  const [showEditDialog, setShowEditDialog] = useState(false);
   const [editingEtape, setEditingEtape] = useState<ITProjectFDRValidation | null>(null);
   const [etapeForm, setEtapeForm] = useState({ statut: 'a_faire', date_validation: '', valideur_id: '', commentaire: '' });
   const [allProfiles, setAllProfiles] = useState<{ id: string; display_name: string }[]>([]);
@@ -231,7 +229,6 @@ export default function ITProjectHubOverview() {
         <ITProjectHubHeader
           project={project}
           stats={stats}
-          onEditProject={() => setShowEditDialog(true)}
         />
 
         <div className="flex-1 overflow-auto p-4 sm:p-6">
@@ -526,13 +523,6 @@ export default function ITProjectHubOverview() {
           </div>
         </div>
       </div>
-
-      <ITProjectFormDialog
-        open={showEditDialog}
-        project={project}
-        onClose={() => setShowEditDialog(false)}
-        onSaved={refetch}
-      />
 
       {/* Dialog modification étape FDR */}
       <Dialog open={!!editingEtape} onOpenChange={() => setEditingEtape(null)}>

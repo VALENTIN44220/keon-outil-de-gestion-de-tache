@@ -48,7 +48,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
-import { ITProjectFormDialog } from '@/components/it/ITProjectFormDialog';
 import {
   TrendingUp,
   RefreshCw,
@@ -207,7 +206,6 @@ export default function ITProjectHubBudget() {
     return new Date().getFullYear();
   }, [lines]);
 
-  const [showEditDialog, setShowEditDialog] = useState(false);
   const [filterTypeDepense, setFilterTypeDepense] = useState<string>('__all__');
   const [filterMois, setFilterMois] = useState<string>('__all__');
 
@@ -720,7 +718,6 @@ export default function ITProjectHubBudget() {
         <ITProjectHubHeader
           project={project}
           stats={stats}
-          onEditProject={() => setShowEditDialog(true)}
         />
 
         {linesLoading ? (
@@ -1142,13 +1139,6 @@ export default function ITProjectHubBudget() {
           </div>
         )}
       </div>
-
-      <ITProjectFormDialog
-        open={showEditDialog}
-        project={project}
-        onClose={() => setShowEditDialog(false)}
-        onSaved={refetch}
-      />
 
       {/* ── Dialog : relier des lignes budgétaires existantes au projet ── */}
       <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
