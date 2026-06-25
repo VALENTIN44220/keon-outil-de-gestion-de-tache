@@ -3,6 +3,10 @@ import { useITProjectHubCode } from '@/hooks/useITProjectHubCode';
 import { Layout } from '@/components/layout/Layout';
 import { ITProjectHubHeader } from '@/components/it/ITProjectHubHeader';
 import { useITProject, useITProjectTasks, useITProjectStats, useITProjectMilestones, useITMilestoneCalendarLinks } from '@/hooks/useITProjectHub';
+import { useITProjectLoad } from '@/hooks/useITProjectLoad';
+import { useFdrProfils } from '@/hooks/useFdrSettings';
+import { getMepRetenue, totalBuildNet } from '@/lib/fdr/calculationEngine';
+import { type StatutPortefeuille, type FdrProjectInput } from '@/types/fdr';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -59,7 +63,52 @@ export default function ITProjectHubTimeline() {
   const { data: project, isLoading } = useITProject(code);
   const { data: tasks = [] } = useITProjectTasks(project?.id);
   const { data: milestones = [], addMilestone, updateMilestone, deleteMilestone } = useITProjectMilestones(project?.id);
+  const { data: projectLoads = [] } = useITProjectLoad(project?.id);
+  const { data: fdrProfils = [] } = useFdrProfils();
   const stats = useITProjectStats(tasks, project);
+
+  // Planning & charge (réutilise le moteur FDR, comme la Synthèse).
+  const charge = useMemo(() => {
+    if (!project) return null;
+    const input: FdrProjectInput = {
+      id: project.id,
+      code: project.code_projet_digital,
+      nom: project.nom_projet,
+      activite_metier: project.activite_metier ?? null,
+      profil_principal: project.profil_principal ?? null,
+      statut_portefeuille: (project.statut_portefeuille as StatutPortefeuille) ?? 'Idée',
+      sur_feuille_de_route: project.sur_feuille_de_route ?? true,
+      date_kickoff: project.date_kickoff ?? null,
+      date_mep_saisie: project.date_mep_saisie ?? null,
+      delai_projete_mois: project.delai_projete_mois ?? null,
+      echeance_cible: project.echeance_cible ?? null,
+      suivi_j_mois: project.suivi_j_mois ?? 0,
+      loads: projectLoads.map(l => ({ profil_code: (l.profil as any)?.code ?? '', j_mois: l.j_mois })),
+      externe: project.externe ?? false,
+      pct_reduction_si_externe: project.pct_reduction_si_externe ?? 0,
+    };
+    const isPermanente = input.statut_portefeuille === 'Tâche permanente';
+    return {
+      isPermanente,
+      mepRetenue: getMepRetenue(input),
+      buildNet: totalBuildNet(input),
+      suivi: input.suivi_j_mois,
+      externe: input.externe,
+      pctReduction: input.pct_reduction_si_externe,
+      delaiProjete: project.delai_projete_mois ?? null,
+      ventilation: projectLoads
+        .filter(l => l.j_mois > 0)
+        .map(l => ({ nom: (l.profil as any)?.nom ?? '—', j_mois: l.j_mois })),
+      profilPrincipalNom: fdrProfils.find(p => p.code === input.profil_principal)?.nom ?? input.profil_principal ?? '—',
+    };
+  }, [project, projectLoads, fdrProfils]);
+
+  const fmtMonth = (ym: string | null) => {
+    if (!ym) return '—';
+    const d = new Date(`${ym}-01`);
+    return isNaN(d.getTime()) ? ym : format(d, 'MMM yyyy', { locale: fr });
+  };
+  const fmtDate = (d: string | null | undefined) => (d ? format(new Date(d), 'dd MMM yyyy', { locale: fr }) : '—');
 
   const milestoneIds = useMemo(() => milestones.map(m => m.id), [milestones]);
   const { data: linksByMilestone = new Map(), addLink, removeLink } = useITMilestoneCalendarLinks(milestoneIds);
@@ -196,6 +245,73 @@ export default function ITProjectHubTimeline() {
             <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-emerald-500" /> Terminé</div>
             <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-red-500" /> Retardé</div>
           </div>
+
+          {/* Planning & charge (lecture seule) */}
+          {charge && (
+            <Card className="border-border/50">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <CalendarClock className="h-5 w-5 text-violet-600" />
+                  Planning &amp; charge
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-0">
+                {/* Dates */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="rounded-lg border bg-muted/20 p-3">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Kickoff</p>
+                    <p className="text-sm font-bold tabular-nums">{fmtDate(project.date_kickoff)}</p>
+                  </div>
+                  <div className="rounded-lg border bg-muted/20 p-3">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{charge.isPermanente ? 'Échéance' : 'MEP retenue'}</p>
+                    <p className="text-sm font-bold tabular-nums">{fmtMonth(charge.mepRetenue)}</p>
+                  </div>
+                  <div className="rounded-lg border bg-muted/20 p-3">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Échéance cible</p>
+                    <p className="text-sm font-bold tabular-nums">{fmtDate(project.echeance_cible)}</p>
+                  </div>
+                  <div className="rounded-lg border bg-muted/20 p-3">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Délai build projeté</p>
+                    <p className="text-sm font-bold tabular-nums">{charge.delaiProjete != null ? `${charge.delaiProjete} mois` : '—'}</p>
+                  </div>
+                </div>
+
+                {/* Charge build par profil */}
+                <div className="rounded-lg border bg-muted/20 p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Charge build par profil</p>
+                    <span className="text-xs tabular-nums">Build net : <span className="font-bold">{Math.round(charge.buildNet * 10) / 10}</span> j/mois</span>
+                  </div>
+                  {charge.ventilation.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">Aucune charge build saisie.</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {charge.ventilation.map((v, i) => (
+                        <div key={i} className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground truncate">{v.nom}</span>
+                          <span className="tabular-nums font-medium">{v.j_mois} j/mois</span>
+                        </div>
+                      ))}
+                      {charge.suivi > 0 && (
+                        <div className="flex items-center justify-between text-sm pt-1 border-t border-border/50">
+                          <span className="text-muted-foreground">Suivi → {charge.profilPrincipalNom}</span>
+                          <span className="tabular-nums font-medium">{charge.suivi} j/mois</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Externalisation */}
+                {charge.externe && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Badge className="bg-amber-100 text-amber-700 border border-amber-200">Projet externalisé</Badge>
+                    <span className="text-muted-foreground">Réduction charge interne : {Math.round((charge.pctReduction ?? 0) * 100)}%</span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Milestones Section */}
           <Card className="border-border/50">

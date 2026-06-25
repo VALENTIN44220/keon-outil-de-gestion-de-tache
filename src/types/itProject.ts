@@ -583,3 +583,35 @@ export interface ITRoiCalc {
   /** Jours build total (tous profils). */
   total_j_build: number;
 }
+
+/** Code d'imputation Lucca rapproché à un projet IT (Mode A). */
+export interface ITProjectLuccaCode {
+  id: string;
+  it_project_id: string;
+  code_site: string;
+  created_at: string;
+}
+
+/** Saisie manuelle de temps réel pour un projet générique (Mode B). */
+export interface ITProjectTempsManuel {
+  id: string;
+  it_project_id: string;
+  user_id?: string | null;
+  profil_label?: string | null;
+  mois?: string | null;
+  jours: number;
+  note?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Ligne agrégée de temps réel (vue v_it_project_temps_reel). */
+export interface ITProjectTempsReel {
+  it_project_id: string;
+  user_id: string | null;
+  collaborateur: string;
+  mois: string | null;
+  source: 'lucca' | 'manuel';
+  jours: number;
+  cout_rh: number;
+}

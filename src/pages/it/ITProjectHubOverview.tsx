@@ -41,6 +41,7 @@ import {
 } from '@/types/itProject';
 import { STATUT_PORTEFEUILLE_CONFIG, type StatutPortefeuille, type FdrProjectInput } from '@/types/fdr';
 import { useITProjectLoad } from '@/hooks/useITProjectLoad';
+import { useITProjectBudget } from '@/hooks/useITProjectBudget';
 import { useFdrProfils } from '@/hooks/useFdrSettings';
 import { useITProjectTypes } from '@/hooks/useITProjectTypes';
 import { getMepRetenue, totalBuildNet, toYM } from '@/lib/fdr/calculationEngine';
@@ -58,6 +59,7 @@ export default function ITProjectHubOverview() {
   const { data: phaseProgressMap = new Map() } = useITProjectPhaseProgress(project?.id);
   const { data: projectLoads = [] } = useITProjectLoad(project?.id);
   const { data: fdrProfils = [] } = useFdrProfils();
+  const { kpis: budgetKpis } = useITProjectBudget(project?.id);
   const { resolve: resolveType } = useITProjectTypes();
 
   const [editingEtape, setEditingEtape] = useState<ITProjectFDRValidation | null>(null);
@@ -350,25 +352,38 @@ export default function ITProjectHubOverview() {
                     </div>
                   </div>
 
-                  {project.budget_previsionnel && (
-                    <div className="pt-3 border-t">
-                      <div className="flex justify-between mb-1.5">
-                        <span className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Euro className="h-3.5 w-3.5" /> Budget consommé
-                        </span>
-                        <span className="text-sm font-semibold tabular-nums">
-                          {(project.budget_consomme || 0).toLocaleString('fr-FR')} €
-                          <span className="text-muted-foreground font-normal">
-                            {' / '}{project.budget_previsionnel.toLocaleString('fr-FR')} €
-                          </span>
-                        </span>
+                  {(() => {
+                    // Avancement financier : engagé (commandes) + constaté (factures) vs budget.
+                    const base = budgetKpis?.budget_revise || project.budget_previsionnel || 0;
+                    if (!base) return null;
+                    const engage = budgetKpis?.engage || 0;
+                    const constate = budgetKpis?.constate || 0;
+                    const pctEng = Math.min(100, Math.round((engage / base) * 100));
+                    const pctCons = Math.min(100, Math.round((constate / base) * 100));
+                    const eur = (n: number) => n.toLocaleString('fr-FR', { maximumFractionDigits: 0 }) + ' €';
+                    return (
+                      <div className="pt-3 border-t space-y-3">
+                        <div className="flex items-center gap-2 text-xs font-semibold text-violet-700">
+                          <Euro className="h-3.5 w-3.5" /> Avancement financier
+                          <span className="ml-auto font-normal text-muted-foreground">Budget : {eur(base)}</span>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-muted-foreground">Engagé (commandes)</span>
+                            <span className="tabular-nums font-medium">{eur(engage)} · {pctEng}%</span>
+                          </div>
+                          <Progress value={pctEng} className="h-2" />
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-muted-foreground">Constaté (factures)</span>
+                            <span className="tabular-nums font-medium">{eur(constate)} · {pctCons}%</span>
+                          </div>
+                          <Progress value={pctCons} className={cn('h-2', pctCons > 100 ? 'text-red-500' : '')} />
+                        </div>
                       </div>
-                      <Progress
-                        value={stats.budgetRatio || 0}
-                        className={cn('h-2', stats.budgetRatio && stats.budgetRatio > 90 ? 'text-red-500' : '')}
-                      />
-                    </div>
-                  )}
+                    );
+                  })()}
                 </CardContent>
               </Card>
 

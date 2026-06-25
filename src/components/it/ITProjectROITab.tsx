@@ -25,7 +25,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import {
   Plus, Pencil, Trash2, Loader2, TrendingUp, Users, Euro, Clock,
-  AlertCircle, CheckCircle2, Info,
+  AlertCircle, CheckCircle2, Info, Timer, X, Link2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -40,6 +40,13 @@ import {
 } from '@/hooks/useITProjectRHHorsIT';
 import { useITTjmReferentiel } from '@/hooks/useITTjmReferentiel';
 import { useFdrProfils } from '@/hooks/useFdrSettings';
+import { useITProjectTempsReel } from '@/hooks/useITProjectTempsReel';
+import {
+  useITProjectLuccaCodes, useAddITProjectLuccaCode, useDeleteITProjectLuccaCode,
+} from '@/hooks/useITProjectLuccaCodes';
+import {
+  useITProjectTempsManuel, useAddITProjectTempsManuel, useDeleteITProjectTempsManuel,
+} from '@/hooks/useITProjectTempsManuel';
 
 // ── Formatage ──────────────────────────────────────────────────────────────
 
@@ -153,6 +160,18 @@ export function ITProjectROITab({ project, loads }: Props) {
   const update = useUpdateITProjectRHHorsIT();
   const del = useDeleteITProjectRHHorsIT();
 
+  // ── Temps réel (RH dépensées) ──
+  const { data: tempsReel } = useITProjectTempsReel(project.id);
+  const { data: luccaCodes = [] } = useITProjectLuccaCodes(project.id);
+  const addLucca = useAddITProjectLuccaCode();
+  const delLucca = useDeleteITProjectLuccaCode();
+  const { data: tempsManuel = [] } = useITProjectTempsManuel(project.id);
+  const addManuel = useAddITProjectTempsManuel();
+  const delManuel = useDeleteITProjectTempsManuel();
+
+  const [newCode, setNewCode] = useState('');
+  const [manForm, setManForm] = useState({ profil_label: '', mois: '', jours: '', note: '' });
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<ITProjectRHHorsIT | null>(null);
   const [form, setForm] = useState<RHFormState>(emptyForm());
@@ -218,6 +237,46 @@ export function ITProjectROITab({ project, loads }: Props) {
   };
 
   const isSaving = add.isPending || update.isPending;
+
+  // ── Handlers temps réel ──
+  const handleAddCode = async () => {
+    const code = newCode.trim();
+    if (!code) return;
+    try {
+      await addLucca.mutateAsync({ it_project_id: project.id, code_site: code });
+      setNewCode('');
+      toast.success(`Code « ${code} » ajouté`);
+    } catch (e) {
+      toast.error(extractErrorMessage(e));
+    }
+  };
+
+  const handleAddManuel = async () => {
+    const j = parseFloat(manForm.jours);
+    if (!manForm.profil_label.trim() || !j) {
+      toast.error('Renseignez au moins un collaborateur/profil et un nombre de jours');
+      return;
+    }
+    try {
+      await addManuel.mutateAsync({
+        it_project_id: project.id,
+        profil_label: manForm.profil_label.trim(),
+        mois: manForm.mois ? `${manForm.mois}-01` : null,
+        jours: j,
+        note: manForm.note.trim() || null,
+      });
+      setManForm({ profil_label: '', mois: '', jours: '', note: '' });
+      toast.success('Temps ajouté');
+    } catch (e) {
+      toast.error(extractErrorMessage(e));
+    }
+  };
+
+  // Réel vs planifié
+  const joursReel = tempsReel?.totalJours ?? 0;
+  const coutReel = tempsReel?.totalCout ?? 0;
+  const joursPlan = roi.total_j_build;
+  const coutPlan = roi.rh_it_eur;
 
   // Gain annuel par ligne
   const gainByRow = (rh: ITProjectRHHorsIT) => {
@@ -444,6 +503,161 @@ export function ITProjectROITab({ project, loads }: Props) {
               )}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* ── Section 3 : RH dépensées (réel) ────────────────────────────── */}
+      <Card className="border-border/50">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Timer className="h-5 w-5 text-blue-500" />
+            RH dépensées (réel)
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Temps réellement passé sur le projet : déclarations Lucca rapprochées par code
+            d'imputation (Mode A) + répartition manuelle pour les projets génériques (Mode B).
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {/* KPI réel vs planifié */}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <RoiKpi label="Jours réels" value={jours(joursReel)}
+              sub={`Lucca ${jours(tempsReel?.joursLucca ?? 0)} · manuel ${jours(tempsReel?.joursManuel ?? 0)}`}
+              color="text-blue-600" icon={<Timer className="h-4 w-4" />} />
+            <RoiKpi label="Jours planifiés" value={joursPlan > 0 ? jours(joursPlan) : '—'}
+              sub="build (plan de charge)" color="text-violet-600" icon={<Users className="h-4 w-4" />} />
+            <RoiKpi label="Coût RH réel" value={eur(coutReel)}
+              sub="valorisé TJM fonction" color="text-blue-600" icon={<Euro className="h-4 w-4" />} />
+            <RoiKpi label="Écart vs planifié"
+              value={joursPlan > 0 ? jours(joursReel - joursPlan) : '—'}
+              sub={coutPlan > 0 ? `${eur(coutReel - coutPlan)}` : 'plan non chiffré'}
+              color={joursReel <= joursPlan || joursPlan === 0 ? 'text-emerald-600' : 'text-amber-600'}
+              icon={<TrendingUp className="h-4 w-4" />} highlight />
+          </div>
+
+          {/* Détail par collaborateur */}
+          {(tempsReel?.parCollaborateur.length ?? 0) > 0 && (
+            <div className="rounded-lg border overflow-hidden">
+              <div className="bg-muted/30 px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Détail par collaborateur
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/10 hover:bg-muted/10">
+                    <TableHead>Collaborateur</TableHead>
+                    <TableHead className="text-right">Jours</TableHead>
+                    <TableHead className="text-right">Coût RH</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {tempsReel!.parCollaborateur.map((c, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="text-sm">{c.collaborateur}</TableCell>
+                      <TableCell className="text-right tabular-nums text-sm">{jours(c.jours)}</TableCell>
+                      <TableCell className="text-right tabular-nums text-sm font-medium">
+                        {c.cout > 0 ? eur(c.cout) : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          {/* Mode A : codes d'imputation Lucca */}
+          <div className="rounded-lg border bg-muted/20 p-3 space-y-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+              <Link2 className="h-3.5 w-3.5" /> Codes d'imputation Lucca (Mode A — par code projet)
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              {luccaCodes.map(c => (
+                <Badge key={c.id} variant="secondary" className="gap-1 font-mono">
+                  {c.code_site}
+                  <button
+                    onClick={() => delLucca.mutate({ id: c.id, projectId: project.id })}
+                    className="hover:text-destructive"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
+              ))}
+              {luccaCodes.length === 0 && (
+                <span className="text-xs text-muted-foreground">Aucun code rapproché.</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Input
+                placeholder="Code analytique Lucca (code_site)"
+                value={newCode}
+                onChange={e => setNewCode(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleAddCode(); }}
+                className="h-8 w-64 font-mono text-xs"
+              />
+              <Button size="sm" variant="outline" onClick={handleAddCode} disabled={addLucca.isPending} className="gap-1">
+                <Plus className="h-3.5 w-3.5" /> Ajouter
+              </Button>
+            </div>
+          </div>
+
+          {/* Mode B : saisie manuelle */}
+          <div className="rounded-lg border bg-muted/20 p-3 space-y-3">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Répartition manuelle (Mode B — projets génériques)
+            </p>
+            {tempsManuel.length > 0 && (
+              <div className="rounded-md border overflow-hidden bg-background">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/10 hover:bg-muted/10">
+                      <TableHead>Collaborateur / profil</TableHead>
+                      <TableHead>Mois</TableHead>
+                      <TableHead className="text-right">Jours</TableHead>
+                      <TableHead>Note</TableHead>
+                      <TableHead className="w-[44px]" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {tempsManuel.map(row => (
+                      <TableRow key={row.id}>
+                        <TableCell className="text-sm">{row.profil_label ?? '—'}</TableCell>
+                        <TableCell className="text-sm tabular-nums">{row.mois ? row.mois.slice(0, 7) : '—'}</TableCell>
+                        <TableCell className="text-right tabular-nums text-sm">{jours(row.jours)}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{row.note ?? '—'}</TableCell>
+                        <TableCell>
+                          <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive"
+                            onClick={() => delManuel.mutate({ id: row.id, projectId: project.id })}>
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-[1fr_130px_90px_auto] gap-2 items-end">
+              <div className="space-y-1">
+                <Label className="text-xs">Collaborateur / profil</Label>
+                <Input placeholder="ex : Jean Dupont" value={manForm.profil_label}
+                  onChange={e => setManForm(f => ({ ...f, profil_label: e.target.value }))} className="h-8" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Mois</Label>
+                <Input type="month" value={manForm.mois}
+                  onChange={e => setManForm(f => ({ ...f, mois: e.target.value }))} className="h-8" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Jours</Label>
+                <Input type="number" min={0} step={0.5} placeholder="ex : 3" value={manForm.jours}
+                  onChange={e => setManForm(f => ({ ...f, jours: e.target.value }))} className="h-8" />
+              </div>
+              <Button size="sm" variant="outline" onClick={handleAddManuel} disabled={addManuel.isPending} className="gap-1 h-8">
+                <Plus className="h-3.5 w-3.5" /> Ajouter
+              </Button>
+            </div>
+            <Input placeholder="Note (optionnel)" value={manForm.note}
+              onChange={e => setManForm(f => ({ ...f, note: e.target.value }))} className="h-8" />
+          </div>
         </CardContent>
       </Card>
 

@@ -38,6 +38,7 @@ import { cn } from '@/lib/utils';
 import {
   IT_PHASE_BADGE_CONFIG, ITProjectPhase, getActivePhases,
   FDR_ETAPES, ITProjectFDRValidation, FDR_ANNEE_OPTIONS, FDR_ETAT_CONFIG, type FdrEtat,
+  IT_PROJECT_PILIER_CONFIG, ITProjectPilier,
 } from '@/types/itProject';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
@@ -237,6 +238,40 @@ export default function ITProjectHubGovernance() {
                     </Button>
                   </div>
                 )}
+
+                {/* ─── Contexte FDR (lecture seule) ─── */}
+                {(() => {
+                  const pilierCfg = project.pilier ? IT_PROJECT_PILIER_CONFIG[project.pilier as ITProjectPilier] : null;
+                  const hasContext = pilierCfg || project.fdr_description || project.fdr_commentaires;
+                  if (!hasContext) return null;
+                  return (
+                    <div className="space-y-3 rounded-lg border bg-background/60 p-3">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Contexte FDR</p>
+                      {pilierCfg && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="text-muted-foreground">Pilier :</span>
+                          <Badge className={cn(pilierCfg.className, 'border')}>{project.pilier} — {pilierCfg.label}</Badge>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-muted-foreground">Inclus PDR :</span>
+                        <span className="font-medium">{(project.sur_feuille_de_route ?? true) ? 'Oui' : 'Non'}</span>
+                      </div>
+                      {project.fdr_description && (
+                        <div className="space-y-0.5">
+                          <p className="text-xs text-muted-foreground">Description FDR</p>
+                          <p className="text-sm whitespace-pre-wrap">{project.fdr_description}</p>
+                        </div>
+                      )}
+                      {project.fdr_commentaires && (
+                        <div className="space-y-0.5">
+                          <p className="text-xs text-muted-foreground">Commentaires</p>
+                          <p className="text-sm whitespace-pre-wrap">{project.fdr_commentaires}</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </CardContent>
             </Card>
 
