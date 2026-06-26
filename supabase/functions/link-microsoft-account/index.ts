@@ -62,13 +62,13 @@ Deno.serve(async (req) => {
 
     const normalised = targetEmail.trim().toLowerCase();
 
-    // Try auth.users first (exact email match)
+    // Try auth.users first (exact email match), excluding the caller's own temp account
     const { data: authUsers } = await admin.auth.admin.listUsers({ perPage: 1000 });
     const targetAuthUser = authUsers?.users.find(
-      (u) => u.email?.toLowerCase() === normalised,
+      (u) => u.email?.toLowerCase() === normalised && u.id !== currentUser.id,
     );
 
-    // Also try profiles.lovable_email / secondary_email
+    // Also try profiles.lovable_email / secondary_email (covers @keon-group.com vs @ter-green.com cases)
     let targetUserId: string | null = targetAuthUser?.id ?? null;
 
     if (!targetUserId) {
