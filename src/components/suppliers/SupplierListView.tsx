@@ -229,7 +229,7 @@ const ALL_COLUMNS: SupplierColumnDef[] = [
   }},
   { key: 'categorie', label: 'Catégorie', defaultVisible: true, render: (s) => s.categorie || '—' },
   { key: 'famille_source_initiale', label: 'Famille source', defaultVisible: false, render: (s) => s.famille_source_initiale || '—' },
-  { key: 'famille', label: 'Famille', defaultVisible: true, render: (s) => s.famille || '—' },
+  { key: 'famille', label: 'Famille', defaultVisible: true, render: (s) => s.famille || s.famille_source_initiale || '—' },
   { key: 'segment', label: 'Segment', defaultVisible: true, render: (s) => (
     s.segment ? <span>{s.segment}{s.sous_segment && <span className="text-muted-foreground"> / {s.sous_segment}</span>}</span> : '—'
   )},

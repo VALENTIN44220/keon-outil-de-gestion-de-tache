@@ -125,7 +125,8 @@ function applyFilters(q: any, filters: SupplierFilters, opts?: { excludeStatus?:
   if (filters.entite && filters.entite !== 'all') query = query.ilike('entite', `%${filters.entite}%`);
 
   if (filters.categorie && filters.categorie !== 'all') query = query.eq('categorie', filters.categorie);
-  if (filters.famille && filters.famille !== 'all') query = query.eq('famille', filters.famille);
+  // Repli sur la famille source (datalake) quand la famille saisie est vide/nulle
+  if (filters.famille && filters.famille !== 'all') query = query.eq('famille_effective', filters.famille);
 
   if (filters.segment && filters.segment !== 'all') query = query.eq('segment', filters.segment);
   if (filters.sous_segment && filters.sous_segment !== 'all') query = query.eq('sous_segment', filters.sous_segment);
@@ -158,7 +159,9 @@ export function useSupplierEnrichment(filters: SupplierFilters, page = 0, pageSi
         .select('*', { count: 'exact' });
 
       // Server-side sorting
-      const sortKey = sortConfig?.key && sortConfig?.direction ? sortConfig.key : 'updated_at';
+      let sortKey = sortConfig?.key && sortConfig?.direction ? sortConfig.key : 'updated_at';
+      // La colonne Famille trie sur la valeur effective (repli sur la famille source)
+      if (sortKey === 'famille') sortKey = 'famille_effective';
       const ascending = sortConfig?.key && sortConfig?.direction ? sortConfig.direction === 'asc' : false;
       q = q.order(sortKey, { ascending, nullsFirst: false });
 
