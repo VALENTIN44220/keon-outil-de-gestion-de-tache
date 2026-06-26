@@ -124,6 +124,7 @@ export interface FdrProjectInput {
   loads: Array<{ profil_code: string; j_mois: number }>; // build ventilé
   externe: boolean;
   pct_reduction_si_externe: number;      // 0..1
+  budget_externe_eur?: number | null;    // coût ST si externalisé (pour ROI scénario)
 }
 
 export interface FdrEngineSettings {

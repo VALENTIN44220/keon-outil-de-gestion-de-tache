@@ -13,13 +13,44 @@ export interface SimulatedHire {
   kind?: HireKind;
 }
 
+/**
+ * Override d'un projet propre à un scénario : on ne stocke que les champs
+ * que l'on veut faire varier ; les champs absents gardent la valeur du projet.
+ */
+export interface ProjectOverride {
+  it_project_id: string;
+  date_kickoff?: string | null;          // 'YYYY-MM-DD' ou 'YYYY-MM'
+  date_mep_saisie?: string | null;       // idem
+  externe?: boolean;
+  pct_reduction_si_externe?: number;     // 0..1
+  budget_externe_eur?: number | null;
+}
+
+/** Hypothèses de coût utilisées pour le ROI agrégé d'un scénario. */
+export interface ScenarioAssumptions {
+  /** Coût annuel chargé d'un ETP embauché (€/an). */
+  cout_annuel_etp_embauche?: number;
+  /** TJM de la sous-traitance générique (€/j). */
+  tjm_st?: number;
+}
+
 export interface FdrHireScenario {
   id: string;
   nom: string;
   hires: SimulatedHire[];
+  project_overrides: ProjectOverride[];
+  assumptions: ScenarioAssumptions;
   created_by: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/** Payload de création/màj d'un scénario (hires + leviers projet + hypothèses). */
+export interface ScenarioPayload {
+  nom: string;
+  hires: SimulatedHire[];
+  project_overrides?: ProjectOverride[];
+  assumptions?: ScenarioAssumptions;
 }
 
 const KEY = ['fdr-hire-scenarios'];
@@ -35,20 +66,36 @@ export function useFdrHireScenarios() {
         .select('*')
         .order('updated_at', { ascending: false });
       if (error) throw error;
-      type Row = Omit<FdrHireScenario, 'hires'> & { hires: unknown };
+      type Row = Omit<FdrHireScenario, 'hires' | 'project_overrides' | 'assumptions'> & {
+        hires: unknown;
+        project_overrides?: unknown;
+        assumptions?: unknown;
+      };
       return ((data ?? []) as Row[]).map((r) => ({
         ...r,
         hires: Array.isArray(r.hires) ? (r.hires as SimulatedHire[]) : [],
+        project_overrides: Array.isArray(r.project_overrides)
+          ? (r.project_overrides as ProjectOverride[])
+          : [],
+        assumptions:
+          r.assumptions && typeof r.assumptions === 'object'
+            ? (r.assumptions as ScenarioAssumptions)
+            : {},
       }));
     },
     staleTime: 30_000,
   });
 
   const create = useMutation({
-    mutationFn: async (payload: { nom: string; hires: SimulatedHire[] }) => {
+    mutationFn: async (payload: ScenarioPayload) => {
       const { data, error } = await supabase
         .from('fdr_hire_scenarios')
-        .insert({ nom: payload.nom, hires: payload.hires })
+        .insert({
+          nom: payload.nom,
+          hires: payload.hires,
+          project_overrides: payload.project_overrides ?? [],
+          assumptions: payload.assumptions ?? {},
+        })
         .select()
         .single();
       if (error) throw error;
@@ -58,7 +105,10 @@ export function useFdrHireScenarios() {
   });
 
   const update = useMutation({
-    mutationFn: async ({ id, ...patch }: { id: string; nom?: string; hires?: SimulatedHire[] }) => {
+    mutationFn: async ({
+      id,
+      ...patch
+    }: { id: string } & Partial<ScenarioPayload>) => {
       const { error } = await supabase
         .from('fdr_hire_scenarios')
         .update({ ...patch, updated_at: new Date().toISOString() })

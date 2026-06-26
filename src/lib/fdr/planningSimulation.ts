@@ -2,8 +2,9 @@
  * Simulation d'embauches sur le plan de charge — fonctions pures (overlay
  * capacité + recalcul de la cascade RSI). Aucune dépendance React/Supabase.
  */
-import type { FdrCapacityMatrix } from '@/types/fdr';
-import type { SimulatedHire } from '@/hooks/useFdrHireScenarios';
+import type { FdrCapacityMatrix, FdrProjectInput, FdrEngineSettings } from '@/types/fdr';
+import type { SimulatedHire, ProjectOverride } from '@/hooks/useFdrHireScenarios';
+import { computeProjectMonthLoads } from './calculationEngine';
 
 export interface AdjustedProfilRow {
   code: string;
@@ -88,6 +89,81 @@ export function applyHires(
   });
 
   return { months, by_profil, cascade };
+}
+
+/**
+ * Applique les overrides d'un scénario aux inputs projets (dates de lancement,
+ * externalisation par projet). Fonction pure : ne modifie pas les inputs
+ * d'origine. Seuls les champs présents dans l'override sont remplacés ;
+ * les champs absents conservent la valeur du projet.
+ */
+export function applyProjectOverrides(
+  inputs: FdrProjectInput[],
+  overrides: ProjectOverride[],
+): FdrProjectInput[] {
+  if (!overrides.length) return inputs;
+  const byId = new Map(overrides.map((o) => [o.it_project_id, o]));
+  return inputs.map((p) => {
+    const o = byId.get(p.id);
+    if (!o) return p;
+    return {
+      ...p,
+      date_kickoff: o.date_kickoff !== undefined ? o.date_kickoff : p.date_kickoff,
+      date_mep_saisie: o.date_mep_saisie !== undefined ? o.date_mep_saisie : p.date_mep_saisie,
+      externe: o.externe !== undefined ? o.externe : p.externe,
+      pct_reduction_si_externe:
+        o.pct_reduction_si_externe !== undefined
+          ? o.pct_reduction_si_externe
+          : p.pct_reduction_si_externe,
+      budget_externe_eur:
+        o.budget_externe_eur !== undefined ? o.budget_externe_eur : p.budget_externe_eur,
+    };
+  });
+}
+
+export interface ProjectClassification {
+  /** Projets dont la fenêtre build ne génère aucune surcharge (écart simulé ≥ 0). */
+  tenable: FdrProjectInput[];
+  /** Projets dont au moins un profil mobilisé est en surcharge sur la fenêtre build. */
+  aRisque: FdrProjectInput[];
+}
+
+/**
+ * Classe les projets selon que le service peut les tenir, sur la base de la
+ * matrice ajustée du scénario.
+ *
+ * Heuristique : un projet est **tenable** si, sur tous les mois où il est actif
+ * (build), tous les profils qu'il mobilise restent en écart simulé ≥ 0. Si un
+ * profil mobilisé est en surcharge sur un de ces mois → **à risque**.
+ *
+ * Les projets hors feuille de route ou abandonnés (aucun mois actif) sont ignorés.
+ */
+export function classifyProjects(
+  inputs: FdrProjectInput[],
+  adjusted: AdjustedMatrix,
+  settings: Pick<FdrEngineSettings, 'echeance_standard_permanentes' | 'jours_productifs_mois'>,
+): ProjectClassification {
+  const tenable: FdrProjectInput[] = [];
+  const aRisque: FdrProjectInput[] = [];
+
+  for (const p of inputs) {
+    let active = false;
+    let risky = false;
+    for (const ym of adjusted.months) {
+      const loads = computeProjectMonthLoads(p, ym, settings);
+      if (loads.length === 0) continue;
+      active = true;
+      for (const l of loads) {
+        const ecart = adjusted.by_profil[l.profil_code]?.ecart[ym];
+        if (ecart !== undefined && ecart < 0) { risky = true; break; }
+      }
+      if (risky) break;
+    }
+    if (!active) continue;
+    (risky ? aRisque : tenable).push(p);
+  }
+
+  return { tenable, aRisque };
 }
 
 /** Pic (max) d'une série mensuelle sur les mois d'une période → { ym, value }. */

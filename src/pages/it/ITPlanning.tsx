@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode, type Dispatch, type SetStateAction } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -10,23 +10,36 @@ import {
 } from '@/components/ui/select';
 import {
   AlertTriangle, TrendingUp, Users, RefreshCw, Info, Bookmark, RotateCcw,
-  FlaskConical, Plus, X, Trash2, Loader2,
+  FlaskConical, Plus, X, Trash2, Loader2, Calendar, Network, Euro, Clock,
+  CheckCircle2, ChevronDown, ChevronRight, GitCompare,
 } from 'lucide-react';
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { Switch } from '@/components/ui/switch';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RcTooltip,
   ReferenceLine, ResponsiveContainer,
 } from 'recharts';
-import { useFdrCapacityMatrix } from '@/hooks/useFdrCapacityMatrix';
+import { computeCapacityMatrix } from '@/lib/fdr/calculationEngine';
+import { useFdrProjectInputs } from '@/hooks/useFdrProjectInputs';
 import { useFdrProfils, useFdrSettings } from '@/hooks/useFdrSettings';
 import { useViewPreferences } from '@/hooks/useViewPreferences';
-import { useFdrHireScenarios, type SimulatedHire } from '@/hooks/useFdrHireScenarios';
+import {
+  useFdrHireScenarios, type SimulatedHire, type ProjectOverride,
+  type ScenarioAssumptions, type FdrHireScenario,
+} from '@/hooks/useFdrHireScenarios';
+import { useScenarioRoiData } from '@/hooks/useScenarioRoiData';
 import {
   type YearGran, type Period, GRAN_CYCLE, GRAN_LETTER, buildPeriods, fmtYMShort,
 } from '@/lib/fdr/periods';
-import { applyHires, peakOver, peakEtp, type AdjustedMatrix } from '@/lib/fdr/planningSimulation';
+import {
+  applyHires, applyProjectOverrides, classifyProjects,
+  peakOver, peakEtp, type AdjustedMatrix,
+} from '@/lib/fdr/planningSimulation';
+import { computeScenarioRoi, DEFAULT_ASSUMPTIONS, type ScenarioRoi } from '@/lib/it/scenarioRoi';
+import { RoiKpi } from '@/components/it/RoiKpi';
+import type { FdrProjectInput, FdrEngineSettings } from '@/types/fdr';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -34,6 +47,27 @@ import { cn } from '@/lib/utils';
 
 function fmtYM(ym: string): string { return fmtYMShort(ym); }
 function round1(n: number) { return Math.round(n * 10) / 10; }
+const eur = (n: number) =>
+  n.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
+
+/** 'YYYY-MM-DD' | 'YYYY-MM' | null → 'YYYY-MM' pour <input type="month">. */
+function toMonthInput(date: string | null | undefined): string {
+  return date ? date.slice(0, 7) : '';
+}
+
+/** Overrides projet indexés par it_project_id (état local de l'éditeur). */
+type OverrideMap = Record<string, ProjectOverride>;
+
+function overridesToArray(map: OverrideMap): ProjectOverride[] {
+  return Object.values(map).filter((o) => {
+    // ne garde que les overrides porteurs d'au moins un champ
+    const { it_project_id, ...rest } = o;
+    return Object.values(rest).some((v) => v !== undefined);
+  });
+}
+function overridesToMap(arr: ProjectOverride[]): OverrideMap {
+  return Object.fromEntries((arr ?? []).map((o) => [o.it_project_id, o]));
+}
 
 /** Couleur de cellule heatmap selon l'écart capacité − demande. */
 function cellClass(ecart: number, capacite: number): string {
@@ -91,9 +125,10 @@ function Header() {
 }
 
 function PlanningContent() {
-  const { data: matrix, isLoading, error, refetch, isFetching } = useFdrCapacityMatrix();
+  const { data: pinputs, isLoading, error, refetch, isFetching } = useFdrProjectInputs();
   const { data: profils = [] } = useFdrProfils();
   const { data: settings } = useFdrSettings();
+  const { data: roiData } = useScenarioRoiData();
   const activeProfils = profils.filter(p => p.actif);
   const joursProductifs = settings?.jours_productifs_mois ?? 18;
 
@@ -109,17 +144,51 @@ function PlanningContent() {
   const cycleYearGran = (year: string) =>
     setYearGran(g => ({ ...g, [year]: GRAN_CYCLE[g[year] ?? 'month'] }));
 
-  // ---- Simulation d'embauches ----
+  // ---- Leviers du scénario ----
   const [hires, setHires] = useState<SimulatedHire[]>([]);
+  const [overrides, setOverrides] = useState<OverrideMap>({});
+  const [assumptions, setAssumptions] = useState<ScenarioAssumptions>({});
 
-  const months = useMemo(() => matrix?.months ?? [], [matrix]);
+  const inputs = pinputs?.inputs;
+  const engineSettings = pinputs?.engineSettings;
+
+  // Baseline (sans aucun levier) — pour comparer l'ETP à recruter
+  const baseline = useMemo(
+    () => (inputs && engineSettings ? computeCapacityMatrix(inputs, engineSettings) : null),
+    [inputs, engineSettings],
+  );
+
+  // Inputs du scénario = inputs + overrides projet (dates / externalisation)
+  const scenarioInputs = useMemo(
+    () => (inputs ? applyProjectOverrides(inputs, overridesToArray(overrides)) : null),
+    [inputs, overrides],
+  );
+
+  // Matrice du scénario : recalcul moteur (dates/externe) puis overlay renforts
+  const adjusted: AdjustedMatrix | null = useMemo(() => {
+    if (!scenarioInputs || !engineSettings) return null;
+    const m = computeCapacityMatrix(scenarioInputs, engineSettings);
+    return applyHires(m, hires, joursProductifs);
+  }, [scenarioInputs, engineSettings, hires, joursProductifs]);
+
+  const classification = useMemo(
+    () => (scenarioInputs && adjusted && engineSettings
+      ? classifyProjects(scenarioInputs, adjusted, engineSettings)
+      : null),
+    [scenarioInputs, adjusted, engineSettings],
+  );
+
+  const scenarioRoi: ScenarioRoi | null = useMemo(() => {
+    if (!classification || !roiData) return null;
+    return computeScenarioRoi(
+      classification.tenable, roiData.rhHorsITByProject, roiData.tjmMap,
+      hires, assumptions, joursProductifs,
+    );
+  }, [classification, roiData, hires, assumptions, joursProductifs]);
+
+  const months = useMemo(() => adjusted?.months ?? [], [adjusted]);
   const periods = useMemo(() => buildPeriods(months, yearGran), [months, yearGran]);
   const years = useMemo(() => [...new Set(months.map(m => m.slice(0, 4)))], [months]);
-
-  const adjusted: AdjustedMatrix | null = useMemo(
-    () => (matrix ? applyHires(matrix, hires, joursProductifs) : null),
-    [matrix, hires, joursProductifs],
-  );
 
   if (isLoading) return (
     <div className="space-y-4">
@@ -136,12 +205,18 @@ function PlanningContent() {
     </Card>
   );
 
-  if (!matrix || !adjusted) return null;
+  if (!inputs || !engineSettings || !adjusted || !baseline) return null;
 
-  const baselinePeakEtp = peakEtp(matrix.rsi_cascade);
+  const baselinePeakEtp = peakEtp(baseline.rsi_cascade);
   const simPeakEtp = peakEtp(adjusted.cascade);
-  const hasHires = hires.length > 0;
+  const hasLevers = hires.length > 0 || overridesToArray(overrides).length > 0;
   const surchargeMonths = adjusted.cascade.filter(r => r.sous_effectif_net > 0);
+
+  const loadScenario = (s: FdrHireScenario | null) => {
+    setHires(s?.hires ?? []);
+    setOverrides(overridesToMap(s?.project_overrides ?? []));
+    setAssumptions(s?.assumptions ?? {});
+  };
 
   return (
     <div className="space-y-6">
@@ -161,14 +236,23 @@ function PlanningContent() {
             ✓ Aucune surcharge nette
           </Badge>
         )}
-        <Badge variant="outline" className={cn('gap-1.5 text-xs py-1', hasHires ? 'border-violet-300 text-violet-700 bg-violet-50' : '')}>
+        <Badge variant="outline" className={cn('gap-1.5 text-xs py-1', hasLevers ? 'border-violet-300 text-violet-700 bg-violet-50' : '')}>
           ETP à recruter (pic) : <strong>{round1(simPeakEtp)}</strong>
-          {hasHires && baselinePeakEtp !== simPeakEtp && (
+          {hasLevers && baselinePeakEtp !== simPeakEtp && (
             <span className="text-muted-foreground">
               {' '}(sans sim. {round1(baselinePeakEtp)} · {simPeakEtp < baselinePeakEtp ? '−' : '+'}{round1(Math.abs(baselinePeakEtp - simPeakEtp))})
             </span>
           )}
         </Badge>
+        {classification && (
+          <Badge variant="outline" className="gap-1.5 text-xs py-1 border-emerald-300 text-emerald-700 bg-emerald-50">
+            <CheckCircle2 className="h-3 w-3" />
+            {classification.tenable.length} projets tenables
+            {classification.aRisque.length > 0 && (
+              <span className="text-red-600"> · {classification.aRisque.length} à risque</span>
+            )}
+          </Badge>
+        )}
 
         <div className="ml-auto flex items-center gap-2">
           {/* Granularité par année */}
@@ -202,14 +286,35 @@ function PlanningContent() {
         </div>
       </div>
 
-      {/* Simulation d'embauches */}
-      <SimulationPanel
+      {/* Comparateur de scénarios enregistrés */}
+      <ScenarioComparator
+        inputs={inputs}
+        engineSettings={engineSettings}
+        roiData={roiData}
+        joursProductifs={joursProductifs}
+        onLoad={loadScenario}
+      />
+
+      {/* Éditeur de scénario (3 leviers) */}
+      <ScenarioEditor
         activeProfils={activeProfils}
+        projects={inputs}
         months={months}
         joursProductifs={joursProductifs}
         hires={hires}
         setHires={setHires}
+        overrides={overrides}
+        setOverrides={setOverrides}
+        assumptions={assumptions}
+        setAssumptions={setAssumptions}
+        onLoadScenario={loadScenario}
       />
+
+      {/* ROI agrégé du scénario */}
+      {scenarioRoi && <ScenarioRoiCard roi={scenarioRoi} hires={hires} />}
+
+      {/* Projets tenables / à risque */}
+      {classification && <ProjectsClassificationCard classification={classification} />}
 
       {/* Heatmap principale */}
       <HeatmapCard adjusted={adjusted} activeProfils={activeProfils} periods={periods} />
@@ -218,7 +323,7 @@ function PlanningContent() {
       <SousEffectifParProfilCard adjusted={adjusted} activeProfils={activeProfils} periods={periods} joursProductifs={joursProductifs} />
 
       {/* Cascade RSI (dev/IA + digital, appui RSI) */}
-      <CascadeCard adjusted={adjusted} baseline={matrix.rsi_cascade} periods={periods} hasHires={hasHires} />
+      <CascadeCard adjusted={adjusted} baseline={baseline.rsi_cascade} periods={periods} hasHires={hasLevers} />
 
       {/* Sparklines par profil (mensuel) */}
       <SparklinesCard adjusted={adjusted} activeProfils={activeProfils} months={months} />
@@ -226,21 +331,63 @@ function PlanningContent() {
   );
 }
 
-// ---- Simulation panel ----
+// ---- Éditeur de scénario (3 leviers) ----
 
-function SimulationPanel({
-  activeProfils, months, joursProductifs, hires, setHires,
+/** Projets pertinents pour les leviers : sur la feuille de route, non abandonnés. */
+function fdrProjects(projects: FdrProjectInput[]): FdrProjectInput[] {
+  return projects
+    .filter(p => p.sur_feuille_de_route && p.statut_portefeuille !== 'Abandonné')
+    .sort((a, b) => (a.code ?? '').localeCompare(b.code ?? ''));
+}
+
+function CollapsibleSection({
+  title, icon, badge, defaultOpen = false, children,
+}: {
+  title: string;
+  icon: ReactNode;
+  badge?: ReactNode;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="rounded-lg border border-border/60 bg-background/60">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium"
+      >
+        {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        <span className="text-muted-foreground">{icon}</span>
+        {title}
+        {badge}
+      </button>
+      {open && <div className="px-3 pb-3 pt-1 space-y-2">{children}</div>}
+    </div>
+  );
+}
+
+function ScenarioEditor({
+  activeProfils, projects, months, joursProductifs,
+  hires, setHires, overrides, setOverrides, assumptions, setAssumptions, onLoadScenario,
 }: {
   activeProfils: ActiveProfil[];
+  projects: FdrProjectInput[];
   months: string[];
   joursProductifs: number;
   hires: SimulatedHire[];
   setHires: (h: SimulatedHire[]) => void;
+  overrides: OverrideMap;
+  setOverrides: Dispatch<SetStateAction<OverrideMap>>;
+  assumptions: ScenarioAssumptions;
+  setAssumptions: Dispatch<SetStateAction<ScenarioAssumptions>>;
+  onLoadScenario: (s: FdrHireScenario | null) => void;
 }) {
   const { scenarios, create, update, remove } = useFdrHireScenarios();
   const [currentId, setCurrentId] = useState<string>('');
   const [name, setName] = useState('');
 
+  // ----- Renforts -----
   const addHire = () => setHires([
     ...hires,
     { profil_code: activeProfils[0]?.code ?? '', nb_etp: 1, start_ym: months[0] ?? '', kind: 'embauche' },
@@ -249,41 +396,56 @@ function SimulationPanel({
     setHires(hires.map((h, k) => (k === i ? { ...h, ...patch } : h)));
   const removeHire = (i: number) => setHires(hires.filter((_, k) => k !== i));
 
-  const loadScenario = (id: string) => {
-    const s = scenarios.find(x => x.id === id);
-    if (!s) { setCurrentId(''); setName(''); setHires([]); return; }
-    setCurrentId(s.id); setName(s.nom); setHires(s.hires);
-  };
+  // ----- Overrides projet -----
+  const patchOverride = (id: string, patch: Partial<ProjectOverride>) =>
+    setOverrides(m => ({ ...m, [id]: { it_project_id: id, ...m[id], ...patch } }));
+  const resetOverride = (id: string) =>
+    setOverrides(m => { const n = { ...m }; delete n[id]; return n; });
+  const ovArray = overridesToArray(overrides);
 
+  // ----- Scénarios -----
+  const loadScenario = (id: string) => {
+    const s = scenarios.find(x => x.id === id) ?? null;
+    setCurrentId(s?.id ?? '');
+    setName(s?.nom ?? '');
+    onLoadScenario(s);
+  };
   const saveScenario = () => {
     const nom = name.trim() || 'Scénario sans nom';
+    const payload = { nom, hires, project_overrides: ovArray, assumptions };
     if (currentId) {
-      update.mutate({ id: currentId, nom, hires }, { onSuccess: () => toast({ title: 'Scénario mis à jour' }) });
+      update.mutate({ id: currentId, ...payload }, { onSuccess: () => toast({ title: 'Scénario mis à jour' }) });
     } else {
-      create.mutate({ nom, hires }, {
+      create.mutate(payload, {
         onSuccess: (s) => { setCurrentId(s.id); toast({ title: 'Scénario enregistré' }); },
       });
     }
   };
-
   const deleteScenario = () => {
     if (!currentId) return;
     remove.mutate(currentId, {
-      onSuccess: () => { setCurrentId(''); setName(''); setHires([]); toast({ title: 'Scénario supprimé' }); },
+      onSuccess: () => {
+        setCurrentId(''); setName(''); onLoadScenario(null);
+        toast({ title: 'Scénario supprimé' });
+      },
     });
   };
 
   const etpEmbauche = hires.filter(h => (h.kind ?? 'embauche') === 'embauche').reduce((s, h) => s + (Number(h.nb_etp) || 0), 0);
   const etpSousTraitance = hires.filter(h => h.kind === 'sous_traitance').reduce((s, h) => s + (Number(h.nb_etp) || 0), 0);
+  const fdrList = useMemo(() => fdrProjects(projects), [projects]);
+  const nbDates = ovArray.filter(o => o.date_kickoff !== undefined || o.date_mep_saisie !== undefined).length;
+  const nbExt = ovArray.filter(o => o.externe !== undefined || o.pct_reduction_si_externe !== undefined || o.budget_externe_eur !== undefined).length;
+  const isEmpty = hires.length === 0 && ovArray.length === 0;
 
   return (
     <Card className="border-violet-200/70 bg-violet-50/30 dark:bg-violet-950/10">
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-base">
           <FlaskConical className="h-4 w-4 text-violet-600" />
-          Simulation de renforts
+          Éditeur de scénario
           <span className="text-xs font-normal text-muted-foreground ml-1">
-            (what-if non destructif — {round1(etpEmbauche)} ETP embauche · {round1(etpSousTraitance)} ETP sous-traitance)
+            (what-if non destructif — {round1(etpEmbauche)} ETP embauche · {round1(etpSousTraitance)} ETP ST · {nbDates} dates · {nbExt} externalisés)
           </span>
         </CardTitle>
       </CardHeader>
@@ -295,16 +457,16 @@ function SimulationPanel({
             <SelectContent>
               <SelectItem value="__none__">— Nouveau scénario —</SelectItem>
               {scenarios.map(s => (
-                <SelectItem key={s.id} value={s.id}>{s.nom} ({s.hires.length})</SelectItem>
+                <SelectItem key={s.id} value={s.id}>{s.nom}</SelectItem>
               ))}
             </SelectContent>
           </Select>
           <Input
             value={name} onChange={e => setName(e.target.value)}
-            placeholder="Nom du scénario" className="h-8 text-xs w-48"
+            placeholder="Nom du scénario" className="h-8 text-xs w-52"
           />
           <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs"
-            onClick={saveScenario} disabled={create.isPending || update.isPending || hires.length === 0}>
+            onClick={saveScenario} disabled={create.isPending || update.isPending || isEmpty}>
             <Bookmark className="h-3.5 w-3.5" />{currentId ? 'Mettre à jour' : 'Enregistrer'}
           </Button>
           {currentId && (
@@ -315,62 +477,415 @@ function SimulationPanel({
           )}
         </div>
 
-        {/* Lignes d'embauche */}
-        {hires.length === 0 ? (
-          <p className="text-xs text-muted-foreground py-1">
-            Aucune embauche simulée. Ajoutez-en pour voir l'impact sur la heatmap et la cascade RSI.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {hires.map((h, i) => (
-              <div key={i} className="flex flex-wrap items-center gap-2">
-                <Select value={h.kind ?? 'embauche'} onValueChange={v => patchHire(i, { kind: v as SimulatedHire['kind'] })}>
-                  <SelectTrigger className={cn('h-8 text-xs w-36', (h.kind ?? 'embauche') === 'sous_traitance' ? 'border-amber-300 text-amber-700' : 'border-emerald-300 text-emerald-700')}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="embauche">👤 Embauche</SelectItem>
-                    <SelectItem value="sous_traitance">🤝 Sous-traitance</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={h.profil_code} onValueChange={v => patchHire(i, { profil_code: v })}>
-                  <SelectTrigger className="h-8 text-xs w-52"><SelectValue placeholder="Profil" /></SelectTrigger>
-                  <SelectContent>
-                    {activeProfils.map(p => <SelectItem key={p.code} value={p.code}>{p.nom}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <div className="flex items-center gap-1">
-                  <Input
-                    type="number" step="0.5" min="0"
-                    value={h.nb_etp}
-                    onChange={e => patchHire(i, { nb_etp: Number(e.target.value) })}
-                    className="h-8 text-xs w-20"
-                  />
-                  <span className="text-xs text-muted-foreground">ETP</span>
+        {/* Levier 1 — Renforts */}
+        <CollapsibleSection
+          title="Renforts (embauches / sous-traitance)"
+          icon={<Users className="h-4 w-4" />}
+          defaultOpen
+          badge={hires.length > 0 ? <Badge variant="secondary" className="ml-1 text-[10px]">{hires.length}</Badge> : undefined}
+        >
+          {hires.length === 0 ? (
+            <p className="text-xs text-muted-foreground py-1">
+              Aucun renfort. Ajoutez une embauche ou de la sous-traitance générique.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {hires.map((h, i) => (
+                <div key={i} className="flex flex-wrap items-center gap-2">
+                  <Select value={h.kind ?? 'embauche'} onValueChange={v => patchHire(i, { kind: v as SimulatedHire['kind'] })}>
+                    <SelectTrigger className={cn('h-8 text-xs w-36', (h.kind ?? 'embauche') === 'sous_traitance' ? 'border-amber-300 text-amber-700' : 'border-emerald-300 text-emerald-700')}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="embauche">👤 Embauche</SelectItem>
+                      <SelectItem value="sous_traitance">🤝 Sous-traitance</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={h.profil_code} onValueChange={v => patchHire(i, { profil_code: v })}>
+                    <SelectTrigger className="h-8 text-xs w-52"><SelectValue placeholder="Profil" /></SelectTrigger>
+                    <SelectContent>
+                      {activeProfils.map(p => <SelectItem key={p.code} value={p.code}>{p.nom}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="number" step="0.5" min="0"
+                      value={h.nb_etp}
+                      onChange={e => patchHire(i, { nb_etp: Number(e.target.value) })}
+                      className="h-8 text-xs w-20"
+                    />
+                    <span className="text-xs text-muted-foreground">ETP</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground">à partir de</span>
+                  <Select value={h.start_ym} onValueChange={v => patchHire(i, { start_ym: v })}>
+                    <SelectTrigger className="h-8 text-xs w-28"><SelectValue /></SelectTrigger>
+                    <SelectContent className="max-h-64">
+                      {months.map(m => <SelectItem key={m} value={m}>{fmtYM(m)}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <span className="text-[11px] text-muted-foreground">
+                    = +{round1((Number(h.nb_etp) || 0) * joursProductifs)} j/mois
+                  </span>
+                  <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                    onClick={() => removeHire(i)}>
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
-                <span className="text-xs text-muted-foreground">à partir de</span>
-                <Select value={h.start_ym} onValueChange={v => patchHire(i, { start_ym: v })}>
-                  <SelectTrigger className="h-8 text-xs w-28"><SelectValue /></SelectTrigger>
-                  <SelectContent className="max-h-64">
-                    {months.map(m => <SelectItem key={m} value={m}>{fmtYM(m)}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <span className="text-[11px] text-muted-foreground">
-                  = +{round1((Number(h.nb_etp) || 0) * joursProductifs)} j/mois
-                </span>
-                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                  onClick={() => removeHire(i)}>
-                  <X className="h-3.5 w-3.5" />
-                </Button>
+              ))}
+            </div>
+          )}
+          <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs mt-1"
+            onClick={addHire} disabled={activeProfils.length === 0}>
+            <Plus className="h-3.5 w-3.5" />Ajouter un renfort
+          </Button>
+        </CollapsibleSection>
+
+        {/* Levier 2 — Dates de lancement */}
+        <CollapsibleSection
+          title="Dates de lancement des projets"
+          icon={<Calendar className="h-4 w-4" />}
+          badge={nbDates > 0 ? <Badge variant="secondary" className="ml-1 text-[10px]">{nbDates}</Badge> : undefined}
+        >
+          <div className="max-h-72 overflow-y-auto rounded border border-border/40">
+            <table className="text-xs w-full">
+              <thead className="sticky top-0 bg-muted/60">
+                <tr className="text-muted-foreground">
+                  <th className="text-left px-2 py-1.5 font-medium">Projet</th>
+                  <th className="text-left px-2 py-1.5 font-medium w-32">Kickoff</th>
+                  <th className="text-left px-2 py-1.5 font-medium w-32">MEP saisie</th>
+                  <th className="w-8" />
+                </tr>
+              </thead>
+              <tbody>
+                {fdrList.map(p => {
+                  const ov = overrides[p.id];
+                  const kickoff = ov?.date_kickoff !== undefined ? ov.date_kickoff : p.date_kickoff;
+                  const mep = ov?.date_mep_saisie !== undefined ? ov.date_mep_saisie : p.date_mep_saisie;
+                  const dirty = ov?.date_kickoff !== undefined || ov?.date_mep_saisie !== undefined;
+                  return (
+                    <tr key={p.id} className={cn('border-t border-border/30', dirty && 'bg-violet-50/60')}>
+                      <td className="px-2 py-1 truncate max-w-[260px]" title={`${p.code} · ${p.nom}`}>
+                        <span className="text-muted-foreground font-mono">{p.code}</span> {p.nom}
+                      </td>
+                      <td className="px-2 py-1">
+                        <Input type="month" value={toMonthInput(kickoff)} className="h-7 text-xs"
+                          onChange={e => patchOverride(p.id, { date_kickoff: e.target.value ? `${e.target.value}-01` : null })} />
+                      </td>
+                      <td className="px-2 py-1">
+                        <Input type="month" value={toMonthInput(mep)} className="h-7 text-xs"
+                          onChange={e => patchOverride(p.id, { date_mep_saisie: e.target.value ? `${e.target.value}-01` : null })} />
+                      </td>
+                      <td className="px-1 py-1">
+                        {dirty && (
+                          <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-muted-foreground"
+                            title="Réinitialiser ce projet" onClick={() => resetOverride(p.id)}>
+                            <RotateCcw className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Override par scénario : la charge build se décale avec le kickoff. Vide = valeur d'origine du projet.
+          </p>
+        </CollapsibleSection>
+
+        {/* Levier 3 — Externalisation */}
+        <CollapsibleSection
+          title="Externalisation par projet (sous-traitance)"
+          icon={<Network className="h-4 w-4" />}
+          badge={nbExt > 0 ? <Badge variant="secondary" className="ml-1 text-[10px]">{nbExt}</Badge> : undefined}
+        >
+          <div className="max-h-72 overflow-y-auto rounded border border-border/40">
+            <table className="text-xs w-full">
+              <thead className="sticky top-0 bg-muted/60">
+                <tr className="text-muted-foreground">
+                  <th className="text-left px-2 py-1.5 font-medium">Projet</th>
+                  <th className="text-center px-2 py-1.5 font-medium w-20">Externe</th>
+                  <th className="text-left px-2 py-1.5 font-medium w-24">Réduction</th>
+                  <th className="text-left px-2 py-1.5 font-medium w-28">Budget ST</th>
+                  <th className="w-8" />
+                </tr>
+              </thead>
+              <tbody>
+                {fdrList.map(p => {
+                  const ov = overrides[p.id];
+                  const externe = ov?.externe !== undefined ? ov.externe : p.externe;
+                  const pct = ov?.pct_reduction_si_externe !== undefined ? ov.pct_reduction_si_externe : p.pct_reduction_si_externe;
+                  const budget = ov?.budget_externe_eur !== undefined ? ov.budget_externe_eur : p.budget_externe_eur;
+                  const dirty = ov?.externe !== undefined || ov?.pct_reduction_si_externe !== undefined || ov?.budget_externe_eur !== undefined;
+                  return (
+                    <tr key={p.id} className={cn('border-t border-border/30', dirty && 'bg-amber-50/60')}>
+                      <td className="px-2 py-1 truncate max-w-[240px]" title={`${p.code} · ${p.nom}`}>
+                        <span className="text-muted-foreground font-mono">{p.code}</span> {p.nom}
+                      </td>
+                      <td className="px-2 py-1 text-center">
+                        <Switch checked={!!externe}
+                          onCheckedChange={v => patchOverride(p.id, {
+                            externe: v,
+                            pct_reduction_si_externe: v && !pct ? 0.3 : pct ?? undefined,
+                          })} />
+                      </td>
+                      <td className="px-2 py-1">
+                        <div className="flex items-center gap-1">
+                          <Input type="number" min="0" max="100" step="5" disabled={!externe}
+                            value={pct != null ? Math.round(pct * 100) : ''} className="h-7 text-xs w-16"
+                            onChange={e => patchOverride(p.id, { pct_reduction_si_externe: (Number(e.target.value) || 0) / 100 })} />
+                          <span className="text-muted-foreground">%</span>
+                        </div>
+                      </td>
+                      <td className="px-2 py-1">
+                        <Input type="number" min="0" step="1000" disabled={!externe}
+                          value={budget ?? ''} placeholder="€" className="h-7 text-xs w-24"
+                          onChange={e => patchOverride(p.id, { budget_externe_eur: e.target.value ? Number(e.target.value) : null })} />
+                      </td>
+                      <td className="px-1 py-1">
+                        {dirty && (
+                          <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-muted-foreground"
+                            title="Réinitialiser ce projet" onClick={() => resetOverride(p.id)}>
+                            <RotateCcw className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Externaliser un projet réduit sa charge interne (% de réduction) et ajoute son budget ST au COGS du ROI.
+          </p>
+        </CollapsibleSection>
+
+        {/* Hypothèses de coût (ROI) */}
+        <CollapsibleSection title="Hypothèses de coût (ROI)" icon={<Euro className="h-4 w-4" />}>
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="space-y-1">
+              <label className="text-[11px] text-muted-foreground">Coût annuel chargé / ETP embauché</label>
+              <div className="flex items-center gap-1">
+                <Input type="number" min="0" step="1000" className="h-8 text-xs w-32"
+                  value={assumptions.cout_annuel_etp_embauche ?? ''}
+                  placeholder={String(DEFAULT_ASSUMPTIONS.cout_annuel_etp_embauche)}
+                  onChange={e => setAssumptions(a => ({ ...a, cout_annuel_etp_embauche: e.target.value ? Number(e.target.value) : undefined }))} />
+                <span className="text-xs text-muted-foreground">€/an</span>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[11px] text-muted-foreground">TJM sous-traitance générique</label>
+              <div className="flex items-center gap-1">
+                <Input type="number" min="0" step="10" className="h-8 text-xs w-28"
+                  value={assumptions.tjm_st ?? ''}
+                  placeholder={String(DEFAULT_ASSUMPTIONS.tjm_st)}
+                  onChange={e => setAssumptions(a => ({ ...a, tjm_st: e.target.value ? Number(e.target.value) : undefined }))} />
+                <span className="text-xs text-muted-foreground">€/j</span>
+              </div>
+            </div>
+          </div>
+        </CollapsibleSection>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---- ROI agrégé du scénario ----
+
+function ScenarioRoiCard({ roi, hires }: { roi: ScenarioRoi; hires: SimulatedHire[] }) {
+  const nbEmb = hires.filter(h => (h.kind ?? 'embauche') === 'embauche').length;
+  const nbSt = hires.filter(h => h.kind === 'sous_traitance').length;
+  return (
+    <Card className="border-border/50">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <TrendingUp className="h-4 w-4 text-emerald-500" />
+          ROI du scénario
+          <span className="text-[11px] font-normal text-muted-foreground">
+            (agrégé sur {roi.nb_projets} projets tenables)
+          </span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <RoiKpi label="Gain annuel" value={eur(roi.gain_annuel_eur)} sub="économies ETP métier"
+            color="text-emerald-600" icon={<TrendingUp className="h-4 w-4" />} />
+          <RoiKpi label="Coût build RH" value={eur(roi.rh_build_eur)} sub="one-shot"
+            color="text-violet-600" icon={<Users className="h-4 w-4" />} />
+          <RoiKpi label="COGS (externalisation)" value={eur(roi.cogs_eur)} sub="budgets ST projet"
+            color="text-blue-600" icon={<Network className="h-4 w-4" />} />
+          <RoiKpi label="Coût embauches" value={eur(roi.cout_embauches_eur)} sub={`${nbEmb} renfort${nbEmb > 1 ? 's' : ''}/an`}
+            color="text-amber-600" icon={<Users className="h-4 w-4" />} />
+          <RoiKpi label="Coût ST générique" value={eur(roi.cout_st_eur)} sub={`${nbSt} renfort${nbSt > 1 ? 's' : ''}/an`}
+            color="text-amber-600" icon={<Euro className="h-4 w-4" />} />
+          <RoiKpi label="BILAN annuel" value={eur(roi.bilan_annuel_eur)} sub="gain − coûts"
+            color={roi.bilan_annuel_eur >= 0 ? 'text-emerald-600' : 'text-red-600'}
+            icon={roi.bilan_annuel_eur >= 0 ? <CheckCircle2 className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+            highlight />
+        </div>
+        <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+          <Clock className="h-4 w-4 shrink-0" />
+          Temps de retour :{' '}
+          <strong className="text-foreground">
+            {roi.temps_retour_an != null
+              ? `${roi.temps_retour_an.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} an${roi.temps_retour_an >= 2 ? 's' : ''}`
+              : '—'}
+          </strong>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---- Projets tenables / à risque ----
+
+function ProjectsClassificationCard({
+  classification,
+}: {
+  classification: { tenable: FdrProjectInput[]; aRisque: FdrProjectInput[] };
+}) {
+  const { tenable, aRisque } = classification;
+  return (
+    <Card className="border-border/50">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+          Projets que le service peut tenir
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild><Info className="h-4 w-4 text-muted-foreground cursor-help" /></TooltipTrigger>
+              <TooltipContent className="max-w-xs text-xs">
+                Un projet est <strong>tenable</strong> si, sur tous les mois de sa fenêtre build, tous les
+                profils qu'il mobilise restent en écart simulé ≥ 0 (compte tenu des renforts et de
+                l'externalisation du scénario). Sinon il est <strong>à risque</strong>.
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <p className="text-xs font-semibold text-emerald-700 mb-1.5">
+            ✓ Tenables ({tenable.length})
+          </p>
+          <div className="space-y-1 max-h-64 overflow-y-auto">
+            {tenable.length === 0 && <p className="text-xs text-muted-foreground">Aucun.</p>}
+            {tenable.map(p => (
+              <div key={p.id} className="text-xs flex items-center gap-1.5 rounded bg-emerald-50/60 px-2 py-1">
+                <CheckCircle2 className="h-3 w-3 text-emerald-500 shrink-0" />
+                <span className="text-muted-foreground font-mono">{p.code}</span>
+                <span className="truncate">{p.nom}</span>
               </div>
             ))}
           </div>
-        )}
+        </div>
+        <div>
+          <p className="text-xs font-semibold text-red-700 mb-1.5">
+            ⚠ À risque ({aRisque.length})
+          </p>
+          <div className="space-y-1 max-h-64 overflow-y-auto">
+            {aRisque.length === 0 && <p className="text-xs text-emerald-600">Aucun — tout passe ✓</p>}
+            {aRisque.map(p => (
+              <div key={p.id} className="text-xs flex items-center gap-1.5 rounded bg-red-50/60 px-2 py-1">
+                <AlertTriangle className="h-3 w-3 text-red-500 shrink-0" />
+                <span className="text-muted-foreground font-mono">{p.code}</span>
+                <span className="truncate">{p.nom}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
-        <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs"
-          onClick={addHire} disabled={activeProfils.length === 0}>
-          <Plus className="h-3.5 w-3.5" />Ajouter une embauche
-        </Button>
+// ---- Comparateur de scénarios enregistrés ----
+
+function ScenarioComparator({
+  inputs, engineSettings, roiData, joursProductifs, onLoad,
+}: {
+  inputs: FdrProjectInput[];
+  engineSettings: FdrEngineSettings;
+  roiData: { rhHorsITByProject: Record<string, any[]>; tjmMap: Record<string, number> } | undefined;
+  joursProductifs: number;
+  onLoad: (s: FdrHireScenario | null) => void;
+}) {
+  const { scenarios } = useFdrHireScenarios();
+
+  const rows = useMemo(() => {
+    return scenarios.map(s => {
+      const sInputs = applyProjectOverrides(inputs, s.project_overrides ?? []);
+      const matrix = computeCapacityMatrix(sInputs, engineSettings);
+      const adjusted = applyHires(matrix, s.hires ?? [], joursProductifs);
+      const { tenable, aRisque } = classifyProjects(sInputs, adjusted, engineSettings);
+      const surcharge = adjusted.cascade.filter(r => r.sous_effectif_net > 0).length;
+      const roi = roiData
+        ? computeScenarioRoi(tenable, roiData.rhHorsITByProject, roiData.tjmMap, s.hires ?? [], s.assumptions ?? {}, joursProductifs)
+        : null;
+      return {
+        s,
+        peakEtp: peakEtp(adjusted.cascade),
+        surcharge,
+        nbTenable: tenable.length,
+        nbRisque: aRisque.length,
+        bilan: roi?.bilan_annuel_eur ?? null,
+        retour: roi?.temps_retour_an ?? null,
+      };
+    });
+  }, [scenarios, inputs, engineSettings, roiData, joursProductifs]);
+
+  if (scenarios.length === 0) return null;
+
+  return (
+    <Card className="border-border/50">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <GitCompare className="h-4 w-4 text-violet-500" />
+          Comparateur de scénarios
+          <span className="text-[11px] font-normal text-muted-foreground">({scenarios.length} enregistrés)</span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="overflow-x-auto">
+        <table className="text-xs w-full min-w-max">
+          <thead>
+            <tr className="text-muted-foreground">
+              <th className="text-left px-2 py-1.5 font-medium">Scénario</th>
+              <th className="text-center px-2 py-1.5 font-medium">ETP à recruter (pic)</th>
+              <th className="text-center px-2 py-1.5 font-medium">Mois surcharge</th>
+              <th className="text-center px-2 py-1.5 font-medium">Tenables</th>
+              <th className="text-center px-2 py-1.5 font-medium">À risque</th>
+              <th className="text-right px-2 py-1.5 font-medium">Bilan annuel</th>
+              <th className="text-center px-2 py-1.5 font-medium">Retour</th>
+              <th className="w-8" />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(r => (
+              <tr key={r.s.id} className="border-t border-border/40">
+                <td className="px-2 py-1.5 font-medium">{r.s.nom}</td>
+                <td className="text-center px-2 py-1.5 tabular-nums">{round1(r.peakEtp)}</td>
+                <td className={cn('text-center px-2 py-1.5 tabular-nums', r.surcharge > 0 ? 'text-red-600 font-semibold' : 'text-emerald-600')}>
+                  {r.surcharge > 0 ? r.surcharge : '✓'}
+                </td>
+                <td className="text-center px-2 py-1.5 tabular-nums text-emerald-700">{r.nbTenable}</td>
+                <td className={cn('text-center px-2 py-1.5 tabular-nums', r.nbRisque > 0 ? 'text-red-600' : 'text-muted-foreground')}>{r.nbRisque}</td>
+                <td className={cn('text-right px-2 py-1.5 tabular-nums font-semibold', (r.bilan ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-600')}>
+                  {r.bilan != null ? eur(r.bilan) : '—'}
+                </td>
+                <td className="text-center px-2 py-1.5 tabular-nums">
+                  {r.retour != null ? `${r.retour.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} an${r.retour >= 2 ? 's' : ''}` : '—'}
+                </td>
+                <td className="px-1 py-1">
+                  <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]" onClick={() => onLoad(r.s)} title="Charger ce scénario dans l'éditeur">
+                    Charger
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </CardContent>
     </Card>
   );
