@@ -145,6 +145,24 @@ function DocBlock({ children, className }: { children: React.ReactNode; classNam
   );
 }
 
+// Captures d'écran servies depuis public/doc-screenshots (voir docs/screenshots)
+const SHOTS = '/doc-screenshots';
+function Screenshot({ file, caption }: { file: string; caption?: string }) {
+  return (
+    <figure className="mb-4 print:break-inside-avoid">
+      <a
+        href={`${SHOTS}/${file}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block rounded-lg border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+      >
+        <img src={`${SHOTS}/${file}`} alt={caption ?? ''} loading="lazy" className="w-full h-auto block" />
+      </a>
+      {caption && <figcaption className="mt-1 text-center text-xs text-slate-400">{caption}</figcaption>}
+    </figure>
+  );
+}
+
 function GroupHeader({ id, title, color, count }: { id: string; title: string; color: string; count: number }) {
   return (
     <div id={id} className="flex items-baseline gap-3 mb-3 mt-8 first:mt-0 border-l-4 pl-3 py-1 rounded-r-lg"
@@ -527,6 +545,7 @@ export default function Documentation() {
 
           <DocBlock>
             <SectionHeader id="doc-dashboard" title="Tableau de bord" access="standard" url="/" />
+            <Screenshot file="01_dashboard.jpg" />
             <Intro>Page d'accueil de chaque utilisateur. Vue synthétique et personnalisée de l'activité en cours, centrée sur les tâches dont vous êtes responsable.</Intro>
             <FeatureGrid features={[
               { title: 'Compteurs synthétiques', desc: 'Tâches actives, en retard, à faire aujourd\'hui et en attente de validation.' },
@@ -539,6 +558,7 @@ export default function Documentation() {
 
           <DocBlock>
             <SectionHeader id="doc-requests" title="Demandes" access="standard" url="/requests" />
+            <Screenshot file="02_requests.jpg" />
             <Intro>Liste toutes les demandes de prestations ouvertes dans le système, tous processus confondus (BE, IT, Innovation, Maintenance, etc.). Point d'entrée pour suivre les demandes en cours et en créer de nouvelles depuis un modèle de processus.</Intro>
             <FeatureGrid features={[
               { title: 'Vue globale multi-processus', desc: 'Toutes les demandes actives avec leur processus d\'appartenance, statut d\'avancement et demandeur.' },
@@ -549,6 +569,7 @@ export default function Documentation() {
 
           <DocBlock>
             <SectionHeader id="doc-workload" title="Plan de charge personnel" access="standard" url="/workload" />
+            <Screenshot file="04_workload.jpg" />
             <Intro>Affiche semaine par semaine les tâches assignées avec leur charge estimée. Permet d'anticiper les surcharges et de planifier son travail.</Intro>
             <FeatureGrid features={[
               { title: 'Vue hebdomadaire', desc: 'Chaque colonne représente une semaine. Les tâches sont positionnées selon leur échéance, avec leur charge en demi-journées.' },
@@ -559,6 +580,7 @@ export default function Documentation() {
 
           <DocBlock>
             <SectionHeader id="doc-calendar" title="Calendrier" access="standard" url="/calendar" />
+            <Screenshot file="05_calendar.jpg" />
             <Intro>Vue temporelle de toutes les tâches et événements, intégrant optionnellement les événements du calendrier Microsoft 365.</Intro>
             <FeatureGrid features={[
               { title: 'Vue mensuelle / hebdomadaire', desc: 'Basculez entre les vues pour différentes granularités.' },
@@ -575,6 +597,7 @@ export default function Documentation() {
               <GroupHeader id="g-team" title="Équipe" color="#8b5cf6" count={1} />
               <DocBlock>
                 <SectionHeader id="doc-team-wl" title="Plan de charge équipe" access="profil" url="/workload" />
+                <Screenshot file="06_team_workload.jpg" />
                 <Intro>Vue agrégée de la charge de travail de l'équipe. Destinée aux managers et responsables qui pilotent la répartition du travail.</Intro>
                 <FeatureGrid features={[
                   { title: 'Vue multi-collaborateurs', desc: 'Chaque ligne représente un collaborateur avec sa charge planifiée semaine par semaine.' },
@@ -597,6 +620,7 @@ export default function Documentation() {
               {p.can_access_be_dispatch && (
                 <DocBlock>
                   <SectionHeader id="doc-be-dispatch" title="Dispatch & Suivi BE" access="standard" url="/be/dispatch" />
+                  <Screenshot file="07_be_dispatch.jpg" />
                   <Intro>Centre de pilotage opérationnel du Bureau d'Études. Permet d'affecter les tâches de prestations aux chargés d'études, de suivre l'avancement de chaque étape du workflow, et d'identifier les actions urgentes.</Intro>
                   <FeatureGrid features={[
                     { title: 'Création de demandes BE', desc: 'Assistant en 5 étapes : sélection du projet/affaire, choix des prestations, paramétrage, niveau d\'urgence, récapitulatif.' },
@@ -613,6 +637,7 @@ export default function Documentation() {
               {p.can_access_projects && (
                 <DocBlock>
                   <SectionHeader id="doc-be-projects" title="Projets BE" access="profil" url="/projects" />
+                  <Screenshot file="08_be_projects.jpg" />
                   <Intro>Liste tous les projets BE synchronisés depuis Divalto. Chaque projet regroupe ses affaires et donne accès à une fiche projet complète.</Intro>
                   <FeatureGrid features={[
                     { title: 'Synchronisation Divalto', desc: 'Projets et affaires synchronisés automatiquement depuis Divalto. Les données financières sont actualisées à chaque sync Fabric.' },
@@ -625,6 +650,7 @@ export default function Documentation() {
               {p.can_access_be_dispatch && (
                 <DocBlock>
                   <SectionHeader id="doc-be-planning" title="Plan de charge BE" access="profil" url="/be/plan-de-charge" />
+                  <Screenshot file="09_be_planning.jpg" />
                   <Intro>Vue agrégée de la charge des membres de l'équipe BE basée sur les tâches affectées. Permet de piloter la répartition de la charge à moyen terme.</Intro>
                   <FeatureGrid features={[
                     { title: 'Granularité temporelle', desc: 'Vue mensuelle, bimensuelle ou hebdomadaire. La mensuelle offre une vision long terme, la hebdomadaire permet la gestion fine.' },
@@ -637,6 +663,7 @@ export default function Documentation() {
               {showBEBudget && (
                 <DocBlock>
                   <SectionHeader id="doc-be-budget" title="Budget BE" access="profil" url="/be/budget" />
+                  <Screenshot file="10_be_budget.jpg" />
                   <Intro>Suivi des budgets alloués et consommés pour l'ensemble des affaires BE. Croise les données de devis Divalto avec les temps Lucca pour mesurer la rentabilité.</Intro>
                   <FeatureGrid features={[
                     { title: 'Vue globale des affaires', desc: 'Budget alloué, heures consommées, écart et taux de consommation pour chaque affaire.' },
@@ -648,6 +675,7 @@ export default function Documentation() {
               {showBETJM && (
                 <DocBlock>
                   <SectionHeader id="doc-be-tjm" title="Référentiel TJM" access="admin" url="/be/admin/tjm" />
+                  <Screenshot file="11_be_tjm.jpg" />
                   <Intro>Gestion des taux journaliers moyens par profil et par collaborateur. Ces taux sont utilisés dans les calculs de valorisation des temps pour le budget BE.</Intro>
                   <FeatureGrid features={[
                     { title: 'TJM par profil', desc: 'Définissez un TJM par fonction métier (Ingénieur Senior, Projeteur, Chef de Projet…) qui sert de valeur par défaut.' },
@@ -661,6 +689,9 @@ export default function Documentation() {
               {p.can_access_projects && (
                 <DocBlock>
                   <SectionHeader id="doc-be-fiche" title="Fiche projet BE — Onglets" access="profil" url="/be/projects/:code/overview" />
+                  <Screenshot file="28a_be_overview.jpg" caption="Onglet Vue d'ensemble" />
+                  <Screenshot file="28b_be_timeline.jpg" caption="Onglet Timeline (Gantt)" />
+                  <Screenshot file="28c_be_budget.jpg" caption="Onglet Budget" />
                   <Intro>Hub centralisé d'un projet BE. Regroupe toutes les informations : affaires, jalons, avancement des prestations, équipe et indicateurs financiers.</Intro>
                   <FeatureGrid features={[
                     { title: 'Vue d\'ensemble', desc: 'Code projet, nom, type, chef de projet, dates clés, statut global, liste des affaires avec budget et avancement.' },
@@ -681,6 +712,7 @@ export default function Documentation() {
               <GroupHeader id="g-spv" title="SPV" color="#059669" count={1} />
               <DocBlock>
                 <SectionHeader id="doc-spv" title="Projets SPV" access="profil" url="/spv" />
+                <Screenshot file="12_spv.jpg" />
                 <Intro>Module de gestion des projets stratégiques avec questionnaires structurés et synthèses analytiques. Distinct du BE opérationnel car il porte sur des projets à dimension stratégique et transverse.</Intro>
                 <FeatureGrid features={[
                   { title: 'Questionnaire structuré', desc: 'Formulaire paramétrable collectant des données selon des piliers définis (technique, économique, environnemental…).' },
@@ -702,6 +734,7 @@ export default function Documentation() {
               {p.can_access_it_dispatch && (
                 <DocBlock>
                   <SectionHeader id="doc-it-dispatch" title="Demandes IT" access="standard" url="/it/dispatch" />
+                  <Screenshot file="13_it_dispatch.jpg" />
                   <Intro>Centre de pilotage des demandes informatiques. Permet de réceptionner les tickets/demandes IT, de les affecter aux membres de l'équipe DSI et de suivre leur résolution.</Intro>
                   <FeatureGrid features={[
                     { title: 'Soumission de demandes', desc: 'Formulaire guidé précisant la nature (support, développement, infrastructure), la priorité et la description.' },
@@ -715,6 +748,7 @@ export default function Documentation() {
                 <>
                   <DocBlock>
                     <SectionHeader id="doc-it-projects" title="Projets IT" access="double" url="/it/projects" />
+                    <Screenshot file="14_it_projects.jpg" />
                     <Intro>Liste tous les projets informatiques en cours ou planifiés avec suivi des tâches, gouvernance, timeline, budget et synchronisation avec les outils externes.</Intro>
                     <FeatureGrid features={[
                       { title: 'Types de projets configurables', desc: 'Projets typés (Infrastructure, Développement, ERP, Intégration…) selon une liste paramétrable par l\'administrateur.' },
@@ -724,6 +758,7 @@ export default function Documentation() {
                   </DocBlock>
                   <DocBlock>
                     <SectionHeader id="doc-it-roadmap" title="Feuille de route IT" access="profil" url="/it/feuille-de-route" />
+                    <Screenshot file="15_it_roadmap.jpg" />
                     <Intro>Vue stratégique présentant l'ensemble des projets et initiatives IT planifiés. Support pour les comités de pilotage DSI.</Intro>
                     <FeatureGrid features={[
                       { title: 'Vue roadmap temporelle', desc: 'Projets positionnés sur un axe temporel avec dates prévues, organisés par priorité ou domaine.' },
@@ -732,6 +767,7 @@ export default function Documentation() {
                   </DocBlock>
                   <DocBlock>
                     <SectionHeader id="doc-it-planning" title="Plan de charge IT" access="profil" url="/it/plan-de-charge" />
+                    <Screenshot file="16_it_planning.jpg" />
                     <Intro>Charge de l'équipe IT semaine par semaine, en croisant les tâches affectées et le temps disponible de chaque membre.</Intro>
                     <FeatureGrid features={[
                       { title: 'Scénarios d\'embauche', desc: 'Simulez l\'impact d\'un recrutement sur la capacité de l\'équipe.' },
@@ -744,6 +780,7 @@ export default function Documentation() {
               {p.can_access_it_budget && (
                 <DocBlock>
                   <SectionHeader id="doc-it-budget" title="Budget IT" access="profil" url="/it/budget" />
+                  <Screenshot file="17_it_budget.jpg" />
                   <Intro>Suivi des budgets alloués aux projets et opérations IT (licences, infrastructure, prestations, masse salariale).</Intro>
                   <FeatureGrid features={[
                     { title: 'Vue globale IT', desc: 'Budget alloué, consommé et solde par poste budgétaire.' },
@@ -755,6 +792,7 @@ export default function Documentation() {
               {p.can_access_it_cartographie && (
                 <DocBlock>
                   <SectionHeader id="doc-it-carto" title="Cartographie IT" access="profil" url="/it/cartographie" />
+                  <Screenshot file="18_it_carto.jpg" />
                   <Intro>Visualisation du système d'information : applications, interconnexions, technologies et responsabilités associées.</Intro>
                   <FeatureGrid features={[
                     { title: 'Vue du SI', desc: 'Applications organisées par domaine fonctionnel avec leurs flux de données et dépendances.' },
@@ -773,6 +811,7 @@ export default function Documentation() {
               <GroupHeader id="g-smq" title="Qualité" color="#db2777" count={1} />
               <DocBlock>
                 <SectionHeader id="doc-smq" title="Non-conformités (SMQ)" access="standard" url="/smq" />
+                <Screenshot file="19_smq.jpg" />
                 <Intro>Déclaration, suivi et traitement des non-conformités internes dans le cadre du Système de Management de la Qualité.</Intro>
                 <FeatureGrid features={[
                   { title: 'Déclaration', desc: 'Tout utilisateur peut déclarer une non-conformité : description, gravité, service concerné, pièces jointes. La déclaration est anonymisable.' },
@@ -794,6 +833,7 @@ export default function Documentation() {
               {p.can_access_innovation && (
                 <DocBlock>
                   <SectionHeader id="doc-innovation" title="Innovation" access="profil" url="/innovation/requests" />
+                  <Screenshot file="20_innovation.jpg" />
                   <Intro>Soumission, évaluation et suivi d'idées ou projets innovants. Cadre structuré pour la gestion du portefeuille d'innovations.</Intro>
                   <FeatureGrid features={[
                     { title: 'Soumission d\'idées', desc: 'Formulaire guidé : titre, description, impact attendu, ressources nécessaires.' },
@@ -805,6 +845,7 @@ export default function Documentation() {
               {p.can_access_maintenance && (
                 <DocBlock>
                   <SectionHeader id="doc-maintenance" title="Maintenance matériel" access="profil" url="/maintenance/dispatch" />
+                  <Screenshot file="21_maintenance.jpg" />
                   <Intro>Gestion des demandes d'intervention sur le matériel ou les équipements (maintenance préventive et curative).</Intro>
                   <FeatureGrid features={[
                     { title: 'Demandes d\'intervention', desc: 'Équipement concerné, nature de la panne, urgence. Historique complet par équipement.' },
@@ -816,6 +857,7 @@ export default function Documentation() {
               {p.can_access_rh && (
                 <DocBlock>
                   <SectionHeader id="doc-rh" title="Mouvements RH" access="profil" url="/rh/dispatch" />
+                  <Screenshot file="22_rh.jpg" />
                   <Intro>Gestion des processus d'onboarding, d'offboarding et de mobilité interne. Génère automatiquement les tâches associées selon des modèles prédéfinis.</Intro>
                   <FeatureGrid features={[
                     { title: 'Types de mouvements', desc: 'Onboarding (arrivée), Offboarding (départ), Mobilité interne. Chaque type déclenche un ensemble de tâches spécifiques.' },
@@ -827,6 +869,7 @@ export default function Documentation() {
               {p.can_access_client && (
                 <DocBlock>
                   <SectionHeader id="doc-client" title="Création client" access="profil" url="/client/dispatch" />
+                  <Screenshot file="23_client.jpg" />
                   <Intro>Processus de référencement d'un nouveau client : vérifications juridiques, création dans les systèmes, ouverture des accès.</Intro>
                   <FeatureGrid features={[
                     { title: 'Formulaire guidé', desc: 'Raison sociale, SIRET, contacts, domaine d\'activité, informations bancaires.' },
@@ -838,6 +881,7 @@ export default function Documentation() {
               {p.can_access_logistique && (
                 <DocBlock>
                   <SectionHeader id="doc-logistique" title="Logistique transports" access="profil" url="/logistique/dispatch" />
+                  <Screenshot file="24_logistique.jpg" />
                   <Intro>Gestion des demandes de transport et de livraison. Soumission des besoins et planification par les responsables logistique.</Intro>
                   <FeatureGrid features={[
                     { title: 'Demandes de transport', desc: 'Type (livraison, enlèvement, transfert), date souhaitée, adresses, volume/poids estimé.' },
@@ -849,6 +893,7 @@ export default function Documentation() {
               {p.can_access_sst && (
                 <DocBlock>
                   <SectionHeader id="doc-sst" title="Situations à risque (SST)" access="profil" url="/sst" />
+                  <Screenshot file="25_sst.jpg" />
                   <Intro>Déclaration et gestion des situations dangereuses détectées sur chantier ou dans les bureaux. Démarche prévention des risques professionnels.</Intro>
                   <FeatureGrid features={[
                     { title: 'Déclaration', desc: 'Localisation, description du risque, niveau de gravité, photo jointe.' },
@@ -868,6 +913,7 @@ export default function Documentation() {
               {p.can_access_templates && (
                 <DocBlock>
                   <SectionHeader id="doc-templates" title="Modèles de processus" access="profil" url="/templates" />
+                  <Screenshot file="26_templates.jpg" />
                   <Intro>Création et modification des processus métier qui structurent l'ensemble des workflows de l'application.</Intro>
                   <FeatureGrid features={[
                     { title: 'Arborescence des processus', desc: 'Processus parent → Sous-processus → Étapes. Chaque étape a : nom, durée estimée, acteur, séquencement.' },
@@ -888,6 +934,7 @@ export default function Documentation() {
               <GroupHeader id="g-admin" title="Administration" color="#dc2626" count={1} />
               <DocBlock>
                 <SectionHeader id="doc-admin" title="Panneau Administration" access="admin" url="/admin" />
+                <Screenshot file="27_admin.jpg" />
                 <Intro>Réservé aux administrateurs. Centralise la gestion des utilisateurs, des permissions, des paramètres globaux et des intégrations systèmes.</Intro>
                 <FeatureGrid features={[
                   { title: 'Gestion des utilisateurs', desc: 'Liste, création, édition, suppression logique, réinitialisation de mot de passe, invitation par email ou en masse.' },
