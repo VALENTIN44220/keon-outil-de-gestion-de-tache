@@ -224,7 +224,7 @@ export default function Documentation() {
   const addItem  = (id: string, label: string) => toc.push({ id, level: 'screen', label });
 
   if (showSources) { addGroup('g-sources', 'Sources des données'); addItem('src-archi','Architecture'); addItem('src-divalto','Divalto'); addItem('src-lucca','Lucca'); addItem('src-ms','Microsoft 365'); addItem('src-fabric','Fabric'); addItem('src-tables','Tables Supabase'); }
-  if (showSources) { addGroup('g-users', 'Gestion des comptes'); addItem('usr-create','Créer un compte'); addItem('usr-ms','Liaison Microsoft 365'); addItem('usr-perms','Rôles & permissions'); addItem('usr-status','Statuts & départs'); addItem('usr-simu','Simulation admin'); }
+  if (showAdmin) { addGroup('g-users', 'Gestion des comptes'); addItem('usr-create','Créer un compte'); addItem('usr-ms','Liaison Microsoft 365'); addItem('usr-perms','Rôles & permissions'); addItem('usr-status','Statuts & départs'); addItem('usr-simu','Simulation admin'); }
   addGroup('g-espace', 'Mon Espace'); addItem('doc-dashboard','Tableau de bord'); addItem('doc-requests','Demandes'); addItem('doc-workload','Plan de charge'); addItem('doc-calendar','Calendrier');
   if (showTeam) { addGroup('g-team', 'Équipe'); addItem('doc-team-wl','Plan de charge équipe'); }
   if (showBE) {
@@ -465,7 +465,14 @@ export default function Documentation() {
                 ]} />
               </DocBlock>
 
-              {/* GESTION COMPTES */}
+            </>
+          )}
+
+          {/* ═══════════════════════════════════════════════════════════
+              GESTION DES COMPTES  (administrateurs uniquement)
+          ══════════════════════════════════════════════════════════════ */}
+          {showAdmin && (
+            <>
               <GroupHeader id="g-users" title="Gestion des comptes utilisateurs" color="#0284c7" count={5} />
 
               <DocBlock>
