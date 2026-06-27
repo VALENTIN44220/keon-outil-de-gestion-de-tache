@@ -488,25 +488,30 @@ export function AccessRightsTab({
     const newValue = !current;
     const dbValue = newValue === profileVal ? null : newValue;
     try {
-      if (userOverrides) {
-        const { data } = await supabase
-          .from("user_permission_overrides")
-          .update({ [key]: dbValue, updated_at: new Date().toISOString() })
-          .eq("user_id", selectedUserId)
-          .select()
-          .single();
-        setUserOverrides(data as unknown as UserPermissionOverride);
-      } else {
-        const { data } = await supabase
-          .from("user_permission_overrides")
-          .insert({ user_id: selectedUserId, [key]: dbValue })
-          .select()
-          .single();
-        setUserOverrides(data as unknown as UserPermissionOverride);
-      }
+      const { data, error } = await supabase
+        .from("user_permission_overrides")
+        .upsert(
+          { user_id: selectedUserId, [key]: dbValue, updated_at: new Date().toISOString() },
+          { onConflict: "user_id" },
+        )
+        .select()
+        .single();
+      if (error) throw error;
+      setUserOverrides(data as unknown as UserPermissionOverride);
       toast.success("Droit mis à jour");
     } catch (e: unknown) {
-      toast.error((e as Error).message || "Erreur");
+      // En cas d'erreur (ex: RLS bloque la lecture après UPSERT), recharger depuis DB
+      const { data: reloaded } = await supabase
+        .from("user_permission_overrides")
+        .select("*")
+        .eq("user_id", selectedUserId)
+        .maybeSingle();
+      if (reloaded) {
+        setUserOverrides(reloaded as unknown as UserPermissionOverride);
+        toast.success("Droit mis à jour");
+      } else {
+        toast.error((e as Error).message || "Erreur lors de la mise à jour");
+      }
     }
   };
 
