@@ -21,10 +21,11 @@ import { Label } from '@/components/ui/label';
 import {
   Plus, Monitor, Search, Save, RotateCcw, Filter,
   FolderKanban, AlertTriangle, TrendingUp, ArrowUpDown, ChevronRight, Target,
-  FolderOpen, Bookmark, Trash2, GitMerge, FileSpreadsheet
+  FolderOpen, Bookmark, Trash2, GitMerge, FileSpreadsheet, LayoutDashboard, Table2
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { ITProjectMergeDialog } from '@/components/it/ITProjectMergeDialog';
+import { ITProjectsBulkGrid } from '@/components/it/ITProjectsBulkGrid';
 import { format, subMonths, startOfMonth, startOfYear, isAfter } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -151,6 +152,15 @@ export default function ITProjects() {
   // Sort
   const [sortKey, setSortKey] = useState<SortKey>('code_projet_digital');
   const [sortAsc, setSortAsc] = useState(true);
+
+  // Mode d'affichage : tableau de bord (KPIs/charts) ou grille d'édition en masse
+  const [viewMode, setViewMode] = useState<'dashboard' | 'grid'>(
+    () => (localStorage.getItem('it_projects_view_mode') as 'dashboard' | 'grid') || 'dashboard',
+  );
+  const changeViewMode = (m: 'dashboard' | 'grid') => {
+    setViewMode(m);
+    localStorage.setItem('it_projects_view_mode', m);
+  };
 
   useEffect(() => {
     supabase.from('companies').select('id, name').order('name').then(({ data }) => setCompanies(data || []));
@@ -360,6 +370,21 @@ export default function ITProjects() {
               </div>
             </div>
             <div className="flex gap-2">
+              {/* Bascule Tableau de bord / Grille d'édition */}
+              <div className="flex items-center rounded-lg border p-0.5">
+                <Button
+                  variant={viewMode === 'dashboard' ? 'default' : 'ghost'} size="sm"
+                  className="h-8 gap-1.5 text-xs" onClick={() => changeViewMode('dashboard')}
+                >
+                  <LayoutDashboard className="h-3.5 w-3.5" /> Tableau de bord
+                </Button>
+                <Button
+                  variant={viewMode === 'grid' ? 'default' : 'ghost'} size="sm"
+                  className="h-8 gap-1.5 text-xs" onClick={() => changeViewMode('grid')}
+                >
+                  <Table2 className="h-3.5 w-3.5" /> Grille d'édition
+                </Button>
+              </div>
               <Button variant="outline" onClick={() => setShowMerge(true)} className="gap-2">
                 <GitMerge className="h-4 w-4" /> Fusionner
               </Button>
@@ -511,6 +536,8 @@ export default function ITProjects() {
             <div className="grid grid-cols-4 gap-4">
               {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-24 rounded-xl bg-muted animate-pulse" />)}
             </div>
+          ) : viewMode === 'grid' ? (
+            <ITProjectsBulkGrid projects={filtered} />
           ) : (
             <>
               {/* KPIs */}

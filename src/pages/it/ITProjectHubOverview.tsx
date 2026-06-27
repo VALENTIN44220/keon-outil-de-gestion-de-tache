@@ -9,6 +9,7 @@
  *  Sidebar : Fiche projet, liens Microsoft 365 (Loop / Teams)
  */
 import { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useITProjectHubCode } from '@/hooks/useITProjectHubCode';
 import { Layout } from '@/components/layout/Layout';
 import { ITProjectHubHeader } from '@/components/it/ITProjectHubHeader';
@@ -37,7 +38,8 @@ import { cn } from '@/lib/utils';
 import {
   IT_PHASE_BADGE_CONFIG, ITProjectPhase, getActivePhases,
   FDR_ETAPES, ITProjectFDRValidation,
-  IT_PROJECT_PILIER_CONFIG,
+  IT_PROJECT_PILIER_CONFIG, IT_PROJECT_PRIORITY_CONFIG,
+  FDR_ETAT_CONFIG, type FdrEtat,
 } from '@/types/itProject';
 import { STATUT_PORTEFEUILLE_CONFIG, type StatutPortefeuille, type FdrProjectInput } from '@/types/fdr';
 import { useITProjectLoad } from '@/hooks/useITProjectLoad';
@@ -49,6 +51,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 export default function ITProjectHubOverview() {
+  const navigate = useNavigate();
   const code = useITProjectHubCode();
   const { data: project, isLoading, refetch } = useITProject(code);
   const { data: tasks = [] } = useITProjectTasks(project?.id);
@@ -464,6 +467,79 @@ export default function ITProjectHubOverview() {
                 </CardContent>
               </Card>
 
+              {/* 3. Paramètres complets (lecture) — tous les champs éditables visibles ici */}
+              <Card>
+                <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <Monitor className="h-4 w-4 text-violet-600" />
+                    Paramètres du projet
+                  </CardTitle>
+                  <Button variant="ghost" size="sm" className="h-7 px-2 gap-1 text-xs"
+                    onClick={() => navigate(`/it/projects/${project.code_projet_digital}/edit`)}>
+                    <Pencil className="h-3.5 w-3.5" /> Modifier
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                    {/* Général */}
+                    <ParamGroup title="Général">
+                      {typeConfig && <InfoRow label="Type" value={`${typeConfig.icon} ${typeConfig.label}`} />}
+                      <InfoRow label="Priorité" value={
+                        project.priorite
+                          ? <Badge variant="outline" className={cn('text-[10px] border', IT_PROJECT_PRIORITY_CONFIG[project.priorite]?.className)}>{IT_PROJECT_PRIORITY_CONFIG[project.priorite]?.label}</Badge>
+                          : '—'} />
+                      {statutPfConfig && <InfoRow label="Statut portefeuille" value={
+                        <Badge className={cn('text-[10px] border', statutPfConfig.className)}>{statutPfConfig.label}</Badge>} />}
+                      <InfoRow label="Catégorie FDR" value={project.categorie_fdr || '—'} />
+                      <InfoRow label="Activité métier" value={project.activite_metier || '—'} />
+                      <InfoRow label="Sur feuille de route" value={project.sur_feuille_de_route === false ? 'Non' : 'Oui'} />
+                      {project.description && <InfoRow label="Description" value={<span className="text-right">{project.description}</span>} />}
+                    </ParamGroup>
+
+                    {/* Équipe */}
+                    <ParamGroup title="Équipe">
+                      <InfoRow label="Société" value={project.company?.name || '—'} />
+                      <InfoRow label="Chef de projet métier" value={project.chef_projet_metier?.display_name || '—'} />
+                      <InfoRow label="Chef de projet IT" value={project.chef_projet_it?.display_name || '—'} />
+                      <InfoRow label="Groupe de service" value={project.groupe_service?.name || '—'} />
+                      <InfoRow label="Directeur" value={project.directeur?.display_name || '—'} />
+                    </ParamGroup>
+
+                    {/* FDR */}
+                    <ParamGroup title="FDR">
+                      <InfoRow label="Pilier" value={
+                        pilierConfig ? <Badge className={cn('text-[10px] border', pilierConfig.className)}>{project.pilier} — {pilierConfig.label}</Badge> : '—'} />
+                      <InfoRow label="Année FDR" value={project.fdr_annee || '—'} />
+                      <InfoRow label="État FDR" value={
+                        project.fdr_annee
+                          ? FDR_ETAT_CONFIG[(project.fdr_etat as FdrEtat) || 'non_soumis']?.label
+                          : '—'} />
+                      {project.fdr_priorite && <InfoRow label="Priorité FDR" value={project.fdr_priorite} />}
+                      {project.fdr_description && <InfoRow label="Description FDR" value={<span className="text-right">{project.fdr_description}</span>} />}
+                      {project.fdr_commentaires && <InfoRow label="Commentaires FDR" value={<span className="text-right">{project.fdr_commentaires}</span>} />}
+                    </ParamGroup>
+
+                    {/* Planning & charge */}
+                    <ParamGroup title="Planning & charge">
+                      <InfoRow label="Délai build projeté" value={project.delai_projete_mois != null ? `${project.delai_projete_mois} mois` : '—'} />
+                      <InfoRow label="MEP saisie" value={project.date_mep_saisie ? format(new Date(project.date_mep_saisie), 'dd/MM/yyyy') : '—'} />
+                      <InfoRow label="Échéance cible" value={project.echeance_cible ? format(new Date(project.echeance_cible), 'dd/MM/yyyy') : '—'} />
+                      <InfoRow label="Profil principal (suivi)" value={charge?.profilPrincipalNom || '—'} />
+                      <InfoRow label="Charge suivi" value={project.suivi_j_mois ? `${project.suivi_j_mois} j/mois` : '—'} />
+                      <InfoRow label="% Avancement (saisi)" value={`${project.pct_avancement ?? 0} %`} />
+                    </ParamGroup>
+
+                    {/* Budget & externalisation */}
+                    <ParamGroup title="Budget & externalisation">
+                      <InfoRow label="Budget prévisionnel" value={project.budget_previsionnel != null ? `${project.budget_previsionnel.toLocaleString('fr-FR')} €` : '—'} />
+                      <InfoRow label="Projet externalisé" value={project.externe ? 'Oui' : 'Non'} />
+                      <InfoRow label="Réduction charge interne" value={project.externe ? `${Math.round((project.pct_reduction_si_externe ?? 0) * 100)} %` : '—'} />
+                      <InfoRow label="Budget externe / ST" value={project.budget_externe_eur != null ? `${project.budget_externe_eur.toLocaleString('fr-FR')} €` : '—'} />
+                    </ParamGroup>
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* Gouvernance FDR déplacée dans l'onglet « Gouvernance & Phasage » */}
             </div>
 
@@ -602,6 +678,15 @@ function DateTile({ label, date }: { label: string; date: string | null | undefi
       <p className="text-sm font-semibold mt-1 tabular-nums">
         {date ? format(new Date(date), 'dd MMM yyyy', { locale: fr }) : '—'}
       </p>
+    </div>
+  );
+}
+
+function ParamGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <p className="text-[11px] font-semibold text-violet-700 uppercase tracking-wide border-b pb-1">{title}</p>
+      <div className="space-y-1.5">{children}</div>
     </div>
   );
 }

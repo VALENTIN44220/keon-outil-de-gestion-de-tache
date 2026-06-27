@@ -85,6 +85,7 @@ export function ITProjectForm({ project, onSaved, onCancel }: ITProjectFormProps
   const [suiviJMois, setSuiviJMois] = useState('0');
   const [externe, setExterne] = useState(false);
   const [pctReduction, setPctReduction] = useState('0');
+  const [budgetExterneEur, setBudgetExterneEur] = useState('');
   const [surFdr, setSurFdr] = useState(true);
   const [pctAvancement, setPctAvancement] = useState('0');
   // Ventilation build par profil : map profil_id → j_mois (string pour l'input)
@@ -168,6 +169,7 @@ export function ITProjectForm({ project, onSaved, onCancel }: ITProjectFormProps
       setSuiviJMois(project.suivi_j_mois?.toString() || '0');
       setExterne(project.externe ?? false);
       setPctReduction(((project.pct_reduction_si_externe ?? 0) * 100).toString());
+      setBudgetExterneEur(project.budget_externe_eur?.toString() || '');
       setSurFdr(project.sur_feuille_de_route ?? true);
       setPctAvancement(project.pct_avancement?.toString() || '0');
     } else {
@@ -221,6 +223,7 @@ export function ITProjectForm({ project, onSaved, onCancel }: ITProjectFormProps
     setSuiviJMois('0');
     setExterne(false);
     setPctReduction('0');
+    setBudgetExterneEur('');
     setSurFdr(true);
     setPctAvancement('0');
     setLoadMap({});
@@ -287,6 +290,7 @@ export function ITProjectForm({ project, onSaved, onCancel }: ITProjectFormProps
       suivi_j_mois: parseFloat(suiviJMois) || 0,
       externe,
       pct_reduction_si_externe: (parseFloat(pctReduction) || 0) / 100,
+      budget_externe_eur: budgetExterneEur ? parseFloat(budgetExterneEur) : null,
       sur_feuille_de_route: surFdr,
       pct_avancement: parseFloat(pctAvancement) || 0,
       // `progress` est la colonne affichée dans la liste/KPI : on la garde
@@ -754,11 +758,19 @@ export function ITProjectForm({ project, onSaved, onCancel }: ITProjectFormProps
                   <Switch checked={externe} onCheckedChange={setExterne} />
                 </div>
                 {externe && (
-                  <div className="flex items-center gap-3">
-                    <Label className="text-xs shrink-0">Réduction charge interne</Label>
-                    <Input type="number" min={0} max={100} step={5} value={pctReduction}
-                      onChange={e => setPctReduction(e.target.value)} className="h-8 w-24 text-right" />
-                    <span className="text-xs text-muted-foreground">%</span>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3">
+                      <Label className="text-xs shrink-0 w-40">Réduction charge interne</Label>
+                      <Input type="number" min={0} max={100} step={5} value={pctReduction}
+                        onChange={e => setPctReduction(e.target.value)} className="h-8 w-24 text-right" />
+                      <span className="text-xs text-muted-foreground">%</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Label className="text-xs shrink-0 w-40">Budget externe / ST (€)</Label>
+                      <Input type="number" min={0} step={1000} placeholder="ex: 30000" value={budgetExterneEur}
+                        onChange={e => setBudgetExterneEur(e.target.value)} className="h-8 w-32 text-right" />
+                      <span className="text-xs text-muted-foreground">€ (COGS ROI)</span>
+                    </div>
                   </div>
                 )}
                 <div className="flex items-center justify-between pt-1 border-t border-border/50">
