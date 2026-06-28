@@ -23,8 +23,9 @@ CREATE POLICY "it_tjm_referentiel_admin_write"
   ON public.it_tjm_referentiel FOR ALL
   USING (
     EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid() AND role = 'admin'
+      SELECT 1 FROM public.user_roles
+      WHERE user_roles.user_id = auth.uid()
+        AND user_roles.role = 'admin'::app_role
     )
   );
 
@@ -57,15 +58,22 @@ CREATE TABLE IF NOT EXISTS public.it_project_rh_hors_it (
 
 ALTER TABLE public.it_project_rh_hors_it ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "it_project_rh_hors_it_access"
-  ON public.it_project_rh_hors_it FOR ALL
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid()
-        AND (can_access_it_projects = true OR role = 'admin')
-    )
-  );
+-- Accès réservé aux utilisateurs authentifiés (lecture + écriture pleine).
+CREATE POLICY "it_project_rh_hors_it_select"
+  ON public.it_project_rh_hors_it FOR SELECT
+  TO authenticated USING (true);
+
+CREATE POLICY "it_project_rh_hors_it_insert"
+  ON public.it_project_rh_hors_it FOR INSERT
+  TO authenticated WITH CHECK (true);
+
+CREATE POLICY "it_project_rh_hors_it_update"
+  ON public.it_project_rh_hors_it FOR UPDATE
+  TO authenticated USING (true);
+
+CREATE POLICY "it_project_rh_hors_it_delete"
+  ON public.it_project_rh_hors_it FOR DELETE
+  TO authenticated USING (true);
 
 -- Trigger updated_at (CREATE OR REPLACE — idempotent si la fonction existe déjà)
 CREATE OR REPLACE FUNCTION public.set_updated_at()
