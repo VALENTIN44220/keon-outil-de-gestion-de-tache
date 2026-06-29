@@ -6,7 +6,9 @@ export function useITTjmReferentiel() {
   return useQuery<ITTjmReferentiel[]>({
     queryKey: ['it-tjm-referentiel'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // be_fonction n'est pas (encore) dans les types générés → cast du client.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
         .from('it_tjm_referentiel')
         .select('*')
         .order('profil_code');
@@ -20,8 +22,10 @@ export function useITTjmReferentiel() {
 export function useUpsertITTjmReferentiel() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (row: { profil_code: string; tjm_eur: number; description?: string | null }) => {
-      const { error } = await supabase
+    mutationFn: async (row: { profil_code: string; tjm_eur: number; be_fonction?: string | null; description?: string | null }) => {
+      // be_fonction n'est pas (encore) dans les types générés → cast du client.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any)
         .from('it_tjm_referentiel')
         .upsert({ ...row, updated_at: new Date().toISOString() }, { onConflict: 'profil_code' });
       if (error) throw error;

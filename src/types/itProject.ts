@@ -538,6 +538,8 @@ export interface ITBudgetUserPreferences {
 export interface ITTjmReferentiel {
   profil_code: string;
   tjm_eur: number;
+  /** Fonction du référentiel TJM BE dont dérive le TJM €/j (NULL = saisi manuellement). */
+  be_fonction?: string | null;
   description?: string | null;
   updated_by?: string | null;
   created_at: string;
