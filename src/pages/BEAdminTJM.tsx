@@ -140,6 +140,9 @@ function BEAdminTJMContent() {
           </div>
         </div>
 
+        {/* Référentiel TJM IT/DIGITAL (€/jour par profil FDR — calcul ROI) */}
+        <ITTjmReferentielCard />
+
         {/* Taux horaires par fonction */}
         <Card className="border-border/50">
           <CardHeader className="pb-3">
@@ -317,9 +320,6 @@ function BEAdminTJMContent() {
             )}
           </CardContent>
         </Card>
-
-        {/* Référentiel TJM IT/DIGITAL (€/jour par profil FDR — calcul ROI) */}
-        <ITTjmReferentielCard />
       </div>
     </Layout>
   );
