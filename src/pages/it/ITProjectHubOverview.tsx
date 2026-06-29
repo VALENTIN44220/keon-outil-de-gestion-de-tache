@@ -140,10 +140,12 @@ export default function ITProjectHubOverview() {
     const buildNet = totalBuildNet(fdrInput);
     const profilName = (code: string | null | undefined) =>
       fdrProfils.find(p => p.code === code)?.nom ?? code ?? '—';
+    const delai = fdrInput.delai_projete_mois ?? null;
     return {
       isPermanente,
       mepRetenue: mep,
       buildNet,
+      buildJours: delai ? Math.round(buildNet * delai * 10) / 10 : null,
       suivi: fdrInput.suivi_j_mois,
       ventilation: projectLoads
         .filter(l => l.j_mois > 0)
@@ -308,6 +310,9 @@ export default function ITProjectHubOverview() {
                         <div>
                           <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Build net</p>
                           <p className="text-lg font-bold tabular-nums">{Math.round(charge.buildNet * 10) / 10}<span className="text-xs font-normal text-muted-foreground"> j/mois</span></p>
+                          {charge.buildJours != null && (
+                            <p className="text-[10px] text-muted-foreground tabular-nums">≈ {charge.buildJours} j total</p>
+                          )}
                         </div>
                         <div>
                           <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Suivi</p>

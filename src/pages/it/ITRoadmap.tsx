@@ -24,6 +24,7 @@ import { useFdrProjects, usePatchFdrProject, type FdrRoadmapProject, type FdrPro
 import { FdrImportExport } from '@/components/it/FdrImportExport';
 import { FdrHistorySheet } from '@/components/it/FdrHistorySheet';
 import { useFdrSettings, useFdrProfils } from '@/hooks/useFdrSettings';
+import { useITActivites } from '@/hooks/useITActivites';
 import { useViewPreferences } from '@/hooks/useViewPreferences';
 import {
   computeCapacityMatrix, computeProjectMonthLoads, generateHorizon, getMepRetenue, toYM, addMonths,
@@ -31,7 +32,7 @@ import {
 import {
   type YearGran, type Period, GRAN_CYCLE, GRAN_LETTER, buildPeriods, periodIndexOfMonth,
 } from '@/lib/fdr/periods';
-import { STATUT_PORTEFEUILLE_CONFIG, ACTIVITES_METIER, type StatutPortefeuille, type FdrEngineSettings } from '@/types/fdr';
+import { STATUT_PORTEFEUILLE_CONFIG, type StatutPortefeuille, type FdrEngineSettings } from '@/types/fdr';
 import { IT_PROJECT_PILIER_CONFIG } from '@/types/itProject';
 import { cn } from '@/lib/utils';
 
@@ -169,6 +170,7 @@ function RoadmapContent() {
   const { data: projects = [], isLoading: projectsLoading } = useFdrProjects();
   const { data: settings } = useFdrSettings();
   const { data: profils = [] } = useFdrProfils();
+  const { activeLabels: activiteLabels } = useITActivites();
   const patchProject = usePatchFdrProject();
 
   // ---- Filtres ----
@@ -593,7 +595,7 @@ function RoadmapContent() {
           <FilterSelect value={fCategorie} onChange={setFCategorie} placeholder="Catégorie"
             options={[['IA', 'IA'], ['HORS IA', 'HORS IA']]} />
           <FilterSelect value={fActivite} onChange={setFActivite} placeholder="Activité"
-            options={ACTIVITES_METIER.map(a => [a, a])} />
+            options={activiteLabels.map(a => [a, a])} />
           <FilterSelect value={fPilier} onChange={setFPilier} placeholder="Pilier"
             options={Object.entries(IT_PROJECT_PILIER_CONFIG).map(([k, c]) => [k, `${k} — ${c.label}`])} />
           <FilterSelect value={fStatut} onChange={setFStatut} placeholder="Statut"

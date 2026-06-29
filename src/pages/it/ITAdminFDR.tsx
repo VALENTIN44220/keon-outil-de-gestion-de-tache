@@ -20,6 +20,7 @@ import {
   useFdrProfils, useUpdateFdrProfil, useAddFdrProfil, useDeleteFdrProfil,
 } from '@/hooks/useFdrSettings';
 import { useITProjectTypes, type ITProjectTypeOption } from '@/hooks/useITProjectTypes';
+import { useITActivites, type ITActiviteOption } from '@/hooks/useITActivites';
 import { useITTjmReferentiel, useUpsertITTjmReferentiel } from '@/hooks/useITTjmReferentiel';
 import type { FdrProfil } from '@/types/fdr';
 
@@ -57,6 +58,7 @@ function ITAdminFDRContent() {
         <ProfilsCard />
         <TjmReferentielCard />
         <ProjectTypesCard />
+        <ActivitesCard />
       </div>
     </Layout>
   );
@@ -545,6 +547,158 @@ function ProjectTypesCard() {
         ) : (
           <Button variant="outline" size="sm" onClick={() => setShowAdd(true)} className="gap-2">
             <Plus className="h-4 w-4" />Ajouter un type
+          </Button>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---- Activités métier ----
+
+function ActivitesCard() {
+  const { activites, isLoading, add, update, remove } = useITActivites();
+
+  const [editMap, setEditMap] = useState<Record<string, Partial<ITActiviteOption>>>({});
+  const editing = (id: string) => editMap[id] != null;
+  const startEdit = (a: ITActiviteOption) => setEditMap(m => ({
+    ...m, [a.id]: { libelle: a.libelle, ordre: a.ordre, actif: a.actif },
+  }));
+  const cancelEdit = (id: string) => setEditMap(m => { const n = { ...m }; delete n[id]; return n; });
+
+  const saveEdit = async (id: string) => {
+    const patch = editMap[id];
+    if (!patch?.libelle?.trim()) { toast({ title: 'Libellé obligatoire', variant: 'destructive' }); return; }
+    try {
+      await update.mutateAsync({
+        id,
+        libelle: patch.libelle.trim(),
+        ordre: Number(patch.ordre) || 0,
+        actif: !!patch.actif,
+      });
+      toast({ title: 'Activité mise à jour' });
+      cancelEdit(id);
+    } catch (e) {
+      toast({ title: 'Erreur', description: extractErrorMessage(e), variant: 'destructive' });
+    }
+  };
+
+  const [showAdd, setShowAdd] = useState(false);
+  const [newLabel, setNewLabel] = useState('');
+
+  const addNew = async () => {
+    if (!newLabel.trim()) { toast({ title: 'Libellé obligatoire', variant: 'destructive' }); return; }
+    try {
+      await add.mutateAsync({ libelle: newLabel.trim(), ordre: activites.length + 1 });
+      toast({ title: `Activité « ${newLabel} » ajoutée` });
+      setNewLabel(''); setShowAdd(false);
+    } catch (e) {
+      toast({ title: 'Erreur', description: extractErrorMessage(e), variant: 'destructive' });
+    }
+  };
+
+  const handleDelete = async (a: ITActiviteOption) => {
+    if (!confirm(`Supprimer l'activité « ${a.libelle} » ? Les projets existants conserveront cette valeur.`)) return;
+    try {
+      await remove.mutateAsync(a.id);
+      toast({ title: `Activité « ${a.libelle} » supprimée` });
+    } catch (e) {
+      toast({ title: 'Erreur', description: extractErrorMessage(e), variant: 'destructive' });
+    }
+  };
+
+  return (
+    <Card className="border-border/50">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-lg">
+          <Tags className="h-5 w-5 text-muted-foreground" />
+          Activités métier
+          {!isLoading && <Badge variant="secondary" className="ml-1 text-xs">{activites.length} activités</Badge>}
+        </CardTitle>
+        <p className="text-xs text-muted-foreground mt-1">
+          Liste paramétrable des activités métier proposées dans le formulaire et la grille des projets.
+          Désactiver une activité la retire des listes sans toucher aux projets qui l'utilisent.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {isLoading ? (
+          <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10" />)}</div>
+        ) : (
+          <div className="rounded-lg border overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/30 hover:bg-muted/30">
+                  <TableHead>Libellé</TableHead>
+                  <TableHead className="w-[90px] text-right">Ordre</TableHead>
+                  <TableHead className="w-[80px] text-center">Actif</TableHead>
+                  <TableHead className="w-[80px]" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {activites.map(a => editing(a.id) ? (
+                  <TableRow key={a.id} className="bg-blue-500/5">
+                    <TableCell>
+                      <Input value={editMap[a.id]?.libelle ?? ''} onChange={e => setEditMap(m => ({ ...m, [a.id]: { ...m[a.id], libelle: e.target.value } }))} className="h-8 text-sm" />
+                    </TableCell>
+                    <TableCell>
+                      <Input type="number" value={editMap[a.id]?.ordre ?? 0} onChange={e => setEditMap(m => ({ ...m, [a.id]: { ...m[a.id], ordre: parseInt(e.target.value) } }))} className="h-8 text-sm text-right w-20 ml-auto" />
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Switch checked={!!editMap[a.id]?.actif} onCheckedChange={v => setEditMap(m => ({ ...m, [a.id]: { ...m[a.id], actif: v } }))} />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button size="icon" className="h-7 w-7" onClick={() => saveEdit(a.id)} disabled={update.isPending}>
+                          {update.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => cancelEdit(a.id)}>
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  <TableRow key={a.id} className={!a.actif ? 'opacity-40' : ''}>
+                    <TableCell className="text-sm font-medium">{a.libelle}</TableCell>
+                    <TableCell className="text-right tabular-nums text-sm">{a.ordre}</TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant={a.actif ? 'default' : 'secondary'} className="text-[10px]">{a.actif ? 'Actif' : 'Inactif'}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => startEdit(a)}>
+                          <Settings2 className="h-3 w-3" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDelete(a)}>
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+
+        {showAdd ? (
+          <div className="rounded-lg border p-4 bg-muted/20 space-y-3">
+            <p className="text-sm font-medium">Nouvelle activité</p>
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1">
+                <Label htmlFor="naLabel" className="text-xs">Libellé</Label>
+                <Input id="naLabel" value={newLabel} onChange={e => setNewLabel(e.target.value)} placeholder="Ex. QUALITE / HSE" className="h-8 text-sm w-64" onKeyDown={e => e.key === 'Enter' && addNew()} />
+              </div>
+              <Button size="sm" onClick={addNew} disabled={add.isPending} className="gap-2">
+                {add.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                Ajouter
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => setShowAdd(false)}>Annuler</Button>
+            </div>
+          </div>
+        ) : (
+          <Button variant="outline" size="sm" onClick={() => setShowAdd(true)} className="gap-2">
+            <Plus className="h-4 w-4" />Ajouter une activité
           </Button>
         )}
       </CardContent>

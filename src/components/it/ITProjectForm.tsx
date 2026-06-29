@@ -8,10 +8,11 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ITProject, ITProjectPriority, ITProjectPhase, IT_PROJECT_PHASES, ALL_IT_PROJECT_PHASES, IT_PROJECT_PILIER_CONFIG, FDR_ANNEE_OPTIONS, FDR_ETAT_CONFIG, type FdrEtat } from '@/types/itProject';
-import { ACTIVITES_METIER, STATUT_PORTEFEUILLE_CONFIG, type StatutPortefeuille } from '@/types/fdr';
+import { STATUT_PORTEFEUILLE_CONFIG, type StatutPortefeuille } from '@/types/fdr';
 import { useITProjects } from '@/hooks/useITProjects';
 import { useITProjectTypes } from '@/hooks/useITProjectTypes';
 import { useFdrProfils } from '@/hooks/useFdrSettings';
+import { useITActivites } from '@/hooks/useITActivites';
 import { useITProjectLoad, useUpsertITProjectLoad } from '@/hooks/useITProjectLoad';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
@@ -93,6 +94,8 @@ export function ITProjectForm({ project, onSaved, onCancel }: ITProjectFormProps
 
   // Profils FDR (pour la ventilation build)
   const { data: fdrProfils = [] } = useFdrProfils();
+  // Activités métier paramétrables (Paramètres FDR)
+  const { activeLabels: activiteLabels } = useITActivites();
   const upsertLoad = useUpsertITProjectLoad();
   // Charge existante (en mode édition)
   const { data: existingLoads = [] } = useITProjectLoad(project?.id);
@@ -242,6 +245,35 @@ export function ITProjectForm({ project, onSaved, onCancel }: ITProjectFormProps
       return next.length > 0 ? next : prev;
     });
   };
+
+  // ─── Charge BUILD : saisie en jours totaux, répartie sur le délai build ───
+  // Source de vérité stockée = j/mois (loadMap), consommée telle quelle par le
+  // moteur de plan de charge. La « charge totale » est une vue dérivée :
+  //   total = j/mois × délai build  ⇔  j/mois = total ÷ délai build
+  const delaiNum = parseFloat(delaiProjete) || 0;
+  const round1 = (n: number) => Math.round(n * 10) / 10;
+  // j/mois → charge totale (j) affichée
+  const totalForProfil = (profilId: string): string => {
+    if (delaiNum <= 0) return '';
+    const jMois = parseFloat(loadMap[profilId] || '0') || 0;
+    return jMois ? String(round1(jMois * delaiNum)) : '0';
+  };
+  // Saisie d'une charge totale (j) → recalcule le j/mois stocké
+  const setTotalForProfil = (profilId: string, totalStr: string) => {
+    if (totalStr.trim() === '') {
+      setLoadMap(m => ({ ...m, [profilId]: '0' }));
+      return;
+    }
+    const total = parseFloat(totalStr);
+    if (isNaN(total) || delaiNum <= 0) return;
+    setLoadMap(m => ({ ...m, [profilId]: String(Math.round((total / delaiNum) * 10000) / 10000) }));
+  };
+  // Total build cumulé (tous profils) en jours
+  const totalBuildJours = round1(
+    fdrProfils
+      .filter(p => p.actif)
+      .reduce((s, p) => s + (parseFloat(loadMap[p.id] || '0') || 0) * delaiNum, 0),
+  );
 
   const handleSubmit = async () => {
     if (!nomProjet.trim()) return;
@@ -651,7 +683,12 @@ export function ITProjectForm({ project, onSaved, onCancel }: ITProjectFormProps
                     <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__none__">— Non défini —</SelectItem>
-                      {ACTIVITES_METIER.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                      {(() => {
+                        const opts = [...activiteLabels];
+                        // Conserve une valeur historique non présente dans la liste paramétrée
+                        if (activiteMetier && !opts.includes(activiteMetier)) opts.push(activiteMetier);
+                        return opts.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>);
+                      })()}
                     </SelectContent>
                   </Select>
                 </div>
@@ -691,21 +728,50 @@ export function ITProjectForm({ project, onSaved, onCancel }: ITProjectFormProps
 
               {/* Ventilation charge BUILD par profil */}
               <div className="rounded-lg border bg-muted/20 p-3 space-y-2">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Charge BUILD par profil (j/mois)</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Charge BUILD par profil</p>
+                  {totalBuildJours > 0 && (
+                    <span className="text-[11px] font-medium text-violet-700 tabular-nums">
+                      Total ≈ {totalBuildJours} j build
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Saisissez la <strong>charge totale (jours)</strong> par profil. Elle est répartie sur le délai build
+                  {delaiNum > 0 ? ` (${delaiNum} mois)` : ''} pour obtenir le j/mois consommé par le plan de charge.
+                  Vous pouvez aussi ajuster directement le j/mois.
+                </p>
+                {delaiNum <= 0 && (
+                  <p className="text-[11px] text-amber-600">
+                    Renseignez le « Délai build projeté » ci-dessus pour saisir en jours totaux. En attendant, saisissez le j/mois.
+                  </p>
+                )}
                 {fdrProfils.filter(p => p.actif).length === 0 ? (
                   <p className="text-xs text-muted-foreground">Aucun profil défini. Configurez les profils dans Paramètres FDR.</p>
                 ) : (
                   <div className="space-y-1.5">
+                    <div className="flex items-center gap-3 pb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                      <span className="flex-1">Profil</span>
+                      <span className="w-24 text-right">Charge totale (j)</span>
+                      <span className="w-24 text-right">j / mois</span>
+                    </div>
                     {fdrProfils.filter(p => p.actif).map(p => (
                       <div key={p.id} className="flex items-center gap-3">
                         <span className="text-xs flex-1 truncate">{p.nom}</span>
                         <Input
+                          type="number" min={0} step={1}
+                          value={totalForProfil(p.id)}
+                          onChange={e => setTotalForProfil(p.id, e.target.value)}
+                          disabled={delaiNum <= 0}
+                          placeholder={delaiNum <= 0 ? '—' : '0'}
+                          className="h-7 w-24 text-right text-sm tabular-nums"
+                        />
+                        <Input
                           type="number" min={0} step={0.5}
                           value={loadMap[p.id] ?? '0'}
                           onChange={e => setLoadMap(m => ({ ...m, [p.id]: e.target.value }))}
-                          className="h-7 w-24 text-right text-sm tabular-nums"
+                          className="h-7 w-24 text-right text-sm tabular-nums text-muted-foreground"
                         />
-                        <span className="text-xs text-muted-foreground w-12">j/mois</span>
                       </div>
                     ))}
                   </div>

@@ -26,6 +26,8 @@ import {
 import * as XLSX from 'xlsx';
 import { ITProjectMergeDialog } from '@/components/it/ITProjectMergeDialog';
 import { ITProjectsBulkGrid } from '@/components/it/ITProjectsBulkGrid';
+import { useFdrProfils } from '@/hooks/useFdrSettings';
+import { getMepRetenue } from '@/lib/fdr/calculationEngine';
 import { format, subMonths, startOfMonth, startOfYear, isAfter } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -125,6 +127,7 @@ export default function ITProjects() {
   const { projects, isLoading, deleteProject, fetchProjects } = useITProjects();
   const { isAdmin } = useUserRole();
   const { resolve: resolveType } = useITProjectTypes();
+  const { data: fdrProfils = [] } = useFdrProfils();
   const [showMerge, setShowMerge] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ITProject | null>(null);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
@@ -205,30 +208,101 @@ export default function ITProjects() {
     localStorage.removeItem(LS_KEY);
   };
 
-  // Export Excel des projets affichés (filtrés + triés)
-  const handleExportExcel = () => {
-    const companyMap = new Map(companies.map(c => [c.id, c.name]));
-    const rows = sorted.map(p => ({
-      'Code': p.code_projet_digital ?? '',
-      'Nom': p.nom_projet ?? '',
-      'Type': p.type_projet ? resolveType(p.type_projet).label : '',
-      'Statut': p.statut_portefeuille ?? '',
-      'Phase': p.phase_courante ? (IT_PROJECT_PHASES.find(ph => ph.value === p.phase_courante)?.label ?? p.phase_courante) : '',
-      'Avancement (%)': p.progress ?? 0,
-      'Date fin prévue': p.date_fin_prevue ? format(new Date(p.date_fin_prevue), 'dd/MM/yyyy') : '',
-      'Pilier': p.pilier ?? '',
-      'Année FDR': p.fdr_annee ?? 'AUCUNE',
-      'État FDR': p.fdr_annee ? (FDR_ETAT_CONFIG[(p.fdr_etat as FdrEtat) || 'non_soumis']?.label ?? p.fdr_etat) : '',
-      'Inclus PDR': p.sur_feuille_de_route === false ? 'Non' : 'Oui',
-      'Chef de projet IT': p.chef_projet_it?.display_name ?? '',
-      'Société': p.company_id ? (companyMap.get(p.company_id) ?? '') : '',
-      'Créé le': p.created_at ? format(new Date(p.created_at), 'dd/MM/yyyy') : '',
-    }));
+  // Export Excel des projets affichés (filtrés + triés) — TOUS les paramètres
+  const handleExportExcel = async () => {
+    const fmtDate = (d?: string | null) => (d ? format(new Date(d), 'dd/MM/yyyy') : '');
+    const phaseLabel = (ph?: string | null) =>
+      ph ? (IT_PROJECT_PHASES.find(x => x.value === ph)?.label ?? ph) : '';
+    const profilNom = (code?: string | null) =>
+      code ? (fdrProfils.find(p => p.code === code)?.nom ?? code) : '';
+
+    // Ventilation build par profil : chargée à la demande pour l'ensemble des projets affichés
+    const ids = sorted.map(p => p.id);
+    const buildByProject = new Map<string, { detail: string; totalJMois: number }>();
+    if (ids.length > 0) {
+      const { data: loads } = await supabase
+        .from('it_project_load')
+        .select('it_project_id, j_mois, profil:fdr_profils(nom, ordre)')
+        .in('it_project_id', ids);
+      for (const l of (loads ?? [])) {
+        const cur = buildByProject.get(l.it_project_id) ?? { detail: '', totalJMois: 0 };
+        const nom = (l.profil as any)?.nom ?? '—';
+        cur.detail = cur.detail ? `${cur.detail}; ${nom}: ${l.j_mois} j/mois` : `${nom}: ${l.j_mois} j/mois`;
+        cur.totalJMois += Number(l.j_mois) || 0;
+        buildByProject.set(l.it_project_id, cur);
+      }
+    }
+
+    const rows = sorted.map(p => {
+      const build = buildByProject.get(p.id);
+      const totalJMois = build?.totalJMois ?? 0;
+      const delai = p.delai_projete_mois ?? null;
+      const mep = getMepRetenue({
+        date_kickoff: p.date_kickoff ?? null,
+        date_mep_saisie: p.date_mep_saisie ?? null,
+        delai_projete_mois: delai,
+      } as any);
+      return {
+        'Code': p.code_projet_digital ?? '',
+        'Nom': p.nom_projet ?? '',
+        'Description': p.description ?? '',
+        'Type': p.type_projet ? resolveType(p.type_projet).label : '',
+        'Priorité': p.priorite ?? '',
+        'Phase courante': phaseLabel(p.phase_courante),
+        'Phases activées': Array.isArray(p.phases_actives)
+          ? p.phases_actives.map(ph => phaseLabel(ph)).join(', ')
+          : '',
+        'Avancement (%)': p.progress ?? 0,
+        // ---- Portefeuille / FDR ----
+        'Statut portefeuille': p.statut_portefeuille ?? '',
+        'Catégorie': p.categorie_fdr ?? '',
+        'Activité métier': p.activite_metier ?? '',
+        'Pilier': p.pilier ?? '',
+        'Année FDR': p.fdr_annee ?? 'AUCUNE',
+        'État FDR': p.fdr_annee ? (FDR_ETAT_CONFIG[(p.fdr_etat as FdrEtat) || 'non_soumis']?.label ?? p.fdr_etat) : '',
+        'Inclus PDR': p.sur_feuille_de_route === false ? 'Non' : 'Oui',
+        'Priorité FDR': p.fdr_priorite ?? '',
+        'Description FDR': p.fdr_description ?? '',
+        'Commentaires FDR': p.fdr_commentaires ?? '',
+        // ---- Équipe ----
+        'Société': p.company?.name ?? '',
+        'Chef de projet métier': p.chef_projet_metier?.display_name ?? '',
+        'Chef de projet IT': p.chef_projet_it?.display_name ?? '',
+        'Groupe de service': p.groupe_service?.name ?? '',
+        'Directeur': p.directeur?.display_name ?? '',
+        // ---- Dates & durée ----
+        'Date début': fmtDate(p.date_debut),
+        'Date kickoff': fmtDate(p.date_kickoff),
+        'Délai build projeté (mois)': delai ?? '',
+        'MEP saisie': fmtDate(p.date_mep_saisie),
+        'MEP retenue': mep ?? '',
+        'Échéance cible': fmtDate(p.echeance_cible),
+        'Date fin prévue': fmtDate(p.date_fin_prevue),
+        'Date fin réelle': fmtDate(p.date_fin_reelle),
+        // ---- Charge ----
+        'Charge build (j/mois total)': totalJMois || '',
+        'Charge build (jours total)': totalJMois && delai ? Math.round(totalJMois * delai * 10) / 10 : '',
+        'Détail build par profil': build?.detail ?? '',
+        'Charge suivi (j/mois)': p.suivi_j_mois ?? '',
+        'Profil principal (suivi)': profilNom(p.profil_principal),
+        // ---- Budget & externalisation ----
+        'Budget prévisionnel (€)': p.budget_previsionnel ?? '',
+        'Projet externalisé': p.externe ? 'Oui' : 'Non',
+        'Réduction charge interne (%)': p.externe ? Math.round((p.pct_reduction_si_externe ?? 0) * 100) : '',
+        'Budget externe / ST (€)': p.budget_externe_eur ?? '',
+        // ---- Liens M365 ----
+        'URL Teams': p.teams_channel_url ?? '',
+        'URL Loop': p.loop_workspace_url ?? '',
+        // ---- Métadonnées ----
+        'Créé le': fmtDate(p.created_at),
+        'Mis à jour le': fmtDate(p.updated_at),
+      };
+    });
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Projets IT');
     XLSX.writeFile(wb, `Projets_IT_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
-    toast.success(`${rows.length} projet(s) exporté(s)`);
+    toast.success(`${rows.length} projet(s) exporté(s) — ${Object.keys(rows[0] ?? {}).length} colonnes`);
   };
 
   // Apply filters

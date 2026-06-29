@@ -31,6 +31,7 @@ import {
 import { ACTIVITES_METIER, STATUT_PORTEFEUILLE_CONFIG, type StatutPortefeuille } from '@/types/fdr';
 import { useITProjects } from '@/hooks/useITProjects';
 import { useFdrProfils } from '@/hooks/useFdrSettings';
+import { useITActivites } from '@/hooks/useITActivites';
 
 const LS_COLS = 'it_projects_grid_cols_v1';
 const NONE = '__none__';
@@ -89,6 +90,8 @@ type EditMap = Record<string, Partial<ITProject>>;
 export function ITProjectsBulkGrid({ projects }: { projects: ITProject[] }) {
   const { updateProject } = useITProjects();
   const { data: fdrProfils = [] } = useFdrProfils();
+  const { activeLabels: activiteLabels } = useITActivites();
+  const activiteOpts: Opt[] = useMemo(() => activiteLabels.map(a => ({ value: a, label: a })), [activiteLabels]);
   const profilOptions: Opt[] = useMemo(
     () => [{ value: NONE, label: '— Aucun —' }, ...fdrProfils.filter(p => p.actif).map(p => ({ value: p.code, label: p.nom }))],
     [fdrProfils],
@@ -115,7 +118,9 @@ export function ITProjectsBulkGrid({ projects }: { projects: ITProject[] }) {
     localStorage.setItem(LS_COLS, JSON.stringify([...n]));
     return n;
   });
-  const cols = COLUMNS.filter(c => visible.has(c.key as string));
+  const cols = COLUMNS
+    .filter(c => visible.has(c.key as string))
+    .map(c => (c.key === 'activite_metier' ? { ...c, options: activiteOpts } : c));
 
   // Tri local (sur les valeurs d'origine, pour ne pas faire sauter les lignes en cours d'édition)
   const [sortKey, setSortKey] = useState<keyof ITProject>('code_projet_digital');
