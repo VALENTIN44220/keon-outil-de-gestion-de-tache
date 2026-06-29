@@ -1,12 +1,19 @@
+import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ITProject, IT_PROJECT_PRIORITY_CONFIG, IT_PROJECT_PILIER_CONFIG, ITProjectPilier, FDR_ETAT_CONFIG, type FdrEtat } from '@/types/itProject';
 import { STATUT_PORTEFEUILLE_CONFIG, type StatutPortefeuille } from '@/types/fdr';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { ArrowLeft, LayoutDashboard, ListTodo, Calendar, MessageSquare, Paperclip, RefreshCw, Pencil, ChevronRight, Monitor, AlertTriangle, TrendingUp, CheckCircle2, Clock, MessageSquareText, Link2, ExternalLink, Euro, Shield, BarChart3 } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { ArrowLeft, LayoutDashboard, ListTodo, Calendar, MessageSquare, Paperclip, RefreshCw, Pencil, ChevronRight, Monitor, AlertTriangle, TrendingUp, CheckCircle2, Clock, MessageSquareText, Link2, ExternalLink, Euro, Shield, BarChart3, Trash2, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useITProjectSync } from '@/hooks/useITProjectSync';
+import { useUserRole } from '@/hooks/useUserRole';
+import { useITProjects } from '@/hooks/useITProjects';
 
 interface ITProjectHubHeaderProps {
   project: ITProject;
@@ -42,10 +49,20 @@ export function ITProjectHubHeader({ project, stats }: ITProjectHubHeaderProps) 
   const navigate = useNavigate();
   const location = useLocation();
   const { openTeams, openLoop, hasTeams, hasLoop } = useITProjectSync(project);
+  const { isAdmin } = useUserRole();
+  const { deleteProject } = useITProjects();
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const activeTab = location.pathname.split('/').pop() || 'overview';
   const activeGroup = navGroups.find(g => g.children.some(c => c.value === activeTab)) ?? navGroups[0];
   const isEditing = activeTab === 'edit';
   const goTo = (value: string) => navigate(`/it/projects/${project.code_projet_digital}/${value}`);
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    const ok = await deleteProject(project.id);
+    setIsDeleting(false);
+    if (ok) { setDeleteOpen(false); navigate('/it/projects'); }
+  };
   const statusConfig = STATUT_PORTEFEUILLE_CONFIG[(project.statut_portefeuille as StatutPortefeuille) ?? 'Idée'] || STATUT_PORTEFEUILLE_CONFIG['Idée'];
   const priorityConfig = project.priorite ? IT_PROJECT_PRIORITY_CONFIG[project.priorite] : null;
   const pilierConfig = project.pilier ? IT_PROJECT_PILIER_CONFIG[project.pilier as ITProjectPilier] : null;
@@ -128,6 +145,17 @@ export function ITProjectHubHeader({ project, stats }: ITProjectHubHeaderProps) 
               >
                 <Pencil className="h-4 w-4" /> Modifier
               </Button>
+              {/* Suppression — admin only, masquée sur l'onglet édition (déjà une zone de danger) */}
+              {isAdmin && !isEditing && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setDeleteOpen(true)}
+                  className="gap-2 text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4" /> Supprimer
+                </Button>
+              )}
 
               {/* KPI tâches retirés — l'avancement global est affiché dans la carte
                   « Synthèse d'avancement » de l'onglet Synthèse pour éviter le doublon. */}
@@ -185,6 +213,37 @@ export function ITProjectHubHeader({ project, stats }: ITProjectHubHeaderProps) 
           </div>
         )}
       </div>
+
+      <AlertDialog open={deleteOpen} onOpenChange={open => { if (!isDeleting) setDeleteOpen(open); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <Trash2 className="h-5 w-5" /> Supprimer le projet IT
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-1">
+              <span className="block">
+                Êtes-vous sûr de vouloir supprimer définitivement{' '}
+                <span className="font-mono font-semibold text-foreground">{project.code_projet_digital}</span>
+                {' '}— <span className="font-medium text-foreground">{project.nom_projet}</span> ?
+              </span>
+              <span className="block text-xs text-destructive/80 font-medium">
+                Cette action est irréversible (jalons et tâches liées inclus).
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isDeleting}
+              onClick={e => { e.preventDefault(); void handleDelete(); }}
+            >
+              {isDeleting && <Loader2 className="h-4 w-4 animate-spin mr-2 inline" />}
+              Supprimer définitivement
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
