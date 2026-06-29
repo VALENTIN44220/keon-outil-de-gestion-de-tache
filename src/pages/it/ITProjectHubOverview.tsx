@@ -556,7 +556,8 @@ export default function ITProjectHubOverview() {
                     <Monitor className="h-4 w-4 text-violet-600" />
                     Fiche projet
                   </CardTitle>
-                  <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setShowEditDialog(true)}>
+                  <Button variant="ghost" size="sm" className="h-7 px-2" title="Modifier la fiche projet"
+                    onClick={() => navigate(`/it/projects/${project.code_projet_digital}/edit`)}>
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
                 </CardHeader>
