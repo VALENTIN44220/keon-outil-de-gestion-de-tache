@@ -21,6 +21,10 @@ export interface ProjectOverride {
   it_project_id: string;
   date_kickoff?: string | null;          // 'YYYY-MM-DD' ou 'YYYY-MM'
   date_mep_saisie?: string | null;       // idem
+  /** Durée build (mois) — décalage/étirement depuis la feuille de route. */
+  delai_projete_mois?: number | null;
+  /** Échéance cible (tâches permanentes) — étirement depuis la feuille de route. */
+  echeance_cible?: string | null;
   externe?: boolean;
   pct_reduction_si_externe?: number;     // 0..1
   budget_externe_eur?: number | null;
@@ -55,13 +59,18 @@ export interface ScenarioPayload {
 
 const KEY = ['fdr-hire-scenarios'];
 
+// project_overrides/hires sont du JSONB : le typage généré du client provoque
+// une instanciation de type trop profonde (TS2589) → on caste l'accès client.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const db = () => supabase as any;
+
 export function useFdrHireScenarios() {
   const qc = useQueryClient();
 
   const list = useQuery<FdrHireScenario[]>({
     queryKey: KEY,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await db()
         .from('fdr_hire_scenarios')
         .select('*')
         .order('updated_at', { ascending: false });
@@ -88,7 +97,7 @@ export function useFdrHireScenarios() {
 
   const create = useMutation({
     mutationFn: async (payload: ScenarioPayload) => {
-      const { data, error } = await supabase
+      const { data, error } = await db()
         .from('fdr_hire_scenarios')
         .insert({
           nom: payload.nom,
@@ -109,7 +118,7 @@ export function useFdrHireScenarios() {
       id,
       ...patch
     }: { id: string } & Partial<ScenarioPayload>) => {
-      const { error } = await supabase
+      const { error } = await db()
         .from('fdr_hire_scenarios')
         .update({ ...patch, updated_at: new Date().toISOString() })
         .eq('id', id);
@@ -120,7 +129,7 @@ export function useFdrHireScenarios() {
 
   const remove = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('fdr_hire_scenarios').delete().eq('id', id);
+      const { error } = await db().from('fdr_hire_scenarios').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: KEY }),

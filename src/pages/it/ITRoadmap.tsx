@@ -17,6 +17,7 @@ import {
   Map as MapIcon, Undo2, Redo2, AlertTriangle, Loader2, ExternalLink,
   EyeOff, Eye, CalendarRange, Filter, X, ChevronDown, ChevronRight, Hash,
   ArrowUp, ArrowDown, Maximize2, Minimize2, CalendarClock, Bookmark, RotateCcw,
+  FlaskConical, Trash2, Save,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { extractErrorMessage } from '@/lib/extractErrorMessage';
@@ -25,6 +26,11 @@ import { FdrImportExport } from '@/components/it/FdrImportExport';
 import { FdrHistorySheet } from '@/components/it/FdrHistorySheet';
 import { useFdrSettings, useFdrProfils } from '@/hooks/useFdrSettings';
 import { useITActivites } from '@/hooks/useITActivites';
+import {
+  useFdrHireScenarios, type ProjectOverride, type SimulatedHire,
+  type ScenarioAssumptions,
+} from '@/hooks/useFdrHireScenarios';
+import { applyHires } from '@/lib/fdr/planningSimulation';
 import { useViewPreferences } from '@/hooks/useViewPreferences';
 import {
   computeCapacityMatrix, computeProjectMonthLoads, generateHorizon, getMepRetenue, toYM, addMonths,
@@ -113,6 +119,43 @@ function shiftDateMonths(date: string, n: number): string {
   return `${String(ny).padStart(4, '0')}-${String(nm).padStart(2, '0')}-${String(nd).padStart(2, '0')}`;
 }
 
+// ---- Scénarios : overrides projet (état local éditeur) ----
+
+const REAL = '__real__';   // édition directe (pas de scénario)
+const NEW_SCENARIO = '__new__';
+
+type OverrideMap = Record<string, ProjectOverride>;
+
+function overridesToArray(map: OverrideMap): ProjectOverride[] {
+  return Object.values(map).filter((o) => {
+    const { it_project_id, ...rest } = o;
+    return Object.values(rest).some((v) => v !== undefined);
+  });
+}
+function overridesToMap(arr: ProjectOverride[]): OverrideMap {
+  return Object.fromEntries((arr ?? []).map((o) => [o.it_project_id, o]));
+}
+
+/** Applique les overrides d'un scénario aux projets de la feuille de route. */
+function applyRoadmapOverrides(projects: FdrRoadmapProject[], overrides: ProjectOverride[]): FdrRoadmapProject[] {
+  if (!overrides.length) return projects;
+  const byId = new Map(overrides.map((o) => [o.it_project_id, o]));
+  return projects.map((p) => {
+    const o = byId.get(p.id);
+    if (!o) return p;
+    return {
+      ...p,
+      date_kickoff: o.date_kickoff !== undefined ? o.date_kickoff : p.date_kickoff,
+      date_mep_saisie: o.date_mep_saisie !== undefined ? o.date_mep_saisie : p.date_mep_saisie,
+      delai_projete_mois: o.delai_projete_mois !== undefined ? o.delai_projete_mois : p.delai_projete_mois,
+      echeance_cible: o.echeance_cible !== undefined ? o.echeance_cible : p.echeance_cible,
+      externe: o.externe !== undefined ? o.externe : p.externe,
+      pct_reduction_si_externe: o.pct_reduction_si_externe !== undefined ? o.pct_reduction_si_externe : p.pct_reduction_si_externe,
+      budget_externe_eur: o.budget_externe_eur !== undefined ? o.budget_externe_eur : p.budget_externe_eur,
+    };
+  });
+}
+
 // ---- Drag state ----
 
 interface DragState {
@@ -172,6 +215,49 @@ function RoadmapContent() {
   const { data: profils = [] } = useFdrProfils();
   const { activeLabels: activiteLabels } = useITActivites();
   const patchProject = usePatchFdrProject();
+
+  // ---- Scénarios (partagés avec le Plan de charge) ----
+  const { scenarios, create: createScenario, update: updateScenario, remove: removeScenario } = useFdrHireScenarios();
+  const [scenarioSel, setScenarioSel] = useState<string>(REAL);
+  const [scenarioName, setScenarioName] = useState('');
+  const [overrides, setOverrides] = useState<OverrideMap>({});
+  const [hires, setHires] = useState<SimulatedHire[]>([]);
+  const [assumptions, setAssumptions] = useState<ScenarioAssumptions>({});
+  const scenarioMode = scenarioSel !== REAL;
+  const setOverride = (id: string, patch: Partial<ProjectOverride>) =>
+    setOverrides(m => ({ ...m, [id]: { it_project_id: id, ...m[id], ...patch } }));
+  const resetOverride = (id: string) =>
+    setOverrides(m => { const n = { ...m }; delete n[id]; return n; });
+  const ovArray = useMemo(() => overridesToArray(overrides), [overrides]);
+
+  const loadScenario = (val: string) => {
+    setScenarioSel(val);
+    if (val === REAL || val === NEW_SCENARIO) {
+      setOverrides({}); setHires([]); setAssumptions({});
+      if (val === NEW_SCENARIO) setScenarioName('');
+      return;
+    }
+    const s = scenarios.find(x => x.id === val);
+    setOverrides(overridesToMap(s?.project_overrides ?? []));
+    setHires(s?.hires ?? []);
+    setAssumptions(s?.assumptions ?? {});
+    setScenarioName(s?.nom ?? '');
+  };
+  const saveScenario = () => {
+    const nom = scenarioName.trim() || 'Scénario sans nom';
+    const payload = { nom, hires, project_overrides: ovArray, assumptions };
+    if (scenarioSel !== REAL && scenarioSel !== NEW_SCENARIO) {
+      updateScenario.mutate({ id: scenarioSel, ...payload }, { onSuccess: () => toast({ title: 'Scénario mis à jour' }) });
+    } else {
+      createScenario.mutate(payload, { onSuccess: (s) => { setScenarioSel(s.id); toast({ title: 'Scénario enregistré' }); } });
+    }
+  };
+  const deleteScenario = () => {
+    if (scenarioSel === REAL || scenarioSel === NEW_SCENARIO) return;
+    removeScenario.mutate(scenarioSel, {
+      onSuccess: () => { setScenarioSel(REAL); setOverrides({}); setHires([]); setScenarioName(''); toast({ title: 'Scénario supprimé' }); },
+    });
+  };
 
   // ---- Filtres ----
   const [search, setSearch] = useState('');
@@ -326,10 +412,16 @@ function RoadmapContent() {
     };
   }, [settings, profils, horizonDebut, horizonDuree]);
 
+  // ---- Base : projets réels, ou projets + overrides du scénario actif ----
+  const baseProjects = useMemo<FdrRoadmapProject[]>(
+    () => (scenarioMode ? applyRoadmapOverrides(projects, ovArray) : projects),
+    [scenarioMode, projects, ovArray],
+  );
+
   // ---- Projets avec preview drag appliqué ----
   const previewProjects = useMemo<FdrRoadmapProject[]>(() => {
-    if (!drag || drag.delta === 0) return projects;
-    return projects.map(p => {
+    if (!drag || drag.delta === 0) return baseProjects;
+    return baseProjects.map(p => {
       if (p.id !== drag.projectId) return p;
       if (drag.mode === 'move') {
         return {
@@ -352,7 +444,7 @@ function RoadmapContent() {
         delai_projete_mois: Math.max(1, (p.delai_projete_mois ?? 1) + drag.delta),
       };
     });
-  }, [projects, drag]);
+  }, [baseProjects, drag]);
 
   // ---- Filtrage ----
   const filtered = useMemo(() => {
@@ -446,11 +538,16 @@ function RoadmapContent() {
     return out;
   }, [periods, engineSettings]);
 
-  // ---- Matrice capacité temps réel (sur TOUS les projets, pas seulement filtrés) ----
-  const matrix = useMemo(() => {
+  // ---- Cascade sous-effectif : sur les projets FILTRÉS (contexte de filtre),
+  // + renforts/externalisation du scénario actif. ----
+  const cascade = useMemo(() => {
     if (!engineSettings) return null;
-    return computeCapacityMatrix(previewProjects, engineSettings);
-  }, [previewProjects, engineSettings]);
+    const base = computeCapacityMatrix(filtered, engineSettings);
+    if (scenarioMode && hires.length > 0) {
+      return applyHires(base, hires, engineSettings.jours_productifs_mois).cascade;
+    }
+    return base.rsi_cascade;
+  }, [filtered, engineSettings, scenarioMode, hires]);
 
   // ---- Handlers drag ----
   const onBarPointerDown = (e: React.PointerEvent, p: FdrRoadmapProject, mode: 'move' | 'resize') => {
@@ -480,6 +577,26 @@ function RoadmapContent() {
     dragRef.current = null;
     setDrag(null);
     if (!st || st.delta === 0) return;
+
+    // ---- Mode scénario : on écrit dans l'override (non destructif) ----
+    if (scenarioMode) {
+      const eff = baseProjects.find(x => x.id === st.projectId);
+      if (!eff) return;
+      if (st.mode === 'move') {
+        const patch: Partial<ProjectOverride> = {};
+        if (eff.date_kickoff) patch.date_kickoff = shiftDateMonths(eff.date_kickoff, st.delta);
+        if (eff.date_mep_saisie) patch.date_mep_saisie = shiftDateMonths(eff.date_mep_saisie, st.delta);
+        if (eff.statut_portefeuille === 'Tâche permanente' && eff.echeance_cible) {
+          patch.echeance_cible = shiftDateMonths(eff.echeance_cible, st.delta);
+        }
+        setOverride(st.projectId, patch);
+      } else if (eff.statut_portefeuille === 'Tâche permanente') {
+        if (eff.echeance_cible) setOverride(st.projectId, { echeance_cible: shiftDateMonths(eff.echeance_cible, st.delta) });
+      } else {
+        setOverride(st.projectId, { delai_projete_mois: Math.max(1, (eff.delai_projete_mois ?? 1) + st.delta) });
+      }
+      return;
+    }
 
     const p = projects.find(x => x.id === st.projectId);
     if (!p) return;
@@ -553,6 +670,17 @@ function RoadmapContent() {
       toast({ title: 'Pas de date kickoff', description: 'Renseignez le kickoff dans la fiche projet.', variant: 'destructive' });
       return;
     }
+    // Mode scénario : décalage non destructif (override)
+    if (scenarioMode) {
+      const ovPatch: Partial<ProjectOverride> = {};
+      if (p.date_kickoff) ovPatch.date_kickoff = shiftDateMonths(p.date_kickoff, n);
+      if (p.date_mep_saisie) ovPatch.date_mep_saisie = shiftDateMonths(p.date_mep_saisie, n);
+      if (p.statut_portefeuille === 'Tâche permanente' && p.echeance_cible) {
+        ovPatch.echeance_cible = shiftDateMonths(p.echeance_cible, n);
+      }
+      setOverride(p.id, ovPatch);
+      return;
+    }
     const patch: Record<string, unknown> = {};
     const undoPatch: Record<string, unknown> = {};
     const changes: HistoryEntry['redo']['changes'] = [];
@@ -578,7 +706,7 @@ function RoadmapContent() {
     return <div className="space-y-3">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-16" />)}</div>;
   }
 
-  const surchargeByYm = new Map(matrix?.rsi_cascade.map(r => [r.ym, r.sous_effectif_net]) ?? []);
+  const surchargeByYm = new Map(cascade?.map(r => [r.ym, r.sous_effectif_net]) ?? []);
 
   return (
     <div className="space-y-4">
@@ -665,6 +793,54 @@ function RoadmapContent() {
             </Button>
             {patchProject.isPending && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Barre scénario (non destructif, partagé avec le Plan de charge) */}
+      <Card className="border-violet-200/70 bg-violet-50/30 dark:bg-violet-950/10">
+        <CardContent className="p-3 flex flex-wrap items-center gap-2">
+          <FlaskConical className="h-4 w-4 text-violet-600 shrink-0" />
+          <span className="text-xs font-medium">Scénario</span>
+          <Select value={scenarioSel} onValueChange={loadScenario}>
+            <SelectTrigger className="h-8 text-xs w-56"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value={REAL}>Réel (édition directe)</SelectItem>
+              <SelectItem value={NEW_SCENARIO}>— Nouveau scénario —</SelectItem>
+              {scenarios.map(s => <SelectItem key={s.id} value={s.id}>{s.nom}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          {scenarioMode ? (
+            <>
+              <Input
+                value={scenarioName} onChange={e => setScenarioName(e.target.value)}
+                placeholder="Nom du scénario" className="h-8 text-xs w-48"
+              />
+              <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs"
+                onClick={saveScenario} disabled={createScenario.isPending || updateScenario.isPending}>
+                <Save className="h-3.5 w-3.5" />
+                {scenarioSel !== REAL && scenarioSel !== NEW_SCENARIO ? 'Mettre à jour' : 'Enregistrer'}
+              </Button>
+              {scenarioSel !== REAL && scenarioSel !== NEW_SCENARIO && (
+                <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                  onClick={deleteScenario} disabled={removeScenario.isPending} title="Supprimer le scénario">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              )}
+              <Badge variant="outline" className="text-[11px] border-violet-300 text-violet-700 bg-violet-50">
+                Non destructif · {ovArray.length} projet(s) décalé(s){hires.length > 0 ? ` · ${hires.length} renfort(s)` : ''}
+              </Badge>
+              {ovArray.length > 0 && (
+                <Button size="sm" variant="ghost" className="h-8 gap-1 text-xs" onClick={() => setOverrides({})}>
+                  <RotateCcw className="h-3 w-3" />Réinitialiser les décalages
+                </Button>
+              )}
+            </>
+          ) : (
+            <span className="text-[11px] text-muted-foreground">
+              Édition directe : vos décalages modifient les dates réelles. Choisissez un scénario pour travailler en non destructif.
+            </span>
+          )}
+          <span className="ml-auto text-[11px] text-muted-foreground">Renforts (embauches/ST) : éditables dans le Plan de charge.</span>
         </CardContent>
       </Card>
 
@@ -776,10 +952,13 @@ function RoadmapContent() {
                       ymIndex={ymIndex}
                       engineSettings={engineSettings}
                       dragging={drag?.projectId === p.id}
+                      scenarioMode={scenarioMode}
+                      hasOverride={scenarioMode && ovArray.some(o => o.it_project_id === p.id)}
                       onPointerDown={onBarPointerDown}
                       onToggleFdr={() => toggleFdr(p)}
                       onChangeStatus={s => changeStatus(p, s)}
                       onShift={n => shiftProject(p, n)}
+                      onResetOverride={() => resetOverride(p.id)}
                       onOpen={() => navigate(`/it/projects/${encodeURIComponent(p.code)}/overview`)}
                     />
                   ))}
@@ -793,7 +972,7 @@ function RoadmapContent() {
             )}
 
             {/* Bandeau surcharge (pic du sous-effectif net par colonne) */}
-            {matrix && (
+            {cascade && (
               <div className="flex border-t bg-muted/30">
                 <div style={{ width: labelW }} className="shrink-0 px-3 py-1.5 text-[11px] font-medium text-muted-foreground sticky left-0 bg-muted/30">
                   Sous-effectif net (j, pic)
@@ -856,7 +1035,8 @@ function FilterSelect({ value, onChange, placeholder, options }: {
 
 function GanttRow({
   project: p, barColor, periods, todayX, labelW, showCode, ymIndex, engineSettings, dragging,
-  onPointerDown, onToggleFdr, onChangeStatus, onShift, onOpen,
+  scenarioMode, hasOverride,
+  onPointerDown, onToggleFdr, onChangeStatus, onShift, onResetOverride, onOpen,
 }: {
   project: FdrRoadmapProject;
   barColor?: string;
@@ -867,10 +1047,13 @@ function GanttRow({
   ymIndex: (ym: string | null) => number | null;
   engineSettings: FdrEngineSettings | null;
   dragging: boolean;
+  scenarioMode: boolean;
+  hasOverride: boolean;
   onPointerDown: (e: React.PointerEvent, p: FdrRoadmapProject, mode: 'move' | 'resize') => void;
   onToggleFdr: () => void;
   onChangeStatus: (s: StatutPortefeuille) => void;
   onShift: (n: number) => void;
+  onResetOverride: () => void;
   onOpen: () => void;
 }) {
   const excluded = !p.sur_feuille_de_route || p.statut_portefeuille === 'Abandonné';
@@ -921,6 +1104,7 @@ function GanttRow({
           {/* Libellé */}
           <div style={{ width: labelW }} className="shrink-0 px-3 flex items-center gap-2 sticky left-0 bg-background z-10 overflow-hidden">
             {excluded && <EyeOff className="h-3 w-3 text-muted-foreground shrink-0" />}
+            {hasOverride && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" title="Décalé dans le scénario" />}
             <span className="w-2 h-2 rounded-full shrink-0" style={{ background: statutCfg?.color ?? '#94a3b8' }} />
             <span className="text-xs truncate" title={`${p.code} — ${p.nom}`}>
               {showCode && <span className="font-mono text-[10px] text-muted-foreground mr-1.5">{p.code}</span>}
@@ -1034,6 +1218,14 @@ function GanttRow({
         <ContextMenuItem onClick={() => onShift(6)} className="gap-2 text-xs">
           <CalendarRange className="h-3.5 w-3.5" />Décaler de +6 mois
         </ContextMenuItem>
+        {scenarioMode && hasOverride && (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem onClick={onResetOverride} className="gap-2 text-xs">
+              <RotateCcw className="h-3.5 w-3.5" />Réinitialiser le décalage (scénario)
+            </ContextMenuItem>
+          </>
+        )}
       </ContextMenuContent>
     </ContextMenu>
   );

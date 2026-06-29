@@ -110,6 +110,8 @@ export function applyProjectOverrides(
       ...p,
       date_kickoff: o.date_kickoff !== undefined ? o.date_kickoff : p.date_kickoff,
       date_mep_saisie: o.date_mep_saisie !== undefined ? o.date_mep_saisie : p.date_mep_saisie,
+      delai_projete_mois: o.delai_projete_mois !== undefined ? o.delai_projete_mois : p.delai_projete_mois,
+      echeance_cible: o.echeance_cible !== undefined ? o.echeance_cible : p.echeance_cible,
       externe: o.externe !== undefined ? o.externe : p.externe,
       pct_reduction_si_externe:
         o.pct_reduction_si_externe !== undefined
