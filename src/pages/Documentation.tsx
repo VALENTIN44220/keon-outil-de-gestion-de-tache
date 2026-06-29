@@ -255,6 +255,7 @@ export default function Documentation() {
     if (p.can_access_logistique)  addItem('doc-logistique','Logistique');
     if (p.can_access_sst)         addItem('doc-sst','SST');
   }
+  addGroup('g-support','Support'); addItem('doc-bugs','Bugs & améliorations');
   if (p.can_access_templates || p.can_manage_questionnaire) { addGroup('g-config','Configuration'); addItem('doc-templates','Modèles de processus'); }
   if (showAdmin) { addGroup('g-admin','Administration'); addItem('doc-admin','Panneau Admin'); }
 
@@ -681,15 +682,15 @@ export default function Documentation() {
 
               {showBETJM && (
                 <DocBlock>
-                  <SectionHeader id="doc-be-tjm" title="Référentiel TJM" access="admin" url="/be/admin/tjm" />
+                  <SectionHeader id="doc-be-tjm" title="Référentiels TJM (BE + IT)" access="admin" url="/be/admin/tjm" />
                   <Screenshot file="11_be_tjm.jpg" />
-                  <Intro>Gestion des taux journaliers moyens par profil et par collaborateur. Ces taux sont utilisés dans les calculs de valorisation des temps pour le budget BE.</Intro>
+                  <Intro>Page unifiée des taux journaliers, accessible depuis le menu <strong>Configuration → Référentiel TJM</strong> (administrateurs uniquement). Elle regroupe désormais deux référentiels distincts : le TJM <strong>BE</strong> (taux horaires par fonction Lucca) et le TJM <strong>IT/DIGITAL</strong> (€/jour par profil FDR).</Intro>
                   <FeatureGrid features={[
-                    { title: 'TJM par profil', desc: 'Définissez un TJM par fonction métier (Ingénieur Senior, Projeteur, Chef de Projet…) qui sert de valeur par défaut.' },
-                    { title: 'TJM individuel', desc: 'Possibilité de définir un TJM spécifique par collaborateur pour surcharger la valeur du profil.' },
-                    { title: 'Historique des taux', desc: 'Les modifications sont tracées avec la date d\'entrée en vigueur pour assurer la cohérence des calculs historiques.' },
+                    { title: 'TJM BE par fonction', desc: 'Taux horaires Lucca par fonction métier, appliqués automatiquement aux temps déclarés pour valoriser le budget BE.' },
+                    { title: 'TJM IT/DIGITAL par profil', desc: 'Taux journalier (€/j) par profil FDR, utilisé pour valoriser la charge build IT dans le calcul du ROI des projets et scénarios.' },
+                    { title: 'Données confidentielles', desc: 'Référentiels réservés aux administrateurs ; ils alimentent directement les calculs budgétaires et de rentabilité.' },
                   ]} />
-                  <TipBox type="warn">Accessible aux administrateurs uniquement. Toute modification affecte les calculs budgétaires à partir de la date d'effet configurée.</TipBox>
+                  <TipBox type="warn">Accessible aux administrateurs uniquement, depuis la section Configuration du menu.</TipBox>
                 </DocBlock>
               )}
 
@@ -756,9 +757,11 @@ export default function Documentation() {
                   <DocBlock>
                     <SectionHeader id="doc-it-projects" title="Projets IT" access="double" url="/it/projects" />
                     <Screenshot file="14_it_projects.jpg" />
-                    <Intro>Liste tous les projets informatiques en cours ou planifiés avec suivi des tâches, gouvernance, timeline, budget et synchronisation avec les outils externes.</Intro>
+                    <Intro>Liste tous les projets informatiques en cours ou planifiés avec suivi des tâches, gouvernance, timeline, budget et synchronisation avec les outils externes. Deux modes d'affichage : tableau de bord (KPI + graphiques) et grille d'édition en masse.</Intro>
                     <FeatureGrid features={[
-                      { title: 'Types de projets configurables', desc: 'Projets typés (Infrastructure, Développement, ERP, Intégration…) selon une liste paramétrable par l\'administrateur.' },
+                      { title: 'Types & activités paramétrables', desc: 'Types de projet (Infrastructure, Développement, ERP…) et activités métier gérables sans développeur depuis les Paramètres FDR (ajout, renommage, ordre, activation).' },
+                      { title: 'Export Excel complet', desc: 'Le bouton "Export Excel" exporte l\'ensemble des paramètres des projets affichés (général, FDR, équipe, dates, charge build, budget, liens M365…), et plus seulement quelques colonnes.' },
+                      { title: 'Charge build en jours totaux', desc: 'La charge build par profil se saisit en jours totaux ; elle est répartie sur le « délai build projeté » pour obtenir le j/mois consommé par le plan de charge. La saisie directe en j/mois reste possible.' },
                       { title: 'Synchronisation externe', desc: 'Lien avec des projets Azure DevOps, Jira ou autres outils pour une vue consolidée.' },
                     ]} />
                     <TipBox>Nécessite la double permission : droit d'écran <strong>can_access_it_projects</strong> ET droit fonctionnel <strong>can_view_it_projects</strong>.</TipBox>
@@ -775,10 +778,11 @@ export default function Documentation() {
                   <DocBlock>
                     <SectionHeader id="doc-it-planning" title="Plan de charge IT" access="profil" url="/it/plan-de-charge" />
                     <Screenshot file="16_it_planning.jpg" />
-                    <Intro>Charge de l'équipe IT semaine par semaine, en croisant les tâches affectées et le temps disponible de chaque membre.</Intro>
+                    <Intro>Demande mensuelle par profil vs capacité, recalculée à partir des projets actifs de la feuille de route. La métrique de dimensionnement est le pic mensuel (ETP à recruter).</Intro>
                     <FeatureGrid features={[
-                      { title: 'Scénarios d\'embauche', desc: 'Simulez l\'impact d\'un recrutement sur la capacité de l\'équipe.' },
-                      { title: 'Sous-traitance', desc: 'Intégrez la capacité des sous-traitants pour une vision globale incluant les ressources externes.' },
+                      { title: 'Scénarios « what-if » (3 leviers)', desc: 'Simulez de façon non destructive : renforts (embauches / sous-traitance), décalage des dates de lancement, et externalisation par projet. Enregistrez plusieurs scénarios et comparez-les.' },
+                      { title: 'Comparateur & ROI', desc: 'Tableau comparatif des scénarios (pic ETP, mois en surcharge, projets tenables/à risque) et ROI agrégé (gain, coûts, bilan annuel, temps de retour).' },
+                      { title: 'Export Excel des scénarios', desc: 'Le bouton "Exporter scénarios" génère un classeur : une feuille de synthèse + une feuille par scénario (charge demande/capacité/écart par profil×mois, cascade RSI, ROI, leviers) — idéal pour une présentation.' },
                     ]} />
                   </DocBlock>
                 </>
@@ -910,6 +914,26 @@ export default function Documentation() {
               )}
             </>
           )}
+
+          {/* ═══════════════════════════════════════════════════════════
+              SUPPORT — Suivi des bugs & améliorations (accessible à tous)
+          ══════════════════════════════════════════════════════════════ */}
+          <GroupHeader id="g-support" title="Support" color="#ef4444" count={1} />
+          <DocBlock>
+            <SectionHeader id="doc-bugs" title="Bugs & améliorations" access="standard" url="/bugs" />
+            <Intro>Module de signalement et de suivi des bugs de l'application et des demandes d'amélioration. Accessible à tous les utilisateurs ; le triage (statut, priorité, assignation) est réservé aux administrateurs.</Intro>
+            <FeatureGrid features={[
+              { title: 'Bouton « Signaler » global', desc: 'Disponible en bas du menu latéral depuis n\'importe quel écran. L\'URL de la page et le navigateur sont capturés automatiquement pour faciliter le diagnostic.' },
+              { title: 'Bug ou amélioration', desc: 'Chaque ticket précise son type (bug / amélioration), un titre, une description, une priorité et une capture d\'écran optionnelle. Une référence unique (BUG-00001) est attribuée automatiquement.' },
+              { title: 'Triage admin', desc: 'Les administrateurs gèrent le statut (nouveau → en cours → planifié → résolu / rejeté / fermé), la priorité et l\'assignation. Chaque changement de statut est tracé dans un historique.' },
+              { title: 'Échanges & pièces jointes', desc: 'Un fil de commentaires en temps réel permet de dialoguer entre demandeur et équipe ; des pièces jointes (captures) peuvent être ajoutées.' },
+            ]} />
+            <StepsList steps={[
+              { title: 'Signaler', desc: 'Cliquez sur « Signaler un bug » dans le menu, ou sur « Nouveau signalement » depuis la page Bugs & améliorations.' },
+              { title: 'Décrire', desc: 'Choisissez bug ou amélioration, renseignez titre, description, priorité et joignez éventuellement une capture.' },
+              { title: 'Suivre', desc: 'Retrouvez tous les tickets dans la page dédiée (menu SUPPORT), suivez leur statut et commentez.' },
+            ]} />
+          </DocBlock>
 
           {/* ═══════════════════════════════════════════════════════════
               CONFIGURATION
