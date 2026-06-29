@@ -4,7 +4,7 @@ import {
   Calendar, MessageCircle, Building2, ClipboardList,
   Lightbulb, Monitor, Leaf, Euro, Map as MapIcon, Users, Wallet,
   Package, Truck, ShieldAlert, Settings2, BarChart2,
-  UserPlus, AlertTriangle, ListChecks, BookOpen, TrendingUp,
+  UserPlus, AlertTriangle, ListChecks, BookOpen, TrendingUp, Bug,
 } from 'lucide-react';
 import type { ScreenPermissionKey, FeaturePermissionKey } from '@/types/permissions';
 
@@ -128,6 +128,13 @@ export const menuGroups: MenuGroup[] = [
       { id: 'documentation', label: 'Documentation', icon: BookOpen, path: '/documentation', permissionKey: 'can_access_dashboard' },
     ],
   },
+  {
+    label: 'SUPPORT',
+    items: [
+      // Pas de permissionKey : accessible à tous les utilisateurs connectés.
+      { id: 'bugs', label: 'Bugs & améliorations', icon: Bug, path: '/bugs' },
+    ],
+  },
 ];
 
 export const adminMenuItem: SidebarMenuItem = {
@@ -152,6 +159,7 @@ export const SECTION_COLORS: Record<string, string> = {
   'ACHATS':          '#f97316', // orange-500
   'CONFIGURATION':   '#64748b', // slate-500
   'OUTILS':          '#a855f7', // purple-500
+  'SUPPORT':         '#ef4444', // red-500
 };
 
 export const getSectionColor = (label?: string) => SECTION_COLORS[label ?? ''] ?? '#64748b';

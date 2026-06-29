@@ -112,6 +112,7 @@ import ITPortfolioROI from "./pages/it/ITPortfolioROI";
 import ITRoadmap from "./pages/it/ITRoadmap";
 import ITRoadmapDefinition from "./pages/it/ITRoadmapDefinition";
 import ITRoadmapTracking from "./pages/it/ITRoadmapTracking";
+import BugTracker from "./pages/bugs/BugTracker";
 import Documentation from "./pages/Documentation";
 import SMQDashboard from "./pages/smq/SMQDashboard";
 import SMQNewDeclaration from "./pages/smq/SMQNewDeclaration";
@@ -233,6 +234,7 @@ const App = () => (
                 { path: "/it/portfolio-roi", end: true, element: <ProtectedRoute><ITProjectsAccessGate><ITPortfolioROI /></ITProjectsAccessGate></ProtectedRoute> },
 
                 { path: "/documentation", end: true, element: <ProtectedRoute><Documentation /></ProtectedRoute> },
+                { path: "/bugs", end: true, element: <ProtectedRoute><BugTracker /></ProtectedRoute> },
               ]}
             />
             <Routes>
@@ -259,6 +261,7 @@ const App = () => (
             <Route path="/calendar" element={<></>} />
             <Route path="/chat" element={<></>} />
             <Route path="/documentation" element={<></>} />
+            <Route path="/bugs" element={<></>} />
             <Route path="/suppliers" element={<></>} />
             <Route path="/innovation" element={<></>} />
             <Route path="/innovation/new" element={<></>} />

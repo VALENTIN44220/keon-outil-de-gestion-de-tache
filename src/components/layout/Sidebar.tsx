@@ -22,6 +22,7 @@ import { useIsMobile, MOBILE_BREAKPOINT } from '@/hooks/use-mobile';
 import { UserProfilePopover } from './UserProfilePopover';
 import { AppNotificationCluster } from '@/components/notifications/AppNotificationCluster';
 import { usePendingValidationRequests } from '@/hooks/usePendingValidationRequests';
+import { ReportBugButton } from '@/components/bugs/ReportBugButton';
 
 interface SidebarProps {
   activeView: string;
@@ -455,7 +456,10 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
 
           {renderNav(false, true)}
 
-          <div className="border-t border-slate-100 px-2 py-2">
+          <div className="border-t border-slate-100 px-2 pt-2">
+            <ReportBugButton collapsed={false} />
+          </div>
+          <div className="px-2 py-2">
             <AppNotificationCluster collapsed={false} />
           </div>
 
@@ -556,8 +560,11 @@ export function Sidebar({ activeView, onViewChange }: SidebarProps) {
       {/* ── Navigation ── */}
       {renderNav(collapsed, false)}
 
-      {/* ── Notifications + Profil ── */}
+      {/* ── Signaler + Notifications + Profil ── */}
       <div className="flex-shrink-0 border-t border-slate-100">
+        <div className={cn('px-2 pt-1.5', collapsed && 'px-1')}>
+          <ReportBugButton collapsed={collapsed} />
+        </div>
         <div className={cn('px-2 py-1.5', collapsed && 'px-1')}>
           <AppNotificationCluster collapsed={collapsed} />
         </div>
