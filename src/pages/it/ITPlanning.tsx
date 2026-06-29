@@ -11,8 +11,9 @@ import {
 import {
   AlertTriangle, TrendingUp, Users, RefreshCw, Info, Bookmark, RotateCcw,
   FlaskConical, Plus, X, Trash2, Loader2, Calendar, Network, Euro, Clock,
-  CheckCircle2, ChevronDown, ChevronRight, GitCompare,
+  CheckCircle2, ChevronDown, ChevronRight, GitCompare, FileSpreadsheet,
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/components/ui/tooltip';
@@ -38,6 +39,7 @@ import {
   peakOver, peakEtp, type AdjustedMatrix,
 } from '@/lib/fdr/planningSimulation';
 import { computeScenarioRoi, DEFAULT_ASSUMPTIONS, type ScenarioRoi } from '@/lib/it/scenarioRoi';
+import { buildScenariosWorkbook, type ExportScenario } from '@/lib/fdr/scenarioExport';
 import { RoiKpi } from '@/components/it/RoiKpi';
 import type { FdrProjectInput, FdrEngineSettings } from '@/types/fdr';
 import { toast } from '@/hooks/use-toast';
@@ -129,6 +131,7 @@ function PlanningContent() {
   const { data: profils = [] } = useFdrProfils();
   const { data: settings } = useFdrSettings();
   const { data: roiData } = useScenarioRoiData();
+  const { scenarios: savedScenarios } = useFdrHireScenarios();
   const activeProfils = profils.filter(p => p.actif);
   const joursProductifs = settings?.jours_productifs_mois ?? 18;
 
@@ -218,6 +221,37 @@ function PlanningContent() {
     setAssumptions(s?.assumptions ?? {});
   };
 
+  // Export Excel : baseline + tous les scénarios enregistrés (+ l'éditeur courant si modifié)
+  const handleExportScenarios = () => {
+    const list: ExportScenario[] = [
+      { nom: 'Baseline (sans levier)', hires: [], overrides: [], assumptions: {} },
+      ...savedScenarios.map(s => ({
+        nom: s.nom,
+        hires: s.hires ?? [],
+        overrides: s.project_overrides ?? [],
+        assumptions: s.assumptions ?? {},
+      })),
+    ];
+    if (hasLevers) {
+      list.push({
+        nom: 'Scénario courant (éditeur)',
+        hires,
+        overrides: overridesToArray(overrides),
+        assumptions,
+      });
+    }
+    const wb = buildScenariosWorkbook({
+      inputs, engineSettings, activeProfils, joursProductifs, roiData, scenarios: list,
+    });
+    const d = new Date();
+    const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    XLSX.writeFile(wb, `Plan_de_charge_scenarios_${stamp}.xlsx`);
+    toast({
+      title: `${list.length} scénario(s) exporté(s)`,
+      description: 'Classeur Excel : 1 feuille de synthèse + 1 feuille par scénario (charge, cascade, ROI).',
+    });
+  };
+
   return (
     <div className="space-y-6">
       {/* KPI bar + toolbar */}
@@ -278,6 +312,11 @@ function PlanningContent() {
             onClick={() => { resetView(); setYearGran({}); toast({ title: 'Vue réinitialisée' }); }}
             title="Réinitialiser la granularité">
             <RotateCcw className="h-3.5 w-3.5" />
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExportScenarios} className="h-7 gap-1.5 text-xs"
+            title="Exporter le plan de charge de tous les scénarios (Excel)">
+            <FileSpreadsheet className="h-3.5 w-3.5" />
+            Exporter scénarios
           </Button>
           <Button variant="ghost" size="sm" onClick={() => refetch()} disabled={isFetching} className="h-7 gap-1.5">
             <RefreshCw className={cn('h-3.5 w-3.5', isFetching && 'animate-spin')} />
