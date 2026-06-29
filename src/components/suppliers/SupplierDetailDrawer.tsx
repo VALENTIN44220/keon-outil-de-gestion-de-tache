@@ -266,11 +266,20 @@ export function SupplierDetailDrawer({ supplierId, open, onClose, canEdit = true
           "validated_by_achats_user_id",
           "validated_by_compta_at",
           "validated_by_compta_user_id",
+          // Colonne générée (COALESCE famille/famille_source_initiale) : NON modifiable
+          // → l'inclure dans l'UPDATE fait échouer toute sauvegarde.
+          "famille_effective",
+          // Champs dérivés du CA réel (vue Divalto), jamais stockés sur cette table.
+          "ca_realise_total",
+          "ca_realise_annee_courante",
+          "ca_realise_annee_precedente",
+          "nb_factures_total",
+          "derniere_facture_at",
         ]);
         const payload = Object.fromEntries(
           Object.entries(pendingSave as Record<string, unknown>).filter(([k]) => !stripKeys.has(k)),
         );
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from("supplier_purchase_enrichment")
           .update(payload)
           .eq("id", supplierId);
@@ -279,6 +288,12 @@ export function SupplierDetailDrawer({ supplierId, open, onClose, canEdit = true
         setTimeout(() => setSaveStatus("idle"), 1500);
       } catch (e) {
         setSaveStatus("error");
+        console.error("[SupplierDetailDrawer] save error:", e);
+        toast({
+          title: "Erreur de sauvegarde",
+          description: e instanceof Error ? e.message : "Impossible d'enregistrer les modifications.",
+          variant: "destructive",
+        });
       } finally {
         setPendingSave(null);
       }
