@@ -33,6 +33,7 @@ import {
   useBEProfilesPostes,
   useUpdateProfileBEFonction,
 } from '@/hooks/useBEProfilesPostes';
+import { ITTjmReferentielCard } from '@/components/it/ITTjmReferentielCard';
 import { cn } from '@/lib/utils';
 
 const eurH = (n: number | null | undefined) =>
@@ -117,7 +118,7 @@ function BEAdminTJMContent() {
             <div className="p-2 rounded-xl bg-violet-500/10">
               <Coins className="h-7 w-7 text-violet-500" />
             </div>
-            Référentiel TJM BE
+            Référentiels TJM
           </h1>
           <p className="text-muted-foreground mt-2 text-sm">
             Les taux horaires Lucca sont appliqués automatiquement via le titre de poste du collaborateur.
@@ -316,6 +317,9 @@ function BEAdminTJMContent() {
             )}
           </CardContent>
         </Card>
+
+        {/* Référentiel TJM IT/DIGITAL (€/jour par profil FDR — calcul ROI) */}
+        <ITTjmReferentielCard />
       </div>
     </Layout>
   );
