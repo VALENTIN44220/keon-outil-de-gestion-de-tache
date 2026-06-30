@@ -35,6 +35,7 @@ import {
   Flag, ListChecks, MessageSquare, User, Workflow, AlertTriangle,
   ShieldCheck, FileText, Loader2, Ban, UserPlus, Hourglass, Sparkles,
   Paperclip, Link as LinkIcon, ExternalLink, Download, Plus, X, Trash2, Copy,
+  Play, Check, RotateCcw, Users,
 } from 'lucide-react';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -47,6 +48,9 @@ import { TaskCommentsSection } from '@/components/tasks/TaskCommentsSection';
 import { getBEStatusMeta } from '@/hooks/useBETaskStatus';
 import { useRequestStates, macroStateColor } from '@/hooks/useRequestStates';
 import { toast } from 'sonner';
+import { TaskChecklist } from '@/components/tasks/TaskChecklist';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import { useSimulation } from '@/contexts/SimulationContext';
 
 // ─── Métadonnées statut ─────────────────────────────────────────────────
 const STATUS_META: Record<string, { label: string; chip: string; dot: string }> = {
@@ -83,6 +87,11 @@ export default function RequestDetail() {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const { isAdmin } = useUserRole();
+  const { isSimulating, simulatedProfile } = useSimulation();
+  // Profil « courant perçu » : en simulation QA, on raisonne comme l'utilisateur
+  // simulé (et on le traite comme non-admin) pour refléter son expérience réelle.
+  const myProfile = isSimulating && simulatedProfile ? simulatedProfile : profile;
+  const effIsAdmin = isAdmin && !isSimulating;
 
   const [activeView, setActiveView] = useState('requests');
   const [activeTab, setActiveTab] = useState<'steps' | 'synthesis'>('steps');
@@ -100,6 +109,10 @@ export default function RequestDetail() {
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
 
+  // Réaffectation / progression de statut (vue étape)
+  const [assignableProfiles, setAssignableProfiles] = useState<Array<{ id: string; display_name: string | null; job_title: string | null }>>([]);
+  const [actionBusy, setActionBusy] = useState(false);
+
   // Ajout de pièces jointes / liens
   const [newLinkUrl, setNewLinkUrl] = useState('');
   const [newLinkLabel, setNewLinkLabel] = useState('');
@@ -113,6 +126,16 @@ export default function RequestDetail() {
 
   // ─── Fetch ──────────────────────────────────────────────────────
   useEffect(() => { if (taskId) void load(); }, [taskId]); // eslint-disable-line
+
+  // Profils actifs pour la réaffectation (chargé une fois)
+  useEffect(() => {
+    void (async () => {
+      const { data } = await supabase
+        .from('profiles').select('id, display_name, job_title')
+        .eq('status', 'active').order('display_name');
+      if (data) setAssignableProfiles(data as any);
+    })();
+  }, []);
 
   const load = async () => {
     if (!taskId) return;
@@ -361,6 +384,33 @@ export default function RequestDetail() {
     await refreshAttachments();
   };
 
+  // ─── Statut & réaffectation (vue étape) ────────────────────────
+  const updateTaskStatus = async (newStatus: string, label: string) => {
+    if (!task) return;
+    setActionBusy(true);
+    const patch: any = { status: newStatus, updated_at: new Date().toISOString() };
+    if (newStatus === 'done') patch.completed_at = new Date().toISOString();
+    if (newStatus === 'in-progress') patch.completed_at = null;
+    const { error } = await supabase.from('tasks').update(patch).eq('id', task.id);
+    setActionBusy(false);
+    if (error) { toast.error(`Erreur : ${error.message}`); return; }
+    toast.success(label);
+    await load();
+  };
+
+  const reassign = async (newAssigneeId: string | null) => {
+    if (!task) return;
+    if (newAssigneeId === ((task as any).assignee_id ?? null)) return; // pas de changement
+    setActionBusy(true);
+    const { error } = await supabase.from('tasks')
+      .update({ assignee_id: newAssigneeId, updated_at: new Date().toISOString() })
+      .eq('id', task.id);
+    setActionBusy(false);
+    if (error) { toast.error(`Erreur de réaffectation : ${error.message}`); return; }
+    toast.success(newAssigneeId ? 'Tâche réaffectée' : 'Tâche désaffectée');
+    await load();
+  };
+
   // ─── Loading ──────────────────────────────────────────────────
   if (isLoading || !task) {
     return (
@@ -387,6 +437,17 @@ export default function RequestDetail() {
 
   // Consulte-t-on une ÉTAPE (tâche enfant) plutôt qu'une demande ?
   const isStep = (task as any).type !== 'request';
+
+  // Droits d'action sur une étape (progression de statut / réaffectation).
+  // Les étapes BE ont leur propre flux (be_status + dispatch) → on n'expose pas
+  // les actions génériques pour elles.
+  const myId = myProfile?.id;
+  const isAssignee = (task as any).assignee_id === myId;
+  const isRequester = (task as any).requester_id === myId || (task as any).user_id === myId;
+  const isGenericStep = isStep && (task as any).be_status == null;
+  const stepStatus = task.status as string;
+  const canExecuteStep = isGenericStep && stepStatus !== 'cancelled' && (isAssignee || effIsAdmin);
+  const canReassignStep = isGenericStep && stepStatus !== 'cancelled' && (effIsAdmin || isRequester);
 
   // Qui peut ajouter/supprimer des pièces jointes : admin, demandeur, ou
   // l'assigné (pour une étape). Pas sur une demande annulée.
@@ -560,6 +621,76 @@ export default function RequestDetail() {
       </CardContent>
     </Card>
   );
+
+  // ─── Carte « Action » (vue étape) : progression de statut + réaffectation ──
+  const stepActionsCard = (canExecuteStep || canReassignStep) ? (
+    <Card className="overflow-hidden shadow-sm border-emerald-200">
+      <CardHeader className="pb-3 border-b bg-gradient-to-r from-emerald-50/70 to-blue-50/40">
+        <CardTitle className="text-base font-semibold flex items-center gap-2">
+          <Play className="h-4 w-4" />
+          Action
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-4 space-y-4">
+        {canExecuteStep && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {(stepStatus === 'todo' || stepStatus === 'to_assign') && (
+              <Button onClick={() => updateTaskStatus('in-progress', 'Tâche démarrée')} disabled={actionBusy} className="gap-2">
+                {actionBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                Démarrer
+              </Button>
+            )}
+            {stepStatus === 'in-progress' && (
+              <Button onClick={() => updateTaskStatus('done', 'Tâche terminée')} disabled={actionBusy} className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
+                {actionBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                Marquer terminée
+              </Button>
+            )}
+            {(stepStatus === 'done' || stepStatus === 'validated') && (
+              <Button variant="outline" onClick={() => updateTaskStatus('in-progress', 'Tâche rouverte')} disabled={actionBusy} className="gap-2">
+                {actionBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+                Rouvrir
+              </Button>
+            )}
+          </div>
+        )}
+        {canReassignStep && (
+          <div className="space-y-2">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Users className="h-3 w-3" /> Affectation
+            </p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="min-w-[240px] flex-1">
+                <SearchableSelect
+                  value={(task as any).assignee_id || 'none'}
+                  onValueChange={(v) => reassign(v === 'none' ? null : v)}
+                  disabled={actionBusy}
+                  placeholder="Sélectionner un exécutant"
+                  searchPlaceholder="Rechercher un collaborateur…"
+                  options={[
+                    { value: 'none', label: 'Non affectée' },
+                    ...assignableProfiles.map(p => ({
+                      value: p.id,
+                      label: `${p.display_name || 'Sans nom'}${p.job_title ? ` — ${p.job_title}` : ''}`,
+                    })),
+                  ]}
+                />
+              </div>
+              {(task as any).assignee_id && (
+                <Button
+                  variant="outline" size="sm"
+                  onClick={() => reassign(null)} disabled={actionBusy}
+                  className="gap-1.5 text-muted-foreground"
+                >
+                  <X className="h-3.5 w-3.5" /> Désaffecter
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  ) : null;
 
   return (
     <div className="flex h-screen">
@@ -785,6 +916,21 @@ export default function RequestDetail() {
                         )}
                       </InfoBlock>
                     </div>
+                  </CardContent>
+                </Card>
+
+                {stepActionsCard}
+
+                {/* Sous-tâches (checklist créée avec la demande) */}
+                <Card className="overflow-hidden shadow-sm">
+                  <CardHeader className="pb-3 border-b bg-gradient-to-r from-blue-50/60 to-violet-50/40">
+                    <CardTitle className="text-base font-semibold flex items-center gap-2">
+                      <ListChecks className="h-4 w-4" />
+                      Sous-tâches
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4">
+                    <TaskChecklist taskId={task.id} />
                   </CardContent>
                 </Card>
 
