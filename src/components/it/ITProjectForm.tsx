@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,6 +14,7 @@ import { useITProjectTypes } from '@/hooks/useITProjectTypes';
 import { useFdrProfils } from '@/hooks/useFdrSettings';
 import { useITActivites } from '@/hooks/useITActivites';
 import { useITProjectLoad, useUpsertITProjectLoad } from '@/hooks/useITProjectLoad';
+import { generateHorizon } from '@/lib/fdr/calculationEngine';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { Monitor, Users, Euro, Link2, MessageSquareText, Loader2, Target, BarChart3 } from 'lucide-react';
@@ -91,6 +92,10 @@ export function ITProjectForm({ project, onSaved, onCancel }: ITProjectFormProps
   const [pctAvancement, setPctAvancement] = useState('0');
   // Ventilation build par profil : map profil_id → j_mois (string pour l'input)
   const [loadMap, setLoadMap] = useState<Record<string, string>>({});
+  // Détail mensuel optionnel : profil_id → { 'YYYY-MM': j_mois (string) }
+  const [monthsMap, setMonthsMap] = useState<Record<string, Record<string, string>>>({});
+  // Profils en mode « détaillé par mois »
+  const [detailedProfils, setDetailedProfils] = useState<Set<string>>(new Set());
 
   // Profils FDR (pour la ventilation build)
   const { data: fdrProfils = [] } = useFdrProfils();
@@ -185,10 +190,20 @@ export function ITProjectForm({ project, onSaved, onCancel }: ITProjectFormProps
   useEffect(() => {
     if (existingLoads.length === 0 || fdrProfils.length === 0) return;
     const map: Record<string, string> = {};
+    const mmap: Record<string, Record<string, string>> = {};
+    const detailed = new Set<string>();
     for (const l of existingLoads) {
       map[l.profil_id] = String(l.j_mois);
+      if (l.months && Object.keys(l.months).length > 0) {
+        detailed.add(l.profil_id);
+        mmap[l.profil_id] = Object.fromEntries(
+          Object.entries(l.months).map(([ym, v]) => [ym, String(v)]),
+        );
+      }
     }
     setLoadMap(map);
+    setMonthsMap(mmap);
+    setDetailedProfils(detailed);
   }, [existingLoads, fdrProfils]);
 
   const resetForm = () => {
@@ -230,6 +245,8 @@ export function ITProjectForm({ project, onSaved, onCancel }: ITProjectFormProps
     setSurFdr(true);
     setPctAvancement('0');
     setLoadMap({});
+    setMonthsMap({});
+    setDetailedProfils(new Set());
   };
 
   const orderedActivePhases = IT_PROJECT_PHASES
@@ -268,11 +285,49 @@ export function ITProjectForm({ project, onSaved, onCancel }: ITProjectFormProps
     if (isNaN(total) || delaiNum <= 0) return;
     setLoadMap(m => ({ ...m, [profilId]: String(Math.round((total / delaiNum) * 10000) / 10000) }));
   };
-  // Total build cumulé (tous profils) en jours
+  // ─── Détail mensuel de la charge build ───────────────────────────────────
+  // Mois de la fenêtre build = kickoff → kickoff + délai (YYYY-MM).
+  const buildMonths = useMemo<string[]>(() => {
+    if (!dateKickoff || delaiNum <= 0) return [];
+    const start = dateKickoff.slice(0, 7);
+    return generateHorizon(start, Math.min(delaiNum, 36));
+  }, [dateKickoff, delaiNum]);
+  const fmtMonth = (ym: string) => {
+    const [y, m] = ym.split('-');
+    return `${m}/${y.slice(2)}`;
+  };
+  const isDetailed = (profilId: string) => detailedProfils.has(profilId);
+  /** Total jours d'un profil : Σ mois si détaillé, sinon j/mois × délai. */
+  const profilTotalJours = (profilId: string): number => {
+    if (isDetailed(profilId)) {
+      return round1(Object.values(monthsMap[profilId] ?? {}).reduce((s, v) => s + (parseFloat(v) || 0), 0));
+    }
+    return round1((parseFloat(loadMap[profilId] || '0') || 0) * delaiNum);
+  };
+  const setMonthValue = (profilId: string, ym: string, val: string) =>
+    setMonthsMap(m => ({ ...m, [profilId]: { ...(m[profilId] ?? {}), [ym]: val } }));
+  /** Bascule un profil entre uniforme et détaillé (pré-remplit la grille depuis le j/mois). */
+  const toggleDetailed = (profilId: string) => {
+    setDetailedProfils(prev => {
+      const next = new Set(prev);
+      if (next.has(profilId)) {
+        next.delete(profilId);
+      } else {
+        next.add(profilId);
+        const jm = loadMap[profilId] && parseFloat(loadMap[profilId]) > 0 ? loadMap[profilId] : '';
+        setMonthsMap(m => {
+          if (m[profilId] && Object.keys(m[profilId]).length > 0) return m; // garde l'existant
+          const grid: Record<string, string> = {};
+          for (const ym of buildMonths) grid[ym] = jm;
+          return { ...m, [profilId]: grid };
+        });
+      }
+      return next;
+    });
+  };
+  // Total build cumulé (tous profils) en jours (détaillé ou uniforme)
   const totalBuildJours = round1(
-    fdrProfils
-      .filter(p => p.actif)
-      .reduce((s, p) => s + (parseFloat(loadMap[p.id] || '0') || 0) * delaiNum, 0),
+    fdrProfils.filter(p => p.actif).reduce((s, p) => s + profilTotalJours(p.id), 0),
   );
 
   const handleSubmit = async () => {
@@ -343,7 +398,17 @@ export function ITProjectForm({ project, onSaved, onCancel }: ITProjectFormProps
     if (savedId) {
       const loads = fdrProfils
         .filter(p => p.actif)
-        .map(p => ({ profil_id: p.id, j_mois: parseFloat(loadMap[p.id] || '0') || 0 }));
+        .map(p => {
+          const detailed = detailedProfils.has(p.id);
+          const months = detailed
+            ? Object.fromEntries(
+                Object.entries(monthsMap[p.id] ?? {})
+                  .map(([ym, v]) => [ym, parseFloat(v) || 0] as const)
+                  .filter(([, v]) => v > 0),
+              )
+            : null;
+          return { profil_id: p.id, j_mois: parseFloat(loadMap[p.id] || '0') || 0, months };
+        });
       await upsertLoad.mutateAsync({ projectId: savedId, loads });
     }
 
@@ -746,34 +811,64 @@ export function ITProjectForm({ project, onSaved, onCancel }: ITProjectFormProps
                     Renseignez le « Délai build projeté » ci-dessus pour saisir en jours totaux. En attendant, saisissez le j/mois.
                   </p>
                 )}
+                <p className="text-[11px] text-muted-foreground">
+                  « Par mois » : varier la charge d'un mois sur l'autre et/ou décaler le démarrage d'un profil
+                  (le 1er mois renseigné = début). Nécessite kickoff + délai build.
+                </p>
                 {fdrProfils.filter(p => p.actif).length === 0 ? (
                   <p className="text-xs text-muted-foreground">Aucun profil défini. Configurez les profils dans Paramètres FDR.</p>
                 ) : (
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-3 pb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                      <span className="flex-1">Profil</span>
-                      <span className="w-24 text-right">Charge totale (j)</span>
-                      <span className="w-24 text-right">j / mois</span>
-                    </div>
-                    {fdrProfils.filter(p => p.actif).map(p => (
-                      <div key={p.id} className="flex items-center gap-3">
-                        <span className="text-xs flex-1 truncate">{p.nom}</span>
-                        <Input
-                          type="number" min={0} step={1}
-                          value={totalForProfil(p.id)}
-                          onChange={e => setTotalForProfil(p.id, e.target.value)}
-                          disabled={delaiNum <= 0}
-                          placeholder={delaiNum <= 0 ? '—' : '0'}
-                          className="h-7 w-24 text-right text-sm tabular-nums"
-                        />
-                        <Input
-                          type="number" min={0} step={0.5}
-                          value={loadMap[p.id] ?? '0'}
-                          onChange={e => setLoadMap(m => ({ ...m, [p.id]: e.target.value }))}
-                          className="h-7 w-24 text-right text-sm tabular-nums text-muted-foreground"
-                        />
-                      </div>
-                    ))}
+                  <div className="space-y-2">
+                    {fdrProfils.filter(p => p.actif).map(p => {
+                      const detailed = isDetailed(p.id);
+                      return (
+                        <div key={p.id} className="rounded-md border border-border/40 bg-background/40 p-2 space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs flex-1 truncate font-medium">{p.nom}</span>
+                            {!detailed ? (
+                              <>
+                                <div className="flex items-center gap-1">
+                                  <Input type="number" min={0} step={1} value={totalForProfil(p.id)}
+                                    onChange={e => setTotalForProfil(p.id, e.target.value)}
+                                    disabled={delaiNum <= 0} placeholder={delaiNum <= 0 ? '—' : '0'}
+                                    className="h-7 w-20 text-right text-sm tabular-nums" />
+                                  <span className="text-[10px] text-muted-foreground w-8">j tot.</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <Input type="number" min={0} step={0.5} value={loadMap[p.id] ?? '0'}
+                                    onChange={e => setLoadMap(m => ({ ...m, [p.id]: e.target.value }))}
+                                    className="h-7 w-20 text-right text-sm tabular-nums text-muted-foreground" />
+                                  <span className="text-[10px] text-muted-foreground w-10">j/mois</span>
+                                </div>
+                              </>
+                            ) : (
+                              <span className="text-xs text-violet-700 tabular-nums">{profilTotalJours(p.id)} j au total</span>
+                            )}
+                            <Button type="button" variant={detailed ? 'default' : 'outline'} size="sm"
+                              className="h-7 px-2 text-[11px]"
+                              disabled={buildMonths.length === 0}
+                              title={buildMonths.length === 0 ? 'Renseignez kickoff + délai build pour détailler par mois' : undefined}
+                              onClick={() => toggleDetailed(p.id)}>
+                              {detailed ? 'Uniforme' : 'Par mois'}
+                            </Button>
+                          </div>
+                          {detailed && buildMonths.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                              {buildMonths.map(ym => (
+                                <div key={ym} className="flex flex-col items-center">
+                                  <span className="text-[9px] text-muted-foreground">{fmtMonth(ym)}</span>
+                                  <Input type="number" min={0} step={0.5}
+                                    value={monthsMap[p.id]?.[ym] ?? ''}
+                                    onChange={e => setMonthValue(p.id, ym, e.target.value)}
+                                    placeholder="0"
+                                    className="h-7 w-12 text-center text-xs tabular-nums px-1" />
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>

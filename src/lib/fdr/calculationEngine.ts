@@ -153,9 +153,16 @@ export function computeProjectMonthLoads(
 
   const factor = p.externe ? (1 - p.pct_reduction_si_externe) : 1;
 
-  const buildLoads = (): FdrMonthlyLoad[] =>
+  // Charge build d'un profil pour un mois donné :
+  //  - profil « détaillé » (months non vide) → valeur du mois (0 = pas démarré / vide)
+  //  - sinon → j/mois uniforme
+  const buildLoads = (ym: string): FdrMonthlyLoad[] =>
     p.loads
-      .map(l => ({ profil_code: l.profil_code, j_mois: l.j_mois * factor }))
+      .map(l => {
+        const isDetailed = !!l.months && Object.keys(l.months).length > 0;
+        const base = isDetailed ? (l.months![ym] ?? 0) : l.j_mois;
+        return { profil_code: l.profil_code, j_mois: base * factor };
+      })
       .filter(l => l.j_mois > 0);
 
   const suiviLoads = (): FdrMonthlyLoad[] => {
@@ -172,10 +179,10 @@ export function computeProjectMonthLoads(
       toYM(p.echeance_cible) ??
       settings.echeance_standard_permanentes;
 
-    if (!kickoff) return buildLoads(); // pas de date → toujours actif
+    if (!kickoff) return buildLoads(ym); // pas de date → toujours actif
 
     if (cmpYM(ym, kickoff) >= 0 && cmpYM(ym, echeance) <= 0) {
-      return buildLoads();
+      return buildLoads(ym);
     }
     return [];
   }
@@ -191,12 +198,12 @@ export function computeProjectMonthLoads(
 
   if (mepRetenue === null) {
     // Pas de MEP définie → perpetuel build
-    return buildLoads();
+    return buildLoads(ym);
   }
 
   if (cmpYM(ym, mepRetenue) < 0) {
     // Phase build : kickoff ≤ m < mep_retenue
-    return buildLoads();
+    return buildLoads(ym);
   }
 
   // Phase suivi : m ≥ mep_retenue
@@ -222,7 +229,40 @@ export function getMepRetenue(p: FdrProjectInput): string | null {
  */
 export function totalBuildNet(p: FdrProjectInput): number {
   const factor = p.externe ? (1 - p.pct_reduction_si_externe) : 1;
-  return p.loads.reduce((s, l) => s + l.j_mois * factor, 0);
+  const isDetailed = (l: FdrProjectInput['loads'][number]) => !!l.months && Object.keys(l.months).length > 0;
+  const hasDetailed = p.loads.some(isDetailed);
+  if (!hasDetailed) {
+    return p.loads.reduce((s, l) => s + l.j_mois, 0) * factor;
+  }
+  // Pic mensuel = max sur les mois de (Σ profils uniformes + Σ profils détaillés ce mois-là)
+  const uniform = p.loads.filter(l => !isDetailed(l)).reduce((s, l) => s + l.j_mois, 0);
+  const months = new Set<string>();
+  for (const l of p.loads) if (l.months) for (const k of Object.keys(l.months)) months.add(k);
+  let peak = uniform;
+  for (const ym of months) {
+    let s = uniform;
+    for (const l of p.loads) if (isDetailed(l)) s += (l.months![ym] ?? 0);
+    if (s > peak) peak = s;
+  }
+  return peak * factor;
+}
+
+/**
+ * Charge build TOTALE (jours, tous profils) d'un projet sur sa durée.
+ *  - profil détaillé : somme des mois saisis.
+ *  - profil uniforme : j/mois × delai_projete_mois (ou 0 si délai non renseigné).
+ * Le facteur d'externalisation n'est PAS appliqué (charge brute) — appliquez-le à l'appel si besoin.
+ */
+export function totalBuildDays(p: FdrProjectInput): number {
+  const duree = p.delai_projete_mois ?? 0;
+  let total = 0;
+  for (const l of p.loads) {
+    const isDetailed = !!l.months && Object.keys(l.months).length > 0;
+    total += isDetailed
+      ? Object.values(l.months!).reduce((s, v) => s + (Number(v) || 0), 0)
+      : (l.j_mois * duree);
+  }
+  return total;
 }
 
 /**

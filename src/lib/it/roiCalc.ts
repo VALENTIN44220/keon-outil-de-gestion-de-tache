@@ -21,7 +21,11 @@ export function computeRoi(
   for (const load of loads) {
     const code = load.profil?.code ?? '';
     const tjm = tjmMap[code] ?? 0;
-    const jBuild = load.j_mois * duree;
+    // profil détaillé : Σ des mois saisis ; sinon j/mois × durée build
+    const isDetailed = !!load.months && Object.keys(load.months).length > 0;
+    const jBuild = isDetailed
+      ? Object.values(load.months!).reduce((s, v) => s + (Number(v) || 0), 0)
+      : load.j_mois * duree;
     total_j_build += jBuild;
     rh_it_eur += jBuild * tjm;
   }

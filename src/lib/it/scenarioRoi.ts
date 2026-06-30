@@ -67,11 +67,16 @@ export function computeScenarioRoi(
     // COGS = budget externe si externalisé
     if (p.externe) cogs_eur += p.budget_externe_eur ?? 0;
 
-    // RH IT BUILD : j/mois × durée × TJM (sur la charge nette du scénario)
+    // RH IT BUILD : jours build × TJM (sur la charge nette du scénario)
+    //  - profil détaillé : Σ des mois saisis ; sinon j/mois × durée.
     const factor = p.externe ? 1 - (p.pct_reduction_si_externe ?? 0) : 1;
     for (const l of p.loads) {
       const tjm = tjmMap[l.profil_code] ?? 0;
-      rh_build_eur += l.j_mois * factor * duree * tjm;
+      const isDetailed = !!l.months && Object.keys(l.months).length > 0;
+      const buildDays = isDetailed
+        ? Object.values(l.months).reduce((s, v) => s + (Number(v) || 0), 0)
+        : l.j_mois * duree;
+      rh_build_eur += buildDays * factor * tjm;
     }
 
     // RH HORS IT BUILD + GAIN annuel

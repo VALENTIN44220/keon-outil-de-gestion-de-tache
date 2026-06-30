@@ -46,7 +46,7 @@ import { useITProjectLoad } from '@/hooks/useITProjectLoad';
 import { useITProjectBudget } from '@/hooks/useITProjectBudget';
 import { useFdrProfils } from '@/hooks/useFdrSettings';
 import { useITProjectTypes } from '@/hooks/useITProjectTypes';
-import { getMepRetenue, totalBuildNet, toYM } from '@/lib/fdr/calculationEngine';
+import { getMepRetenue, totalBuildNet, totalBuildDays, toYM } from '@/lib/fdr/calculationEngine';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -127,7 +127,7 @@ export default function ITProjectHubOverview() {
       delai_projete_mois: project.delai_projete_mois ?? null,
       echeance_cible: project.echeance_cible ?? null,
       suivi_j_mois: project.suivi_j_mois ?? 0,
-      loads: projectLoads.map(l => ({ profil_code: (l.profil as any)?.code ?? '', j_mois: l.j_mois })),
+      loads: projectLoads.map(l => ({ profil_code: (l.profil as any)?.code ?? '', j_mois: l.j_mois, months: l.months })),
       externe: project.externe ?? false,
       pct_reduction_si_externe: project.pct_reduction_si_externe ?? 0,
     };
@@ -140,16 +140,22 @@ export default function ITProjectHubOverview() {
     const buildNet = totalBuildNet(fdrInput);
     const profilName = (code: string | null | undefined) =>
       fdrProfils.find(p => p.code === code)?.nom ?? code ?? '—';
-    const delai = fdrInput.delai_projete_mois ?? null;
+    const joursTotal = Math.round(totalBuildDays(fdrInput) * 10) / 10;
     return {
       isPermanente,
       mepRetenue: mep,
-      buildNet,
-      buildJours: delai ? Math.round(buildNet * delai * 10) / 10 : null,
+      buildNet, // pic mensuel
+      buildJours: joursTotal > 0 ? joursTotal : null,
       suivi: fdrInput.suivi_j_mois,
       ventilation: projectLoads
-        .filter(l => l.j_mois > 0)
-        .map(l => ({ nom: (l.profil as any)?.nom ?? '—', j_mois: l.j_mois })),
+        .map(l => {
+          const detailed = !!l.months && Object.keys(l.months).length > 0;
+          const totalJ = detailed
+            ? Math.round(Object.values(l.months!).reduce((s, v) => s + (Number(v) || 0), 0) * 10) / 10
+            : null;
+          return { nom: (l.profil as any)?.nom ?? '—', j_mois: l.j_mois, detailed, totalJ };
+        })
+        .filter(v => v.j_mois > 0 || (v.totalJ ?? 0) > 0),
       profilPrincipalNom: profilName(fdrInput.profil_principal),
     };
   }, [fdrInput, projectLoads, fdrProfils]);
@@ -329,7 +335,9 @@ export default function ITProjectHubOverview() {
                           {charge.ventilation.map((v, i) => (
                             <div key={i} className="flex items-center justify-between text-xs">
                               <span className="text-muted-foreground">{v.nom}</span>
-                              <span className="tabular-nums font-medium">{v.j_mois} j/mois</span>
+                              <span className="tabular-nums font-medium">
+                                {v.detailed ? `${v.totalJ} j (mensualisé)` : `${v.j_mois} j/mois`}
+                              </span>
                             </div>
                           ))}
                           {charge.suivi > 0 && (

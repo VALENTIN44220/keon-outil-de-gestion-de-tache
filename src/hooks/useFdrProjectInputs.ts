@@ -38,19 +38,42 @@ export function useFdrProjectInputs() {
         `);
       if (pErr) throw pErr;
 
-      // 2. Récupère toute la ventilation build
+      // 2. Récupère toute la ventilation build (j/mois uniforme)
       const { data: loads, error: lErr } = await supabase
         .from('it_project_load')
         .select('it_project_id, profil_id, j_mois, profil:fdr_profils(code)');
       if (lErr) throw lErr;
 
-      // Index loads par projet
-      const loadsByProject: Record<string, Array<{ profil_code: string; j_mois: number }>> = {};
+      // 2bis. Détail mensuel optionnel
+      const { data: monthRows } = await (supabase as any)
+        .from('it_project_load_months')
+        .select('it_project_id, j_mois, ym, profil:fdr_profils(code)');
+      // proj → code → { ym: j_mois }
+      const monthsMap: Record<string, Record<string, Record<string, number>>> = {};
+      for (const m of (monthRows ?? []) as any[]) {
+        const code = m.profil?.code;
+        if (!code) continue;
+        ((monthsMap[m.it_project_id] ??= {})[code] ??= {})[m.ym] = Number(m.j_mois) || 0;
+      }
+
+      // Index loads par projet (+ attache le détail mensuel)
+      const loadsByProject: Record<string, Array<{ profil_code: string; j_mois: number; months?: Record<string, number> }>> = {};
+      const seen: Record<string, Set<string>> = {};
       for (const l of loads ?? []) {
         const code = (l.profil as any)?.code;
         if (!code) continue;
-        if (!loadsByProject[l.it_project_id]) loadsByProject[l.it_project_id] = [];
-        loadsByProject[l.it_project_id].push({ profil_code: code, j_mois: l.j_mois });
+        (loadsByProject[l.it_project_id] ??= []).push({
+          profil_code: code, j_mois: l.j_mois, months: monthsMap[l.it_project_id]?.[code],
+        });
+        (seen[l.it_project_id] ??= new Set()).add(code);
+      }
+      // Profils ayant uniquement du détail mensuel (pas de ligne it_project_load)
+      for (const [proj, byCode] of Object.entries(monthsMap)) {
+        for (const code of Object.keys(byCode)) {
+          if (!seen[proj]?.has(code)) {
+            (loadsByProject[proj] ??= []).push({ profil_code: code, j_mois: 0, months: byCode[code] });
+          }
+        }
       }
 
       // 3. Transforme en FdrProjectInput

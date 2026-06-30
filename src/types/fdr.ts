@@ -78,6 +78,8 @@ export interface ITProjectLoad {
   it_project_id: string;
   profil_id: string;
   j_mois: number;
+  /** Détail mensuel optionnel { 'YYYY-MM': j_mois }. Si présent/non vide → profil « détaillé ». */
+  months?: Record<string, number>;
   profil?: FdrProfil | null;
   created_at?: string;
   updated_at?: string;
@@ -121,7 +123,9 @@ export interface FdrProjectInput {
   delai_projete_mois?: number | null;
   echeance_cible?: string | null;        // idem
   suivi_j_mois: number;
-  loads: Array<{ profil_code: string; j_mois: number }>; // build ventilé
+  // build ventilé : j_mois = charge UNIFORME ; months = détail mensuel optionnel
+  // (override du j_mois ; si présent, le profil est « détaillé » → démarrage = 1er mois non vide).
+  loads: Array<{ profil_code: string; j_mois: number; months?: Record<string, number> }>;
   externe: boolean;
   pct_reduction_si_externe: number;      // 0..1
   budget_externe_eur?: number | null;    // coût ST si externalisé (pour ROI scénario)
