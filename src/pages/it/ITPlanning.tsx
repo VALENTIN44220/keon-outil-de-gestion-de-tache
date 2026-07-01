@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode, type Dispatch, type SetStateAction } from 'react';
+import { useMemo, useState, useEffect, useRef, type ReactNode, type Dispatch, type SetStateAction } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -443,12 +443,28 @@ function ScenarioEditor({
   const ovArray = overridesToArray(overrides);
 
   // ----- Scénarios -----
+  const stampRef = useRef<string>('');
   const loadScenario = (id: string) => {
     const s = scenarios.find(x => x.id === id) ?? null;
     setCurrentId(s?.id ?? '');
     setName(s?.nom ?? '');
+    stampRef.current = s ? `${s.id}:${(s as any).updated_at ?? ''}` : '';
     onLoadScenario(s);
   };
+
+  // Rechargement auto : si la version ENREGISTRÉE du scénario courant change
+  // (ex. modifié depuis la Feuille de route), on recharge depuis la base — les
+  // deux pages reflètent toujours la dernière version enregistrée.
+  useEffect(() => {
+    if (!currentId) return;
+    const s = scenarios.find(x => x.id === currentId);
+    if (!s) return;
+    const stamp = `${s.id}:${(s as any).updated_at ?? ''}`;
+    if (stampRef.current === stamp) return;
+    stampRef.current = stamp;
+    setName(s.nom ?? '');
+    onLoadScenario(s);
+  }, [scenarios, currentId]); // eslint-disable-line react-hooks/exhaustive-deps
   const saveScenario = () => {
     const nom = name.trim() || 'Scénario sans nom';
     const payload = { nom, hires, project_overrides: ovArray, assumptions };

@@ -225,6 +225,7 @@ function RoadmapContent() {
   const [overrides, setOverrides] = useState<OverrideMap>({});
   const [hires, setHires] = useState<SimulatedHire[]>([]);
   const [assumptions, setAssumptions] = useState<ScenarioAssumptions>({});
+  const scenarioStampRef = useRef<string>('');
   const scenarioMode = scenarioSel !== REAL;
   const setOverride = (id: string, patch: Partial<ProjectOverride>) =>
     setOverrides(m => ({ ...m, [id]: { it_project_id: id, ...m[id], ...patch } }));
@@ -244,7 +245,24 @@ function RoadmapContent() {
     setHires(s?.hires ?? []);
     setAssumptions(s?.assumptions ?? {});
     setScenarioName(s?.nom ?? '');
+    scenarioStampRef.current = s ? `${s.id}:${(s as any).updated_at ?? ''}` : '';
   };
+
+  // Rechargement auto : si la version ENREGISTRÉE du scénario sélectionné change
+  // (ex. modifié depuis le Plan de charge), on recharge l'état local depuis la base.
+  // Les deux pages reflètent ainsi toujours la dernière version enregistrée.
+  useEffect(() => {
+    if (scenarioSel === REAL || scenarioSel === NEW_SCENARIO) { scenarioStampRef.current = ''; return; }
+    const s = scenarios.find(x => x.id === scenarioSel);
+    if (!s) return;
+    const stamp = `${s.id}:${(s as any).updated_at ?? ''}`;
+    if (scenarioStampRef.current === stamp) return;
+    scenarioStampRef.current = stamp;
+    setOverrides(overridesToMap(s.project_overrides ?? []));
+    setHires(s.hires ?? []);
+    setAssumptions(s.assumptions ?? {});
+    setScenarioName(s.nom ?? '');
+  }, [scenarios, scenarioSel]); // eslint-disable-line react-hooks/exhaustive-deps
   const saveScenario = () => {
     const nom = scenarioName.trim() || 'Scénario sans nom';
     const payload = { nom, hires, project_overrides: ovArray, assumptions };
@@ -721,6 +739,7 @@ function RoadmapContent() {
   }
 
   const surchargeByYm = new Map(cascade?.map(r => [r.ym, r.sous_effectif_net]) ?? []);
+  const avantRsiByYm = new Map(cascade?.map(r => [r.ym, r.sous_effectif_projets]) ?? []);
 
   return (
     <div className="space-y-4">
@@ -985,24 +1004,42 @@ function RoadmapContent() {
               </div>
             )}
 
-            {/* Bandeau surcharge (pic du sous-effectif net par colonne) */}
+            {/* Bandeaux surcharge : avant appui RSI (par profil cumulé) + net après RSI */}
             {cascade && (
-              <div className="flex border-t bg-muted/30">
-                <div style={{ width: labelW }} className="shrink-0 px-3 py-1.5 text-[11px] font-medium text-muted-foreground sticky left-0 bg-muted/30">
-                  Sous-effectif net (j, pic)
+              <>
+                <div className="flex border-t bg-amber-50/40">
+                  <div style={{ width: labelW }} className="shrink-0 px-3 py-1.5 text-[11px] font-medium text-muted-foreground sticky left-0 bg-amber-50/40">
+                    Sous-effectif avant RSI (j, pic)
+                  </div>
+                  {periods.map(per => {
+                    const v = Math.max(0, ...per.months.map(ym => avantRsiByYm.get(ym) ?? 0));
+                    return (
+                      <div key={per.key} style={{ width: MONTH_W }} className={cn(
+                        'shrink-0 text-center text-[10px] py-1.5 tabular-nums border-l border-border/30',
+                        v > 0 ? 'text-amber-700 font-semibold bg-amber-100/60' : 'text-muted-foreground/40',
+                      )}>
+                        {v > 0 ? Math.round(v * 10) / 10 : '—'}
+                      </div>
+                    );
+                  })}
                 </div>
-                {periods.map(per => {
-                  const v = Math.max(0, ...per.months.map(ym => surchargeByYm.get(ym) ?? 0));
-                  return (
-                    <div key={per.key} style={{ width: MONTH_W }} className={cn(
-                      'shrink-0 text-center text-[10px] py-1.5 tabular-nums border-l border-border/30',
-                      v > 0 ? 'text-red-700 font-bold bg-red-100' : 'text-muted-foreground/40',
-                    )}>
-                      {v > 0 ? Math.round(v * 10) / 10 : '—'}
-                    </div>
-                  );
-                })}
-              </div>
+                <div className="flex border-t bg-muted/30">
+                  <div style={{ width: labelW }} className="shrink-0 px-3 py-1.5 text-[11px] font-medium text-muted-foreground sticky left-0 bg-muted/30">
+                    Sous-effectif net après RSI (j, pic)
+                  </div>
+                  {periods.map(per => {
+                    const v = Math.max(0, ...per.months.map(ym => surchargeByYm.get(ym) ?? 0));
+                    return (
+                      <div key={per.key} style={{ width: MONTH_W }} className={cn(
+                        'shrink-0 text-center text-[10px] py-1.5 tabular-nums border-l border-border/30',
+                        v > 0 ? 'text-red-700 font-bold bg-red-100' : 'text-muted-foreground/40',
+                      )}>
+                        {v > 0 ? Math.round(v * 10) / 10 : '—'}
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
             )}
           </div>
         </CardContent>
