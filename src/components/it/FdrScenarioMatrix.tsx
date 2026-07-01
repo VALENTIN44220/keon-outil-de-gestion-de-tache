@@ -48,6 +48,24 @@ function fmtStart(ym: string | null): string {
   return `${m}/${y.slice(2)}`;
 }
 
+/** Décale une date 'YYYY-MM-DD' de n mois (jour clampé à la fin de mois). */
+function shiftMonths(dateStr: string, n: number): string {
+  const [y, m, d] = dateStr.slice(0, 10).split('-').map(Number);
+  const total = (y * 12 + (m - 1)) + n;
+  const ny = Math.floor(total / 12);
+  const nm = (total % 12) + 1;
+  const lastDay = new Date(ny, nm, 0).getDate();
+  const nd = Math.min(d || 1, lastDay);
+  return `${String(ny).padStart(4, '0')}-${String(nm).padStart(2, '0')}-${String(nd).padStart(2, '0')}`;
+}
+
+/** Nombre de mois entre deux 'YYYY-MM'. */
+function monthsBetween(fromYm: string, toYm: string): number {
+  const [fy, fm] = fromYm.split('-').map(Number);
+  const [ty, tm] = toYm.split('-').map(Number);
+  return (ty * 12 + (tm - 1)) - (fy * 12 + (fm - 1));
+}
+
 export function FdrScenarioMatrix({
   projects, scenarios, activeSel, activeName, activeOverrides, onSetOverride, onToggleRealFdr,
 }: FdrScenarioMatrixProps) {
@@ -93,6 +111,30 @@ export function FdrScenarioMatrix({
   const toggleSt = (col: Col, p: FdrRoadmapProject, curSt: boolean) => {
     if (col.key === REAL) return; // ST du réel : à éditer dans la fiche projet
     onSetOverride(p.id, { externe: !curSt, pct_reduction_si_externe: p.pct_reduction_si_externe || 1 });
+  };
+
+  // Change le mois de démarrage (colonne scénario active) : décale kickoff + MEP
+  // (et échéance des tâches permanentes) du même nombre de mois → durée préservée,
+  // même logique que le glisser/déposer du Gantt.
+  const setStart = (col: Col, p: FdrRoadmapProject, ovMap: Map<string, ProjectOverride>, newYm: string) => {
+    if (col.key === REAL || !newYm) return; // date du réel : via le Gantt
+    const o = ovMap.get(p.id) ?? ({} as ProjectOverride);
+    const curKick = o.date_kickoff ?? p.date_kickoff;
+    const effYm = curKick ? toYM(curKick) : null;
+    if (!curKick || !effYm) {
+      onSetOverride(p.id, { date_kickoff: `${newYm}-01` });
+      return;
+    }
+    const delta = monthsBetween(effYm, newYm);
+    if (delta === 0) return;
+    const curMep = o.date_mep_saisie ?? p.date_mep_saisie;
+    const curEch = o.echeance_cible ?? p.echeance_cible;
+    const patch: Partial<ProjectOverride> = { date_kickoff: shiftMonths(curKick, delta) };
+    if (curMep) patch.date_mep_saisie = shiftMonths(curMep, delta);
+    if (p.statut_portefeuille === 'Tâche permanente' && curEch) {
+      patch.echeance_cible = shiftMonths(curEch, delta);
+    }
+    onSetOverride(p.id, patch);
   };
 
   return (
@@ -153,16 +195,25 @@ export function FdrScenarioMatrix({
                       >
                         {c.editable ? (
                           <div className="flex items-center gap-2 flex-wrap">
-                            <label className="flex items-center gap-1 cursor-pointer" title="Pris en compte dans la FDR">
-                              <Checkbox
-                                checked={e.included}
-                                onCheckedChange={() => toggleInc(c, p, e.inclRaw)}
-                                className="h-3.5 w-3.5"
+                            <Checkbox
+                              checked={e.included}
+                              onCheckedChange={() => toggleInc(c, p, e.inclRaw)}
+                              className="h-3.5 w-3.5"
+                              title="Pris en compte dans la FDR"
+                            />
+                            {!e.included ? (
+                              <span className="text-muted-foreground line-through">hors</span>
+                            ) : c.key === REAL ? (
+                              <span className="tabular-nums">{fmtStart(e.startYm)}</span>
+                            ) : (
+                              <input
+                                type="month"
+                                value={e.startYm ?? ''}
+                                onChange={(ev) => setStart(c, p, c.ovMap, ev.target.value)}
+                                className="h-6 w-[108px] rounded border px-1 text-[11px] bg-background"
+                                title="Mois de démarrage — décale la MEP d'autant (durée préservée)"
                               />
-                              <span className={cn('tabular-nums', !e.included && 'text-muted-foreground line-through')}>
-                                {e.included ? fmtStart(e.startYm) : 'hors'}
-                              </span>
-                            </label>
+                            )}
                             {e.included && c.key !== REAL && (
                               <label className="flex items-center gap-1 cursor-pointer text-[11px]" title="Externalisation / sous-traitance">
                                 <Checkbox
